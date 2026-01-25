@@ -2,7 +2,6 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useItemCategories } from "../../../../hooks";
-import { ITEM_CATEGORY_STATUS } from "../../../../constants";
 import type { OrderScheduleCreateFormData } from "../../../../schemas";
 
 interface CategorySelectorProps {
@@ -15,7 +14,7 @@ export function OrderScheduleCategorySelector({ control, disabled = false, requi
   // Fetch active item categories
   const { data: response, isLoading } = useItemCategories({
     where: {
-      status: ITEM_CATEGORY_STATUS.ACTIVE,
+      isActive: true,
     },
     orderBy: {
       name: "asc",

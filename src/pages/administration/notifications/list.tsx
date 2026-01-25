@@ -377,7 +377,7 @@ export const NotificationListPage = () => {
 
   return (
     <PrivilegeRoute>
-      <div className="h-full flex flex-col bg-background px-4 pt-4">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"
           title="Notificações"
@@ -406,7 +406,7 @@ export const NotificationListPage = () => {
           ]}
         />
 
-        <div className="flex-1 min-h-0 pb-6 flex flex-col gap-4 mt-4">
+        <div className="flex-1 min-h-0 pb-6 flex flex-col gap-4">
           {/* Search and Filter Controls */}
           <Card className="p-4">
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -453,13 +453,13 @@ export const NotificationListPage = () => {
           </Card>
 
           {/* Table */}
-          <div className="flex-1 min-h-0">
+          <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <NotificationTable
               filters={queryFilters}
               onDataChange={setTableData}
               className="h-full"
             />
-          </div>
+          </Card>
         </div>
       </div>
 

@@ -3,7 +3,6 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { Combobox } from "@/components/ui/combobox";
 import type { OrderScheduleCreateFormData } from "../../../../schemas";
 import { getSuppliers } from "../../../../api-client";
-import { SUPPLIER_STATUS } from "../../../../constants";
 import type { Supplier } from "../../../../types";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
@@ -21,7 +20,7 @@ export function OrderScheduleSupplierSelector({ control, disabled = false, requi
       take: pageSize,
       include: { logo: true },
       where: {
-        status: SUPPLIER_STATUS.ACTIVE,
+        isActive: true,
         ...(searchTerm
           ? {
               OR: [
@@ -59,14 +58,14 @@ export function OrderScheduleSupplierSelector({ control, disabled = false, requi
   return (
     <FormField
       control={control}
-      name="items" // TODO: Fix this - supplierId doesn't exist in OrderScheduleCreateFormData
+      name="supplierId"
       render={({ field }) => (
         <FormItem>
           <FormLabel className={required ? "after:content-['*'] after:ml-0.5 after:text-red-500" : ""}>Fornecedor</FormLabel>
           <FormControl>
             <Combobox
-              value={Array.isArray(field.value) && field.value.length > 0 ? field.value[0] : "_no_supplier"}
-              onValueChange={(value) => field.onChange(value === "_no_supplier" ? [] : [value])}
+              value={field.value || "_no_supplier"}
+              onValueChange={(value) => field.onChange(value === "_no_supplier" ? undefined : value)}
               async={true}
               queryKey={["suppliers", "order-schedule"]}
               queryFn={fetchSuppliers}

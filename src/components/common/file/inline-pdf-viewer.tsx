@@ -75,6 +75,12 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
     const containerRef = React.useRef<HTMLDivElement>(null);
     const pdfDocRef = React.useRef<PDFDocumentProxy | null>(null);
     const renderTaskRef = React.useRef<RenderTask | null>(null);
+    const onFitScaleCalculatedRef = React.useRef(onFitScaleCalculated);
+
+    // Keep the ref updated with the latest callback
+    React.useEffect(() => {
+      onFitScaleCalculatedRef.current = onFitScaleCalculated;
+    }, [onFitScaleCalculated]);
 
     // Control functions
     const zoomIn = React.useCallback(() => {
@@ -160,7 +166,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           onLoadSuccess?.(pdfDoc.numPages);
 
           // Calculate fit scale based on first page dimensions and container
-          if (onFitScaleCalculated && containerRef.current) {
+          if (onFitScaleCalculatedRef.current && containerRef.current) {
             try {
               const firstPage = await pdfDoc.getPage(1);
               const viewport = firstPage.getViewport({ scale: 1, rotation: 0 });
@@ -179,7 +185,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
               // Use the smaller scale to ensure the page fits entirely
               const fitScale = Math.min(scaleX, scaleY, 2); // Cap at 2x max
 
-              onFitScaleCalculated(fitScale, pageWidth, pageHeight);
+              onFitScaleCalculatedRef.current(fitScale, pageWidth, pageHeight);
             } catch (err) {
               // Fallback if we can't calculate fit scale
               if (process.env.NODE_ENV !== 'production') {
@@ -206,7 +212,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           renderTaskRef.current.cancel();
         }
       };
-    }, [url, onFitScaleCalculated]);
+    }, [url]); // Removed onFitScaleCalculated from dependencies to prevent unnecessary reloads
 
     // Render current page
     React.useEffect(() => {

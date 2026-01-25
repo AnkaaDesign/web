@@ -13,19 +13,22 @@ import { ItemsSelector } from "./items-selector";
 import { ScheduleForm } from "@/components/ui/schedule-form";
 
 // Types and validation
-import { type OrderScheduleCreateFormData, orderScheduleCreateSchema } from "../../../../schemas";
+import { type OrderScheduleCreateFormData, type OrderScheduleUpdateFormData, orderScheduleCreateSchema, orderScheduleUpdateSchema } from "../../../../schemas";
+import { useEffect } from "react";
 
 interface OrderScheduleFormProps {
-  initialData?: Partial<OrderScheduleCreateFormData>;
-  onSubmit: (data: OrderScheduleCreateFormData) => Promise<void>;
+  initialData?: Partial<OrderScheduleCreateFormData | OrderScheduleUpdateFormData>;
+  onSubmit: (data: OrderScheduleCreateFormData | OrderScheduleUpdateFormData) => Promise<void>;
   onCancel?: () => void;
+  isSubmitting?: boolean;
   isLoading?: boolean;
   mode?: "create" | "edit";
+  onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
 }
 
-export function OrderScheduleForm({ initialData, onSubmit, onCancel, isLoading = false, mode = "create" }: OrderScheduleFormProps) {
-  const form = useForm<OrderScheduleCreateFormData>({
-    resolver: zodResolver(orderScheduleCreateSchema),
+export function OrderScheduleForm({ initialData, onSubmit, onCancel, isSubmitting = false, isLoading = false, mode = "create", onFormStateChange }: OrderScheduleFormProps) {
+  const form = useForm<OrderScheduleCreateFormData | OrderScheduleUpdateFormData>({
+    resolver: zodResolver(mode === "create" ? orderScheduleCreateSchema : orderScheduleUpdateSchema),
     defaultValues: {
       frequency: undefined,
       frequencyCount: 1,
@@ -45,7 +48,17 @@ export function OrderScheduleForm({ initialData, onSubmit, onCancel, isLoading =
     reValidateMode: "onChange",
   });
 
-  const handleSubmit = async (data: OrderScheduleCreateFormData) => {
+  // Notify parent of form state changes
+  useEffect(() => {
+    if (onFormStateChange) {
+      onFormStateChange({
+        isValid: form.formState.isValid,
+        isDirty: form.formState.isDirty,
+      });
+    }
+  }, [form.formState.isValid, form.formState.isDirty, onFormStateChange]);
+
+  const handleSubmit = async (data: OrderScheduleCreateFormData | OrderScheduleUpdateFormData) => {
     try {
       await onSubmit(data);
     } catch (error) {
@@ -62,18 +75,9 @@ export function OrderScheduleForm({ initialData, onSubmit, onCancel, isLoading =
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">{mode === "create" ? "Criar Cronograma de Pedidos" : "Editar Cronograma de Pedidos"}</h2>
-            <p className="text-muted-foreground">
-              {mode === "create" ? "Configure um novo cronograma automático para pedidos" : "Atualize as configurações do cronograma de pedidos"}
-            </p>
-          </div>
-        </div>
-
-        <Separator />
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        {/* Hidden submit button for external trigger */}
+        <button type="submit" id="order-schedule-form-submit" className="hidden" />
 
         {/* Basic Information */}
         <Card>
@@ -104,33 +108,9 @@ export function OrderScheduleForm({ initialData, onSubmit, onCancel, isLoading =
             <CardDescription>Defina quando e como os pedidos devem ser criados automaticamente</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScheduleForm control={form.control as any} disabled={isLoading} type="order" showNextRun={true} />
+            <ScheduleForm control={form.control as any} disabled={isSubmitting || isLoading} type="order" showNextRun={true} />
           </CardContent>
         </Card>
-
-        {/* Form Actions */}
-        <div className="flex items-center justify-end gap-4 pt-6">
-          {onCancel && (
-            <Button type="button" variant="outline" onClick={handleCancel} disabled={isLoading}>
-              <IconX className="mr-2 h-4 w-4" />
-              Cancelar
-            </Button>
-          )}
-
-          <Button type="submit" disabled={isLoading || !form.formState.isValid}>
-            {isLoading ? (
-              <>
-                <IconLoader className="mr-2 h-4 w-4 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              <>
-                <IconDeviceFloppy className="mr-2 h-4 w-4" />
-                {mode === "create" ? "Cadastrar" : "Atualizar Cronograma"}
-              </>
-            )}
-          </Button>
-        </div>
       </form>
     </Form>
   );

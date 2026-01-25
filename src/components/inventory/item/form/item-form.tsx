@@ -66,10 +66,12 @@ export function ItemForm(props: ItemFormProps) {
     name: "",
     uniCode: null,
     quantity: 0,
-    reorderPoint: null,
-    reorderQuantity: null,
-    maxQuantity: null,
+    reorderPoint: null,  // Auto-calculated by default
+    reorderQuantity: null,  // Optional manual override
+    maxQuantity: null,  // Auto-calculated by default
     boxQuantity: null,
+    isManualMaxQuantity: false,  // Start in automatic mode
+    isManualReorderPoint: false,  // Start in automatic mode
     icms: undefined,
     ipi: undefined,
     measures: [], // Initialize with empty measures array
@@ -316,7 +318,11 @@ export function ItemForm(props: ItemFormProps) {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <QuantityInput disabled={isSubmitting} required={isRequired} />
-                <MaxQuantityInput disabled={isSubmitting} />
+                <MaxQuantityInput
+                  disabled={isSubmitting}
+                  currentValue={defaultValues?.maxQuantity}
+                  isManual={defaultValues?.isManualMaxQuantity || false}
+                />
                 <BoxQuantityInput disabled={isSubmitting} />
                 <LeadTimeInput disabled={isSubmitting} />
               </div>

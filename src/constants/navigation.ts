@@ -689,15 +689,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
               { id: "agendamentos-editar", title: "Editar", icon: "edit", path: "/estoque/pedidos/agendamentos/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
             ],
           },
-          {
-            id: "pedidos-automaticos",
-            title: "Automáticos",
-            icon: "automation",
-            path: "/estoque/pedidos/automaticos",
-            children: [
-              { id: "automaticos-configurar", title: "Configurar", icon: "cog", path: "/estoque/pedidos/automaticos/configurar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
-            ],
-          },
+          { id: "pedidos-automaticos", title: "Automáticos", icon: "automation", path: "/estoque/pedidos/automaticos" },
           { id: "pedidos-cadastrar", title: "Cadastrar", icon: "plus", path: "/estoque/pedidos/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
           { id: "pedidos-detalhes", title: "Detalhes", icon: "eye", path: "/estoque/pedidos/detalhes/:id", isDynamic: true },
           { id: "pedidos-editar", title: "Editar", icon: "edit", path: "/estoque/pedidos/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },

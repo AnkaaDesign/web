@@ -20,7 +20,7 @@ import { extractActiveFilters, createFilterRemover } from "./filter-utils";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { CopyFromTaskModal } from "../schedule/copy-from-task-modal";
 import type { CopyableTaskField } from "@/types/task-copy";
-import { IconFilter, IconHandClick, IconX } from "@tabler/icons-react";
+import { IconFilter, IconHandClick, IconX, IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { hasPrivilege } from "../../../../utils";
@@ -93,6 +93,49 @@ export function TaskHistoryList({
 
   // Advanced actions ref
   const advancedActionsRef = React.useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
+
+  // State for tracking expanded groups across all tables with localStorage persistence
+  const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('task-groups-expanded');
+      if (stored) {
+        return new Set(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Failed to load expanded groups from localStorage:', error);
+    }
+    return new Set();
+  });
+  const [hasGroups, setHasGroups] = React.useState(false);
+
+  // Persist expanded groups to localStorage whenever it changes
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('task-groups-expanded', JSON.stringify(Array.from(expandedGroups)));
+    } catch (error) {
+      console.error('Failed to save expanded groups to localStorage:', error);
+    }
+  }, [expandedGroups]);
+
+  // Ref to track all available group IDs from tables
+  const allGroupIds = React.useRef<string[]>([]);
+
+  // Handler called by tables when groups are detected
+  const handleGroupsDetected = React.useCallback((groupIds: string[], tableHasGroups: boolean) => {
+    // Merge group IDs from all tables
+    allGroupIds.current = Array.from(new Set([...allGroupIds.current, ...groupIds]));
+    setHasGroups(prev => prev || tableHasGroups);
+  }, []);
+
+  // Handler to expand all groups
+  const handleExpandAll = React.useCallback(() => {
+    setExpandedGroups(new Set(allGroupIds.current));
+  }, []);
+
+  // Handler to collapse all groups
+  const handleCollapseAll = React.useCallback(() => {
+    setExpandedGroups(new Set());
+  }, []);
 
   // Copy from task state
   const [copyFromTaskState, setCopyFromTaskState] = React.useState<CopyFromTaskState>(initialCopyFromTaskState);
@@ -633,6 +676,29 @@ export function TaskHistoryList({
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+
+            {/* Expand/Collapse All Groups Button */}
+            {hasGroups && (
+              <Button
+                variant="outline"
+                size="default"
+                onClick={expandedGroups.size > 0 ? handleCollapseAll : handleExpandAll}
+                title={expandedGroups.size > 0 ? "Recolher todos os grupos" : "Expandir todos os grupos"}
+              >
+                {expandedGroups.size > 0 ? (
+                  <>
+                    <IconChevronRight className="h-4 w-4" />
+                    <span>Recolher Grupos</span>
+                  </>
+                ) : (
+                  <>
+                    <IconChevronDown className="h-4 w-4" />
+                    <span>Expandir Grupos</span>
+                  </>
+                )}
+              </Button>
+            )}
+
             <Button
               variant={activeFilters.length > 0 ? "default" : "outline"}
               size="default"
@@ -688,6 +754,9 @@ export function TaskHistoryList({
                   disablePagination={true}
                   onShiftClickSelect={handleShiftClickSelect}
                   onSingleClickSelect={handleSingleClickSelect}
+                  externalExpandedGroups={expandedGroups}
+                  onExpandedGroupsChange={setExpandedGroups}
+                  onGroupsDetected={handleGroupsDetected}
                 />
               </div>
 
@@ -708,6 +777,9 @@ export function TaskHistoryList({
                   disablePagination={true}
                   onShiftClickSelect={handleShiftClickSelect}
                   onSingleClickSelect={handleSingleClickSelect}
+                  externalExpandedGroups={expandedGroups}
+                  onExpandedGroupsChange={setExpandedGroups}
+                  onGroupsDetected={handleGroupsDetected}
                 />
               </div>
 
@@ -728,6 +800,9 @@ export function TaskHistoryList({
                   disablePagination={true}
                   onShiftClickSelect={handleShiftClickSelect}
                   onSingleClickSelect={handleSingleClickSelect}
+                  externalExpandedGroups={expandedGroups}
+                  onExpandedGroupsChange={setExpandedGroups}
+                  onGroupsDetected={handleGroupsDetected}
                 />
               </div>
             </div>
@@ -743,6 +818,9 @@ export function TaskHistoryList({
               onStartCopyFromTask={handleStartCopyFromTask}
               isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
               onSourceTaskSelect={handleSourceTaskSelected}
+              externalExpandedGroups={expandedGroups}
+              onExpandedGroupsChange={setExpandedGroups}
+              onGroupsDetected={handleGroupsDetected}
             />
           )}
         </div>

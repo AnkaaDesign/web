@@ -634,7 +634,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
 
   return (
     <>
-      <div className="border border-border rounded-md overflow-hidden">
+      <div className="border border-border rounded-md overflow-hidden task-schedule-table">
         <Table>
           <TableHeader className="[&_tr]:!border-b [&_tr]:border-border [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">

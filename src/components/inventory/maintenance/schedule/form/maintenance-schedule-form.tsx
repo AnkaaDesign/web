@@ -312,13 +312,13 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                 <CardTitle>Configuração de Agendamento</CardTitle>
                 <CardDescription>Configure a frequência e período da manutenção</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CardContent>
+                <div className="flex flex-wrap gap-4">
                   <FormField
                     control={form.control}
                     name="frequency"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex-1 min-w-[200px]">
                         <FormLabel>Frequência {isRequired && <span className="text-destructive">*</span>}</FormLabel>
                         <FormControl>
                           <Combobox
@@ -355,7 +355,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                         };
 
                         return (
-                          <FormItem>
+                          <FormItem className="flex-1 min-w-[150px]">
                             <FormLabel>{getIntervalLabel()}</FormLabel>
                             <FormControl>
                               <Input
@@ -376,17 +376,14 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                       }}
                     />
                   )}
-                </div>
 
-                {/* Frequency-specific fields */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Specific date field (for ONCE and CUSTOM frequencies) */}
                   {watchFrequency && frequencyGroups.needsSpecificDate.includes(watchFrequency) && (
                     <FormField
                       control={form.control}
                       name="specificDate"
                       render={({ field }) => (
-                        <FormItem className="flex flex-col md:col-span-2">
+                        <FormItem className="flex flex-col flex-1 min-w-[200px]">
                           <FormLabel>
                             {watchFrequency === SCHEDULE_FREQUENCY.ONCE ? "Data da Manutenção" : "Próxima Execução"}
                             {isRequired && <span className="text-destructive">*</span>}
@@ -413,7 +410,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                       control={form.control}
                       name="dayOfWeek"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex-1 min-w-[200px]">
                           <FormLabel>Dia da Semana {isRequired && <span className="text-destructive">*</span>}</FormLabel>
                           <FormControl>
                             <Combobox
@@ -437,7 +434,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                       control={form.control}
                       name="month"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex-1 min-w-[200px]">
                           <FormLabel>Mês {isRequired && <span className="text-destructive">*</span>}</FormLabel>
                           <FormControl>
                             <Combobox
@@ -461,7 +458,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                       control={form.control}
                       name="dayOfMonth"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex-1 min-w-[150px]">
                           <FormLabel>Dia do Mês {isRequired && <span className="text-destructive">*</span>}</FormLabel>
                           <FormControl>
                             <Input
@@ -489,14 +486,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                       control={form.control}
                       name="nextRun"
                       render={({ field }) => (
-                        <FormItem
-                          className={cn("flex flex-col", {
-                            "md:col-span-2":
-                              !frequencyGroups.needsDayOfWeek.includes(watchFrequency) &&
-                              !frequencyGroups.needsDayOfMonth.includes(watchFrequency) &&
-                              !frequencyGroups.needsMonth.includes(watchFrequency),
-                          })}
-                        >
+                        <FormItem className="flex flex-col flex-1 min-w-[200px]">
                           <FormLabel>Primeira Execução</FormLabel>
                           <DateTimeInput
                             field={field}

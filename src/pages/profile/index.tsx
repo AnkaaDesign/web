@@ -11,13 +11,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { FormInput } from "@/components/ui/form-input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PageHeader } from "@/components/ui/page-header";
 import { routes } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
 import { useCepLookup } from "@/hooks/use-cep-lookup";
 import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 import { cn } from "@/lib/utils";
+import { UserAvatarDisplay } from "@/components/ui/avatar-display";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +35,6 @@ export function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showDeletePhotoDialog, setShowDeletePhotoDialog] = useState(false);
   const { refreshUser } = useAuth();
 
@@ -120,11 +119,6 @@ export function ProfilePage() {
           state: response.data.state || "",
           zipCode: response.data.zipCode || "",
         });
-
-        // Set photo preview if avatar exists
-        if (response.data.avatar) {
-          setPhotoPreview(response.data.avatar.url || null);
-        }
       }
     } catch (error: any) {
       toast.error(error?.response?.data?.message || "Erro ao carregar perfil");
@@ -175,32 +169,18 @@ export function ProfilePage() {
     try {
       setIsUploadingPhoto(true);
 
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-
       // Upload photo with user name for proper file organization
       const response = await uploadPhoto(file, user?.name);
 
       if (response.success) {
         setUser(response.data);
-        if (response.data.avatar) {
-          setPhotoPreview(response.data.avatar.url || null);
-        }
+        toast.success("Foto de perfil atualizada com sucesso!");
       }
     } catch (error: any) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error uploading photo:", error);
       }
-      // Restore previous photo on error
-      if (user?.avatar) {
-        setPhotoPreview(user.avatar.url || null);
-      } else {
-        setPhotoPreview(null);
-      }
+      toast.error("Erro ao fazer upload da foto");
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -213,25 +193,17 @@ export function ProfilePage() {
 
       if (response.success) {
         setUser(response.data);
-        setPhotoPreview(null);
+        toast.success("Foto de perfil removida com sucesso!");
       }
     } catch (error: any) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error deleting photo:", error);
       }
+      toast.error("Erro ao remover foto");
     } finally {
       setIsUploadingPhoto(false);
       setShowDeletePhotoDialog(false);
     }
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
   };
 
   if (isLoading) {
@@ -304,12 +276,13 @@ export function ProfilePage() {
             </CardHeader>
             <CardContent className="flex flex-col items-center space-y-4">
               <div className="relative">
-                <Avatar className="w-32 h-32">
-                  <AvatarImage src={photoPreview || undefined} alt={user.name} />
-                  <AvatarFallback className="text-2xl">
-                    {getInitials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatarDisplay
+                  avatar={user.avatar}
+                  userName={user.name}
+                  size="2xl"
+                  shape="circle"
+                  bordered={true}
+                />
 
                 {isUploadingPhoto && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">

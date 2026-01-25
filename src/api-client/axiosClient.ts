@@ -1057,8 +1057,14 @@ const handleApiError = (error: unknown): ErrorInfo => {
 
   // Fallback to error message
   if (!mainMessage && error.message) {
-    mainMessage = error.message;
-    errorMessages = [error.message];
+    // For 502 errors, use custom message instead of Axios's default
+    if (statusCode === 502) {
+      mainMessage = "Servidor indisponivel";
+      errorMessages = ["Servidor indisponivel"];
+    } else {
+      mainMessage = error.message;
+      errorMessages = [error.message];
+    }
   }
 
   // Determine error category and retryability

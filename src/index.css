@@ -538,6 +538,38 @@ input[type="time"]::-moz-calendar-picker-indicator {
     height: 100%;
   }
 
+  /* Light mode - subtle checkbox enhancement for all tables */
+  table th:has([role="checkbox"]) [role="checkbox"],
+  table td:has([role="checkbox"]) [role="checkbox"] {
+    border-color: hsl(0 0% 60%) !important; /* Slightly darker than default for better visibility */
+  }
+
+  /* Dark mode checkbox visibility fix - ensure checkboxes in tables are visible */
+  .dark table th:has([role="checkbox"]) [role="checkbox"],
+  .dark table td:has([role="checkbox"]) [role="checkbox"] {
+    border-color: hsl(0 0% 50%) !important; /* Medium gray border for visibility */
+    border-width: 1.5px !important; /* Slightly thicker border for better visibility */
+  }
+
+  /* Dark mode checkbox hover state */
+  .dark table th:has([role="checkbox"]) [role="checkbox"]:hover,
+  .dark table td:has([role="checkbox"]) [role="checkbox"]:hover {
+    border-color: hsl(0 0% 65%) !important; /* Lighter gray on hover */
+  }
+
+  /* Light mode schedule table - enhance checkbox and border visibility on colored rows */
+  .task-schedule-table table tbody tr [role="checkbox"],
+  .task-schedule-table table thead tr [role="checkbox"] {
+    border-color: hsl(0 0% 50%) !important; /* Medium gray for visibility without being too dark */
+    border-width: 1.5px !important; /* Slightly thicker border */
+  }
+
+  /* Light mode schedule table - enhance row borders for better separation on colored backgrounds */
+  .task-schedule-table table tbody tr,
+  .task-schedule-table table thead tr {
+    border-bottom-color: hsl(0 0% 50%) !important; /* Match checkbox border color */
+  }
+
   /* Override any inline styles for checkbox columns */
   .w-12:has([role="checkbox"]),
   .w-\[48px\]:has([role="checkbox"]) {

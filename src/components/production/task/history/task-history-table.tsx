@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { useTasks } from "../../../../hooks";
@@ -17,8 +17,11 @@ import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { IconChevronUp, IconChevronDown, IconSelector, IconAlertTriangle, IconHistory } from "@tabler/icons-react";
+import { Badge } from "@/components/ui/badge";
 import { TaskHistoryTableSkeleton } from "./task-history-table-skeleton";
 import { useNavigate } from "react-router-dom";
+import { groupSequentialTasks, type TaskGroup } from "./task-grouping-utils";
+import { CollapsedGroupRow } from "./collapsed-group-row";
 
 interface TaskHistoryTableProps {
   visibleColumns: Set<string>;
@@ -35,6 +38,12 @@ interface TaskHistoryTableProps {
   onShiftClickSelect?: (taskId: string) => void;
   /** Handler to update last clicked task for cross-table shift+click */
   onSingleClickSelect?: (taskId: string) => void;
+  /** External expanded groups state */
+  externalExpandedGroups?: Set<string>;
+  /** Handler to update expanded groups state */
+  onExpandedGroupsChange?: (expandedGroups: Set<string>) => void;
+  /** Callback to report group IDs to parent */
+  onGroupsDetected?: (groupIds: string[], hasGroups: boolean) => void;
 }
 
 export function TaskHistoryTable({
@@ -50,10 +59,18 @@ export function TaskHistoryTable({
   disablePagination = false,
   onShiftClickSelect,
   onSingleClickSelect,
+  externalExpandedGroups,
+  onExpandedGroupsChange,
+  onGroupsDetected,
 }: TaskHistoryTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canEdit = canEditTasks(user);
+
+  // State for expanded groups - use external state if provided
+  const [internalExpandedGroups, setInternalExpandedGroups] = useState<Set<string>>(new Set());
+  const expandedGroups = externalExpandedGroups ?? internalExpandedGroups;
+  const setExpandedGroups = onExpandedGroupsChange ?? setInternalExpandedGroups;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -78,6 +95,7 @@ export function TaskHistoryTable({
     showSelectedOnly,
     setPage,
     setPageSize,
+    setSelectedIds,
     toggleSelection,
     toggleSelectAll,
     toggleSort,
@@ -179,7 +197,36 @@ export function TaskHistoryTable({
   const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;
   const totalRecords = response?.meta?.totalRecords || 0;
 
+  // Group sequential tasks
+  const groupedTasks = useMemo(() => {
+    return groupSequentialTasks(tasks);
+  }, [tasks]);
 
+  // Notify parent about detected groups
+  useEffect(() => {
+    if (onGroupsDetected) {
+      const groupIds = groupedTasks
+        .filter(g => g.type === 'group-collapsed')
+        .map(g => g.groupId!)
+        .filter(Boolean);
+
+      const hasGroups = groupIds.length > 0;
+      onGroupsDetected(groupIds, hasGroups);
+    }
+  }, [groupedTasks, onGroupsDetected]);
+
+  // Toggle group expansion
+  const toggleGroup = useCallback((groupId: string) => {
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId);
+      } else {
+        newSet.add(groupId);
+      }
+      return newSet;
+    });
+  }, []);
 
   // Define all available columns
   const allColumns = React.useMemo(() => createTaskHistoryColumns({
@@ -306,6 +353,102 @@ export function TaskHistoryTable({
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
+  // Helper function to handle task row clicks
+  const handleTaskRowClick = useCallback((e: React.MouseEvent, task: Task) => {
+    // Don't navigate if clicking checkbox or if it's a context menu click
+    if ((e.target as HTMLElement).closest("[data-checkbox]") || e.button === 2) {
+      return;
+    }
+
+    // Handle source task selection mode
+    if (isSelectingSourceTask && onSourceTaskSelect) {
+      onSourceTaskSelect(task);
+      return;
+    }
+
+    // Handle selection with Ctrl/Cmd or Shift
+    if (e.ctrlKey || e.metaKey) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[TaskHistoryTable] Ctrl/Cmd click - toggling selection');
+      }
+      toggleSelection(task.id);
+      // Update last clicked task for cross-table shift+click
+      onSingleClickSelect?.(task.id);
+    } else if (e.shiftKey) {
+      // Shift+click - use cross-table selection if available
+      if (onShiftClickSelect) {
+        onShiftClickSelect(task.id);
+      } else {
+        // Fallback: Implement shift-click range selection within this table only
+        handleSelectItem(task.id, e);
+      }
+    } else {
+      // Normal click - navigate
+      const detailRoute =
+        navigationRoute === 'preparation' ? routes.production.preparation.details(task.id) :
+        navigationRoute === 'schedule' ? routes.production.schedule.details(task.id) :
+        routes.production.history.details(task.id);
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Task history row clicked, navigating to:', detailRoute);
+      }
+      navigate(detailRoute);
+    }
+  }, [isSelectingSourceTask, onSourceTaskSelect, toggleSelection, onSingleClickSelect, onShiftClickSelect, handleSelectItem, navigationRoute, navigate]);
+
+  // Helper function to render task cells
+  const renderTaskCells = useCallback((task: Task, taskIsSelected: boolean) => {
+    return (
+      <>
+        {/* Selection checkbox - only show for users who can edit */}
+        {canEdit && (
+          <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+            <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => {
+              e.stopPropagation();
+              if (e.shiftKey && onShiftClickSelect) {
+                // Use cross-table shift+click selection
+                onShiftClickSelect(task.id);
+              } else {
+                // Regular selection or fallback shift+click
+                handleSelectItem(task.id, e);
+                // Update last clicked task for cross-table shift+click
+                if (!e.shiftKey) {
+                  onSingleClickSelect?.(task.id);
+                }
+              }
+            }}>
+              <Checkbox checked={taskIsSelected} onCheckedChange={() => handleSelectItem(task.id)} aria-label={`Select ${task.name}`} data-checkbox />
+            </div>
+          </TableCell>
+        )}
+
+        {/* Data columns */}
+        {columns.map((column) => (
+          <TableCell
+            key={column.id}
+            className={cn(
+              column.className,
+              "p-0 !border-r-0",
+            )}
+          >
+            <div className="px-4 py-2 relative">
+              {column.formatter
+                ? column.formatter(
+                    column.accessorFn
+                      ? column.accessorFn(task)
+                      : task[column.accessorKey as keyof Task],
+                    task,
+                  )
+                : column.accessorFn
+                ? column.accessorFn(task)
+                : task[column.accessorKey as keyof Task]}
+            </div>
+          </TableCell>
+        ))}
+      </>
+    );
+  }, [canEdit, columns, onShiftClickSelect, handleSelectItem, onSingleClickSelect]);
+
   if (isLoading) {
     return <TaskHistoryTableSkeleton />;
   }
@@ -393,115 +536,145 @@ export function TaskHistoryTable({
                 </TableCell>
               </TableRow>
             ) : (
-              tasks.map((task, index) => {
-                const taskIsSelected = isSelected(task.id);
+              (() => {
+                // Track visual row index for consistent zebra striping
+                let visualRowIndex = 0;
 
-                return (
-                  <tr
-                    key={task.id}
-                    data-state={taskIsSelected ? "selected" : undefined}
-                    className={cn(
-                      "cursor-pointer transition-colors border-b border-border",
-                      // Alternating row colors
-                      index % 2 === 1 && "bg-muted/10",
-                      // Hover state
-                      "hover:bg-muted/20",
-                      // Selected state overrides alternating colors
-                      taskIsSelected && "bg-muted/30 hover:bg-muted/40",
-                      // Source selection mode highlight
-                      isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary",
-                    )}
-                    onClick={(e) => {
-                      // Don't navigate if clicking checkbox or if it's a context menu click
-                      if ((e.target as HTMLElement).closest("[data-checkbox]") || e.button === 2) {
-                        return;
-                      }
+                return groupedTasks.flatMap((group, groupIndex) => {
+                  // Handle collapsed group row
+                  if (group.type === 'group-collapsed') {
+                    const groupId = group.groupId!;
+                    const isExpanded = expandedGroups.has(groupId);
+                    const collapsedTasks = group.collapsedTasks!;
 
-                      // Handle source task selection mode
-                      if (isSelectingSourceTask && onSourceTaskSelect) {
-                        onSourceTaskSelect(task);
-                        return;
-                      }
+                    // Get all tasks in the group (including first and last)
+                    const allTasksInGroup: Task[] = [];
 
-                      // Handle selection with Ctrl/Cmd or Shift
-                      if (e.ctrlKey || e.metaKey) {
-                        if (process.env.NODE_ENV !== 'production') {
-                          console.log('[TaskHistoryTable] Ctrl/Cmd click - toggling selection');
-                        }
-                        toggleSelection(task.id);
-                        // Update last clicked task for cross-table shift+click
-                        onSingleClickSelect?.(task.id);
-                      } else if (e.shiftKey) {
-                        // Shift+click - use cross-table selection if available
-                        if (onShiftClickSelect) {
-                          onShiftClickSelect(task.id);
-                        } else {
-                          // Fallback: Implement shift-click range selection within this table only
-                          handleSelectItem(task.id, e);
-                        }
+                    // Find the first task (appears before this collapsed row)
+                    const firstTaskGroup = groupedTasks.find(g => g.type === 'group-first' && g.groupId === groupId);
+                    if (firstTaskGroup?.task) {
+                      allTasksInGroup.push(firstTaskGroup.task);
+                    }
+
+                    // Add middle tasks
+                    allTasksInGroup.push(...collapsedTasks);
+
+                    // Find the last task (appears after this collapsed row)
+                    const lastTaskGroup = groupedTasks.find(g => g.type === 'group-last' && g.groupId === groupId);
+                    if (lastTaskGroup?.task) {
+                      allTasksInGroup.push(lastTaskGroup.task);
+                    }
+
+                    // Count selected tasks in the ENTIRE group (first + middle + last)
+                    const selectedCountInGroup = allTasksInGroup.filter(t => isSelected(t.id)).length;
+                    const allTasksSelected = selectedCountInGroup === allTasksInGroup.length;
+
+                    // Handler to select/deselect ALL tasks in the group (including first and last)
+                    const handleSelectAllInGroup = () => {
+                      const groupTaskIds = allTasksInGroup.map(t => t.id);
+                      const currentSelected = new Set(selectedIds);
+
+                      if (allTasksSelected) {
+                        // Deselect all tasks in the group
+                        groupTaskIds.forEach(id => currentSelected.delete(id));
                       } else {
-                        // Normal click - navigate
-                        const detailRoute =
-                          navigationRoute === 'preparation' ? routes.production.preparation.details(task.id) :
-                          navigationRoute === 'schedule' ? routes.production.schedule.details(task.id) :
-                          routes.production.history.details(task.id);
-
-                        if (process.env.NODE_ENV !== 'production') {
-                          console.log('Task history row clicked, navigating to:', detailRoute);
-                        }
-                        navigate(detailRoute);
+                        // Select all tasks in the group
+                        groupTaskIds.forEach(id => currentSelected.add(id));
                       }
-                    }}
-                    onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
-                  >
-                    {/* Selection checkbox - only show for users who can edit */}
-                    {canEdit && (
-                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => {
-                          e.stopPropagation();
-                          if (e.shiftKey && onShiftClickSelect) {
-                            // Use cross-table shift+click selection
-                            onShiftClickSelect(task.id);
-                          } else {
-                            // Regular selection or fallback shift+click
-                            handleSelectItem(task.id, e);
-                            // Update last clicked task for cross-table shift+click
-                            if (!e.shiftKey) {
-                              onSingleClickSelect?.(task.id);
-                            }
-                          }
-                        }}>
-                          <Checkbox checked={taskIsSelected} onCheckedChange={() => handleSelectItem(task.id)} aria-label={`Select ${task.name}`} data-checkbox />
-                        </div>
-                      </TableCell>
-                    )}
 
-                    {/* Data columns */}
-                    {columns.map((column) => (
-                      <TableCell
-                        key={column.id}
+                      // Update selection in one batch
+                      setSelectedIds(Array.from(currentSelected));
+                    };
+
+                    if (isExpanded) {
+                      // Render all expanded tasks with fade-in animation (no collapse button row)
+                      return collapsedTasks.map((task, taskIndex) => {
+                        const taskIsSelected = isSelected(task.id);
+                        const currentRowIndex = visualRowIndex++;
+
+                        return (
+                          <tr
+                            key={task.id}
+                            data-state={taskIsSelected ? "selected" : undefined}
+                            className={cn(
+                              "cursor-pointer border-b border-border",
+                              "transition-all duration-200 ease-in-out",
+                              "animate-in fade-in slide-in-from-top-2",
+                              // Alternating row colors
+                              currentRowIndex % 2 === 1 && "bg-muted/30",
+                              // Hover state
+                              "hover:bg-muted/40",
+                              // Selected state overrides alternating colors
+                              taskIsSelected && "bg-muted/50 hover:bg-muted/60",
+                              // Source selection mode highlight
+                              isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary",
+                            )}
+                            style={{
+                              animationDelay: `${taskIndex * 30}ms`, // Stagger animation
+                              animationDuration: "200ms"
+                            }}
+                            onClick={(e) => handleTaskRowClick(e, task)}
+                            onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
+                          >
+                            {renderTaskCells(task, taskIsSelected)}
+                          </tr>
+                        );
+                      });
+                    } else {
+                      // Collapsed row counts as one visual row
+                      visualRowIndex++;
+
+                      // Render collapsed row
+                      return (
+                        <CollapsedGroupRow
+                          key={`${groupId}-collapsed`}
+                          groupId={groupId}
+                          collapsedTasks={collapsedTasks}
+                          totalCount={group.totalCount!}
+                          isExpanded={isExpanded}
+                          onToggle={() => toggleGroup(groupId)}
+                          isSelected={allTasksSelected}
+                          onSelectAll={handleSelectAllInGroup}
+                          canEdit={canEdit}
+                          columnCount={columns.length}
+                          selectedCount={selectedCountInGroup}
+                        />
+                      );
+                    }
+                  }
+
+                  // Handle regular task rows (single, group-first, group-last)
+                  if (group.task) {
+                    const task = group.task;
+                    const taskIsSelected = isSelected(task.id);
+                    const currentRowIndex = visualRowIndex++;
+
+                    return (
+                      <tr
+                        key={task.id}
+                        data-state={taskIsSelected ? "selected" : undefined}
                         className={cn(
-                          column.className,
-                          "p-0 !border-r-0",
+                          "cursor-pointer transition-colors border-b border-border",
+                          // Alternating row colors
+                          currentRowIndex % 2 === 1 && "bg-muted/30",
+                          // Hover state
+                          "hover:bg-muted/40",
+                          // Selected state overrides alternating colors
+                          taskIsSelected && "bg-muted/50 hover:bg-muted/60",
+                          // Source selection mode highlight
+                          isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary",
                         )}
+                        onClick={(e) => handleTaskRowClick(e, task)}
+                        onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
                       >
-                        <div className="px-4 py-2 relative">
-                          {column.formatter
-                            ? column.formatter(
-                                column.accessorFn
-                                  ? column.accessorFn(task)
-                                  : task[column.accessorKey as keyof Task],
-                                task,
-                              )
-                            : column.accessorFn
-                            ? column.accessorFn(task)
-                            : task[column.accessorKey as keyof Task]}
-                        </div>
-                      </TableCell>
-                    ))}
-                  </tr>
-                );
-              })
+                        {renderTaskCells(task, taskIsSelected)}
+                      </tr>
+                    );
+                  }
+
+                  return null;
+                });
+              })()
             )}
           </TableBody>
         </Table>

@@ -176,6 +176,23 @@ export function FilePreviewModal({
     }
   }, [pdfPageNumber, pdfNumPages]);
 
+  // Memoize PDF callbacks to prevent unnecessary re-renders
+  const handlePdfLoadSuccess = React.useCallback((numPages: number) => {
+    setPdfNumPages(numPages);
+    setImageLoading(false);
+  }, []);
+
+  const handlePdfLoadError = React.useCallback(() => {
+    setImageError(true);
+    setImageLoading(false);
+  }, []);
+
+  const handlePdfFitScaleCalculated = React.useCallback((fitScale: number) => {
+    setPdfFitScale(fitScale);
+    // Set initial scale to fit scale so PDF is fully visible on load
+    setPdfScale(fitScale);
+  }, []);
+
   // Check if image is already loaded (handles race condition where onLoad fires before React attaches handler)
   React.useEffect(() => {
     // Only run when modal is open
@@ -744,19 +761,9 @@ export function FilePreviewModal({
                     ref={pdfViewerRef}
                     url={getFileUrl(currentFile, baseUrl)}
                     filename={currentFile.filename}
-                    onLoadSuccess={(numPages) => {
-                      setPdfNumPages(numPages);
-                      setImageLoading(false);
-                    }}
-                    onLoadError={() => {
-                      setImageError(true);
-                      setImageLoading(false);
-                    }}
-                    onFitScaleCalculated={(fitScale) => {
-                      setPdfFitScale(fitScale);
-                      // Set initial scale to fit scale so PDF is fully visible on load
-                      setPdfScale(fitScale);
-                    }}
+                    onLoadSuccess={handlePdfLoadSuccess}
+                    onLoadError={handlePdfLoadError}
+                    onFitScaleCalculated={handlePdfFitScaleCalculated}
                     onDownload={handleDownload}
                     scale={pdfScale}
                     pageNumber={pdfPageNumber}

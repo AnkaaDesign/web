@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DataTableWithSelection } from "@/components/ui/data-table-with-selection";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -15,140 +16,125 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { IconCalendar, IconClock, IconDots, IconPackage, IconPlayerPause, IconPlayerPlay, IconEdit, IconEye, IconCircleCheck, IconCircleX, IconTrash } from "@tabler/icons-react";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { IconCalendar, IconClock, IconDots, IconPackage, IconPlayerPause, IconPlayerPlay, IconEdit, IconEye, IconCircleCheck, IconCircleX, IconTrash, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
+import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { useAuth } from "../../../../hooks/useAuth";
-import { canEditOrders, canDeleteOrders, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
-
+import { canEditOrders, canDeleteOrders } from "@/utils/permissions/entity-permissions";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useOrderSchedules, useOrderScheduleMutations } from "../../../../hooks";
+import type { OrderScheduleGetManyFormData } from "../../../../schemas";
 import { getDynamicFrequencyLabel } from "../../../../constants";
 import type { OrderSchedule } from "../../../../types";
-
-// Extended interface for table display with potential supplier/category info
-interface OrderScheduleWithDisplayInfo extends OrderSchedule {
-  supplier?: {
-    id: string;
-    fantasyName: string;
-  };
-  category?: {
-    id: string;
-    name: string;
-  };
-}
+import { cn } from "@/lib/utils";
+import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 
 interface OrderScheduleTableProps {
-  data: OrderScheduleWithDisplayInfo[];
-  isLoading?: boolean;
-  onEdit?: (schedule: OrderScheduleWithDisplayInfo) => void;
-  onView?: (schedule: OrderScheduleWithDisplayInfo) => void;
-  onStatusChange?: (schedule: OrderScheduleWithDisplayInfo, newStatus: string) => void;
-  onDelete?: (scheduleIds: string[]) => void;
+  visibleColumns: Set<string>;
   className?: string;
+  onEdit?: (schedule: OrderSchedule) => void;
+  onView?: (schedule: OrderSchedule) => void;
+  filters?: Partial<OrderScheduleGetManyFormData>;
 }
 
-export function OrderScheduleTable({ data, isLoading = false, onEdit, onView, onStatusChange, onDelete, className }: OrderScheduleTableProps) {
+export function OrderScheduleTable({ visibleColumns, className, onEdit, onView, filters = {} }: OrderScheduleTableProps) {
   // Delete confirmation dialog state
   const [deleteDialog, setDeleteDialog] = useState<{
-    items: OrderScheduleWithDisplayInfo[];
+    items: OrderSchedule[];
     isBulk: boolean;
   } | null>(null);
 
-  // Use column visibility hook with localStorage persistence
-  const { visibleColumns } = useColumnVisibility(
-    "order-schedule-table-visible-columns",
-    new Set(["status", "target", "frequency", "itemsCount", "nextRun", "lastRun"])
-  );
-
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user } = useAuth();
   const canEdit = user ? canEditOrders(user) : false;
   const canDelete = user ? canDeleteOrders(user) : false;
-  const showInteractive = user ? shouldShowInteractiveElements(user, 'order') : false;
 
-  const allColumns = React.useMemo(
+  // Mutations
+  const { delete: deleteSchedule } = useOrderScheduleMutations();
+
+  // Use URL state management for pagination and selection
+  const {
+    page,
+    pageSize,
+    selectedIds,
+    sortConfigs,
+    setPage,
+    setPageSize,
+    toggleSelection,
+    toggleSelectAll,
+    toggleSort,
+    getSortDirection,
+    isSelected,
+    isAllSelected,
+    isPartiallySelected,
+    selectionCount,
+  } = useTableState({
+    defaultPageSize: 40,
+    resetSelectionOnPageChange: false,
+  });
+
+  // Memoize query parameters
+  const queryParams = useMemo(
+    () => ({
+      ...filters,
+      page: page + 1,
+      limit: pageSize,
+      orderBy: convertSortConfigsToOrderBy(
+        sortConfigs.length > 0
+          ? sortConfigs
+          : [{ column: "createdAt", direction: "desc" }],
+      ),
+    }),
+    [filters, page, pageSize, sortConfigs],
+  );
+
+  // Fetch data
+  const { data, isLoading } = useOrderSchedules(queryParams);
+
+  const schedules = data?.data || [];
+  const totalRecords = data?.totalRecords || 0;
+  const totalPages = Math.ceil(totalRecords / pageSize);
+
+  // Column definitions
+  const allColumns = useMemo(
     () => [
-      // Status
       {
         key: "status",
-        header: "Status",
-        accessor: (_row: OrderScheduleWithDisplayInfo) => {
-          return (
-            <Badge variant="outline" className="bg-green-50 text-green-700">
-              Ativo
-            </Badge>
-          );
-        },
+        header: "STATUS",
         sortable: true,
+        render: (_schedule: OrderSchedule) => (
+          <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+            Ativo
+          </Badge>
+        ),
       },
-
-      // Supplier/Category
-      {
-        key: "target",
-        header: "Fornecedor/Categoria",
-        accessor: (schedule: OrderScheduleWithDisplayInfo) => {
-          return (
-            <div className="flex flex-col">
-              {schedule.supplier ? (
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">
-                    Fornecedor
-                  </Badge>
-                  <span className="font-medium">{schedule.supplier.fantasyName}</span>
-                </div>
-              ) : schedule.category ? (
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">
-                    Categoria
-                  </Badge>
-                  <span className="font-medium">{schedule.category.name}</span>
-                </div>
-              ) : (
-                <span className="text-muted-foreground text-sm">Não definido</span>
-              )}
-            </div>
-          );
-        },
-        sortable: false,
-      },
-
-      // Frequency
       {
         key: "frequency",
-        header: "Frequência",
-        accessor: (schedule: OrderScheduleWithDisplayInfo) => {
-          const frequencyLabel = getDynamicFrequencyLabel(schedule.frequency, schedule.frequencyCount);
-          return (
-            <div className="flex flex-col">
-              <span className="font-medium">{frequencyLabel}</span>
-            </div>
-          );
-        },
+        header: "FREQUÊNCIA",
         sortable: true,
+        render: (schedule: OrderSchedule) => {
+          const frequencyLabel = getDynamicFrequencyLabel(schedule.frequency, schedule.frequencyCount);
+          return <span className="font-medium">{frequencyLabel}</span>;
+        },
       },
-
-      // Items Count
       {
         key: "itemsCount",
-        header: "Itens",
-        accessor: (schedule: OrderScheduleWithDisplayInfo) => {
-          return (
-            <div className="flex items-center gap-2">
-              <IconPackage className="h-4 w-4 text-muted-foreground" />
-              <span>{schedule.items?.length || 0}</span>
-            </div>
-          );
-        },
+        header: "ITENS",
         sortable: true,
+        render: (schedule: OrderSchedule) => (
+          <div className="flex items-center gap-2">
+            <IconPackage className="h-4 w-4 text-muted-foreground" />
+            <span>{schedule.items?.length || 0}</span>
+          </div>
+        ),
       },
-
-      // Next Run
       {
         key: "nextRun",
-        header: "Próxima Execução",
-        accessor: (schedule: OrderScheduleWithDisplayInfo) => {
+        header: "PRÓXIMA EXECUÇÃO",
+        sortable: true,
+        render: (schedule: OrderSchedule) => {
           if (!schedule.nextRun) {
             return <span className="text-muted-foreground text-sm">Não agendada</span>;
           }
-
           const date = typeof schedule.nextRun === "string" ? new Date(schedule.nextRun) : schedule.nextRun;
           return (
             <div className="flex items-center gap-2">
@@ -157,18 +143,15 @@ export function OrderScheduleTable({ data, isLoading = false, onEdit, onView, on
             </div>
           );
         },
-        sortable: true,
       },
-
-      // Last Run
       {
         key: "lastRun",
-        header: "Última Execução",
-        accessor: (schedule: OrderScheduleWithDisplayInfo) => {
+        header: "ÚLTIMA EXECUÇÃO",
+        sortable: true,
+        render: (schedule: OrderSchedule) => {
           if (!schedule.lastRun) {
             return <span className="text-muted-foreground text-sm">Nunca executado</span>;
           }
-
           const date = typeof schedule.lastRun === "string" ? new Date(schedule.lastRun) : schedule.lastRun;
           return (
             <div className="flex items-center gap-2">
@@ -177,138 +160,171 @@ export function OrderScheduleTable({ data, isLoading = false, onEdit, onView, on
             </div>
           );
         },
-        sortable: true,
-      },
-
-      // Actions
-      {
-        key: "actions",
-        header: "Ações",
-        accessor: (schedule: OrderScheduleWithDisplayInfo) => {
-          return (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Abrir menu</span>
-                  <IconDots className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {onView && (
-                  <DropdownMenuItem onClick={() => onView(schedule)}>
-                    <IconEye className="mr-2 h-4 w-4" />
-                    Visualizar
-                  </DropdownMenuItem>
-                )}
-                {canEdit && onEdit && (
-                  <DropdownMenuItem onClick={() => onEdit(schedule)}>
-                    <IconEdit className="mr-2 h-4 w-4" />
-                    Editar
-                  </DropdownMenuItem>
-                )}
-
-                {/* Status transitions */}
-                {canEdit && onStatusChange && (
-                  <>
-                    <DropdownMenuSeparator />
-                    {schedule.isActive && !schedule.finishedAt && (
-                      <DropdownMenuItem onClick={() => onStatusChange(schedule, "PAUSED")}>
-                        <IconPlayerPause className="mr-2 h-4 w-4" />
-                        Pausar
-                      </DropdownMenuItem>
-                    )}
-
-                    {!schedule.isActive && !schedule.finishedAt && (
-                      <DropdownMenuItem onClick={() => onStatusChange(schedule, "ACTIVE")}>
-                        <IconPlayerPlay className="mr-2 h-4 w-4" />
-                        Reativar
-                      </DropdownMenuItem>
-                    )}
-
-                    {!schedule.finishedAt && (
-                      <>
-                        <DropdownMenuItem onClick={() => onStatusChange(schedule, "COMPLETED")}>
-                          <IconCircleCheck className="mr-2 h-4 w-4" />
-                          Marcar como Concluído
-                        </DropdownMenuItem>
-
-                        <DropdownMenuItem onClick={() => onStatusChange(schedule, "CANCELLED")} className="text-destructive">
-                          <IconCircleX className="mr-2 h-4 w-4" />
-                          Cancelar
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </>
-                )}
-
-                {(canEdit || canDelete) && <DropdownMenuSeparator />}
-
-                {canDelete && (
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setDeleteDialog({ items: [schedule], isBulk: false });
-                    }}
-                    className="text-destructive"
-                  >
-                    <IconTrash className="mr-2 h-4 w-4" />
-                    Deletar
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          );
-        },
-        sortable: false,
       },
     ],
-    [onEdit, onView, onStatusChange],
+    [],
   );
 
-  // Filter columns based on visibility (always include actions)
+  // Filter columns based on visibility
   const columns = useMemo(() => {
-    return allColumns.filter((col) => col.key === "actions" || visibleColumns.has(col.key));
+    return allColumns.filter((col) => visibleColumns.has(col.key));
   }, [allColumns, visibleColumns]);
 
   // Handle delete confirmation
   const confirmDelete = () => {
-    if (!deleteDialog || !onDelete) return;
-
-    const scheduleIds = deleteDialog.items.map((schedule) => schedule.id);
-    onDelete(scheduleIds);
+    if (!deleteDialog) return;
+    deleteDialog.items.forEach((schedule) => deleteSchedule(schedule.id));
     setDeleteDialog(null);
   };
 
-  // Bulk actions component
-  const bulkActionsComponent = onDelete && (
-    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-md">
-      <span className="text-sm text-muted-foreground">Cronogramas selecionados</span>
-      <Button
-        variant="destructive"
-        size="sm"
-        onClick={() => {
-          // Note: The actual selected IDs will be managed by DataTableWithSelection
-          // This is a placeholder - the actual implementation would need to get the selected IDs
-          // For now, this triggers the delete dialog with empty items
-          setDeleteDialog({ items: [], isBulk: true });
-        }}
-      >
-        <IconCircleX className="mr-2 h-4 w-4" />
-        Excluir Selecionados
-      </Button>
-    </div>
-  );
+  // Render sort icon
+  const renderSortIcon = (columnKey: string) => {
+    const direction = getSortDirection(columnKey);
+    if (direction === "asc") {
+      return <IconChevronUp className="h-4 w-4" />;
+    } else if (direction === "desc") {
+      return <IconChevronDown className="h-4 w-4" />;
+    }
+    return <IconSelector className="h-4 w-4 opacity-50" />;
+  };
 
   return (
-    <div className={className}>
-      <DataTableWithSelection
-        columns={columns}
-        data={data}
-        rowId={(schedule) => schedule.id}
-        searchKey="id" // Can be changed to a more relevant field
-        searchPlaceholder="Buscar cronogramas..."
-        bulkActionsComponent={bulkActionsComponent}
-        className={isLoading ? "opacity-50" : ""}
-      />
+    <div className={cn("flex flex-col h-full", className)}>
+      {/* Table */}
+      <div className="flex-1 overflow-auto border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {/* Selection checkbox */}
+              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                <div className="flex items-center justify-center h-full w-full px-2">
+                  <Checkbox
+                    checked={isAllSelected(schedules.map(s => s.id))}
+                    onCheckedChange={() => toggleSelectAll(schedules.map(s => s.id))}
+                  />
+                </div>
+              </TableHead>
+
+              {/* Column headers */}
+              {columns.map((column) => (
+                <TableHead
+                  key={column.key}
+                  className={cn(
+                    "whitespace-nowrap font-bold uppercase text-xs",
+                    column.sortable && "cursor-pointer select-none hover:bg-muted/50"
+                  )}
+                  onClick={() => column.sortable && toggleSort(column.key)}
+                >
+                  <div className="flex items-center gap-2">
+                    {column.header}
+                    {column.sortable && renderSortIcon(column.key)}
+                  </div>
+                </TableHead>
+              ))}
+
+              {/* Actions column */}
+              <TableHead className="whitespace-nowrap font-bold uppercase text-xs w-20">AÇÕES</TableHead>
+            </TableRow>
+          </TableHeader>
+
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length + 2} className="text-center py-8 text-muted-foreground">
+                  Carregando...
+                </TableCell>
+              </TableRow>
+            ) : schedules.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length + 2} className="text-center py-8 text-muted-foreground">
+                  Nenhum resultado encontrado.
+                </TableCell>
+              </TableRow>
+            ) : (
+              schedules.map((schedule) => (
+                <TableRow key={schedule.id} className="hover:bg-muted/30">
+                  {/* Selection checkbox */}
+                  <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                    <div
+                      className="flex items-center justify-center h-full w-full px-2 py-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelection(schedule.id);
+                      }}
+                    >
+                      <Checkbox
+                        checked={isSelected(schedule.id)}
+                        onCheckedChange={() => toggleSelection(schedule.id)}
+                      />
+                    </div>
+                  </TableCell>
+
+                  {/* Data columns */}
+                  {columns.map((column) => (
+                    <TableCell key={column.key}>
+                      {column.render(schedule)}
+                    </TableCell>
+                  ))}
+
+                  {/* Actions */}
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Abrir menu</span>
+                          <IconDots className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {onView && (
+                          <DropdownMenuItem onClick={() => onView(schedule)}>
+                            <IconEye className="mr-2 h-4 w-4" />
+                            Visualizar
+                          </DropdownMenuItem>
+                        )}
+                        {canEdit && onEdit && (
+                          <DropdownMenuItem onClick={() => onEdit(schedule)}>
+                            <IconEdit className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                        )}
+
+                        {canDelete && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDeleteDialog({ items: [schedule], isBulk: false })}
+                              className="text-destructive"
+                            >
+                              <IconTrash className="mr-2 h-4 w-4" />
+                              Deletar
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination */}
+      {totalRecords > 0 && (
+        <div className="mt-4">
+          <SimplePaginationAdvanced
+            currentPage={page}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalRecords={totalRecords}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[20, 40, 60, 100]}
+          />
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
@@ -317,10 +333,10 @@ export function OrderScheduleTable({ data, isLoading = false, onEdit, onView, on
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteDialog?.isBulk && deleteDialog.items.length > 1
-                ? `Tem certeza que deseja deletar ${deleteDialog.items.length} cronogramas? Esta ação não pode ser desfeita.`
+                ? `Tem certeza que deseja deletar ${deleteDialog.items.length} agendamentos? Esta ação não pode ser desfeita.`
                 : deleteDialog?.items.length === 1
-                ? `Tem certeza que deseja deletar este cronograma? Esta ação não pode ser desfeita.`
-                : "Tem certeza que deseja deletar os cronogramas selecionados? Esta ação não pode ser desfeita."}
+                ? `Tem certeza que deseja deletar este agendamento? Esta ação não pode ser desfeita.`
+                : "Tem certeza que deseja deletar os agendamentos selecionados? Esta ação não pode ser desfeita."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

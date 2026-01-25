@@ -27,8 +27,6 @@ import {
 } from "@tabler/icons-react";
 import { FAVORITE_PAGES } from "../../../constants";
 import { apiClient } from "@/api-client/axiosClient";
-import { useUsersInfinite } from "@/hooks/useUser";
-import { useSectorsInfinite } from "@/hooks/useSector";
 
 // =====================
 // Types & Schema
@@ -58,39 +56,52 @@ export const CreateNotificationPage = () => {
   const [isSending, setIsSending] = useState(false);
   const [scheduleLater, setScheduleLater] = useState(false);
 
-  // Fetch users with infinite scroll support
-  const {
-    data: usersData,
-    fetchNextPage: fetchNextUsers,
-    hasNextPage: hasNextUsers,
-    isFetchingNextPage: isFetchingNextUsers,
-  } = useUsersInfinite({
-    where: { isActive: true },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-    },
-    orderBy: { name: "asc" },
-    take: 50, // Load 50 users at a time
-  });
+  // Query functions for async combobox
+  const fetchUsers = async (searchTerm: string, page = 1) => {
+    const response = await apiClient.get("/users", {
+      params: {
+        searchingFor: searchTerm || undefined,
+        where: JSON.stringify({ isActive: true }),
+        select: JSON.stringify({
+          id: true,
+          name: true,
+          email: true,
+        }),
+        orderBy: JSON.stringify({ name: "asc" }),
+        limit: 50,
+        offset: (page - 1) * 50,
+      },
+    });
 
-  // Fetch sectors with infinite scroll support
-  const {
-    data: sectorsData,
-    fetchNextPage: fetchNextSectors,
-    hasNextPage: hasNextSectors,
-    isFetchingNextPage: isFetchingNextSectors,
-  } = useSectorsInfinite({
-    orderBy: { name: "asc" },
-    take: 50, // Load 50 sectors at a time
-  });
+    return {
+      data: response.data.data.map((user: any) => ({
+        value: user.id,
+        label: `${user.name} (${user.email})`,
+      })),
+      hasMore: response.data.data.length === 50,
+      total: response.data.totalRecords,
+    };
+  };
 
-  // Flatten paginated data for users
-  const allUsers = usersData?.pages.flatMap((page) => page.data) || [];
+  const fetchSectors = async (searchTerm: string, page = 1) => {
+    const response = await apiClient.get("/sectors", {
+      params: {
+        searchingFor: searchTerm || undefined,
+        orderBy: JSON.stringify({ name: "asc" }),
+        limit: 50,
+        offset: (page - 1) * 50,
+      },
+    });
 
-  // Flatten paginated data for sectors
-  const allSectors = sectorsData?.pages.flatMap((page) => page.data) || [];
+    return {
+      data: response.data.data.map((sector: any) => ({
+        value: sector.privileges,
+        label: sector.name,
+      })),
+      hasMore: response.data.data.length === 50,
+      total: response.data.totalRecords,
+    };
+  };
 
   const form = useForm<NotificationFormData>({
     resolver: zodResolver(notificationSchema),
@@ -401,27 +412,14 @@ export const CreateNotificationPage = () => {
                     name="targetSectors"
                     label="Setores"
                     placeholder="Selecione os setores"
-                    options={
-                      allSectors.map((sector) => ({
-                        value: sector.privileges, // Use privileges (ADMIN, PRODUCTION, etc.) not ID
-                        label: sector.name,
-                      }))
-                    }
+                    async
+                    queryKey={["sectors-async"]}
+                    queryFn={fetchSectors}
+                    minSearchLength={0}
                     multiple
                     searchable
+                    emptyText="Nenhum setor encontrado"
                   />
-                  {hasNextSectors && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => fetchNextSectors()}
-                      disabled={isFetchingNextSectors}
-                      className="w-full mt-2"
-                    >
-                      {isFetchingNextSectors ? "Carregando..." : "Carregar mais setores"}
-                    </Button>
-                  )}
                   <p className="text-xs text-muted-foreground">
                     Selecione um ou mais setores que receberão a notificação
                   </p>
@@ -434,27 +432,14 @@ export const CreateNotificationPage = () => {
                     name="targetUsers"
                     label="Usuários"
                     placeholder="Selecione os usuários"
-                    options={
-                      allUsers.map((user) => ({
-                        value: user.id,
-                        label: `${user.name} (${user.email})`,
-                      }))
-                    }
+                    async
+                    queryKey={["users-async"]}
+                    queryFn={fetchUsers}
+                    minSearchLength={0}
                     multiple
                     searchable
+                    emptyText="Nenhum usuário ativo encontrado"
                   />
-                  {hasNextUsers && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => fetchNextUsers()}
-                      disabled={isFetchingNextUsers}
-                      className="w-full mt-2"
-                    >
-                      {isFetchingNextUsers ? "Carregando..." : "Carregar mais usuários"}
-                    </Button>
-                  )}
                   <p className="text-xs text-muted-foreground">
                     Selecione um ou mais usuários que receberão a notificação
                   </p>
