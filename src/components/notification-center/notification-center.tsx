@@ -242,9 +242,20 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
 
       // Show single meaningful toast
       toast.success("Lembrete agendado para 1 hora");
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Failed to schedule reminder:", error);
-      toast.error("Erro ao agendar lembrete");
+
+      // Extract error message from response
+      const errorMessage = error?.response?.data?.message || error?.message || "Erro desconhecido";
+
+      // Show specific error message
+      if (errorMessage.includes("not found") || errorMessage.includes("Notification not found")) {
+        toast.error("Notificação não encontrada. Tente atualizar a página.");
+      } else if (errorMessage.includes("Maximum") || errorMessage.includes("reminders reached")) {
+        toast.error("Limite de 3 lembretes atingido para esta notificação.");
+      } else {
+        toast.error(`Erro ao agendar lembrete: ${errorMessage}`);
+      }
     }
   };
 
