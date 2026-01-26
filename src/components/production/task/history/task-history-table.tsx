@@ -100,6 +100,7 @@ export function TaskHistoryTable({
     defaultSort: navigationRoute === 'preparation'
       ? [
           { column: 'forecastDate', direction: 'asc' },
+          { column: 'name', direction: 'asc' },
           { column: 'identificador', direction: 'asc' },
         ]
       : [{ column: 'finishedAt', direction: 'desc' }],

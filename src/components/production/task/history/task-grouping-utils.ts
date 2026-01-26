@@ -86,27 +86,16 @@ function getIdentificador(task: Task): string {
 
 /**
  * Check if two tasks should be grouped together
+ * Groups by name similarity - serial number distance is no longer a requirement
  */
 function shouldGroupTasks(
   task1: Task,
   task2: Task,
-  similarityThreshold: number = 0.8
+  similarityThreshold: number = 0.95
 ): boolean {
-  // Check name similarity
+  // Check name similarity - if names are similar enough, group regardless of serial number
   const nameSimilarity = stringSimilarity(task1.name, task2.name);
-  if (nameSimilarity < similarityThreshold) return false;
-
-  // Check if serial numbers are sequential
-  const id1 = getIdentificador(task1);
-  const id2 = getIdentificador(task2);
-
-  const num1 = parseSerialNumber(id1);
-  const num2 = parseSerialNumber(id2);
-
-  if (num1 === null || num2 === null) return false;
-
-  // Check if numbers are sequential (difference of 1)
-  return Math.abs(num1 - num2) === 1;
+  return nameSimilarity >= similarityThreshold;
 }
 
 export interface TaskGroup {
@@ -118,36 +107,72 @@ export interface TaskGroup {
 }
 
 /**
- * Group sequential tasks with similar names
+ * Find all tasks that should be grouped with a given task based on name similarity
+ */
+function findSimilarTasks(
+  targetTask: Task,
+  tasks: Task[],
+  usedIndices: Set<number>,
+  similarityThreshold: number
+): { task: Task; index: number }[] {
+  const similar: { task: Task; index: number }[] = [];
+
+  for (let i = 0; i < tasks.length; i++) {
+    if (usedIndices.has(i)) continue;
+
+    const task = tasks[i];
+    if (shouldGroupTasks(targetTask, task, similarityThreshold)) {
+      similar.push({ task, index: i });
+    }
+  }
+
+  return similar;
+}
+
+/**
+ * Sort tasks by serial number (numeric extraction)
+ */
+function sortBySerialNumber(tasks: Task[]): Task[] {
+  return [...tasks].sort((a, b) => {
+    const numA = parseSerialNumber(getIdentificador(a));
+    const numB = parseSerialNumber(getIdentificador(b));
+
+    if (numA === null && numB === null) return 0;
+    if (numA === null) return 1;
+    if (numB === null) return -1;
+
+    return numA - numB;
+  });
+}
+
+/**
+ * Group tasks with similar names regardless of serial number distance
  * Returns an array of TaskGroup objects that can be rendered
  */
 export function groupSequentialTasks(
   tasks: Task[],
   minGroupSize: number = 3,
-  similarityThreshold: number = 0.8
+  similarityThreshold: number = 0.95
 ): TaskGroup[] {
   if (tasks.length === 0) return [];
 
   const result: TaskGroup[] = [];
-  let i = 0;
+  const usedIndices = new Set<number>();
 
-  while (i < tasks.length) {
+  // Process tasks in original order, but find ALL similar tasks for each
+  for (let i = 0; i < tasks.length; i++) {
+    if (usedIndices.has(i)) continue;
+
     const currentTask = tasks[i];
-    const groupTasks: Task[] = [currentTask];
 
-    // Look ahead to find sequential tasks
-    let j = i + 1;
-    while (j < tasks.length) {
-      const nextTask = tasks[j];
-      const lastTaskInGroup = groupTasks[groupTasks.length - 1];
+    // Find all tasks similar to this one (including itself)
+    const similarTasks = findSimilarTasks(currentTask, tasks, usedIndices, similarityThreshold);
 
-      if (shouldGroupTasks(lastTaskInGroup, nextTask, similarityThreshold)) {
-        groupTasks.push(nextTask);
-        j++;
-      } else {
-        break;
-      }
-    }
+    // Mark all found tasks as used
+    similarTasks.forEach(({ index }) => usedIndices.add(index));
+
+    // Sort the group by serial number
+    const groupTasks = sortBySerialNumber(similarTasks.map(s => s.task));
 
     // If we found a group of minGroupSize or more, create a collapsible group
     if (groupTasks.length >= minGroupSize) {
@@ -179,8 +204,6 @@ export function groupSequentialTasks(
         groupId,
         totalCount: groupTasks.length,
       });
-
-      i = j; // Skip past the grouped tasks
     } else {
       // Not enough tasks to form a group, add them individually
       for (const task of groupTasks) {
@@ -189,7 +212,6 @@ export function groupSequentialTasks(
           task,
         });
       }
-      i = j;
     }
   }
 
