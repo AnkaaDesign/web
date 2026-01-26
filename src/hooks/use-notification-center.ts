@@ -11,6 +11,7 @@ interface UseNotificationCenterReturn {
   notifications: Notification[];
   unreadCount: number;
   isLoading: boolean;
+  isLoadingMore: boolean;
   isConnected: boolean;
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
@@ -26,6 +27,7 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [take, setTake] = useState(20);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Fetch recent notifications with pagination support
   const { data: notificationsData, isLoading } = useNotifications({
@@ -46,6 +48,11 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
   const notifications = notificationsData?.data || [];
   const totalRecords = notificationsData?.meta?.totalRecords || 0;
   const hasMore = notifications.length < totalRecords;
+
+  // Reset loading more state when notifications data changes
+  useEffect(() => {
+    setIsLoadingMore(false);
+  }, [notifications.length]);
 
   // Calculate unread count
   useEffect(() => {
@@ -196,14 +203,17 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
   }, [queryClient]);
 
   const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
     // Increase the take count to load more notifications
     setTake((prev) => prev + 20);
-  }, []);
+  }, [isLoadingMore, hasMore]);
 
   return {
     notifications,
     unreadCount,
     isLoading,
+    isLoadingMore,
     isConnected,
     markAsRead,
     markAllAsRead,

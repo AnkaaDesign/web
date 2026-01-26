@@ -2,11 +2,9 @@ import { useAuth } from "../contexts/auth-context";
 import { useFavorites } from "../contexts/favorites-context";
 import { SECTOR_PRIVILEGES } from "../constants";
 import { getMostAccessedPages, getRecentPages, getIconInfoByPath } from "../utils";
-import { IconStar, IconClock, IconFlame, IconRefresh } from "@tabler/icons-react";
+import { IconStar, IconClock, IconFlame } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "../components/ui/card";
-import { Button } from "../components/ui/button";
 import { usePageTracker } from "../hooks/use-page-tracker";
 
 function getGreeting(): string {
@@ -20,10 +18,9 @@ export function HomePage() {
   const { user } = useAuth();
   const { favorites } = useFavorites();
   const navigate = useNavigate();
-  const [mostAccessedPages, setMostAccessedPages] = useState(getMostAccessedPages(6));
-  const [recentPages, setRecentPages] = useState(getRecentPages(6));
+  const [mostAccessedPages, setMostAccessedPages] = useState(getMostAccessedPages(12));
+  const [recentPages, setRecentPages] = useState(getRecentPages(12));
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [isSpinning, setIsSpinning] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -40,8 +37,8 @@ export function HomePage() {
 
   useEffect(() => {
     // Update most accessed and recent pages when component mounts
-    setMostAccessedPages(getMostAccessedPages(6));
-    setRecentPages(getRecentPages(6));
+    setMostAccessedPages(getMostAccessedPages(12));
+    setRecentPages(getRecentPages(12));
   }, []);
 
   const hasBasicPrivilegeOnly = user?.sector?.privileges === SECTOR_PRIVILEGES.BASIC || !user?.sector;
@@ -59,23 +56,16 @@ export function HomePage() {
     );
   }
 
-  const handleRefresh = () => {
-    setIsSpinning(true);
-    setMostAccessedPages(getMostAccessedPages(6));
-    setRecentPages(getRecentPages(6));
-    setTimeout(() => setIsSpinning(false), 500);
-  };
-
   // Regular home page content
   return (
-    <div className="m-4 p-4 rounded-lg flex flex-col gap-4 bg-background">
+    <div className="m-4 p-4 rounded-xl flex flex-col gap-4 bg-card border border-border shadow-sm min-h-[calc(100vh-6rem)]">
       {/* Welcome Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex items-start justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-bold text-secondary-foreground">
+          <h1 className="text-base sm:text-xl md:text-2xl font-bold text-secondary-foreground">
             {getGreeting()}, {user?.name || "Usuário"}!
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground text-xs sm:text-sm mt-1">
             {new Date().toLocaleDateString("pt-BR", {
               weekday: "long",
               year: "numeric",
@@ -84,49 +74,37 @@ export function HomePage() {
             })}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-secondary-foreground">
-          <span className="text-xl">
-            {currentTime.toLocaleTimeString("pt-BR", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleRefresh}
-            title="Atualizar conteúdo"
-          >
-            <IconRefresh className={`h-6 w-6 transition-transform ${isSpinning ? "animate-spin [animation-direction:reverse]" : ""}`} />
-          </Button>
-        </div>
+        <span className="text-sm sm:text-base md:text-lg text-secondary-foreground">
+          {currentTime.toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })}
+        </span>
       </div>
 
-      {/* Favoritos */}
+      {/* Favoritos - horizontal scroll */}
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-secondary-foreground flex items-center gap-2">
           <IconStar className="h-5 w-5 text-yellow-500" />
           Favoritos
         </h2>
         {favorites.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="flex gap-4 overflow-x-auto pb-2">
             {favorites.map((fav) => {
               const iconInfo = getIconInfoByPath(fav.path);
               const IconComponent = iconInfo.icon;
               return (
-                <Card
+                <div
                   key={fav.id}
-                  className="cursor-pointer hover:shadow-sm shadow-[#fff] transition-shadow duration-200 rounded-md border border-border"
+                  className="cursor-pointer hover:shadow-sm transition-shadow duration-200 rounded-lg bg-secondary border border-border flex-shrink-0 w-36 p-4"
                   onClick={() => navigate(fav.path)}
                 >
-                  <CardContent className="p-4">
-                    <div className={`${iconInfo.color} text-white p-3 rounded-lg inline-block mb-2`}>
-                      <IconComponent className="h-6 w-6" />
-                    </div>
-                    <h3 className="font-semibold text-sm text-secondary-foreground">{fav.title}</h3>
-                  </CardContent>
-                </Card>
+                  <div className={`${iconInfo.color} text-white p-3 rounded-lg inline-block mb-2`}>
+                    <IconComponent className="h-6 w-6" />
+                  </div>
+                  <h3 className="font-semibold text-sm text-secondary-foreground">{fav.title}</h3>
+                </div>
               );
             })}
           </div>
@@ -135,30 +113,28 @@ export function HomePage() {
         )}
       </div>
 
-      {/* Recentes */}
+      {/* Recentes - 2 rows */}
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-secondary-foreground flex items-center gap-2">
           <IconClock className="h-5 w-5 text-blue-500" />
           Recentes
         </h2>
         {recentPages.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
             {recentPages.map((page) => {
               const iconInfo = getIconInfoByPath(page.path);
               const IconComponent = iconInfo.icon;
               return (
-                <Card
+                <div
                   key={page.path}
-                  className="cursor-pointer hover:shadow-sm shadow-[#fff] transition-shadow duration-200 rounded-md border border-border"
+                  className="cursor-pointer hover:shadow-sm transition-shadow duration-200 rounded-lg bg-secondary border border-border p-4"
                   onClick={() => navigate(page.path)}
                 >
-                  <CardContent className="p-4">
-                    <div className={`${iconInfo.color} text-white p-3 rounded-lg inline-block mb-2`}>
-                      <IconComponent className="h-6 w-6" />
-                    </div>
-                    <h3 className="font-semibold text-sm text-secondary-foreground">{page.title}</h3>
-                  </CardContent>
-                </Card>
+                  <div className={`${iconInfo.color} text-white p-3 rounded-lg inline-block mb-2`}>
+                    <IconComponent className="h-6 w-6" />
+                  </div>
+                  <h3 className="font-semibold text-sm text-secondary-foreground">{page.title}</h3>
+                </div>
               );
             })}
           </div>
@@ -167,33 +143,31 @@ export function HomePage() {
         )}
       </div>
 
-      {/* Mais Acessadas */}
+      {/* Mais Acessadas - 2 rows */}
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-secondary-foreground flex items-center gap-2">
           <IconFlame className="h-5 w-5 text-orange-500" />
           Mais Acessadas
         </h2>
         {mostAccessedPages.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
             {mostAccessedPages.map((page) => {
               const iconInfo = getIconInfoByPath(page.path);
               const IconComponent = iconInfo.icon;
               return (
-                <Card
+                <div
                   key={page.path}
-                  className="cursor-pointer hover:shadow-sm shadow-[#fff] transition-shadow duration-200 rounded-md border border-border"
+                  className="cursor-pointer hover:shadow-sm transition-shadow duration-200 rounded-lg bg-secondary border border-border p-4"
                   onClick={() => navigate(page.path)}
                 >
-                  <CardContent className="p-4">
-                    <div className={`${iconInfo.color} text-white p-3 rounded-lg inline-block mb-2`}>
-                      <IconComponent className="h-6 w-6" />
-                    </div>
-                    <h3 className="font-semibold text-sm text-secondary-foreground">{page.title}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {page.count} {page.count === 1 ? "acesso" : "acessos"}
-                    </p>
-                  </CardContent>
-                </Card>
+                  <div className={`${iconInfo.color} text-white p-3 rounded-lg inline-block mb-2`}>
+                    <IconComponent className="h-6 w-6" />
+                  </div>
+                  <h3 className="font-semibold text-sm text-secondary-foreground">{page.title}</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {page.count} {page.count === 1 ? "acesso" : "acessos"}
+                  </p>
+                </div>
               );
             })}
           </div>

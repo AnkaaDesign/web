@@ -12,6 +12,9 @@ interface NotificationListProps {
   onDismiss?: (notification: Notification) => void;
   maxHeight?: string;
   currentUserId?: string;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
 }
 
 interface GroupedNotifications {
@@ -83,7 +86,26 @@ export const NotificationList: React.FC<NotificationListProps> = ({
   onDismiss,
   maxHeight = "500px",
   currentUserId,
+  hasMore = false,
+  onLoadMore,
+  isLoadingMore = false,
 }) => {
+  // Handle scroll to detect when user reaches the bottom
+  const handleScroll = React.useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      if (!hasMore || !onLoadMore || isLoadingMore) return;
+
+      const target = event.target as HTMLDivElement;
+      const { scrollTop, scrollHeight, clientHeight } = target;
+
+      // Load more when user is within 100px of the bottom
+      if (scrollHeight - scrollTop - clientHeight < 100) {
+        onLoadMore();
+      }
+    },
+    [hasMore, onLoadMore, isLoadingMore]
+  );
+
   if (notifications.length === 0) {
     return <NotificationEmpty />;
   }
@@ -114,12 +136,22 @@ export const NotificationList: React.FC<NotificationListProps> = ({
   };
 
   return (
-    <ScrollArea className="w-full" style={{ height: maxHeight }}>
+    <ScrollArea className="w-full" style={{ height: maxHeight }} onScroll={handleScroll}>
       <div className="flex flex-col">
         {renderGroup("Hoje", grouped.today)}
         {renderGroup("Ontem", grouped.yesterday)}
         {renderGroup("Esta Semana", grouped.thisWeek)}
         {renderGroup("Mais Antigas", grouped.older)}
+
+        {/* Loading indicator */}
+        {isLoadingMore && (
+          <div className="py-4 flex items-center justify-center">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+              Carregando...
+            </div>
+          </div>
+        )}
       </div>
     </ScrollArea>
   );

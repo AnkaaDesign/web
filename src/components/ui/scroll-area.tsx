@@ -7,11 +7,13 @@ interface ScrollAreaProps extends React.ComponentPropsWithoutRef<typeof ScrollAr
   children?: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
+  viewportRef?: React.RefObject<HTMLDivElement>;
+  onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 }
 
-const ScrollArea = React.forwardRef<React.ElementRef<typeof ScrollAreaPrimitive.Root>, ScrollAreaProps>(({ className, children, style, ...props }, ref) => (
+const ScrollArea = React.forwardRef<React.ElementRef<typeof ScrollAreaPrimitive.Root>, ScrollAreaProps>(({ className, children, style, viewportRef, onScroll, ...props }, ref) => (
   <ScrollAreaPrimitive.Root ref={ref} className={cn("relative overflow-hidden", className)} style={style} {...props}>
-    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">{children}</ScrollAreaPrimitive.Viewport>
+    <ScrollAreaPrimitive.Viewport ref={viewportRef} className="h-full w-full rounded-[inherit]" onScroll={onScroll}>{children}</ScrollAreaPrimitive.Viewport>
     <ScrollBar />
     <ScrollAreaPrimitive.Corner />
   </ScrollAreaPrimitive.Root>

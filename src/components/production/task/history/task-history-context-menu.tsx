@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout } from "@tabler/icons-react";
+import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
@@ -68,6 +68,8 @@ export function TaskHistoryContextMenu({
   const hasPreparationTasks = tasks.some((t) => t.status === TASK_STATUS.PREPARATION);
   const hasWaitingProductionTasks = tasks.some((t) => t.status === TASK_STATUS.WAITING_PRODUCTION);
   const hasCompletedTasks = tasks.some((t) => t.status === TASK_STATUS.COMPLETED);
+  const hasCancelledTasks = tasks.some((t) => t.status === TASK_STATUS.CANCELLED);
+  const hasNonCancelledTasks = tasks.some((t) => t.status !== TASK_STATUS.CANCELLED);
 
   // Permission checks
   const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
@@ -92,6 +94,20 @@ export function TaskHistoryContextMenu({
 
   // Users who can access advanced menu options: ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC
   const canAccessAdvancedMenu = isAdmin || isFinancialUser || isLogisticOrCommercial;
+
+  // Users who can cancel tasks: ADMIN, LOGISTIC, FINANCIAL, COMMERCIAL
+  const canCancel = isAdmin || isFinancialUser || isLogisticOrCommercial;
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[TaskHistoryContextMenu] Cancel permission check:', {
+      userPrivilege: user?.sector?.privileges,
+      isAdmin,
+      isFinancialUser,
+      isLogisticOrCommercial,
+      canCancel,
+      hasNonCancelledTasks,
+    });
+  }
 
   // Check if we're on the preparation/agenda route (to hide Definir Setor)
   const isPreparationRoute = navigationRoute === 'preparation';
@@ -363,6 +379,37 @@ export function TaskHistoryContextMenu({
       }
       toast.error("Erro ao liberar tarefa(s)", {
         description: "Não foi possível atualizar a previsão. Tente novamente.",
+      });
+    }
+    setDropdownOpen(false);
+  };
+
+  const handleCancel = async () => {
+    try {
+      // Update all non-cancelled tasks to CANCELLED status
+      for (const t of tasks) {
+        if (t.status !== TASK_STATUS.CANCELLED) {
+          await update({
+            id: t.id,
+            data: { status: TASK_STATUS.CANCELLED },
+          });
+        }
+      }
+
+      toast.success(
+        isBulk ? "Tarefas canceladas" : "Tarefa cancelada",
+        {
+          description: isBulk
+            ? `${tasks.length} tarefa(s) foram canceladas`
+            : "A tarefa foi cancelada com sucesso",
+        }
+      );
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error cancelling task(s):", error);
+      }
+      toast.error("Erro ao cancelar tarefa(s)", {
+        description: "Não foi possível cancelar. Tente novamente.",
       });
     }
     setDropdownOpen(false);
@@ -657,6 +704,16 @@ export function TaskHistoryContextMenu({
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
+          )}
+
+          {/* Cancel action - ADMIN, LOGISTIC, FINANCIAL, COMMERCIAL */}
+          {canCancel && hasNonCancelledTasks && <DropdownMenuSeparator />}
+
+          {canCancel && hasNonCancelledTasks && (
+            <DropdownMenuItem onClick={handleCancel} className="text-orange-600 hover:text-white">
+              <IconX className="mr-2 h-4 w-4" />
+              {isBulk ? "Cancelar selecionadas" : "Cancelar"}
+            </DropdownMenuItem>
           )}
 
           {/* Delete action - ADMIN only */}

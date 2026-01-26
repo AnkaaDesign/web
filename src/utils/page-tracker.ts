@@ -9,7 +9,17 @@ interface PageAccess {
 const PAGE_ACCESS_KEY = "ankaa_page_access";
 const MAX_TRACKED_PAGES = 20;
 
+// Pages that should not be tracked or displayed in recents/most accessed
+const EXCLUDED_PATHS = ["/", "/login", "/logout", "/register", "/forgot-password", "/reset-password"];
+
+function isExcludedPath(path: string): boolean {
+  return EXCLUDED_PATHS.some((excluded) => path === excluded || path.startsWith(excluded + "?"));
+}
+
 export function trackPageAccess(path: string, title: string, icon?: string): void {
+  // Don't track excluded pages
+  if (isExcludedPath(path)) return;
+
   try {
     const storedData = localStorage.getItem(PAGE_ACCESS_KEY);
     const pageAccesses: PageAccess[] = storedData ? JSON.parse(storedData) : [];
@@ -56,7 +66,9 @@ export function getMostAccessedPages(limit: number = 6): PageAccess[] {
     const pageAccesses: PageAccess[] = JSON.parse(storedData);
 
     // Sort by count (descending) and then by last accessed (most recent first)
+    // Filter out excluded paths
     return pageAccesses
+      .filter((page) => !isExcludedPath(page.path))
       .sort((a, b) => {
         if (b.count !== a.count) return b.count - a.count;
         return new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime();
@@ -78,7 +90,9 @@ export function getRecentPages(limit: number = 6): PageAccess[] {
     const pageAccesses: PageAccess[] = JSON.parse(storedData);
 
     // Sort by last accessed (most recent first)
+    // Filter out excluded paths
     return pageAccesses
+      .filter((page) => !isExcludedPath(page.path))
       .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
       .slice(0, limit);
   } catch (error) {

@@ -173,15 +173,6 @@ export const ENTITY_PRESETS: Record<string, FilterDefinition> = {
     }
   ),
 
-  "high-priority": createFilterPreset(
-    "Alta prioridade",
-    [createFilterGroup([SelectFilterBuilder.equals("priority", "HIGH")], "AND")],
-    {
-      description: "Itens com alta prioridade",
-      isPreset: true,
-    }
-  ),
-
   "low-stock-items": createFilterPreset(
     "Estoque baixo",
     [

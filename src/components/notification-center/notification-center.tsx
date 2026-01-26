@@ -9,7 +9,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { NotificationBadge } from "./notification-badge";
 import { NotificationList } from "./notification-list";
 import { useNotificationCenter } from "@/hooks/use-notification-center";
@@ -120,6 +119,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     notifications,
     unreadCount,
     isLoading,
+    isLoadingMore,
     isConnected,
     markAsRead,
     markAllAsRead,
@@ -217,10 +217,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
 
   const handleMarkAllAsRead = async () => {
     await markAllAsRead();
-  };
-
-  const handleLoadMore = async () => {
-    await loadMore();
   };
 
   const handleRemindLater = async (notification: Notification) => {
@@ -327,28 +323,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
               onNotificationClick={handleNotificationClick}
               onRemindLater={handleRemindLater}
               onDismiss={handleDismiss}
-              maxHeight="calc(100vh - 180px)"
+              maxHeight="calc(100vh - 140px)"
               currentUserId={user?.id}
+              hasMore={hasMore}
+              onLoadMore={loadMore}
+              isLoadingMore={isLoadingMore}
             />
           )}
         </div>
 
-        {/* Footer - Load More */}
-        {hasMore && notifications.length > 0 && (
-          <>
-            <Separator />
-            <div className="p-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLoadMore}
-                className="w-full justify-center text-xs"
-              >
-                Carregar mais
-              </Button>
-            </div>
-          </>
-        )}
       </SheetContent>
     </Sheet>
   );

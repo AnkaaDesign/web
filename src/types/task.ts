@@ -42,7 +42,6 @@ export interface Task extends BaseEntity {
   reimbursementInvoiceIds?: string[];
   baseFileIds?: string[];
   createdById: string | null;
-  priority?: string | null;
 
   // Relations
   sector?: Sector;
