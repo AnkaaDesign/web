@@ -86,17 +86,21 @@ function getIdentificador(task: Task): string {
 
 /**
  * Check if two tasks should be grouped together
+ * @param maxGap - Maximum allowed gap between serial numbers (default: 5)
+ *                 This allows grouping sequences like 37057, 37058, 37059, 37061, 37062
+ *                 where some numbers are missing in the middle
  */
 function shouldGroupTasks(
   task1: Task,
   task2: Task,
-  similarityThreshold: number = 0.8
+  similarityThreshold: number = 0.8,
+  maxGap: number = 5
 ): boolean {
   // Check name similarity
   const nameSimilarity = stringSimilarity(task1.name, task2.name);
   if (nameSimilarity < similarityThreshold) return false;
 
-  // Check if serial numbers are sequential
+  // Check if serial numbers are within acceptable range
   const id1 = getIdentificador(task1);
   const id2 = getIdentificador(task2);
 
@@ -105,8 +109,11 @@ function shouldGroupTasks(
 
   if (num1 === null || num2 === null) return false;
 
-  // Check if numbers are sequential (difference of 1)
-  return Math.abs(num1 - num2) === 1;
+  // Check if numbers are close enough (allowing gaps in the sequence)
+  // This handles cases like: 37057, 37058, 37059, 37061, 37062, 37064, 37065, 37067, 37068
+  // where some serial numbers are missing but they should still be grouped
+  const diff = Math.abs(num1 - num2);
+  return diff >= 1 && diff <= maxGap;
 }
 
 export interface TaskGroup {
@@ -120,11 +127,14 @@ export interface TaskGroup {
 /**
  * Group sequential tasks with similar names
  * Returns an array of TaskGroup objects that can be rendered
+ * @param maxGap - Maximum allowed gap between serial numbers (default: 5)
+ *                 Allows grouping sequences with missing numbers in the middle
  */
 export function groupSequentialTasks(
   tasks: Task[],
   minGroupSize: number = 3,
-  similarityThreshold: number = 0.8
+  similarityThreshold: number = 0.8,
+  maxGap: number = 5
 ): TaskGroup[] {
   if (tasks.length === 0) return [];
 
@@ -135,13 +145,13 @@ export function groupSequentialTasks(
     const currentTask = tasks[i];
     const groupTasks: Task[] = [currentTask];
 
-    // Look ahead to find sequential tasks
+    // Look ahead to find sequential tasks (allowing gaps)
     let j = i + 1;
     while (j < tasks.length) {
       const nextTask = tasks[j];
       const lastTaskInGroup = groupTasks[groupTasks.length - 1];
 
-      if (shouldGroupTasks(lastTaskInGroup, nextTask, similarityThreshold)) {
+      if (shouldGroupTasks(lastTaskInGroup, nextTask, similarityThreshold, maxGap)) {
         groupTasks.push(nextTask);
         j++;
       } else {

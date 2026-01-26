@@ -8,6 +8,7 @@ import { FavoritesProvider } from "@/contexts/favorites-context";
 import { FileViewerProvider } from "@/components/common/file/file-viewer";
 import { MessageModalProvider } from "@/components/common/message-modal";
 import { AutoPrivilegeRoute } from "@/components/navigation/auto-privilege-route";
+import { DeepLinkRedirect } from "@/components/navigation/deep-link-redirect";
 import { MainLayout } from "@/layouts/main-layout";
 import { AuthLayout } from "@/layouts/auth-layout";
 import { Toaster } from "@/components/ui/sonner";
@@ -352,6 +353,28 @@ function App() {
                               <Route path={routes.authentication.verifyPasswordReset} element={<VerifyPasswordResetPage />} />
                               <Route path={routes.authentication.resetPassword(":token")} element={<ResetPasswordPage />} />
                             </Route>
+
+                            {/* Deep link redirect routes - handle universal links from mobile */}
+                            {/* These routes intercept deep links like /task/123, /order/456 and redirect to proper web routes */}
+                            <Route path="/task/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/order/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/item/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/service-order/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/user/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/customer/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/supplier/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/notification/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/borrow/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/maintenance/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/financial/:id" element={<DeepLinkRedirect />} />
+                            {/* List page deep links without ID like /items, /orders, /tasks */}
+                            <Route path="/items" element={<Navigate to={routes.inventory.products.root} replace />} />
+                            <Route path="/orders" element={<Navigate to={routes.inventory.orders.root} replace />} />
+                            <Route path="/tasks" element={<Navigate to={routes.production.preparation.root} replace />} />
+                            <Route path="/users" element={<Navigate to={routes.administration.collaborators.root} replace />} />
+                            <Route path="/customers" element={<Navigate to={routes.administration.customers.root} replace />} />
+                            <Route path="/suppliers" element={<Navigate to={routes.inventory.suppliers.root} replace />} />
+                            <Route path="/notifications" element={<Navigate to={routes.administration.notifications.root} replace />} />
 
                             {/* Protected routes with automatic privilege checking */}
               <Route
