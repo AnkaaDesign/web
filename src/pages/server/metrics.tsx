@@ -828,26 +828,38 @@ export function ServerMetricsPage() {
                         </div>
 
                         {/* Health Percentage */}
-                        <div className="bg-muted/50 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-medium text-muted-foreground">Saúde Geral</span>
-                            <span className={`text-lg font-bold ${getSsdHealthColor(calculateSsdHealthPercentage(ssd))}`}>{calculateSsdHealthPercentage(ssd)}%</span>
+                        {ssd.health.overall === "UNKNOWN" && ssd.health.status?.includes("smartmontools") ? (
+                          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                              <IconAlertTriangle className="h-4 w-4 flex-shrink-0" />
+                              <div className="text-xs">
+                                <div className="font-medium">Dados SMART indisponíveis</div>
+                                <div className="opacity-75 mt-0.5">Instale: sudo apt install smartmontools</div>
+                              </div>
+                            </div>
                           </div>
-                          <div className="w-full bg-muted rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full transition-all ${
-                                calculateSsdHealthPercentage(ssd) >= 80
-                                  ? "bg-green-600"
-                                  : calculateSsdHealthPercentage(ssd) >= 60
-                                    ? "bg-amber-600"
-                                    : calculateSsdHealthPercentage(ssd) >= 40
-                                      ? "bg-orange-600"
-                                      : "bg-red-600"
-                              }`}
-                              style={{ width: `${calculateSsdHealthPercentage(ssd)}%` }}
-                            />
+                        ) : (
+                          <div className="bg-muted/50 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-medium text-muted-foreground">Saúde Geral</span>
+                              <span className={`text-lg font-bold ${getSsdHealthColor(calculateSsdHealthPercentage(ssd))}`}>{calculateSsdHealthPercentage(ssd)}%</span>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full transition-all ${
+                                  calculateSsdHealthPercentage(ssd) >= 80
+                                    ? "bg-green-600"
+                                    : calculateSsdHealthPercentage(ssd) >= 60
+                                      ? "bg-amber-600"
+                                      : calculateSsdHealthPercentage(ssd) >= 40
+                                        ? "bg-orange-600"
+                                        : "bg-red-600"
+                                }`}
+                                style={{ width: `${calculateSsdHealthPercentage(ssd)}%` }}
+                              />
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                         {/* Metrics */}
                         <div className="space-y-2 text-xs">
@@ -967,7 +979,8 @@ export function ServerMetricsPage() {
             </CardContent>
           </Card>
 
-          {/* RAID Status */}
+          {/* RAID Status - Only show if RAID arrays exist */}
+          {!isRaidLoading && raidStatus?.data?.arrays && raidStatus.data.arrays.length > 0 && (
           <Card className="flex-shrink-0">
             <CardHeader className="px-8 py-6 pb-4">
               <CardTitle className="text-xl flex items-center gap-3">
@@ -978,46 +991,8 @@ export function ServerMetricsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-8 py-6 pt-2">
-              {isRaidLoading ? (
-                <div className="space-y-4">
-                  {Array.from({ length: 2 }).map((_, i) => (
-                    <div key={i} className="animate-pulse border rounded p-4">
-                      <div className="flex justify-between items-center">
-                        <div className="space-y-2">
-                          <div className="h-4 bg-gray-200 rounded w-32"></div>
-                          <div className="h-3 bg-gray-200 rounded w-24"></div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="h-3 bg-gray-200 rounded w-20"></div>
-                          <div className="h-3 bg-gray-200 rounded w-16"></div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                (() => {
+              {(() => {
                   const data = getRaidData();
-
-                  if (data.hasError) {
-                    return (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <IconShield className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <div className="text-sm">{data.errorMessage}</div>
-                        <div className="text-xs mt-1">Arrays RAID podem não estar configurados ou disponíveis</div>
-                      </div>
-                    );
-                  }
-
-                  if (!data.arrays || data.arrays.length === 0) {
-                    return (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <IconShield className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <div className="text-sm">Nenhum array RAID encontrado</div>
-                        <div className="text-xs mt-1">Sistema não possui arrays RAID configurados</div>
-                      </div>
-                    );
-                  }
 
                   return (
                     <div className="space-y-6">
@@ -1151,10 +1126,10 @@ export function ServerMetricsPage() {
                       </div>
                     </div>
                   );
-                })()
-              )}
+                })()}
             </CardContent>
           </Card>
+          )}
         </CardContent>
       </Card>
       </div>

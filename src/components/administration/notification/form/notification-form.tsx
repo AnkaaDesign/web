@@ -37,6 +37,9 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
   const [messageLength, setMessageLength] = useState(0);
   const [titleLength, setTitleLength] = useState(0);
+  const [targetingType, setTargetingType] = useState<'specific' | 'all'>(
+    defaultValues?.userId === null ? 'all' : 'specific'
+  );
 
   const { data: users } = useUsers({
     limit: 1000,
@@ -94,6 +97,15 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
         return;
       }
 
+      // Validate user selection when targeting specific users
+      if (targetingType === 'specific' && !data.userId) {
+        form.setError("userId", {
+          type: "required",
+          message: "Selecione um usuário para enviar a notificação",
+        });
+        return;
+      }
+
       // Validate action URL if action type is provided
       if (data.actionType && !data.actionUrl) {
         form.setError("actionUrl", {
@@ -129,7 +141,7 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
   // Get channel count for display
   const selectedChannelCount = selectedChannels.length;
   const allUsers = users?.data || [];
-  const recipientCount = currentUserId ? 1 : allUsers.length;
+  const recipientCount = targetingType === 'all' ? allUsers.length : (currentUserId ? 1 : 0);
 
   // Character limits
   const TITLE_MAX_LENGTH = 200;
@@ -243,40 +255,68 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
 
             {/* Recipients and Importance */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* User */}
-              <FormField
-                control={form.control}
-                name="userId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Destinatário
-                    </FormLabel>
-                    <FormControl>
-                      <Combobox
-                        value={field.value || ""}
-                        onValueChange={field.onChange}
-                        options={[
-                          { value: "", label: `Todos os usuários (${allUsers.length})` },
-                          ...allUsers.map((user) => ({
-                            value: user.id,
-                            label: user.name,
-                            sublabel: user.email || undefined,
-                          })),
-                        ]}
-                        placeholder="Selecione o usuário (opcional)"
-                        searchable={true}
-                        clearable={false}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                    {!currentUserId && allUsers.length > 0 && (
-                      <div className="text-xs text-muted-foreground">A notificação será enviada para todos os {allUsers.length} usuários ativos</div>
+              {/* Targeting Type and User Selection */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Tipo de Destinatário
+                  </Label>
+                  <Combobox
+                    value={targetingType}
+                    onValueChange={(value) => {
+                      const newType = value as 'specific' | 'all';
+                      setTargetingType(newType);
+                      if (newType === 'all') {
+                        form.setValue('userId', null);
+                      } else {
+                        form.setValue('userId', null);
+                      }
+                    }}
+                    options={[
+                      { value: 'specific', label: 'Usuário Específico' },
+                      { value: 'all', label: `Todos os Usuários (${allUsers.length})` },
+                    ]}
+                    placeholder="Selecione o tipo de destinatário"
+                    searchable={false}
+                    clearable={false}
+                  />
+                </div>
+
+                {/* User Selection - Only show when targeting specific users */}
+                {targetingType === 'specific' && (
+                  <FormField
+                    control={form.control}
+                    name="userId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Selecione o Usuário <span className="text-destructive">*</span></FormLabel>
+                        <FormControl>
+                          <Combobox
+                            value={field.value || ""}
+                            onValueChange={field.onChange}
+                            options={allUsers.map((user) => ({
+                              value: user.id,
+                              label: user.name,
+                              sublabel: user.email || undefined,
+                            }))}
+                            placeholder="Buscar usuário..."
+                            searchable={true}
+                            clearable={false}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
                     )}
-                  </FormItem>
+                  />
                 )}
-              />
+
+                {targetingType === 'all' && allUsers.length > 0 && (
+                  <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                    A notificação será enviada para todos os {allUsers.length} usuários ativos
+                  </div>
+                )}
+              </div>
 
               {/* Importance */}
               <FormField
@@ -428,16 +468,18 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
             {/* Submit Section */}
             <div className="flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center">
               <div className="text-sm text-muted-foreground">
-                {selectedChannelCount > 0 && recipientCount > 0 && (
+                {targetingType === 'specific' && !currentUserId ? (
+                  <span className="text-amber-600">Selecione um usuário para continuar</span>
+                ) : selectedChannelCount > 0 && recipientCount > 0 ? (
                   <span>
                     Será enviada para {recipientCount} destinatário{recipientCount !== 1 ? "s" : ""}
                     via {selectedChannelCount} canal{selectedChannelCount !== 1 ? "is" : ""}
                   </span>
-                )}
+                ) : null}
               </div>
 
               <div className="flex gap-3">
-                <Button type="submit" disabled={isLoading || selectedChannelCount === 0 || messageLength === 0 || titleLength === 0} className="min-w-[120px]">
+                <Button type="submit" disabled={isLoading || selectedChannelCount === 0 || messageLength === 0 || titleLength === 0 || (targetingType === 'specific' && !currentUserId)} className="min-w-[120px]">
                   {isLoading ? (
                     <>
                       <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />

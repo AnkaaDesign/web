@@ -22,7 +22,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
   const [blocks, setBlocks] = useState<ContentBlock[]>(initialData?.blocks || []);
   const [metadata, setMetadata] = useState({
     title: initialData?.title || '',
-    targeting: initialData?.targeting || { type: 'all' as const },
+    targeting: initialData?.targeting || { type: 'specific' as const, userIds: [] },
     scheduling: initialData?.scheduling || {},
   });
 
@@ -44,7 +44,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
         });
         setMetadata({
           title: initialData.title || '',
-          targeting: initialData.targeting || { type: 'all' as const },
+          targeting: initialData.targeting || { type: 'specific' as const, userIds: [] },
           scheduling: initialData.scheduling || {},
         });
       }
@@ -53,12 +53,23 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
 
   // Preview only needs blocks, but publishing needs title + blocks
   const canPreview = blocks.length > 0;
-  const canPublish = metadata.title.trim().length > 0 && blocks.length > 0;
-  const isValid = canPublish; // For draft/publish, require title
+
+  // Check if targeting is valid (for specific types, ensure selections are made)
+  const isTargetingValid = () => {
+    const { type, userIds, sectorIds, positionIds } = metadata.targeting;
+    if (type === 'all') return true;
+    if (type === 'specific') return (userIds?.length ?? 0) > 0;
+    if (type === 'sector') return (sectorIds?.length ?? 0) > 0;
+    if (type === 'position') return (positionIds?.length ?? 0) > 0;
+    return false;
+  };
+
+  const canPublish = metadata.title.trim().length > 0 && blocks.length > 0 && isTargetingValid();
+  const isValid = canPublish; // For draft/publish, require title and valid targeting
   const isDirty = blocks.length > 0 || metadata.title.length > 0;
 
   // Validation for each step
-  const step1Valid = metadata.title.trim().length > 0;
+  const step1Valid = metadata.title.trim().length > 0 && isTargetingValid();
   const step2Valid = blocks.length > 0;
 
   const stepErrors = {

@@ -32,10 +32,10 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
 
   // Targeting type options
   const targetingTypeOptions = [
-    { value: 'all', label: 'Todos os Usuários' },
     { value: 'specific', label: 'Usuários Específicos' },
     { value: 'sector', label: 'Por Setor' },
     { value: 'position', label: 'Por Cargo' },
+    { value: 'all', label: 'Todos os Usuários' },
   ];
 
   return (
@@ -100,7 +100,9 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
           {/* Show user combobox when "specific" is selected */}
           {data.targeting.type === 'specific' && (
             <div className="space-y-2">
-              <Label htmlFor="targeting-users">Selecione os Usuários</Label>
+              <Label htmlFor="targeting-users">
+                Selecione os Usuários <span className="text-destructive">*</span>
+              </Label>
               <Combobox
                 mode="multiple"
                 async
@@ -160,13 +162,20 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
                 searchPlaceholder="Buscar usuários..."
                 emptyText="Nenhum usuário encontrado"
               />
+              {(!data.targeting.userIds || data.targeting.userIds.length === 0) && (
+                <p className="text-xs text-amber-600">
+                  Selecione pelo menos um usuário para continuar
+                </p>
+              )}
             </div>
           )}
 
           {/* Show sector combobox when "sector" is selected */}
           {data.targeting.type === 'sector' && (
             <div className="space-y-2">
-              <Label htmlFor="targeting-sectors">Selecione os Setores</Label>
+              <Label htmlFor="targeting-sectors">
+                Selecione os Setores <span className="text-destructive">*</span>
+              </Label>
               <Combobox
                 mode="multiple"
                 async
@@ -208,13 +217,20 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
                 searchPlaceholder="Buscar setores..."
                 emptyText="Nenhum setor encontrado"
               />
+              {(!data.targeting.sectorIds || data.targeting.sectorIds.length === 0) && (
+                <p className="text-xs text-amber-600">
+                  Selecione pelo menos um setor para continuar
+                </p>
+              )}
             </div>
           )}
 
           {/* Show position combobox when "position" is selected */}
           {data.targeting.type === 'position' && (
             <div className="space-y-2">
-              <Label htmlFor="targeting-positions">Selecione os Cargos</Label>
+              <Label htmlFor="targeting-positions">
+                Selecione os Cargos <span className="text-destructive">*</span>
+              </Label>
               <Combobox
                 mode="multiple"
                 async
@@ -256,6 +272,11 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
                 searchPlaceholder="Buscar cargos..."
                 emptyText="Nenhum cargo encontrado"
               />
+              {(!data.targeting.positionIds || data.targeting.positionIds.length === 0) && (
+                <p className="text-xs text-amber-600">
+                  Selecione pelo menos um cargo para continuar
+                </p>
+              )}
             </div>
           )}
         </CardContent>

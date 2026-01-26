@@ -3584,12 +3584,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     <CardContent className="pt-0">
                       <FileUploadField
                         onFilesChange={handleBaseFilesChange}
-                        maxFiles={5}
+                        maxFiles={20}
+                        maxSize={500 * 1024 * 1024}
                         disabled={isSubmitting}
                         showPreview={true}
                         existingFiles={baseFiles}
                         variant="compact"
-                        placeholder="Adicione arquivos base para a tarefa"
+                        placeholder="Adicione arquivos base para a tarefa (imagens, vídeos, documentos)"
                         label="Arquivos base anexados"
                       />
                     </CardContent>
