@@ -765,7 +765,7 @@ export default function BonusListPage() {
         <PageHeader
           className="flex-shrink-0"
           title="Bônus"
-          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_BONUS}
+          favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_BONUS_LISTAR}
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }, { label: "Bônus" }]}
           description={(() => {
             if (filters.year && filters.months && filters.months.length > 0) {

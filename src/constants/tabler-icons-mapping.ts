@@ -322,6 +322,8 @@ export const TABLER_ICONS = {
   // Communication
   phone: "IconPhone",
   email: "IconMail",
+  message: "IconMessageCircle", // Messages menu icon
+  messageCircle: "IconMessageCircle", // Messages/chat icon
 
   // ==================== SPECIALIZED TOOLS ====================
   // Configuration Tools

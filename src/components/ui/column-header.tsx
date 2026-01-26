@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   IconSelector,
   IconChevronUp,
@@ -122,13 +122,25 @@ export function ColumnHeader({
 }: ColumnHeaderProps) {
   const [isHovering, setIsHovering] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [startWidth, setStartWidth] = useState(0);
-  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Use refs for resize state to avoid stale closure issues with document event listeners
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0); // Cursor X position when drag started
+  const startWidthRef = useRef(0); // Column width when drag started
+  const onResizeRef = useRef(onResize);
+
+  // Keep onResize ref up to date
+  useEffect(() => {
+    onResizeRef.current = onResize;
+  }, [onResize]);
+
+  const headerRef = useRef<HTMLTableCellElement>(null);
   const resizeHandleRef = useRef<HTMLDivElement>(null);
 
-  const headerText = typeof children === "string" ? children : String(children);
-  const displayTooltip = tooltip || headerText;
+  // Check if children is a string or a React element
+  const isStringChildren = typeof children === "string";
+  const headerText = isStringChildren ? children : "";
+  const displayTooltip = tooltip || (isStringChildren ? headerText : "");
 
   const isActive = sortDirection !== null;
   const hasFilter = filterConfig?.isActive;
@@ -153,7 +165,7 @@ export function ColumnHeader({
   const getAriaLabel = (): string => {
     if (ariaLabel) return ariaLabel;
 
-    let label = `${headerText}`;
+    let label = isStringChildren ? headerText : "Coluna";
 
     if (sortable) {
       label += sortDirection ? `, ordenado ${sortDirection === "asc" ? "crescente" : "decrescente"}` : ", ordenável";
@@ -170,44 +182,61 @@ export function ColumnHeader({
     return label;
   };
 
-  // Resizing functionality
-  const handleResizeStart = (e: React.MouseEvent) => {
-    if (!resizable || !onResize) return;
+  // Resizing functionality - using refs to avoid stale closure issues
+  // Key insight: Track the DIFFERENCE from starting position, not absolute position
+  // This ensures the divider moves exactly with the cursor, no matter where you grab it
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isResizingRef.current) return;
 
-    e.preventDefault();
-    setIsResizing(true);
-    setStartX(e.clientX);
-    setStartWidth(headerRef.current?.offsetWidth || 0);
+    // Calculate how far the cursor has moved from the starting position
+    const diff = e.clientX - startXRef.current;
+    // New width = initial width + cursor movement
+    const newWidth = startWidthRef.current + diff;
+    const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
 
-    document.addEventListener("mousemove", handleResizeMove);
-    document.addEventListener("mouseup", handleResizeEnd);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-  };
+    if (onResizeRef.current) {
+      onResizeRef.current(clampedWidth);
+    }
+  }, [minWidth, maxWidth]);
 
-  const handleResizeMove = (e: MouseEvent) => {
-    if (!isResizing || !onResize) return;
-
-    const diff = e.clientX - startX;
-    const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + diff));
-    onResize(newWidth);
-  };
-
-  const handleResizeEnd = () => {
+  const handleResizeEnd = useCallback(() => {
+    isResizingRef.current = false;
     setIsResizing(false);
     document.removeEventListener("mousemove", handleResizeMove);
     document.removeEventListener("mouseup", handleResizeEnd);
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
-  };
+  }, [handleResizeMove]);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    if (!resizable || !onResizeRef.current) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Store initial cursor position and column width
+    // This allows us to calculate relative movement, keeping cursor aligned with divider
+    startXRef.current = e.clientX;
+    startWidthRef.current = headerRef.current?.offsetWidth || 0;
+
+    isResizingRef.current = true;
+    setIsResizing(true);
+
+    document.addEventListener("mousemove", handleResizeMove);
+    document.addEventListener("mouseup", handleResizeEnd);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [resizable, handleResizeMove, handleResizeEnd]);
 
   // Cleanup event listeners on unmount
   useEffect(() => {
     return () => {
       document.removeEventListener("mousemove", handleResizeMove);
       document.removeEventListener("mouseup", handleResizeEnd);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
     };
-  }, []);
+  }, [handleResizeMove, handleResizeEnd]);
 
   // Sort icon component
   const SortIcon = () => {
@@ -361,20 +390,34 @@ export function ColumnHeader({
     );
   };
 
-  // Resize handle component
+  // Resize handle component - wider hit area for easier grabbing
   const ResizeHandle = () => {
     if (!resizable) return null;
 
     return (
       <div
         ref={resizeHandleRef}
-        className={cn("absolute right-0 top-0 h-full w-1 cursor-col-resize group/resize", "hover:bg-primary/30 active:bg-primary/50", {
-          "bg-primary/50": isResizing,
-        })}
+        className={cn(
+          "absolute right-0 top-0 h-full w-3 cursor-col-resize group/resize z-10",
+          "hover:bg-primary/30 active:bg-primary/50",
+          "transition-colors duration-100",
+          // Shift left by half width so it straddles the column divider
+          "-translate-x-1/2",
+          {
+            "bg-primary/50": isResizing,
+          }
+        )}
         onMouseDown={handleResizeStart}
-        aria-label={`Redimensionar coluna ${headerText}`}
+        aria-label={`Redimensionar coluna${isStringChildren ? ` ${headerText}` : ""}`}
+        role="separator"
+        aria-orientation="vertical"
       >
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover/resize:opacity-100 transition-opacity">
+        {/* Visual indicator centered in the resize handle */}
+        <div className={cn(
+          "absolute inset-0 flex items-center justify-center",
+          "opacity-0 group-hover/resize:opacity-100 transition-opacity",
+          { "opacity-100": isResizing }
+        )}>
           <IconArrowsHorizontal className="h-3 w-3 text-primary" />
         </div>
       </div>
@@ -437,14 +480,23 @@ export function ColumnHeader({
       }}
     >
       <ContentContainer>
-        {/* Column header text */}
-        <TruncatedTextWithTooltip
-          text={headerText.toUpperCase()}
-          className={cn("transition-colors duration-150", {
+        {/* Column header content - handle both string and React element children */}
+        {isStringChildren ? (
+          <TruncatedTextWithTooltip
+            text={headerText.toUpperCase()}
+            className={cn("transition-colors duration-150", {
+              "text-primary": isActive,
+              "group-hover:text-foreground": !isActive && sortable,
+            })}
+          />
+        ) : (
+          <span className={cn("transition-colors duration-150 truncate", {
             "text-primary": isActive,
             "group-hover:text-foreground": !isActive && sortable,
-          })}
-        />
+          })}>
+            {children}
+          </span>
+        )}
 
         {/* Pin indicator */}
         {isPinned && !sortable && <IconPinned className="h-3 w-3 ml-1 text-primary" />}

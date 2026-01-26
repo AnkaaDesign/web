@@ -1109,7 +1109,7 @@ export const Sidebar = memo(() => {
                 </div>
 
                 {showFavorites && isOpen && (
-                  <div className="mt-1 space-y-1 pl-12">
+                  <div className="mt-1 space-y-1 pl-6">
                     {favorites.map((fav) => (
                       <div
                         key={fav.id}

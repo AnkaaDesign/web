@@ -177,6 +177,12 @@ export const MessageDetailsPage = () => {
                     </Badge>
                   </div>
                   <div>
+                    <div className="text-sm text-muted-foreground mb-1">Criado por</div>
+                    <div className="text-sm">
+                      {message.createdBy?.name || "Não informado"}
+                    </div>
+                  </div>
+                  <div>
                     <div className="text-sm text-muted-foreground mb-1">Público-Alvo</div>
                     <div className="text-sm">
                       {!message.targets || message.targets.length === 0

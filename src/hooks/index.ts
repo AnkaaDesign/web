@@ -122,6 +122,11 @@ export * from "./deployment";
 export * from "./secullum";
 
 // =====================================================
+// Table & UI Utilities
+// =====================================================
+export * from "./use-column-widths";
+
+// =====================================================
 // Monitoring & Utilities
 // =====================================================
 // NOTE: query-error-monitor is NOT exported here to prevent module initialization issues

@@ -132,11 +132,15 @@ function createEmptyBlock(type: BlockType): ContentBlock {
 
   switch (type) {
     case 'heading1':
+      return { id, type, content: '', fontSize: 'lg', fontWeight: 'semibold' };
     case 'heading2':
+      return { id, type, content: '', fontSize: '2xl', fontWeight: 'semibold' };
     case 'heading3':
+      return { id, type, content: '', fontSize: 'xl', fontWeight: 'medium' };
     case 'paragraph':
+      return { id, type, content: '', fontSize: 'base', fontWeight: 'normal' };
     case 'quote':
-      return { id, type, content: '' };
+      return { id, type, content: '', fontSize: 'lg', fontWeight: 'normal' };
     case 'image':
       return { id, type, url: '', alignment: 'center' };
     case 'button':
@@ -152,6 +156,6 @@ function createEmptyBlock(type: BlockType): ContentBlock {
     case 'row':
       return { id, type, blocks: [], columns: 2, gap: 'md', verticalAlign: 'top' };
     default:
-      return { id, type: 'paragraph', content: '' };
+      return { id, type: 'paragraph', content: '', fontSize: 'base', fontWeight: 'normal' };
   }
 }

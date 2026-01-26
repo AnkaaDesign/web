@@ -14,10 +14,12 @@ import { MultiCutSelector, type MultiCutSelectorRef } from "../form/multi-cut-se
 import { useTaskBatchMutations } from "../../../../hooks";
 import { taskService } from "../../../../api-client/task";
 import { fileService } from "../../../../api-client/file";
-import { IconPhoto, IconFileText, IconPalette, IconCut, IconLoader2, IconAlertTriangle, IconPlus, IconFileInvoice, IconLayout } from "@tabler/icons-react";
+import { IconPhoto, IconFileText, IconPalette, IconCut, IconLoader2, IconPlus, IconFileInvoice, IconLayout } from "@tabler/icons-react";
 import { CUT_TYPE, CUT_ORIGIN, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE_LABELS } from "../../../../constants";
 import { Textarea } from "@/components/ui/textarea";
 import { serviceOrderService } from "../../../../api-client/serviceOrder";
+import { ServiceSelectorAutoGrouped } from "../form/service-selector-auto-grouped";
+import { useCurrentUser } from "../../../../hooks";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -39,6 +41,19 @@ const bulkOperationSchema = z.object({
     origin: z.nativeEnum(CUT_ORIGIN),
     fileId: z.string().optional(),
     file: z.any().optional(),
+  })).optional(),
+
+  // For service orders batch editing
+  serviceOrders: z.array(z.object({
+    id: z.string().optional(),
+    type: z.nativeEnum(SERVICE_ORDER_TYPE),
+    status: z.nativeEnum(SERVICE_ORDER_STATUS),
+    statusOrder: z.number().optional(),
+    description: z.string().min(3, "Descrição deve ter pelo menos 3 caracteres"),
+    observation: z.string().nullable().optional(),
+    assignedToId: z.string().nullable().optional(),
+    _isCommon: z.boolean().optional(),
+    _commonKey: z.string().optional(),
   })).optional(),
 });
 
@@ -73,9 +88,16 @@ export const AdvancedBulkActionsHandler = forwardRef<
     back: any | null;
   }>({ left: null, right: null, back: null });
 
-  // States for service order form
+  // States for service order form (legacy - for creating new ones)
   const [serviceOrderType, setServiceOrderType] = useState<SERVICE_ORDER_TYPE>(SERVICE_ORDER_TYPE.PRODUCTION);
   const [serviceOrderDescription, setServiceOrderDescription] = useState<string>("");
+
+  // State for common service orders (for batch editing existing ones)
+  const [commonServiceOrders, setCommonServiceOrders] = useState<any[]>([]);
+  // Track original service order IDs per task for computing updates
+  const [originalServiceOrdersMap, setOriginalServiceOrdersMap] = useState<Record<string, any[]>>({});
+  // Map of _commonKey -> array of all service order IDs across all tasks (for batch updates)
+  const [commonKeyToIdsMap, setCommonKeyToIdsMap] = useState<Record<string, string[]>>({});
 
   // States for tracking common values across selected tasks
   const [commonValues, setCommonValues] = useState<{
@@ -86,6 +108,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
     artworkFiles: Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string; thumbnailUrl?: string | null }>;
     baseFiles: Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>;
     cuts: Array<any>;
+    serviceOrders: Array<any>;
   }>({
     paintId: null,
     generalPainting: null,
@@ -94,7 +117,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
     artworkFiles: [],
     baseFiles: [],
     cuts: [],
+    serviceOrders: [],
   });
+
+  // Get current user for service order permissions
+  const { user } = useCurrentUser();
 
   const { batchUpdateAsync } = useTaskBatchMutations();
 
@@ -108,6 +135,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       paintId: null,
       paintIds: [],
       cuts: [],
+      serviceOrders: [],
     },
   });
 
@@ -124,6 +152,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
     // Reset service order states
     setServiceOrderType(SERVICE_ORDER_TYPE.PRODUCTION);
     setServiceOrderDescription("");
+    setCommonServiceOrders([]);
+    setOriginalServiceOrdersMap({});
+    setCommonKeyToIdsMap({});
 
     // Reset common values
     setCommonValues({
@@ -134,6 +165,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       artworkFiles: [],
       baseFiles: [],
       cuts: [],
+      serviceOrders: [],
     });
 
     // Reset form
@@ -141,6 +173,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       paintId: null,
       paintIds: [],
       cuts: [],
+      serviceOrders: [],
     });
   };
 
@@ -166,6 +199,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
               logoPaints: true,
               generalPainting: true,
               truck: true,
+              serviceOrders: { include: { assignedTo: true } },
             },
           });
 
@@ -181,6 +215,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             artworkFiles: [] as Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string; thumbnailUrl?: string | null }>,
             baseFiles: [] as Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>,
             cuts: [] as Array<any>,
+            serviceOrders: [] as Array<any>,
           };
 
           // Check if all tasks have the same general painting
@@ -318,6 +353,98 @@ export const AdvancedBulkActionsHandler = forwardRef<
             }
           }
 
+          // Find service orders that ALL tasks have in common (by type + description)
+          // A service order is "common" if all tasks have a service order with the same type AND description
+          if (tasks.length > 0 && type === 'serviceOrder') {
+            console.log('[DEBUG] Computing common service orders for', tasks.length, 'tasks');
+
+            // Build map of original service orders per task (for tracking updates later)
+            const serviceOrdersPerTask: Record<string, any[]> = {};
+            tasks.forEach(task => {
+              serviceOrdersPerTask[task.id] = (task.serviceOrders || []).map((so: any) => ({
+                id: so.id,
+                type: so.type,
+                status: so.status,
+                statusOrder: so.statusOrder,
+                description: so.description,
+                observation: so.observation,
+                assignedToId: so.assignedToId,
+                assignedTo: so.assignedTo,
+                taskId: so.taskId,
+              }));
+              console.log('[DEBUG] Task', task.id, 'has', (task.serviceOrders || []).length, 'service orders');
+            });
+            setOriginalServiceOrdersMap(serviceOrdersPerTask);
+
+            // Find common service orders (matching by type + description across ALL tasks)
+            const firstTaskServiceOrders = tasks[0].serviceOrders || [];
+            const commonSOs: any[] = [];
+            // Map to track all IDs for each common key
+            const keyToIdsMap: Record<string, string[]> = {};
+            // Track processed keys to avoid duplicates (if task has duplicate service orders)
+            const processedCommonKeys = new Set<string>();
+
+            firstTaskServiceOrders.forEach((firstSO: any) => {
+              const commonKey = `${firstSO.type}:${firstSO.description?.trim().toLowerCase()}`;
+
+              // Skip if we already processed this commonKey (handles duplicate SOs in same task)
+              if (processedCommonKeys.has(commonKey)) {
+                console.log('[DEBUG] Skipping duplicate commonKey:', commonKey);
+                return;
+              }
+
+              // Check if all other tasks have a service order with same type and description
+              const isCommon = tasks.every(task => {
+                return (task.serviceOrders || []).some((so: any) =>
+                  so.type === firstSO.type &&
+                  so.description?.trim().toLowerCase() === firstSO.description?.trim().toLowerCase()
+                );
+              });
+
+              if (isCommon) {
+                processedCommonKeys.add(commonKey);
+
+                // Collect ALL service order IDs across all tasks for this common key
+                // Note: If a task has multiple SOs with same type+description, we only take the first match
+                const allIdsForThisKey: string[] = [];
+                tasks.forEach(task => {
+                  const matchingSO = (task.serviceOrders || []).find((so: any) =>
+                    so.type === firstSO.type &&
+                    so.description?.trim().toLowerCase() === firstSO.description?.trim().toLowerCase()
+                  );
+                  if (matchingSO) {
+                    allIdsForThisKey.push(matchingSO.id);
+                  }
+                });
+                keyToIdsMap[commonKey] = allIdsForThisKey;
+                console.log('[DEBUG] Common key:', commonKey, '-> IDs:', allIdsForThisKey);
+
+                // Use the first task's service order as the reference
+                // Include a unique identifier based on type + description for form tracking
+                commonSOs.push({
+                  id: firstSO.id,
+                  type: firstSO.type,
+                  status: firstSO.status,
+                  statusOrder: firstSO.statusOrder || 1,
+                  description: firstSO.description,
+                  observation: firstSO.observation,
+                  assignedToId: firstSO.assignedToId,
+                  // Mark as common so we know this is an existing service order
+                  _isCommon: true,
+                  _commonKey: commonKey,
+                });
+              }
+            });
+
+            console.log('[DEBUG] Found', commonSOs.length, 'common service orders');
+            console.log('[DEBUG] keyToIdsMap:', keyToIdsMap);
+            console.log('[DEBUG] commonSOs:', commonSOs);
+
+            computed.serviceOrders = commonSOs;
+            setCommonServiceOrders(commonSOs);
+            setCommonKeyToIdsMap(keyToIdsMap);
+          }
+
           setCommonValues(computed);
 
           // Pre-fill form with common values
@@ -325,6 +452,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             paintId: computed.paintId,
             paintIds: computed.paintIds,
             cuts: computed.cuts,
+            serviceOrders: computed.serviceOrders,
           });
 
           // Pre-fill existing files for display
@@ -335,6 +463,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
           } else if (type === 'cuttingPlans') {
             // Cuts are handled by form.reset above
             setCutsCount(computed.cuts.length);
+          } else if (type === 'serviceOrder') {
+            // Service orders are handled by form.reset above
+            // The ServiceSelectorAutoGrouped component will use the form's serviceOrders field
           }
         } catch (error) {
           if (process.env.NODE_ENV !== 'production') {
@@ -663,26 +794,143 @@ export const AdvancedBulkActionsHandler = forwardRef<
           break;
 
         case "serviceOrder":
-          // Create a NEW service order for EACH selected task
-          if (serviceOrderDescription.trim()) {
-            const serviceOrdersToCreate = currentTaskIds.map(taskId => ({
-              taskId,
-              type: serviceOrderType,
-              status: SERVICE_ORDER_STATUS.PENDING,
-              description: serviceOrderDescription.trim(),
-            }));
+          // Handle batch update/create of service orders
+          const currentFormServiceOrders = form.getValues("serviceOrders") || [];
 
-            // Use batch create to create all service orders at once
-            await serviceOrderService.batchCreateServiceOrders({
-              serviceOrders: serviceOrdersToCreate,
+          console.log('[DEBUG] handleSubmit - serviceOrder case');
+          console.log('[DEBUG] currentFormServiceOrders:', currentFormServiceOrders);
+          console.log('[DEBUG] commonKeyToIdsMap (from state):', commonKeyToIdsMap);
+          console.log('[DEBUG] commonServiceOrders (from state):', commonServiceOrders);
+
+          // Build a map of original ID -> commonKey for robust matching
+          // (in case form doesn't preserve _commonKey)
+          const originalIdToCommonKey: Record<string, string> = {};
+          commonServiceOrders.forEach((origSO: any) => {
+            if (origSO.id && origSO._commonKey) {
+              originalIdToCommonKey[origSO.id] = origSO._commonKey;
+            }
+          });
+          console.log('[DEBUG] originalIdToCommonKey:', originalIdToCommonKey);
+
+          // Separate into updates (common service orders) and creates (new ones)
+          const serviceOrdersToUpdate: Array<{ id: string; data: any }> = [];
+          const serviceOrdersToCreate: Array<any> = [];
+          const processedCommonKeys: Set<string> = new Set();
+
+          currentFormServiceOrders.forEach((formSO: any, index: number) => {
+            // Try to get commonKey from form field first, then fallback to matching by ID
+            let commonKey = formSO._commonKey;
+            if (!commonKey && formSO.id) {
+              commonKey = originalIdToCommonKey[formSO.id];
+            }
+
+            const isCommonServiceOrder = commonKey && commonKeyToIdsMap[commonKey];
+
+            console.log(`[DEBUG] Processing formSO[${index}]:`, {
+              id: formSO.id,
+              type: formSO.type,
+              description: formSO.description,
+              _isCommon: formSO._isCommon,
+              _commonKey: formSO._commonKey,
+              resolvedCommonKey: commonKey,
+              isCommonServiceOrder,
             });
 
-            // Close and clear after successful creation
-            handleClose();
-            onClearSelection();
-            return; // Exit early - no need for batch task update
+            if (isCommonServiceOrder) {
+              // This is a common service order - update ALL matching ones across tasks
+              const allIds = commonKeyToIdsMap[commonKey];
+              processedCommonKeys.add(commonKey);
+              console.log(`[DEBUG] -> Will UPDATE ${allIds.length} service orders for key:`, commonKey);
+
+              allIds.forEach((soId: string) => {
+                serviceOrdersToUpdate.push({
+                  id: soId,
+                  data: {
+                    type: formSO.type,
+                    status: formSO.status,
+                    statusOrder: formSO.statusOrder,
+                    description: formSO.description?.trim(),
+                    observation: formSO.observation || null,
+                    assignedToId: formSO.assignedToId || null,
+                  },
+                });
+              });
+            } else if (!formSO.id || (typeof formSO.id === 'string' && formSO.id.startsWith('temp-'))) {
+              // This is a new service order - create for all tasks
+              console.log(`[DEBUG] -> Will CREATE new service order for all tasks`);
+              currentTaskIds.forEach(taskId => {
+                serviceOrdersToCreate.push({
+                  taskId,
+                  type: formSO.type,
+                  status: formSO.status || SERVICE_ORDER_STATUS.PENDING,
+                  statusOrder: formSO.statusOrder || 1,
+                  description: formSO.description?.trim(),
+                  observation: formSO.observation || null,
+                  assignedToId: formSO.assignedToId || null,
+                });
+              });
+            } else {
+              console.log(`[DEBUG] -> SKIPPED: not common, not new. id=${formSO.id}, _isCommon=${formSO._isCommon}, _commonKey=${formSO._commonKey}, resolvedCommonKey=${commonKey}`);
+            }
+          });
+
+          // Check for removed common service orders (ones that were in commonKeyToIdsMap but not processed)
+          const serviceOrdersToDelete: string[] = [];
+          Object.entries(commonKeyToIdsMap).forEach(([commonKey, ids]) => {
+            if (!processedCommonKeys.has(commonKey)) {
+              // This common key was removed from the form - delete all associated service orders
+              console.log(`[DEBUG] Common key ${commonKey} was removed - will delete ${ids.length} service orders`);
+              serviceOrdersToDelete.push(...ids);
+            }
+          });
+
+          console.log('[DEBUG] Final counts:');
+          console.log('[DEBUG] - serviceOrdersToUpdate:', serviceOrdersToUpdate.length, serviceOrdersToUpdate);
+          console.log('[DEBUG] - serviceOrdersToCreate:', serviceOrdersToCreate.length, serviceOrdersToCreate);
+          console.log('[DEBUG] - serviceOrdersToDelete:', serviceOrdersToDelete.length, serviceOrdersToDelete);
+
+          // Execute batch operations
+          const operations: Promise<any>[] = [];
+
+          if (serviceOrdersToUpdate.length > 0) {
+            console.log('[DEBUG] Calling batchUpdateServiceOrders...');
+            operations.push(
+              serviceOrderService.batchUpdateServiceOrders({
+                serviceOrders: serviceOrdersToUpdate,
+              })
+            );
           }
-          break;
+
+          if (serviceOrdersToCreate.length > 0) {
+            console.log('[DEBUG] Calling batchCreateServiceOrders...');
+            operations.push(
+              serviceOrderService.batchCreateServiceOrders({
+                serviceOrders: serviceOrdersToCreate,
+              })
+            );
+          }
+
+          if (serviceOrdersToDelete.length > 0) {
+            console.log('[DEBUG] Calling batchDeleteServiceOrders...');
+            operations.push(
+              serviceOrderService.batchDeleteServiceOrders({
+                serviceOrderIds: serviceOrdersToDelete,
+              })
+            );
+          }
+
+          if (operations.length > 0) {
+            console.log('[DEBUG] Executing', operations.length, 'operations...');
+            await Promise.all(operations);
+            console.log('[DEBUG] All operations completed');
+          } else {
+            console.log('[DEBUG] No operations to execute');
+          }
+
+          // Close and clear after successful operations
+          handleClose();
+          onClearSelection();
+          return; // Exit early - no need for batch task update
       }
 
       // Extract per-task data and internal flags
@@ -1007,47 +1255,18 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
       case "serviceOrder":
         return (
-          <div className="space-y-4">
-            {/* Service Type Selector */}
-            <div className="space-y-2">
-              <Label>Tipo de Servico</Label>
-              <Select
-                value={serviceOrderType}
-                onValueChange={(value) => setServiceOrderType(value as SERVICE_ORDER_TYPE)}
+          <FormProvider {...form} key={`serviceOrder-${currentTaskIds.join(',')}`}>
+            <div className="max-h-[60vh] overflow-y-auto">
+              {/* Service Orders Selector - exactly like task edit form */}
+              <ServiceSelectorAutoGrouped
+                control={form.control}
                 disabled={isSubmitting}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(SERVICE_ORDER_TYPE).map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {SERVICE_ORDER_TYPE_LABELS[type]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Description Field */}
-            <div className="space-y-2">
-              <Label>Descricao</Label>
-              <Textarea
-                value={serviceOrderDescription}
-                onChange={(e) => setServiceOrderDescription(e.target.value)}
-                placeholder="Descreva o servico a ser realizado..."
-                disabled={isSubmitting}
-                rows={4}
+                currentUserId={user?.id}
+                userPrivilege={user?.sector?.privileges}
+                isTeamLeader={false}
               />
             </div>
-
-            {/* Info about creating separate service orders */}
-            <Alert>
-              <AlertDescription>
-                Sera criada uma ordem de servico separada para cada tarefa selecionada ({currentTaskIds.length} {currentTaskIds.length === 1 ? "tarefa" : "tarefas"}).
-              </AlertDescription>
-            </Alert>
-          </div>
+          </FormProvider>
         );
 
       default:
@@ -1064,7 +1283,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className={`${operationType === "layout" ? "sm:max-w-4xl" : "sm:max-w-2xl"} max-h-[85vh] flex flex-col`}>
+      <DialogContent className={`${operationType === "layout" || operationType === "serviceOrder" ? "sm:max-w-4xl" : "sm:max-w-2xl"} max-h-[85vh] flex flex-col`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getModalIcon()}

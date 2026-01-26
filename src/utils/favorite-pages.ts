@@ -80,6 +80,7 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/administracao/arquivos": FAVORITE_PAGES.ADMINISTRACAO_ARQUIVOS_LISTAR,
   "/administracao/setores": FAVORITE_PAGES.ADMINISTRACAO_SETORES_LISTAR,
   "/administracao/notificacoes": FAVORITE_PAGES.ADMINISTRACAO_NOTIFICACOES_LISTAR,
+  "/administracao/mensagens": FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_LISTAR,
 
   // Administration - Create Pages
   "/administracao/clientes/cadastrar": FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_CADASTRAR,
@@ -88,6 +89,7 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/administracao/arquivos/upload": FAVORITE_PAGES.ADMINISTRACAO_ARQUIVOS_CADASTRAR,
   "/administracao/setores/cadastrar": FAVORITE_PAGES.ADMINISTRACAO_SETORES_CADASTRAR,
   "/administracao/notificacoes/cadastrar/enviar": FAVORITE_PAGES.ADMINISTRACAO_NOTIFICACOES_CADASTRAR,
+  "/administracao/mensagens/criar": FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_CRIAR,
 
   // Human Resources - List Pages
   "/recursos-humanos/cargos": FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR,

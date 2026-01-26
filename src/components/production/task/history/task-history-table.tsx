@@ -23,6 +23,8 @@ import { TaskHistoryTableSkeleton } from "./task-history-table-skeleton";
 import { useNavigate } from "react-router-dom";
 import { groupSequentialTasks, type TaskGroup } from "./task-grouping-utils";
 import { CollapsedGroupRow } from "./collapsed-group-row";
+import { ColumnHeader } from "@/components/ui/column-header";
+import { useColumnWidths, DEFAULT_COLUMN_WIDTHS, COLUMN_WIDTH_CONSTRAINTS } from "@/hooks/use-column-widths";
 
 interface TaskHistoryTableProps {
   visibleColumns: Set<string>;
@@ -84,6 +86,13 @@ export function TaskHistoryTable({
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
+
+  // Column widths management for resizable columns
+  const storageKey = `task-history-column-widths-${navigationRoute}`;
+  const { getColumnWidth, setColumnWidth } = useColumnWidths({
+    storageKey,
+    defaultWidths: DEFAULT_COLUMN_WIDTHS,
+  });
 
   // Use URL state management for pagination and selection
   const tableState = useTableState({
@@ -409,13 +418,18 @@ export function TaskHistoryTable({
   }, [isSelectingSourceTask, onSourceTaskSelect, toggleSelection, onSingleClickSelect, onShiftClickSelect, handleSelectItem, navigationRoute, navigate]);
 
   // Helper function to render task cells
+  // Use compact padding for preparation view
+  const isCompactView = navigationRoute === 'preparation';
+  const cellPaddingClass = isCompactView ? "px-4 py-1" : "px-4 py-2";
+  const checkboxPaddingClass = isCompactView ? "px-2 py-1" : "px-2 py-2";
+
   const renderTaskCells = useCallback((task: Task, taskIsSelected: boolean) => {
     return (
       <>
         {/* Selection checkbox - only show for users who can edit */}
         {canEdit && (
           <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-            <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => {
+            <div className={cn("flex items-center justify-center h-full w-full", checkboxPaddingClass)} onClick={(e) => {
               e.stopPropagation();
               if (e.shiftKey && onShiftClickSelect) {
                 // Use cross-table shift+click selection
@@ -434,7 +448,7 @@ export function TaskHistoryTable({
           </TableCell>
         )}
 
-        {/* Data columns */}
+        {/* Data columns with dynamic widths */}
         {columns.map((column) => (
           <TableCell
             key={column.id}
@@ -442,8 +456,13 @@ export function TaskHistoryTable({
               column.className,
               "p-0 !border-r-0",
             )}
+            style={{
+              width: getColumnWidth(column.id),
+              minWidth: COLUMN_WIDTH_CONSTRAINTS.minWidth,
+              maxWidth: COLUMN_WIDTH_CONSTRAINTS.maxWidth,
+            }}
           >
-            <div className="px-4 py-2 relative">
+            <div className={cn(cellPaddingClass, "relative overflow-hidden")}>
               {column.formatter
                 ? column.formatter(
                     column.accessorFn
@@ -459,7 +478,7 @@ export function TaskHistoryTable({
         ))}
       </>
     );
-  }, [canEdit, columns, onShiftClickSelect, handleSelectItem, onSingleClickSelect]);
+  }, [canEdit, columns, onShiftClickSelect, handleSelectItem, onSingleClickSelect, getColumnWidth, cellPaddingClass, checkboxPaddingClass]);
 
   if (isLoading) {
     return <TaskHistoryTableSkeleton />;
@@ -488,26 +507,25 @@ export function TaskHistoryTable({
                 </TableHead>
               )}
 
-              {/* Data columns */}
+              {/* Data columns with resizable headers */}
               {columns.map((column) => (
-                <TableHead key={column.id} className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0", column.className)}>
-                  {column.sortable ? (
-                    <button
-                      onClick={() => toggleSort(column.id)}
-                      className={cn(
-                        "flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent",
-                      )}
-                      disabled={isLoading || tasks.length === 0}
-                    >
-                      <TruncatedTextWithTooltip text={column.header} />
-                      {renderSortIndicator(column.id)}
-                    </button>
-                  ) : (
-                    <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                      <TruncatedTextWithTooltip text={column.header} />
-                    </div>
-                  )}
-                </TableHead>
+                <ColumnHeader
+                  key={column.id}
+                  sortable={column.sortable}
+                  sortDirection={getSortDirection(column.id)}
+                  sortOrder={getSortOrder(column.id)}
+                  onSort={() => toggleSort(column.id)}
+                  showMultipleSortOrder={sortConfigs.length > 1}
+                  resizable={true}
+                  width={getColumnWidth(column.id)}
+                  minWidth={COLUMN_WIDTH_CONSTRAINTS.minWidth}
+                  maxWidth={COLUMN_WIDTH_CONSTRAINTS.maxWidth}
+                  onResize={(width) => setColumnWidth(column.id, width)}
+                  className={cn(column.className, column.headerClassName)}
+                  align={column.className?.includes("text-right") ? "right" : column.className?.includes("text-center") ? "center" : "left"}
+                >
+                  {typeof column.header === "string" ? column.header : column.header}
+                </ColumnHeader>
               ))}
 
               {/* Scrollbar spacer - only show if not overlay scrollbar */}

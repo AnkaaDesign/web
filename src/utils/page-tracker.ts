@@ -70,6 +70,25 @@ export function getMostAccessedPages(limit: number = 6): PageAccess[] {
   }
 }
 
+export function getRecentPages(limit: number = 6): PageAccess[] {
+  try {
+    const storedData = localStorage.getItem(PAGE_ACCESS_KEY);
+    if (!storedData) return [];
+
+    const pageAccesses: PageAccess[] = JSON.parse(storedData);
+
+    // Sort by last accessed (most recent first)
+    return pageAccesses
+      .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
+      .slice(0, limit);
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Failed to get recent pages:", error);
+    }
+    return [];
+  }
+}
+
 export function clearPageAccessHistory(): void {
   try {
     localStorage.removeItem(PAGE_ACCESS_KEY);

@@ -301,6 +301,9 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     relatedTasks: "Tarefas Relacionadas",
     relatedTo: "Relacionado a",
     trucks: "Caminhões",
+    // Direct truck fields (when truck data is embedded in task changelog)
+    category: "Categoria do Caminhão",
+    implementType: "Tipo de Implemento",
     // Nested relationship fields
     "customer.fantasyName": "Nome Fantasia do Cliente",
     "customer.corporateName": "Razão Social do Cliente",
@@ -909,6 +912,11 @@ interface FieldMetadata {
  * @returns The formatted value as a string
  */
 export function formatFieldValue(value: ComplexFieldValue, field?: string | null, entityType?: CHANGE_LOG_ENTITY_TYPE, metadata?: FieldMetadata): string {
+  // Handle null/undefined commission field specifically
+  if ((value === null || value === undefined) && field === "commission" && entityType === CHANGE_LOG_ENTITY_TYPE.TASK) {
+    return "Não Definida";
+  }
+
   if (value === null || value === undefined) return "Nenhum";
 
   // First, try to parse JSON-encoded strings (double-encoded values from backend)

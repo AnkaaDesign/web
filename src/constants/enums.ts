@@ -2002,6 +2002,7 @@ export enum FAVORITE_PAGES {
   RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR = "/recursos-humanos/epi/entregas/cadastrar",
   RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR = "/recursos-humanos/epi/agendamentos/cadastrar",
   RECURSOS_HUMANOS_SETORES_CADASTRAR = "/recursos-humanos/setores/cadastrar",
+  RECURSOS_HUMANOS_BONUS_LISTAR = "/recursos-humanos/bonus",
 
   // Personal - List Pages
   PESSOAL_FERIADOS_LISTAR = "/pessoal/feriados",

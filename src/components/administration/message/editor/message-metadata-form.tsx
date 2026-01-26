@@ -1,13 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { IconCalendar, IconUsers } from "@tabler/icons-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { getUsers, getSectors, getPositions } from "@/api-client";
 
 interface MessageMetadata {
@@ -59,6 +55,7 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
               value={data.title}
               onChange={(value) => handleChange({ title: value as string || '' })}
               placeholder="Digite o título da mensagem..."
+              className="bg-transparent"
               required
             />
             <p className="text-xs text-muted-foreground">
@@ -273,73 +270,23 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start-date">Data de Início</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <IconCalendar className="mr-2 h-4 w-4" />
-                    {data.scheduling.startDate ? (
-                      format(data.scheduling.startDate, "PPP", { locale: ptBR })
-                    ) : (
-                      <span>Selecione uma data</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={data.scheduling.startDate}
-                    onSelect={(date) =>
-                      handleChange({
-                        scheduling: { ...data.scheduling, startDate: date },
-                      })
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="end-date">Data de Término</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <IconCalendar className="mr-2 h-4 w-4" />
-                    {data.scheduling.endDate ? (
-                      format(data.scheduling.endDate, "PPP", { locale: ptBR })
-                    ) : (
-                      <span>Selecione uma data</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={data.scheduling.endDate}
-                    onSelect={(date) =>
-                      handleChange({
-                        scheduling: { ...data.scheduling, endDate: date },
-                      })
-                    }
-                    disabled={(date) =>
-                      data.scheduling.startDate
-                        ? date < data.scheduling.startDate
-                        : false
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="date-range">Período de Exibição</Label>
+            <DateRangePicker
+              dateRange={{
+                from: data.scheduling.startDate,
+                to: data.scheduling.endDate,
+              }}
+              onDateRangeChange={(range) =>
+                handleChange({
+                  scheduling: {
+                    startDate: range?.from,
+                    endDate: range?.to,
+                  },
+                })
+              }
+              placeholder="Selecione o período"
+            />
           </div>
 
           <p className="text-xs text-muted-foreground">

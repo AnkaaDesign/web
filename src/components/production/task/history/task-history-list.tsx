@@ -404,10 +404,11 @@ export function TaskHistoryList({
     };
 
     // Add agenda display filtering for preparation view
-    // Role-based behavior:
+    // Role-based behavior (hasPrivilege treats ADMIN as having all privileges):
+    // - ADMIN users: See ALL tasks (no exclusions - hasPrivilege returns true for all privileges)
     // - FINANCIAL users: Need PRODUCTION, COMMERCIAL, ARTWORK, FINANCIAL (exclude LOGISTIC)
     // - LOGISTIC users: Need PRODUCTION, COMMERCIAL, ARTWORK, LOGISTIC (exclude FINANCIAL)
-    // - All other users (including ADMIN): Only need PRODUCTION, COMMERCIAL, ARTWORK (exclude both)
+    // - All other users: Only need PRODUCTION, COMMERCIAL, ARTWORK (exclude both FINANCIAL and LOGISTIC)
     if (navigationRoute === "preparation") {
       result.shouldDisplayInAgenda = true;
 

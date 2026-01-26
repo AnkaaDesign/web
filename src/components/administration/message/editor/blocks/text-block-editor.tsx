@@ -34,7 +34,7 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
   };
 
   const getFontSizeClass = () => {
-    const fontSizeMap = {
+    const fontSizeMap: Record<string, string> = {
       xs: 'text-xs',
       sm: 'text-sm',
       base: 'text-base',
@@ -47,7 +47,7 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
   };
 
   const getFontWeightClass = () => {
-    const fontWeightMap = {
+    const fontWeightMap: Record<string, string> = {
       normal: 'font-normal',
       medium: 'font-medium',
       semibold: 'font-semibold',
@@ -57,19 +57,14 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
   };
 
   const getClassName = () => {
-    const baseClasses = [getFontSizeClass(), getFontWeightClass()];
+    const fontSizeClass = getFontSizeClass();
+    const fontWeightClass = getFontWeightClass();
 
     switch (block.type) {
-      case 'heading1':
-        return cn(baseClasses, !block.fontSize && 'text-4xl', !block.fontWeight && 'font-semibold');
-      case 'heading2':
-        return cn(baseClasses, !block.fontSize && 'text-3xl', !block.fontWeight && 'font-semibold');
-      case 'heading3':
-        return cn(baseClasses, !block.fontSize && 'text-2xl', !block.fontWeight && 'font-medium');
       case 'quote':
-        return cn(baseClasses, 'italic border-l-4 border-primary pl-4', !block.fontSize && 'text-lg');
+        return cn(fontSizeClass, fontWeightClass, 'italic border-l-4 border-primary pl-4');
       default:
-        return cn(baseClasses);
+        return cn(fontSizeClass, fontWeightClass);
     }
   };
 

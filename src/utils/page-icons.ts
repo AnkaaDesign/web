@@ -30,7 +30,10 @@ import {
   IconTools,
   IconRuler,
   IconStar,
-  IconActivity
+  IconActivity,
+  IconMessageCircle,
+  IconHome,
+  IconChartBar,
 } from "@tabler/icons-react";
 import type { Icon } from "@tabler/icons-react";
 import { FAVORITE_PAGES } from '@constants';
@@ -106,6 +109,8 @@ export const PAGE_ICON_MAP: Record<string, { icon: Icon; color: string }> = {
   [FAVORITE_PAGES.ADMINISTRACAO_SETORES_CADASTRAR]: { icon: IconBuildingSkyscraper, color: "bg-teal-600" },
   [FAVORITE_PAGES.ADMINISTRACAO_NOTIFICACOES_LISTAR]: { icon: IconBell, color: "bg-red-500" },
   //   [FAVORITE_PAGES.ADMINISTRACAO_NOTIFICACOES_ENVIAR]: { icon: IconBell, color: "bg-red-600" },
+  [FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_LISTAR]: { icon: IconMessageCircle, color: "bg-blue-500" },
+  [FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_CRIAR]: { icon: IconMessageCircle, color: "bg-blue-600" },
 
   // Recursos Humanos
   [FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR]: { icon: IconBriefcase, color: "bg-purple-500" },
@@ -165,6 +170,116 @@ for (const [, enumValue] of Object.entries(FAVORITE_PAGES)) {
 // Backward compatibility for old favorites that might have different paths stored
 PATH_TO_ICON_MAP["/producao/garagens"] = { icon: IconBuildingWarehouse, color: "bg-slate-500" };
 PATH_TO_ICON_MAP["/producao/garagens/cadastrar"] = { icon: IconBuildingWarehouse, color: "bg-slate-600" };
+
+// Path prefix to icon mapping for dynamic routes
+const PATH_PREFIX_ICON_MAP: Array<{ prefix: string; icon: Icon; color: string }> = [
+  // Home
+  { prefix: "/", icon: IconHome, color: "bg-blue-500" },
+
+  // Produção
+  { prefix: "/producao/agenda", icon: IconClipboardList, color: "bg-amber-500" },
+  { prefix: "/producao/cronograma", icon: IconClipboardList, color: "bg-blue-500" },
+  { prefix: "/producao/barracoes", icon: IconBuildingWarehouse, color: "bg-slate-500" },
+  { prefix: "/producao/garagens", icon: IconBuildingWarehouse, color: "bg-slate-500" },
+  { prefix: "/producao/historico", icon: IconHistory, color: "bg-gray-500" },
+  { prefix: "/producao/recorte", icon: IconScissors, color: "bg-purple-500" },
+  { prefix: "/producao/observacoes", icon: IconNote, color: "bg-teal-500" },
+  { prefix: "/producao/aerografia", icon: IconBrush, color: "bg-pink-500" },
+  { prefix: "/producao/servicos", icon: IconTools, color: "bg-orange-500" },
+  { prefix: "/producao/ordens-de-servico", icon: IconClipboardList, color: "bg-blue-600" },
+  { prefix: "/producao/dashboard", icon: IconChartBar, color: "bg-blue-500" },
+  { prefix: "/producao", icon: IconClipboardList, color: "bg-blue-500" },
+
+  // Estoque
+  { prefix: "/estoque/movimentacoes", icon: IconArchive, color: "bg-green-500" },
+  { prefix: "/estoque/produtos/categorias", icon: IconTag, color: "bg-emerald-500" },
+  { prefix: "/estoque/produtos/marcas", icon: IconTag, color: "bg-emerald-500" },
+  { prefix: "/estoque/produtos", icon: IconPackage, color: "bg-green-600" },
+  { prefix: "/estoque/fornecedores", icon: IconTruck, color: "bg-cyan-500" },
+  { prefix: "/estoque/pedidos/agendamentos", icon: IconCalendarEvent, color: "bg-blue-400" },
+  { prefix: "/estoque/pedidos/automaticos", icon: IconRepeat, color: "bg-blue-500" },
+  { prefix: "/estoque/pedidos", icon: IconShoppingCart, color: "bg-blue-500" },
+  { prefix: "/estoque/manutencao/agendamentos", icon: IconCalendar, color: "bg-red-500" },
+  { prefix: "/estoque/manutencao", icon: IconTool, color: "bg-red-600" },
+  { prefix: "/estoque/retiradas-externas", icon: IconArchive, color: "bg-orange-500" },
+  { prefix: "/estoque/epi/entregas", icon: IconShield, color: "bg-yellow-400" },
+  { prefix: "/estoque/epi/agendamentos", icon: IconCalendar, color: "bg-yellow-400" },
+  { prefix: "/estoque/epi", icon: IconShield, color: "bg-yellow-500" },
+  { prefix: "/estoque/emprestimos", icon: IconRepeat, color: "bg-purple-500" },
+  { prefix: "/estoque", icon: IconPackage, color: "bg-green-500" },
+
+  // Pintura
+  { prefix: "/pintura/catalogo", icon: IconPaint, color: "bg-indigo-500" },
+  { prefix: "/pintura/producoes", icon: IconFlask, color: "bg-indigo-400" },
+  { prefix: "/pintura/formulas", icon: IconFlask, color: "bg-indigo-500" },
+  { prefix: "/pintura/formulacoes", icon: IconFlask, color: "bg-indigo-500" },
+  { prefix: "/pintura/componentes", icon: IconFlask, color: "bg-indigo-500" },
+  { prefix: "/pintura/tipos-de-tinta", icon: IconPalette, color: "bg-indigo-400" },
+  { prefix: "/pintura/dashboard", icon: IconChartBar, color: "bg-indigo-500" },
+  { prefix: "/pintura", icon: IconPaint, color: "bg-indigo-500" },
+
+  // Administração
+  { prefix: "/administracao/comissoes", icon: IconCoins, color: "bg-green-500" },
+  { prefix: "/administracao/clientes", icon: IconUsers, color: "bg-orange-500" },
+  { prefix: "/administracao/colaboradores", icon: IconUsers, color: "bg-purple-500" },
+  { prefix: "/administracao/orcamentos", icon: IconFileInvoice, color: "bg-blue-500" },
+  { prefix: "/administracao/registros-de-alteracoes", icon: IconHistory, color: "bg-gray-500" },
+  { prefix: "/administracao/arquivos", icon: IconFile, color: "bg-gray-600" },
+  { prefix: "/administracao/setores", icon: IconBuildingSkyscraper, color: "bg-teal-500" },
+  { prefix: "/administracao/notificacoes", icon: IconBell, color: "bg-red-500" },
+  { prefix: "/administracao/mensagens", icon: IconMessageCircle, color: "bg-blue-500" },
+  { prefix: "/administracao", icon: IconBuildingSkyscraper, color: "bg-teal-500" },
+
+  // Recursos Humanos
+  { prefix: "/recursos-humanos/cargos", icon: IconBriefcase, color: "bg-purple-500" },
+  { prefix: "/recursos-humanos/ferias", icon: IconBeach, color: "bg-blue-500" },
+  { prefix: "/recursos-humanos/feriados", icon: IconCalendar, color: "bg-orange-500" },
+  { prefix: "/recursos-humanos/avisos", icon: IconAlertTriangle, color: "bg-red-500" },
+  { prefix: "/recursos-humanos/epi/entregas", icon: IconShield, color: "bg-yellow-400" },
+  { prefix: "/recursos-humanos/epi/agendamentos", icon: IconCalendar, color: "bg-yellow-400" },
+  { prefix: "/recursos-humanos/epi", icon: IconShield, color: "bg-yellow-500" },
+  { prefix: "/recursos-humanos/setores", icon: IconBuildingSkyscraper, color: "bg-teal-500" },
+  { prefix: "/recursos-humanos", icon: IconUsers, color: "bg-purple-500" },
+
+  // Pessoal
+  { prefix: "/pessoal/feriados", icon: IconCalendar, color: "bg-orange-500" },
+  { prefix: "/pessoal/ferias", icon: IconBeach, color: "bg-blue-500" },
+  { prefix: "/pessoal/meus-epis", icon: IconShield, color: "bg-yellow-500" },
+  { prefix: "/pessoal/meus-emprestimos", icon: IconRepeat, color: "bg-purple-500" },
+  { prefix: "/pessoal/minhas-atividades", icon: IconActivity, color: "bg-green-500" },
+  { prefix: "/pessoal", icon: IconUsers, color: "bg-blue-500" },
+
+  // Estatísticas
+  { prefix: "/estatisticas", icon: IconChartBar, color: "bg-blue-500" },
+
+  // Favoritos
+  { prefix: "/favoritos", icon: IconStar, color: "bg-yellow-500" },
+];
+
+// Get icon and color for a page by path (supports dynamic routes)
+export function getIconInfoByPath(path: string): { icon: Icon; color: string } {
+  // Exact match for home
+  if (path === "/" || path === "") {
+    return { icon: IconHome, color: "bg-blue-500" };
+  }
+
+  // Find the most specific matching prefix (longer prefix = more specific)
+  let bestMatch: { icon: Icon; color: string } | null = null;
+  let bestMatchLength = 0;
+
+  for (const entry of PATH_PREFIX_ICON_MAP) {
+    if (path.startsWith(entry.prefix) && entry.prefix.length > bestMatchLength) {
+      bestMatch = { icon: entry.icon, color: entry.color };
+      bestMatchLength = entry.prefix.length;
+    }
+  }
+
+  if (bestMatch) {
+    return bestMatch;
+  }
+
+  return { icon: IconFile, color: "bg-gray-500" };
+}
 
 // Get icon and color for a page
 export function getPageIconInfo(page: string): { icon: Icon; color: string } {
@@ -257,6 +372,8 @@ export function getPageIconName(path: string): string {
     "/administracao/setores/cadastrar": "building",
     "/administracao/notificacoes": "notification",
     "/administracao/notificacoes/cadastrar/enviar": "notification",
+    "/administracao/mensagens": "message",
+    "/administracao/mensagens/criar": "message",
 
     // Recursos Humanos
     "/recursos-humanos/cargos": "briefcase",
@@ -386,6 +503,8 @@ export function getPageIconName(path: string): string {
     [FAVORITE_PAGES.ADMINISTRACAO_SETORES_LISTAR]: "building",
     [FAVORITE_PAGES.ADMINISTRACAO_SETORES_CADASTRAR]: "building",
     [FAVORITE_PAGES.ADMINISTRACAO_NOTIFICACOES_LISTAR]: "notification",
+    [FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_LISTAR]: "message",
+    [FAVORITE_PAGES.ADMINISTRACAO_MENSAGENS_CRIAR]: "message",
 
     // Recursos Humanos
     [FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR]: "briefcase",
