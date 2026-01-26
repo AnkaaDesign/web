@@ -340,11 +340,11 @@ export const NotificationListPage = () => {
       });
     }
 
-    if (filters.sentAt) {
+    if ((filters as any).status) {
       indicators.push({
         label: "Status",
-        value: filters.sentAt.isNotNull ? "Enviadas" : "Pendentes",
-        onRemove: () => setFilters((prev) => ({ ...prev, sentAt: undefined })),
+        value: (filters as any).status === "sent" ? "Enviadas" : "Pendentes",
+        onRemove: () => setFilters((prev) => ({ ...prev, status: undefined } as any)),
       });
     }
 
@@ -406,59 +406,61 @@ export const NotificationListPage = () => {
           ]}
         />
 
-        <div className="flex-1 min-h-0 pb-6 flex flex-col gap-4">
-          {/* Search and Filter Controls */}
-          <Card className="p-4">
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <TableSearchInput
-                value={searchInput}
-                onChange={handleSearchChange}
-                placeholder="Buscar por título, mensagem..."
-                isPending={searchInput !== searchingFor}
-                className="flex-1"
-              />
-              <div className="flex gap-2">
-                <Button
-                  variant={hasActiveFilters ? "default" : "outline"}
-                  onClick={() => setShowFilters(true)}
-                >
-                  <IconFilter className="h-4 w-4 mr-2" />
-                  Filtros
-                  {hasActiveFilters && ` (${activeFilters.length})`}
-                </Button>
+        <div className="flex-1 min-h-0 pb-6 flex flex-col">
+          <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="p-4 space-y-4 flex flex-col flex-1 overflow-hidden">
+              {/* Search and Filter Controls */}
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <TableSearchInput
+                  value={searchInput}
+                  onChange={handleSearchChange}
+                  placeholder="Buscar por título, mensagem..."
+                  isPending={searchInput !== searchingFor}
+                  className="flex-1"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant={hasActiveFilters ? "default" : "outline"}
+                    onClick={() => setShowFilters(true)}
+                  >
+                    <IconFilter className="h-4 w-4 mr-2" />
+                    Filtros
+                    {hasActiveFilters && ` (${activeFilters.length})`}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Active Filter Indicators */}
+              {activeFilters.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-3 border-t">
+                  {activeFilters.map((filter, index) => (
+                    <FilterIndicator
+                      key={index}
+                      label={filter.label}
+                      value={filter.value}
+                      onRemove={filter.onRemove}
+                    />
+                  ))}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllFilters}
+                    className="h-6 px-2 text-xs"
+                  >
+                    Limpar todos
+                  </Button>
+                </div>
+              )}
+
+              {/* Table */}
+              <div className="flex-1 min-h-0 overflow-auto">
+                <NotificationTable
+                  filters={queryFilters}
+                  onDataChange={setTableData}
+                  className="h-full"
+                />
               </div>
             </div>
-
-            {/* Active Filter Indicators */}
-            {activeFilters.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t">
-                {activeFilters.map((filter, index) => (
-                  <FilterIndicator
-                    key={index}
-                    label={filter.label}
-                    value={filter.value}
-                    onRemove={filter.onRemove}
-                  />
-                ))}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAllFilters}
-                  className="h-6 px-2 text-xs"
-                >
-                  Limpar todos
-                </Button>
-              </div>
-            )}
-          </Card>
-
-          {/* Table */}
-          <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            <NotificationTable
-              filters={queryFilters}
-              onDataChange={setTableData}
-              className="h-full"
-            />
           </Card>
         </div>
       </div>

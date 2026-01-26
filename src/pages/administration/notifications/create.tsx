@@ -109,7 +109,7 @@ export const CreateNotificationPage = () => {
       type: "SYSTEM", // SYSTEM type is mandatory - users cannot hide these
       importance: "NORMAL",
       channels: ["IN_APP", "PUSH"], // In-app and push mobile enabled by default, email disabled
-      targetType: "all",
+      targetType: "users",
       targetSectors: [],
       targetUsers: [],
     },
@@ -219,6 +219,7 @@ export const CreateNotificationPage = () => {
                 <Input
                   id="title"
                   placeholder="Ex: Atualização Importante do Sistema"
+                  transparent
                   {...form.register("title")}
                 />
                 {form.formState.errors.title && (
@@ -275,6 +276,7 @@ export const CreateNotificationPage = () => {
                 <Input
                   id="actionUrl"
                   placeholder="/administracao/configuracoes"
+                  transparent
                   {...form.register("actionUrl")}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -294,7 +296,10 @@ export const CreateNotificationPage = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center space-x-3 border border-border/40 rounded-lg p-4">
+                <label
+                  htmlFor="channel-in-app"
+                  className="flex items-center space-x-3 border border-border/40 rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                >
                   <Checkbox
                     id="channel-in-app"
                     checked={selectedChannels.includes("IN_APP")}
@@ -309,13 +314,14 @@ export const CreateNotificationPage = () => {
                   />
                   <div className="flex items-center gap-2">
                     <IconBellRinging className="w-5 h-5 text-orange-500" />
-                    <Label htmlFor="channel-in-app" className="cursor-pointer">
-                      In-App
-                    </Label>
+                    <span>In-App</span>
                   </div>
-                </div>
+                </label>
 
-                <div className="flex items-center space-x-3 border border-border/40 rounded-lg p-4">
+                <label
+                  htmlFor="channel-email"
+                  className="flex items-center space-x-3 border border-border/40 rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                >
                   <Checkbox
                     id="channel-email"
                     checked={selectedChannels.includes("EMAIL")}
@@ -330,13 +336,14 @@ export const CreateNotificationPage = () => {
                   />
                   <div className="flex items-center gap-2">
                     <IconMail className="w-5 h-5 text-purple-500" />
-                    <Label htmlFor="channel-email" className="cursor-pointer">
-                      E-mail
-                    </Label>
+                    <span>E-mail</span>
                   </div>
-                </div>
+                </label>
 
-                <div className="flex items-center space-x-3 border border-border/40 rounded-lg p-4">
+                <label
+                  htmlFor="channel-push"
+                  className="flex items-center space-x-3 border border-border/40 rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                >
                   <Checkbox
                     id="channel-push"
                     checked={selectedChannels.includes("PUSH")}
@@ -351,13 +358,14 @@ export const CreateNotificationPage = () => {
                   />
                   <div className="flex items-center gap-2">
                     <IconDeviceMobile className="w-5 h-5 text-blue-500" />
-                    <Label htmlFor="channel-push" className="cursor-pointer">
-                      Push Mobile
-                    </Label>
+                    <span>Push Mobile</span>
                   </div>
-                </div>
+                </label>
 
-                <div className="flex items-center space-x-3 border border-border/40 rounded-lg p-4">
+                <label
+                  htmlFor="channel-whatsapp"
+                  className="flex items-center space-x-3 border border-border/40 rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                >
                   <Checkbox
                     id="channel-whatsapp"
                     checked={selectedChannels.includes("WHATSAPP")}
@@ -372,11 +380,9 @@ export const CreateNotificationPage = () => {
                   />
                   <div className="flex items-center gap-2">
                     <IconBrandWhatsapp className="w-5 h-5 text-green-500" />
-                    <Label htmlFor="channel-whatsapp" className="cursor-pointer">
-                      WhatsApp
-                    </Label>
+                    <span>WhatsApp</span>
                   </div>
-                </div>
+                </label>
               </div>
               {form.formState.errors.channels && (
                 <p className="text-sm text-destructive">{form.formState.errors.channels.message}</p>

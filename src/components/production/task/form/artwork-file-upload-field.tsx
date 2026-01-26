@@ -86,7 +86,7 @@ const getFileIcon = (file: File | FileWithPreview) => {
 export function ArtworkFileUploadField({
   onFilesChange,
   onStatusChange,
-  maxFiles = 5,
+  maxFiles = 10,
   maxSize = 100 * 1024 * 1024,
   acceptedFileTypes = defaultAcceptedTypes,
   existingFiles = [],

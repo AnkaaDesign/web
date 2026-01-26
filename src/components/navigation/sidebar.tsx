@@ -317,6 +317,28 @@ export const Sidebar = memo(() => {
 
       // For dynamic routes (with :id), check pattern match
       if (itemPath.includes(":")) {
+        // First, check if there's a static sibling route that matches exactly
+        // This prevents dynamic routes like /mensagens/:id from matching /mensagens/criar
+        // when "criar" is a known static route
+        const knownStaticSegments = ["criar", "cadastrar", "editar", "detalhes", "editar-em-lote", "editar-lote"];
+
+        // Extract the base path (everything before the first :param)
+        const basePathMatch = itemPath.match(/^(.+?)\/:[^/]+/);
+        if (basePathMatch) {
+          const basePath = basePathMatch[1];
+          // Check if current path starts with the base path
+          if (currentPath.startsWith(basePath + "/")) {
+            // Get the segment that would match the dynamic parameter
+            const remainingPath = currentPath.slice(basePath.length + 1);
+            const firstSegment = remainingPath.split("/")[0];
+
+            // If the first segment is a known static route name, don't match this dynamic route
+            if (knownStaticSegments.includes(firstSegment)) {
+              return false;
+            }
+          }
+        }
+
         const pathPattern = itemPath.replace(/:[^/]+/g, "[^/]+");
         const regex = new RegExp(`^${pathPattern}$`);
         return regex.test(currentPath);
@@ -336,8 +358,43 @@ export const Sidebar = memo(() => {
 
       if (!itemPath) return false;
 
-      // Clean paths for comparison
+      // Known static route segments that should NOT trigger dynamic route matching
+      const knownStaticSegments = ["criar", "cadastrar", "editar", "detalhes", "editar-em-lote", "editar-lote", "list", "novo"];
+
+      // If item path has dynamic segments, we need special handling
+      if (itemPath.includes(":")) {
+        // Extract the base path (everything before the first :param)
+        const basePathMatch = itemPath.match(/^(.+?)\/:[^/]+/);
+        if (basePathMatch) {
+          const basePath = basePathMatch[1];
+          // Check if current path starts with the base path
+          if (currentPath.startsWith(basePath + "/")) {
+            // Get the segment that would match the dynamic parameter
+            const remainingPath = currentPath.slice(basePath.length + 1);
+            const firstSegment = remainingPath.split("/")[0];
+
+            // If the first segment is a known static route name, this dynamic route is NOT a parent
+            if (knownStaticSegments.includes(firstSegment)) {
+              return false;
+            }
+          }
+        }
+      }
+
+      // Clean paths for comparison (remove dynamic segments like :id)
       const cleanItemPath = itemPath.replace(/\/:[^/]+/g, "");
+
+      // Don't match if this item is a contextual item (cadastrar, criar, editar, detalhes)
+      // These should only be active when exactly matched, not when path starts with them
+      const contextualActions = ["cadastrar", "criar", "editar", "detalhes"];
+      const isContextualItem = contextualActions.some(
+        (action) => item.id?.includes(action) || cleanItemPath.endsWith(`/${action}`) || cleanItemPath.includes(`/${action}/`)
+      );
+
+      if (isContextualItem) {
+        return false;
+      }
+
       return currentPath.startsWith(cleanItemPath + "/");
     },
     [location.pathname],
@@ -451,6 +508,26 @@ export const Sidebar = memo(() => {
 
           // For dynamic routes (with :id), check if we're on a specific instance
           if (child.isDynamic && child.path) {
+            // Known static route segments that should NOT be treated as dynamic IDs
+            const knownStaticSegments = ["criar", "cadastrar", "editar", "detalhes", "editar-em-lote", "editar-lote", "list", "novo"];
+
+            // Extract base path and check if current path segment is a static route
+            const basePathMatch = child.path.match(/^(.+?)\/:[^/]+/);
+            if (basePathMatch) {
+              const basePath = basePathMatch[1];
+              if (currentPath.startsWith(basePath + "/")) {
+                const remainingPath = currentPath.slice(basePath.length + 1);
+                const firstSegment = remainingPath.split("/")[0];
+
+                // If the segment is a known static route, don't show this dynamic item
+                if (knownStaticSegments.includes(firstSegment)) {
+                  if (isContextualItem) {
+                    return null; // Hide this dynamic contextual item
+                  }
+                }
+              }
+            }
+
             const pathPattern = child.path.replace(/:[^/]+/g, "[^/]+");
             const regex = new RegExp(`^${pathPattern}$`);
             const shouldShow = regex.test(currentPath);

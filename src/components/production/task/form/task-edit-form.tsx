@@ -3584,13 +3584,24 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     <CardContent className="pt-0">
                       <FileUploadField
                         onFilesChange={handleBaseFilesChange}
-                        maxFiles={5}
+                        maxFiles={30}
+                        maxSize={500 * 1024 * 1024}
                         disabled={isSubmitting}
                         showPreview={true}
                         existingFiles={baseFiles}
                         variant="compact"
-                        placeholder="Adicione arquivos base para a tarefa"
+                        placeholder="Adicione arquivos base para a tarefa (vídeos, imagens, PDFs)"
                         label="Arquivos base anexados"
+                        acceptedFileTypes={{
+                          "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
+                          "application/pdf": [".pdf"],
+                          "video/mp4": [".mp4"],
+                          "video/quicktime": [".mov"],
+                          "video/webm": [".webm"],
+                          "video/x-msvideo": [".avi"],
+                          "video/x-matroska": [".mkv"],
+                          "application/postscript": [".eps", ".ai"],
+                        }}
                       />
                     </CardContent>
                   </AccordionContent>

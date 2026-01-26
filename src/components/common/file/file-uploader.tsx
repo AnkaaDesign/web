@@ -45,6 +45,11 @@ const defaultAcceptedTypes = {
   "application/eps": [".eps"],
   "image/eps": [".eps"],
   "image/x-eps": [".eps"],
+  "video/mp4": [".mp4"],
+  "video/quicktime": [".mov"],
+  "video/x-msvideo": [".avi"],
+  "video/webm": [".webm"],
+  "video/x-matroska": [".mkv"],
 };
 
 const formatFileSize = (bytes: number): string => {

@@ -22,7 +22,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
   const [blocks, setBlocks] = useState<ContentBlock[]>(initialData?.blocks || []);
   const [metadata, setMetadata] = useState({
     title: initialData?.title || '',
-    targeting: initialData?.targeting || { type: 'all' as const },
+    targeting: initialData?.targeting || { type: 'specific' as const, userIds: [], sectorIds: [], positionIds: [] },
     scheduling: initialData?.scheduling || {},
   });
 
@@ -44,21 +44,45 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
         });
         setMetadata({
           title: initialData.title || '',
-          targeting: initialData.targeting || { type: 'all' as const },
+          targeting: initialData.targeting || { type: 'specific' as const, userIds: [], sectorIds: [], positionIds: [] },
           scheduling: initialData.scheduling || {},
         });
       }
     }
   }, [initialData]);
 
-  // Preview only needs blocks, but publishing needs title + blocks
+  // Helper function to validate targeting
+  const isTargetingValid = () => {
+    const { type, userIds, sectorIds, positionIds } = metadata.targeting as {
+      type: 'all' | 'specific' | 'sector' | 'position';
+      userIds?: string[];
+      sectorIds?: string[];
+      positionIds?: string[];
+    };
+
+    switch (type) {
+      case 'all':
+        return true;
+      case 'specific':
+        return userIds && userIds.length > 0;
+      case 'sector':
+        return sectorIds && sectorIds.length > 0;
+      case 'position':
+        return positionIds && positionIds.length > 0;
+      default:
+        return true;
+    }
+  };
+
+  // Preview only needs blocks, but publishing needs title + blocks + valid targeting
   const canPreview = blocks.length > 0;
-  const canPublish = metadata.title.trim().length > 0 && blocks.length > 0;
-  const isValid = canPublish; // For draft/publish, require title
+  const targetingValid = isTargetingValid();
+  const canPublish = metadata.title.trim().length > 0 && blocks.length > 0 && targetingValid;
+  const isValid = canPublish; // For draft/publish, require title and valid targeting
   const isDirty = blocks.length > 0 || metadata.title.length > 0;
 
   // Validation for each step
-  const step1Valid = metadata.title.trim().length > 0;
+  const step1Valid = metadata.title.trim().length > 0 && targetingValid;
   const step2Valid = blocks.length > 0;
 
   const stepErrors = {

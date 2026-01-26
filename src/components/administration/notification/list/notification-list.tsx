@@ -156,60 +156,54 @@ export function NotificationList({ className }: NotificationListProps) {
         {showFilters && (
           <div className="bg-gray-50 p-4 rounded-lg border space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Type filter */}
+              {/* Type filter - Multi-select */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Tipo</label>
                 <Combobox
-                  value={filters.types?.join(",") || ""}
-                  onValueChange={(value) => handleFilterChange("types", value ? value.split(",") : [])}
-                  options={[
-                    { value: "", label: "Todos os tipos" },
-                    ...Object.values(NOTIFICATION_TYPE).map((type) => ({
-                      value: type,
-                      label: NOTIFICATION_TYPE_LABELS[type],
-                    })),
-                  ]}
-                  placeholder="Todos os tipos"
+                  mode="multiple"
+                  value={filters.types || []}
+                  onValueChange={(value) => handleFilterChange("types", Array.isArray(value) ? value : [])}
+                  options={Object.values(NOTIFICATION_TYPE).map((type) => ({
+                    value: type,
+                    label: NOTIFICATION_TYPE_LABELS[type],
+                  }))}
+                  placeholder="Selecione os tipos"
                   searchable={false}
-                  clearable={false}
+                  clearable
                 />
               </div>
 
-              {/* Importance filter */}
+              {/* Importance filter - Multi-select */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Importância</label>
                 <Combobox
-                  value={filters.importance?.join(",") || ""}
-                  onValueChange={(value) => handleFilterChange("importance", value ? value.split(",") : [])}
-                  options={[
-                    { value: "", label: "Todas" },
-                    ...Object.values(NOTIFICATION_IMPORTANCE).map((importance) => ({
-                      value: importance,
-                      label: NOTIFICATION_IMPORTANCE_LABELS[importance],
-                    })),
-                  ]}
-                  placeholder="Todas"
+                  mode="multiple"
+                  value={filters.importance || []}
+                  onValueChange={(value) => handleFilterChange("importance", Array.isArray(value) ? value : [])}
+                  options={Object.values(NOTIFICATION_IMPORTANCE).map((importance) => ({
+                    value: importance,
+                    label: NOTIFICATION_IMPORTANCE_LABELS[importance],
+                  }))}
+                  placeholder="Selecione as importâncias"
                   searchable={false}
-                  clearable={false}
+                  clearable
                 />
               </div>
 
-              {/* Channel filter */}
+              {/* Channel filter - Multi-select */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Canal</label>
                 <Combobox
-                  value={filters.channels?.join(",") || ""}
-                  onValueChange={(value) => handleFilterChange("channels", value ? value.split(",") : [])}
-                  options={[
-                    { value: "", label: "Todos os canais" },
-                    ...Object.values(NOTIFICATION_CHANNEL).map((channel) => ({
-                      value: channel,
-                      label: NOTIFICATION_CHANNEL_LABELS[channel],
-                    })),
-                  ]}
-                  placeholder="Todos os canais"
+                  mode="multiple"
+                  value={filters.channels || []}
+                  onValueChange={(value) => handleFilterChange("channels", Array.isArray(value) ? value : [])}
+                  options={Object.values(NOTIFICATION_CHANNEL).map((channel) => ({
+                    value: channel,
+                    label: NOTIFICATION_CHANNEL_LABELS[channel],
+                  }))}
+                  placeholder="Selecione os canais"
                   searchable={false}
-                  clearable={false}
+                  clearable
                 />
               </div>
 
@@ -218,7 +212,10 @@ export function NotificationList({ className }: NotificationListProps) {
                 <label className="text-sm font-medium mb-2 block">Status</label>
                 <Combobox
                   value={filters.unread === undefined ? "" : filters.unread ? "unread" : "read"}
-                  onValueChange={(value) => handleFilterChange("unread", value === "" ? undefined : value === "unread")}
+                  onValueChange={(value) => {
+                    const statusValue = Array.isArray(value) ? value[0] : value;
+                    handleFilterChange("unread", statusValue === "" || statusValue === undefined ? undefined : statusValue === "unread");
+                  }}
                   options={[
                     { value: "", label: "Todas" },
                     { value: "unread", label: "Não lidas" },
@@ -226,7 +223,7 @@ export function NotificationList({ className }: NotificationListProps) {
                   ]}
                   placeholder="Todas"
                   searchable={false}
-                  clearable={false}
+                  clearable
                 />
               </div>
             </div>

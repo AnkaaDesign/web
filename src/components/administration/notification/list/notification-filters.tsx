@@ -37,29 +37,28 @@ export function NotificationFilters({
   filters,
   onFilterChange,
 }: NotificationFiltersProps) {
-  const handleTypeChange = (value: string) => {
-    const types = value ? value.split(",").filter(Boolean) : [];
+  const handleTypeChange = (value: string | string[] | null | undefined) => {
+    const types = Array.isArray(value) ? value : [];
     onFilterChange({ ...filters, types });
   };
 
-  const handleImportanceChange = (value: string) => {
-    const importance = value ? value.split(",").filter(Boolean) : [];
+  const handleImportanceChange = (value: string | string[] | null | undefined) => {
+    const importance = Array.isArray(value) ? value : [];
     onFilterChange({ ...filters, importance });
   };
 
-  const handleChannelChange = (value: string) => {
-    const channels = value ? value.split(",").filter(Boolean) : [];
+  const handleChannelChange = (value: string | string[] | null | undefined) => {
+    const channels = Array.isArray(value) ? value : [];
     onFilterChange({ ...filters, channels });
   };
 
-  const handleStatusChange = (value: string) => {
-    let sentAt: { isNull?: boolean; isNotNull?: boolean } | undefined;
-    if (value === "sent") {
-      sentAt = { isNotNull: true };
-    } else if (value === "pending") {
-      sentAt = { isNull: true };
-    }
-    onFilterChange({ ...filters, sentAt });
+  const handleStatusChange = (value: string | string[] | null | undefined) => {
+    const statusValue = Array.isArray(value) ? value[0] : value;
+    // Use the 'status' parameter that the admin API expects
+    // instead of 'sentAt' which is used by the standard CRUD API
+    const status = statusValue || undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onFilterChange({ ...filters, status } as any);
   };
 
   const handleUnreadChange = (checked: boolean) => {
@@ -88,8 +87,11 @@ export function NotificationFilters({
   };
 
   const getStatusValue = () => {
-    if (filters.sentAt?.isNotNull) return "sent";
-    if (filters.sentAt?.isNull) return "pending";
+    // Read from the 'status' parameter used by admin API
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const status = (filters as any).status;
+    if (status === "sent") return "sent";
+    if (status === "pending") return "pending";
     return "";
   };
 
@@ -105,7 +107,8 @@ export function NotificationFilters({
     (filters.types?.length || 0) > 0 ||
     (filters.importance?.length || 0) > 0 ||
     (filters.channels?.length || 0) > 0 ||
-    filters.sentAt !== undefined ||
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (filters as any).status !== undefined ||
     filters.unread !== undefined ||
     filters.createdAt !== undefined;
 
@@ -123,58 +126,52 @@ export function NotificationFilters({
         </SheetHeader>
 
         <div className="space-y-6 py-6">
-          {/* Type Filter */}
+          {/* Type Filter - Multi-select */}
           <div className="space-y-2">
             <Label>Tipo</Label>
             <Combobox
-              value={filters.types?.join(",") || ""}
+              mode="multiple"
+              value={filters.types || []}
               onValueChange={handleTypeChange}
-              options={[
-                { value: "", label: "Todos os tipos" },
-                ...Object.values(NOTIFICATION_TYPE).map((type) => ({
-                  value: type,
-                  label: NOTIFICATION_TYPE_LABELS[type],
-                })),
-              ]}
-              placeholder="Selecione o tipo"
+              options={Object.values(NOTIFICATION_TYPE).map((type) => ({
+                value: type,
+                label: NOTIFICATION_TYPE_LABELS[type],
+              }))}
+              placeholder="Selecione os tipos"
               searchable={false}
               clearable
             />
           </div>
 
-          {/* Importance Filter */}
+          {/* Importance Filter - Multi-select */}
           <div className="space-y-2">
             <Label>Importância</Label>
             <Combobox
-              value={filters.importance?.join(",") || ""}
+              mode="multiple"
+              value={filters.importance || []}
               onValueChange={handleImportanceChange}
-              options={[
-                { value: "", label: "Todas" },
-                ...Object.values(NOTIFICATION_IMPORTANCE).map((importance) => ({
-                  value: importance,
-                  label: NOTIFICATION_IMPORTANCE_LABELS[importance],
-                })),
-              ]}
-              placeholder="Selecione a importância"
+              options={Object.values(NOTIFICATION_IMPORTANCE).map((importance) => ({
+                value: importance,
+                label: NOTIFICATION_IMPORTANCE_LABELS[importance],
+              }))}
+              placeholder="Selecione as importâncias"
               searchable={false}
               clearable
             />
           </div>
 
-          {/* Channel Filter */}
+          {/* Channel Filter - Multi-select */}
           <div className="space-y-2">
             <Label>Canal</Label>
             <Combobox
-              value={filters.channels?.join(",") || ""}
+              mode="multiple"
+              value={filters.channels || []}
               onValueChange={handleChannelChange}
-              options={[
-                { value: "", label: "Todos os canais" },
-                ...Object.values(NOTIFICATION_CHANNEL).map((channel) => ({
-                  value: channel,
-                  label: NOTIFICATION_CHANNEL_LABELS[channel],
-                })),
-              ]}
-              placeholder="Selecione o canal"
+              options={Object.values(NOTIFICATION_CHANNEL).map((channel) => ({
+                value: channel,
+                label: NOTIFICATION_CHANNEL_LABELS[channel],
+              }))}
+              placeholder="Selecione os canais"
               searchable={false}
               clearable
             />

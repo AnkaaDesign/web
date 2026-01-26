@@ -896,6 +896,17 @@ const ChangelogTimelineItem = ({
                           return null;
                         }
 
+                        // Calculate dimensions
+                        const height = Math.round(
+                          (layoutDetails.height || 0) * 100,
+                        );
+                        const totalWidth = Math.round(
+                          layoutDetails.layoutSections.reduce(
+                            (sum: number, s: any) => sum + (s.width || 0) * 100,
+                            0,
+                          ),
+                        );
+
                         // Detect side from reason - backend uses "lado left/right/back" format
                         const reason = layoutChange.reason?.toLowerCase() || "";
                         const sideName =
@@ -930,25 +941,32 @@ const ChangelogTimelineItem = ({
                           layoutDetails,
                           sideName,
                           sortOrder,
+                          totalWidth,
+                          height,
                         };
                       })
                       .filter(Boolean)
                       .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
-                      .map(({ layoutChange, layoutDetails, sideName }: any) => (
-                        <div key={layoutChange.id} className="flex-shrink-0">
-                          <div className="text-xs font-medium text-muted-foreground mb-1 text-center">
-                            {sideName}
+                      .map(
+                        ({
+                          layoutChange,
+                          sideName,
+                          totalWidth,
+                          height,
+                        }: any) => (
+                          <div
+                            key={layoutChange.id}
+                            className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-muted/30 inline-flex items-center gap-2"
+                          >
+                            <span className="text-xs font-medium">
+                              {sideName}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {totalWidth}cm × {height}cm
+                            </span>
                           </div>
-                          <div className="border rounded-lg bg-white/50 dark:bg-muted/30 backdrop-blur-sm p-1.5">
-                            <div
-                              dangerouslySetInnerHTML={{
-                                __html: generateLayoutSVG(layoutDetails),
-                              }}
-                              className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[140px] [&>svg]:max-h-[60px]"
-                            />
-                          </div>
-                        </div>
-                      ))}
+                        ),
+                      )}
                   </div>
                 )}
               </div>
