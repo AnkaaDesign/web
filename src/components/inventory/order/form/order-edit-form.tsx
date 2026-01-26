@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -216,6 +216,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     setNfeFiles(initialNfeFiles);
   }, [initialBudgetFiles, initialReceiptFiles, initialNfeFiles]);
 
+  // Local state for notes input to avoid slow typing from URL state updates
+  const [localNotes, setLocalNotes] = useState(order.notes || "");
+  const notesDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   // Memoize initialData to prevent infinite loop from recreating the object on every render
   const initialDataForUrlState = useMemo(() => {
     console.log('[OrderEditForm] initialDataForUrlState RECREATED', {
@@ -405,6 +409,16 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes]);
 
+  // Sync localNotes from URL state when it changes externally (e.g., on initial load)
+  useEffect(() => {
+    // Only sync if the URL state value differs and localNotes hasn't been modified yet
+    // or if this is an external update (not from our debounced update)
+    if (notes !== localNotes && !notesDebounceRef.current) {
+      setLocalNotes(notes || "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes]);
+
   useEffect(() => {
     const currentValue = form.getValues("temporaryItems");
     const newValue = temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems;
@@ -565,7 +579,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     const descriptionChanged = description?.trim() !== order.description?.trim();
     const supplierChanged = (supplierId || null) !== (order.supplierId || null);
     const forecastChanged = (forecast ? new Date(forecast).getTime() : null) !== (order.forecast ? new Date(order.forecast).getTime() : null);
-    const notesChanged = (notes?.trim() || "") !== (order.notes?.trim() || "");
+    const notesChanged = (localNotes?.trim() || "") !== (order.notes?.trim() || "");
 
     // Check payment fields for changes
     const paymentMethodChanged = (watchedPaymentMethod || null) !== (order.paymentMethod || null);
@@ -591,7 +605,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
     const hasChanges = descriptionChanged || supplierChanged || forecastChanged || notesChanged || itemsChanged || quantitiesChanged || pricesChanged || hasFileChanges || paymentMethodChanged || paymentPixChanged || paymentDueDaysChanged;
     return hasChanges;
-  }, [description, supplierId, forecast, notes, selectedItems, quantities, prices, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays]);
+  }, [description, supplierId, forecast, localNotes, selectedItems, quantities, prices, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays]);
 
   // Stage validation
   const validateCurrentStep = useCallback((): boolean => {
@@ -1250,8 +1264,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                             <Input
                               placeholder="Digite a descrição do pedido"
                               value={description}
-                              onChange={(e) => {
-                                const newValue = e.target.value || "";
+                              onChange={(value) => {
+                                const newValue = (value as string) || "";
                                 updateDescription(newValue);
                                 // Form will be synced by useEffect, no need to set it here
                                 // Trigger validation after state update
@@ -1385,12 +1399,18 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                             </Label>
                             <Textarea
                               placeholder="Observações sobre o pedido (opcional)"
-                              value={notes}
+                              value={localNotes}
                               onChange={(e) => {
-                                updateNotes(e.target.value);
-                                // Form will be synced by useEffect
-                                // Trigger validation after state update
-                                setTimeout(() => form.trigger(), 0);
+                                const newValue = e.target.value;
+                                setLocalNotes(newValue);
+                                // Debounce URL state update to avoid slow typing
+                                if (notesDebounceRef.current) {
+                                  clearTimeout(notesDebounceRef.current);
+                                }
+                                notesDebounceRef.current = setTimeout(() => {
+                                  updateNotes(newValue);
+                                  setTimeout(() => form.trigger(), 0);
+                                }, 300);
                               }}
                               className="resize-none w-full flex-1 min-h-[134px]"
                             />
@@ -1678,7 +1698,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="rounded-md border overflow-hidden w-full">
+                        <div className="rounded-md border border-border/40 overflow-hidden w-full">
                           {orderItemMode === "inventory" ? (
                             <Table>
                               <TableHeader>

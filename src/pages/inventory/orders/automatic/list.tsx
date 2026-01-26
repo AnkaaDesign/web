@@ -256,23 +256,23 @@ export const AutomaticOrderListPage = () => {
               <>
                 {analysisData?.data.summary && (
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="p-4 border rounded-lg">
+                    <div className="p-4 border border-border/40 rounded-lg">
                       <div className="text-xs text-muted-foreground mb-1">Total de Itens</div>
                       <div className="text-2xl font-bold">{analysisData.data.summary.totalItems}</div>
                     </div>
-                    <div className="p-4 border rounded-lg">
+                    <div className="p-4 border border-border/40 rounded-lg">
                       <div className="text-xs text-muted-foreground mb-1">Valor Estimado</div>
                       <div className="text-2xl font-bold">
                         {formatCurrency(analysisData.data.summary.totalEstimatedCost || 0)}
                       </div>
                     </div>
-                    <div className="p-4 border rounded-lg">
+                    <div className="p-4 border border-border/40 rounded-lg">
                       <div className="text-xs text-muted-foreground mb-1">Críticos</div>
                       <div className="text-2xl font-bold text-destructive">
                         {analysisData.data.summary.criticalItems}
                       </div>
                     </div>
-                    <div className="p-4 border rounded-lg">
+                    <div className="p-4 border border-border/40 rounded-lg">
                       <div className="text-xs text-muted-foreground mb-1">Overrides Emergenciais</div>
                       <div className="text-2xl font-bold text-orange-500">
                         {analysisData.data.summary.emergencyOverrides}
@@ -350,7 +350,7 @@ export const AutomaticOrderListPage = () => {
                             </div>
 
                             {/* Table */}
-                            <div className="border rounded-lg overflow-hidden">
+                            <div className="border border-border/40 rounded-lg overflow-hidden">
                               <Table>
                                 <TableHeader>
                                   <TableRow>

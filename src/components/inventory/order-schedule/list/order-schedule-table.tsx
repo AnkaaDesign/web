@@ -191,7 +191,7 @@ export function OrderScheduleTable({ visibleColumns, className, onEdit, onView, 
   return (
     <div className={cn("flex flex-col h-full", className)}>
       {/* Table */}
-      <div className="flex-1 overflow-auto border rounded-lg">
+      <div className="flex-1 overflow-auto border border-border/40 rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>

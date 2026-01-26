@@ -342,7 +342,7 @@ export const OrderScheduleCreateForm = () => {
                                               className="bg-transparent"
                                               ref={field.ref}
                                               value={field.value}
-                                              onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                                              onChange={(value) => field.onChange(typeof value === 'number' ? value : parseInt(String(value)) || 1)}
                                               onBlur={field.onBlur}
                                             />
                                           </FormControl>
@@ -446,7 +446,7 @@ export const OrderScheduleCreateForm = () => {
                                             className="bg-transparent"
                                             ref={field.ref}
                                             value={field.value ?? ""}
-                                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                                            onChange={(value) => field.onChange(typeof value === 'number' ? value : parseInt(String(value)) || undefined)}
                                             onBlur={field.onBlur}
                                           />
                                         </FormControl>
