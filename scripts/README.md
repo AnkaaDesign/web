@@ -7,6 +7,7 @@ Automatically detects and updates your local network IP address in environment f
 ### When to use
 
 Run this script when:
+
 - Your IP address changes (e.g., after DHCP reassignment)
 - You get CORS errors saying "CORS request did not succeed"
 - You're switching between different networks
@@ -34,9 +35,9 @@ bash scripts/update-local-ip.sh
 
 ```
 🔍 Detecting local IP address...
-✅ Detected IP: 192.168.0.13
-📝 Current IP in .env: 192.168.0.16
-📝 Updating to: 192.168.0.13
+✅ Detected IP: 192.168.10.161
+📝 Current IP in .env: 192.168.10.161
+📝 Updating to: 192.168.10.161
 ✅ Updated .env
 ✅ Updated .env.development
 
@@ -73,14 +74,17 @@ The API backend (`/home/kennedy/Documents/repositories/api`) has been configured
 ### Troubleshooting
 
 **Issue**: Script says "Could not detect local IP address"
+
 - **Solution**: Check that you're connected to a network (WiFi or Ethernet)
 - Run `ip addr show` to manually check your network interfaces
 
 **Issue**: CORS errors persist after updating
+
 - **Solution**: Make sure you restarted your Vite dev server
 - Clear browser cache or use incognito mode
 - Check that the API is running on the correct IP
 
 **Issue**: Want to use localhost instead of network IP
+
 - **Solution**: Manually edit `.env` and change `VITE_API_URL` to `http://localhost:3030`
 - This works if frontend and backend are on the same machine

@@ -10,7 +10,8 @@ import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { TaskHistoryContextMenu } from "./task-history-context-menu";
 import { createTaskHistoryColumns } from "./task-history-columns";
 import { cn } from "@/lib/utils";
-import { TASK_STATUS, routes } from "../../../../constants";
+import { TASK_STATUS, SECTOR_PRIVILEGES, routes } from "../../../../constants";
+import { hasPrivilege } from "../../../../utils/user";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { isDateInPast, getHoursBetween } from "../../../../utils";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
@@ -66,6 +67,15 @@ export function TaskHistoryTable({
   const navigate = useNavigate();
   const { user } = useAuth();
   const canEdit = canEditTasks(user);
+
+  // Get user's sector privilege for column visibility
+  const userSectorPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
+
+  // Check if user can view price (Admin or Financial only)
+  const canViewPrice = user && (
+    hasPrivilege(user, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(user, SECTOR_PRIVILEGES.FINANCIAL)
+  );
 
   // State for expanded groups - use external state if provided
   const [internalExpandedGroups, setInternalExpandedGroups] = useState<Set<string>>(new Set());
@@ -230,9 +240,11 @@ export function TaskHistoryTable({
 
   // Define all available columns
   const allColumns = React.useMemo(() => createTaskHistoryColumns({
+    canViewPrice: !!canViewPrice,
     currentUserId: user?.id,
+    sectorPrivilege: userSectorPrivilege,
     navigationRoute
-  }), [user?.id, navigationRoute]);
+  }), [canViewPrice, user?.id, userSectorPrivilege, navigationRoute]);
 
   // Filter visible columns
   const columns = React.useMemo(
