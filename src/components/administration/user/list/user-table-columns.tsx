@@ -1,5 +1,5 @@
 import { formatCPF, formatBrazilianPhone, formatDate, formatDateTime } from "../../../../utils";
-import { USER_STATUS_LABELS } from "../../../../constants";
+import { USER_STATUS_LABELS, SHIRT_SIZE_LABELS, PANTS_SIZE_LABELS, BOOT_SIZE_LABELS, SLEEVES_SIZE_LABELS, MASK_SIZE_LABELS, GLOVES_SIZE_LABELS, RAIN_BOOTS_SIZE_LABELS } from "../../../../constants";
 import { getUserStatusBadgeText } from "../../../../utils/user";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import type { User } from "../../../../types";
@@ -117,20 +117,6 @@ export const createUserColumns = (): UserColumn[] => [
     align: "left",
   },
 
-  // Total de Férias (Vacation Count)
-  {
-    key: "vacationsCount",
-    header: "FÉRIAS",
-    accessor: (user: User) => (
-      <Badge variant="default" className="w-10">
-        {user._count?.vacations || 0}
-      </Badge>
-    ),
-    sortable: false,
-    className: "w-24",
-    align: "left",
-  },
-
   // Data de Nascimento (Birth Date)
   {
     key: "birth",
@@ -215,14 +201,95 @@ export const createUserColumns = (): UserColumn[] => [
     align: "left",
   },
 
-  // Setor Gerenciado (Managed Sector)
+  // Camisa (Shirt Size)
   {
-    key: "managedSector.name",
-    header: "SETOR GERENCIADO",
-    accessor: (user: User) => <div className="text-sm truncate" title={user.managedSector?.name}>{user.managedSector?.name || <span className="text-muted-foreground">-</span>}</div>,
-    sortable: true,
-    className: "min-w-[150px]",
-    align: "left",
+    key: "ppeSize.shirts",
+    header: "CAMISA",
+    accessor: (user: User) => {
+      const value = user.ppeSize?.shirts;
+      return <div className="text-sm truncate">{value ? (SHIRT_SIZE_LABELS[value as keyof typeof SHIRT_SIZE_LABELS] || value) : <span className="text-muted-foreground">-</span>}</div>;
+    },
+    sortable: false,
+    className: "w-20",
+    align: "center",
+  },
+
+  // Calça (Pants Size)
+  {
+    key: "ppeSize.pants",
+    header: "CALÇA",
+    accessor: (user: User) => {
+      const value = user.ppeSize?.pants;
+      return <div className="text-sm truncate">{value ? (PANTS_SIZE_LABELS[value as keyof typeof PANTS_SIZE_LABELS] || value) : <span className="text-muted-foreground">-</span>}</div>;
+    },
+    sortable: false,
+    className: "w-20",
+    align: "center",
+  },
+
+  // Bota (Boot Size)
+  {
+    key: "ppeSize.boots",
+    header: "BOTA",
+    accessor: (user: User) => {
+      const value = user.ppeSize?.boots;
+      return <div className="text-sm truncate">{value ? (BOOT_SIZE_LABELS[value as keyof typeof BOOT_SIZE_LABELS] || value) : <span className="text-muted-foreground">-</span>}</div>;
+    },
+    sortable: false,
+    className: "w-20",
+    align: "center",
+  },
+
+  // Manguito (Sleeves Size)
+  {
+    key: "ppeSize.sleeves",
+    header: "MANGUITO",
+    accessor: (user: User) => {
+      const value = user.ppeSize?.sleeves;
+      return <div className="text-sm truncate">{value ? (SLEEVES_SIZE_LABELS[value as keyof typeof SLEEVES_SIZE_LABELS] || value) : <span className="text-muted-foreground">-</span>}</div>;
+    },
+    sortable: false,
+    className: "w-24",
+    align: "center",
+  },
+
+  // Máscara (Mask Size)
+  {
+    key: "ppeSize.mask",
+    header: "MÁSCARA",
+    accessor: (user: User) => {
+      const value = user.ppeSize?.mask;
+      return <div className="text-sm truncate">{value ? (MASK_SIZE_LABELS[value as keyof typeof MASK_SIZE_LABELS] || value) : <span className="text-muted-foreground">-</span>}</div>;
+    },
+    sortable: false,
+    className: "w-24",
+    align: "center",
+  },
+
+  // Luva (Gloves Size)
+  {
+    key: "ppeSize.gloves",
+    header: "LUVA",
+    accessor: (user: User) => {
+      const value = user.ppeSize?.gloves;
+      return <div className="text-sm truncate">{value ? (GLOVES_SIZE_LABELS[value as keyof typeof GLOVES_SIZE_LABELS] || value) : <span className="text-muted-foreground">-</span>}</div>;
+    },
+    sortable: false,
+    className: "w-20",
+    align: "center",
+  },
+
+  // Galocha (Rain Boots Size)
+  {
+    key: "ppeSize.rainBoots",
+    header: "GALOCHA",
+    accessor: (user: User) => {
+      const value = user.ppeSize?.rainBoots;
+      return <div className="text-sm truncate">{value ? (RAIN_BOOTS_SIZE_LABELS[value as keyof typeof RAIN_BOOTS_SIZE_LABELS] || value) : <span className="text-muted-foreground">-</span>}</div>;
+    },
+    sortable: false,
+    className: "w-24",
+    align: "center",
   },
 
   // Cidade (City)
@@ -287,47 +354,6 @@ export const createUserColumns = (): UserColumn[] => [
     align: "left",
   },
 
-  // Requer Alteração de Senha (Require Password Change)
-  {
-    key: "requirePasswordChange",
-    header: "REQUER ALTERAÇÃO DE SENHA",
-    accessor: (user: User) => (
-      <div className="text-sm">
-        {user.requirePasswordChange ? (
-          <Badge variant="destructive" className="text-xs">
-            Sim
-          </Badge>
-        ) : (
-          <Badge variant="secondary" className="text-xs">
-            Não
-          </Badge>
-        )}
-      </div>
-    ),
-    sortable: true,
-    className: "min-w-[220px]",
-    align: "left",
-  },
-
-  // Data de Criação (Created At)
-  {
-    key: "createdAt",
-    header: "DATA DE CRIAÇÃO",
-    accessor: (user: User) => <div className="text-sm truncate">{user.createdAt ? formatDateTime(new Date(user.createdAt)) : <span className="text-muted-foreground">-</span>}</div>,
-    sortable: true,
-    className: "min-w-[180px]",
-    align: "left",
-  },
-
-  // Data de Atualização (Updated At)
-  {
-    key: "updatedAt",
-    header: "ÚLTIMA ATUALIZAÇÃO",
-    accessor: (user: User) => <div className="text-sm truncate">{user.updatedAt ? formatDateTime(new Date(user.updatedAt)) : <span className="text-muted-foreground">-</span>}</div>,
-    sortable: true,
-    className: "min-w-[180px]",
-    align: "left",
-  },
 ];
 
 // Export the default visible columns

@@ -689,8 +689,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
               shouldSync: (so as any).shouldSync !== false, // Include shouldSync flag (default true)
               createdAt: so.createdAt, // Keep createdAt for ordering
             }))
-            // Sort by createdAt to maintain creation order (oldest first)
+            // Sort by creation order (oldest first), cancelled items go to end
             .sort((a, b) => {
+              const aCancelled = a.status === SERVICE_ORDER_STATUS.CANCELLED ? 1 : 0;
+              const bCancelled = b.status === SERVICE_ORDER_STATUS.CANCELLED ? 1 : 0;
+              if (aCancelled !== bCancelled) return aCancelled - bCancelled;
               const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
               const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
               return aTime - bTime;

@@ -17,6 +17,17 @@ export interface SecullumTimeEntry {
   Saida4?: string | null;
   Entrada5?: string | null;
   Saida5?: string | null;
+  // Origin fields: 0 or null = electronic, non-zero = manual entry
+  OrigemEntrada1?: number | null;
+  OrigemSaida1?: number | null;
+  OrigemEntrada2?: number | null;
+  OrigemSaida2?: number | null;
+  OrigemEntrada3?: number | null;
+  OrigemSaida3?: number | null;
+  OrigemEntrada4?: number | null;
+  OrigemSaida4?: number | null;
+  OrigemEntrada5?: number | null;
+  OrigemSaida5?: number | null;
   Compensado?: boolean;
   Neutro?: boolean;
   Folga?: boolean;

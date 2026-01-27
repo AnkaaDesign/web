@@ -123,6 +123,21 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
       ),
     },
     {
+      key: "bonusExtra",
+      title: "Extra Ponto",
+      render: (bonus) => {
+        const extras = bonus.bonusExtras || [];
+        if (extras.length === 0) return <span className="text-muted-foreground">-</span>;
+        const totalValue = extras.reduce((sum, e) => sum + (Number(e.value) || 0), 0);
+        const totalPct = extras.reduce((sum, e) => sum + (Number(e.percentage) || 0), 0);
+        return (
+          <span className="font-medium text-emerald-600">
+            {totalPct > 0 ? `${totalPct}%` : ""}{totalPct > 0 && totalValue > 0 ? " / " : ""}{totalValue > 0 ? formatCurrency(totalValue) : ""}
+          </span>
+        );
+      },
+    },
+    {
       key: "performanceLevel",
       title: "Nível",
       sortable: true,

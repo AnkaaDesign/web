@@ -1,12 +1,10 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { IconLoader2 as Loader2, IconCalendar as CalendarIcon, IconShield, IconUsers as Users, IconUserCheck as UserCheck, IconUserX as UserX } from "@tabler/icons-react";
+import { IconShield, IconUsers as Users, IconUserCheck as UserCheck, IconUserX as UserX } from "@tabler/icons-react";
 import { ppeDeliveryScheduleCreateSchema, ppeDeliveryScheduleUpdateSchema, type PpeDeliveryScheduleCreateFormData, type PpeDeliveryScheduleUpdateFormData } from "../../../../schemas";
 import { getUsers } from "../../../../api-client";
 import { type PpeDeliverySchedule } from "../../../../types";
@@ -23,14 +21,9 @@ import {
   USER_STATUS,
   routes,
 } from "../../../../constants";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
 import { Combobox } from "@/components/ui/combobox";
+import { DateTimeInput } from "@/components/ui/date-time-input";
 import { PpeItemsConfiguration } from "./ppe-items-configuration";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 interface BasePpeScheduleFormProps {
   isSubmitting?: boolean;
@@ -53,10 +46,9 @@ type PpeScheduleFormProps = CreatePpeScheduleFormProps | UpdatePpeScheduleFormPr
 
 export function PpeScheduleForm(props: PpeScheduleFormProps) {
   const { isSubmitting, mode } = props;
-  const navigate = useNavigate();
   // Note: Form uses props.onSubmit directly instead of mutations
 
-  const [selectedAssignmentType, setSelectedAssignmentType] = useState<ASSIGNMENT_TYPE>(mode === "update" ? props.ppeSchedule.assignmentType : ASSIGNMENT_TYPE.ALL);
+  const [selectedAssignmentType, setSelectedAssignmentType] = useState<ASSIGNMENT_TYPE>(mode === "update" ? props.ppeSchedule.assignmentType : ASSIGNMENT_TYPE.SPECIFIC);
 
   // Create a stable cache for fetched users
   const cacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
@@ -68,8 +60,9 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
     defaultValues:
       mode === "create"
         ? {
+            name: "",
             ppeItems: [{ ppeType: Object.values(PPE_TYPE)[0], quantity: 1 }],
-            assignmentType: ASSIGNMENT_TYPE.ALL,
+            assignmentType: ASSIGNMENT_TYPE.SPECIFIC,
             excludedUserIds: [],
             includedUserIds: [],
             frequency: SCHEDULE_FREQUENCY.MONTHLY,
@@ -79,6 +72,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
             ...props.defaultValues,
           }
         : {
+            name: props.ppeSchedule.name || "",
             ppeItems: props.ppeSchedule.ppeItems || [],
             assignmentType: props.ppeSchedule.assignmentType || ASSIGNMENT_TYPE.ALL,
             excludedUserIds: props.ppeSchedule.excludedUserIds || [],
@@ -164,7 +158,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
       } else {
         await (props as UpdatePpeScheduleFormProps).onSubmit(data as PpeDeliveryScheduleUpdateFormData);
       }
-      navigate(routes.inventory.ppe.root);
+      // Navigation is handled by the page component's onSubmit callback
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error submitting form:", error);
@@ -186,115 +180,24 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
     }
   };
 
-  // Helper function to render schedule details based on frequency
-  const renderScheduleFields = () => {
-    switch (watchFrequency) {
-      case SCHEDULE_FREQUENCY.ONCE:
-        return (
-          <FormField
-            control={form.control}
-            name="specificDate"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  Data Específica <span className="text-destructive">*</span>
-                </FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                        {field.value ? format(field.value, "PPP", { locale: ptBR }) : <span>Selecione a data</span>}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={field.value || undefined} onSelect={field.onChange} initialFocus />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        );
-      case SCHEDULE_FREQUENCY.WEEKLY:
-        return (
-          <FormField
-            control={form.control}
-            name="dayOfWeek"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  Dia da Semana <span className="text-destructive">*</span>
-                </FormLabel>
-                <FormControl>
-                  <Combobox
-                    value={field.value || ""}
-                    onValueChange={field.onChange}
-                    options={Object.values(WEEK_DAY).map((day) => ({
-                      label: WEEK_DAY_LABELS[day],
-                      value: day,
-                    }))}
-                    placeholder="Selecione o dia"
-                    searchPlaceholder="Buscar dia..."
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        );
-      case SCHEDULE_FREQUENCY.MONTHLY:
-        // Day of month is now rendered inline with frequency fields
-        return null;
-      case SCHEDULE_FREQUENCY.ANNUAL:
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField
-              control={form.control}
-              name="month"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Mês <span className="text-destructive">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Combobox
-                      value={field.value || ""}
-                      onValueChange={field.onChange}
-                      options={Object.values(MONTH).map((month) => ({
-                        label: MONTH_LABELS[month],
-                        value: month,
-                      }))}
-                      placeholder="Selecione o mês"
-                      searchPlaceholder="Buscar mês..."
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="dayOfMonth"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Dia do Mês <span className="text-destructive">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input type="number" min={1} max={31} value={field.value || ""} onChange={(value) => field.onChange(typeof value === "number" ? value : undefined)} placeholder="1-31" className="bg-transparent" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
+  // Frequency groups - defines which fields appear for which frequencies (inspired by maintenance schedule pattern)
+  const frequencyGroups = useMemo(() => ({
+    withInterval: [SCHEDULE_FREQUENCY.WEEKLY, SCHEDULE_FREQUENCY.MONTHLY, SCHEDULE_FREQUENCY.ANNUAL] as string[],
+    needsDayOfWeek: [SCHEDULE_FREQUENCY.WEEKLY, SCHEDULE_FREQUENCY.BIWEEKLY] as string[],
+    needsDayOfMonth: [
+      SCHEDULE_FREQUENCY.MONTHLY, SCHEDULE_FREQUENCY.BIMONTHLY, SCHEDULE_FREQUENCY.QUARTERLY,
+      SCHEDULE_FREQUENCY.TRIANNUAL, SCHEDULE_FREQUENCY.QUADRIMESTRAL, SCHEDULE_FREQUENCY.SEMI_ANNUAL,
+      SCHEDULE_FREQUENCY.ANNUAL,
+    ] as string[],
+    needsMonth: [SCHEDULE_FREQUENCY.ANNUAL] as string[],
+    needsSpecificDate: [SCHEDULE_FREQUENCY.ONCE] as string[],
+    needsNextRun: [
+      SCHEDULE_FREQUENCY.DAILY, SCHEDULE_FREQUENCY.WEEKLY, SCHEDULE_FREQUENCY.BIWEEKLY,
+      SCHEDULE_FREQUENCY.MONTHLY, SCHEDULE_FREQUENCY.BIMONTHLY, SCHEDULE_FREQUENCY.QUARTERLY,
+      SCHEDULE_FREQUENCY.TRIANNUAL, SCHEDULE_FREQUENCY.QUADRIMESTRAL, SCHEDULE_FREQUENCY.SEMI_ANNUAL,
+      SCHEDULE_FREQUENCY.ANNUAL,
+    ] as string[],
+  }), []);
 
   return (
     <Card className="h-full flex flex-col shadow-sm border border-border overflow-hidden">
@@ -303,6 +206,29 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
           <form id="ppe-schedule-form" onSubmit={form.handleSubmit(handleSubmit, handleError)} className="space-y-8">
             {/* Hidden submit button for programmatic form submission */}
             <button type="submit" id="ppe-schedule-form-submit" className="hidden" aria-hidden="true" />
+
+              {/* Name */}
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Nome <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: Entrega Semestral de Uniformes"
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        className="bg-transparent"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* PPE Items Configuration */}
               <FormField
                 control={form.control}
@@ -419,14 +345,14 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                 )}
               </div>
 
-              {/* Schedule Configuration - Frequency, a cada, and dia do mes in same row */}
-              <div className="grid grid-cols-[2fr,1fr,1fr] gap-4">
+              {/* Schedule Configuration - All frequency fields in a single responsive row */}
+              <div className="flex flex-wrap gap-4">
                 {/* Frequency */}
                 <FormField
                   control={form.control}
                   name="frequency"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex-1 min-w-[200px]">
                       <FormLabel>
                         Frequência <span className="text-destructive">*</span>
                       </FormLabel>
@@ -447,28 +373,119 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                   )}
                 />
 
-                {/* Frequency count (A cada) */}
-                <FormField
-                  control={form.control}
-                  name="frequencyCount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>A cada</FormLabel>
-                      <FormControl>
-                        <Input type="number" min={1} value={field.value} onChange={(value) => field.onChange(typeof value === "number" ? value : 1)} placeholder="1" className="bg-transparent" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Frequency count (A cada) - only for frequencies that support intervals */}
+                {watchFrequency && frequencyGroups.withInterval.includes(watchFrequency) && (
+                  <FormField
+                    control={form.control}
+                    name="frequencyCount"
+                    render={({ field }) => {
+                      const getIntervalLabel = () => {
+                        switch (watchFrequency) {
+                          case SCHEDULE_FREQUENCY.WEEKLY: return "Intervalo (semanas)";
+                          case SCHEDULE_FREQUENCY.MONTHLY: return "Intervalo (meses)";
+                          case SCHEDULE_FREQUENCY.ANNUAL: return "Intervalo (anos)";
+                          default: return "Intervalo";
+                        }
+                      };
+                      return (
+                        <FormItem className="flex-1 min-w-[150px]">
+                          <FormLabel>{getIntervalLabel()}</FormLabel>
+                          <FormControl>
+                            <Input type="number" min={1} value={field.value} onChange={(value) => field.onChange(typeof value === "number" ? value : parseInt(String(value)) || 1)} placeholder="1" className="bg-transparent" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+                )}
 
-                {/* Day of Month - show for monthly frequency */}
-                {watchFrequency === SCHEDULE_FREQUENCY.MONTHLY ? (
+                {/* Specific Date - for ONCE frequency */}
+                {watchFrequency && frequencyGroups.needsSpecificDate.includes(watchFrequency) && (
+                  <FormField
+                    control={form.control}
+                    name="specificDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col flex-1 min-w-[200px]">
+                        <FormLabel>
+                          Data Específica <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <DateTimeInput
+                          field={field}
+                          hideLabel
+                          placeholder="Selecione a data"
+                          mode="date"
+                          constraints={{ minDate: new Date() }}
+                        />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* Day of Week - for weekly/biweekly */}
+                {watchFrequency && frequencyGroups.needsDayOfWeek.includes(watchFrequency) && (
+                  <FormField
+                    control={form.control}
+                    name="dayOfWeek"
+                    render={({ field }) => (
+                      <FormItem className="flex-1 min-w-[200px]">
+                        <FormLabel>
+                          Dia da Semana <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Combobox
+                            value={field.value || ""}
+                            onValueChange={field.onChange}
+                            options={Object.values(WEEK_DAY).map((day) => ({
+                              label: WEEK_DAY_LABELS[day],
+                              value: day,
+                            }))}
+                            placeholder="Selecione o dia"
+                            searchPlaceholder="Buscar dia..."
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* Month - for annual */}
+                {watchFrequency && frequencyGroups.needsMonth.includes(watchFrequency) && (
+                  <FormField
+                    control={form.control}
+                    name="month"
+                    render={({ field }) => (
+                      <FormItem className="flex-1 min-w-[200px]">
+                        <FormLabel>
+                          Mês <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Combobox
+                            value={field.value || ""}
+                            onValueChange={field.onChange}
+                            options={Object.values(MONTH).map((m) => ({
+                              label: MONTH_LABELS[m],
+                              value: m,
+                            }))}
+                            placeholder="Selecione o mês"
+                            searchPlaceholder="Buscar mês..."
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* Day of Month - for monthly, bimonthly, quarterly, etc. */}
+                {watchFrequency && frequencyGroups.needsDayOfMonth.includes(watchFrequency) && (
                   <FormField
                     control={form.control}
                     name="dayOfMonth"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex-1 min-w-[150px]">
                         <FormLabel>
                           Dia do Mês <span className="text-destructive">*</span>
                         </FormLabel>
@@ -487,13 +504,29 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                       </FormItem>
                     )}
                   />
-                ) : (
-                  <div className="invisible">{/* Placeholder to maintain grid structure */}</div>
+                )}
+
+                {/* First Run / Next Run - for all recurring frequencies */}
+                {watchFrequency && frequencyGroups.needsNextRun.includes(watchFrequency) && (
+                  <FormField
+                    control={form.control}
+                    name={"nextRun" as any}
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col flex-1 min-w-[200px]">
+                        <FormLabel>Primeira Execução</FormLabel>
+                        <DateTimeInput
+                          field={field}
+                          hideLabel
+                          placeholder="Data de início"
+                          mode="date"
+                          constraints={{ minDate: new Date() }}
+                        />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
               </div>
-
-              {/* Frequency-specific fields (except monthly dayOfMonth which is now inline) */}
-              {watchFrequency !== SCHEDULE_FREQUENCY.MONTHLY && renderScheduleFields()}
 
               {/* Form Validation Summary */}
               {Object.keys(form.formState.errors).length > 0 && (

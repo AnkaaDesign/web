@@ -1959,7 +1959,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       const data = value as { name?: string; phone?: string | null };
       if (!data.name && !data.phone) return "Nenhum";
       if (data.name && data.phone) {
-        return `${data.name} (${formatBrazilianPhone(data.phone)})`;
+        return `${data.name} ${formatBrazilianPhone(data.phone)}`;
       }
       return data.name || "Nenhum";
     }

@@ -142,6 +142,7 @@ export function ConsumptionFilters({
 
   const fetchUsers = useCallback(async (search: string, page: number = 1) => {
     const response = await getUsers({
+      where: { isActive: true },
       search: search || undefined,
       page,
       limit: COMBOBOX_PAGE_SIZE,

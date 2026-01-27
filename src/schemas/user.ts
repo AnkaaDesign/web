@@ -465,6 +465,16 @@ export const userWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
+      isActive: z
+        .union([
+          z.boolean(),
+          z.object({
+            equals: z.boolean().optional(),
+            not: z.boolean().optional(),
+          }),
+        ])
+        .optional(),
+
       birth: z
         .union([
           z.date(),

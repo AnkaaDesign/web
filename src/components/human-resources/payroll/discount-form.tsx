@@ -86,7 +86,7 @@ const DISCOUNT_PRESETS = [
     label: "Plano de Saúde",
     reference: "Plano de Saúde",
     type: "fixed" as const,
-    fixedValue: 150.00,
+    value: 150.00,
     description: "Contribuição plano de saúde"
   },
   {
@@ -94,7 +94,7 @@ const DISCOUNT_PRESETS = [
     label: "Seguro de Vida",
     reference: "Seguro de Vida",
     type: "fixed" as const,
-    fixedValue: 25.00,
+    value: 25.00,
     description: "Seguro de vida em grupo"
   },
   {
@@ -126,14 +126,14 @@ export function DiscountForm({
     defaultValues: {
       reference: initialData?.reference || "",
       percentage: initialData?.percentage || undefined,
-      fixedValue: initialData?.fixedValue || undefined,
+      value: initialData?.value || undefined,
     }
   });
 
   // Watch form values for preview calculation
   const watchedValues = form.watch();
   const currentPercentage = watchedValues.percentage;
-  const currentFixedValue = watchedValues.fixedValue;
+  const currentFixedValue = watchedValues.value;
 
   // Calculate discount preview
   const discountPreview = React.useMemo(() => {
@@ -157,16 +157,16 @@ export function DiscountForm({
 
       if (preset.type === "percentage" && preset.percentage) {
         form.setValue("percentage", preset.percentage);
-        form.setValue("fixedValue", undefined);
-      } else if (preset.type === "fixed" && preset.fixedValue) {
-        form.setValue("fixedValue", preset.fixedValue);
+        form.setValue("value", undefined);
+      } else if (preset.type === "fixed" && preset.value) {
+        form.setValue("value", preset.value);
         form.setValue("percentage", undefined);
       }
     } else {
       // Reset form for custom discount
       form.setValue("reference", "");
       form.setValue("percentage", undefined);
-      form.setValue("fixedValue", undefined);
+      form.setValue("value", undefined);
     }
   };
 
@@ -174,7 +174,7 @@ export function DiscountForm({
   const handleDiscountTypeChange = (type: "percentage" | "fixed") => {
     setDiscountType(type);
     if (type === "percentage") {
-      form.setValue("fixedValue", undefined);
+      form.setValue("value", undefined);
     } else {
       form.setValue("percentage", undefined);
     }
@@ -183,7 +183,7 @@ export function DiscountForm({
   const handleSubmit = (data: DiscountCreateFormData | DiscountUpdateFormData) => {
     // Ensure only one type of value is set
     if (discountType === "percentage") {
-      onSubmit({ ...data, fixedValue: undefined });
+      onSubmit({ ...data, value: undefined });
     } else {
       onSubmit({ ...data, percentage: undefined });
     }
@@ -312,7 +312,7 @@ export function DiscountForm({
               {discountType === "fixed" && (
                 <FormField
                   control={form.control}
-                  name="fixedValue"
+                  name="value"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Valor Fixo</FormLabel>

@@ -81,6 +81,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
       position: true,
       sector: true,
       managedSector: true,
+      ppeSize: true,
       _count: {
         select: {
           createdTasks: true,

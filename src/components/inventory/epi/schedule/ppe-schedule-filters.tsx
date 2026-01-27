@@ -102,6 +102,7 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
     try {
       const queryParams: any = {
+        where: { isActive: true },
         orderBy: { name: "asc" },
         page: page,
         take: 50,

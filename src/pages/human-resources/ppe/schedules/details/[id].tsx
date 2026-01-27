@@ -168,13 +168,13 @@ export function PPEScheduleDetailsPage() {
           <div className="animate-in fade-in-50 duration-500">
             <PageHeader
             variant="detail"
-            title={`Agendamento #${ppeSchedule.data.id.slice(-8)}`}
+            title={ppeSchedule.data.name || `Agendamento #${ppeSchedule.data.id.slice(-8)}`}
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "RH", href: routes.humanResources.root },
               { label: "EPIs", href: routes.humanResources.ppe.root },
               { label: "Agendamentos", href: routes.humanResources.ppe.schedules.root },
-              { label: `#${ppeSchedule.data.id.slice(-8)}` },
+              { label: ppeSchedule.data.name || `#${ppeSchedule.data.id.slice(-8)}` },
             ]}
             actions={[
               {

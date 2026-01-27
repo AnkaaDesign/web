@@ -103,8 +103,8 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
   const grossSalary = Number(baseRemuneration) + Number(bonusValue);
 
   const totalDiscounts = payroll?.discounts?.reduce((sum, discount) => {
-    if (discount.fixedValue) {
-      return sum + Number(discount.fixedValue);
+    if (discount.value) {
+      return sum + Number(discount.value);
     }
     if (discount.percentage) {
       return sum + (Number(grossSalary) * Number(discount.percentage) / 100);
@@ -452,8 +452,8 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
                     className="space-y-3"
                   >
                     {payroll.discounts.map((discount, index) => {
-                      const discountValue = discount.fixedValue
-                        ? Number(discount.fixedValue)
+                      const discountValue = discount.value
+                        ? Number(discount.value)
                         : discount.percentage
                         ? (Number(grossSalary) * Number(discount.percentage) / 100)
                         : 0;
@@ -484,7 +484,7 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
                                   <div>
                                     <p className="font-medium">{discount.reference}</p>
                                     <p className="text-sm text-muted-foreground">
-                                      {discount.fixedValue
+                                      {discount.value
                                         ? "Valor fixo"
                                         : `${discount.percentage}% do salário bruto`
                                       }

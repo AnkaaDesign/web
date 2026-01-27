@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.ankaadesign.management",
+      "sha256_cert_fingerprints": [
+        "BC:72:57:60:30:FB:9D:5E:D6:BE:A7:80:E1:64:66:43:E4:9B:20:EE:C0:7A:48:F9:C2:2C:0C:CE:89:F7:AE:5B"
+      ]
+    }
+  }
+]

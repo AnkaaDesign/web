@@ -26,6 +26,7 @@ import {
   IconArrowUp as MoveUp,
   IconArrowDown as MoveDown,
   IconFileText as FileText,
+  IconPencil as PencilIcon,
 } from "@tabler/icons-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../../ui/dropdown-menu";
 import { secullumService } from "../../../api-client";
@@ -45,6 +46,34 @@ export interface TimeClockEntryTableRef {
   handleRestore: () => void;
   hasChanges: boolean;
   isPending: boolean;
+}
+
+// Map normalized field names to Secullum FonteDados field names
+// FonteDadosEntradaX is an object: { Tipo: 0 = electronic, 1 = manual, Origem, Motivo, Geolocalizacao }
+const FONTE_DADOS_FIELD_MAP: Record<string, string> = {
+  entry1: "FonteDadosEntrada1",
+  exit1: "FonteDadosSaida1",
+  entry2: "FonteDadosEntrada2",
+  exit2: "FonteDadosSaida2",
+  entry3: "FonteDadosEntrada3",
+  exit3: "FonteDadosSaida3",
+  entry4: "FonteDadosEntrada4",
+  exit4: "FonteDadosSaida4",
+  entry5: "FonteDadosEntrada5",
+  exit5: "FonteDadosSaida5",
+};
+
+/**
+ * Check if a time entry field was manually added (not electronic).
+ * FonteDadosX.Tipo: 0 = electronic (device/app), 1 = manual (requested adjustment).
+ */
+function isManualEntry(rawEntry: any, fieldName: string): boolean {
+  if (!rawEntry) return false;
+  const fdField = FONTE_DADOS_FIELD_MAP[fieldName];
+  if (!fdField) return false;
+  const fd = rawEntry[fdField];
+  if (!fd || typeof fd !== 'object') return false;
+  return fd.Tipo === 1;
 }
 
 const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: React.Ref<TimeClockEntryTableRef>) => {
@@ -699,6 +728,8 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                         const currentValue = form.getValues(`entries.${index}.${timeField}` as any);
                         const originalEntry = originalNormalizedEntries.find((e) => e.id === field.id);
                         const originalValue = originalEntry?.[timeField as keyof typeof originalEntry];
+                        const rawEntry = entries.find((e: any) => String(e.Id) === field.id || String(e.id) === field.id);
+                        const isManual = isManualEntry(rawEntry, timeField);
                         return (
                           <td
                             key={timeField}
@@ -751,6 +782,9 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                                           </Button>
                                         )}
                                       </div>
+                                      {isManual && formField.value && (
+                                        <PencilIcon className="h-3 w-3 text-amber-500 flex-shrink-0" title="Entrada manual" />
+                                      )}
                                     </div>
                                   </FormControl>
                                 </FormItem>

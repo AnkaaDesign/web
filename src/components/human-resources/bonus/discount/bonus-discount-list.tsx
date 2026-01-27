@@ -24,20 +24,39 @@ export function BonusDiscountList({
   isLoading = false,
   className
 }: BonusDiscountListProps) {
-  // Calculate discount amounts
-  const discountsWithCalculations = discounts.map((discount) => {
-    const calculatedAmount = discount.value || (bonus.baseBonus * (discount.percentage || 0) / 100);
+  // Calculate extras total
+  const baseBonus = Number(bonus.baseBonus);
+  const extras = bonus.bonusExtras || [];
+  let totalExtras = 0;
+  for (const extra of extras) {
+    if (extra.value !== null && extra.value !== undefined) {
+      totalExtras += Number(extra.value);
+    } else if (extra.percentage !== null && extra.percentage !== undefined) {
+      totalExtras += baseBonus * (Number(extra.percentage) / 100);
+    }
+  }
+
+  // Canonical cascading discount calculation (matches recalculateNetBonus)
+  const sortedDiscounts = [...discounts].sort(
+    (a, b) => (a.calculationOrder || 0) - (b.calculationOrder || 0)
+  );
+  let currentValue = baseBonus + totalExtras;
+  const discountsWithCalculations = sortedDiscounts.map((discount) => {
+    let calculatedAmount = 0;
+    if (discount.percentage) {
+      calculatedAmount = currentValue * (Number(discount.percentage) / 100);
+    } else if (discount.value) {
+      calculatedAmount = Math.min(Number(discount.value), currentValue);
+    }
+    currentValue = Math.max(0, currentValue - calculatedAmount);
     return {
       ...discount,
       calculatedAmount,
     };
   });
 
-  const totalDiscountValue = discountsWithCalculations.reduce((total, discount) => {
-    return total + discount.calculatedAmount;
-  }, 0);
-
-  const finalBonusAmount = Math.max(0, bonus.baseBonus - totalDiscountValue);
+  const totalDiscountValue = discountsWithCalculations.reduce((total, d) => total + d.calculatedAmount, 0);
+  const finalBonusAmount = Math.max(0, baseBonus + totalExtras - totalDiscountValue);
 
   const columns: StandardizedColumn<typeof discountsWithCalculations[0]>[] = [
     {
@@ -159,7 +178,7 @@ export function BonusDiscountList({
             <div className="flex items-center gap-1 mt-1">
               <IconCalculator className="h-3 w-3 text-muted-foreground" />
               <p className="text-xs text-muted-foreground">
-                {((finalBonusAmount / bonus.baseBonus) * 100).toFixed(1)}% do valor base
+                {(((baseBonus + totalExtras) > 0 ? finalBonusAmount / (baseBonus + totalExtras) : 0) * 100).toFixed(1)}% do valor base + extras
               </p>
             </div>
           </CardContent>

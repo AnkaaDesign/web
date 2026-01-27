@@ -1214,6 +1214,7 @@ export const ppeDeliveryScheduleOrderBySchema = z
     z
       .object({
         id: orderByDirectionSchema.optional(),
+        name: orderByDirectionSchema.optional(),
         itemId: orderByDirectionSchema.optional(),
         userId: orderByDirectionSchema.optional(),
         categoryId: orderByDirectionSchema.optional(),
@@ -1235,6 +1236,7 @@ export const ppeDeliveryScheduleOrderBySchema = z
       z
         .object({
           id: orderByDirectionSchema.optional(),
+          name: orderByDirectionSchema.optional(),
           frequency: orderByDirectionSchema.optional(),
           isActive: orderByDirectionSchema.optional(),
           nextRun: orderByDirectionSchema.optional(),
@@ -1520,6 +1522,7 @@ export const ppeScheduleItemSchema = z.object({
 
 // CRUD Schemas
 export const ppeDeliveryScheduleCreateSchema = z.object({
+  name: z.string().min(1, "Nome é obrigatório").max(255, "Nome muito longo"),
   ppeItems: z
     .array(ppeScheduleItemSchema)
     .min(1, "Pelo menos um item de PPE deve ser especificado")
@@ -1559,21 +1562,11 @@ export const ppeDeliveryScheduleCreateSchema = z.object({
     .nullable()
     .optional(),
   customMonths: z.array(z.nativeEnum(MONTH)).default([]),
-  rescheduleCount: z.number().int().min(0).default(0),
-  originalDate: z.date().nullable().optional(),
-  lastRescheduleDate: z.date().nullable().optional(),
-  rescheduleReason: z
-    .nativeEnum(RESCHEDULE_REASON, {
-      errorMap: () => ({ message: "Motivo de reagendamento inválido" }),
-    })
-    .nullable()
-    .optional(),
-  weeklyConfigId: z.string().uuid().nullable().optional(),
-  monthlyConfigId: z.string().uuid().nullable().optional(),
-  yearlyConfigId: z.string().uuid().nullable().optional(),
+  nextRun: z.date().nullable().optional(),
 });
 
 export const ppeDeliveryScheduleUpdateSchema = z.object({
+  name: z.string().min(1, "Nome é obrigatório").max(255, "Nome muito longo").optional(),
   ppeItems: z
     .array(ppeScheduleItemSchema)
     .min(1, "Pelo menos um item de PPE deve ser especificado")
@@ -1614,15 +1607,6 @@ export const ppeDeliveryScheduleUpdateSchema = z.object({
     .nullable()
     .optional(),
   customMonths: z.array(z.nativeEnum(MONTH)).optional(),
-  rescheduleCount: z.number().int().min(0).optional(),
-  originalDate: z.date().nullable().optional(),
-  lastRescheduleDate: z.date().nullable().optional(),
-  rescheduleReason: z
-    .nativeEnum(RESCHEDULE_REASON, {
-      errorMap: () => ({ message: "Motivo de reagendamento inválido" }),
-    })
-    .nullable()
-    .optional(),
   nextRun: z.date().nullable().optional(),
   lastRun: z.date().nullable().optional(),
 });

@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../../types";
 import { isImageFile, isVideoFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl } from "../../../utils/file";
 import { InlinePdfViewer, type InlinePdfViewerRef } from "./inline-pdf-viewer";
+import { VideoPlayer } from "./video-player";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 
 // Types for touch gestures and zoom
@@ -131,14 +132,16 @@ export function FilePreviewModal({
     setRotation(0);
     setPanX(0);
     setPanY(0);
-    setImageLoading(true);
+    // Video files handle their own loading state via VideoPlayer
+    const currentIsVideo = files[currentIndex] && isVideoFile(files[currentIndex]);
+    setImageLoading(!currentIsVideo);
     setImageError(false);
     // Reset PDF state
     setPdfNumPages(0);
     setPdfPageNumber(1);
     setPdfScale(1);
     setPdfFitScale(1);
-  }, [currentIndex, fitZoom]);
+  }, [currentIndex, fitZoom, files]);
 
   // Calculate the minimum PDF scale (either fit scale or 0.25, whichever allows full view)
   const pdfMinScale = React.useMemo(() => {
@@ -771,24 +774,15 @@ export function FilePreviewModal({
                   />
                 </div>
               ) : isVideo ? (
-                <div className="w-full max-w-5xl mx-auto">
-                  <video
+                <div className="w-full max-w-5xl mx-auto" style={{ maxHeight: "80vh" }}>
+                  <VideoPlayer
                     key={currentFile.id}
-                    controls
-                    autoPlay={false}
-                    className="w-full rounded-lg shadow-2xl"
-                    style={{
-                      maxHeight: "80vh",
-                    }}
-                    onLoadStart={() => setImageLoading(false)}
-                    onError={() => {
-                      setImageError(true);
-                      setImageLoading(false);
-                    }}
-                  >
-                    <source src={getFileUrl(currentFile, baseUrl)} type={currentFile.mimetype} />
-                    Seu navegador não suporta a reprodução de vídeo.
-                  </video>
+                    file={currentFile}
+                    url={getFileUrl(currentFile, baseUrl)}
+                    mode="inline"
+                    onDownload={() => handleDownload()}
+                    className="shadow-2xl"
+                  />
                 </div>
               ) : (
                 <>

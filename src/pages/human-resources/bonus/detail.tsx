@@ -110,6 +110,7 @@ export default function BonusDetailPage() {
               },
             },
             bonusDiscounts: true,
+            bonusExtras: true,
             users: true,
           },
         });
@@ -136,7 +137,7 @@ export default function BonusDetailPage() {
     fetchBonus();
   }, [id]);
 
-  // Calculate final bonus amount (after discounts)
+  // Calculate final bonus amount (extras + base - discounts)
   const calculateFinalAmount = useMemo(() => {
     if (!bonus) return 0;
 
@@ -144,23 +145,33 @@ export default function BonusDetailPage() {
       ? bonus.baseBonus
       : (bonus.baseBonus as any)?.toNumber?.() || Number(bonus.baseBonus) || 0;
 
-    if (!bonus.bonusDiscounts || bonus.bonusDiscounts.length === 0) {
-      return baseBonus;
-    }
-
-    let finalAmount = baseBonus;
-
-    bonus.bonusDiscounts
-      .sort((a: any, b: any) => a.calculationOrder - b.calculationOrder)
-      .forEach((discount: any) => {
-        if (discount.percentage) {
-          finalAmount -= finalAmount * (discount.percentage / 100);
-        } else if (discount.value) {
-          finalAmount -= discount.value;
+    // Apply extras first
+    let totalExtras = 0;
+    if (bonus.bonusExtras && bonus.bonusExtras.length > 0) {
+      bonus.bonusExtras.forEach((extra: any) => {
+        if (extra.value) {
+          totalExtras += Number(extra.value);
+        } else if (extra.percentage) {
+          totalExtras += baseBonus * (Number(extra.percentage) / 100);
         }
       });
+    }
 
-    return finalAmount;
+    let finalAmount = baseBonus + totalExtras;
+
+    if (bonus.bonusDiscounts && bonus.bonusDiscounts.length > 0) {
+      bonus.bonusDiscounts
+        .sort((a: any, b: any) => a.calculationOrder - b.calculationOrder)
+        .forEach((discount: any) => {
+          if (discount.percentage) {
+            finalAmount -= finalAmount * (Number(discount.percentage) / 100);
+          } else if (discount.value) {
+            finalAmount -= Number(discount.value);
+          }
+        });
+    }
+
+    return Math.max(0, finalAmount);
   }, [bonus]);
 
   // Get task statistics - use pre-calculated values from API
@@ -326,6 +337,7 @@ export default function BonusDetailPage() {
     window.print();
   };
 
+  const hasExtras = bonus.bonusExtras && bonus.bonusExtras.length > 0;
   const hasDiscounts = bonus.bonusDiscounts && bonus.bonusDiscounts.length > 0;
   const finalBonusValue = calculateFinalAmount;
 
@@ -401,6 +413,20 @@ export default function BonusDetailPage() {
                 <span className="text-sm text-muted-foreground">Bônus Base</span>
                 <span className="text-sm font-medium">{formatBonusAmount(bonus.baseBonus)}</span>
               </div>
+              {hasExtras && bonus.bonusExtras!.map((extra: any) => {
+                const percentageValue = Number(extra.percentage) || 0;
+                const hasPercentage = percentageValue > 0;
+                return (
+                  <div key={extra.id} className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">{extra.reference}</span>
+                    <span className="text-sm font-medium text-emerald-600">
+                      +{hasPercentage
+                        ? `${percentageValue}%`
+                        : formatCurrency(Number(extra.value) || 0)}
+                    </span>
+                  </div>
+                );
+              })}
               {hasDiscounts && bonus.bonusDiscounts!.map((discount: any) => {
                 const percentageValue = Number(discount.percentage) || 0;
                 const hasPercentage = percentageValue > 0;

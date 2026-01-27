@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { IconLogin, IconShieldCheck, IconShieldOff, IconKey, IconClock } from "@tabler/icons-react";
+import { IconLogin, IconShieldCheck, IconShieldOff, IconKey, IconClock, IconUserCheck, IconUserOff } from "@tabler/icons-react";
 import type { User } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { formatDateTime, formatRelativeTime } from "../../../../utils";
@@ -25,6 +25,14 @@ export function LoginInfoCard({ user, className }: LoginInfoCardProps) {
           <div>
             <h3 className="text-base font-semibold mb-4 text-foreground">Dados de Acesso</h3>
             <div className="space-y-4">
+              <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  {user.isActive ? <IconUserCheck className="h-4 w-4 text-green-600" /> : <IconUserOff className="h-4 w-4 text-destructive" />}
+                  Conta Ativa
+                </span>
+                <Badge variant={user.isActive ? "active" : "destructive"}>{user.isActive ? "Ativo" : "Inativo"}</Badge>
+              </div>
+
               <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   {user.verified ? <IconShieldCheck className="h-4 w-4 text-green-600" /> : <IconShieldOff className="h-4 w-4 text-muted-foreground" />}

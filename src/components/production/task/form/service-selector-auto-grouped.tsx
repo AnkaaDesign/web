@@ -65,10 +65,12 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     }
 
     // Check permissions based on sector and service order type
+    // Users can edit fields (description, responsible, observation) on all service order types
+    // Status editing is controlled separately by canEditServiceOrderStatus
     switch (userPrivilege) {
       case SECTOR_PRIVILEGES.COMMERCIAL:
-        // Can edit COMMERCIAL service orders if not assigned or assigned to them
-        return type === SERVICE_ORDER_TYPE.COMMERCIAL && (isNotAssigned || isAssignedToCurrentUser);
+        // Commercial can edit fields on ALL service order types
+        return true;
 
       case SECTOR_PRIVILEGES.FINANCIAL:
         // Can edit FINANCIAL service orders if not assigned or assigned to them
@@ -84,6 +86,32 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
 
       default:
         // Other sectors cannot edit any service orders
+        return false;
+    }
+  }, [userPrivilege, currentUserId]);
+
+  // Check if user can edit the STATUS of a service order (more restrictive than field editing)
+  const canEditServiceOrderStatus = useCallback((serviceOrder: any) => {
+    if (!userPrivilege || !serviceOrder) return true;
+    if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) return true;
+
+    const { type, assignedToId } = serviceOrder;
+    const isNotAssigned = !assignedToId || assignedToId === null || assignedToId === "";
+    const isAssignedToCurrentUser = assignedToId === currentUserId;
+
+    const isNewServiceOrder = !serviceOrder.id || (typeof serviceOrder.id === 'string' && serviceOrder.id.startsWith('temp-'));
+    if (isNewServiceOrder) return true;
+
+    switch (userPrivilege) {
+      case SECTOR_PRIVILEGES.COMMERCIAL:
+        return type === SERVICE_ORDER_TYPE.COMMERCIAL && (isNotAssigned || isAssignedToCurrentUser);
+      case SECTOR_PRIVILEGES.FINANCIAL:
+        return type === SERVICE_ORDER_TYPE.FINANCIAL && (isNotAssigned || isAssignedToCurrentUser);
+      case SECTOR_PRIVILEGES.LOGISTIC:
+        return (type === SERVICE_ORDER_TYPE.LOGISTIC || type === SERVICE_ORDER_TYPE.PRODUCTION) && (isNotAssigned || isAssignedToCurrentUser);
+      case SECTOR_PRIVILEGES.DESIGNER:
+        return type === SERVICE_ORDER_TYPE.ARTWORK && (isNotAssigned || isAssignedToCurrentUser);
+      default:
         return false;
     }
   }, [userPrivilege, currentUserId]);
@@ -179,6 +207,7 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
           {serviceIndices.map((index) => {
             const serviceOrder = servicesValues[index];
             const isServiceDisabled = disabled || !canEditServiceOrder(serviceOrder);
+            const isStatusDisabled = disabled || !canEditServiceOrderStatus(serviceOrder);
 
             return (
               <ServiceRow
@@ -187,6 +216,7 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
                 index={index}
                 type={type}
                 disabled={isServiceDisabled}
+                statusDisabled={isStatusDisabled}
                 onRemove={() => handleRemoveItem(index)}
                 isGrouped={true}
                 userPrivilege={userPrivilege}
@@ -202,20 +232,18 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <FormLabel>Serviços</FormLabel>
-        {/* Add Service Button - At the top - Disabled for DESIGNER users */}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleAddService}
-          disabled={disabled || userPrivilege === SECTOR_PRIVILEGES.DESIGNER}
-        >
-          <IconPlus className="h-4 w-4 mr-2" />
-          Adicionar Serviço
-        </Button>
-      </div>
+      {/* Add Service Button - Full width above rows */}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={handleAddService}
+        disabled={disabled || userPrivilege === SECTOR_PRIVILEGES.DESIGNER}
+        className="w-full"
+      >
+        <IconPlus className="h-4 w-4 mr-2" />
+        Adicionar Serviço
+      </Button>
 
       {/* Ungrouped services (being edited) - shown in a card for consistency */}
       {ungroupedIndices.length > 0 && (
@@ -269,6 +297,7 @@ interface ServiceRowProps {
   index: number;
   type: SERVICE_ORDER_TYPE;
   disabled?: boolean;
+  statusDisabled?: boolean;
   onRemove: () => void;
   isGrouped: boolean; // Whether this service is in a group card or being edited
   userPrivilege?: string;
@@ -281,6 +310,7 @@ function ServiceRow({
   index,
   type,
   disabled,
+  statusDisabled,
   onRemove,
   isGrouped,
   userPrivilege,
@@ -473,8 +503,8 @@ function ServiceRow({
   // Note: Type column needs 150px to fit "Comercial" without truncation
   // Note: Buttons column now 90px to fit both observation and trash buttons (2 icons + gap)
   const gridClass = isGrouped
-    ? "grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_90px] gap-3 items-center"
-    : "grid grid-cols-1 md:grid-cols-[150px_2fr_1fr_90px] gap-3 items-center";
+    ? "grid grid-cols-[2fr_1fr_1fr_90px] gap-3 items-center"
+    : "grid grid-cols-[150px_2fr_1fr_90px] gap-3 items-center";
 
   return (
     <>
@@ -535,8 +565,8 @@ function ServiceRow({
           />
         </div>
 
-        {/* Status Field - Show combobox for team leaders/editors, badge for read-only users */}
-        {showStatusField ? (
+        {/* Status Field - Only rendered for grouped (existing) service orders */}
+        {isGrouped && (showStatusField && !statusDisabled ? (
           <div className="min-w-0">
             <FormField
               control={control}
@@ -558,17 +588,14 @@ function ServiceRow({
               )}
             />
           </div>
-        ) : isGrouped ? (
-          // Show read-only badge for PRODUCTION users who are not team leaders
+        ) : (
+          // Show read-only badge when user cannot edit status (e.g., PRODUCTION non-leaders, or cross-sector)
           <div className="min-w-0 flex items-center">
             <Badge variant={getServiceOrderStatusColor(currentStatus)} className="whitespace-nowrap">
               {SERVICE_ORDER_STATUS_LABELS[currentStatus] || currentStatus}
             </Badge>
           </div>
-        ) : (
-          // Placeholder for ungrouped items to maintain grid structure
-          <div className="min-w-0" />
-        )}
+        ))}
 
         {/* Action Buttons - fixed width */}
         <div className="flex items-center justify-end gap-1">

@@ -77,6 +77,7 @@ export interface PpeScheduleItem {
 }
 
 export interface PpeDeliverySchedule extends BaseEntity {
+  name: string;
   assignmentType: ASSIGNMENT_TYPE;
   excludedUserIds: string[];
   includedUserIds: string[];
@@ -89,10 +90,6 @@ export interface PpeDeliverySchedule extends BaseEntity {
   dayOfWeek: WEEK_DAY | null;
   month: MONTH | null;
   customMonths: MONTH[];
-  rescheduleCount: number;
-  originalDate: Date | null;
-  lastRescheduleDate: Date | null;
-  rescheduleReason: RESCHEDULE_REASON | null;
   nextRun: Date | null;
   lastRun: Date | null;
 
@@ -286,6 +283,7 @@ export interface PpeDeliveryScheduleWhere {
 
   // Fields
   id?: string | { equals?: string; not?: string; in?: string[]; notIn?: string[] };
+  name?: string | { equals?: string; not?: string; contains?: string; startsWith?: string; endsWith?: string; in?: string[]; notIn?: string[]; mode?: "insensitive" | "default" };
   assignmentType?: ASSIGNMENT_TYPE | { equals?: ASSIGNMENT_TYPE; not?: ASSIGNMENT_TYPE; in?: ASSIGNMENT_TYPE[]; notIn?: ASSIGNMENT_TYPE[] };
   excludedUserIds?: string[] | { has?: string; hasEvery?: string[]; hasSome?: string[]; isEmpty?: boolean };
   includedUserIds?: string[] | { has?: string; hasEvery?: string[]; hasSome?: string[]; isEmpty?: boolean };
@@ -297,13 +295,9 @@ export interface PpeDeliveryScheduleWhere {
   dayOfWeek?: WEEK_DAY | { equals?: WEEK_DAY; not?: WEEK_DAY; in?: WEEK_DAY[]; notIn?: WEEK_DAY[] } | null;
   month?: MONTH | { equals?: MONTH; not?: MONTH; in?: MONTH[]; notIn?: MONTH[] } | null;
   customMonths?: MONTH[] | { has?: MONTH; hasEvery?: MONTH[]; hasSome?: MONTH[]; isEmpty?: boolean };
-  rescheduleCount?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] };
-  rescheduleReason?: RESCHEDULE_REASON | { equals?: RESCHEDULE_REASON; not?: RESCHEDULE_REASON; in?: RESCHEDULE_REASON[]; notIn?: RESCHEDULE_REASON[] } | null;
 
   // Date fields
   specificDate?: Date | { equals?: Date; not?: Date; lt?: Date; lte?: Date; gt?: Date; gte?: Date; in?: Date[]; notIn?: Date[] } | null;
-  originalDate?: Date | { equals?: Date; not?: Date; lt?: Date; lte?: Date; gt?: Date; gte?: Date; in?: Date[]; notIn?: Date[] } | null;
-  lastRescheduleDate?: Date | { equals?: Date; not?: Date; lt?: Date; lte?: Date; gt?: Date; gte?: Date; in?: Date[]; notIn?: Date[] } | null;
   nextRun?: Date | { equals?: Date; not?: Date; lt?: Date; lte?: Date; gt?: Date; gte?: Date; in?: Date[]; notIn?: Date[] } | null;
   lastRun?: Date | { equals?: Date; not?: Date; lt?: Date; lte?: Date; gt?: Date; gte?: Date; in?: Date[]; notIn?: Date[] } | null;
   createdAt?: Date | { equals?: Date; not?: Date; lt?: Date; lte?: Date; gt?: Date; gte?: Date; in?: Date[]; notIn?: Date[] };
@@ -408,6 +402,7 @@ export interface PpeDeliveryOrderBy {
 
 export interface PpeDeliveryScheduleOrderBy {
   id?: ORDER_BY_DIRECTION;
+  name?: ORDER_BY_DIRECTION;
   assignmentType?: ORDER_BY_DIRECTION;
   frequency?: ORDER_BY_DIRECTION;
   frequencyCount?: ORDER_BY_DIRECTION;

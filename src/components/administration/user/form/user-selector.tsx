@@ -43,6 +43,7 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
     try {
       const queryParams: any = {
+        where: { isActive: true },
         statuses: [
           USER_STATUS.EXPERIENCE_PERIOD_1,
           USER_STATUS.EXPERIENCE_PERIOD_2,

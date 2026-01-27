@@ -142,7 +142,7 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
             if (!item.ppeType) return true;
 
             // For OUTROS type, sizes are optional - always include these items
-            if (item.ppeType === PPE_TYPE.OUTROS) return true;
+            if (item.ppeType === PPE_TYPE.OTHERS) return true;
 
             // Get the size field mapping for this PPE type
             const sizeField = PPE_TYPE_TO_USER_SIZE_FIELD[item.ppeType];
@@ -264,7 +264,7 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
 
           // Add size (or brand for OUTROS type) with bullet separator
           // Only add if it's different from unicode to avoid duplication
-          if (meta.ppeType === PPE_TYPE.OUTROS) {
+          if (meta.ppeType === PPE_TYPE.OTHERS) {
             if (meta.brandName && meta.brandName !== meta.uniCode) {
               label += (label ? ' • ' : '') + meta.brandName;
             }

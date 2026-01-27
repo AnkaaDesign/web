@@ -69,7 +69,7 @@ const EPIScheduleDetails = () => {
 
   const handleEdit = () => {
     if (ppeSchedule && canManageWarehouse) {
-      navigate(`/estoque/epi/agendamentos/editar/${ppeSchedule.id}`);
+      navigate(routes.inventory.ppe.schedules.edit(ppeSchedule.id));
     }
   };
 
@@ -127,7 +127,7 @@ const EPIScheduleDetails = () => {
     setIsProcessing(true);
     try {
       await deleteAsync(ppeSchedule.id);
-      navigate("/estoque/epi/agendamentos");
+      navigate(routes.inventory.ppe.schedules.root);
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error deleting schedule:", error);
@@ -194,7 +194,7 @@ const EPIScheduleDetails = () => {
                     O agendamento de EPI que você está procurando não existe ou foi removido do sistema.
                   </p>
                   <div className="space-y-3">
-                    <Button onClick={() => navigate("/estoque/epi/agendamentos")} className="w-full sm:w-auto">
+                    <Button onClick={() => navigate(routes.inventory.ppe.schedules.root)} className="w-full sm:w-auto">
                       Ir para Lista de Agendamentos
                     </Button>
                     <Button variant="outline" onClick={() => navigate(routes.inventory.ppe.root)} className="w-full sm:w-auto">
@@ -251,14 +251,14 @@ const EPIScheduleDetails = () => {
         <div className="flex-shrink-0">
           <PageHeader
             variant="detail"
-            title={ppeSchedule.name}
+            title={ppeSchedule.name || `Agendamento #${ppeSchedule.id.slice(-8)}`}
             className="shadow-sm"
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "Estoque", href: routes.inventory.root },
               { label: "EPIs", href: routes.inventory.ppe.root },
-              { label: "Agendamentos", href: "/estoque/epi/agendamentos" },
-              { label: ppeSchedule.name },
+              { label: "Agendamentos", href: routes.inventory.ppe.schedules.root },
+              { label: ppeSchedule.name || `#${ppeSchedule.id.slice(-8)}` },
             ]}
             actions={[
               {

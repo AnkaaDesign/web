@@ -142,8 +142,8 @@ export function PayrollCalculation({
   // Calculate discounts
   const discounts = payroll?.discounts || [];
   const totalDiscounts = discounts.reduce((sum: number, discount: any) => {
-    if (discount.fixedValue) {
-      return sum + Number(discount.fixedValue);
+    if (discount.value) {
+      return sum + Number(discount.value);
     }
     if (discount.percentage) {
       return sum + (grossSalary * Number(discount.percentage) / 100);
@@ -348,7 +348,7 @@ export function PayrollCalculation({
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Descontos:</p>
                       {discounts.map((discount: any) => {
-                        const discountValue = discount.fixedValue ||
+                        const discountValue = discount.value ||
                           (discount.percentage ? (grossSalary * discount.percentage / 100) : 0);
 
                         return (

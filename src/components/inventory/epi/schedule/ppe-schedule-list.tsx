@@ -20,8 +20,14 @@ import { useTableState } from "@/hooks/use-table-state";
 import { Badge } from "@/components/ui/badge";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 
+interface PpeScheduleRoutes {
+  details: (id: string) => string;
+  edit: (id: string) => string;
+}
+
 interface PpeScheduleListProps {
   className?: string;
+  scheduleRoutes?: PpeScheduleRoutes;
 }
 
 const DEFAULT_PAGE_SIZE = 40;
@@ -39,10 +45,15 @@ function createDebounce<T extends (...args: any[]) => any>(func: T, wait: number
   return debounced;
 }
 
-export function PpeScheduleList({ className }: PpeScheduleListProps) {
+export function PpeScheduleList({ className, scheduleRoutes }: PpeScheduleListProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const activeRoutes: PpeScheduleRoutes = scheduleRoutes || {
+    details: (id: string) => routes.inventory.ppe.schedules.details(id),
+    edit: (id: string) => routes.inventory.ppe.schedules.edit(id),
+  };
 
   // State to hold current page items and total count from the table
   const [tableData, setTableData] = useState<{ items: PpeDeliverySchedule[]; totalRecords: number }>({ items: [], totalRecords: 0 });
@@ -295,7 +306,7 @@ export function PpeScheduleList({ className }: PpeScheduleListProps) {
   const handleBulkEdit = (schedules: PpeDeliverySchedule[]) => {
     if (schedules.length === 1) {
       // Single schedule - navigate to edit page
-      navigate(routes.inventory.ppe.schedules.edit(schedules[0].id));
+      navigate(activeRoutes.edit(schedules[0].id));
     } else {
       // Multiple schedules - navigate to batch edit page
       const ids = schedules.map((schedule) => schedule.id).join(",");
@@ -349,6 +360,7 @@ export function PpeScheduleList({ className }: PpeScheduleListProps) {
         <div className="flex-1 min-h-0 overflow-auto">
           <PpeScheduleTable
             visibleColumns={visibleColumns}
+            scheduleRoutes={activeRoutes}
             onEdit={handleBulkEdit}
             onActivate={handleBulkActivate}
             onDeactivate={handleBulkDeactivate}

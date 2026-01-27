@@ -29,7 +29,6 @@ export const PRODUCTION_SERVICE_DESCRIPTIONS = [
   'Logomarca Lateral',
   'Logomarca Laterais',
   'Logomarca no Teto',
-  'Logomarca Padrão',
   'Logomarca Parcial',
   'Logomarca Plataforma',
   'Logomarca Portas Traseiras',
@@ -90,35 +89,35 @@ export const PRODUCTION_SERVICE_DESCRIPTIONS = [
 // =====================
 export const COMMERCIAL_SERVICE_DESCRIPTIONS = [
   // Default for new tasks
-  'Em Negociacao',
+  'Em Negociação',
   // Orçamento - Ações
-  'Elaborar Orcamento',
-  'Enviar Orcamento',
-  'Reenviar Orcamento',
-  'Revisar Orcamento',
-  'Ajustar Orcamento',
-  'Detalhar Orcamento',
-  'Orcamento Urgente',
-  'Orcamento Frota',
-  'Orcamento Parcial',
-  'Orcamento Complementar',
+  'Elaborar Orçamento',
+  'Enviar Orçamento',
+  'Reenviar Orçamento',
+  'Revisar Orçamento',
+  'Ajustar Orçamento',
+  'Detalhar Orçamento',
+  'Orçamento Urgente',
+  'Orçamento Frota',
+  'Orçamento Parcial',
+  'Orçamento Complementar',
   // Proposta e Negociação
   'Apresentar Proposta',
   'Negociar Valor',
   'Negociar Prazo',
-  'Negociar Condicoes',
+  'Negociar Condições',
   'Aplicar Desconto',
   'Proposta Especial',
   'Contraproposta',
-  'Fechar Negocio',
+  'Fechar Negócio',
   // Comunicação com Cliente
   'Ligar para Cliente',
-  'Retornar Ligacao',
+  'Retornar Ligação',
   'Enviar Whatsapp',
   'Enviar Email',
   'Responder Cliente',
   'Confirmar Interesse',
-  'Esclarecer Duvidas',
+  'Esclarecer Dúvidas',
   'Informar Prazo',
   'Informar Status',
   'Solicitar Feedback',
@@ -131,23 +130,23 @@ export const COMMERCIAL_SERVICE_DESCRIPTIONS = [
   'Registrar Contato Cliente',
   // Visitas e Reuniões
   'Agendar Visita',
-  'Realizar Visita Tecnica',
-  'Reuniao com Cliente',
-  'Apresentar Catalogo',
-  'Demonstrar Servicos',
-  'Visita Pos-Servico',
+  'Realizar Visita Técnica',
+  'Reunião com Cliente',
+  'Apresentar Catálogo',
+  'Demonstrar Serviços',
+  'Visita Pós-Serviço',
   // Contratos e Documentos
   'Enviar Contrato',
   'Coletar Assinatura',
-  'Registrar Aprovacao',
+  'Registrar Aprovação',
   'Formalizar Pedido',
-  'Enviar Confirmacao',
+  'Enviar Confirmação',
   // Pós-venda e Fidelização
-  'Pesquisa Satisfacao',
-  'Tratar Reclamacao',
-  'Oferecer Servico Adicional',
+  'Pesquisa Satisfação',
+  'Tratar Reclamação',
+  'Oferecer Serviço Adicional',
   'Programa Fidelidade',
-  'Solicitar Indicacao',
+  'Solicitar Indicação',
   // Outros
   'Outros',
 ] as const;
@@ -208,7 +207,7 @@ export const ARTWORK_SERVICE_DESCRIPTIONS = [
   'Ajustar Layout',
   'Elaborar Projeto',
   'Ajustar Projeto',
-  'Preparar Arquivos para Protagem',
+  'Preparar Arquivos para Plotagem',
   'Aprovar com o Cliente',
 ] as const;
 
@@ -308,9 +307,9 @@ export function isValidServiceDescription(
 }
 
 /**
- * Default service order for new tasks (COMMERCIAL type with "Em Negociacao")
+ * Default service order for new tasks (COMMERCIAL type with "Em Negociação")
  */
 export const DEFAULT_TASK_SERVICE_ORDER = {
   type: SERVICE_ORDER_TYPE.COMMERCIAL,
-  description: 'Em Negociacao',
+  description: 'Em Negociação',
 } as const;

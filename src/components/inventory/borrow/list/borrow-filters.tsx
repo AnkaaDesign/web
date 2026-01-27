@@ -101,16 +101,18 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
         orderBy: { name: "asc" },
         page: page,
         take: 50,
-        where: searchTerm
-          ? {
-              OR: [
-                { name: { contains: searchTerm, mode: "insensitive" } },
-                { email: { contains: searchTerm, mode: "insensitive" } },
-              ],
-            }
-          : undefined,
+        where: {
+          isActive: true,
+          ...(searchTerm
+            ? {
+                OR: [
+                  { name: { contains: searchTerm, mode: "insensitive" } },
+                  { email: { contains: searchTerm, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
       });
-
       const users = response.data || [];
       const hasMore = response.meta?.hasNextPage || false;
 

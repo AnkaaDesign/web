@@ -57,9 +57,11 @@ interface PayrollData {
 }
 
 interface BonusDiscountCreateFormData {
-  bonusId?: string; // Optional for backward compatibility
-  reason: string;
+  bonusId?: string;
+  reference: string;
   percentage: number;
+  value?: number | null;
+  calculationOrder?: number;
 }
 
 // Interfaces for bonus calculation and batch operations
@@ -137,9 +139,6 @@ export const bonusService = {
   calculateAndSaveBonuses: (params: BonusCalculationParams) =>
     apiClient.post<BonusCalculationResult>(`/bonus/calculate/${params.year}/${params.month}`),
 
-  /**
-   * Alias for calculateAndSaveBonuses - for hooks compatibility
-   */
   calculateBonuses: (params: BonusCalculationParams) =>
     apiClient.post<BonusCalculationResult>(`/bonus/calculate/${params.year}/${params.month}`),
 
@@ -177,14 +176,6 @@ export const bonusService = {
       params: weightedTaskCount ? { weightedTaskCount: weightedTaskCount.toString() } : undefined
     }),
 
-  // =====================================================
-  // Legacy/Backward Compatibility Methods
-  // =====================================================
-
-  /**
-   * @deprecated Use getLiveBonuses instead
-   * Legacy method - Get live payroll data
-   */
   getLivePayrollData: (filters?: BonusPayrollFilters) => {
     const year = filters?.year || new Date().getFullYear().toString();
     const monthVal = Array.isArray(filters?.month) ? filters.month[0] : filters?.month;
@@ -192,16 +183,9 @@ export const bonusService = {
     return apiClient.get<PayrollData>(`/bonus/live/${year}/${month}`);
   },
 
-  /**
-   * @deprecated Use calculateAndSaveBonuses instead
-   */
   saveMonthlyBonuses: (params: BonusCalculationParams) =>
     apiClient.post<BonusCalculationResult>(`/bonus/calculate/${params.year}/${params.month}`),
 
-  /**
-   * @deprecated Use getLiveBonuses instead
-   * Get payroll data for a specific period
-   */
   getPayroll: (params: BonusPayrollParams) => {
     const year = params.year || new Date().getFullYear().toString();
     const month = params.month || (new Date().getMonth() + 1).toString();
@@ -230,23 +214,12 @@ export const bonusService = {
   // Bonus discount operations
   /**
    * Create discount for a bonus
-   * @param bonusIdOrData - Either bonusId string or discount data object (for backward compatibility)
-   * @param dataOrUndefined - Discount data if first param is bonusId, undefined otherwise
    */
-  createDiscount: (bonusIdOrData: string | BonusDiscountCreateFormData, dataOrUndefined?: BonusDiscountCreateFormData) => {
-    // Handle both signatures for backward compatibility
-    if (typeof bonusIdOrData === 'string' && dataOrUndefined) {
-      // New signature: createDiscount(bonusId, data)
-      return apiClient.post(`/bonus/${bonusIdOrData}/discounts`, dataOrUndefined);
-    } else if (typeof bonusIdOrData === 'object') {
-      // Old signature: createDiscount(data) - extract bonusId from data
-      const data = bonusIdOrData;
-      if (!data.bonusId) {
-        throw new Error('bonusId is required in discount data');
-      }
-      return apiClient.post(`/bonus/${data.bonusId}/discounts`, data);
+  createDiscount: (data: BonusDiscountCreateFormData) => {
+    if (!data.bonusId) {
+      throw new Error('bonusId is required in discount data');
     }
-    throw new Error('Invalid arguments for createDiscount');
+    return apiClient.post(`/bonus/${data.bonusId}/discounts`, data);
   },
 
   deleteDiscount: (discountId: string) =>

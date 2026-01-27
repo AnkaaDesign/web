@@ -69,7 +69,7 @@ const PPE_TYPE_SIZE_MAP: Record<PPE_TYPE, PPE_SIZE[]> = {
     PPE_SIZE.SIZE_47,
     PPE_SIZE.SIZE_48,
   ],
-  [PPE_TYPE.OUTROS]: [], // OUTROS type doesn't require specific sizes
+  [PPE_TYPE.OTHERS]: [], // OTHERS type doesn't require specific sizes
 };
 
 export function PpeSizeSelector({

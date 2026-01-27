@@ -133,9 +133,11 @@ export const filePreviewUtils = {
   filterPreviewableFiles: (files: AnkaaFile[]): AnkaaFile[] => {
     return files.filter((file) => {
       const isImage = file.mimetype.startsWith("image/");
+      const isVideo = file.mimetype.startsWith("video/");
+      const isPdf = file.mimetype === "application/pdf";
       const isEpsWithThumbnail = (file.mimetype.includes("postscript") || file.mimetype.includes("eps")) && !!file.thumbnailUrl;
 
-      return isImage || isEpsWithThumbnail;
+      return isImage || isVideo || isPdf || isEpsWithThumbnail;
     });
   },
 
@@ -172,9 +174,11 @@ export const filePreviewUtils = {
    */
   canPreviewFile: (file: AnkaaFile): boolean => {
     const isImage = file.mimetype.startsWith("image/");
+    const isVideo = file.mimetype.startsWith("video/");
+    const isPdf = file.mimetype === "application/pdf";
     const isEpsWithThumbnail = (file.mimetype.includes("postscript") || file.mimetype.includes("eps")) && !!file.thumbnailUrl;
 
-    return isImage || isEpsWithThumbnail;
+    return isImage || isVideo || isPdf || isEpsWithThumbnail;
   },
 
   /**
@@ -183,6 +187,10 @@ export const filePreviewUtils = {
   getFileDisplayType: (file: AnkaaFile): string => {
     if (file.mimetype.startsWith("image/")) {
       return "Imagem";
+    }
+
+    if (file.mimetype.startsWith("video/")) {
+      return "V\u00eddeo";
     }
 
     if (file.mimetype === "application/pdf") {

@@ -26,9 +26,15 @@ import { createPpeScheduleColumns } from "./ppe-schedule-table-columns";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 
+interface PpeScheduleRoutes {
+  details: (id: string) => string;
+  edit: (id: string) => string;
+}
+
 interface PpeScheduleTableProps {
   visibleColumns: Set<string>;
   className?: string;
+  scheduleRoutes?: PpeScheduleRoutes;
   onEdit?: (schedules: PpeDeliverySchedule[]) => void;
   onActivate?: (schedules: PpeDeliverySchedule[]) => void;
   onDeactivate?: (schedules: PpeDeliverySchedule[]) => void;
@@ -37,7 +43,12 @@ interface PpeScheduleTableProps {
   onDataChange?: (data: { items: PpeDeliverySchedule[]; totalRecords: number }) => void;
 }
 
-export function PpeScheduleTable({ visibleColumns, className, onEdit, onActivate, onDeactivate, onDelete, filters = {}, onDataChange }: PpeScheduleTableProps) {
+export function PpeScheduleTable({ visibleColumns, className, scheduleRoutes, onEdit, onActivate, onDeactivate, onDelete, filters = {}, onDataChange }: PpeScheduleTableProps) {
+  const defaultRoutes: PpeScheduleRoutes = {
+    details: (id: string) => routes.inventory.ppe.schedules.details(id),
+    edit: (id: string) => routes.inventory.ppe.schedules.edit(id),
+  };
+  const activeRoutes = scheduleRoutes || defaultRoutes;
   const navigate = useNavigate();
   // Batch mutations available but not used in this component
   usePpeDeliveryScheduleBatchMutations();
@@ -122,7 +133,7 @@ export function PpeScheduleTable({ visibleColumns, className, onEdit, onActivate
 
   // Row actions
   const handleRowClick = (schedule: PpeDeliverySchedule) => {
-    navigate(`/estoque/epi/agendamentos/detalhes/${schedule.id}`);
+    navigate(activeRoutes.details(schedule.id));
   };
 
   // Get current page schedule IDs for selection

@@ -142,7 +142,7 @@ export const mapPayrollToFormData = (payroll: any): PayrollUpdateFormData => {
     baseRemuneration: payroll.baseRemuneration,
     discounts: payroll.discounts?.map((discount: any) => ({
       percentage: discount.percentage,
-      fixedValue: discount.fixedValue,
+      value: discount.value,
       calculationOrder: discount.calculationOrder,
       reference: discount.reference
     }))

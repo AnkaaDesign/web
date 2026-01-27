@@ -582,6 +582,11 @@ export const useFilePreview = () => {
       return fileService.getFileUrl(file.id);
     }
 
+    // For videos, use the file serving URL (supports range requests for streaming)
+    if (file.mimetype.startsWith("video/")) {
+      return fileService.getFileUrl(file.id);
+    }
+
     // For PDFs, use thumbnail service
     if (file.mimetype === "application/pdf") {
       return fileService.getFileThumbnailUrl(file.id, "medium");

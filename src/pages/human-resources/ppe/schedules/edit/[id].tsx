@@ -151,18 +151,17 @@ export const PPEScheduleEditPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="h-full flex flex-col px-4 pt-4">
+      <div className="h-full flex flex-col px-4 pt-4 max-w-5xl mx-auto w-full">
         <PageHeader
           variant="form"
-          title={`Editar Agendamento #${ppeSchedule.data.id.slice(-8)}`}
-          subtitle={`${ppeSchedule.data.frequency} - ${ppeSchedule.data.ppeItems?.map((item) => item.ppeType).join(", ") || "N/A"}`}
+          title={`Editar: ${ppeSchedule.data.name || `#${ppeSchedule.data.id.slice(-8)}`}`}
           icon={IconCalendar}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Recursos Humanos", href: routes.humanResources.root },
             { label: "EPIs", href: routes.humanResources.ppe.root },
             { label: "Agendamentos", href: routes.humanResources.ppe.schedules.root },
-            { label: `#${ppeSchedule.data.id.slice(-8)}`, href: routes.humanResources.ppe.schedules.details(ppeSchedule.data.id) },
+            { label: ppeSchedule.data.name || `#${ppeSchedule.data.id.slice(-8)}`, href: routes.humanResources.ppe.schedules.details(ppeSchedule.data.id) },
             { label: "Editar" },
           ]}
           actions={actions}
@@ -175,6 +174,7 @@ export const PPEScheduleEditPage = () => {
               onSubmit={handleSubmit}
               isSubmitting={updateMutation.isPending}
               defaultValues={{
+                name: ppeSchedule.data.name || "",
                 ppeItems: ppeSchedule.data.ppeItems || [],
                 assignmentType: ppeSchedule.data.assignmentType,
                 excludedUserIds: ppeSchedule.data.excludedUserIds || [],

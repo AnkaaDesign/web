@@ -1247,6 +1247,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "epi-rh-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/epi/cadastrar" },
           { id: "epi-rh-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/epi/detalhes/:id", isDynamic: true },
           { id: "epi-rh-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/epi/editar/:id", isDynamic: true },
+          { id: "epi-rh-tamanhos", title: "Tamanhos", icon: "sizes", path: "/recursos-humanos/epi/tamanhos" },
           {
             id: "epi-rh-entregas",
             title: "Entregas",

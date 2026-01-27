@@ -309,10 +309,19 @@ function BonusTableComponent({
     },
     {
       key: "totalDiscounts",
-      header: "Descontos",
-      accessor: (row: BonusRow) => <span className="whitespace-nowrap">{formatCurrency(row.totalDiscounts)}</span>,
+      header: "Ajustes",
+      accessor: (row: BonusRow) => {
+        if (row.totalDiscounts === 0) {
+          return <span className="whitespace-nowrap text-muted-foreground">R$ 0,00</span>;
+        }
+        const isExtra = row.totalDiscounts > 0;
+        const absValue = Math.abs(row.totalDiscounts);
+        const prefix = isExtra ? '+' : '-';
+        const colorClass = isExtra ? 'text-green-600' : 'text-red-600';
+        return <span className={`whitespace-nowrap ${colorClass}`}>{prefix}{formatCurrency(absValue)}</span>;
+      },
       sortable: true,
-      className: "text-sm w-28 font-mono text-red-600 truncate",
+      className: "text-sm w-28 font-mono truncate",
       align: "left" as const,
     },
     {
@@ -521,6 +530,7 @@ export default function BonusListPage() {
       },
       tasks: true,
       bonusDiscounts: true,
+      bonusExtras: true,
       users: true,
     },
   });
@@ -570,14 +580,15 @@ export default function BonusListPage() {
         : 0;
 
       // Get net bonus directly from the database field
-      const netBonusAmount = bonus.netBonus
-        ? (typeof bonus.netBonus === 'object' && bonus.netBonus?.toNumber
-          ? bonus.netBonus.toNumber()
-          : Number(bonus.netBonus) || 0)
+      const netBonusAmount = bonus.netBonus !== undefined && bonus.netBonus !== null
+        ? (typeof bonus.netBonus === 'object' && (bonus.netBonus as any)?.toNumber
+          ? (bonus.netBonus as any).toNumber()
+          : Number(bonus.netBonus))
         : bonusAmount;
 
-      // Calculate total discounts as the difference between base and net
-      const totalDiscounts = bonusAmount - netBonusAmount;
+      // Calculate net adjustment (positive = extras, negative = discounts)
+      // netBonus > baseBonus means extras outweigh discounts
+      const totalDiscounts = netBonusAmount - bonusAmount;
 
       // Get period-level task count (total tasks in the period - same for all users)
       // bonus.tasks contains ALL tasks for the period

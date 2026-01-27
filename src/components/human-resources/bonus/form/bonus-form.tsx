@@ -278,7 +278,7 @@ export function BonusForm({
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="text-sm font-medium">Período da Bonificação:</p>
                   <p className="text-sm text-muted-foreground">
-                    26/{String(watchedValues.month - 1).padStart(2, '0')} a 25/{String(watchedValues.month).padStart(2, '0')}/{watchedValues.year}
+                    26/{watchedValues.month === 1 ? '12' : String(watchedValues.month - 1).padStart(2, '0')}/{watchedValues.month === 1 ? watchedValues.year - 1 : watchedValues.year} a 25/{String(watchedValues.month).padStart(2, '0')}/{watchedValues.year}
                   </p>
                 </div>
               </div>

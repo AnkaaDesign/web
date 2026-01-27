@@ -89,7 +89,7 @@ export const PricingSelector = forwardRef<
   const lastRowRef = useRef<HTMLDivElement>(null);
   const { setValue, clearErrors, getValues } = useFormContext();
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, prepend, remove } = useFieldArray({
     control,
     name: "pricing.items",
   });
@@ -240,12 +240,12 @@ export const PricingSelector = forwardRef<
       setValue("pricing.subtotal", 0);
       setValue("pricing.total", 0);
     }
-    append({ description: "", observation: null, amount: undefined });
+    prepend({ description: "", observation: null, amount: undefined });
     setTimeout(() => {
       const serviceInput = lastRowRef.current?.querySelector('[role="combobox"]') as HTMLElement;
       serviceInput?.focus();
     }, 100);
-  }, [append, clearErrors, fields.length, setValue]);
+  }, [prepend, clearErrors, fields.length, setValue]);
 
   const clearAll = useCallback(() => {
     for (let i = fields.length - 1; i >= 0; i--) {
@@ -338,6 +338,21 @@ export const PricingSelector = forwardRef<
 
   return (
     <div className="space-y-4">
+      {/* Add Service Button - Full width above rows */}
+      {!readOnly && !disabled && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleAddItem}
+          disabled={disabled}
+          className="w-full"
+        >
+          <IconPlus className="h-4 w-4 mr-2" />
+          Adicionar Serviço
+        </Button>
+      )}
+
       {/* Services Section */}
       <div className="space-y-3">
         {fields.length > 0 && fields.map((field, index) => (
@@ -348,24 +363,11 @@ export const PricingSelector = forwardRef<
             disabled={disabled}
             readOnly={readOnly}
             onRemove={() => handleRemoveItem(index)}
-            onAdd={handleAddItem}
             isFirstRow={index === 0}
             isLastRow={index === fields.length - 1}
             ref={index === fields.length - 1 ? lastRowRef : null}
           />
         ))}
-        {fields.length === 0 && !readOnly && !disabled && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddItem}
-            disabled={disabled}
-          >
-            <IconPlus className="h-4 w-4 mr-2" />
-            Adicionar Serviço
-          </Button>
-        )}
       </div>
 
       {/* Discount Section - Right after services */}
@@ -682,13 +684,12 @@ interface PricingItemRowProps {
   disabled?: boolean;
   readOnly?: boolean;
   onRemove: () => void;
-  onAdd: () => void;
   isFirstRow: boolean;
   isLastRow: boolean;
 }
 
 const PricingItemRow = forwardRef<HTMLDivElement, PricingItemRowProps>(
-  ({ control, index, disabled, readOnly, onRemove, onAdd, isFirstRow, isLastRow }, ref) => {
+  ({ control, index, disabled, readOnly, onRemove, isFirstRow, isLastRow }, ref) => {
     // Observation modal state
     const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
     const [tempObservation, setTempObservation] = useState("");
@@ -807,20 +808,6 @@ const PricingItemRow = forwardRef<HTMLDivElement, PricingItemRowProps>(
                 </Button>
               )}
 
-              {/* Add Button - Only on last row */}
-              {!readOnly && !disabled && isLastRow && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={onAdd}
-                  disabled={disabled}
-                  className="text-primary h-9 w-9"
-                  title="Adicionar serviço"
-                >
-                  <IconPlus className="h-4 w-4" />
-                </Button>
-              )}
             </div>
           </div>
         </div>

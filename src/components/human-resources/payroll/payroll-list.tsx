@@ -66,8 +66,8 @@ const calculateNetSalary = (payroll: Payroll): number => {
   // Subtract discounts
   if (payroll.discounts) {
     for (const discount of payroll.discounts) {
-      if (discount.fixedValue) {
-        netSalary -= discount.fixedValue;
+      if (discount.value) {
+        netSalary -= discount.value;
       } else if (discount.percentage) {
         netSalary -= (netSalary * discount.percentage) / 100;
       }
@@ -85,8 +85,8 @@ const getTotalDiscounts = (payroll: Payroll): number => {
   let baseAmount = payroll.baseRemuneration + (payroll.bonus?.finalValue || 0);
 
   for (const discount of payroll.discounts) {
-    if (discount.fixedValue) {
-      totalDiscounts += discount.fixedValue;
+    if (discount.value) {
+      totalDiscounts += discount.value;
     } else if (discount.percentage) {
       totalDiscounts += (baseAmount * discount.percentage) / 100;
     }

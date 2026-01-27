@@ -43,6 +43,7 @@ export * from "./dashboard";
 export * from "./auth";
 export * from "./bonus";
 export * from "./bonusDiscount";
+export * from "./bonusExtra";
 export * from "./payroll";
 export * from "./payrollDetails";
 export * from "./sms";

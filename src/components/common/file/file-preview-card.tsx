@@ -70,7 +70,8 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
   const isImage = isImageFile(file);
   const isPdf = file.mimetype === "application/pdf";
   const isEps = isEpsFile(file);
-  const canPreview = isImage || isPdf || isEps;
+  const isVideo = category === "video";
+  const canPreview = isImage || isPdf || isEps || isVideo;
   // For PDFs and EPS, always try to show thumbnail
   const hasThumbnail = file.thumbnailUrl || isImage || isPdf || isEps;
 

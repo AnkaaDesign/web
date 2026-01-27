@@ -730,6 +730,7 @@ export const PPE_TYPE_ORDER: Record<string, number> = {
   [PPE_TYPE.MASK]: 5,
   [PPE_TYPE.GLOVES]: 6,
   [PPE_TYPE.RAIN_BOOTS]: 7,
+  [PPE_TYPE.OTHERS]: 8,
 };
 
 export const PPE_SIZE_TYPE_ORDER: Record<string, number> = {

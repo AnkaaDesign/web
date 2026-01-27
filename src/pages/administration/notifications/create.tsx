@@ -61,7 +61,7 @@ export const CreateNotificationPage = () => {
     const response = await apiClient.get("/users", {
       params: {
         searchingFor: searchTerm || undefined,
-        where: JSON.stringify({ isActive: true }),
+        where: { isActive: true },
         select: JSON.stringify({
           id: true,
           name: true,

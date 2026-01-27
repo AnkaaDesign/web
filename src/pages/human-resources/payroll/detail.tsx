@@ -108,6 +108,7 @@ export default function PayrollDetailPage() {
             bonus: {
               include: {
                 bonusDiscounts: true,
+                bonusExtras: true,
                 position: true,
               },
             },
@@ -182,9 +183,9 @@ export default function PayrollDetailPage() {
     let totalDiscounts = 0;
     if (payroll.discounts && payroll.discounts.length > 0) {
       payroll.discounts.forEach((discount: any) => {
-        const fixedValue = getNumericValue(discount.value) || getNumericValue(discount.fixedValue);
-        if (fixedValue > 0) {
-          totalDiscounts += fixedValue;
+        const discountVal = getNumericValue(discount.value);
+        if (discountVal > 0) {
+          totalDiscounts += discountVal;
         } else if (discount.percentage) {
           totalDiscounts += totalGross * (getNumericValue(discount.percentage) / 100);
         }
@@ -560,6 +561,21 @@ export default function PayrollDetailPage() {
                         </td>
                         <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.bonusAmount)}</td>
                       </tr>
+                      {/* Bonus Extras */}
+                      {payroll.bonus?.bonusExtras && payroll.bonus.bonusExtras.map((extra: any, index: number) => {
+                        const extraValue = extra.percentage
+                          ? calculations.bonusAmount * (getNumericValue(extra.percentage) / 100)
+                          : getNumericValue(extra.value);
+                        return (
+                          <tr key={extra.id || `bonus-extra-${index}`} className="border-b border-border/50">
+                            <td className="py-2 px-0 pl-4 text-muted-foreground">{extra.reference || 'Extra Bônus'}</td>
+                            <td className="py-2 px-0 text-left text-muted-foreground text-xs">
+                              {extra.percentage ? `${getNumericValue(extra.percentage).toFixed(2)}%` : '-'}
+                            </td>
+                            <td className="py-2 px-0 text-right font-semibold text-emerald-600">+{formatAmount(extraValue)}</td>
+                          </tr>
+                        );
+                      })}
                       {/* Bonus Discounts */}
                       {hasBonusDiscounts && payroll.bonus.bonusDiscounts.map((discount: any, index: number) => {
                         const discountValue = discount.percentage
@@ -600,7 +616,6 @@ export default function PayrollDetailPage() {
                     .map((discount: any, index: number) => {
                       const discountValue = getNumericValue(discount.amount) ||
                         getNumericValue(discount.value) ||
-                        getNumericValue(discount.fixedValue) ||
                         (calculations.totalGross * (getNumericValue(discount.percentage) / 100));
 
                       // Use reference for display (clean names like "I.N.S.S.")

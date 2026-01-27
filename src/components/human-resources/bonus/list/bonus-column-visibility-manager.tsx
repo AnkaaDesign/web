@@ -25,7 +25,7 @@ const BONUS_COLUMNS: BonusColumn[] = [
   { key: "totalCollaborators", header: "Colaboradores", defaultVisible: true },
   { key: "averageTasks", header: "Média", defaultVisible: true },
   { key: "bonus", header: "Bônus Bruto", defaultVisible: true },
-  { key: "totalDiscounts", header: "Descontos", defaultVisible: false },
+  { key: "totalDiscounts", header: "Ajustes", defaultVisible: false },
   { key: "netBonus", header: "Bônus Líquido", defaultVisible: true },
 ];
 

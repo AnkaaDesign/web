@@ -145,6 +145,9 @@ export const routes = {
         usage: "/recursos-humanos/epi/relatorios/uso",
       },
       root: "/recursos-humanos/epi",
+      sizes: {
+        root: "/recursos-humanos/epi/tamanhos",
+      },
       schedules: {
         create: "/recursos-humanos/epi/agendamentos/cadastrar",
         details: (id: string) => `/recursos-humanos/epi/agendamentos/detalhes/${id}`,

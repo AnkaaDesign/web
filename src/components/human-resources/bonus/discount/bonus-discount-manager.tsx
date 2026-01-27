@@ -12,12 +12,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { formatCurrency } from "../../../../utils";
 import { bonusDiscountCreateSchema } from "../../../../schemas";
-import type { BonusDiscountCreateFormData, BonusDiscount, Task, Bonus } from "../../../../types";
-import { IconPlus, IconTrash, IconAlertTriangle } from "@tabler/icons-react";
+import type { BonusDiscountCreateFormData, BonusDiscount, BonusExtra, Task, Bonus } from "../../../../types";
+import { IconPlus, IconTrash, IconAlertTriangle, IconStar } from "@tabler/icons-react";
 
 interface BonusDiscountManagerProps {
   bonus: Bonus;
   discounts?: BonusDiscount[];
+  extras?: BonusExtra[];
   suspendedTasks?: Task[];
   availableTasks?: Task[];
   onAddDiscount: (data: BonusDiscountCreateFormData) => Promise<void>;
@@ -31,6 +32,7 @@ interface BonusDiscountManagerProps {
 export function BonusDiscountManager({
   bonus,
   discounts = [],
+  extras = [],
   suspendedTasks = [],
   availableTasks = [],
   onAddDiscount,
@@ -40,7 +42,7 @@ export function BonusDiscountManager({
   isLoading = false,
   className
 }: BonusDiscountManagerProps) {
-  const [activeTab, setActiveTab] = useState<"discounts" | "suspended">("discounts");
+  const [activeTab, setActiveTab] = useState<"discounts" | "extras" | "suspended">("discounts");
 
   const form = useForm<BonusDiscountCreateFormData>({
     resolver: zodResolver(bonusDiscountCreateSchema),
@@ -60,18 +62,38 @@ export function BonusDiscountManager({
     });
   };
 
-  // Calculate total discount amount
-  const totalDiscountValue = discounts.reduce((total, discount) => {
-    if (discount.value) {
-      return total + discount.value;
-    }
-    if (discount.percentage) {
-      return total + (bonus.baseBonus * discount.percentage / 100);
-    }
-    return total;
-  }, 0);
+  // Canonical cascading calculation (matches recalculateNetBonus)
+  const baseBonus = Number(bonus.baseBonus);
 
-  const finalBonusAmount = Math.max(0, bonus.baseBonus - totalDiscountValue);
+  // Calculate extras total
+  let totalExtrasValue = 0;
+  for (const extra of extras) {
+    if (extra.value !== null && extra.value !== undefined) {
+      totalExtrasValue += Number(extra.value);
+    } else if (extra.percentage !== null && extra.percentage !== undefined) {
+      totalExtrasValue += baseBonus * (Number(extra.percentage) / 100);
+    }
+  }
+
+  // Apply discounts in cascading order
+  const sortedDiscounts = [...discounts].sort(
+    (a, b) => (a.calculationOrder || 0) - (b.calculationOrder || 0)
+  );
+  let currentValue = baseBonus + totalExtrasValue;
+  let totalDiscountValue = 0;
+  for (const discount of sortedDiscounts) {
+    if (discount.percentage !== null && discount.percentage !== undefined) {
+      const amount = currentValue * (Number(discount.percentage) / 100);
+      totalDiscountValue += amount;
+      currentValue = Math.max(0, currentValue - amount);
+    } else if (discount.value !== null && discount.value !== undefined) {
+      const amount = Math.min(Number(discount.value), currentValue);
+      totalDiscountValue += amount;
+      currentValue = Math.max(0, currentValue - amount);
+    }
+  }
+
+  const finalBonusAmount = Math.max(0, currentValue);
 
   // Discount table columns
   const discountColumns: StandardizedColumn<BonusDiscount>[] = [
@@ -168,21 +190,27 @@ export function BonusDiscountManager({
           <CardTitle>Resumo da Bonificação</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <p className="text-sm font-medium">Valor Base</p>
               <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(bonus.baseBonus)}
+                {formatCurrency(Number(bonus.baseBonus))}
               </p>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium">Total de Descontos</p>
+              <p className="text-sm font-medium">+ Extras</p>
+              <p className="text-2xl font-bold text-emerald-600">
+                +{formatCurrency(totalExtrasValue)}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">- Descontos</p>
               <p className="text-2xl font-bold text-red-600">
                 -{formatCurrency(totalDiscountValue)}
               </p>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium">Valor Final</p>
+              <p className="text-sm font-medium">= Valor Final</p>
               <p className="text-2xl font-bold text-blue-600">
                 {formatCurrency(finalBonusAmount)}
               </p>
@@ -211,6 +239,16 @@ export function BonusDiscountManager({
           onClick={() => setActiveTab("discounts")}
         >
           Descontos
+        </button>
+        <button
+          className={`px-4 py-2 font-medium ${
+            activeTab === "extras"
+              ? "border-b-2 border-emerald-500 text-emerald-600"
+              : "text-gray-600"
+          }`}
+          onClick={() => setActiveTab("extras")}
+        >
+          Extras
         </button>
         <button
           className={`px-4 py-2 font-medium ${
@@ -344,6 +382,69 @@ export function BonusDiscountManager({
                 columns={discountColumns}
                 emptyMessage="Nenhum desconto aplicado"
               />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Extras Tab */}
+      {activeTab === "extras" && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconStar className="h-5 w-5 text-emerald-600" />
+                Extras Aplicados
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {extras.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum extra aplicado</p>
+              ) : (
+                <StandardizedTable
+                  data={extras}
+                  columns={[
+                    {
+                      key: "reference",
+                      title: "Referência",
+                      render: (extra) => (
+                        <div className="font-medium">{extra.reference}</div>
+                      ),
+                    },
+                    {
+                      key: "percentage",
+                      title: "Tipo",
+                      render: (extra) => (
+                        <Badge variant={extra.percentage ? "secondary" : "outline"}>
+                          {extra.percentage ? `${extra.percentage}%` : "Valor Fixo"}
+                        </Badge>
+                      ),
+                    },
+                    {
+                      key: "value",
+                      title: "Valor",
+                      render: (extra) => {
+                        const extraAmount = extra.value
+                          ? Number(extra.value)
+                          : Number(bonus.baseBonus) * (Number(extra.percentage) || 0) / 100;
+                        return (
+                          <span className="font-medium text-emerald-600">
+                            +{formatCurrency(extraAmount)}
+                          </span>
+                        );
+                      },
+                    },
+                    {
+                      key: "calculationOrder",
+                      title: "Ordem",
+                      render: (extra) => (
+                        <Badge variant="outline">{extra.calculationOrder}</Badge>
+                      ),
+                    },
+                  ]}
+                  emptyMessage="Nenhum extra aplicado"
+                />
+              )}
             </CardContent>
           </Card>
         </div>

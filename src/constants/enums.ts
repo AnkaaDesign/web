@@ -1144,7 +1144,6 @@ export enum PPE_TYPE {
   MASK = "MASK",
   GLOVES = "GLOVES",
   RAIN_BOOTS = "RAIN_BOOTS",
-  OUTROS = "OUTROS",
   OTHERS = "OTHERS",
 }
 
@@ -1991,6 +1990,7 @@ export enum FAVORITE_PAGES {
   RECURSOS_HUMANOS_EPI_LISTAR = "/recursos-humanos/epi",
   RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR = "/recursos-humanos/epi/entregas",
   RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR = "/recursos-humanos/epi/agendamentos",
+  RECURSOS_HUMANOS_EPI_TAMANHOS_LISTAR = "/recursos-humanos/epi/tamanhos",
   RECURSOS_HUMANOS_SETORES_LISTAR = "/recursos-humanos/setores",
 
   // Human Resources - Create Pages

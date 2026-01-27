@@ -26,7 +26,7 @@ export const PPESchedulesListPage = () => {
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "RH", href: routes.humanResources.root },
-            { label: "EPIs", href: routes.humanResources.ppe?.root || routes.humanResources.ppe.root },
+            { label: "EPIs", href: routes.humanResources.ppe.root },
             { label: "Agendamentos" },
           ]}
           actions={[
@@ -34,12 +34,18 @@ export const PPESchedulesListPage = () => {
               key: "create",
               label: "Cadastrar",
               icon: IconPlus,
-              onClick: () => navigate(routes.humanResources.ppe?.schedules?.create || routes.humanResources.ppe.schedules.create),
+              onClick: () => navigate(routes.humanResources.ppe.schedules.create),
               variant: "default",
             },
           ]}
         />
-        <PpeScheduleList className="flex-1 min-h-0" />
+        <PpeScheduleList
+          className="flex-1 min-h-0"
+          scheduleRoutes={{
+            details: (id: string) => routes.humanResources.ppe.schedules.details(id),
+            edit: (id: string) => routes.humanResources.ppe.schedules.edit(id),
+          }}
+        />
       </div>
     </PrivilegeRoute>
   );

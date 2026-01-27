@@ -8,11 +8,15 @@ import type { PpeScheduleColumn } from "./types";
 export const createPpeScheduleColumns = (): PpeScheduleColumn[] => [
   // Primary columns in the correct order
   {
-    key: "id",
-    header: "ID",
-    accessor: (schedule: PpeDeliverySchedule) => <div className="font-medium truncate">{schedule.id.slice(0, 8)}</div>,
+    key: "name",
+    header: "NOME",
+    accessor: (schedule: PpeDeliverySchedule) => (
+      <div className="font-medium truncate" title={schedule.name || ""}>
+        {schedule.name || `#${schedule.id.slice(0, 8)}`}
+      </div>
+    ),
     sortable: true,
-    className: TABLE_LAYOUT.firstDataColumn.className + " w-64",
+    className: TABLE_LAYOUT.firstDataColumn.className + " w-48",
     align: "left",
   },
   {
@@ -117,6 +121,14 @@ export const createPpeScheduleColumns = (): PpeScheduleColumn[] => [
   },
   // Secondary columns
   {
+    key: "id",
+    header: "ID",
+    accessor: (schedule: PpeDeliverySchedule) => <div className="font-mono text-xs truncate text-muted-foreground">{schedule.id.slice(0, 8)}</div>,
+    sortable: true,
+    className: "w-24",
+    align: "left",
+  },
+  {
     key: "frequencyCount",
     header: "INTERVALO",
     accessor: (schedule: PpeDeliverySchedule) => (
@@ -160,5 +172,5 @@ export const createPpeScheduleColumns = (): PpeScheduleColumn[] => [
 
 // Default visible columns
 export const getDefaultVisibleColumns = (): Set<string> => {
-  return new Set(["ppeItems", "assignmentType", "frequency", "nextRun", "isActive"]);
+  return new Set(["name", "ppeItems", "frequency", "nextRun", "isActive"]);
 };

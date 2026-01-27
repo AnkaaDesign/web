@@ -71,14 +71,17 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
         orderBy: { name: "asc" },
         page: page,
         take: 50,
-        where: searchTerm
-          ? {
-              OR: [
-                { name: { contains: searchTerm, mode: "insensitive" } },
-                { email: { contains: searchTerm, mode: "insensitive" } },
-              ],
-            }
-          : undefined,
+        where: {
+          isActive: true,
+          ...(searchTerm
+            ? {
+                OR: [
+                  { name: { contains: searchTerm, mode: "insensitive" } },
+                  { email: { contains: searchTerm, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
       });
 
       const users = response.data || [];

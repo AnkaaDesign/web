@@ -47,7 +47,7 @@ export const PPEScheduleCreatePage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col px-4 pt-4">
+    <div className="h-full flex flex-col px-4 pt-4 max-w-5xl mx-auto w-full">
       <PageHeader
         variant="form"
         title="Novo Agendamento de EPI"

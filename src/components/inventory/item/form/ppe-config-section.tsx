@@ -150,13 +150,13 @@ export function PpeConfigSection({ disabled, required }: PpeConfigSectionProps) 
                 <IconRuler className="h-4 w-4" />
                 Tamanho
                 {/* Size is optional for OUTROS type */}
-                {required && ppeType && ppeType !== "OUTROS" && <span className="text-destructive ml-1">*</span>}
+                {required && ppeType && ppeType !== "OTHERS" && <span className="text-destructive ml-1">*</span>}
               </FormLabel>
               <PpeSizeSelector
                 name="__ppeSize" // Virtual field name
                 ppeType={ppeType}
                 disabled={disabled || !ppeType}
-                required={required && ppeType !== "OUTROS"}
+                required={required && ppeType !== "OTHERS"}
                 value={getCurrentPpeSize()}
                 onValueChange={setPpeSize}
               />
