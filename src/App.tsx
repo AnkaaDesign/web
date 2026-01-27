@@ -8,6 +8,7 @@ import { FavoritesProvider } from "@/contexts/favorites-context";
 import { FileViewerProvider } from "@/components/common/file/file-viewer";
 import { MessageModalProvider } from "@/components/common/message-modal";
 import { AutoPrivilegeRoute } from "@/components/navigation/auto-privilege-route";
+import { DeepLinkRedirect } from "@/components/navigation/deep-link-redirect";
 import { MainLayout } from "@/layouts/main-layout";
 import { AuthLayout } from "@/layouts/auth-layout";
 import { Toaster } from "@/components/ui/sonner";
@@ -2232,6 +2233,22 @@ function App() {
                   }
                 />
               </Route>
+
+                            {/* Universal link / Deep link routes */}
+                            {/* These handle URLs like /app/task/123 from iOS/Android universal links */}
+                            <Route path="/app/:entityType/:id" element={<DeepLinkRedirect />} />
+                            {/* Also handle direct entity routes like /task/123 */}
+                            <Route path="/task/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/order/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/item/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/service-order/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/user/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/customer/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/supplier/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/borrow/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/maintenance/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/financial/:id" element={<DeepLinkRedirect />} />
+                            <Route path="/notification/:id" element={<DeepLinkRedirect />} />
 
                             {/* 404 Not Found route */}
                             <Route path="*" element={<NotFound />} />

@@ -71,8 +71,8 @@ const validateFile = (file: File, maxSize: number): string | null => {
 
 export function FileUploader({
   onFilesChange,
-  maxFiles = 10,
-  maxSize = 50 * 1024 * 1024, // 50MB default
+  maxFiles = 30,
+  maxSize = 500 * 1024 * 1024, // 500MB default
   acceptedFileTypes = defaultAcceptedTypes,
   existingFiles = [],
   disabled = false,
