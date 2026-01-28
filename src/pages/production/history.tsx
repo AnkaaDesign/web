@@ -14,9 +14,8 @@ export const TaskHistoryPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
-          className="flex-shrink-0"
           variant="default"
           title="Histórico de Tarefas"
           icon={IconHistory}
@@ -27,7 +26,10 @@ export const TaskHistoryPage = () => {
             { label: "Histórico" },
           ]}
         />
-        <TaskHistoryList navigationRoute="history" className="flex-1 min-h-0" hideStatusFilter={true} />
+
+        <div className="flex-1 min-h-0 pb-6 flex flex-col">
+          <TaskHistoryList className="h-full" hideStatusFilter={true} />
+        </div>
       </div>
     </PrivilegeRoute>
   );

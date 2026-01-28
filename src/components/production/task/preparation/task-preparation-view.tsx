@@ -11,12 +11,12 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Button } from "@/components/ui/button";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
-import { TaskHistoryTable } from "./task-history-table";
-import { TaskHistoryFilters } from "./task-history-filters";
-import { TaskExport } from "./task-export";
-import { ColumnVisibilityManager } from "./column-visibility-manager";
-import { createTaskHistoryColumns } from "./task-history-columns";
-import { extractActiveFilters, createFilterRemover } from "./filter-utils";
+import { TaskPreparationTable } from "./task-preparation-table";
+import { TaskHistoryFilters } from "../history/task-history-filters";
+import { TaskExport } from "../history/task-export";
+import { ColumnVisibilityManager } from "../history/column-visibility-manager";
+import { createTaskHistoryColumns } from "../history/task-history-columns";
+import { extractActiveFilters, createFilterRemover } from "../history/filter-utils";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { CopyFromTaskModal } from "../schedule/copy-from-task-modal";
 import type { CopyableTaskField } from "@/types/task-copy";
@@ -24,8 +24,8 @@ import { IconFilter, IconHandClick, IconX, IconChevronDown, IconChevronRight } f
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { hasPrivilege } from "@/utils";
-import { toast } from "sonner";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
+import { toast } from "sonner";
 
 // Copy from task state type
 interface CopyFromTaskState {
@@ -42,23 +42,17 @@ const initialCopyFromTaskState: CopyFromTaskState = {
   sourceTask: null,
 };
 
-interface TaskHistoryListProps {
+interface TaskPreparationViewProps {
   className?: string;
-  statusFilter?: TASK_STATUS[];
   storageKey?: string;
   searchPlaceholder?: string;
-  navigationRoute?: 'history' | 'preparation' | 'schedule';
-  hideStatusFilter?: boolean;
 }
 
-export function TaskHistoryList({
+export function TaskPreparationView({
   className,
-  statusFilter = [TASK_STATUS.COMPLETED],
-  storageKey = "task-history-visible-columns",
-  searchPlaceholder = "Buscar por nome, cliente, setor...",
-  navigationRoute = 'history',
-  hideStatusFilter = false,
-}: TaskHistoryListProps) {
+  storageKey = "task-preparation-visible-columns",
+  searchPlaceholder = "Buscar por nome, número de série, placa...",
+}: TaskPreparationViewProps) {
   // Load entity data for filter labels
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" } });
   const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" } });
@@ -71,22 +65,22 @@ export function TaskHistoryList({
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
   );
 
-  // Check if user can view/change status filter (Admin or Financial only, and not explicitly hidden)
-  const canViewStatusFilter = !hideStatusFilter && currentUser && (
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
-  );
+  // Check if user is admin
+  const isAdmin = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN);
 
   // Get table state for selected tasks functionality
-  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds, resetSelection } = useTableState({
+  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds, resetSelection, selectRange } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
   });
 
+  // Track the last clicked task ID for cross-table shift+click selection
+  const lastClickedTaskIdRef = useRef<string | null>(null);
+
   // Advanced actions ref
   const advancedActionsRef = useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
 
-  // State for tracking expanded groups with localStorage persistence
+  // State for tracking expanded groups across all tables with localStorage persistence
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('task-groups-expanded');
@@ -109,13 +103,14 @@ export function TaskHistoryList({
     }
   }, [expandedGroups]);
 
-  // Ref to track all available group IDs
+  // Ref to track all available group IDs from tables
   const allGroupIds = useRef<string[]>([]);
 
-  // Handler called by table when groups are detected
+  // Handler called by tables when groups are detected
   const handleGroupsDetected = useCallback((groupIds: string[], tableHasGroups: boolean) => {
-    allGroupIds.current = groupIds;
-    setHasGroups(tableHasGroups);
+    // Merge group IDs from all tables
+    allGroupIds.current = Array.from(new Set([...allGroupIds.current, ...groupIds]));
+    setHasGroups(prev => prev || tableHasGroups);
   }, []);
 
   // Handler to expand all groups
@@ -153,8 +148,6 @@ export function TaskHistoryList({
       const statusParam = params.get("status");
       if (statusParam) {
         filters.status = statusParam.split(",") as TASK_STATUS[];
-      } else {
-        filters.status = statusFilter;
       }
 
       // Date ranges
@@ -217,7 +210,7 @@ export function TaskHistoryList({
 
       return filters;
     },
-    [statusFilter],
+    [],
   );
 
   // Custom serializer for task filters
@@ -273,7 +266,7 @@ export function TaskHistoryList({
     queryFilters: baseQueryFilters,
   } = useTableFilters<TaskGetManyFormData>({
     defaultFilters: {
-      status: statusFilter,
+      status: [TASK_STATUS.PREPARATION],
     },
     searchDebounceMs: 300,
     searchParamName: "search",
@@ -285,55 +278,18 @@ export function TaskHistoryList({
   // Get user's sector privilege for default columns
   const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
 
-  // Default visible columns based on navigation route and sector privilege
-  const defaultVisibleColumns = useMemo(
-    () => {
-      // Base columns that are always visible
-      const baseColumns = [
-        "name",
-        "customer.fantasyName",
-        "identificador",
-      ];
+  // Default visible columns for preparation view
+  const defaultVisibleColumns = useMemo(() => {
+    const baseColumns = ["name", "customer.fantasyName", "identificador"];
+    const visibleServiceOrderTypes = getVisibleServiceOrderTypes(userSectorPrivilege);
+    const serviceOrderColumns = visibleServiceOrderTypes.map(type => `serviceOrders.${type.toLowerCase()}`);
 
-      // Get visible service order types based on user's sector privilege
-      const visibleServiceOrderTypes = getVisibleServiceOrderTypes(userSectorPrivilege);
-      const serviceOrderColumns = visibleServiceOrderTypes.map(type => `serviceOrders.${type.toLowerCase()}`);
-
-      if (navigationRoute === 'preparation') {
-        // Preparation page: show base columns + forecastDate + visible service order columns
-        return new Set([
-          ...baseColumns,
-          "forecastDate",
-          ...serviceOrderColumns,
-        ]);
-      }
-
-      if (navigationRoute === 'schedule') {
-        // Schedule page: name, customer, general painting, identificador, sector, term, forecastDate
-        return new Set([
-          "name",
-          "customer.fantasyName",
-          "generalPainting",
-          "identificador",
-          "sector.name",
-          "term",
-          "forecastDate",
-        ]);
-      }
-
-      // History page: name, customer, general painting, identificador, sector, finishedAt, commission
-      return new Set([
-        "name",
-        "customer.fantasyName",
-        "generalPainting",
-        "identificador",
-        "sector.name",
-        "finishedAt",
-        "commission",
-      ]);
-    },
-    [navigationRoute, userSectorPrivilege]
-  );
+    return new Set([
+      ...baseColumns,
+      "forecastDate",
+      ...serviceOrderColumns,
+    ]);
+  }, [userSectorPrivilege]);
 
   // Column visibility state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(storageKey, defaultVisibleColumns);
@@ -341,11 +297,33 @@ export function TaskHistoryList({
   // Filter modal state
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  // Table data for export
-  const [tableData, setTableData] = useState<{ items: Task[]; totalRecords: number }>({
-    items: [],
-    totalRecords: 0,
-  });
+  // Aggregate table data from all three tables
+  const [preparationTableData, setPreparationTableData] = useState<Task[]>([]);
+  const [productionTableData, setProductionTableData] = useState<Task[]>([]);
+  const [completedTableData, setCompletedTableData] = useState<Task[]>([]);
+
+  // Track ordered task IDs from each table (after grouping/sorting)
+  const [preparationOrderedIds, setPreparationOrderedIds] = useState<string[]>([]);
+  const [productionOrderedIds, setProductionOrderedIds] = useState<string[]>([]);
+  const [completedOrderedIds, setCompletedOrderedIds] = useState<string[]>([]);
+
+  // Combined ordered task IDs for cross-table shift+click selection
+  const allOrderedTaskIds = useMemo(() => {
+    return [
+      ...preparationOrderedIds,
+      ...productionOrderedIds,
+      ...completedOrderedIds,
+    ];
+  }, [preparationOrderedIds, productionOrderedIds, completedOrderedIds]);
+
+  // Combined table data for export (includes all three tables)
+  const allTableData = useMemo(() => {
+    return [
+      ...preparationTableData,
+      ...productionTableData,
+      ...completedTableData,
+    ];
+  }, [preparationTableData, productionTableData, completedTableData]);
 
   // Get all columns for visibility manager
   const allColumns = useMemo(
@@ -353,19 +331,39 @@ export function TaskHistoryList({
       canViewPrice,
       currentUserId: currentUser?.id,
       sectorPrivilege: userSectorPrivilege,
-      navigationRoute,
+      navigationRoute: 'preparation',
     }),
-    [canViewPrice, currentUser?.id, userSectorPrivilege, navigationRoute]
+    [canViewPrice, currentUser?.id, userSectorPrivilege]
   );
 
-  // Prepare final query filters
+  // Determine preparation exclusion flags based on user's sector privilege
+  const isFinancialUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL);
+  const isLogisticUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC);
+
+  // Prepare final query filters with preparation-specific logic
   const queryFilters = useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
-    return {
+    const result: Record<string, any> = {
       ...filterWithoutOrderBy,
-      status: filterWithoutOrderBy.status || statusFilter,
     };
-  }, [baseQueryFilters, statusFilter]);
+
+    // Add preparation display filtering
+    result.shouldDisplayInPreparation = true;
+
+    // Only FINANCIAL users see FINANCIAL service order requirements
+    if (!isFinancialUser) {
+      result.preparationExcludeFinancial = true;
+    }
+    // Only LOGISTIC users see LOGISTIC service order requirements
+    if (!isLogisticUser) {
+      result.preparationExcludeLogistic = true;
+    }
+
+    // Remove status filter to allow any status (except CANCELLED and fully completed)
+    delete result.status;
+
+    return result;
+  }, [baseQueryFilters, isFinancialUser, isLogisticUser]);
 
   // Handle filter changes
   const handleFilterChange = useCallback(
@@ -402,13 +400,47 @@ export function TaskHistoryList({
       sectors: sectorsData?.data || [],
       customers: customersData?.data || [],
       users: usersData?.data || [],
-      hideStatusTags: hideStatusFilter || !canViewStatusFilter,
+      hideStatusTags: true, // Hide status tags in preparation view
     });
-  }, [filters, searchingFor, sectorsData?.data, customersData?.data, usersData?.data, onRemoveFilter, canViewStatusFilter, hideStatusFilter]);
+  }, [filters, searchingFor, sectorsData?.data, customersData?.data, usersData?.data, onRemoveFilter]);
 
-  // Handle table data changes
-  const handleTableDataChange = useCallback((data: { items: Task[]; totalRecords: number }) => {
-    setTableData(data);
+  // Handlers for table data changes
+  const handlePreparationTableDataChange = useCallback((data: { items: Task[]; totalRecords: number }) => {
+    setPreparationTableData(data.items);
+  }, []);
+
+  const handleProductionTableDataChange = useCallback((data: { items: Task[]; totalRecords: number }) => {
+    setProductionTableData(data.items);
+  }, []);
+
+  const handleCompletedTableDataChange = useCallback((data: { items: Task[]; totalRecords: number }) => {
+    setCompletedTableData(data.items);
+  }, []);
+
+  // Handlers for ordered task IDs
+  const handlePreparationOrderedIdsChange = useCallback((orderedIds: string[]) => {
+    setPreparationOrderedIds(orderedIds);
+  }, []);
+
+  const handleProductionOrderedIdsChange = useCallback((orderedIds: string[]) => {
+    setProductionOrderedIds(orderedIds);
+  }, []);
+
+  const handleCompletedOrderedIdsChange = useCallback((orderedIds: string[]) => {
+    setCompletedOrderedIds(orderedIds);
+  }, []);
+
+  // Handler for shift+click selection across all tables
+  const handleShiftClickSelect = useCallback((taskId: string) => {
+    if (lastClickedTaskIdRef.current && allOrderedTaskIds.length > 0) {
+      selectRange(allOrderedTaskIds, lastClickedTaskIdRef.current, taskId);
+    }
+    lastClickedTaskIdRef.current = taskId;
+  }, [allOrderedTaskIds, selectRange]);
+
+  // Handler to update last clicked task ID
+  const handleSingleClickSelect = useCallback((taskId: string) => {
+    lastClickedTaskIdRef.current = taskId;
   }, []);
 
   // Copy from task handlers
@@ -542,8 +574,8 @@ export function TaskHistoryList({
   }, [copyFromTaskState.step, handleCopyFromTaskCancel]);
 
   return (
-    <Card className={cn("flex flex-col shadow-sm border border-border h-full", className)}>
-      <CardContent className="flex flex-col p-4 space-y-4 pb-6 h-full overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex flex-col p-4 pt-6 space-y-4 pb-6">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput
@@ -587,7 +619,7 @@ export function TaskHistoryList({
             </Button>
             <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} defaultColumns={defaultVisibleColumns} />
             {currentUser?.sector?.privileges !== SECTOR_PRIVILEGES.WAREHOUSE && (
-              <TaskExport filters={queryFilters} currentItems={tableData.items} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
+              <TaskExport filters={queryFilters} currentItems={allTableData} totalRecords={allTableData.length} visibleColumns={visibleColumns} />
             )}
           </div>
         </div>
@@ -611,21 +643,79 @@ export function TaskHistoryList({
           </div>
         )}
 
-        {/* Single table */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <TaskHistoryTable
-            filters={queryFilters}
-            visibleColumns={visibleColumns}
-            onDataChange={handleTableDataChange}
-            navigationRoute={navigationRoute}
-            advancedActionsRef={advancedActionsRef}
-            onStartCopyFromTask={handleStartCopyFromTask}
-            isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
-            onSourceTaskSelect={handleSourceTaskSelected}
-            externalExpandedGroups={expandedGroups}
-            onExpandedGroupsChange={setExpandedGroups}
-            onGroupsDetected={handleGroupsDetected}
-          />
+        {/* Three tables grouped by status */}
+        <div className="space-y-8 pb-8">
+          {/* Table 1: Em Preparação + Aguardando Produção */}
+          <div>
+            <TaskPreparationTable
+              filters={{
+                ...queryFilters,
+                status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION],
+                limit: 1000,
+              }}
+              visibleColumns={visibleColumns}
+              onDataChange={handlePreparationTableDataChange}
+              advancedActionsRef={advancedActionsRef}
+              onStartCopyFromTask={handleStartCopyFromTask}
+              isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+              onSourceTaskSelect={handleSourceTaskSelected}
+              onShiftClickSelect={handleShiftClickSelect}
+              onSingleClickSelect={handleSingleClickSelect}
+              externalExpandedGroups={expandedGroups}
+              onExpandedGroupsChange={setExpandedGroups}
+              onGroupsDetected={handleGroupsDetected}
+              onOrderedTaskIdsChange={handlePreparationOrderedIdsChange}
+              showSelectedOnly={showSelectedOnly}
+            />
+          </div>
+
+          {/* Table 2: Em Produção */}
+          <div>
+            <TaskPreparationTable
+              filters={{
+                ...queryFilters,
+                status: [TASK_STATUS.IN_PRODUCTION],
+                limit: 1000,
+              }}
+              visibleColumns={visibleColumns}
+              onDataChange={handleProductionTableDataChange}
+              advancedActionsRef={advancedActionsRef}
+              onStartCopyFromTask={handleStartCopyFromTask}
+              isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+              onSourceTaskSelect={handleSourceTaskSelected}
+              onShiftClickSelect={handleShiftClickSelect}
+              onSingleClickSelect={handleSingleClickSelect}
+              externalExpandedGroups={expandedGroups}
+              onExpandedGroupsChange={setExpandedGroups}
+              onGroupsDetected={handleGroupsDetected}
+              onOrderedTaskIdsChange={handleProductionOrderedIdsChange}
+              showSelectedOnly={showSelectedOnly}
+            />
+          </div>
+
+          {/* Table 3: Concluído */}
+          <div>
+            <TaskPreparationTable
+              filters={{
+                ...queryFilters,
+                status: [TASK_STATUS.COMPLETED],
+                limit: 1000,
+              }}
+              visibleColumns={visibleColumns}
+              onDataChange={handleCompletedTableDataChange}
+              advancedActionsRef={advancedActionsRef}
+              onStartCopyFromTask={handleStartCopyFromTask}
+              isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+              onSourceTaskSelect={handleSourceTaskSelected}
+              onShiftClickSelect={handleShiftClickSelect}
+              onSingleClickSelect={handleSingleClickSelect}
+              externalExpandedGroups={expandedGroups}
+              onExpandedGroupsChange={setExpandedGroups}
+              onGroupsDetected={handleGroupsDetected}
+              onOrderedTaskIdsChange={handleCompletedOrderedIdsChange}
+              showSelectedOnly={showSelectedOnly}
+            />
+          </div>
         </div>
 
         {/* Filter Modal */}
@@ -635,7 +725,7 @@ export function TaskHistoryList({
           filters={filters}
           onFilterChange={handleFilterChange}
           canViewPrice={canViewPrice}
-          canViewStatusFilter={canViewStatusFilter}
+          canViewStatusFilter={false}
         />
 
         {/* Advanced Bulk Actions Handler */}

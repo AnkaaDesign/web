@@ -52,9 +52,9 @@ export function ServiceOrderCell({ task, serviceOrderType, navigationRoute }: Se
         <>
           <span className="text-muted-foreground">-</span>
           {/* Red corner triangle indicator for missing service orders - positioned flush with cell corner */}
-          <Tooltip delayDuration={0}>
+          <Tooltip delayDuration={500}>
             <TooltipTrigger asChild>
-              <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
+              <div className="absolute top-0 right-0 z-[5] w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
                 <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
               </div>
             </TooltipTrigger>
@@ -80,7 +80,7 @@ export function ServiceOrderCell({ task, serviceOrderType, navigationRoute }: Se
 
   return (
     <>
-      <Tooltip delayDuration={0}>
+      <Tooltip delayDuration={500}>
         <TooltipTrigger asChild>
           <div className="relative cursor-help">
               {/* Progress bar container */}
@@ -188,9 +188,9 @@ export function ServiceOrderCell({ task, serviceOrderType, navigationRoute }: Se
 
       {/* Red corner triangle indicator for pending user-assigned orders */}
       {pendingAssignedCount > 0 && (
-        <Tooltip delayDuration={0}>
+        <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
-            <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
+            <div className="absolute top-0 right-0 z-[5] w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
               <span className="absolute -top-[25px] right-[2px] h-3 w-3 flex items-center justify-center text-[11px] font-bold text-white leading-none" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}>
                 {pendingAssignedCount}
               </span>

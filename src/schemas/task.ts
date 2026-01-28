@@ -881,10 +881,10 @@ export const taskGetManySchema = z
     hasBudget: z.boolean().optional(),
     hasNfe: z.boolean().optional(),
     hasReceipt: z.boolean().optional(),
-    // Agenda display logic filter
-    shouldDisplayInAgenda: z.boolean().optional(),
-    agendaExcludeFinancial: z.boolean().optional(), // When true, excludes FINANCIAL SO from agenda completion check
-    agendaExcludeLogistic: z.boolean().optional(), // When true, excludes LOGISTIC SO from agenda completion check
+    // Preparation display logic filter
+    shouldDisplayInPreparation: z.boolean().optional(),
+    preparationExcludeFinancial: z.boolean().optional(), // When true, excludes FINANCIAL SO from preparation completion check
+    preparationExcludeLogistic: z.boolean().optional(), // When true, excludes LOGISTIC SO from preparation completion check
     // Boolean status convenience filters
     isOverdue: z.boolean().optional(),
     isActive: z.boolean().optional(),

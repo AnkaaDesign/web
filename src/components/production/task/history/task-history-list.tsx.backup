@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import type { Task } from "@/types";
-import type { TaskGetManyFormData } from "@/schemas";
-import { useSectors, useCustomers, useUsers, useCurrentUser, useTaskBatchMutations } from "@/hooks";
-import { TASK_STATUS, SECTOR_PRIVILEGES } from "@/constants";
-import { taskService } from "@/api-client/task";
+import React from "react";
+import type { Task } from "../../../../types";
+import type { TaskGetManyFormData } from "../../../../schemas";
+import { useSectors, useCustomers, useUsers, useCurrentUser, useTaskBatchMutations } from "../../../../hooks";
+import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { taskService } from "../../../../api-client/task";
 import { useTableFilters } from "@/hooks/use-table-filters";
 import { useTableState } from "@/hooks/use-table-state";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,9 +23,9 @@ import type { CopyableTaskField } from "@/types/task-copy";
 import { IconFilter, IconHandClick, IconX, IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
-import { hasPrivilege } from "@/utils";
+import { hasPrivilege } from "../../../../utils";
+import { getVisibleServiceOrderTypes } from "../../../../utils/permissions/service-order-permissions";
 import { toast } from "sonner";
-import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 
 // Copy from task state type
 interface CopyFromTaskState {
@@ -51,6 +51,8 @@ interface TaskHistoryListProps {
   hideStatusFilter?: boolean;
 }
 
+const DEFAULT_PAGE_SIZE = 40;
+
 export function TaskHistoryList({
   className,
   statusFilter = [TASK_STATUS.COMPLETED],
@@ -71,6 +73,9 @@ export function TaskHistoryList({
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
   );
 
+  // Check if user is admin
+  const isAdmin = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN);
+
   // Check if user can view/change status filter (Admin or Financial only, and not explicitly hidden)
   const canViewStatusFilter = !hideStatusFilter && currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
@@ -78,16 +83,19 @@ export function TaskHistoryList({
   );
 
   // Get table state for selected tasks functionality
-  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds, resetSelection } = useTableState({
+  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds, resetSelection, selectRange } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
   });
 
-  // Advanced actions ref
-  const advancedActionsRef = useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
+  // Track the last clicked task ID for cross-table shift+click selection
+  const lastClickedTaskIdRef = React.useRef<string | null>(null);
 
-  // State for tracking expanded groups with localStorage persistence
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+  // Advanced actions ref
+  const advancedActionsRef = React.useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
+
+  // State for tracking expanded groups across all tables with localStorage persistence
+  const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('task-groups-expanded');
       if (stored) {
@@ -98,10 +106,10 @@ export function TaskHistoryList({
     }
     return new Set();
   });
-  const [hasGroups, setHasGroups] = useState(false);
+  const [hasGroups, setHasGroups] = React.useState(false);
 
   // Persist expanded groups to localStorage whenever it changes
-  useEffect(() => {
+  React.useEffect(() => {
     try {
       localStorage.setItem('task-groups-expanded', JSON.stringify(Array.from(expandedGroups)));
     } catch (error) {
@@ -109,33 +117,34 @@ export function TaskHistoryList({
     }
   }, [expandedGroups]);
 
-  // Ref to track all available group IDs
-  const allGroupIds = useRef<string[]>([]);
+  // Ref to track all available group IDs from tables
+  const allGroupIds = React.useRef<string[]>([]);
 
-  // Handler called by table when groups are detected
-  const handleGroupsDetected = useCallback((groupIds: string[], tableHasGroups: boolean) => {
-    allGroupIds.current = groupIds;
-    setHasGroups(tableHasGroups);
+  // Handler called by tables when groups are detected
+  const handleGroupsDetected = React.useCallback((groupIds: string[], tableHasGroups: boolean) => {
+    // Merge group IDs from all tables
+    allGroupIds.current = Array.from(new Set([...allGroupIds.current, ...groupIds]));
+    setHasGroups(prev => prev || tableHasGroups);
   }, []);
 
   // Handler to expand all groups
-  const handleExpandAll = useCallback(() => {
+  const handleExpandAll = React.useCallback(() => {
     setExpandedGroups(new Set(allGroupIds.current));
   }, []);
 
   // Handler to collapse all groups
-  const handleCollapseAll = useCallback(() => {
+  const handleCollapseAll = React.useCallback(() => {
     setExpandedGroups(new Set());
   }, []);
 
   // Copy from task state
-  const [copyFromTaskState, setCopyFromTaskState] = useState<CopyFromTaskState>(initialCopyFromTaskState);
+  const [copyFromTaskState, setCopyFromTaskState] = React.useState<CopyFromTaskState>(initialCopyFromTaskState);
 
   // Batch mutations for copy operation
   const { batchUpdateAsync } = useTaskBatchMutations();
 
   // Custom deserializer for task filters
-  const deserializeTaskFilters = useCallback(
+  const deserializeTaskFilters = React.useCallback(
     (params: URLSearchParams): Partial<TaskGetManyFormData> => {
       const filters: Partial<TaskGetManyFormData> = {};
 
@@ -221,7 +230,7 @@ export function TaskHistoryList({
   );
 
   // Custom serializer for task filters
-  const serializeTaskFilters = useCallback((filters: Partial<TaskGetManyFormData>): Record<string, string> => {
+  const serializeTaskFilters = React.useCallback((filters: Partial<TaskGetManyFormData>): Record<string, string> => {
     const params: Record<string, string> = {};
 
     // Entity filters
@@ -276,17 +285,17 @@ export function TaskHistoryList({
       status: statusFilter,
     },
     searchDebounceMs: 300,
-    searchParamName: "search",
+    searchParamName: "search", // Use "search" for URL compatibility
     serializeToUrl: serializeTaskFilters,
     deserializeFromUrl: deserializeTaskFilters,
     excludeFromUrl: ["limit", "orderBy"],
   });
 
-  // Get user's sector privilege for default columns
+  // Get user's sector privilege early for default columns computation
   const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
 
   // Default visible columns based on navigation route and sector privilege
-  const defaultVisibleColumns = useMemo(
+  const defaultVisibleColumns = React.useMemo(
     () => {
       // Base columns that are always visible
       const baseColumns = [
@@ -300,7 +309,7 @@ export function TaskHistoryList({
       const serviceOrderColumns = visibleServiceOrderTypes.map(type => `serviceOrders.${type.toLowerCase()}`);
 
       if (navigationRoute === 'preparation') {
-        // Preparation page: show base columns + forecastDate + visible service order columns
+        // Agenda page: show base columns + forecastDate + visible service order columns
         return new Set([
           ...baseColumns,
           "forecastDate",
@@ -309,7 +318,7 @@ export function TaskHistoryList({
       }
 
       if (navigationRoute === 'schedule') {
-        // Schedule page: name, customer, general painting, identificador, sector, term, forecastDate
+        // Cronograma page: name, customer, general painting, identificador, sector, term, forecastDate
         return new Set([
           "name",
           "customer.fantasyName",
@@ -339,16 +348,47 @@ export function TaskHistoryList({
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(storageKey, defaultVisibleColumns);
 
   // Filter modal state
-  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = React.useState(false);
 
-  // Table data for export
-  const [tableData, setTableData] = useState<{ items: Task[]; totalRecords: number }>({
+  // Table data for export and cross-table selection
+  const [tableData, setTableData] = React.useState<{ items: Task[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });
 
+  // Aggregate table data from all three tables for agenda view (for cross-table shift selection)
+  const [preparationTableData, setPreparationTableData] = React.useState<Task[]>([]);
+  const [productionTableData, setProductionTableData] = React.useState<Task[]>([]);
+  const [completedTableData, setCompletedTableData] = React.useState<Task[]>([]);
+
+  // Track the actual rendered order of task IDs from each table (after grouping/sorting)
+  // This is critical for shift+click range selection to work correctly with grouped tasks
+  const [preparationOrderedIds, setPreparationOrderedIds] = React.useState<string[]>([]);
+  const [productionOrderedIds, setProductionOrderedIds] = React.useState<string[]>([]);
+  const [completedOrderedIds, setCompletedOrderedIds] = React.useState<string[]>([]);
+
+  // Combined ordered task IDs for cross-table shift+click selection (agenda view only)
+  // Uses the actual rendered order after grouping, not the API response order
+  const allAgendaTaskIds = React.useMemo(() => {
+    if (navigationRoute !== 'preparation') return [];
+    // Order: Preparation/Waiting -> In Production -> Completed
+    return [
+      ...preparationOrderedIds,
+      ...productionOrderedIds,
+      ...completedOrderedIds,
+    ];
+  }, [navigationRoute, preparationOrderedIds, productionOrderedIds, completedOrderedIds]);
+
   // Get all columns for visibility manager
-  const allColumns = useMemo(
+  // Columns are filtered based on user's sector privilege:
+  // - ADMIN: sees all service order columns
+  // - COMMERCIAL: sees PRODUCTION + FINANCIAL + COMMERCIAL
+  // - DESIGNER: sees PRODUCTION + ARTWORK (view only)
+  // - FINANCIAL: sees PRODUCTION + FINANCIAL only
+  // - LOGISTIC: sees PRODUCTION + LOGISTIC only
+  // - PRODUCTION/WAREHOUSE/etc: sees PRODUCTION only
+  // - HR: sees no service order columns
+  const allColumns = React.useMemo(
     () => createTaskHistoryColumns({
       canViewPrice,
       currentUserId: currentUser?.id,
@@ -358,17 +398,45 @@ export function TaskHistoryList({
     [canViewPrice, currentUser?.id, userSectorPrivilege, navigationRoute]
   );
 
+  // Determine agenda exclusion flags based on user's sector privilege
+  const isFinancialUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL);
+  const isLogisticUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC);
+
   // Prepare final query filters
-  const queryFilters = useMemo(() => {
+  const queryFilters = React.useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
-    return {
+    const result: Record<string, any> = {
       ...filterWithoutOrderBy,
       status: filterWithoutOrderBy.status || statusFilter,
     };
-  }, [baseQueryFilters, statusFilter]);
+
+    // Add agenda display filtering for preparation view
+    // Role-based behavior (hasPrivilege treats ADMIN as having all privileges):
+    // - ADMIN users: See ALL tasks (no exclusions - hasPrivilege returns true for all privileges)
+    // - FINANCIAL users: Need PRODUCTION, COMMERCIAL, ARTWORK, FINANCIAL (exclude LOGISTIC)
+    // - LOGISTIC users: Need PRODUCTION, COMMERCIAL, ARTWORK, LOGISTIC (exclude FINANCIAL)
+    // - All other users: Only need PRODUCTION, COMMERCIAL, ARTWORK (exclude both FINANCIAL and LOGISTIC)
+    if (navigationRoute === "preparation") {
+      result.shouldDisplayInAgenda = true;
+
+      // Only FINANCIAL users see FINANCIAL service order requirements
+      if (!isFinancialUser) {
+        result.agendaExcludeFinancial = true;
+      }
+      // Only LOGISTIC users see LOGISTIC service order requirements
+      if (!isLogisticUser) {
+        result.agendaExcludeLogistic = true;
+      }
+
+      // Remove status filter to allow any status (except CANCELLED and fully completed)
+      delete result.status;
+    }
+
+    return result;
+  }, [baseQueryFilters, statusFilter, navigationRoute, isFinancialUser, isLogisticUser]);
 
   // Handle filter changes
-  const handleFilterChange = useCallback(
+  const handleFilterChange = React.useCallback(
     (newFilters: Partial<TaskGetManyFormData>) => {
       const { orderBy: _, ...filtersWithoutOrderBy } = newFilters;
       setFilters(filtersWithoutOrderBy);
@@ -380,7 +448,7 @@ export function TaskHistoryList({
   const baseOnRemoveFilter = createFilterRemover(filters, handleFilterChange);
 
   // Wrap to handle search removal
-  const onRemoveFilter = useCallback(
+  const onRemoveFilter = React.useCallback(
     (key: string, value?: any) => {
       if (key === "search" || key === "searchingFor") {
         setSearch("");
@@ -392,7 +460,7 @@ export function TaskHistoryList({
   );
 
   // Extract active filters for display
-  const activeFilters = useMemo(() => {
+  const activeFilters = React.useMemo(() => {
     const filtersWithSearch = {
       ...filters,
       search: searchingFor || undefined,
@@ -402,17 +470,59 @@ export function TaskHistoryList({
       sectors: sectorsData?.data || [],
       customers: customersData?.data || [],
       users: usersData?.data || [],
-      hideStatusTags: hideStatusFilter || !canViewStatusFilter,
+      hideStatusTags: hideStatusFilter || !canViewStatusFilter, // Hide status tags if explicitly requested or for non-admin/financial users
     });
   }, [filters, searchingFor, sectorsData?.data, customersData?.data, usersData?.data, onRemoveFilter, canViewStatusFilter, hideStatusFilter]);
 
   // Handle table data changes
-  const handleTableDataChange = useCallback((data: { items: Task[]; totalRecords: number }) => {
+  const handleTableDataChange = React.useCallback((data: { items: Task[]; totalRecords: number }) => {
     setTableData(data);
   }, []);
 
+  // Handlers for cross-table data collection (agenda view)
+  const handlePreparationTableDataChange = React.useCallback((data: { items: Task[]; totalRecords: number }) => {
+    setPreparationTableData(data.items);
+    // Also update main table data for export (use preparation table as primary)
+    setTableData(data);
+  }, []);
+
+  const handleProductionTableDataChange = React.useCallback((data: { items: Task[]; totalRecords: number }) => {
+    setProductionTableData(data.items);
+  }, []);
+
+  const handleCompletedTableDataChange = React.useCallback((data: { items: Task[]; totalRecords: number }) => {
+    setCompletedTableData(data.items);
+  }, []);
+
+  // Handlers for ordered task IDs (after grouping/sorting)
+  const handlePreparationOrderedIdsChange = React.useCallback((orderedIds: string[]) => {
+    setPreparationOrderedIds(orderedIds);
+  }, []);
+
+  const handleProductionOrderedIdsChange = React.useCallback((orderedIds: string[]) => {
+    setProductionOrderedIds(orderedIds);
+  }, []);
+
+  const handleCompletedOrderedIdsChange = React.useCallback((orderedIds: string[]) => {
+    setCompletedOrderedIds(orderedIds);
+  }, []);
+
+  // Handler for shift+click selection across all agenda tables
+  const handleShiftClickSelect = React.useCallback((taskId: string) => {
+    // If there's a last clicked task, select the range
+    if (lastClickedTaskIdRef.current && allAgendaTaskIds.length > 0) {
+      selectRange(allAgendaTaskIds, lastClickedTaskIdRef.current, taskId);
+    }
+    lastClickedTaskIdRef.current = taskId;
+  }, [allAgendaTaskIds, selectRange]);
+
+  // Handler to update last clicked task ID for cross-table shift+click
+  const handleSingleClickSelect = React.useCallback((taskId: string) => {
+    lastClickedTaskIdRef.current = taskId;
+  }, []);
+
   // Copy from task handlers
-  const handleStartCopyFromTask = useCallback((targetTasks: Task[]) => {
+  const handleStartCopyFromTask = React.useCallback((targetTasks: Task[]) => {
     setCopyFromTaskState({
       step: "selecting_fields",
       targetTasks,
@@ -421,7 +531,7 @@ export function TaskHistoryList({
     });
   }, []);
 
-  const handleStartSourceSelection = useCallback((selectedFields: CopyableTaskField[]) => {
+  const handleStartSourceSelection = React.useCallback((selectedFields: CopyableTaskField[]) => {
     setCopyFromTaskState((prev) => ({
       ...prev,
       step: "selecting_source",
@@ -429,15 +539,23 @@ export function TaskHistoryList({
     }));
   }, []);
 
-  const handleSourceTaskSelected = useCallback(async (sourceTask: Task) => {
+  const handleSourceTaskSelected = React.useCallback(async (sourceTask: Task) => {
+    console.log('[CopyFromTask] ========== handleSourceTaskSelected CALLED (HISTORY VIEW) ==========');
+    console.log('[CopyFromTask] Source task ID:', sourceTask?.id);
+    console.log('[CopyFromTask] Source task artworks:', sourceTask?.artworks);
+
+    // CRITICAL FIX: Refetch the source task with proper includes to get artwork fileIds
+    // The task from the table doesn't have the file relationship loaded on artworks
     try {
+      console.log(`[CopyFromTask] Refetching source task ${sourceTask.id} with full artwork details...`);
+
       const fullSourceTask = await taskService.getTaskById(sourceTask.id, {
         include: {
-          artworks: { include: { file: true } },
+          artworks: { include: { file: true } },  // ✅ Include file relationship
           budgets: true,
           invoices: true,
           receipts: true,
-          pricing: true,
+          pricing: true,  // ✅ Include pricing (one-to-many: one pricing can be shared across multiple tasks)
           logoPaints: true,
           cuts: true,
           serviceOrders: true,
@@ -455,32 +573,49 @@ export function TaskHistoryList({
         throw new Error('Failed to fetch source task details');
       }
 
+      console.log(
+        `[CopyFromTask] Fetched source task with ${fullSourceTask.data.artworks?.length || 0} artworks`,
+        fullSourceTask.data.artworks
+      );
+
+      // Move to confirming step with fully loaded source task
       setCopyFromTaskState((prev) => ({
         ...prev,
         step: "confirming",
-        sourceTask: fullSourceTask.data,
+        sourceTask: fullSourceTask.data,  // Use refetched task
       }));
     } catch (error) {
-      console.error('Failed to fetch source task:', error);
+      console.error('[CopyFromTask] Failed to fetch source task:', error);
       toast.error('Falha ao carregar detalhes da tarefa de origem');
-      setCopyFromTaskState(initialCopyFromTaskState);
+      // Reset to idle on error
+      setCopyFromTaskState({
+        step: "idle",
+        targetTasks: [],
+        selectedFields: [],
+        sourceTask: null,
+      });
     }
   }, []);
 
-  const handleCopyFromTaskConfirm = useCallback(
+  const handleCopyFromTaskConfirm = React.useCallback(
     async (selectedFields: CopyableTaskField[], sourceTask: Task) => {
       const { targetTasks } = copyFromTaskState;
 
       try {
+        console.log(`[CopyFromTask] Copying ${selectedFields.length} field(s) from task ${sourceTask.id} to ${targetTasks.length} task(s)`);
+        console.log(`[CopyFromTask] Selected fields:`, selectedFields);
+
+        // Call the copy-from endpoint for each target task
         const copyPromises = targetTasks.map(async (targetTask) => {
           try {
             const result = await taskService.copyFromTask(targetTask.id, {
               sourceTaskId: sourceTask.id,
               fields: selectedFields,
             });
+            console.log(`[CopyFromTask] Successfully copied to task ${targetTask.id}:`, result);
             return { success: true, taskId: targetTask.id, result };
           } catch (error) {
-            console.error(`Failed to copy to task ${targetTask.id}:`, error);
+            console.error(`[CopyFromTask] Failed to copy to task ${targetTask.id}:`, error);
             return { success: false, taskId: targetTask.id, error };
           }
         });
@@ -490,11 +625,14 @@ export function TaskHistoryList({
         const failureCount = results.length - successCount;
 
         if (successCount > 0) {
-          toast.success(`Campos copiados com sucesso`, {
-            description: failureCount === 0
-              ? `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${successCount} tarefa(s)`
-              : `${successCount} tarefa(s) atualizada(s), ${failureCount} falhou(ram)`,
-          });
+          toast.success(
+            `Campos copiados com sucesso`,
+            {
+              description: failureCount === 0
+                ? `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${successCount} tarefa(s)`
+                : `${successCount} tarefa(s) atualizada(s), ${failureCount} falhou(ram)`,
+            }
+          );
         }
 
         if (failureCount > 0 && successCount === 0) {
@@ -505,8 +643,13 @@ export function TaskHistoryList({
 
         setCopyFromTaskState(initialCopyFromTaskState);
         resetSelection();
+
+        // Refresh task list to show updated data
+        if (successCount > 0) {
+          // Note: The refetch will happen automatically via React Query invalidation
+        }
       } catch (error) {
-        console.error('Unexpected error:', error);
+        console.error('[CopyFromTask] Unexpected error:', error);
         toast.error("Erro ao copiar campos", {
           description: "Não foi possível copiar os campos. Tente novamente.",
         });
@@ -515,11 +658,11 @@ export function TaskHistoryList({
     [copyFromTaskState, resetSelection]
   );
 
-  const handleCopyFromTaskCancel = useCallback(() => {
+  const handleCopyFromTaskCancel = React.useCallback(() => {
     setCopyFromTaskState(initialCopyFromTaskState);
   }, []);
 
-  const handleChangeSource = useCallback(() => {
+  const handleChangeSource = React.useCallback(() => {
     setCopyFromTaskState((prev) => ({
       ...prev,
       step: "selecting_source",
@@ -528,7 +671,7 @@ export function TaskHistoryList({
   }, []);
 
   // Effect to handle escape key during source selection
-  useEffect(() => {
+  React.useEffect(() => {
     if (copyFromTaskState.step !== "selecting_source") return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -542,14 +685,14 @@ export function TaskHistoryList({
   }, [copyFromTaskState.step, handleCopyFromTaskCancel]);
 
   return (
-    <Card className={cn("flex flex-col shadow-sm border border-border h-full", className)}>
-      <CardContent className="flex flex-col p-4 space-y-4 pb-6 h-full overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex flex-col p-4 space-y-4 pb-6">
         {/* Search and controls */}
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-3 sm:flex-row flex-shrink-0">
           <TableSearchInput
             value={displaySearchText}
             onChange={setSearch}
-            placeholder={searchPlaceholder}
+            placeholder="Buscar por nome, número de série, placa..."
             isPending={displaySearchText !== searchingFor}
           />
           <div className="flex gap-2">
@@ -593,7 +736,7 @@ export function TaskHistoryList({
         </div>
 
         {/* Active Filter Indicators */}
-        {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
+        {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1 flex-shrink-0" />}
 
         {/* Source selection mode indicator */}
         {copyFromTaskState.step === "selecting_source" && (
@@ -611,21 +754,92 @@ export function TaskHistoryList({
           </div>
         )}
 
-        {/* Single table */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <TaskHistoryTable
-            filters={queryFilters}
-            visibleColumns={visibleColumns}
-            onDataChange={handleTableDataChange}
-            navigationRoute={navigationRoute}
-            advancedActionsRef={advancedActionsRef}
-            onStartCopyFromTask={handleStartCopyFromTask}
-            isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
-            onSourceTaskSelect={handleSourceTaskSelected}
-            externalExpandedGroups={expandedGroups}
-            onExpandedGroupsChange={setExpandedGroups}
-            onGroupsDetected={handleGroupsDetected}
-          />
+        {/* Tables - separated by status for preparation route */}
+        <div>
+          {navigationRoute === 'preparation' ? (
+            <div className="space-y-8 pb-8">
+              {/* Group 1: Em Preparação + Aguardando Produção */}
+              <TaskHistoryTable
+                filters={{
+                  ...queryFilters,
+                  status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION],
+                }}
+                visibleColumns={visibleColumns}
+                onDataChange={handlePreparationTableDataChange}
+                navigationRoute={navigationRoute}
+                advancedActionsRef={advancedActionsRef}
+                onStartCopyFromTask={handleStartCopyFromTask}
+                isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+                onSourceTaskSelect={handleSourceTaskSelected}
+                disablePagination={true}
+                onShiftClickSelect={handleShiftClickSelect}
+                onSingleClickSelect={handleSingleClickSelect}
+                externalExpandedGroups={expandedGroups}
+                onExpandedGroupsChange={setExpandedGroups}
+                onGroupsDetected={handleGroupsDetected}
+                onOrderedTaskIdsChange={handlePreparationOrderedIdsChange}
+              />
+
+              {/* Group 2: Em Produção */}
+              <TaskHistoryTable
+                filters={{
+                  ...queryFilters,
+                  status: [TASK_STATUS.IN_PRODUCTION],
+                }}
+                visibleColumns={visibleColumns}
+                onDataChange={handleProductionTableDataChange}
+                navigationRoute={navigationRoute}
+                advancedActionsRef={advancedActionsRef}
+                onStartCopyFromTask={handleStartCopyFromTask}
+                isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+                onSourceTaskSelect={handleSourceTaskSelected}
+                disablePagination={true}
+                onShiftClickSelect={handleShiftClickSelect}
+                onSingleClickSelect={handleSingleClickSelect}
+                externalExpandedGroups={expandedGroups}
+                onExpandedGroupsChange={setExpandedGroups}
+                onGroupsDetected={handleGroupsDetected}
+                onOrderedTaskIdsChange={handleProductionOrderedIdsChange}
+              />
+
+              {/* Group 3: Concluído */}
+              <TaskHistoryTable
+                filters={{
+                  ...queryFilters,
+                  status: [TASK_STATUS.COMPLETED],
+                }}
+                visibleColumns={visibleColumns}
+                onDataChange={handleCompletedTableDataChange}
+                navigationRoute={navigationRoute}
+                advancedActionsRef={advancedActionsRef}
+                onStartCopyFromTask={handleStartCopyFromTask}
+                isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+                onSourceTaskSelect={handleSourceTaskSelected}
+                disablePagination={true}
+                onShiftClickSelect={handleShiftClickSelect}
+                onSingleClickSelect={handleSingleClickSelect}
+                externalExpandedGroups={expandedGroups}
+                onExpandedGroupsChange={setExpandedGroups}
+                onGroupsDetected={handleGroupsDetected}
+                onOrderedTaskIdsChange={handleCompletedOrderedIdsChange}
+              />
+            </div>
+          ) : (
+            // Single table for non-preparation routes
+            <TaskHistoryTable
+              filters={queryFilters}
+              visibleColumns={visibleColumns}
+              onDataChange={handleTableDataChange}
+              navigationRoute={navigationRoute}
+              advancedActionsRef={advancedActionsRef}
+              onStartCopyFromTask={handleStartCopyFromTask}
+              isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+              onSourceTaskSelect={handleSourceTaskSelected}
+              externalExpandedGroups={expandedGroups}
+              onExpandedGroupsChange={setExpandedGroups}
+              onGroupsDetected={handleGroupsDetected}
+            />
+          )}
         </div>
 
         {/* Filter Modal */}

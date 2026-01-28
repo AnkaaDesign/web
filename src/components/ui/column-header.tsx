@@ -243,7 +243,7 @@ export function ColumnHeader({
     if (!sortable) return null;
 
     const iconClass = cn("h-4 w-4 transition-colors duration-150", {
-      "text-primary": isActive,
+      "text-foreground": isActive,
       "text-muted-foreground": !isActive && !isHovering,
       "text-foreground/70": !isActive && isHovering,
     });
@@ -258,7 +258,7 @@ export function ColumnHeader({
         {showMultipleSortOrder && sortOrder !== null && (
           <span
             className={cn("text-xs ml-0.5 transition-colors duration-150", {
-              "text-primary font-medium": isActive,
+              "text-foreground font-medium": isActive,
               "text-muted-foreground": !isActive,
             })}
           >
@@ -437,9 +437,6 @@ export function ColumnHeader({
             "hover:bg-muted/80 focus:bg-muted/80 focus:outline-none focus:ring-2 focus:ring-primary/20",
             "cursor-pointer border-0 bg-transparent",
             alignmentClasses[align],
-            {
-              "bg-primary/5": isActive,
-            },
           )}
           aria-label={getAriaLabel()}
           aria-sort={getAriaSort()}
@@ -484,16 +481,10 @@ export function ColumnHeader({
         {isStringChildren ? (
           <TruncatedTextWithTooltip
             text={headerText.toUpperCase()}
-            className={cn("transition-colors duration-150", {
-              "text-primary": isActive,
-              "group-hover:text-foreground": !isActive && sortable,
-            })}
+            className="transition-colors duration-150"
           />
         ) : (
-          <span className={cn("transition-colors duration-150 truncate", {
-            "text-primary": isActive,
-            "group-hover:text-foreground": !isActive && sortable,
-          })}>
+          <span className="transition-colors duration-150 truncate">
             {children}
           </span>
         )}

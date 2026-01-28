@@ -21,8 +21,6 @@ import { IconChevronUp, IconChevronDown, IconSelector, IconAlertTriangle, IconHi
 import { Badge } from "@/components/ui/badge";
 import { TaskHistoryTableSkeleton } from "./task-history-table-skeleton";
 import { useNavigate } from "react-router-dom";
-import { groupSequentialTasks, type TaskGroup } from "./task-grouping-utils";
-import { CollapsedGroupRow } from "./collapsed-group-row";
 import { ColumnHeader } from "@/components/ui/column-header";
 import { useColumnWidths, DEFAULT_COLUMN_WIDTHS, COLUMN_WIDTH_CONSTRAINTS } from "@/hooks/use-column-widths";
 
@@ -36,7 +34,6 @@ interface TaskHistoryTableProps {
   onStartCopyFromTask?: (targetTasks: Task[]) => void;
   isSelectingSourceTask?: boolean;
   onSourceTaskSelect?: (task: Task) => void;
-  disablePagination?: boolean;
   /** Handler for shift+click selection across tables */
   onShiftClickSelect?: (taskId: string) => void;
   /** Handler to update last clicked task for cross-table shift+click */
@@ -59,7 +56,6 @@ export function TaskHistoryTable({
   onStartCopyFromTask,
   isSelectingSourceTask,
   onSourceTaskSelect,
-  disablePagination = false,
   onShiftClickSelect,
   onSingleClickSelect,
   externalExpandedGroups,
@@ -79,10 +75,6 @@ export function TaskHistoryTable({
     hasPrivilege(user, SECTOR_PRIVILEGES.FINANCIAL)
   );
 
-  // State for expanded groups - use external state if provided
-  const [internalExpandedGroups, setInternalExpandedGroups] = useState<Set<string>>(new Set());
-  const expandedGroups = externalExpandedGroups ?? internalExpandedGroups;
-  const setExpandedGroups = onExpandedGroupsChange ?? setInternalExpandedGroups;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -190,9 +182,8 @@ export function TaskHistoryTable({
       // Always apply base filters to prevent showing unintended tasks
       ...filters,
       ...(statusToUse && { status: statusToUse }),
-      // If pagination is disabled, fetch all records
-      page: disablePagination ? 1 : page + 1, // Convert 0-based to 1-based for API
-      limit: disablePagination ? 1000 : pageSize,
+      page: page + 1, // Convert 0-based to 1-based for API
+      limit: pageSize,
       include: includeConfig,
       // Convert sortConfigs to orderBy format for API
       ...(sortConfigs.length > 0 && {
@@ -208,7 +199,7 @@ export function TaskHistoryTable({
     };
 
     return params;
-  }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds, disablePagination]);
+  }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds]);
 
   // Fetch data
   const { data: response, isLoading, error } = useTasks(queryParams);
@@ -217,36 +208,13 @@ export function TaskHistoryTable({
   const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;
   const totalRecords = response?.meta?.totalRecords || 0;
 
-  // Group sequential tasks
-  const groupedTasks = useMemo(() => {
-    return groupSequentialTasks(tasks);
-  }, [tasks]);
-
-  // Notify parent about detected groups
+  // History table does not use grouping - notify parent that there are no groups
   useEffect(() => {
     if (onGroupsDetected) {
-      const groupIds = groupedTasks
-        .filter(g => g.type === 'group-collapsed')
-        .map(g => g.groupId!)
-        .filter(Boolean);
-
-      const hasGroups = groupIds.length > 0;
-      onGroupsDetected(groupIds, hasGroups);
+      onGroupsDetected([], false);
     }
-  }, [groupedTasks, onGroupsDetected]);
+  }, [onGroupsDetected]);
 
-  // Toggle group expansion
-  const toggleGroup = useCallback((groupId: string) => {
-    setExpandedGroups(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(groupId)) {
-        newSet.delete(groupId);
-      } else {
-        newSet.add(groupId);
-      }
-      return newSet;
-    });
-  }, []);
 
   // Define all available columns
   const allColumns = React.useMemo(() => createTaskHistoryColumns({
@@ -454,6 +422,7 @@ export function TaskHistoryTable({
           <TableCell
             key={column.id}
             className={cn(
+              column.cellClassName,
               column.className,
               "p-0 !border-r-0",
             )}
@@ -487,9 +456,9 @@ export function TaskHistoryTable({
 
 
   return (
-    <div className={cn("rounded-lg flex flex-col overflow-hidden", className)}>
+    <div className={cn("rounded-lg flex flex-col h-full overflow-hidden", className)}>
       {/* Fixed Header Table */}
-      <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
+      <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden shrink-0">
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
@@ -567,171 +536,55 @@ export function TaskHistoryTable({
                 </TableCell>
               </TableRow>
             ) : (
-              (() => {
-                // Track visual row index for consistent zebra striping
-                let visualRowIndex = 0;
+              tasks.map((task, index) => {
+                const taskIsSelected = isSelected(task.id);
 
-                return groupedTasks.flatMap((group, groupIndex) => {
-                  // Handle collapsed group row
-                  if (group.type === 'group-collapsed') {
-                    const groupId = group.groupId!;
-                    const isExpanded = expandedGroups.has(groupId);
-                    const collapsedTasks = group.collapsedTasks!;
-
-                    // Get all tasks in the group (including first and last)
-                    const allTasksInGroup: Task[] = [];
-
-                    // Find the first task (appears before this collapsed row)
-                    const firstTaskGroup = groupedTasks.find(g => g.type === 'group-first' && g.groupId === groupId);
-                    if (firstTaskGroup?.task) {
-                      allTasksInGroup.push(firstTaskGroup.task);
-                    }
-
-                    // Add middle tasks
-                    allTasksInGroup.push(...collapsedTasks);
-
-                    // Find the last task (appears after this collapsed row)
-                    const lastTaskGroup = groupedTasks.find(g => g.type === 'group-last' && g.groupId === groupId);
-                    if (lastTaskGroup?.task) {
-                      allTasksInGroup.push(lastTaskGroup.task);
-                    }
-
-                    // Count selected tasks in the ENTIRE group (first + middle + last)
-                    const selectedCountInGroup = allTasksInGroup.filter(t => isSelected(t.id)).length;
-                    const allTasksSelected = selectedCountInGroup === allTasksInGroup.length;
-
-                    // Handler to select/deselect ALL tasks in the group (including first and last)
-                    const handleSelectAllInGroup = () => {
-                      const groupTaskIds = allTasksInGroup.map(t => t.id);
-                      const currentSelected = new Set(selectedIds);
-
-                      if (allTasksSelected) {
-                        // Deselect all tasks in the group
-                        groupTaskIds.forEach(id => currentSelected.delete(id));
-                      } else {
-                        // Select all tasks in the group
-                        groupTaskIds.forEach(id => currentSelected.add(id));
-                      }
-
-                      // Update selection in one batch
-                      setSelectedIds(Array.from(currentSelected));
-                    };
-
-                    if (isExpanded) {
-                      // Render all expanded tasks with fade-in animation (no collapse button row)
-                      return collapsedTasks.map((task, taskIndex) => {
-                        const taskIsSelected = isSelected(task.id);
-                        const currentRowIndex = visualRowIndex++;
-
-                        return (
-                          <tr
-                            key={task.id}
-                            data-state={taskIsSelected ? "selected" : undefined}
-                            className={cn(
-                              "cursor-pointer border-b border-border",
-                              "transition-all duration-200 ease-in-out",
-                              "animate-in fade-in slide-in-from-top-2",
-                              // Alternating row colors
-                              currentRowIndex % 2 === 1 && "bg-muted/30",
-                              // Hover state
-                              "hover:bg-muted/40",
-                              // Selected state overrides alternating colors
-                              taskIsSelected && "bg-muted/50 hover:bg-muted/60",
-                              // Source selection mode highlight
-                              isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary",
-                            )}
-                            style={{
-                              animationDelay: `${taskIndex * 30}ms`, // Stagger animation
-                              animationDuration: "200ms"
-                            }}
-                            onClick={(e) => handleTaskRowClick(e, task)}
-                            onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
-                          >
-                            {renderTaskCells(task, taskIsSelected)}
-                          </tr>
-                        );
-                      });
-                    } else {
-                      // Collapsed row counts as one visual row
-                      visualRowIndex++;
-
-                      // Render collapsed row
-                      return (
-                        <CollapsedGroupRow
-                          key={`${groupId}-collapsed`}
-                          groupId={groupId}
-                          collapsedTasks={collapsedTasks}
-                          totalCount={group.totalCount!}
-                          isExpanded={isExpanded}
-                          onToggle={() => toggleGroup(groupId)}
-                          isSelected={allTasksSelected}
-                          onSelectAll={handleSelectAllInGroup}
-                          canEdit={canEdit}
-                          columnCount={columns.length}
-                          selectedCount={selectedCountInGroup}
-                        />
-                      );
-                    }
-                  }
-
-                  // Handle regular task rows (single, group-first, group-last)
-                  if (group.task) {
-                    const task = group.task;
-                    const taskIsSelected = isSelected(task.id);
-                    const currentRowIndex = visualRowIndex++;
-
-                    return (
-                      <tr
-                        key={task.id}
-                        data-state={taskIsSelected ? "selected" : undefined}
-                        className={cn(
-                          "cursor-pointer transition-colors border-b border-border",
-                          // Alternating row colors
-                          currentRowIndex % 2 === 1 && "bg-muted/30",
-                          // Hover state
-                          "hover:bg-muted/40",
-                          // Selected state overrides alternating colors
-                          taskIsSelected && "bg-muted/50 hover:bg-muted/60",
-                          // Source selection mode highlight
-                          isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary",
-                        )}
-                        onClick={(e) => handleTaskRowClick(e, task)}
-                        onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
-                      >
-                        {renderTaskCells(task, taskIsSelected)}
-                      </tr>
-                    );
-                  }
-
-                  return null;
-                });
-              })()
+                return (
+                  <tr
+                    key={task.id}
+                    data-state={taskIsSelected ? "selected" : undefined}
+                    className={cn(
+                      "cursor-pointer transition-colors border-b border-border",
+                      // Alternating row colors
+                      index % 2 === 1 && "bg-muted/30",
+                      // Hover state
+                      "hover:bg-muted/40",
+                      // Selected state overrides alternating colors
+                      taskIsSelected && "bg-muted/50 hover:bg-muted/60",
+                      // Source selection mode highlight
+                      isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary",
+                    )}
+                    onClick={(e) => handleTaskRowClick(e, task)}
+                    onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
+                  >
+                    {renderTaskCells(task, taskIsSelected)}
+                  </tr>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Pagination Footer - hidden when pagination is disabled */}
-      {!disablePagination && (
-        <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
-          <SimplePaginationAdvanced
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={(newPage) => {
-              setPage(newPage);
-            }}
-            pageSize={pageSize}
-            totalItems={totalRecords}
-            pageSizeOptions={[20, 40, 60, 100]}
-            onPageSizeChange={(newPageSize) => {
-              setPageSize(newPageSize);
-            }}
-            showPageSizeSelector={true}
-            showGoToPage={true}
-            showPageInfo={true}
-          />
-        </div>
-      )}
+      {/* Pagination Footer */}
+      <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50 shrink-0">
+        <SimplePaginationAdvanced
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={(newPage) => {
+            setPage(newPage);
+          }}
+          pageSize={pageSize}
+          totalItems={totalRecords}
+          pageSizeOptions={[20, 40, 60, 100]}
+          onPageSizeChange={(newPageSize) => {
+            setPageSize(newPageSize);
+          }}
+          showPageSizeSelector={true}
+          showGoToPage={true}
+          showPageInfo={true}
+        />
+      </div>
 
       {/* Context Menu */}
       {contextMenu && (

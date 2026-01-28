@@ -315,7 +315,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [copyFromTaskState.step, handleCopyFromTaskCancel]);
 
-  // Filter tasks based on search (agenda display filtering is done by backend via shouldDisplayInAgenda)
+  // Filter tasks based on search (preparation display filtering is done by backend via shouldDisplayInPreparation)
   const filteredTasks = useMemo(() => {
     // Filter by search text if provided
     if (!searchText) return allTasks;

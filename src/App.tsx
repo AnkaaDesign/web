@@ -241,7 +241,7 @@ const ProductionTasksBatchEdit = lazy(() => import("@/pages/production/schedule/
 const ProductionTasksCreate = lazy(() => import("@/pages/production/schedule/create"));
 const ProductionTasksEdit = lazy(() => import("@/pages/production/schedule/edit/[id]").then((module) => ({ default: module.TaskEditPage })));
 const ProductionTasksDetails = lazy(() => import("@/pages/production/schedule/details/[id]").then((module) => ({ default: module.TaskDetailsPage })));
-const ProductionPreparation = lazy(() => import("@/pages/production/em-preparacao").then((module) => ({ default: module.PreparationPage })));
+const ProductionPreparation = lazy(() => import("@/pages/production/preparation").then((module) => ({ default: module.PreparationPage })));
 const ProductionGarages = lazy(() => import("@/pages/production/barracoes").then((module) => ({ default: module.GaragesPage })));
 
 // Human Resources
@@ -319,7 +319,7 @@ function App() {
   return (
     <Router>
       <ThemeProvider defaultTheme="light" storageKey="ankaa-ui-theme">
-        <TooltipProvider>
+        <TooltipProvider skipDelayDuration={0}>
           <Routes>
             {/* Customer routes (no authentication, no notifications) - MUST be first */}
             <Route

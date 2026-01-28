@@ -78,9 +78,9 @@ function parseSerialNumber(serialNumber: string | null | undefined): number | nu
 }
 
 /**
- * Get the IDENTIFICADOR value for a task (serial number or truck plate)
+ * Get the identifier value for a task (serial number or truck plate)
  */
-function getIdentificador(task: Task): string {
+function getIdentifier(task: Task): string {
   return task.serialNumber || task.truck?.plate || "";
 }
 
@@ -134,8 +134,8 @@ function findSimilarTasks(
  */
 function sortBySerialNumber(tasks: Task[]): Task[] {
   return [...tasks].sort((a, b) => {
-    const numA = parseSerialNumber(getIdentificador(a));
-    const numB = parseSerialNumber(getIdentificador(b));
+    const numA = parseSerialNumber(getIdentifier(a));
+    const numB = parseSerialNumber(getIdentifier(b));
 
     if (numA === null && numB === null) return 0;
     if (numA === null) return 1;

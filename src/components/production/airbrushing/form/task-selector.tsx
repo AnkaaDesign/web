@@ -140,8 +140,8 @@ export const TaskSelector = ({
       searchingFor: debouncedSearchTerm || undefined,
       page: page - 1, // Convert from 1-based (UI) to 0-based (API)
       limit: currentPageSize,
-      // Use the same logic as preparation page: shouldDisplayInAgenda flag
-      shouldDisplayInAgenda: true,
+      // Use the same logic as preparation page: shouldDisplayInPreparation flag
+      shouldDisplayInPreparation: true,
       // Note: status filter is intentionally not set, matching preparation page behavior
       include: {
         sector: true,

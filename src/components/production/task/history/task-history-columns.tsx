@@ -9,6 +9,7 @@ import {
   PAINT_BRAND_LABELS,
   TRUCK_MANUFACTURER_LABELS,
   TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_TYPE_LABELS,
   COMMISSION_STATUS,
   COMMISSION_STATUS_LABELS,
   TASK_STATUS,
@@ -172,7 +173,7 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
   return (
     <>
       {showIndicators && isForecastToday ? (
-        <Tooltip delayDuration={0}>
+        <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
             <span className="truncate text-blue-500 font-medium cursor-help">
               {formatted}
@@ -193,9 +194,9 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
 
       {/* Red indicator for today with incomplete/missing orders (blue font already indicates "today") */}
       {showRedTodayWithIncompleteOrders && (
-        <Tooltip delayDuration={0}>
+        <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
-            <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
+            <div className="absolute top-0 right-0 z-[5] w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
               <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
             </div>
           </TooltipTrigger>
@@ -210,10 +211,10 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
 
       {/* Urgency indicator for approaching forecast with incomplete/missing orders */}
       {showUrgencyIndicator && urgencyInfo && (
-        <Tooltip delayDuration={0}>
+        <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
             <div
-              className="absolute top-0 right-0 w-0 h-0 border-l-[28px] border-l-transparent pointer-events-auto cursor-help"
+              className="absolute top-0 right-0 z-20 w-0 h-0 border-l-[28px] border-l-transparent pointer-events-auto cursor-help"
               style={{ borderTop: `28px solid ${urgencyInfo.color}` }}
             >
               <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
@@ -230,9 +231,9 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
 
       {/* Blue indicator for today (without incomplete orders) - positioned flush with cell corner */}
       {showBlueIndicator && (
-        <Tooltip delayDuration={0}>
+        <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
-            <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-blue-500 pointer-events-auto cursor-help">
+            <div className="absolute top-0 right-0 z-[5] w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-blue-500 pointer-events-auto cursor-help">
               <IconCheck className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
             </div>
           </TooltipTrigger>
@@ -247,9 +248,9 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
 
       {/* Red indicator for overdue with incomplete/missing orders - positioned flush with cell corner */}
       {showRedOverdueWithIncompleteOrders && (
-        <Tooltip delayDuration={0}>
+        <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
-            <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
+            <div className="absolute top-0 right-0 z-[5] w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
               <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
             </div>
           </TooltipTrigger>
@@ -264,9 +265,9 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
 
       {/* Red indicator for overdue without entry date (when no incomplete orders) - positioned flush with cell corner */}
       {showRedOverdueNoEntryDate && (
-        <Tooltip delayDuration={0}>
+        <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
-            <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
+            <div className="absolute top-0 right-0 z-[5] w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
               <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
             </div>
           </TooltipTrigger>
@@ -504,6 +505,23 @@ export const createTaskHistoryColumns = (options?: {
     },
   },
   {
+    id: "implementType",
+    header: "TIPO DE IMPLEMENTO",
+    accessorFn: (row) => row.truck?.implementType || "",
+    sortable: true,
+    filterable: true,
+    defaultVisible: false,
+    width: "140px",
+    formatter: (value: string | null, row: Task) => {
+      if (!row.truck?.implementType) return <span className="text-muted-foreground">-</span>;
+      return (
+        <Badge variant="outline" className="truncate">
+          {IMPLEMENT_TYPE_LABELS[row.truck.implementType]}
+        </Badge>
+      );
+    },
+  },
+  {
     id: "forecastDate",
     header: "PREVISÃO",
     accessorKey: "forecastDate",
@@ -511,6 +529,7 @@ export const createTaskHistoryColumns = (options?: {
     filterable: true,
     defaultVisible: false,
     width: "120px",
+    cellClassName: "relative",
     formatter: (value: Date | null, row: Task) => renderForecastDate(value, row, navigationRoute, currentUserId),
   },
   {
@@ -579,7 +598,7 @@ export const createTaskHistoryColumns = (options?: {
   {
     id: "serviceOrders.commercial",
     header: (
-      <Tooltip delayDuration={0}>
+      <Tooltip delayDuration={500}>
         <TooltipTrigger asChild>
           <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.COMMERCIAL]}</span>
         </TooltipTrigger>
@@ -595,12 +614,13 @@ export const createTaskHistoryColumns = (options?: {
     filterable: false,
     defaultVisible: false,
     width: "140px",
+    cellClassName: "relative",
     formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.COMMERCIAL} navigationRoute={navigationRoute} />,
   },
   {
     id: "serviceOrders.logistic",
     header: (
-      <Tooltip delayDuration={0}>
+      <Tooltip delayDuration={500}>
         <TooltipTrigger asChild>
           <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.LOGISTIC]}</span>
         </TooltipTrigger>
@@ -616,12 +636,13 @@ export const createTaskHistoryColumns = (options?: {
     filterable: false,
     defaultVisible: false,
     width: "140px",
+    cellClassName: "relative",
     formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.LOGISTIC} navigationRoute={navigationRoute} />,
   },
   {
     id: "serviceOrders.artwork",
     header: (
-      <Tooltip delayDuration={0}>
+      <Tooltip delayDuration={500}>
         <TooltipTrigger asChild>
           <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.ARTWORK]}</span>
         </TooltipTrigger>
@@ -637,12 +658,13 @@ export const createTaskHistoryColumns = (options?: {
     filterable: false,
     defaultVisible: false,
     width: "100px",
+    cellClassName: "relative",
     formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.ARTWORK} navigationRoute={navigationRoute} />,
   },
   {
     id: "serviceOrders.production",
     header: (
-      <Tooltip delayDuration={0}>
+      <Tooltip delayDuration={500}>
         <TooltipTrigger asChild>
           <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.PRODUCTION]}</span>
         </TooltipTrigger>
@@ -658,12 +680,13 @@ export const createTaskHistoryColumns = (options?: {
     filterable: false,
     defaultVisible: false,
     width: "120px",
+    cellClassName: "relative",
     formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} navigationRoute={navigationRoute} />,
   },
   {
     id: "serviceOrders.financial",
     header: (
-      <Tooltip delayDuration={0}>
+      <Tooltip delayDuration={500}>
         <TooltipTrigger asChild>
           <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.FINANCIAL]}</span>
         </TooltipTrigger>
@@ -679,6 +702,7 @@ export const createTaskHistoryColumns = (options?: {
     filterable: false,
     defaultVisible: false,
     width: "120px",
+    cellClassName: "relative",
     formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} navigationRoute={navigationRoute} />,
   },
   {
@@ -727,7 +751,7 @@ export const createTaskHistoryColumns = (options?: {
         }
 
         return (
-          <Tooltip delayDuration={0}>
+          <Tooltip delayDuration={500}>
             <TooltipTrigger asChild>
               <div className="inline-block">
                 <Badge variant={variant as any} className="cursor-help">
