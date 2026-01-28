@@ -159,7 +159,7 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
       // Don't disconnect socket on unmount - let it persist for the session
       // socketService.disconnect();
     };
-  }, [user, queryClient, notifications]);
+  }, [user, queryClient]);
 
   const markAsRead = useCallback(
     async (notificationId: string) => {

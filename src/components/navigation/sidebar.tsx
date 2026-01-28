@@ -1102,12 +1102,18 @@ export const Sidebar = memo(() => {
 
           {/* User dropdown menu positioned based on sidebar state */}
           {showUserMenu && (
-            <div
-              className={cn(
-                "absolute z-50 bg-card border border-border rounded-lg shadow-sm p-1 animate-in fade-in-0 zoom-in-95",
-                isOpen ? "top-full left-3 right-3 mt-2" : "left-full top-0 ml-2 min-w-[200px]",
-              )}
-            >
+            <>
+              {/* Backdrop to close menu when clicking outside */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowUserMenu(false)}
+              />
+              <div
+                className={cn(
+                  "absolute z-50 bg-card border border-border rounded-lg shadow-sm p-1 animate-in fade-in-0 zoom-in-95",
+                  isOpen ? "top-full left-3 right-3 mt-2" : "left-full top-0 ml-2 min-w-[200px]",
+                )}
+              >
               <button
                 onClick={() => {
                   navigate("/perfil");
@@ -1133,6 +1139,7 @@ export const Sidebar = memo(() => {
                 <span>Sair</span>
               </button>
             </div>
+            </>
           )}
         </div>
 

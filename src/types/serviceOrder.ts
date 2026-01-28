@@ -15,6 +15,7 @@ export interface ServiceOrder extends BaseEntity {
   type: SERVICE_ORDER_TYPE | null;
   description: string;
   observation: string | null;
+  position: number; // User-defined order within each type group
   taskId: string;
   assignedToId: string | null;
   startedById: string | null;
@@ -85,6 +86,7 @@ export interface ServiceOrderOrderBy {
   type?: ORDER_BY_DIRECTION;
   description?: ORDER_BY_DIRECTION;
   observation?: ORDER_BY_DIRECTION;
+  position?: ORDER_BY_DIRECTION;
   taskId?: ORDER_BY_DIRECTION;
   assignedToId?: ORDER_BY_DIRECTION;
   startedById?: ORDER_BY_DIRECTION;

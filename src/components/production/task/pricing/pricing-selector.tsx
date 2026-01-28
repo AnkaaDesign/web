@@ -187,6 +187,9 @@ export const PricingSelector = forwardRef<
   useEffect(() => {
     if (!initialized) {
       const expiresAt = getValues("pricing.expiresAt");
+      const items = getValues("pricing.items");
+      const hasItems = items && items.length > 0;
+
       if (expiresAt) {
         const today = new Date();
         const diffTime = new Date(expiresAt).getTime() - today.getTime();
@@ -197,11 +200,20 @@ export const PricingSelector = forwardRef<
           setValidityPeriod(30);
         }
       } else {
+        // Default to 30 days
         setValidityPeriod(30);
+        // If there are items but no expiresAt, set a default expiry date
+        // This fixes validation errors when editing tasks with pricing items but no expiry
+        if (hasItems) {
+          const expiryDate = new Date();
+          expiryDate.setDate(expiryDate.getDate() + 30);
+          expiryDate.setHours(23, 59, 59, 999);
+          setValue("pricing.expiresAt", expiryDate, { shouldDirty: false });
+        }
       }
       setInitialized(true);
     }
-  }, [initialized, getValues]);
+  }, [initialized, getValues, setValue]);
 
   // Notify parent about count changes
   useEffect(() => {
@@ -240,12 +252,16 @@ export const PricingSelector = forwardRef<
       setValue("pricing.subtotal", 0);
       setValue("pricing.total", 0);
     }
-    prepend({ description: "", observation: null, amount: undefined });
+    // Use append to preserve addition order (first added = first position)
+    // Incomplete items are displayed at top via the grouping logic
+    append({ description: "", observation: null, amount: undefined });
+    // Focus the new item (will be shown at top in the incomplete section)
     setTimeout(() => {
-      const serviceInput = lastRowRef.current?.querySelector('[role="combobox"]') as HTMLElement;
-      serviceInput?.focus();
+      const incompleteSection = document.querySelector('[data-incomplete-section]');
+      const combobox = incompleteSection?.querySelector('[role="combobox"]') as HTMLElement;
+      combobox?.focus();
     }, 100);
-  }, [prepend, clearErrors, fields.length, setValue]);
+  }, [append, clearErrors, fields.length, setValue]);
 
   const clearAll = useCallback(() => {
     for (let i = fields.length - 1; i >= 0; i--) {
@@ -327,6 +343,26 @@ export const PricingSelector = forwardRef<
 
   const hasPricingItems = pricingItems && pricingItems.length > 0;
 
+  // Separate incomplete items (shown at top) from complete items (shown below in order)
+  // An item is complete if it has a description with at least 3 characters
+  const { incompleteIndices, completeIndices } = useMemo(() => {
+    const incomplete: number[] = [];
+    const complete: number[] = [];
+
+    fields.forEach((field, index) => {
+      const item = pricingItems?.[index];
+      const isComplete = item?.description && item.description.trim().length >= 3;
+
+      if (isComplete) {
+        complete.push(index);
+      } else {
+        incomplete.push(index);
+      }
+    });
+
+    return { incompleteIndices: incomplete, completeIndices: complete };
+  }, [fields, pricingItems]);
+
   // Handler to remove an item and track deletion
   const handleRemoveItem = useCallback((index: number) => {
     const item = pricingItems?.[index];
@@ -353,22 +389,56 @@ export const PricingSelector = forwardRef<
         </Button>
       )}
 
-      {/* Services Section */}
-      <div className="space-y-3">
-        {fields.length > 0 && fields.map((field, index) => (
-          <PricingItemRow
-            key={field.id}
-            control={control}
-            index={index}
-            disabled={disabled}
-            readOnly={readOnly}
-            onRemove={() => handleRemoveItem(index)}
-            isFirstRow={index === 0}
-            isLastRow={index === fields.length - 1}
-            ref={index === fields.length - 1 ? lastRowRef : null}
-          />
-        ))}
-      </div>
+      {/* Incomplete Items Section - Items being configured (shown at top) */}
+      {incompleteIndices.length > 0 && (
+        <div className="space-y-3 pb-3 border-b border-dashed border-muted" data-incomplete-section>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">
+              Configurando Serviço
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Preencha a descrição
+            </span>
+          </div>
+          {incompleteIndices.map((index, i) => (
+            <PricingItemRow
+              key={fields[index].id}
+              control={control}
+              index={index}
+              disabled={disabled}
+              readOnly={readOnly}
+              onRemove={() => handleRemoveItem(index)}
+              isFirstRow={i === 0 && completeIndices.length === 0}
+              isLastRow={false}
+              ref={null}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Complete Items Section - Items with description (in their position order) */}
+      {completeIndices.length > 0 && (
+        <div className="space-y-3">
+          {completeIndices.map((index, i) => (
+            <PricingItemRow
+              key={fields[index].id}
+              control={control}
+              index={index}
+              disabled={disabled}
+              readOnly={readOnly}
+              onRemove={() => handleRemoveItem(index)}
+              isFirstRow={i === 0 && incompleteIndices.length === 0}
+              isLastRow={index === fields.length - 1}
+              ref={index === fields.length - 1 ? lastRowRef : null}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Spacing between items and configuration sections */}
+      {hasPricingItems && (
+        <div className="h-4" />
+      )}
 
       {/* Discount Section - Right after services */}
       {hasPricingItems && (
@@ -487,9 +557,12 @@ export const PricingSelector = forwardRef<
         </div>
       )}
 
+      {/* Spacing between totals and status */}
+      {hasPricingItems && <div className="h-4" />}
+
       {/* Status and Validity Period */}
       {hasPricingItems && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border/30">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
             control={control}
             name="pricing.status"
@@ -640,9 +713,12 @@ export const PricingSelector = forwardRef<
         />
       )}
 
+      {/* Spacing before layout */}
+      {hasPricingItems && <div className="h-4" />}
+
       {/* Layout File Upload */}
       {hasPricingItems && (
-        <div className="space-y-3 pt-4 border-t border-border/30">
+        <div className="space-y-3">
           <h4 className="font-medium text-sm flex items-center gap-2">
             <IconPhoto className="h-4 w-4" />
             Layout Aprovado

@@ -151,7 +151,7 @@ export const RowBlockEditor = ({ block, onUpdate }: RowBlockEditorProps) => {
             ]}
             placeholder="Selecione"
             searchable={false}
-            triggerClassName="h-9"
+            triggerClassName="h-9 dark:border-muted"
           />
         </div>
 
@@ -168,7 +168,7 @@ export const RowBlockEditor = ({ block, onUpdate }: RowBlockEditorProps) => {
             ]}
             placeholder="Selecione"
             searchable={false}
-            triggerClassName="h-9"
+            triggerClassName="h-9 dark:border-muted"
           />
         </div>
 
@@ -184,7 +184,7 @@ export const RowBlockEditor = ({ block, onUpdate }: RowBlockEditorProps) => {
             ]}
             placeholder="Selecione"
             searchable={false}
-            triggerClassName="h-9"
+            triggerClassName="h-9 dark:border-muted"
           />
         </div>
       </div>
@@ -223,7 +223,7 @@ export const RowBlockEditor = ({ block, onUpdate }: RowBlockEditorProps) => {
                   </Card>
                 ) : (
                   <button
-                    className="w-full h-full min-h-[120px] border-2 border-dashed border-border rounded-lg hover:border-primary/50 hover:bg-muted/50 transition-colors flex flex-col items-center justify-center gap-2 group"
+                    className="w-full h-full min-h-[120px] border-2 border-dashed border-border dark:border-muted rounded-lg hover:border-primary/50 hover:bg-muted/50 transition-colors flex flex-col items-center justify-center gap-2 group"
                     onClick={() => {
                       setAddingToIndex(colIndex);
                       setShowTypeSelector(true);

@@ -103,7 +103,7 @@ export function PpeConfigSection({ disabled, required }: PpeConfigSectionProps) 
   }, [ppeType]);
 
   return (
-    <Card className="bg-transparent">
+    <Card>
       <CardHeader>
         <CardTitle>Configuração de EPI</CardTitle>
         <CardDescription>Configure as propriedades do equipamento de proteção individual (EPI)</CardDescription>

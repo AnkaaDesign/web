@@ -50,7 +50,8 @@ export const ListBlockEditor = ({ block, onUpdate }: ListBlockEditorProps) => {
               value={item}
               onChange={(value) => handleUpdateItem(index, value as string)}
               placeholder={`Item ${index + 1}...`}
-              className="h-9"
+              className="h-9 dark:border-muted"
+              transparent
             />
             {block.items.length > 1 && (
               <Button

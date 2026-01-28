@@ -3,14 +3,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Form } from "@/components/ui/form";
-import { FormInput } from "@/components/ui/form-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemUpdateFormData } from "../../../../schemas";
 import { useItemCategories } from "../../../../hooks";
 import { ITEM_CATEGORY_TYPE } from "../../../../constants";
 import { serializeItemFormToUrlParams, debounce } from "@/utils/url-form-state";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 // Import all form components
 import { NameInput } from "@/components/inventory/item/form/name-input";
 import { UnicodeInput } from "@/components/inventory/item/form/unicode-input";
@@ -200,7 +197,7 @@ export function EpiForm(props: EpiFormProps) {
   const isRequired = mode === "create";
 
   return (
-    <Card className="h-full flex flex-col shadow-sm border border-border overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4">
         <Form {...form}>
           <form
@@ -210,74 +207,78 @@ export function EpiForm(props: EpiFormProps) {
                 console.error("EPI form validation errors:", errors);
               }
             })}
-            className="space-y-6"
+            className="container mx-auto max-w-4xl space-y-6"
           >
             {/* Hidden submit button for programmatic form submission */}
             <button type="submit" id="epi-form-submit" className="hidden" aria-hidden="true" />
 
             {/* Basic Information */}
-            <Card className="bg-transparent">
+            <Card>
               <CardHeader>
                 <CardTitle>Informações Básicas</CardTitle>
                 <CardDescription>Identificação e classificação do EPI</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <UnicodeInput control={form.control} disabled={isSubmitting} />
-                  <NameInput control={form.control} disabled={isSubmitting} required={isRequired} />
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <UnicodeInput disabled={isSubmitting} />
+                  <NameInput disabled={isSubmitting} required={isRequired} />
                 </div>
-                {/* Display name validation errors */}
-                {form.formState.errors.name && <div className="text-red-500 text-sm mt-1">{form.formState.errors.name.message}</div>}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <ItemBrandSelector control={form.control} disabled={isSubmitting} />
-                  <ItemSupplierSelector control={form.control} disabled={isSubmitting} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <ItemBrandSelector disabled={isSubmitting} />
+                  <ItemSupplierSelector disabled={isSubmitting} />
                 </div>
               </CardContent>
             </Card>
 
             {/* Inventory */}
-            <Card className="bg-transparent">
+            <Card>
               <CardHeader>
                 <CardTitle>Controle de Estoque</CardTitle>
                 <CardDescription>Quantidades e níveis de estoque</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <QuantityInput control={form.control} disabled={isSubmitting} required={isRequired} />
-                  <MaxQuantityInput control={form.control} disabled={isSubmitting} />
-                  <BoxQuantityInput control={form.control} disabled={isSubmitting} />
-                  <LeadTimeInput control={form.control} disabled={isSubmitting} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <QuantityInput disabled={isSubmitting} required={isRequired} />
+                  <MaxQuantityInput
+                    disabled={isSubmitting}
+                    currentValue={defaultValues?.maxQuantity}
+                    isManual={defaultValues?.isManualMaxQuantity || false}
+                  />
+                  <BoxQuantityInput disabled={isSubmitting} />
+                  <LeadTimeInput disabled={isSubmitting} />
                 </div>
-                {/* Display quantity-related validation errors */}
-                {(form.formState.errors.quantity || form.formState.errors.maxQuantity || form.formState.errors.estimatedLeadTime) && (
-                  <div className="text-red-500 text-sm mt-2">
-                    {form.formState.errors.quantity?.message || form.formState.errors.maxQuantity?.message || form.formState.errors.estimatedLeadTime?.message}
-                  </div>
-                )}
               </CardContent>
             </Card>
 
             {/* Pricing */}
-            <Card className="bg-transparent">
+            <Card>
               <CardHeader>
                 <CardTitle>Preço e Taxas</CardTitle>
                 <CardDescription>Informações de preço e impostos</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <PriceInput control={form.control} disabled={isSubmitting} />
-                  <IcmsInput control={form.control} disabled={isSubmitting} />
-                  <IpiInput control={form.control} disabled={isSubmitting} />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <PriceInput disabled={isSubmitting} />
+                  <IcmsInput
+                    control={form.control}
+                    disabled={isSubmitting}
+                    priceFieldName="price"
+                    onPriceUpdate={(newPrice) => form.setValue("price", newPrice, { shouldDirty: true, shouldValidate: true })}
+                    watch={form.watch}
+                  />
+                  <IpiInput
+                    control={form.control}
+                    disabled={isSubmitting}
+                    priceFieldName="price"
+                    onPriceUpdate={(newPrice) => form.setValue("price", newPrice, { shouldDirty: true, shouldValidate: true })}
+                    watch={form.watch}
+                  />
                 </div>
-                {/* Display price-related validation errors */}
-                {(form.formState.errors.price || form.formState.errors.icms || form.formState.errors.ipi) && (
-                  <div className="text-red-500 text-sm mt-2">{form.formState.errors.price?.message || form.formState.errors.icms?.message || form.formState.errors.ipi?.message}</div>
-                )}
               </CardContent>
             </Card>
 
             {/* PPE Configuration - Always show for EPI forms */}
-            <PpeConfigSection control={form.control} disabled={isSubmitting} required={isRequired} />
+            <PpeConfigSection disabled={isSubmitting} required={isRequired} />
             {/* Display PPE configuration validation errors */}
             {(form.formState.errors.ppeType || form.formState.errors.ppeCA || form.formState.errors.ppeDeliveryMode || form.formState.errors.ppeStandardQuantity) && (
               <div className="text-red-500 text-sm mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
@@ -292,28 +293,26 @@ export function EpiForm(props: EpiFormProps) {
             )}
 
             {/* Tracking */}
-            <Card className="bg-transparent">
+            <Card>
               <CardHeader>
                 <CardTitle>Rastreamento</CardTitle>
                 <CardDescription>Códigos de barras para identificação do EPI</CardDescription>
               </CardHeader>
               <CardContent>
-                <BarcodeManager control={form.control} disabled={isSubmitting} />
-                {/* Display barcode validation errors */}
-                {form.formState.errors.barcodes && <div className="text-red-500 text-sm mt-2">{form.formState.errors.barcodes.message || "Erro nos códigos de barras"}</div>}
+                <BarcodeManager disabled={isSubmitting} />
               </CardContent>
             </Card>
 
             {/* Extra Configurations */}
-            <Card className="bg-transparent">
+            <Card>
               <CardHeader>
                 <CardTitle>Configurações Extras</CardTitle>
                 <CardDescription>Configurações adicionais do EPI</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <AssignToUserToggle control={form.control} disabled={isSubmitting} />
-                  <StatusToggle control={form.control} disabled={isSubmitting} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <AssignToUserToggle disabled={isSubmitting} />
+                  <StatusToggle disabled={isSubmitting} />
                 </div>
               </CardContent>
             </Card>
@@ -352,6 +351,6 @@ export function EpiForm(props: EpiFormProps) {
           </form>
         </Form>
       </div>
-    </Card>
+    </div>
   );
 }

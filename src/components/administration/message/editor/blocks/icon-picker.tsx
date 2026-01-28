@@ -389,7 +389,7 @@ export const IconPicker = ({ open, onClose, onSelect, selectedIcon }: IconPicker
             autoFocus
           />
 
-          <ScrollArea className="h-[400px] w-full rounded-md border p-4">
+          <ScrollArea className="h-[400px] w-full rounded-md border dark:border-muted p-4">
             <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
               {filteredIcons.map((iconName) => {
                 const IconComponent = AVAILABLE_ICONS[iconName as keyof typeof AVAILABLE_ICONS];

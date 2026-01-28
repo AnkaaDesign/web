@@ -34,7 +34,8 @@ export const ButtonBlockEditor = ({ block, onUpdate }: ButtonBlockEditorProps) =
           value={block.text}
           onChange={(value) => onUpdate({ text: value as string })}
           placeholder="Ex: Saiba Mais, Clique Aqui..."
-          className="h-9"
+          className="h-9 dark:border-muted"
+          transparent
         />
       </div>
 
@@ -45,7 +46,8 @@ export const ButtonBlockEditor = ({ block, onUpdate }: ButtonBlockEditorProps) =
           onChange={(value) => handleUrlChange(value as string)}
           onBlur={(e) => handleUrlChange(e.target.value)}
           placeholder="https://exemplo.com ou /rota-interna"
-          className="h-9"
+          className="h-9 dark:border-muted"
+          transparent
         />
         <p className="text-xs text-muted-foreground mt-1">
           URLs externas: <span className="font-mono">google.com</span> ou <span className="font-mono">https://google.com</span>
@@ -67,7 +69,7 @@ export const ButtonBlockEditor = ({ block, onUpdate }: ButtonBlockEditorProps) =
             ]}
             placeholder="Selecione o estilo"
             searchable={false}
-            triggerClassName="h-9"
+            triggerClassName="h-9 dark:border-muted"
           />
         </div>
 
@@ -83,7 +85,7 @@ export const ButtonBlockEditor = ({ block, onUpdate }: ButtonBlockEditorProps) =
             ]}
             placeholder="Selecione o alinhamento"
             searchable={false}
-            triggerClassName="h-9"
+            triggerClassName="h-9 dark:border-muted"
           />
         </div>
       </div>

@@ -53,7 +53,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
   return (
     <div className="space-y-3">
       {!block.url ? (
-        <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+        <div className="border-2 border-dashed border-border dark:border-muted rounded-lg p-8 text-center">
           <IconPhoto className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
           <p className="text-sm text-muted-foreground mb-3">
             Faça upload de uma imagem ou cole a URL
@@ -80,6 +80,8 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
             <Input
               placeholder="Ou cole a URL da imagem..."
               onChange={(value) => onUpdate({ url: value as string })}
+              transparent
+              className="dark:border-muted"
             />
           </div>
         </div>
@@ -90,7 +92,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
               <img
                 src={block.url}
                 alt={block.alt || ''}
-                className="w-full h-auto rounded-lg border"
+                className="w-full h-auto rounded-lg border dark:border-muted"
               />
             </div>
           </div>
@@ -113,7 +115,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
                 ]}
                 placeholder="Selecione o tamanho"
                 searchable={true}
-                triggerClassName="h-8 text-sm"
+                triggerClassName="h-8 text-sm dark:border-muted"
               />
             </div>
             <div>
@@ -128,7 +130,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
                 ]}
                 placeholder="Selecione o alinhamento"
                 searchable={false}
-                triggerClassName="h-8 text-sm"
+                triggerClassName="h-8 text-sm dark:border-muted"
               />
             </div>
             <div>
@@ -137,7 +139,8 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
                 value={block.alt || ''}
                 onChange={(value) => onUpdate({ alt: value as string })}
                 placeholder="Descrição"
-                className="h-8 text-sm"
+                className="h-8 text-sm dark:border-muted"
+                transparent
               />
             </div>
           </div>
@@ -148,7 +151,8 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
               value={block.caption || ''}
               onChange={(value) => onUpdate({ caption: value as string })}
               placeholder="Adicione uma legenda..."
-              className="h-8 text-sm"
+              className="h-8 text-sm dark:border-muted"
+              transparent
             />
           </div>
 

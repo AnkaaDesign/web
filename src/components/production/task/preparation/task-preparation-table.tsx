@@ -507,9 +507,16 @@ export function TaskPreparationTable({
                       <TableCell className="w-12 border-r p-0">
                         <div
                           className="flex items-center justify-center h-full w-full px-2 py-1"
+                          onMouseDown={(e) => {
+                            // Prevent text selection when shift-clicking
+                            if (e.shiftKey) {
+                              e.preventDefault();
+                            }
+                          }}
                           onClick={(e) => {
                             e.stopPropagation();
                             if (e.shiftKey && onShiftClickSelect) {
+                              e.preventDefault(); // Prevent text selection when shift-clicking
                               onShiftClickSelect(task.id);
                             } else {
                               if (onSingleClickSelect && !e.shiftKey) {
@@ -592,12 +599,19 @@ export function TaskPreparationTable({
                   <TableCell className="w-12 border-r p-0">
                     <div
                       className="flex items-center justify-center h-full w-full px-2 py-1"
+                      onMouseDown={(e) => {
+                        // Prevent text selection when shift-clicking
+                        if (e.shiftKey) {
+                          e.preventDefault();
+                        }
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         console.log('[DIV onClick] Clicked, shiftKey:', e.shiftKey, 'task:', task.id);
 
                         // Handle shift-click for range selection
                         if (e.shiftKey && onShiftClickSelect) {
+                          e.preventDefault(); // Prevent text selection when shift-clicking
                           console.log('[DIV onClick] SHIFT-CLICK detected, calling onShiftClickSelect');
                           onShiftClickSelect(task.id);
                           return;

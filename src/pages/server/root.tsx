@@ -37,8 +37,8 @@ export function ServerRootPage() {
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Fixed Header */}
-      <div className="flex-shrink-0 bg-background border-b border-border">
-        <div className="px-4 py-4">
+      <div className="flex-shrink-0 bg-background">
+        <div className="px-4">
           <PageHeader
             title="Gerenciamento do Servidor"
             icon={IconServer}

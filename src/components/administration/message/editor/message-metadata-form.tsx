@@ -135,10 +135,7 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
                         ],
                       } : {}),
                     },
-                    orderBy: [
-                      { status: 'asc' as const },
-                      { name: 'asc' as const },
-                    ],
+                    orderBy: { name: 'asc' as const },
                     include: {
                       sector: true,
                     },

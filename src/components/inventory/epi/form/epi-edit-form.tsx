@@ -23,6 +23,7 @@ export function EpiEditForm({ item, onSubmit, isSubmitting }: EpiEditFormProps) 
       reorderPoint: item.reorderPoint,
       reorderQuantity: item.reorderQuantity,
       maxQuantity: item.maxQuantity,
+      isManualMaxQuantity: item.isManualMaxQuantity || false,
       boxQuantity: item.boxQuantity,
       icms: item.icms,
       ipi: item.ipi,

@@ -28,7 +28,7 @@ export const SpacerBlockEditor = ({ block, onUpdate }: SpacerBlockEditorProps) =
           ]}
           placeholder="Selecione a altura"
           searchable={false}
-          triggerClassName="h-9"
+          triggerClassName="h-9 dark:border-muted"
         />
       </div>
 

@@ -121,7 +121,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
   });
 
   // Get current user for service order permissions
-  const { user } = useCurrentUser();
+  const { data: user } = useCurrentUser();
 
   const { batchUpdateAsync } = useTaskBatchMutations();
 

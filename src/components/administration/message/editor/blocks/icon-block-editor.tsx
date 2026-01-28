@@ -51,7 +51,7 @@ export const IconBlockEditor = ({ block, onUpdate }: IconBlockEditorProps) => {
             ]}
             placeholder="Selecione o tamanho"
             searchable={false}
-            triggerClassName="h-9"
+            triggerClassName="h-9 dark:border-muted"
           />
         </div>
 
@@ -67,7 +67,7 @@ export const IconBlockEditor = ({ block, onUpdate }: IconBlockEditorProps) => {
             ]}
             placeholder="Selecione o alinhamento"
             searchable={false}
-            triggerClassName="h-9"
+            triggerClassName="h-9 dark:border-muted"
           />
         </div>
       </div>
@@ -92,7 +92,7 @@ export const IconBlockEditor = ({ block, onUpdate }: IconBlockEditorProps) => {
           ]}
           placeholder="Selecione a cor"
           searchable={false}
-          triggerClassName="h-9"
+          triggerClassName="h-9 dark:border-muted"
         />
       </div>
 

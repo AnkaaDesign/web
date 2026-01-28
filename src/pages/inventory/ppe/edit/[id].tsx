@@ -104,23 +104,23 @@ export const EditEpiPage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col px-4 pt-4">
-      <PageHeader
-        variant="form"
-        title={`Editar ${item.name}`}
-        icon={IconShield}
-        breadcrumbs={[
-          { label: "Estoque", href: routes.inventory.root },
-          { label: "EPIs", href: routes.inventory.ppe.root },
-          { label: item.name, href: routes.inventory.ppe.details(id!) },
-          { label: "Editar" },
-        ]}
-        actions={actions}
-      />
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <PageHeader
+          variant="form"
+          title={`Editar ${item.name}`}
+          icon={IconShield}
+          breadcrumbs={[
+            { label: "Estoque", href: routes.inventory.root },
+            { label: "EPIs", href: routes.inventory.ppe.root },
+            { label: item.name, href: routes.inventory.ppe.details(id!) },
+            { label: "Editar" },
+          ]}
+          actions={actions}
+        />
+      </div>
       <div className="flex-1 overflow-y-auto pb-6">
-        <div className="mt-4 space-y-4">
-          <EpiEditForm item={item} onSubmit={handleFormSubmit} isSubmitting={updateMutation.isPending} />
-        </div>
+        <EpiEditForm item={item} onSubmit={handleFormSubmit} isSubmitting={updateMutation.isPending} />
       </div>
     </div>
   );

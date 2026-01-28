@@ -17,7 +17,6 @@ import type {
   MessageUpdateFormData,
   MessageBatchDeleteFormData,
 } from "@/schemas/message";
-import { useToast } from "./use-toast";
 
 // Query Keys
 export const messageKeys = {
@@ -86,23 +85,11 @@ export function useMessageStats(
  */
 export function useCreateMessage() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
     mutationFn: (data: MessageCreateFormData) => messageService.createMessage(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
-      toast({
-        title: "Mensagem criada",
-        description: "A mensagem foi criada com sucesso.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro ao criar mensagem",
-        description: error?.response?.data?.message || "Ocorreu um erro ao criar a mensagem.",
-        variant: "destructive",
-      });
     },
   });
 }
@@ -112,7 +99,6 @@ export function useCreateMessage() {
  */
 export function useUpdateMessage() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: MessageUpdateFormData }) =>
@@ -120,17 +106,6 @@ export function useUpdateMessage() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
       queryClient.invalidateQueries({ queryKey: messageKeys.detail(variables.id) });
-      toast({
-        title: "Mensagem atualizada",
-        description: "A mensagem foi atualizada com sucesso.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro ao atualizar mensagem",
-        description: error?.response?.data?.message || "Ocorreu um erro ao atualizar a mensagem.",
-        variant: "destructive",
-      });
     },
   });
 }
@@ -140,23 +115,11 @@ export function useUpdateMessage() {
  */
 export function useDeleteMessage() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
     mutationFn: (id: string) => messageService.deleteMessage(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
-      toast({
-        title: "Mensagem excluída",
-        description: "A mensagem foi excluída com sucesso.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro ao excluir mensagem",
-        description: error?.response?.data?.message || "Ocorreu um erro ao excluir a mensagem.",
-        variant: "destructive",
-      });
     },
   });
 }
@@ -166,23 +129,11 @@ export function useDeleteMessage() {
  */
 export function useBatchDeleteMessages() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
     mutationFn: (data: MessageBatchDeleteFormData) => messageService.batchDeleteMessages(data),
-    onSuccess: (response) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
-      toast({
-        title: "Mensagens excluídas",
-        description: `${response.data.count} mensagem(ns) excluída(s) com sucesso.`,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro ao excluir mensagens",
-        description: error?.response?.data?.message || "Ocorreu um erro ao excluir as mensagens.",
-        variant: "destructive",
-      });
     },
   });
 }
@@ -192,24 +143,12 @@ export function useBatchDeleteMessages() {
  */
 export function useArchiveMessage() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
     mutationFn: (id: string) => messageService.archiveMessage(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
       queryClient.invalidateQueries({ queryKey: messageKeys.detail(id) });
-      toast({
-        title: "Mensagem arquivada",
-        description: "A mensagem foi arquivada com sucesso.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro ao arquivar mensagem",
-        description: error?.response?.data?.message || "Ocorreu um erro ao arquivar a mensagem.",
-        variant: "destructive",
-      });
     },
   });
 }
@@ -219,24 +158,12 @@ export function useArchiveMessage() {
  */
 export function useActivateMessage() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
     mutationFn: (id: string) => messageService.activateMessage(id),
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
       queryClient.invalidateQueries({ queryKey: messageKeys.detail(id) });
-      toast({
-        title: "Mensagem ativada",
-        description: "A mensagem foi ativada com sucesso.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro ao ativar mensagem",
-        description: error?.response?.data?.message || "Ocorreu um erro ao ativar a mensagem.",
-        variant: "destructive",
-      });
     },
   });
 }
@@ -265,20 +192,11 @@ export function useMarkAsViewed() {
  */
 export function useDismissMessage() {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   return useMutation({
     mutationFn: (id: string) => messageService.dismissMessage(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
-      // Don't show toast - dismissal is a quiet action
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro ao dispensar mensagem",
-        description: error?.response?.data?.message || "Ocorreu um erro ao dispensar a mensagem.",
-        variant: "destructive",
-      });
     },
   });
 }

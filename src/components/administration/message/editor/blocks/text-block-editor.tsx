@@ -289,7 +289,7 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
             ]}
             placeholder="Selecione o tamanho"
             searchable={false}
-            triggerClassName="h-8 text-xs"
+            triggerClassName="h-8 text-xs dark:border-muted"
           />
         </div>
         <div className="flex-1">
@@ -305,7 +305,7 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
             ]}
             placeholder="Selecione o peso"
             searchable={false}
-            triggerClassName="h-8 text-xs"
+            triggerClassName="h-8 text-xs dark:border-muted"
           />
         </div>
       </div>

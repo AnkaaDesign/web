@@ -613,7 +613,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       paintId: taskData.paintId || null,
       // Initialize pricing with default structure - default row is part of initial state, not a change
       pricing: taskData.pricing ? {
-        expiresAt: taskData.pricing.expiresAt ? new Date(taskData.pricing.expiresAt) : null,
+        // Default to 30 days from now if expiresAt is null (required when items exist)
+        expiresAt: taskData.pricing.expiresAt ? new Date(taskData.pricing.expiresAt) : (() => {
+          const date = new Date();
+          date.setDate(date.getDate() + 30);
+          date.setHours(23, 59, 59, 999);
+          return date;
+        })(),
         status: taskData.pricing.status || 'DRAFT',
         subtotal: taskData.pricing.subtotal || 0,
         discountType: taskData.pricing.discountType || 'NONE',

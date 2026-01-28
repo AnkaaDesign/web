@@ -75,7 +75,7 @@ export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasP
       </CardHeader>
       <CardContent className="space-y-4">
         {blocks.length === 0 && (
-          <div className="text-center py-12 border-2 border-dashed border-border rounded-lg">
+          <div className="text-center py-12 border-2 border-dashed border-border dark:border-muted rounded-lg">
             <p className="text-muted-foreground mb-4">Nenhum bloco adicionado ainda</p>
             <Button onClick={() => setShowTypeSelector(true)}>
               <IconPlus className="h-4 w-4 mr-2" />

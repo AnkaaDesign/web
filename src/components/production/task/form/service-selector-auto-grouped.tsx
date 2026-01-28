@@ -161,8 +161,9 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
   }, [userPrivilege]);
 
   const handleAddService = () => {
-    // Use prepend to add new service at the beginning (top)
-    prepend({
+    // Use append to add new service at the end (bottom)
+    // This preserves addition order: first added = first in list
+    append({
       status: SERVICE_ORDER_STATUS.PENDING,
       statusOrder: 1,
       description: "",

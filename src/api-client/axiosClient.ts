@@ -520,7 +520,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       }
 
       // Fix array serialization issues for batch operations and regular task updates
-      if ((config.url?.includes("/batch") || config.url?.includes("/tasks/")) && (config.method?.toLowerCase() === "put" || config.method?.toLowerCase() === "patch")) {
+      if ((config.url?.includes("/batch") || config.url?.includes("/tasks/")) && (config.method?.toLowerCase() === "put" || config.method?.toLowerCase() === "patch" || config.method?.toLowerCase() === "post")) {
         // Skip object transformation if data is FormData
         if (config.data && typeof config.data === "object" && !Array.isArray(config.data) && !(config.data instanceof FormData)) {
           // Known date fields that should never be empty objects
