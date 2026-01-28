@@ -66,9 +66,14 @@ export function CollapsedGroupRow({
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log('[CollapsedGroupRow] Checkbox cell clicked');
   };
 
   const handleCheckboxChange = () => {
+    console.log('[CollapsedGroupRow] onCheckedChange called - calling onSelectAll()');
+    console.log('[CollapsedGroupRow] Group ID:', groupId);
+    console.log('[CollapsedGroupRow] Collapsed tasks count:', collapsedTasks.length);
+    console.log('[CollapsedGroupRow] Selected count:', selectedCount);
     onSelectAll();
   };
 

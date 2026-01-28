@@ -727,6 +727,9 @@ const toFormData = <T>(data: T) => data;
 
 export const notificationCreateSchema = z
   .object({
+    recipientType: z.enum(["all", "specific"], {
+      errorMap: () => ({ message: "Tipo de destinatário inválido" })
+    }).default("all"),
     userId: z.union([z.string().uuid({ message: "Usuário inválido" }), z.null()]).optional(),
     title: z.string().min(1, "Título é obrigatório"),
     body: z.string().min(1, "Corpo é obrigatório"),
@@ -750,10 +753,34 @@ export const notificationCreateSchema = z
     scheduledAt: nullableDate.optional(),
     sentAt: nullableDate.optional(),
   })
-  .transform(toFormData);
+  .refine(
+    (data) => {
+      // If recipientType is "specific", userId must be provided
+      if (data.recipientType === "specific") {
+        return data.userId != null && data.userId !== "";
+      }
+      return true;
+    },
+    {
+      message: "Selecione pelo menos um usuário ao enviar para usuários específicos",
+      path: ["userId"],
+    }
+  )
+  .transform((data) => {
+    // Remove recipientType before sending to API (it's just for form validation)
+    const { recipientType, ...rest } = data;
+    // If recipientType is "all", ensure userId is null
+    if (recipientType === "all") {
+      rest.userId = null;
+    }
+    return toFormData(rest);
+  });
 
 export const notificationUpdateSchema = z
   .object({
+    recipientType: z.enum(["all", "specific"], {
+      errorMap: () => ({ message: "Tipo de destinatário inválido" })
+    }).optional(),
     userId: z.union([z.string().uuid({ message: "Usuário inválido" }), z.null()]).optional(),
     title: z.string().min(1, "Título é obrigatório").optional(),
     body: z.string().min(1, "Corpo é obrigatório").optional(),
@@ -779,7 +806,28 @@ export const notificationUpdateSchema = z
     scheduledAt: nullableDate.optional(),
     sentAt: nullableDate.optional(),
   })
-  .transform(toFormData);
+  .refine(
+    (data) => {
+      // If recipientType is "specific", userId must be provided
+      if (data.recipientType === "specific") {
+        return data.userId != null && data.userId !== "";
+      }
+      return true;
+    },
+    {
+      message: "Selecione pelo menos um usuário ao enviar para usuários específicos",
+      path: ["userId"],
+    }
+  )
+  .transform((data) => {
+    // Remove recipientType before sending to API (it's just for form validation)
+    const { recipientType, ...rest } = data;
+    // If recipientType is "all", ensure userId is null
+    if (recipientType === "all") {
+      rest.userId = null;
+    }
+    return toFormData(rest);
+  });
 
 export const seenNotificationCreateSchema = z
   .object({

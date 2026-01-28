@@ -3,7 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { IconCalendar, IconFileText, IconUsers } from "@tabler/icons-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { IconCalendar, IconFileText, IconUsers, IconAlertTriangle } from "@tabler/icons-react";
 import { getUsers, getSectors, getPositions } from "@/api-client";
 
 interface MessageMetadata {
@@ -30,9 +31,9 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
     onChange({ ...data, ...updates });
   };
 
-  // Targeting type options
+  // Targeting type options (note: we can't easily get total user count here without adding a query)
   const targetingTypeOptions = [
-    { value: 'all', label: 'Todos os Usuários' },
+    { value: 'all', label: 'Todos os Usuários (Broadcast)' },
     { value: 'specific', label: 'Usuários Específicos' },
     { value: 'sector', label: 'Por Setor' },
     { value: 'position', label: 'Por Cargo' },
@@ -93,11 +94,15 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
             />
           </div>
 
-          {/* Show message when "all" is selected */}
+          {/* Show warning when "all" is selected */}
           {data.targeting.type === 'all' && (
-            <p className="text-sm text-muted-foreground">
-              Esta mensagem será exibida para todos os usuários.
-            </p>
+            <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950">
+              <IconAlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertDescription className="text-amber-800 dark:text-amber-200">
+                <strong>Atenção:</strong> Esta mensagem será exibida para <strong>todos os usuários</strong> do sistema.
+                Se deseja enviar apenas para usuários específicos, selecione "Usuários Específicos", "Por Setor" ou "Por Cargo".
+              </AlertDescription>
+            </Alert>
           )}
 
           {/* Show user combobox when "specific" is selected */}

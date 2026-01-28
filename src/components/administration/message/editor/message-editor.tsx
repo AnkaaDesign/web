@@ -64,7 +64,11 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
       case 'all':
         return true;
       case 'specific':
-        return userIds && userIds.length > 0;
+        const isValid = userIds && userIds.length > 0;
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[MessageEditor] Validating specific targeting:', { userIds, isValid });
+        }
+        return isValid;
       case 'sector':
         return sectorIds && sectorIds.length > 0;
       case 'position':

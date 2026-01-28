@@ -43,6 +43,19 @@ const notificationSchema = z.object({
   targetType: z.enum(["all", "sectors", "users"]),
   targetSectors: z.array(z.string()).optional(),
   targetUsers: z.array(z.string()).optional(),
+}).refine((data) => {
+  // If targetType is "users", targetUsers must have at least one user
+  if (data.targetType === "users") {
+    return data.targetUsers && data.targetUsers.length > 0;
+  }
+  // If targetType is "sectors", targetSectors must have at least one sector
+  if (data.targetType === "sectors") {
+    return data.targetSectors && data.targetSectors.length > 0;
+  }
+  return true;
+}, {
+  message: "Selecione pelo menos um destinatário",
+  path: ["targetUsers"], // This will show error on the targetUsers field
 });
 
 type NotificationFormData = z.infer<typeof notificationSchema>;
@@ -117,6 +130,16 @@ export const CreateNotificationPage = () => {
 
   const onSubmit = async (data: NotificationFormData) => {
     try {
+      // Validate targeting requirements
+      if (data.targetType === "users" && (!data.targetUsers || data.targetUsers.length === 0)) {
+        toast.error("Selecione pelo menos um usuário ao enviar para usuários específicos");
+        return;
+      }
+      if (data.targetType === "sectors" && (!data.targetSectors || data.targetSectors.length === 0)) {
+        toast.error("Selecione pelo menos um setor ao enviar para setores específicos");
+        return;
+      }
+
       setIsSending(true);
 
       // Prepare payload based on target type
@@ -164,6 +187,14 @@ export const CreateNotificationPage = () => {
   const selectedChannels = form.watch("channels") || [];
   const notificationType = form.watch("type");
   const targetType = form.watch("targetType");
+  const targetUsers = form.watch("targetUsers") || [];
+  const targetSectors = form.watch("targetSectors") || [];
+
+  // Check if form can be submitted based on targeting
+  const canSubmit =
+    targetType === "all" ||
+    (targetType === "users" && targetUsers.length > 0) ||
+    (targetType === "sectors" && targetSectors.length > 0);
 
   return (
     <FormProvider {...form}>
@@ -195,7 +226,7 @@ export const CreateNotificationPage = () => {
                 icon: scheduleLater ? IconClock : IconSend,
                 onClick: handleSubmit,
                 variant: "default",
-                disabled: isSending,
+                disabled: isSending || !canSubmit,
               },
             ]}
           />
@@ -417,6 +448,7 @@ export const CreateNotificationPage = () => {
                   <FormCombobox
                     name="targetSectors"
                     label="Setores"
+                    required
                     placeholder="Selecione os setores"
                     async
                     queryKey={["sectors-async"]}
@@ -426,9 +458,15 @@ export const CreateNotificationPage = () => {
                     searchable
                     emptyText="Nenhum setor encontrado"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Selecione um ou mais setores que receberão a notificação
-                  </p>
+                  {targetSectors.length === 0 ? (
+                    <p className="text-xs text-destructive">
+                      Selecione pelo menos um setor para continuar
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {targetSectors.length} setor{targetSectors.length !== 1 ? "es" : ""} selecionado{targetSectors.length !== 1 ? "s" : ""}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -437,6 +475,7 @@ export const CreateNotificationPage = () => {
                   <FormCombobox
                     name="targetUsers"
                     label="Usuários"
+                    required
                     placeholder="Selecione os usuários"
                     async
                     queryKey={["users-async"]}
@@ -446,9 +485,15 @@ export const CreateNotificationPage = () => {
                     searchable
                     emptyText="Nenhum usuário ativo encontrado"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Selecione um ou mais usuários que receberão a notificação
-                  </p>
+                  {targetUsers.length === 0 ? (
+                    <p className="text-xs text-destructive">
+                      Selecione pelo menos um usuário para continuar
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {targetUsers.length} usuário{targetUsers.length !== 1 ? "s" : ""} selecionado{targetUsers.length !== 1 ? "s" : ""}
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>
