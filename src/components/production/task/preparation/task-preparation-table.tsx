@@ -7,7 +7,7 @@ import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { SECTOR_PRIVILEGES } from "@/constants";
+import { SECTOR_PRIVILEGES, routes } from "@/constants";
 import { hasPrivilege } from "@/utils/user";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { TaskHistoryContextMenu } from "../history/task-history-context-menu";
@@ -140,6 +140,67 @@ export function TaskPreparationTable({
     return groupSequentialTasks(tasks, 3, 0.95);
   }, [tasks]);
 
+  // Build maps: groupId → all task IDs, and taskId → groupId
+  const { groupAllTaskIds, taskIdToGroupId } = useMemo(() => {
+    const groupAllTaskIds = new Map<string, string[]>();
+    const taskIdToGroupId = new Map<string, string>();
+
+    for (const group of groupedTasks) {
+      if (!group.groupId) continue;
+      const gid = group.groupId;
+
+      if (!groupAllTaskIds.has(gid)) {
+        groupAllTaskIds.set(gid, []);
+      }
+      const ids = groupAllTaskIds.get(gid)!;
+
+      if (group.type === 'group-first' || group.type === 'group-last') {
+        if (group.task) {
+          ids.push(group.task.id);
+          taskIdToGroupId.set(group.task.id, gid);
+        }
+      } else if (group.type === 'group-collapsed' && group.collapsedTasks) {
+        for (const t of group.collapsedTasks) {
+          ids.push(t.id);
+          taskIdToGroupId.set(t.id, gid);
+        }
+      }
+    }
+
+    return { groupAllTaskIds, taskIdToGroupId };
+  }, [groupedTasks]);
+
+  // Toggle selection for an entire group
+  const toggleGroupSelection = useCallback((groupId: string) => {
+    const allIds = groupAllTaskIds.get(groupId);
+    if (!allIds) return;
+
+    const allSelected = allIds.every(id => isSelected(id));
+    if (allSelected) {
+      allIds.forEach(id => { if (isSelected(id)) toggleSelection(id); });
+    } else {
+      allIds.forEach(id => { if (!isSelected(id)) toggleSelection(id); });
+    }
+  }, [groupAllTaskIds, isSelected, toggleSelection]);
+
+  // Handle checkbox click for a task that may belong to a group
+  const handleCheckboxClick = useCallback((taskId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (event.shiftKey && onShiftClickSelect) {
+      onShiftClickSelect(taskId);
+      return;
+    }
+    if (onSingleClickSelect && !event.shiftKey) {
+      onSingleClickSelect(taskId);
+    }
+    const gid = taskIdToGroupId.get(taskId);
+    if (gid) {
+      toggleGroupSelection(gid);
+    } else {
+      toggleSelection(taskId);
+    }
+  }, [taskIdToGroupId, toggleGroupSelection, toggleSelection, onShiftClickSelect, onSingleClickSelect]);
+
   // Notify parent about groups
   useEffect(() => {
     if (onGroupsDetected) {
@@ -225,21 +286,26 @@ export function TaskPreparationTable({
 
   // Row click handler
   const handleRowClick = useCallback((task: Task, event: React.MouseEvent) => {
+    // Ignore clicks on the checkbox cell (handled separately)
+    const isCheckboxClick = (event.target as HTMLElement).closest('input[type="checkbox"]');
+    if (isCheckboxClick) return;
+
     if (isSelectingSourceTask && onSourceTaskSelect) {
       onSourceTaskSelect(task);
       return;
     }
 
-    const isCheckboxClick = (event.target as HTMLElement).closest('input[type="checkbox"]');
-    if (isCheckboxClick) return;
-
-    if (event.shiftKey && onShiftClickSelect) {
+    if (event.ctrlKey || event.metaKey) {
+      // Ctrl/Cmd click - toggle selection
+      toggleSelection(task.id);
+      onSingleClickSelect?.(task.id);
+    } else if (event.shiftKey && onShiftClickSelect) {
       onShiftClickSelect(task.id);
     } else {
-      if (onSingleClickSelect) onSingleClickSelect(task.id);
-      toggleSelection(task.id);
+      // Normal click - navigate to detail page
+      navigate(routes.production.preparation.details(task.id));
     }
-  }, [isSelectingSourceTask, onSourceTaskSelect, onShiftClickSelect, onSingleClickSelect, toggleSelection]);
+  }, [isSelectingSourceTask, onSourceTaskSelect, onShiftClickSelect, onSingleClickSelect, toggleSelection, navigate]);
 
   if (isLoading) {
     return <TaskHistoryTableSkeleton />;
@@ -314,23 +380,14 @@ export function TaskPreparationTable({
               const collapsedTasks = group.collapsedTasks!;
               const isExpanded = expandedGroups.has(groupId);
 
-              // Calculate selection state for the group
-              const selectedCountInGroup = collapsedTasks.filter(t => isSelected(t.id)).length;
-              const allTasksSelected = selectedCountInGroup === collapsedTasks.length;
+              // Calculate selection state for the ENTIRE group (first + middle + last)
+              const allGroupIds = groupAllTaskIds.get(groupId) || [];
+              const selectedCountInGroup = allGroupIds.filter(id => isSelected(id)).length;
+              const allTasksSelected = allGroupIds.length > 0 && selectedCountInGroup === allGroupIds.length;
 
-              // Handle select all in group
+              // Handle select all in group (entire group)
               const handleSelectAllInGroup = () => {
-                if (allTasksSelected) {
-                  // Deselect all
-                  collapsedTasks.forEach(t => {
-                    if (isSelected(t.id)) toggleSelection(t.id);
-                  });
-                } else {
-                  // Select all
-                  collapsedTasks.forEach(t => {
-                    if (!isSelected(t.id)) toggleSelection(t.id);
-                  });
-                }
+                toggleGroupSelection(groupId);
               };
 
               // If expanded, render all individual task rows
@@ -355,21 +412,15 @@ export function TaskPreparationTable({
                       <TableCell className="w-12 border-r p-0">
                         <div
                           className="flex items-center justify-center h-full w-full px-2 py-1"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (e.shiftKey && onShiftClickSelect) {
-                              onShiftClickSelect(task.id);
-                            } else {
-                              if (onSingleClickSelect && !e.shiftKey) {
-                                onSingleClickSelect(task.id);
-                              }
-                              toggleSelection(task.id);
-                            }
-                          }}
+                          onClick={(e) => handleCheckboxClick(task.id, e)}
                         >
                           <Checkbox
                             checked={isSelected(task.id)}
-                            onCheckedChange={() => toggleSelection(task.id)}
+                            onCheckedChange={() => {
+                              const gid = taskIdToGroupId.get(task.id);
+                              if (gid) toggleGroupSelection(gid);
+                              else toggleSelection(task.id);
+                            }}
                             aria-label={`Select ${task.name}`}
                           />
                         </div>
@@ -439,21 +490,15 @@ export function TaskPreparationTable({
                   <TableCell className="w-12 border-r p-0">
                     <div
                       className="flex items-center justify-center h-full w-full px-2 py-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (e.shiftKey && onShiftClickSelect) {
-                          onShiftClickSelect(task.id);
-                        } else {
-                          if (onSingleClickSelect && !e.shiftKey) {
-                            onSingleClickSelect(task.id);
-                          }
-                          toggleSelection(task.id);
-                        }
-                      }}
+                      onClick={(e) => handleCheckboxClick(task.id, e)}
                     >
                       <Checkbox
                         checked={isSelected(task.id)}
-                        onCheckedChange={() => toggleSelection(task.id)}
+                        onCheckedChange={() => {
+                          const gid = taskIdToGroupId.get(task.id);
+                          if (gid) toggleGroupSelection(gid);
+                          else toggleSelection(task.id);
+                        }}
                         aria-label={`Select ${task.name}`}
                       />
                     </div>

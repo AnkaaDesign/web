@@ -331,6 +331,22 @@ function App() {
               }
             />
 
+            {/* Universal link / Deep link routes - MUST be before the catch-all */}
+            {/* These handle URLs like /app/task/123 from iOS/Android universal links */}
+            {/* Placed at top level so they work outside auth context */}
+            <Route path="/app/:entityType/:id" element={<DeepLinkRedirect />} />
+            <Route path="/task/:id" element={<DeepLinkRedirect />} />
+            <Route path="/order/:id" element={<DeepLinkRedirect />} />
+            <Route path="/item/:id" element={<DeepLinkRedirect />} />
+            <Route path="/service-order/:id" element={<DeepLinkRedirect />} />
+            <Route path="/user/:id" element={<DeepLinkRedirect />} />
+            <Route path="/customer/:id" element={<DeepLinkRedirect />} />
+            <Route path="/supplier/:id" element={<DeepLinkRedirect />} />
+            <Route path="/borrow/:id" element={<DeepLinkRedirect />} />
+            <Route path="/maintenance/:id" element={<DeepLinkRedirect />} />
+            <Route path="/financial/:id" element={<DeepLinkRedirect />} />
+            <Route path="/notification/:id" element={<DeepLinkRedirect />} />
+
             {/* All other routes wrapped in auth and notification providers */}
             <Route
               path="*"
@@ -2242,22 +2258,6 @@ function App() {
                   }
                 />
               </Route>
-
-                            {/* Universal link / Deep link routes */}
-                            {/* These handle URLs like /app/task/123 from iOS/Android universal links */}
-                            <Route path="/app/:entityType/:id" element={<DeepLinkRedirect />} />
-                            {/* Also handle direct entity routes like /task/123 */}
-                            <Route path="/task/:id" element={<DeepLinkRedirect />} />
-                            <Route path="/order/:id" element={<DeepLinkRedirect />} />
-                            <Route path="/item/:id" element={<DeepLinkRedirect />} />
-                            <Route path="/service-order/:id" element={<DeepLinkRedirect />} />
-                            <Route path="/user/:id" element={<DeepLinkRedirect />} />
-                            <Route path="/customer/:id" element={<DeepLinkRedirect />} />
-                            <Route path="/supplier/:id" element={<DeepLinkRedirect />} />
-                            <Route path="/borrow/:id" element={<DeepLinkRedirect />} />
-                            <Route path="/maintenance/:id" element={<DeepLinkRedirect />} />
-                            <Route path="/financial/:id" element={<DeepLinkRedirect />} />
-                            <Route path="/notification/:id" element={<DeepLinkRedirect />} />
 
                             {/* 404 Not Found route */}
                             <Route path="*" element={<NotFound />} />

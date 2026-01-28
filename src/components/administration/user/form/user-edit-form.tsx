@@ -42,6 +42,7 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
       pis: user.pis,
       status: user.status,
       currentStatus: user.status, // Required for validation in update mode
+      isActive: user.isActive,
       verified: user.verified,
       birth: toDate(user.birth),
       dismissedAt: toDate(user.dismissal),

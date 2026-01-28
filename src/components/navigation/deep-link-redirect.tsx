@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { routes } from '@/constants';
 
@@ -42,16 +42,19 @@ function isMobileDevice(): boolean {
 }
 
 /**
- * Component that handles deep link redirects from universal links
+ * Component that handles deep link redirects from universal links.
+ *
  * When a user clicks a universal link like https://ankaadesign.com.br/app/task/123
- * or https://ankaadesign.com.br/task/123 and the mobile app isn't installed,
- * this component redirects them to the correct web application route.
+ * and the mobile app is NOT installed (so universal links / app links didn't intercept),
+ * this component:
+ *
+ * 1. On mobile: Immediately attempts to open the app via custom scheme (ankaadesign://).
+ *    Shows a prompt with options to open in app or continue in browser.
+ * 2. On desktop: Redirects immediately to the correct web application route.
  *
  * Supported URL patterns:
  * - /app/:entityType/:id (universal link format from iOS/Android)
  * - /:entityType/:id (direct entity link)
- *
- * For mobile users, it also shows an option to open in the app.
  */
 export function DeepLinkRedirect() {
   const { entityType: entityTypeParam, id: idParam } = useParams<{ entityType?: string; id?: string }>();
@@ -61,10 +64,10 @@ export function DeepLinkRedirect() {
   const [targetRoute, setTargetRoute] = useState<string | null>(null);
   const [entityType, setEntityType] = useState<string>('');
   const [entityId, setEntityId] = useState<string>('');
+  const attemptedAppOpen = useRef(false);
 
   useEffect(() => {
     // Extract entity type and ID from the URL path
-    // Handles both /app/:entityType/:id and /:entityType/:id patterns
     const pathParts = location.pathname.split('/').filter(Boolean);
 
     let extractedEntityType: string;
@@ -75,7 +78,6 @@ export function DeepLinkRedirect() {
       extractedEntityType = pathParts[1];
       extractedId = pathParts[2];
     } else if (entityTypeParam && idParam) {
-      // Route params from /app/:entityType/:id pattern
       extractedEntityType = entityTypeParam;
       extractedId = idParam;
     } else if (pathParts.length >= 2) {
@@ -108,22 +110,46 @@ export function DeepLinkRedirect() {
     const route = routeGenerator(extractedId);
     setTargetRoute(route);
 
-    // If on mobile, show the app prompt briefly before redirecting
     if (isMobileDevice()) {
+      // On mobile: immediately try to open the app via custom scheme
+      // If the app is installed, it will open. If not, nothing happens
+      // and we show the prompt with fallback options.
+      if (!attemptedAppOpen.current) {
+        attemptedAppOpen.current = true;
+        const deepLinkUrl = `ankaadesign://${extractedEntityType}/${extractedId}`;
+
+        // Use an iframe to attempt opening the custom scheme silently
+        // This avoids the "can't open page" error on some browsers
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = deepLinkUrl;
+        document.body.appendChild(iframe);
+
+        // Also try window.location as fallback for some browsers
+        setTimeout(() => {
+          window.location.href = deepLinkUrl;
+        }, 100);
+
+        // Clean up iframe
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 2000);
+      }
+
       setShowAppPrompt(true);
-      // Auto-redirect after a short delay if user doesn't interact
+
+      // Auto-redirect to web after a delay if the app didn't open
       const timeout = setTimeout(() => {
         navigate(route, { replace: true });
-      }, 3000);
+      }, 4000);
       return () => clearTimeout(timeout);
     } else {
-      // Desktop: redirect immediately
+      // Desktop: redirect immediately to the web route
       navigate(route, { replace: true });
     }
   }, [location.pathname, entityTypeParam, idParam, navigate]);
 
   const handleOpenInApp = () => {
-    // Try to open the custom URL scheme
     const deepLinkUrl = `ankaadesign://${entityType}/${entityId}`;
     window.location.href = deepLinkUrl;
   };
@@ -142,7 +168,7 @@ export function DeepLinkRedirect() {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">Abrir no Aplicativo?</h1>
             <p className="text-muted-foreground">
-              Detectamos que voce esta em um dispositivo movel. Deseja abrir este conteudo no aplicativo Ankaa Design?
+              Detectamos que você está em um dispositivo móvel. Deseja abrir este conteúdo no aplicativo Ankaa Design?
             </p>
           </div>
 
