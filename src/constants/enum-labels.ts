@@ -286,7 +286,10 @@ export const PPE_DELIVERY_STATUS_LABELS: Record<PPE_DELIVERY_STATUS, string> = {
   [PPE_DELIVERY_STATUS.PENDING]: "Pendente",
   [PPE_DELIVERY_STATUS.APPROVED]: "Aprovado",
   [PPE_DELIVERY_STATUS.DELIVERED]: "Entregue",
+  [PPE_DELIVERY_STATUS.WAITING_SIGNATURE]: "Aguardando Assinatura",
+  [PPE_DELIVERY_STATUS.COMPLETED]: "Concluído",
   [PPE_DELIVERY_STATUS.REPROVED]: "Reprovado",
+  [PPE_DELIVERY_STATUS.SIGNATURE_REJECTED]: "Assinatura Rejeitada",
   [PPE_DELIVERY_STATUS.CANCELLED]: "Cancelado",
 };
 
@@ -898,6 +901,7 @@ export const RAIN_BOOTS_SIZE_LABELS: Record<RAIN_BOOTS_SIZE, string> = {
 export const PPE_TYPE_LABELS: Record<PPE_TYPE, string> = {
   [PPE_TYPE.SHIRT]: "Camisa",
   [PPE_TYPE.PANTS]: "Calça",
+  [PPE_TYPE.SHORT]: "Bermuda",
   [PPE_TYPE.BOOTS]: "Botas",
   [PPE_TYPE.SLEEVES]: "Manguito",
   [PPE_TYPE.MASK]: "Máscara",

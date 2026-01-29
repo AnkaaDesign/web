@@ -1,14 +1,29 @@
+import React, { useState, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { IconTruck, IconUser, IconCalendar, IconArrowRight, IconAlertCircle } from "@tabler/icons-react";
+import {
+  IconTruck,
+  IconChevronRight,
+  IconAlertCircle,
+  IconClock,
+  IconCircleCheck,
+  IconX,
+  IconCheck,
+} from "@tabler/icons-react";
+import { TableSearchInput } from "@/components/ui/table-search-input";
+import { PpeDeliveryTable } from "../../delivery/ppe-delivery-table";
+import { ColumnVisibilityManager } from "../../delivery/column-visibility-manager";
+import { createPpeDeliveryColumns, getDefaultVisibleColumns } from "../../delivery/ppe-delivery-table-columns";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useTableFilters } from "@/hooks/use-table-filters";
 import { usePpeDeliveries } from "../../../../../hooks";
 import type { PpeDelivery } from "../../../../../types";
-import { PPE_DELIVERY_STATUS, PPE_DELIVERY_STATUS_LABELS } from "../../../../../constants";
-import { formatDate, formatRelativeTime } from "../../../../../utils";
-import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
+import type { PpeDeliveryGetManyFormData } from "../../../../../schemas";
+import { PPE_DELIVERY_STATUS } from "../../../../../constants";
 import { routes } from "../../../../../constants";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PpeScheduleDeliveriesCardProps {
@@ -19,117 +34,176 @@ interface PpeScheduleDeliveriesCardProps {
 export function PpeScheduleDeliveriesCard({ scheduleId, className }: PpeScheduleDeliveriesCardProps) {
   const navigate = useNavigate();
 
-  // Fetch recent deliveries for this schedule
-  const { data: deliveriesData, isLoading } = usePpeDeliveries({
+  // State to hold current table data
+  const [tableData, setTableData] = useState<{ items: PpeDelivery[]; totalRecords: number }>({
+    items: [],
+    totalRecords: 0,
+  });
+
+  // Stable callback for table data updates
+  const handleTableDataChange = useCallback((data: { items: PpeDelivery[]; totalRecords: number }) => {
+    setTableData(data);
+  }, []);
+
+  // Use table filters for search functionality
+  const { searchingFor, displaySearchText, setSearch } = useTableFilters<PpeDeliveryGetManyFormData>({
+    defaultFilters: {},
+    searchDebounceMs: 300,
+    searchParamName: "deliverySearch",
+  });
+
+  // Visible columns state with localStorage persistence
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility(
+    "ppe-schedule-detail-delivery-visible-columns",
+    new Set(["item.uniCode", "item.name", "item.measures", "user.name", "status", "quantity"])
+  );
+
+  // Get all available columns for column visibility manager
+  const allColumns = useMemo(() => createPpeDeliveryColumns(), []);
+
+  // Fetch all deliveries for statistics (without pagination)
+  const { data: statsData, isLoading: isLoadingStats } = usePpeDeliveries({
     where: {
       ppeScheduleId: scheduleId,
     },
-    include: {
-      user: {
-        include: {
-          position: true,
-        },
-      },
-      item: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    limit: 5,
+    limit: 1000, // Get all for statistics
   });
 
-  const deliveries = deliveriesData?.data || [];
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const allDeliveries = statsData?.data || [];
+    const total = allDeliveries.length;
+    const pending = allDeliveries.filter((d) => d.status === PPE_DELIVERY_STATUS.PENDING).length;
+    const approved = allDeliveries.filter((d) => d.status === PPE_DELIVERY_STATUS.APPROVED).length;
+    const delivered = allDeliveries.filter(
+      (d) => d.status === PPE_DELIVERY_STATUS.DELIVERED || d.status === PPE_DELIVERY_STATUS.COMPLETED
+    ).length;
+    const cancelled = allDeliveries.filter(
+      (d) => d.status === PPE_DELIVERY_STATUS.CANCELLED || d.status === PPE_DELIVERY_STATUS.REPROVED
+    ).length;
 
-  const getStatusColor = (status: PPE_DELIVERY_STATUS) => {
-    switch (status) {
-      case PPE_DELIVERY_STATUS.PENDING:
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
-      case PPE_DELIVERY_STATUS.APPROVED:
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
-      case PPE_DELIVERY_STATUS.DELIVERED:
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-      case PPE_DELIVERY_STATUS.CANCELLED:
-      case PPE_DELIVERY_STATUS.REPROVED:
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400";
-    }
-  };
+    return { total, pending, approved, delivered, cancelled };
+  }, [statsData]);
+
+  // Filter to only show deliveries from this schedule, with search
+  const filters = useMemo(() => {
+    return {
+      where: {
+        ppeScheduleId: scheduleId,
+      },
+      searchingFor: searchingFor || undefined,
+    };
+  }, [scheduleId, searchingFor]);
 
   return (
     <Card className={cn("shadow-sm border border-border", className)}>
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2">
-          <IconTruck className="h-5 w-5 text-muted-foreground" />
-          Entregas Recentes
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <IconTruck className="h-5 w-5 text-muted-foreground" />
+            Entregas do Agendamento
+            {stats.total > 0 && (
+              <Badge variant="outline" className="font-semibold ml-2">
+                {stats.total} {stats.total === 1 ? "entrega" : "entregas"}
+              </Badge>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`${routes.inventory.ppe.deliveries.root}?scheduleId=${scheduleId}`)}
+          >
+            Ver todas as entregas
+            <IconChevronRight className="h-4 w-4 ml-2" />
+          </Button>
         </CardTitle>
       </CardHeader>
 
-      <CardContent>
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="p-4 rounded-lg bg-muted/30">
-                <Skeleton className="h-4 w-3/4 mb-2" />
-                <Skeleton className="h-3 w-1/2" />
-              </div>
-            ))}
+      <CardContent className="space-y-4">
+        {isLoadingStats ? (
+          <div className="space-y-4">
+            {/* Stats skeleton */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-16 rounded-lg" />
+              ))}
+            </div>
+            {/* Table skeleton */}
+            <Skeleton className="h-64 rounded-lg" />
           </div>
-        ) : deliveries.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+        ) : stats.total === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
             <IconAlertCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">Nenhuma entrega gerada ainda</p>
+            <p className="text-sm font-medium">Nenhuma entrega gerada ainda</p>
             <p className="text-xs mt-1">As entregas aparecerão aqui quando forem criadas pelo agendamento</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {deliveries.map((delivery: PpeDelivery) => (
-              <div
-                key={delivery.id}
-                className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
-                onClick={() => navigate(routes.inventory.ppe.deliveries.details(delivery.id))}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <IconUser className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{delivery.user?.name || "Usuário desconhecido"}</p>
-                      {delivery.user?.position && (
-                        <p className="text-xs text-muted-foreground truncate">{delivery.user.position.name}</p>
-                      )}
-                    </div>
-                  </div>
-                  <Badge className={cn("ml-2 text-xs flex-shrink-0", getStatusColor(delivery.status))}>
-                    {PPE_DELIVERY_STATUS_LABELS[delivery.status]}
-                  </Badge>
+          <>
+            {/* Statistics Row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {/* Pending */}
+              <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <IconClock className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wide">Pendentes</span>
                 </div>
-
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <IconCalendar className="h-3 w-3" />
-                    <span>{formatRelativeTime(delivery.createdAt)}</span>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span>Ver detalhes</span>
-                    <IconArrowRight className="h-3 w-3" />
-                  </div>
-                </div>
+                <p className="text-2xl font-bold mt-1">{stats.pending}</p>
               </div>
-            ))}
 
-            {/* View All Button */}
-            {deliveries.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full mt-4"
-                onClick={() => navigate(`${routes.inventory.ppe.deliveries.root}?scheduleId=${scheduleId}`)}
-              >
-                Ver Todas as Entregas
-                <IconArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            )}
-          </div>
+              {/* Approved */}
+              <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30">
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                  <IconCircleCheck className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wide">Aprovadas</span>
+                </div>
+                <p className="text-2xl font-bold text-blue-700 dark:text-blue-300 mt-1">{stats.approved}</p>
+              </div>
+
+              {/* Delivered */}
+              <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <IconCheck className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wide">Entregues</span>
+                </div>
+                <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-1">{stats.delivered}</p>
+              </div>
+
+              {/* Cancelled */}
+              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30">
+                <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <IconX className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wide">Canceladas</span>
+                </div>
+                <p className="text-2xl font-bold text-red-700 dark:text-red-300 mt-1">{stats.cancelled}</p>
+              </div>
+            </div>
+
+            {/* Search and Column Visibility Controls */}
+            <div className="flex flex-col gap-3 sm:flex-row pt-2">
+              <TableSearchInput
+                value={displaySearchText}
+                onChange={(value) => setSearch(value)}
+                placeholder="Buscar por item, usuário..."
+                isPending={displaySearchText !== searchingFor}
+              />
+              <div className="flex gap-2">
+                <ColumnVisibilityManager
+                  columns={allColumns}
+                  visibleColumns={visibleColumns}
+                  onVisibilityChange={setVisibleColumns}
+                />
+              </div>
+            </div>
+
+            {/* Delivery Table */}
+            <div style={{ minHeight: "300px", maxHeight: "500px" }}>
+              <PpeDeliveryTable
+                visibleColumns={visibleColumns}
+                filters={filters}
+                onDataChange={handleTableDataChange}
+              />
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

@@ -95,8 +95,18 @@ export function PpeSizesSection({ disabled }: PpeSizesSectionProps) {
           />
         </div>
 
-        {/* Row 2: Boots and Rain Boots */}
+        {/* Row 2: Shorts and Boots */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <FormCombobox
+            name="ppeSize.shorts"
+            label="Bermuda"
+            icon={<IconShirt className="h-4 w-4 text-muted-foreground" />}
+            options={pantsSizeOptions}
+            disabled={disabled}
+            placeholder="Selecione o tamanho da bermuda"
+            emptyText="Nenhum tamanho disponível"
+            required={false}
+          />
           <FormCombobox
             name="ppeSize.boots"
             label="Botas"
@@ -107,6 +117,10 @@ export function PpeSizesSection({ disabled }: PpeSizesSectionProps) {
             emptyText="Nenhum tamanho disponível"
             required={false}
           />
+        </div>
+
+        {/* Row 3: Rain Boots */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormCombobox
             name="ppeSize.rainBoots"
             label="Galocha"
@@ -119,7 +133,7 @@ export function PpeSizesSection({ disabled }: PpeSizesSectionProps) {
           />
         </div>
 
-        {/* Row 3: Sleeves and Mask */}
+        {/* Row 4: Sleeves and Mask */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormCombobox
             name="ppeSize.sleeves"
@@ -143,7 +157,7 @@ export function PpeSizesSection({ disabled }: PpeSizesSectionProps) {
           />
         </div>
 
-        {/* Row 4: Gloves */}
+        {/* Row 5: Gloves */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormCombobox
             name="ppeSize.gloves"

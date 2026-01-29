@@ -66,8 +66,6 @@ import { formatCNPJ, formatCPF, toTitleCase } from "../../../../utils";
 import {
   getPricingItemsToAddFromServiceOrders,
   getServiceOrdersToAddFromPricingItems,
-  syncObservationsFromServiceOrdersToPricing,
-  syncObservationsFromPricingToServiceOrders,
   combineServiceOrderToPricingDescription,
   normalizeDescription,
   type SyncServiceOrder,
@@ -534,10 +532,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       const leftTotalWidth = leftSections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
       const rightTotalWidth = rightSections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
       const widthDifference = Math.abs(leftTotalWidth - rightTotalWidth);
-      const maxAllowedDifference = 0.04; // 4cm in meters
+      const maxAllowedDifference = 0.02; // 2cm in meters
 
       if (widthDifference > maxAllowedDifference) {
-        const errorMessage = `O layout possui diferença de largura maior que 4cm entre os lados. Lado Motorista: ${leftTotalWidth.toFixed(2)}m, Lado Sapo: ${rightTotalWidth.toFixed(2)}m (diferença de ${(widthDifference * 100).toFixed(1)}cm). Ajuste as medidas antes de enviar o formulário.`;
+        const errorMessage = `O layout possui diferença de largura maior que 2cm entre os lados. Lado Motorista: ${(leftTotalWidth * 100).toFixed(0)}cm, Lado Sapo: ${(rightTotalWidth * 100).toFixed(0)}cm (diferença de ${(widthDifference * 100).toFixed(1)}cm). Ajuste as medidas antes de enviar o formulário.`;
         setLayoutWidthError(errorMessage);
       } else {
         setLayoutWidthError(null);
@@ -632,6 +630,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         // Guarantee Terms
         guaranteeYears: taskData.pricing.guaranteeYears || null,
         customGuaranteeText: taskData.pricing.customGuaranteeText || null,
+        // Custom Forecast
+        customForecastDays: taskData.pricing.customForecastDays || null,
         // Layout File
         layoutFileId: taskData.pricing.layoutFileId || null,
         items: (() => {
@@ -671,6 +671,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         // Guarantee Terms (defaults)
         guaranteeYears: null,
         customGuaranteeText: null,
+        // Custom Forecast (defaults)
+        customForecastDays: null,
         // Layout File (defaults)
         layoutFileId: null,
         items: [{ description: "", amount: null, observation: null }], // Default empty row
@@ -2071,6 +2073,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const deletedServiceOrderDescriptionsRef = useRef<Set<string>>(new Set());
   const deletedPricingItemDescriptionsRef = useRef<Set<string>>(new Set());
 
+  // Track previous observation values to detect which side changed
+  // This allows us to sync observations only FROM the side that was edited
+  // Key: normalized description, Value: observation value (string or null)
+  const prevSOObservationsRef = useRef<Map<string, string | null>>(new Map());
+  const prevPIObservationsRef = useRef<Map<string, string | null>>(new Map());
+
   // Callbacks to track deleted items from child components
   const handleServiceOrderDeleted = useCallback((description: string) => {
     const normalizedDesc = normalizeDescription(description);
@@ -2121,17 +2129,35 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       const currentPricingItems = ((pricingValues as any)?.items as any[]) || [];
 
       // Count only PRODUCTION service orders with valid descriptions
-      const validServiceOrderCount = currentServiceOrders.filter(
+      const validServiceOrders = currentServiceOrders.filter(
         (so: any) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.description?.trim().length >= 3
-      ).length;
-
-      // Count only pricing items with valid descriptions
-      const validPricingItemCount = currentPricingItems.filter(
+      );
+      const validPricingItems = currentPricingItems.filter(
         (item: any) => item.description?.trim().length >= 3
-      ).length;
+      );
 
-      lastSyncedServiceOrderCountRef.current = validServiceOrderCount;
-      lastSyncedPricingItemCountRef.current = validPricingItemCount;
+      lastSyncedServiceOrderCountRef.current = validServiceOrders.length;
+      lastSyncedPricingItemCountRef.current = validPricingItems.length;
+
+      // Initialize previous observation maps with current values
+      // This prevents false "change" detection on the first sync
+      const initialSOObsMap = new Map<string, string | null>();
+      for (const so of validServiceOrders) {
+        const normalizedDesc = normalizeDescription(so.description);
+        if (normalizedDesc) {
+          initialSOObsMap.set(normalizedDesc, so.observation || null);
+        }
+      }
+      prevSOObservationsRef.current = initialSOObsMap;
+
+      const initialPIObsMap = new Map<string, string | null>();
+      for (const item of validPricingItems) {
+        const normalizedDesc = normalizeDescription(item.description);
+        if (normalizedDesc) {
+          initialPIObsMap.set(normalizedDesc, item.observation || null);
+        }
+      }
+      prevPIObservationsRef.current = initialPIObsMap;
 
       // Mark form as initialized after a delay to skip any initial render cycles
       setTimeout(() => {
@@ -2214,8 +2240,99 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           return so.description && so.description.trim().length >= 3;
         });
 
-        // SYNC 1: Service Orders → Pricing Items
-        // Add new items if SO count increased, but exclude items that were intentionally deleted
+        // =====================================================================
+        // OBSERVATION SYNC WITH CHANGE DETECTION
+        // We track which side changed and only sync FROM the changed side.
+        // This prevents the issue where clearing an observation on one side
+        // gets restored by the sync from the other side.
+        // =====================================================================
+
+        // Build current observation maps
+        const currentSOObsMap = new Map<string, string | null>();
+        for (const so of syncServiceOrders) {
+          const normalizedDesc = normalizeDescription(so.description);
+          if (normalizedDesc) {
+            currentSOObsMap.set(normalizedDesc, so.observation || null);
+          }
+        }
+
+        const currentPIObsMap = new Map<string, string | null>();
+        for (const item of syncPricingItems) {
+          const normalizedDesc = normalizeDescription(item.description);
+          if (normalizedDesc) {
+            currentPIObsMap.set(normalizedDesc, item.observation || null);
+          }
+        }
+
+        // Detect which side changed for each description
+        const soObsChangedDescs = new Set<string>();
+        const piObsChangedDescs = new Set<string>();
+
+        for (const [desc, obs] of currentSOObsMap) {
+          const prevObs = prevSOObservationsRef.current.get(desc);
+          // Normalize comparison: treat undefined, null, and "" as equivalent
+          const normalizedPrev = prevObs || null;
+          const normalizedCurrent = obs || null;
+          if (normalizedPrev !== normalizedCurrent) {
+            soObsChangedDescs.add(desc);
+          }
+        }
+
+        for (const [desc, obs] of currentPIObsMap) {
+          const prevObs = prevPIObservationsRef.current.get(desc);
+          // Normalize comparison: treat undefined, null, and "" as equivalent
+          const normalizedPrev = prevObs || null;
+          const normalizedCurrent = obs || null;
+          if (normalizedPrev !== normalizedCurrent) {
+            piObsChangedDescs.add(desc);
+          }
+        }
+
+        // Sync observations based on which side changed
+        // If SO changed but PI didn't -> sync SO observation to PI
+        // If PI changed but SO didn't -> sync PI observation to SO
+        // If both changed -> conflict, don't sync (keep both values)
+
+        let pricingObservationsUpdated = false;
+        const pricingItemsWithSyncedObs = currentPricingItems.map((item: any) => {
+          if (!item.description || item.description.trim().length < 3) return item;
+          const normalizedDesc = normalizeDescription(item.description);
+
+          // Only sync if SO changed AND PI didn't change (to avoid conflicts)
+          if (soObsChangedDescs.has(normalizedDesc) && !piObsChangedDescs.has(normalizedDesc)) {
+            const soObs = currentSOObsMap.get(normalizedDesc);
+            const currentItemObs = item.observation || null;
+            if (currentItemObs !== soObs) {
+              pricingObservationsUpdated = true;
+              console.log('[PRICING↔SO SYNC] Syncing SO→PI observation:', normalizedDesc, soObs);
+              return { ...item, observation: soObs };
+            }
+          }
+          return item;
+        });
+
+        let soObservationsUpdated = false;
+        const serviceOrdersWithSyncedObs = currentServiceOrders.map((so: any) => {
+          if (so.type !== SERVICE_ORDER_TYPE.PRODUCTION) return so;
+          if (!so.description || so.description.trim().length < 3) return so;
+          const normalizedDesc = normalizeDescription(so.description);
+
+          // Only sync if PI changed AND SO didn't change (to avoid conflicts)
+          if (piObsChangedDescs.has(normalizedDesc) && !soObsChangedDescs.has(normalizedDesc)) {
+            const piObs = currentPIObsMap.get(normalizedDesc);
+            const currentSOObs = so.observation || null;
+            if (currentSOObs !== piObs) {
+              soObservationsUpdated = true;
+              console.log('[PRICING↔SO SYNC] Syncing PI→SO observation:', normalizedDesc, piObs);
+              return { ...so, observation: piObs };
+            }
+          }
+          return so;
+        });
+
+        // =====================================================================
+        // SYNC 1: Service Orders → Pricing Items (NEW ITEMS)
+        // =====================================================================
         const pricingItemsToAddRaw = serviceOrdersAdded
           ? getPricingItemsToAddFromServiceOrders(syncServiceOrders, syncPricingItems)
           : [];
@@ -2226,28 +2343,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           return !deletedPricingItemDescriptionsRef.current.has(normalizedDesc);
         });
 
-        // Sync observations from SO to ALL pricing items (including empty ones)
-        // This preserves empty placeholder rows
-        const pricingWithSyncedObs = syncObservationsFromServiceOrdersToPricing(
-          syncServiceOrders,
-          currentPricingItems,
-        );
-
-        // Check if observations changed
-        const pricingObservationsChanged = JSON.stringify(pricingWithSyncedObs) !== JSON.stringify(currentPricingItems);
-
-        // Only update pricing if new items added OR observations changed
-        if (pricingItemsToAdd.length > 0 || pricingObservationsChanged) {
-          // When adding new items, filter out empty placeholder rows first
+        // Update pricing if new items added OR observations changed
+        if (pricingItemsToAdd.length > 0 || pricingObservationsUpdated) {
           const basePricingItems = pricingItemsToAdd.length > 0
-            ? filterEmptyPricingItems(pricingWithSyncedObs)
-            : pricingWithSyncedObs;
-
+            ? filterEmptyPricingItems(pricingItemsWithSyncedObs)
+            : pricingItemsWithSyncedObs;
           const finalPricingItems = [...basePricingItems, ...pricingItemsToAdd];
 
           console.log('[PRICING↔SO SYNC] Updating pricing items:', {
             added: pricingItemsToAdd.length,
-            observationsChanged: pricingObservationsChanged,
+            observationsUpdated: pricingObservationsUpdated,
           });
           form.setValue('pricing.items', finalPricingItems, {
             shouldDirty: true,
@@ -2255,8 +2360,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           });
         }
 
-        // SYNC 2: Pricing Items → Service Orders
-        // Add new items if pricing count increased, but exclude items that were intentionally deleted
+        // =====================================================================
+        // SYNC 2: Pricing Items → Service Orders (NEW ITEMS)
+        // =====================================================================
         const serviceOrdersToAddRaw = pricingItemsAdded
           ? getServiceOrdersToAddFromPricingItems(syncPricingItems, syncServiceOrders, historicalDescriptionsRef.current)
           : [];
@@ -2267,34 +2373,48 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           return !deletedServiceOrderDescriptionsRef.current.has(normalizedDesc);
         });
 
-        // Sync observations from pricing items to ALL service orders (including empty ones)
-        // This preserves empty placeholder rows
-        const serviceOrdersWithSyncedObs = syncObservationsFromPricingToServiceOrders(
-          syncPricingItems,
-          currentServiceOrders,
-        );
-
-        // Check if observations changed
-        const soObservationsChanged = JSON.stringify(serviceOrdersWithSyncedObs) !== JSON.stringify(currentServiceOrders);
-
-        // Only update service orders if new items added OR observations changed
-        if (serviceOrdersToAdd.length > 0 || soObservationsChanged) {
-          // When adding new items, filter out empty placeholder rows first
+        // Update service orders if new items added OR observations changed
+        if (serviceOrdersToAdd.length > 0 || soObservationsUpdated) {
           const baseServiceOrders = serviceOrdersToAdd.length > 0
             ? filterEmptyServiceOrders(serviceOrdersWithSyncedObs)
             : serviceOrdersWithSyncedObs;
-
           const finalServiceOrders = [...serviceOrdersToAdd, ...baseServiceOrders];
 
           console.log('[PRICING↔SO SYNC] Updating service orders:', {
             added: serviceOrdersToAdd.length,
-            observationsChanged: soObservationsChanged,
+            observationsUpdated: soObservationsUpdated,
           });
           form.setValue('serviceOrders', finalServiceOrders, {
             shouldDirty: true,
             shouldTouch: true,
           });
         }
+
+        // =====================================================================
+        // UPDATE PREVIOUS OBSERVATION REFS
+        // CRITICAL: Update to the TARGET values (after sync) to prevent false
+        // change detection on the next render when the synced values come back.
+        // =====================================================================
+        const newPrevSOMap = new Map<string, string | null>();
+        const finalSOsForPrevMap = soObservationsUpdated ? serviceOrdersWithSyncedObs : currentServiceOrders;
+        for (const so of finalSOsForPrevMap) {
+          if (so.type !== SERVICE_ORDER_TYPE.PRODUCTION) continue;
+          const normalizedDesc = normalizeDescription(so.description);
+          if (normalizedDesc) {
+            newPrevSOMap.set(normalizedDesc, so.observation || null);
+          }
+        }
+        prevSOObservationsRef.current = newPrevSOMap;
+
+        const newPrevPIMap = new Map<string, string | null>();
+        const finalPIsForPrevMap = pricingObservationsUpdated ? pricingItemsWithSyncedObs : currentPricingItems;
+        for (const item of finalPIsForPrevMap) {
+          const normalizedDesc = normalizeDescription(item.description);
+          if (normalizedDesc) {
+            newPrevPIMap.set(normalizedDesc, item.observation || null);
+          }
+        }
+        prevPIObservationsRef.current = newPrevPIMap;
 
         // Update refs with new counts (using local variables instead of calling functions again)
         lastSyncedServiceOrderCountRef.current = currentSOCount + serviceOrdersToAdd.length;
@@ -2845,7 +2965,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     {/* Sector, Status and Commission in a row */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Sector */}
-                      <SectorSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} productionOnly />
+                      <SectorSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isCommercialUser} productionOnly />
 
                       {/* Status Field (edit-specific) */}
                       <FormField
@@ -2861,7 +2981,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                               <Combobox
                                 value={field.value}
                                 onValueChange={field.onChange}
-                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser}
+                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isCommercialUser}
                                 options={[
                                   TASK_STATUS.PREPARATION,
                                   TASK_STATUS.WAITING_PRODUCTION,
@@ -3186,9 +3306,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                 const currentLayout = currentState || savedLayout;
                                 const sections = currentLayout?.sections || currentLayout?.layoutSections;
 
-                                if (!sections || sections.length === 0) return "0,00m";
-                                const totalWidth = sections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
-                                return totalWidth.toFixed(2).replace(".", ",") + "m";
+                                if (!sections || sections.length === 0) return "0cm";
+                                const totalWidthMeters = sections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
+                                const totalWidthCm = Math.round(totalWidthMeters * 100);
+                                return totalWidthCm + "cm";
                               })()}
                             </span>
                           </div>

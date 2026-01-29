@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { routes, SECTOR_PRIVILEGES } from "../../../../../constants";
-import { usePpeDeliverySchedule, usePpeDeliveryScheduleMutations, useAuth } from "../../../../../hooks";
+import { usePpeDeliverySchedule, usePpeDeliveryScheduleMutations, useExecutePpeDeliverySchedule, useAuth } from "../../../../../hooks";
 import { PpeScheduleInfoCard, PpeScheduleItemsCard, PpeScheduleDeliveriesCard } from "@/components/inventory/epi/schedule/detail";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconCalendar, IconEdit, IconRefresh, IconTrash, IconPlayerPlay, IconPlayerPause, IconAlertTriangle } from "@tabler/icons-react";
@@ -21,12 +21,13 @@ import { IconLoader } from "@tabler/icons-react";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { hasPrivilege } from "../../../../../utils";
 import { usePageTracker } from "@/hooks/use-page-tracker";
-import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
+import { getDetailGridClasses } from "@/lib/layout-constants";
 
 const EPIScheduleDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { updateAsync, deleteAsync } = usePpeDeliveryScheduleMutations();
+  const executeMutation = useExecutePpeDeliverySchedule();
   const { user: currentUser } = useAuth();
 
   // Dialog states
@@ -34,6 +35,7 @@ const EPIScheduleDetails = () => {
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
 
   // Track page access
   usePageTracker({
@@ -53,10 +55,15 @@ const EPIScheduleDetails = () => {
     refetch,
   } = usePpeDeliverySchedule(id!, {
     include: {
-      item: {
+      items: {
         include: {
-          brand: true,
-          category: true,
+          item: true,
+        },
+      },
+      deliveries: {
+        include: {
+          item: true,
+          user: true,
         },
       },
     },
@@ -75,6 +82,22 @@ const EPIScheduleDetails = () => {
 
   const handleRefresh = () => {
     refetch();
+  };
+
+  const handleExecuteNow = async () => {
+    if (!ppeSchedule) return;
+
+    try {
+      setIsExecuting(true);
+      const result = await executeMutation.mutateAsync(ppeSchedule.id);
+      toast.success(result.message || `${result.data.deliveriesCreated} entregas criadas com sucesso!`);
+      refetch();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Erro ao executar agendamento";
+      toast.error(errorMessage);
+    } finally {
+      setIsExecuting(false);
+    }
   };
 
   const handleActivate = async () => {
@@ -218,6 +241,17 @@ const EPIScheduleDetails = () => {
   // Build custom actions for header
   const customActions = [];
 
+  // Add execute now button for active schedules
+  if (canEdit && ppeSchedule.isActive) {
+    customActions.push({
+      key: "execute",
+      label: isExecuting ? "Executando..." : "Executar Agora",
+      icon: IconPlayerPlay,
+      onClick: handleExecuteNow,
+      disabled: isExecuting,
+    });
+  }
+
   if (canToggleActive) {
     if (ppeSchedule.isActive) {
       customActions.push({
@@ -267,6 +301,7 @@ const EPIScheduleDetails = () => {
                 icon: IconRefresh,
                 onClick: handleRefresh,
               },
+              ...customActions,
               ...(canEdit
                 ? [
                     {
@@ -277,22 +312,19 @@ const EPIScheduleDetails = () => {
                     },
                   ]
                 : []),
-              ...customActions,
             ]}
           />
         </div>
         <div className="flex-1 overflow-y-auto pb-6">
           <div className="space-y-4 mt-4">
             {/* First Row: Info and Items (1/2 each) */}
-            <div className={DETAIL_PAGE_SPACING.HEADER_TO_GRID}>
             <div className={getDetailGridClasses()}>
               <PpeScheduleInfoCard schedule={ppeSchedule} className="h-full" />
               <PpeScheduleItemsCard schedule={ppeSchedule} className="h-full" />
             </div>
-          </div>
 
             {/* Second Row: Deliveries (full width) */}
-            <PpeScheduleDeliveriesCard scheduleId={ppeSchedule.id} className="h-full" />
+            <PpeScheduleDeliveriesCard scheduleId={ppeSchedule.id} />
           </div>
         </div>
 

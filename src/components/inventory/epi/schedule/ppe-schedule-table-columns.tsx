@@ -20,10 +20,10 @@ export const createPpeScheduleColumns = (): PpeScheduleColumn[] => [
     align: "left",
   },
   {
-    key: "ppeItems",
+    key: "items",
     header: "ITENS DE EPI",
     accessor: (schedule: PpeDeliverySchedule) => {
-      const ppeItems = schedule.ppeItems || [];
+      const ppeItems = schedule.items || [];
       if (ppeItems.length === 0) return <div className="truncate text-muted-foreground">-</div>;
 
       const displayText =
@@ -172,5 +172,5 @@ export const createPpeScheduleColumns = (): PpeScheduleColumn[] => [
 
 // Default visible columns
 export const getDefaultVisibleColumns = (): Set<string> => {
-  return new Set(["name", "ppeItems", "frequency", "nextRun", "isActive"]);
+  return new Set(["name", "items", "frequency", "nextRun", "isActive"]);
 };

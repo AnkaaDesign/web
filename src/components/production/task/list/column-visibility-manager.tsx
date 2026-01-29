@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
 import { getDefaultVisibleColumns } from "./task-table-columns";
+import { getHeaderText } from "@/components/ui/column-visibility-utils";
 import type { TaskColumn } from "./types";
 
 interface ColumnVisibilityManagerProps {
@@ -22,7 +23,7 @@ export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityC
 
   const filteredColumns = useMemo(() => {
     if (!searchQuery) return columns;
-    return columns.filter((col) => col.header.toLowerCase().includes(searchQuery.toLowerCase()));
+    return columns.filter((col) => getHeaderText(col.header).toLowerCase().includes(searchQuery.toLowerCase()));
   }, [columns, searchQuery]);
 
   const handleToggle = (columnKey: string, checked: boolean | undefined) => {

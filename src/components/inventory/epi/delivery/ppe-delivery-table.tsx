@@ -4,7 +4,7 @@ import type { PpeDelivery } from "../../../../types";
 import { PPE_DELIVERY_STATUS } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { IconChevronUp, IconChevronDown, IconRefresh, IconEdit, IconTrash, IconSelector, IconAlertTriangle, IconTruck, IconCheck, IconX } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconRefresh, IconEdit, IconTrash, IconSelector, IconAlertTriangle, IconTruck, IconCheck, IconX, IconArrowBackUp } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { usePpeDeliveries } from "../../../../hooks";
@@ -23,12 +23,13 @@ interface PpeDeliveryTableProps {
   onApprove?: (deliveries: PpeDelivery[]) => void;
   onReject?: (deliveries: PpeDelivery[]) => void;
   onDeliver?: (deliveries: PpeDelivery[]) => void;
+  onRevertToApproved?: (deliveries: PpeDelivery[]) => void;
   onDelete?: (deliveries: PpeDelivery[]) => void;
   filters?: Partial<PpeDeliveryGetManyFormData>;
   onDataChange?: (data: { items: PpeDelivery[]; totalRecords: number }) => void;
 }
 
-export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove, onReject, onDeliver, onDelete, filters = {}, onDataChange }: PpeDeliveryTableProps) {
+export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove, onReject, onDeliver, onRevertToApproved, onDelete, filters = {}, onDataChange }: PpeDeliveryTableProps) {
   const navigate = useNavigate();
 
   // Get scrollbar width info
@@ -73,6 +74,7 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
         include: {
           brand: true,
           category: true,
+          measures: true,
         },
       },
       user: true,
@@ -219,6 +221,13 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
   const handleDeliver = () => {
     if (contextMenu && onDeliver) {
       onDeliver(contextMenu.deliveries);
+      setContextMenu(null);
+    }
+  };
+
+  const handleRevertToApproved = () => {
+    if (contextMenu && onRevertToApproved) {
+      onRevertToApproved(contextMenu.deliveries);
       setContextMenu(null);
     }
   };
@@ -446,6 +455,14 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
             <DropdownMenuItem onClick={handleDeliver}>
               <IconTruck className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.deliveries.length > 1 ? "Marcar como entregues" : "Marcar como entregue"}
+            </DropdownMenuItem>
+          )}
+
+          {/* Only show revert option if at least one delivery is DELIVERED */}
+          {contextMenu?.deliveries.some((d) => d.status === PPE_DELIVERY_STATUS.DELIVERED) && (
+            <DropdownMenuItem onClick={handleRevertToApproved}>
+              <IconArrowBackUp className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.deliveries.length > 1 ? "Reverter para aprovado" : "Reverter para aprovado"}
             </DropdownMenuItem>
           )}
 

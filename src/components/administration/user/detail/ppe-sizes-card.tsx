@@ -22,6 +22,7 @@ export function PpeSizesCard({ user, className }: PpeSizesCardProps) {
     user.ppeSize.shirts ||
     user.ppeSize.boots ||
     user.ppeSize.pants ||
+    user.ppeSize.shorts ||
     user.ppeSize.sleeves ||
     user.ppeSize.mask ||
     user.ppeSize.gloves ||
@@ -60,6 +61,16 @@ export function PpeSizesCard({ user, className }: PpeSizesCardProps) {
                   Calça
                 </span>
                 <span className="text-sm font-semibold text-foreground">{PANTS_SIZE_LABELS[user.ppeSize.pants]}</span>
+              </div>
+            )}
+
+            {user.ppeSize?.shorts && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconHanger className="h-4 w-4" />
+                  Bermuda
+                </span>
+                <span className="text-sm font-semibold text-foreground">{PANTS_SIZE_LABELS[user.ppeSize.shorts]}</span>
               </div>
             )}
 

@@ -1033,6 +1033,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "meus-epis-solicitar", title: "Solicitar EPI", icon: "plus", path: "/pessoal/meus-epis/solicitar" },
         ],
       },
+      {
+        id: "assinaturas-pendentes",
+        title: "Assinaturas Pendentes",
+        icon: "signature",
+        path: "/pessoal/assinaturas-pendentes",
+        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE],
+      },
       { id: "meus-pontos", title: "Meus Pontos", icon: "fingerprint", path: "/pessoal/meus-pontos", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE] },
       {
         id: "minhas-advertencias",

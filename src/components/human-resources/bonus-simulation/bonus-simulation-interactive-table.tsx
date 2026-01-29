@@ -793,7 +793,7 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
     const cellPadding = "8px 6px";
     const headerPadding = "10px 6px";
 
-    // A4 optimized PDF with proper formatting
+    // A4 optimized PDF with proper formatting matching task history
     const pdfContent = `
       <!DOCTYPE html>
       <html>
@@ -803,7 +803,7 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
         <style>
           @page {
             size: A4;
-            margin: 12mm;
+            margin: 10mm;
           }
 
           * {
@@ -818,7 +818,7 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background: white;
             font-size: ${fontSize};
-            line-height: 1.3;
+            line-height: 1.2;
           }
 
           body {
@@ -829,36 +829,40 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
           }
 
           .header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-top: 10px;
+            margin-bottom: 12px;
+            flex-shrink: 0;
           }
 
           .logo {
-            width: 100px;
+            width: 140px;
             height: auto;
-            margin-right: 15px;
+            margin-bottom: 8px;
           }
 
           .header-info {
-            flex: 1;
+          }
+
+          .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 4px;
           }
 
           .info {
             color: #6b7280;
-            font-size: 12px;
+            font-size: 10px;
           }
 
           .info p {
-            margin: 2px 0;
+            margin: 1px 0;
           }
 
           .content-wrapper {
             flex: 1;
             overflow: auto;
             min-height: 0;
-            padding-bottom: 40px;
+            padding-bottom: 35px;
           }
 
           table {
@@ -872,30 +876,26 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
             font-weight: 600;
             color: #374151;
             padding: ${headerPadding};
-            border-bottom: 1px solid #e5e7eb;
-            border-right: 1px solid #e5e7eb;
+            border: 1px solid #e5e7eb;
+            border-bottom: 1px solid #d1d5db;
             font-size: ${headerFontSize};
             text-transform: uppercase;
             letter-spacing: 0.03em;
-          }
-
-          th:last-child {
-            border-right: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
 
           td {
             padding: ${cellPadding};
-            border-bottom: 1px solid #f3f4f6;
-            border-right: 1px solid #f3f4f6;
-            vertical-align: top;
-          }
-
-          td:last-child {
-            border-right: none;
-          }
-
-          tbody tr:first-child td {
+            border-left: 1px solid #e5e7eb;
+            border-right: 1px solid #e5e7eb;
+            border-bottom: 1px solid #e5e7eb;
             border-top: none;
+            vertical-align: middle;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
 
           tbody tr:nth-child(even) {
@@ -918,28 +918,48 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding-top: 15px;
+            padding-top: 10px;
             border-top: 1px solid #e5e7eb;
             color: #6b7280;
-            font-size: 10px;
+            font-size: 9px;
+            flex-shrink: 0;
             background: white;
           }
 
+          .footer-left {
+            flex: 1;
+          }
+
+          .footer-right {
+            text-align: right;
+          }
+
           @media print {
+            @page {
+              size: A4;
+              margin: 8mm;
+            }
+
             .footer {
               position: fixed;
-              bottom: 15px;
-              left: 12mm;
-              right: 12mm;
+              bottom: 6mm;
+              left: 6mm;
+              right: 6mm;
+              background: white;
+              font-size: 7px;
+            }
+
+            .content-wrapper {
+              padding-bottom: 50px;
             }
           }
         </style>
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Logo" class="logo" />
+          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <h1 class="header-title">Simulação de Bônus</h1>
           <div class="header-info">
-            <h1 style="font-size: 20px; margin-bottom: 8px;">Simulação de Bônus</h1>
             <div class="info">
               <p><strong>Data:</strong> ${formatDate(new Date())}</p>
               <p><strong>Total de tarefas:</strong> ${taskQuantity.toFixed(1)}</p>
@@ -974,10 +994,10 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
         </div>
 
         <div class="footer">
-          <div>
-            <p>Relatório gerado pelo sistema Ankaa</p>
+          <div class="footer-left">
+            <p>Simulação de Bônus - Sistema Ankaa</p>
           </div>
-          <div>
+          <div class="footer-right">
             <p><strong>Gerado em:</strong> ${formatDate(new Date())} ${new Date().toLocaleTimeString('pt-BR')}</p>
           </div>
         </div>

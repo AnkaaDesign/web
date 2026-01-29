@@ -61,7 +61,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
       mode === "create"
         ? {
             name: "",
-            ppeItems: [{ ppeType: Object.values(PPE_TYPE)[0], quantity: 1 }],
+            items: [{ ppeType: Object.values(PPE_TYPE)[0], quantity: 1 }],
             assignmentType: ASSIGNMENT_TYPE.SPECIFIC,
             excludedUserIds: [],
             includedUserIds: [],
@@ -69,11 +69,12 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
             frequencyCount: 1,
             dayOfMonth: 1,
             customMonths: [],
+            isActive: true, // Ensure schedule is created as active
             ...props.defaultValues,
           }
         : {
             name: props.ppeSchedule.name || "",
-            ppeItems: props.ppeSchedule.ppeItems || [],
+            items: props.ppeSchedule.items || [],
             assignmentType: props.ppeSchedule.assignmentType || ASSIGNMENT_TYPE.ALL,
             excludedUserIds: props.ppeSchedule.excludedUserIds || [],
             includedUserIds: props.ppeSchedule.includedUserIds || [],
@@ -232,7 +233,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
               {/* PPE Items Configuration */}
               <FormField
                 control={form.control}
-                name="ppeItems"
+                name="items"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
@@ -540,7 +541,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                     {Object.entries(form.formState.errors).map(([field, error]) => (
                       <li key={field} className="flex items-start gap-2">
                         <span className="font-medium">
-                          {field === "ppeItems" && "Itens de EPI:"}
+                          {field === "items" && "Itens de EPI:"}
                           {field === "assignmentType" && "Tipo de Atribuição:"}
                           {field === "includedUserIds" && "Funcionários Incluídos:"}
                           {field === "excludedUserIds" && "Funcionários Excluídos:"}
@@ -551,7 +552,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                           {field === "month" && "Mês:"}
                           {field === "specificDate" && "Data Específica:"}
                           {![
-                            "ppeItems",
+                            "items",
                             "assignmentType",
                             "includedUserIds",
                             "excludedUserIds",

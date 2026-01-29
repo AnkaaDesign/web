@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
+import { getHeaderText } from "@/components/ui/column-visibility-utils";
 
 interface GenericColumn {
   key: string;
@@ -28,7 +29,7 @@ export function GenericColumnVisibilityManager({ columns, visibleColumns, onVisi
 
   const filteredColumns = useMemo(() => {
     if (!searchQuery) return columns;
-    return columns.filter((col) => col.header.toLowerCase().includes(searchQuery.toLowerCase()));
+    return columns.filter((col) => getHeaderText(col.header).toLowerCase().includes(searchQuery.toLowerCase()));
   }, [columns, searchQuery]);
 
   const handleToggle = (columnKey: string, checked: boolean) => {

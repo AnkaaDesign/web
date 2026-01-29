@@ -1221,7 +1221,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
               <div className="px-3 py-1 bg-primary/10 rounded-md">
                 <span className="text-sm text-muted-foreground">Comprimento Total: </span>
                 <span className="text-sm font-semibold text-foreground">
-                  {totalLength.toFixed(2).replace(".", ",")}m
+                  {Math.round(totalLength * 100)}cm
                 </span>
               </div>
             </div>

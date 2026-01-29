@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
+import { getHeaderText } from "@/components/ui/column-visibility-utils";
 
 interface BonusColumn {
   key: string;
@@ -53,7 +54,7 @@ export function BonusColumnVisibilityManager({ visibleColumns, onVisibilityChang
 
   const filteredColumns = useMemo(() => {
     if (!searchQuery) return BONUS_COLUMNS;
-    return BONUS_COLUMNS.filter((col) => col.header.toLowerCase().includes(searchQuery.toLowerCase()));
+    return BONUS_COLUMNS.filter((col) => getHeaderText(col.header).toLowerCase().includes(searchQuery.toLowerCase()));
   }, [searchQuery]);
 
   const handleToggle = (columnKey: string, checked: boolean | undefined) => {

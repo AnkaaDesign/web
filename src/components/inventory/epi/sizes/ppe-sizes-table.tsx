@@ -37,6 +37,8 @@ function getSizeLabel(field: string, value: string | null): string {
       return SHIRT_SIZE_LABELS[value as keyof typeof SHIRT_SIZE_LABELS] || value;
     case "pants":
       return PANTS_SIZE_LABELS[value as keyof typeof PANTS_SIZE_LABELS] || value;
+    case "shorts":
+      return PANTS_SIZE_LABELS[value as keyof typeof PANTS_SIZE_LABELS] || value;
     case "boots":
       return BOOT_SIZE_LABELS[value as keyof typeof BOOT_SIZE_LABELS] || value;
     case "sleeves":
@@ -115,6 +117,21 @@ export function createPpeSizeColumns(): PpeSizeColumn[] {
         const value = user.ppeSize?.pants as string | null | undefined;
         return value ? (
           <Badge variant="secondary" className="font-medium text-xs">{getSizeLabel("pants", value)}</Badge>
+        ) : (
+          <span className="text-muted-foreground/40 text-xs">-</span>
+        );
+      },
+      sortable: true,
+      className: "w-[1%] whitespace-nowrap",
+      align: "left",
+    },
+    {
+      key: "ppeSize.shorts",
+      header: "BERMUDA",
+      accessor: (user: User) => {
+        const value = user.ppeSize?.shorts as string | null | undefined;
+        return value ? (
+          <Badge variant="secondary" className="font-medium text-xs">{getSizeLabel("shorts", value)}</Badge>
         ) : (
           <span className="text-muted-foreground/40 text-xs">-</span>
         );
@@ -203,7 +220,7 @@ export function createPpeSizeColumns(): PpeSizeColumn[] {
 
 export const DEFAULT_PPE_SIZE_VISIBLE_COLUMNS = new Set([
   "name", "sector.name",
-  "ppeSize.shirts", "ppeSize.pants", "ppeSize.boots", "ppeSize.sleeves",
+  "ppeSize.shirts", "ppeSize.pants", "ppeSize.shorts", "ppeSize.boots", "ppeSize.sleeves",
   "ppeSize.mask", "ppeSize.gloves", "ppeSize.rainBoots",
 ]);
 

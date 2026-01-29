@@ -280,7 +280,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
         side="right"
         size="md"
         className="p-0 flex flex-col"
-        showCloseButton={true}
+        showCloseButton={false}
       >
         {/* Header */}
         <SheetHeader className="px-4 py-4 border-b border-border mb-0">

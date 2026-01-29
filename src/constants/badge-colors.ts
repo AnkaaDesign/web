@@ -466,10 +466,13 @@ export const ENTITY_BADGE_CONFIG = {
 
   // PPE Delivery Status
   PPE_DELIVERY: {
-    [PPE_DELIVERY_STATUS.PENDING]: "pending" as BadgeVariant,
-    [PPE_DELIVERY_STATUS.APPROVED]: "approved" as BadgeVariant,
+    [PPE_DELIVERY_STATUS.PENDING]: "gray" as BadgeVariant,
+    [PPE_DELIVERY_STATUS.APPROVED]: "blue" as BadgeVariant,
     [PPE_DELIVERY_STATUS.DELIVERED]: "delivered" as BadgeVariant,
+    [PPE_DELIVERY_STATUS.WAITING_SIGNATURE]: "yellow" as BadgeVariant,
+    [PPE_DELIVERY_STATUS.COMPLETED]: "green" as BadgeVariant,
     [PPE_DELIVERY_STATUS.REPROVED]: "red" as BadgeVariant,
+    [PPE_DELIVERY_STATUS.SIGNATURE_REJECTED]: "red" as BadgeVariant,
     [PPE_DELIVERY_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
 

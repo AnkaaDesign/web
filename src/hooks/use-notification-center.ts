@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
 import { useNotifications, useMarkAsRead, useMarkAllAsRead } from "./useNotification";
 import { toast } from "@/components/ui/sonner";
@@ -30,17 +30,22 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Fetch recent notifications with pagination support
-  const { data: notificationsData, isLoading } = useNotifications({
-    take,
-    orderBy: { createdAt: "desc" },
-    include: {
-      seenBy: {
-        include: {
-          user: true,
+  const { data: notificationsData, isLoading } = useNotifications(
+    {
+      take,
+      orderBy: { createdAt: "desc" },
+      include: {
+        seenBy: {
+          include: {
+            user: true,
+          },
         },
       },
     },
-  });
+    {
+      placeholderData: keepPreviousData,
+    }
+  );
 
   const markAsReadMutation = useMarkAsRead();
   const markAllAsReadMutation = useMarkAllAsRead();

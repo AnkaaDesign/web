@@ -21,6 +21,7 @@ import {
   batchUpdatePpeDeliveries,
   batchDeletePpeDeliveries,
   markPpeDeliveryAsDelivered,
+  batchMarkPpeDeliveriesAsDelivered,
   batchApprovePpeDeliveries,
   batchRejectPpeDeliveries,
   // PpeConfig - COMMENTED OUT: PPE config now in Item model
@@ -694,6 +695,22 @@ export function useBatchDeletePpeDeliverySchedules() {
   return batchDeleteMutation;
 }
 
+// Execute schedule now (create deliveries immediately)
+export function useExecutePpeDeliverySchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (scheduleId: string) => {
+      return ppeDeliveryScheduleService.executeScheduleNow(scheduleId);
+    },
+    onSuccess: () => {
+      // Invalidate all relevant queries
+      queryClient.invalidateQueries({ queryKey: ppeDeliveryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ppeDeliveryScheduleKeys.all });
+    },
+  });
+}
+
 // =====================================================
 // Additional PPE Delivery Operations
 // =====================================================
@@ -756,6 +773,35 @@ export function useMarkPpeDeliveryAsDelivered() {
     onError: (error) => {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Mark as delivered failed:", error);
+      }
+    },
+  });
+}
+
+export function useBatchMarkPpeDeliveriesAsDelivered() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ deliveryIds, deliveryDate }: { deliveryIds: string[]; deliveryDate?: Date }) =>
+      batchMarkPpeDeliveriesAsDelivered(deliveryIds, deliveryDate),
+    onSuccess: (_data, variables) => {
+      // Invalidate PPE delivery queries
+      queryClient.invalidateQueries({ queryKey: ppeDeliveryKeys.all });
+      // Invalidate each delivery detail
+      variables.deliveryIds.forEach((id) => {
+        queryClient.invalidateQueries({ queryKey: ppeDeliveryKeys.detail(id) });
+      });
+
+      // Invalidate changelog queries
+      queryClient.invalidateQueries({ queryKey: changeLogKeys.all });
+
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: userKeys.all });
+      queryClient.invalidateQueries({ queryKey: itemKeys.all });
+    },
+    onError: (error) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Batch mark as delivered failed:", error);
       }
     },
   });

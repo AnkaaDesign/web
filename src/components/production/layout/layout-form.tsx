@@ -697,6 +697,15 @@ export const LayoutForm = ({
         }
       };
 
+      // Sync height between left and right sides (not back)
+      if (updates.height !== undefined && selectedSide !== 'back') {
+        const oppositeSide = selectedSide === 'left' ? 'right' : 'left';
+        newState[oppositeSide] = {
+          ...newState[oppositeSide],
+          height: updates.height
+        };
+      }
+
       const state = newState[selectedSide];
 
       // Emit changes for current side
@@ -722,6 +731,29 @@ export const LayoutForm = ({
       // Support both callback patterns
       if (onChange) {
         onChange(selectedSide, layoutData);
+
+        // Also emit changes for the opposite side if height was synced
+        if (updates.height !== undefined && selectedSide !== 'back') {
+          const oppositeSide = selectedSide === 'left' ? 'right' : 'left';
+          const oppositeState = newState[oppositeSide];
+          const oppositeSegments = calculateSegments(oppositeState.doors, oppositeState.totalWidth);
+
+          const oppositeLayoutSections = oppositeSegments.map((segment, index) => ({
+            width: segment.width / 100,
+            isDoor: segment.type === 'door',
+            doorHeight: segment.type === 'door' && segment.door ? segment.door.doorHeight / 100 : null,
+            position: index
+          }));
+
+          const oppositeLayoutData = {
+            height: oppositeState.height / 100,
+            layoutSections: oppositeLayoutSections,
+            photoId: null,
+            photoFile: null,
+          };
+
+          onChange(oppositeSide, oppositeLayoutData);
+        }
       } else if (onSave) {
         // Call onSave and handle the promise
         const saveResult = onSave(layoutData);
@@ -858,8 +890,8 @@ export const LayoutForm = ({
       let bestGap = 0;
       let bestPosition = 0;
 
-      // Check gap at the beginning
-      if (sortedDoors[0].position > doorWidth + 50) {
+      // Check gap at the beginning (allow doors at edge - no minimum buffer required)
+      if (sortedDoors[0].position >= doorWidth) {
         bestGap = sortedDoors[0].position;
         bestPosition = Math.round((sortedDoors[0].position - doorWidth) / 2);
       }
@@ -870,16 +902,16 @@ export const LayoutForm = ({
         const gapEnd = sortedDoors[i + 1].position;
         const gapSize = gapEnd - gapStart;
 
-        if (gapSize > bestGap && gapSize >= doorWidth + 50) {
+        if (gapSize > bestGap && gapSize >= doorWidth) {
           bestGap = gapSize;
           bestPosition = Math.round(gapStart + (gapSize - doorWidth) / 2);
         }
       }
 
-      // Check gap at the end
+      // Check gap at the end (allow doors at edge - no minimum buffer required)
       const lastDoor = sortedDoors[sortedDoors.length - 1];
       const endGap = currentState.totalWidth - (lastDoor.position + lastDoor.width);
-      if (endGap > bestGap && endGap >= doorWidth + 50) {
+      if (endGap > bestGap && endGap >= doorWidth) {
         bestPosition = Math.round(lastDoor.position + lastDoor.width + (endGap - doorWidth) / 2);
       }
 
@@ -1220,7 +1252,7 @@ export const LayoutForm = ({
 
               {/* Main Layout Rectangle */}
               <div
-                className="border-2 border-border/40 bg-muted/10 relative overflow-hidden"
+                className="border-2 border-foreground/70 bg-muted/30 relative overflow-hidden"
                 style={{
                   width: `${currentState.totalWidth * scale}px`,
                   height: `${currentState.height * scale}px`
@@ -1243,7 +1275,7 @@ export const LayoutForm = ({
                     <div key={door.id}>
                       {/* Door vertical lines - only below the door top line */}
                       <div
-                        className="absolute border-l-2 border-r-2 border-border/40 pointer-events-none"
+                        className="absolute border-l-2 border-r-2 border-foreground/70 pointer-events-none"
                         style={{
                           left: `${door.position * scale}px`,
                           top: `${doorTopPosition * scale}px`,
@@ -1254,7 +1286,7 @@ export const LayoutForm = ({
 
                       {/* Door top line */}
                       <div
-                        className="absolute border-t-2 border-border/40 pointer-events-none"
+                        className="absolute border-t-2 border-foreground/70 pointer-events-none"
                         style={{
                           left: `${door.position * scale}px`,
                           top: `${doorTopPosition * scale}px`,
@@ -1306,7 +1338,7 @@ export const LayoutForm = ({
                       }}
                       placeholder="1,00"
                       suffix="cm"
-                      min={50}
+                      min={0}
                       disabled={disabled}
                       className="w-14 text-center text-xs"
                     />

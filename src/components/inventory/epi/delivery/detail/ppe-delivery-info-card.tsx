@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { IconCalendar, IconShield, IconUser, IconPackage, IconTruck, IconCircleCheck } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
+import { IconCalendar, IconShield, IconUser, IconPackage, IconTruck, IconCircleCheck, IconFileText, IconPencil, IconExternalLink, IconRefresh } from "@tabler/icons-react";
 import type { PpeDelivery } from "../../../../../types";
-import { PPE_DELIVERY_STATUS_LABELS, getBadgeVariant } from "../../../../../constants";
+import { PPE_DELIVERY_STATUS_LABELS, getBadgeVariant, PPE_DELIVERY_STATUS } from "../../../../../constants";
 import { formatDateTime } from "../../../../../utils";
 import { cn } from "@/lib/utils";
 
@@ -100,6 +101,81 @@ export function PpeDeliveryInfoCard({ ppeDelivery, className }: PpeDeliveryInfoC
             </div>
             <span className="text-sm font-semibold text-foreground">{formatDateTime(ppeDelivery.actualDeliveryDate)}</span>
           </div>
+        )}
+
+        {/* Signature Section - Only show for statuses related to signature */}
+        {(ppeDelivery.status === PPE_DELIVERY_STATUS.WAITING_SIGNATURE ||
+          ppeDelivery.status === PPE_DELIVERY_STATUS.COMPLETED ||
+          ppeDelivery.status === PPE_DELIVERY_STATUS.SIGNATURE_REJECTED) && (
+          <>
+            {/* Divider */}
+            <div className="border-t border-border my-4" />
+
+            {/* Signature Header */}
+            <div className="flex items-center gap-2 mb-3">
+              <IconPencil className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold text-foreground">Assinatura Digital</span>
+            </div>
+
+            {/* Signature Status */}
+            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+              <span className="text-sm font-medium text-muted-foreground">Status da Assinatura</span>
+              <Badge
+                variant={
+                  ppeDelivery.status === PPE_DELIVERY_STATUS.COMPLETED
+                    ? "success"
+                    : ppeDelivery.status === PPE_DELIVERY_STATUS.SIGNATURE_REJECTED
+                    ? "destructive"
+                    : "warning"
+                }
+              >
+                {ppeDelivery.status === PPE_DELIVERY_STATUS.COMPLETED
+                  ? "Assinado"
+                  : ppeDelivery.status === PPE_DELIVERY_STATUS.SIGNATURE_REJECTED
+                  ? "Rejeitado"
+                  : "Aguardando Assinatura"}
+              </Badge>
+            </div>
+
+            {/* Signed At */}
+            {ppeDelivery.clicksignSignedAt && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <IconCircleCheck className="h-4 w-4 text-green-500" />
+                  <span className="text-sm font-medium text-muted-foreground">Data da Assinatura</span>
+                </div>
+                <span className="text-sm font-semibold text-foreground">
+                  {formatDateTime(ppeDelivery.clicksignSignedAt)}
+                </span>
+              </div>
+            )}
+
+            {/* Delivery Document */}
+            {ppeDelivery.deliveryDocument && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <IconFileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Termo de Entrega</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  asChild
+                  className="h-7"
+                >
+                  <a
+                    href={`${import.meta.env.VITE_API_URL || ""}/files/${ppeDelivery.deliveryDocument.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1"
+                  >
+                    <IconExternalLink className="h-3.5 w-3.5" />
+                    {ppeDelivery.clicksignSignedAt ? "Ver Documento Assinado" : "Ver Documento"}
+                  </a>
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

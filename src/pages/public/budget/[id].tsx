@@ -42,6 +42,9 @@ interface PricingData extends TaskPricing {
       corporateName?: string;
       fantasyName?: string;
     };
+    truck?: {
+      plate?: string;
+    };
   };
 }
 
@@ -173,10 +176,13 @@ export function PublicBudgetPage() {
   const budgetNumber = pricing.budgetNumber
     ? String(pricing.budgetNumber).padStart(4, '0')
     : pricing.task?.serialNumber || "0000";
+  // Calculate validity in days (budget expiration, NOT delivery time)
   const validityDays = pricing.expiresAt
     ? Math.max(0, Math.round((new Date(pricing.expiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
     : 30;
   const termDate = pricing.task?.term ? formatDate(pricing.task.term) : "";
+  // Custom delivery days (production time) - used when no term date is set
+  const customDeliveryDays = pricing.customForecastDays || null;
   const paymentText = generatePaymentText(pricing);
   const guaranteeText = generateGuaranteeText(pricing);
   const hasDiscount = pricing.discountType !== "NONE" && pricing.discountValue && pricing.discountValue > 0;
@@ -239,7 +245,19 @@ export function PublicBudgetPage() {
               )}
               <p className="text-gray-700">
                 Conforme solicitado, apresentamos nossa proposta de preço para execução dos
-                serviços abaixo descriminados.
+                serviços abaixo descriminados
+                {(pricing.task?.serialNumber || pricing.task?.truck?.plate) && (
+                  <>
+                    {" "}no veículo
+                    {pricing.task?.serialNumber && (
+                      <> nº série: <strong>{pricing.task.serialNumber}</strong></>
+                    )}
+                    {pricing.task?.serialNumber && pricing.task?.truck?.plate && ","}
+                    {pricing.task?.truck?.plate && (
+                      <> placa: <span className="font-semibold">{pricing.task.truck.plate}</span></>
+                    )}
+                  </>
+                )}.
               </p>
             </div>
 
@@ -268,34 +286,45 @@ export function PublicBudgetPage() {
                 })}
               </div>
 
-              {/* Totals */}
-              {hasDiscount && (
-                <div className="mt-6 pl-4 space-y-1">
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-gray-700">Subtotal</span>
-                    <span className="text-gray-800">{formatCurrency(pricing.subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between items-baseline text-red-600">
-                    <span>
-                      Desconto
-                      {pricing.discountType === "PERCENTAGE"
-                        ? ` (${pricing.discountValue}%)`
-                        : ""}
-                    </span>
-                    <span>- {formatCurrency(discountAmount)}</span>
-                  </div>
-                  <div className="flex justify-between items-baseline pt-2 border-t border-gray-200">
-                    <span className="font-bold text-gray-900">Total</span>
-                    <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
-                      {formatCurrency(pricing.total)}
-                    </span>
-                  </div>
+              {/* Totals - Always show total, only show subtotal/discount rows when there's a discount */}
+              <div className="mt-6 pl-4 space-y-1">
+                {hasDiscount && (
+                  <>
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-gray-700">Subtotal</span>
+                      <span className="text-gray-800">{formatCurrency(pricing.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between items-baseline text-red-600">
+                      <span>
+                        Desconto
+                        {pricing.discountType === "PERCENTAGE"
+                          ? ` (${pricing.discountValue}%)`
+                          : ""}
+                      </span>
+                      <span>- {formatCurrency(discountAmount)}</span>
+                    </div>
+                  </>
+                )}
+                <div className={`flex justify-between items-baseline ${hasDiscount ? 'pt-2 border-t border-gray-200' : ''}`}>
+                  <span className="font-bold text-gray-900">Total</span>
+                  <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
+                    {formatCurrency(pricing.total)}
+                  </span>
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* Delivery Term */}
-            {termDate && (
+            {/* Delivery Term - customDeliveryDays takes priority over termDate */}
+            {customDeliveryDays ? (
+              <div className="mb-6">
+                <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
+                  Prazo de entrega
+                </h3>
+                <p className="text-gray-700">
+                  O prazo de entrega é de {customDeliveryDays} dias úteis a partir da data de liberação.
+                </p>
+              </div>
+            ) : termDate ? (
               <div className="mb-6">
                 <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
                   Prazo de entrega
@@ -305,7 +334,7 @@ export function PublicBudgetPage() {
                   previamente informada e não haja alterações nos serviços descritos.
                 </p>
               </div>
-            )}
+            ) : null}
 
             {/* Payment Terms */}
             {paymentText && (

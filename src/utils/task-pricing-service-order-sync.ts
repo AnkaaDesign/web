@@ -300,24 +300,23 @@ export function isServiceOrderMatchingPricingItem(
  * Syncs observations from service orders to matching pricing items.
  * Returns updated pricing items array with observations synced.
  *
- * IMPORTANT: Only syncs when the source HAS an observation.
- * If the service order has no observation, the pricing item's observation is preserved.
+ * This function propagates both set and cleared observations.
+ * If the service order's observation is empty/null, it will clear the pricing item's observation.
  */
 export function syncObservationsFromServiceOrdersToPricing(
   serviceOrders: SyncServiceOrder[],
   pricingItems: SyncPricingItem[],
 ): SyncPricingItem[] {
   // Create a map of normalized description -> observation from service orders
-  // ONLY include entries that actually have an observation value
-  const soObservationMap = new Map<string, string>();
+  // Include ALL matched descriptions, even with empty observations
+  const soObservationMap = new Map<string, string | null>();
   for (const so of serviceOrders) {
     if (so.type !== SERVICE_ORDER_TYPE.PRODUCTION) continue;
     if (!so.description || so.description.trim().length < 3) continue;
-    // Only add to map if the service order actually HAS an observation
-    if (so.observation && so.observation.trim()) {
-      const normalizedDesc = normalizeDescription(so.description);
-      soObservationMap.set(normalizedDesc, so.observation);
-    }
+    const normalizedDesc = normalizeDescription(so.description);
+    // Store the observation value (or null if empty)
+    const observationValue = so.observation && so.observation.trim() ? so.observation : null;
+    soObservationMap.set(normalizedDesc, observationValue);
   }
 
   // Update pricing items with matching observations
@@ -325,9 +324,10 @@ export function syncObservationsFromServiceOrdersToPricing(
     if (!item.description || item.description.trim().length < 3) return item;
     const normalizedDesc = normalizeDescription(item.description);
     if (soObservationMap.has(normalizedDesc)) {
-      const soObservation = soObservationMap.get(normalizedDesc)!;
-      // Only update if observation differs
-      if (item.observation !== soObservation) {
+      const soObservation = soObservationMap.get(normalizedDesc);
+      // Only update if observation differs (including clearing)
+      const currentObs = item.observation && item.observation.trim() ? item.observation : null;
+      if (currentObs !== soObservation) {
         return { ...item, observation: soObservation };
       }
     }
@@ -339,23 +339,22 @@ export function syncObservationsFromServiceOrdersToPricing(
  * Syncs observations from pricing items to matching service orders.
  * Returns updated service orders array with observations synced.
  *
- * IMPORTANT: Only syncs when the source HAS an observation.
- * If the pricing item has no observation, the service order's observation is preserved.
+ * This function propagates both set and cleared observations.
+ * If the pricing item's observation is empty/null, it will clear the service order's observation.
  */
 export function syncObservationsFromPricingToServiceOrders(
   pricingItems: SyncPricingItem[],
   serviceOrders: SyncServiceOrder[],
 ): SyncServiceOrder[] {
   // Create a map of normalized description -> observation from pricing items
-  // ONLY include entries that actually have an observation value
-  const pricingObservationMap = new Map<string, string>();
+  // Include ALL matched descriptions, even with empty observations
+  const pricingObservationMap = new Map<string, string | null>();
   for (const item of pricingItems) {
     if (!item.description || item.description.trim().length < 3) continue;
-    // Only add to map if the pricing item actually HAS an observation
-    if (item.observation && item.observation.trim()) {
-      const normalizedDesc = normalizeDescription(item.description);
-      pricingObservationMap.set(normalizedDesc, item.observation);
-    }
+    const normalizedDesc = normalizeDescription(item.description);
+    // Store the observation value (or null if empty)
+    const observationValue = item.observation && item.observation.trim() ? item.observation : null;
+    pricingObservationMap.set(normalizedDesc, observationValue);
   }
 
   // Update service orders with matching observations
@@ -364,9 +363,10 @@ export function syncObservationsFromPricingToServiceOrders(
     if (!so.description || so.description.trim().length < 3) return so;
     const normalizedDesc = normalizeDescription(so.description);
     if (pricingObservationMap.has(normalizedDesc)) {
-      const pricingObservation = pricingObservationMap.get(normalizedDesc)!;
-      // Only update if observation differs
-      if (so.observation !== pricingObservation) {
+      const pricingObservation = pricingObservationMap.get(normalizedDesc);
+      // Only update if observation differs (including clearing)
+      const currentObs = so.observation && so.observation.trim() ? so.observation : null;
+      if (currentObs !== pricingObservation) {
         return { ...so, observation: pricingObservation };
       }
     }

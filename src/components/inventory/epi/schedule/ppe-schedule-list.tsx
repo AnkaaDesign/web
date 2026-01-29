@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useUsers, useItems } from "../../../../hooks";
+import { useUsers, useItems, usePpeDeliveryScheduleMutations } from "../../../../hooks";
 import type { PpeDeliverySchedule } from "../../../../types";
 import type { PpeDeliveryScheduleGetManyFormData } from "../../../../schemas";
 import { routes, SCHEDULE_FREQUENCY, ITEM_CATEGORY_TYPE } from "../../../../constants";
@@ -19,6 +19,16 @@ import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/use-table-state";
 import { Badge } from "@/components/ui/badge";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PpeScheduleRoutes {
   details: (id: string) => string;
@@ -49,6 +59,7 @@ export function PpeScheduleList({ className, scheduleRoutes }: PpeScheduleListPr
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const { deleteMutation } = usePpeDeliveryScheduleMutations();
 
   const activeRoutes: PpeScheduleRoutes = scheduleRoutes || {
     details: (id: string) => routes.inventory.ppe.schedules.details(id),
@@ -57,6 +68,11 @@ export function PpeScheduleList({ className, scheduleRoutes }: PpeScheduleListPr
 
   // State to hold current page items and total count from the table
   const [tableData, setTableData] = useState<{ items: PpeDeliverySchedule[]; totalRecords: number }>({ items: [], totalRecords: 0 });
+
+  // Delete dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [schedulesToDelete, setSchedulesToDelete] = useState<PpeDeliverySchedule[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Stable callback for table data updates
   const handleTableDataChange = useCallback((data: { items: PpeDeliverySchedule[]; totalRecords: number }) => {
@@ -322,8 +338,22 @@ export function PpeScheduleList({ className, scheduleRoutes }: PpeScheduleListPr
     // TODO: Implement batch deactivate logic
   };
 
-  const handleBulkDelete = async (schedules: PpeDeliverySchedule[]) => {
-    // TODO: Implement batch delete logic
+  const handleBulkDelete = (schedules: PpeDeliverySchedule[]) => {
+    setSchedulesToDelete(schedules);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await Promise.all(schedulesToDelete.map((schedule) => deleteMutation.mutateAsync(schedule.id)));
+    } catch (error) {
+      // Error handled by mutation
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setSchedulesToDelete([]);
+    }
   };
 
   return (
@@ -374,6 +404,31 @@ export function PpeScheduleList({ className, scheduleRoutes }: PpeScheduleListPr
 
       {/* Enhanced Filter Modal */}
       <PpeScheduleFilters open={showFilterModal} onOpenChange={setShowFilterModal} filters={filters} onFilterChange={handleFilterChange} />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              {schedulesToDelete.length === 1
+                ? `Tem certeza que deseja excluir o agendamento "${schedulesToDelete[0]?.name}"?`
+                : `Tem certeza que deseja excluir ${schedulesToDelete.length} agendamentos?`}
+              {" "}Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

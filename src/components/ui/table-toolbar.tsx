@@ -33,6 +33,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { BaseExportPopover, ExportColumn, ExportFormat } from "@/components/ui/export-popover";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
+import { getHeaderText } from "@/components/ui/column-visibility-utils";
 
 export type TableDensity = "compact" | "normal" | "comfortable";
 
@@ -244,7 +245,7 @@ export function TableToolbar<T extends { id: string }>({
   // Filter columns based on search
   const filteredColumns = useMemo(() => {
     if (!columnSearchQuery) return columns;
-    return columns.filter((col) => col.header.toLowerCase().includes(columnSearchQuery.toLowerCase()));
+    return columns.filter((col) => getHeaderText(col.header).toLowerCase().includes(columnSearchQuery.toLowerCase()));
   }, [columns, columnSearchQuery]);
 
   // Column visibility handlers

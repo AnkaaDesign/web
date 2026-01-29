@@ -1,9 +1,34 @@
 import { formatDateTime } from "../../../../utils";
-import { PPE_DELIVERY_STATUS_LABELS, getBadgeVariant } from "../../../../constants";
-import type { PpeDelivery } from "../../../../types";
+import { PPE_DELIVERY_STATUS_LABELS, getBadgeVariant, MEASURE_TYPE, MEASURE_UNIT_LABELS } from "../../../../constants";
+import type { PpeDelivery, Item } from "../../../../types";
 import { Badge } from "../../../ui/badge";
 import { TABLE_LAYOUT } from "../../../ui/table-constants";
 import type { PpeDeliveryColumn } from "./types";
+
+// Helper function to get PPE size from item measures
+const getItemSize = (item: Item | undefined): string => {
+  if (!item?.measures || item.measures.length === 0) {
+    return "-";
+  }
+
+  const sizeMeasure = item.measures.find((m) => m.measureType === MEASURE_TYPE.SIZE);
+  if (!sizeMeasure) {
+    return "-";
+  }
+
+  // Check if it's a numeric size in the value field (e.g., 38, 42 for boots)
+  if (sizeMeasure.value !== null && sizeMeasure.value !== undefined) {
+    return String(sizeMeasure.value);
+  }
+
+  // Check if it's a letter size in the unit field (e.g., P, M, G for shirts)
+  if (sizeMeasure.unit) {
+    const unitLabel = MEASURE_UNIT_LABELS[sizeMeasure.unit as keyof typeof MEASURE_UNIT_LABELS];
+    return unitLabel || sizeMeasure.unit;
+  }
+
+  return "-";
+};
 
 export const createPpeDeliveryColumns = (): PpeDeliveryColumn[] => [
   // Primary columns in the correct order
@@ -21,6 +46,14 @@ export const createPpeDeliveryColumns = (): PpeDeliveryColumn[] => [
     accessor: (delivery: PpeDelivery) => <div className="font-medium truncate">{delivery.item?.name || "-"}</div>,
     sortable: true,
     className: "w-52",
+    align: "left",
+  },
+  {
+    key: "item.measures",
+    header: "TAMANHO",
+    accessor: (delivery: PpeDelivery) => <div className="truncate">{getItemSize(delivery.item)}</div>,
+    sortable: false,
+    className: "w-24",
     align: "left",
   },
   {
@@ -124,5 +157,5 @@ export const createPpeDeliveryColumns = (): PpeDeliveryColumn[] => [
 ];
 
 export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["item.uniCode", "item.name", "user.name", "status", "quantity", "createdAt"]);
+  return new Set(["item.uniCode", "item.name", "item.measures", "user.name", "status", "quantity", "createdAt"]);
 }

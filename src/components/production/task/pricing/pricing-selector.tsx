@@ -74,6 +74,12 @@ const GUARANTEE_OPTIONS = [
   { value: "CUSTOM", label: "Personalizado" },
 ] as const;
 
+// Validity days options (1-30 days)
+const VALIDITY_DAYS_OPTIONS = Array.from({ length: 30 }, (_, i) => ({
+  value: String(i + 1),
+  label: `${i + 1} ${i + 1 === 1 ? 'dia' : 'dias'}`,
+}));
+
 export const PricingSelector = forwardRef<
   PricingSelectorRef,
   PricingSelectorProps
@@ -610,11 +616,11 @@ export const PricingSelector = forwardRef<
         </div>
       )}
 
-      {/* Payment, Date, and Guarantee - 3 column grid */}
+      {/* Payment, Date, Guarantee, and Validity - 6 column grid (2/6, 1/6, 2/6, 1/6) */}
       {hasPricingItems && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {/* Payment Condition */}
-          <FormItem>
+        <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
+          {/* Payment Condition - 2/6 */}
+          <FormItem className="sm:col-span-2">
             <FormLabel>Condição de Pagamento</FormLabel>
             <FormControl>
               <Combobox
@@ -631,7 +637,7 @@ export const PricingSelector = forwardRef<
             </FormControl>
           </FormItem>
 
-          {/* Down Payment Date */}
+          {/* Down Payment Date - 1/6 */}
           <FormField
             control={control}
             name="pricing.downPaymentDate"
@@ -645,8 +651,8 @@ export const PricingSelector = forwardRef<
             )}
           />
 
-          {/* Guarantee */}
-          <FormItem>
+          {/* Guarantee - 2/6 */}
+          <FormItem className="sm:col-span-2">
             <FormLabel>Período de Garantia</FormLabel>
             <FormControl>
               <Combobox
@@ -662,6 +668,27 @@ export const PricingSelector = forwardRef<
               />
             </FormControl>
           </FormItem>
+
+          {/* Custom Delivery Days - 1/6 */}
+          <FormField
+            control={control}
+            name="pricing.customForecastDays"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Prazo Entrega</FormLabel>
+                <FormControl>
+                  <Combobox
+                    value={field.value ? String(field.value) : ""}
+                    onValueChange={(value) => field.onChange(value ? Number(value) : null)}
+                    disabled={disabled || readOnly}
+                    options={VALIDITY_DAYS_OPTIONS}
+                    placeholder="Auto"
+                    emptyMessage="Nenhuma opção"
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
         </div>
       )}
 

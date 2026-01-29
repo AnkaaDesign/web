@@ -74,6 +74,7 @@ const EPIDeliveryDetails = () => {
       },
       reviewedByUser: true,
       ppeSchedule: true,
+      deliveryDocument: true,
     },
     enabled: !!id,
   });
@@ -289,11 +290,15 @@ const EPIDeliveryDetails = () => {
             </div>
           </div>
 
-            {/* Second Row: Schedule (if available) and Changelog (1/2 each) */}
-            <div className={getDetailGridClasses()}>
-              {ppeDelivery.ppeSchedule && <PpeDeliveryScheduleCard schedule={ppeDelivery.ppeSchedule} className="h-full" />}
-              <PpeDeliveryChangelogCard delivery={ppeDelivery} className={ppeDelivery.ppeSchedule ? "h-full" : "lg:col-span-2 h-full"} />
-            </div>
+            {/* Second Row: Schedule (if available) */}
+            {ppeDelivery.ppeSchedule && (
+              <div className={getDetailGridClasses()}>
+                <PpeDeliveryScheduleCard schedule={ppeDelivery.ppeSchedule} className="h-full" />
+              </div>
+            )}
+
+            {/* Third Row: Changelog (full width) */}
+            <PpeDeliveryChangelogCard delivery={ppeDelivery} className="h-full" />
           </div>
         </div>
 

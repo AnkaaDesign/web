@@ -1,9 +1,10 @@
 import type { Task } from "../../../../types";
 import type { ColumnDef } from "@tanstack/react-table";
+import type { ReactNode } from "react";
 
 export interface TaskColumn {
   id: string;
-  header: string;
+  header: string | ReactNode;
   accessorKey?: string;
   accessorFn?: (row: Task) => any;
   sortable?: boolean;

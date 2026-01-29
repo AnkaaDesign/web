@@ -253,6 +253,19 @@ export function PpeSizesFilters({ open, onOpenChange, filters, onFilterChange }:
             </div>
 
             <div>
+              <Label className="flex items-center gap-2 text-xs text-muted-foreground mb-1"><IconHanger className="h-3.5 w-3.5" />Bermuda</Label>
+              <Combobox
+                mode="multiple"
+                options={pantsOptions}
+                value={ppeSizeFilters.shorts || []}
+                onValueChange={(v) => handlePpeSizeChange("shorts", v)}
+                placeholder="Selecione tamanhos"
+                searchable={true}
+                minSearchLength={0}
+              />
+            </div>
+
+            <div>
               <Label className="flex items-center gap-2 text-xs text-muted-foreground mb-1"><IconShoe className="h-3.5 w-3.5" />Bota</Label>
               <Combobox
                 mode="multiple"

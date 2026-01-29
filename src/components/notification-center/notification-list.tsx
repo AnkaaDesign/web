@@ -90,13 +90,46 @@ export const NotificationList: React.FC<NotificationListProps> = ({
   onLoadMore,
   isLoadingMore = false,
 }) => {
+  const viewportRef = React.useRef<HTMLDivElement>(null);
+  const scrollPositionRef = React.useRef<number>(0);
+  const prevNotificationsLengthRef = React.useRef<number>(notifications.length);
+  const isLoadingMoreRef = React.useRef<boolean>(false);
+
+  // Track when loading more starts
+  React.useEffect(() => {
+    if (isLoadingMore) {
+      isLoadingMoreRef.current = true;
+    }
+  }, [isLoadingMore]);
+
+  // Restore scroll position after new data loads
+  React.useEffect(() => {
+    // Only restore if we were loading more and now have more notifications
+    if (isLoadingMoreRef.current && notifications.length > prevNotificationsLengthRef.current && viewportRef.current) {
+      const savedPosition = scrollPositionRef.current;
+      // Use double requestAnimationFrame to ensure DOM is fully updated
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (viewportRef.current) {
+            viewportRef.current.scrollTop = savedPosition;
+          }
+        });
+      });
+      isLoadingMoreRef.current = false;
+    }
+    prevNotificationsLengthRef.current = notifications.length;
+  }, [notifications]);
+
   // Handle scroll to detect when user reaches the bottom
   const handleScroll = React.useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
-      if (!hasMore || !onLoadMore || isLoadingMore) return;
-
       const target = event.target as HTMLDivElement;
       const { scrollTop, scrollHeight, clientHeight } = target;
+
+      // Always save the current scroll position
+      scrollPositionRef.current = scrollTop;
+
+      if (!hasMore || !onLoadMore || isLoadingMore) return;
 
       // Load more when user is within 100px of the bottom
       if (scrollHeight - scrollTop - clientHeight < 100) {
@@ -136,7 +169,7 @@ export const NotificationList: React.FC<NotificationListProps> = ({
   };
 
   return (
-    <ScrollArea className="w-full" style={{ height: maxHeight }} onScroll={handleScroll}>
+    <ScrollArea className="w-full" style={{ height: maxHeight }} viewportRef={viewportRef} onScroll={handleScroll}>
       <div className="flex flex-col">
         {renderGroup("Hoje", grouped.today)}
         {renderGroup("Ontem", grouped.yesterday)}

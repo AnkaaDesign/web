@@ -23,6 +23,21 @@ interface MessagePreviewDialogProps {
 export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePreviewDialogProps) => {
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
 
+  // Helper to render text content with newlines converted to <br /> elements
+  const renderTextWithLineBreaks = (text: string) => {
+    if (!text.includes('\n')) {
+      return text;
+    }
+
+    const parts = text.split('\n');
+    return parts.map((part, i) => (
+      <span key={i}>
+        {part}
+        {i < parts.length - 1 && <br />}
+      </span>
+    ));
+  };
+
   // Helper to render formatted text with markdown support
   const renderFormattedText = (text: string) => {
     const formatted = parseMarkdownToInlineFormat(text);
@@ -30,11 +45,11 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
       const key = `fmt-${index}`;
       switch (format.type) {
         case 'text':
-          return <span key={key}>{format.content}</span>;
+          return <span key={key}>{renderTextWithLineBreaks(format.content)}</span>;
         case 'bold':
-          return <strong key={key} className="font-semibold">{format.content}</strong>;
+          return <strong key={key} className="font-semibold">{renderTextWithLineBreaks(format.content)}</strong>;
         case 'italic':
-          return <em key={key} className="italic">{format.content}</em>;
+          return <em key={key} className="italic">{renderTextWithLineBreaks(format.content)}</em>;
         case 'link':
           return (
             <a
@@ -44,7 +59,7 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
               target="_blank"
               rel="noopener noreferrer"
             >
-              {format.content}
+              {renderTextWithLineBreaks(format.content)}
             </a>
           );
         default:

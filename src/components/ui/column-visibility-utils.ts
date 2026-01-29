@@ -1,7 +1,7 @@
 import React from "react";
 
 /**
- * Helper function to extract text from ReactNode headers
+ * Helper function to recursively extract text from ReactNode headers
  * This is used in column visibility managers to handle both string and ReactNode headers
  */
 export function getHeaderText(header: string | React.ReactNode): string {
@@ -9,8 +9,28 @@ export function getHeaderText(header: string | React.ReactNode): string {
     return header;
   }
 
-  // For ReactNode headers, we can't easily extract text content
-  // Return empty string to exclude from search/filtering
+  if (typeof header === "number") {
+    return String(header);
+  }
+
+  if (header === null || header === undefined) {
+    return "";
+  }
+
+  // Handle React elements - recursively extract text from children
+  if (React.isValidElement(header)) {
+    const { children } = header.props as { children?: React.ReactNode };
+    if (children) {
+      return getHeaderText(children);
+    }
+    return "";
+  }
+
+  // Handle arrays of children
+  if (Array.isArray(header)) {
+    return header.map(getHeaderText).join("");
+  }
+
   return "";
 }
 

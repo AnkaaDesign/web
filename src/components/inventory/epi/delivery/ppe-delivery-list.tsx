@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useUsers, useItems, useMarkPpeDeliveryAsDelivered, useAuth, useBatchApprovePpeDeliveries, useBatchRejectPpeDeliveries, usePpeDeliveryMutations, useBatchDeletePpeDeliveries } from "../../../../hooks";
+import { useUsers, useItems, useMarkPpeDeliveryAsDelivered, useBatchMarkPpeDeliveriesAsDelivered, useAuth, useBatchApprovePpeDeliveries, useBatchRejectPpeDeliveries, usePpeDeliveryMutations, useBatchDeletePpeDeliveries } from "../../../../hooks";
 import type { PpeDelivery } from "../../../../types";
 import type { PpeDeliveryGetManyFormData } from "../../../../schemas";
 import { routes, PPE_DELIVERY_STATUS, ITEM_CATEGORY_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PpeDeliveryTable } from "./ppe-delivery-table";
 import { IconSearch, IconFilter } from "@tabler/icons-react";
+import { toast } from "sonner";
 import { PpeDeliveryFilters } from "./ppe-delivery-filters";
 import { FilterIndicators } from "./filter-indicators";
 import { extractActiveFilters, createFilterRemover } from "./filter-utils";
@@ -47,6 +48,7 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const markAsDeliveredMutation = useMarkPpeDeliveryAsDelivered();
+  const batchMarkAsDeliveredMutation = useBatchMarkPpeDeliveriesAsDelivered();
   const batchApproveMutation = useBatchApprovePpeDeliveries();
   const batchRejectMutation = useBatchRejectPpeDeliveries();
   const batchDeleteMutation = useBatchDeletePpeDeliveries();
@@ -331,6 +333,7 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   const handleBulkApprove = useCallback(async (deliveries: PpeDelivery[]) => {
     // Check permissions - only ADMIN can approve/reject deliveries
     if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN)) {
+      toast.error("Você não tem permissão para aprovar entregas");
       return;
     }
 
@@ -341,8 +344,13 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     );
 
     if (deliveriesToApprove.length === 0) {
+      toast.warning("Nenhuma entrega selecionada está pendente. Apenas entregas pendentes podem ser aprovadas.");
       return;
     }
+
+    const toastId = toast.loading(
+      `Aprovando ${deliveriesToApprove.length} entrega${deliveriesToApprove.length > 1 ? "s" : ""}...`
+    );
 
     try {
       // Check if single or batch operation
@@ -364,7 +372,15 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
           approvedBy: currentUser.id,
         });
       }
+      toast.success(
+        deliveriesToApprove.length === 1
+          ? "Entrega aprovada com sucesso"
+          : `${deliveriesToApprove.length} entregas aprovadas com sucesso`,
+        { id: toastId }
+      );
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Erro ao aprovar entregas";
+      toast.error(errorMessage, { id: toastId });
       if (process.env.NODE_ENV !== 'production') {
         console.error("[handleBulkApprove] Error approving deliveries:", error);
       }
@@ -374,6 +390,7 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   const handleBulkDeliver = useCallback(async (deliveries: PpeDelivery[]) => {
     // Check permissions
     if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.WAREHOUSE)) {
+      toast.error("Você não tem permissão para marcar entregas como entregues");
       return;
     }
 
@@ -381,30 +398,67 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     const deliveriesToMark = deliveries.filter((d) => d.status === PPE_DELIVERY_STATUS.APPROVED);
 
     if (deliveriesToMark.length === 0) {
+      toast.warning("Nenhuma entrega selecionada está aprovada. Apenas entregas aprovadas podem ser marcadas como entregues.");
       return;
     }
 
+    // Show loading toast with progress indicator
+    const toastId = toast.loading(
+      `Processando ${deliveriesToMark.length} entrega${deliveriesToMark.length > 1 ? "s" : ""}...`,
+      {
+        description: "Marcando como entregue e gerando documento de assinatura",
+      }
+    );
+
     try {
-      // Mark each delivery as delivered
-      await Promise.all(
-        deliveriesToMark.map((delivery) =>
-          markAsDeliveredMutation.mutateAsync({
-            id: delivery.id,
-            deliveryDate: new Date(),
-          }),
-        ),
-      );
+      // Use batch endpoint to mark all deliveries as delivered at once
+      // This ensures the backend groups deliveries by user and creates a single PDF per user
+      const deliveryIds = deliveriesToMark.map((d) => d.id);
+      const result = await batchMarkAsDeliveredMutation.mutateAsync({
+        deliveryIds,
+        deliveryDate: new Date(),
+      });
+
+      if (result.success > 0 && result.failed === 0) {
+        toast.success(
+          result.success === 1
+            ? "Entrega processada com sucesso!"
+            : `${result.success} entregas processadas com sucesso!`,
+          {
+            id: toastId,
+            description: "Documento de assinatura gerado e enviado para o funcionário",
+          }
+        );
+      } else if (result.success > 0 && result.failed > 0) {
+        toast.warning(
+          `${result.success} sucesso, ${result.failed} falha${result.failed > 1 ? "s" : ""}`,
+          {
+            id: toastId,
+            description: "Algumas entregas foram processadas, outras falharam",
+          }
+        );
+      } else {
+        toast.error("Falha ao processar entregas", {
+          id: toastId,
+          description: `${result.failed} entrega${result.failed > 1 ? "s" : ""} falhou/falharam`,
+        });
+      }
     } catch (error) {
-      // Error is handled by the API client with detailed message
+      const errorMessage = error instanceof Error ? error.message : "Erro ao marcar entregas como entregues";
+      toast.error("Erro ao processar entregas", {
+        id: toastId,
+        description: errorMessage,
+      });
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error marking deliveries as delivered:", error);
       }
     }
-  }, [currentUser, markAsDeliveredMutation]);
+  }, [currentUser, batchMarkAsDeliveredMutation]);
 
   const handleBulkReject = useCallback(async (deliveries: PpeDelivery[]) => {
     // Check permissions - only ADMIN can approve/reject deliveries
     if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN)) {
+      toast.error("Você não tem permissão para reprovar entregas");
       return;
     }
 
@@ -417,8 +471,13 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     );
 
     if (deliveriesToReject.length === 0) {
+      toast.warning("Nenhuma entrega selecionada pode ser reprovada. Apenas entregas pendentes ou aprovadas podem ser reprovadas.");
       return;
     }
+
+    const toastId = toast.loading(
+      `Reprovando ${deliveriesToReject.length} entrega${deliveriesToReject.length > 1 ? "s" : ""}...`
+    );
 
     try {
       // Check if single or batch operation
@@ -440,7 +499,15 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
           reviewedBy: currentUser.id,
         });
       }
+      toast.success(
+        deliveriesToReject.length === 1
+          ? "Entrega reprovada com sucesso"
+          : `${deliveriesToReject.length} entregas reprovadas com sucesso`,
+        { id: toastId }
+      );
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Erro ao reprovar entregas";
+      toast.error(errorMessage, { id: toastId });
       if (process.env.NODE_ENV !== 'production') {
         console.error("[handleBulkReject] Error rejecting deliveries:", error);
       }
@@ -454,18 +521,83 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     });
   }, []);
 
+  const handleBulkRevertToApproved = useCallback(async (deliveries: PpeDelivery[]) => {
+    // Check permissions - only WAREHOUSE can revert deliveries
+    if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.WAREHOUSE)) {
+      toast.error("Você não tem permissão para reverter entregas");
+      return;
+    }
+
+    // Filter only deliveries that can be reverted (DELIVERED status)
+    const deliveriesToRevert = deliveries.filter((d) => d.status === PPE_DELIVERY_STATUS.DELIVERED);
+
+    if (deliveriesToRevert.length === 0) {
+      toast.warning("Nenhuma entrega selecionada está entregue. Apenas entregas já entregues podem ser revertidas.");
+      return;
+    }
+
+    const toastId = toast.loading(
+      `Revertendo ${deliveriesToRevert.length} entrega${deliveriesToRevert.length > 1 ? "s" : ""}...`,
+      {
+        description: "Restaurando estoque e alterando status para aprovado",
+      }
+    );
+
+    try {
+      // Revert each delivery to APPROVED status
+      await Promise.all(
+        deliveriesToRevert.map((delivery) =>
+          updateAsync({
+            id: delivery.id,
+            data: {
+              status: PPE_DELIVERY_STATUS.APPROVED,
+              actualDeliveryDate: null,
+            },
+          }),
+        ),
+      );
+      toast.success(
+        deliveriesToRevert.length === 1
+          ? "Entrega revertida para aprovado com sucesso"
+          : `${deliveriesToRevert.length} entregas revertidas para aprovado com sucesso`,
+        { id: toastId, description: "Estoque restaurado" }
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Erro ao reverter entregas";
+      toast.error(errorMessage, { id: toastId });
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error reverting deliveries:", error);
+      }
+    }
+  }, [currentUser, updateAsync]);
+
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const confirmDelete = async () => {
     if (!deleteDialog) return;
+
+    setIsDeleting(true);
+    const toastId = toast.loading(
+      `Deletando ${deleteDialog.items.length} entrega${deleteDialog.items.length > 1 ? "s" : ""}...`
+    );
 
     try {
       const ids = deleteDialog.items.map((delivery) => delivery.id);
       await batchDeleteMutation.mutateAsync({ ppeDeliveryIds: ids });
+      toast.success(
+        deleteDialog.items.length === 1
+          ? "Entrega deletada com sucesso"
+          : `${deleteDialog.items.length} entregas deletadas com sucesso`,
+        { id: toastId }
+      );
     } catch (error) {
-      // Error is handled by the API client with detailed message
+      const errorMessage = error instanceof Error ? error.message : "Erro ao deletar entregas";
+      toast.error(errorMessage, { id: toastId });
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error deleting delivery(ies):", error);
       }
     } finally {
+      setIsDeleting(false);
       setDeleteDialog(null);
     }
   };
@@ -510,6 +642,7 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
             onApprove={handleBulkApprove}
             onReject={handleBulkReject}
             onDeliver={handleBulkDeliver}
+            onRevertToApproved={handleBulkRevertToApproved}
             onDelete={handleBulkDelete}
             filters={queryFilters}
             className="h-full"
@@ -533,9 +666,13 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Deletar
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deletando..." : "Deletar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

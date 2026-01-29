@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { routes, SECTOR_PRIVILEGES, SCHEDULE_FREQUENCY_LABELS, MONTH } from "../../../../../constants";
-import { ASSIGNMENT_TYPE_LABELS, PPE_DELIVERY_STATUS_LABELS } from "../../../../../constants";
-import type { PpeDelivery, PpeScheduleItem } from "../../../../../types";
-import { usePpeDeliverySchedule, usePpeDeliveryScheduleMutations, useAuth } from "../../../../../hooks";
+import { routes, SECTOR_PRIVILEGES } from "../../../../../constants";
+import { usePpeDeliverySchedule, usePpeDeliveryScheduleMutations, useExecutePpeDeliverySchedule, useAuth } from "../../../../../hooks";
+import { PpeScheduleInfoCard, PpeScheduleItemsCard, PpeScheduleDeliveriesCard } from "@/components/inventory/epi/schedule/detail";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconCalendar, IconEdit, IconTrash, IconRefresh, IconAlertTriangle } from "@tabler/icons-react";
+import { IconCalendar, IconEdit, IconTrash, IconRefresh, IconAlertTriangle, IconPlayerPlay, IconPlayerPause, IconLoader } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -21,19 +20,21 @@ import {
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { hasPrivilege } from "../../../../../utils";
 import { usePageTracker } from "@/hooks/use-page-tracker";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
+import { getDetailGridClasses } from "@/lib/layout-constants";
 
 export function PPEScheduleDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { deleteMutation } = usePpeDeliveryScheduleMutations();
+  const { updateAsync, deleteAsync } = usePpeDeliveryScheduleMutations();
+  const executeMutation = useExecutePpeDeliverySchedule();
   const { user: currentUser } = useAuth();
 
   // Dialog states
+  const [showActivateDialog, setShowActivateDialog] = useState(false);
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
 
   // Track page access
   usePageTracker({
@@ -47,12 +48,17 @@ export function PPEScheduleDetailsPage() {
 
   // Fetch PPE schedule data
   const {
-    data: ppeSchedule,
+    data: response,
     isLoading,
     error,
     refetch,
   } = usePpeDeliverySchedule(id!, {
     include: {
+      items: {
+        include: {
+          item: true,
+        },
+      },
       deliveries: {
         include: {
           item: true,
@@ -63,10 +69,12 @@ export function PPEScheduleDetailsPage() {
     enabled: !!id,
   });
 
+  const ppeSchedule = response?.data;
+
   // Handlers
   const handleEdit = () => {
-    if (ppeSchedule?.data && canManageWarehouse) {
-      navigate(routes.humanResources.ppe.schedules.edit(ppeSchedule.data.id));
+    if (ppeSchedule && canManageWarehouse) {
+      navigate(routes.humanResources.ppe.schedules.edit(ppeSchedule.id));
     }
   };
 
@@ -74,16 +82,78 @@ export function PPEScheduleDetailsPage() {
     refetch();
   };
 
-  const handleDelete = async () => {
-    if (!ppeSchedule?.data) return;
+  const handleExecuteNow = async () => {
+    if (!ppeSchedule) return;
 
     try {
-      await deleteMutation.mutateAsync(ppeSchedule.data.id);
+      setIsExecuting(true);
+      const result = await executeMutation.mutateAsync(ppeSchedule.id);
+      toast.success(result.message || `${result.data.deliveriesCreated} entregas criadas com sucesso!`);
+      refetch();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Erro ao executar agendamento";
+      toast.error(errorMessage);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const handleActivate = async () => {
+    if (!ppeSchedule) return;
+
+    setIsProcessing(true);
+    try {
+      await updateAsync({
+        id: ppeSchedule.id,
+        data: {
+          isActive: true,
+        },
+      });
+      refetch();
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error activating schedule:", error);
+      }
+    } finally {
+      setIsProcessing(false);
+      setShowActivateDialog(false);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (!ppeSchedule) return;
+
+    setIsProcessing(true);
+    try {
+      await updateAsync({
+        id: ppeSchedule.id,
+        data: {
+          isActive: false,
+        },
+      });
+      refetch();
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deactivating schedule:", error);
+      }
+    } finally {
+      setIsProcessing(false);
+      setShowDeactivateDialog(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!ppeSchedule) return;
+
+    setIsProcessing(true);
+    try {
+      await deleteAsync(ppeSchedule.id);
       navigate(routes.humanResources.ppe.schedules.root);
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error deleting schedule:", error);
       }
+      setIsProcessing(false);
     } finally {
       setShowDeleteDialog(false);
     }
@@ -93,24 +163,35 @@ export function PPEScheduleDetailsPage() {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-        <div className={cn("flex flex-col h-full", DETAIL_PAGE_SPACING.CONTAINER)}>
-          <div className="animate-pulse space-y-4">
-            <div className="flex items-center space-x-2">
-              <div className="h-4 w-16 bg-muted rounded"></div>
-              <div className="h-4 w-4 bg-muted rounded"></div>
-              <div className="h-4 w-20 bg-muted rounded"></div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="h-8 bg-muted rounded w-48"></div>
-              <div className="flex gap-2">
-                <div className="h-9 w-20 bg-muted rounded"></div>
-                <div className="h-9 w-20 bg-muted rounded"></div>
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
+          <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
+            <div className="animate-pulse space-y-6">
+              {/* Header Skeleton */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <div className="h-4 w-16 bg-muted rounded"></div>
+                  <div className="h-4 w-4 bg-muted rounded"></div>
+                  <div className="h-4 w-20 bg-muted rounded"></div>
+                  <div className="h-4 w-4 bg-muted rounded"></div>
+                  <div className="h-4 w-24 bg-muted rounded"></div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="h-8 bg-muted rounded w-48"></div>
+                  <div className="flex gap-2">
+                    <div className="h-9 w-20 bg-muted rounded"></div>
+                    <div className="h-9 w-20 bg-muted rounded"></div>
+                    <div className="h-9 w-16 bg-muted rounded"></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3 Column Grid Skeleton */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="h-96 bg-muted rounded-xl"></div>
+                <div className="h-96 bg-muted rounded-xl"></div>
+                <div className="h-96 bg-muted rounded-xl"></div>
               </div>
             </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="h-96 bg-muted rounded-xl"></div>
-            <div className="h-96 bg-muted rounded-xl"></div>
           </div>
         </div>
       </PrivilegeRoute>
@@ -118,36 +199,29 @@ export function PPEScheduleDetailsPage() {
   }
 
   // Error state
-  if (error || !ppeSchedule?.data) {
+  if (error || !ppeSchedule) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-        <div className={cn("flex flex-col h-full", DETAIL_PAGE_SPACING.CONTAINER)}>
-          <PageHeader
-            variant="detail"
-            title="Agendamento não encontrado"
-            icon={IconCalendar}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "RH", href: routes.humanResources.root },
-              { label: "EPIs", href: routes.humanResources.ppe.root },
-              { label: "Agendamentos", href: routes.humanResources.ppe.schedules.root },
-              { label: "Detalhes" },
-            ]}
-          />
-          <div className="flex flex-1 items-center justify-center">
-            <div className="text-center px-4 max-w-md mx-auto">
-              <div className="animate-in fade-in-50 duration-500">
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-                  <IconAlertTriangle className="h-10 w-10 text-red-500" />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-semibold mb-3 text-foreground">Agendamento não encontrado</h2>
-                <p className="text-sm sm:text-base text-muted-foreground mb-6 leading-relaxed">
-                  O agendamento de EPI que você está procurando não existe ou foi removido do sistema.
-                </p>
-                <div className="space-y-3">
-                  <Button onClick={() => navigate(routes.humanResources.ppe.schedules.root)} className="w-full sm:w-auto">
-                    Ir para Lista de Agendamentos
-                  </Button>
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
+          <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
+            <div className="flex flex-1 items-center justify-center min-h-[60vh]">
+              <div className="text-center px-4 max-w-md mx-auto">
+                <div className="animate-in fade-in-50 duration-500">
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                    <IconAlertTriangle className="h-10 w-10 text-red-500" />
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-semibold mb-3 text-foreground">Agendamento não encontrado</h2>
+                  <p className="text-sm sm:text-base text-muted-foreground mb-6 leading-relaxed">
+                    O agendamento de EPI que você está procurando não existe ou foi removido do sistema.
+                  </p>
+                  <div className="space-y-3">
+                    <Button onClick={() => navigate(routes.humanResources.ppe.schedules.root)} className="w-full sm:w-auto">
+                      Ir para Lista de Agendamentos
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate(routes.humanResources.ppe.root)} className="w-full sm:w-auto">
+                      Ir para EPIs
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -157,24 +231,66 @@ export function PPEScheduleDetailsPage() {
     );
   }
 
-  // Check permissions
+  // Check permissions for actions
   const canEdit = canManageWarehouse;
   const canDelete = isAdmin;
+  const canToggleActive = canManageWarehouse;
+
+  // Build custom actions for header
+  const customActions = [];
+
+  // Add execute now button for active schedules
+  if (canEdit && ppeSchedule.isActive) {
+    customActions.push({
+      key: "execute",
+      label: isExecuting ? "Executando..." : "Executar Agora",
+      icon: IconPlayerPlay,
+      onClick: handleExecuteNow,
+      disabled: isExecuting,
+    });
+  }
+
+  if (canToggleActive) {
+    if (ppeSchedule.isActive) {
+      customActions.push({
+        key: "deactivate",
+        label: "Desativar",
+        icon: IconPlayerPause,
+        onClick: () => setShowDeactivateDialog(true),
+      });
+    } else {
+      customActions.push({
+        key: "activate",
+        label: "Ativar",
+        icon: IconPlayerPlay,
+        onClick: () => setShowActivateDialog(true),
+      });
+    }
+  }
+
+  if (canDelete) {
+    customActions.push({
+      key: "delete",
+      label: "Excluir",
+      icon: IconTrash,
+      onClick: () => setShowDeleteDialog(true),
+    });
+  }
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
       <div className="h-full flex flex-col px-4 pt-4">
         <div className="flex-shrink-0">
-          <div className="animate-in fade-in-50 duration-500">
-            <PageHeader
+          <PageHeader
             variant="detail"
-            title={ppeSchedule.data.name || `Agendamento #${ppeSchedule.data.id.slice(-8)}`}
+            title={ppeSchedule.name || `Agendamento #${ppeSchedule.id.slice(-8)}`}
+            className="shadow-sm"
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "RH", href: routes.humanResources.root },
               { label: "EPIs", href: routes.humanResources.ppe.root },
               { label: "Agendamentos", href: routes.humanResources.ppe.schedules.root },
-              { label: ppeSchedule.data.name || `#${ppeSchedule.data.id.slice(-8)}` },
+              { label: ppeSchedule.name || `#${ppeSchedule.id.slice(-8)}` },
             ]}
             actions={[
               {
@@ -183,6 +299,7 @@ export function PPEScheduleDetailsPage() {
                 icon: IconRefresh,
                 onClick: handleRefresh,
               },
+              ...customActions,
               ...(canEdit
                 ? [
                     {
@@ -193,143 +310,84 @@ export function PPEScheduleDetailsPage() {
                     },
                   ]
                 : []),
-              ...(canDelete
-                ? [
-                    {
-                      key: "delete",
-                      label: "Excluir",
-                      icon: IconTrash,
-                      onClick: () => setShowDeleteDialog(true),
-                    },
-                  ]
-                : []),
             ]}
-            />
-          </div>
+          />
         </div>
-
         <div className="flex-1 overflow-y-auto pb-6">
-          {/* Content Grid */}
-          <div className="mt-4 animate-in fade-in-50 duration-700">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Basic Information Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Informações Gerais</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Status</span>
-                  <Badge variant={ppeSchedule.data.isActive ? "success" : "secondary"}>{ppeSchedule.data.isActive ? "Ativo" : "Inativo"}</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Frequência</span>
-                  <span className="text-sm font-medium">{SCHEDULE_FREQUENCY_LABELS[ppeSchedule.data.frequency] || ppeSchedule.data.frequency}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Frequência de Repetição</span>
-                  <span className="text-sm font-medium">{ppeSchedule.data.frequencyCount}x</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Tipo de Atribuição</span>
-                  <span className="text-sm font-medium">{ASSIGNMENT_TYPE_LABELS[ppeSchedule.data.assignmentType] || ppeSchedule.data.assignmentType}</span>
-                </div>
-                {ppeSchedule.data.ppeItems && ppeSchedule.data.ppeItems.length > 0 && (
-                  <div>
-                    <span className="text-sm text-muted-foreground">EPIs</span>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {ppeSchedule.data.ppeItems.map((ppe: PpeScheduleItem, index: number) => (
-                        <Badge key={`${ppe.ppeType}-${index}`} variant="outline">
-                          {ppe.ppeType} (Qtd: {ppe.quantity})
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Schedule Configuration Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Configuração do Agendamento</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {ppeSchedule.data.specificDate && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Data Específica</span>
-                    <span className="text-sm font-medium">{new Date(ppeSchedule.data.specificDate).toLocaleDateString("pt-BR")}</span>
-                  </div>
-                )}
-                {ppeSchedule.data.dayOfWeek !== null && ppeSchedule.data.dayOfWeek !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Dia da Semana</span>
-                    <span className="text-sm font-medium">{["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][Number(ppeSchedule.data.dayOfWeek)]}</span>
-                  </div>
-                )}
-                {ppeSchedule.data.dayOfMonth !== null && ppeSchedule.data.dayOfMonth !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Dia do Mês</span>
-                    <span className="text-sm font-medium">{ppeSchedule.data.dayOfMonth}</span>
-                  </div>
-                )}
-                {ppeSchedule.data.month !== null && ppeSchedule.data.month !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Mês</span>
-                    <span className="text-sm font-medium">
-                      {["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"][Number(ppeSchedule.data.month)]}
-                    </span>
-                  </div>
-                )}
-                {ppeSchedule.data.customMonths && ppeSchedule.data.customMonths.length > 0 && (
-                  <div>
-                    <span className="text-sm text-muted-foreground">Meses Personalizados</span>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {ppeSchedule.data.customMonths.map((month: MONTH) => (
-                        <Badge key={month} variant="outline">
-                          {["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"][Number(month)]}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Deliveries Summary Card */}
-            {ppeSchedule.data.deliveries && ppeSchedule.data.deliveries.length > 0 && (
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>Últimas Entregas</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {ppeSchedule.data.deliveries.slice(0, 5).map((delivery: PpeDelivery) => (
-                      <div key={delivery.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium">{delivery.item?.name || "Item não especificado"}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {delivery.user?.name || "Usuário não especificado"} - Qtd: {delivery.quantity}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">
-                            {delivery.scheduledDate ? new Date(delivery.scheduledDate).toLocaleDateString("pt-BR") : "Não agendado"}
-                          </p>
-                          <Badge variant="outline">{PPE_DELIVERY_STATUS_LABELS[delivery.status] || delivery.status}</Badge>
-                        </div>
-                      </div>
-                    ))}
-                    {ppeSchedule.data.deliveries.length > 5 && (
-                      <p className="text-sm text-muted-foreground text-center">E mais {ppeSchedule.data.deliveries.length - 5} entregas...</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+          <div className="space-y-4 mt-4">
+            {/* First Row: Info and Items (1/2 each) */}
+            <div className={getDetailGridClasses()}>
+              <PpeScheduleInfoCard schedule={ppeSchedule} className="h-full" />
+              <PpeScheduleItemsCard schedule={ppeSchedule} className="h-full" />
             </div>
+
+            {/* Second Row: Deliveries (full width) */}
+            <PpeScheduleDeliveriesCard scheduleId={ppeSchedule.id} />
           </div>
         </div>
+
+        {/* Activate Dialog */}
+        <AlertDialog open={showActivateDialog} onOpenChange={setShowActivateDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Ativar Agendamento</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja ativar este agendamento? Ele começará a gerar entregas automaticamente de acordo com a
+                frequência configurada.
+                <br />
+                <br />
+                <strong>Nome:</strong> {ppeSchedule.name}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isProcessing}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleActivate} disabled={isProcessing}>
+                {isProcessing ? (
+                  <>
+                    <IconLoader className="mr-2 h-4 w-4 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <IconPlayerPlay className="mr-2 h-4 w-4" />
+                    Ativar
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Deactivate Dialog */}
+        <AlertDialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Desativar Agendamento</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja desativar este agendamento? Ele parará de gerar entregas automaticamente.
+                <br />
+                <br />
+                <strong>Nome:</strong> {ppeSchedule.name}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isProcessing}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeactivate} disabled={isProcessing} className="bg-orange-600 hover:bg-orange-700">
+                {isProcessing ? (
+                  <>
+                    <IconLoader className="mr-2 h-4 w-4 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <IconPlayerPause className="mr-2 h-4 w-4" />
+                    Desativar
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Delete Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -337,13 +395,26 @@ export function PPEScheduleDetailsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir Agendamento</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita e todas as entregas futuras serão canceladas.
+                Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.
+                <br />
+                <br />
+                <strong>Nome:</strong> {ppeSchedule.name}
+                <br />
+                <br />
+                <strong className="text-destructive">Atenção:</strong> As entregas geradas por este agendamento não serão excluídas.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Excluir
+              <AlertDialogCancel disabled={isProcessing}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} disabled={isProcessing} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                {isProcessing ? (
+                  <>
+                    <IconLoader className="mr-2 h-4 w-4 animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  "Excluir"
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

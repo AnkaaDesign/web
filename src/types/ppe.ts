@@ -31,6 +31,7 @@ export interface PpeSize extends BaseEntity {
   shirts: SHIRT_SIZE | null;
   boots: BOOT_SIZE | null;
   pants: PANTS_SIZE | null;
+  shorts: PANTS_SIZE | null;
   sleeves: SLEEVES_SIZE | null;
   mask: MASK_SIZE | null;
   gloves: GLOVES_SIZE | null;
@@ -53,11 +54,27 @@ export interface PpeDelivery extends BaseEntity {
   quantity: number;
   reason: string | null;
 
+  // ClickSign integration fields
+  clicksignEnvelopeId?: string | null;
+  clicksignDocumentKey?: string | null;
+  clicksignRequestKey?: string | null;
+  clicksignSignerKey?: string | null;
+  clicksignSignedAt?: Date | null;
+  deliveryDocumentId?: string | null;
+
   // Relations (optional, populated based on query)
   user?: User;
   reviewedByUser?: User;
   ppeSchedule?: PpeDeliverySchedule;
   item?: Item;
+  deliveryDocument?: {
+    id: string;
+    filename: string;
+    originalName: string;
+    mimetype: string;
+    path: string;
+    size: number;
+  };
 }
 
 // PPE configuration is now stored directly on the Item model
@@ -70,10 +87,23 @@ export interface PpeDelivery extends BaseEntity {
 // - ppeDeliveryMode: SCHEDULED, ON_DEMAND, BOTH
 // - ppeStandardQuantity: Standard quantity per delivery
 
-// PPE Schedule Item for schedules with quantities per type
-export interface PpeScheduleItem {
+// PPE Schedule Item - database entity for PPE types in a schedule
+export interface PpeScheduleItem extends BaseEntity {
+  scheduleId: string;
   ppeType: PPE_TYPE;
   quantity: number;
+  itemId: string | null; // Required when ppeType is OTHERS - references specific item
+
+  // Relations (optional, populated based on query)
+  schedule?: PpeDeliverySchedule;
+  item?: Item;
+}
+
+// Input type for creating/updating PPE schedule items (without id/timestamps)
+export interface PpeScheduleItemInput {
+  ppeType: PPE_TYPE;
+  quantity: number;
+  itemId?: string; // Required when ppeType is OTHERS
 }
 
 export interface PpeDeliverySchedule extends BaseEntity {
@@ -84,7 +114,6 @@ export interface PpeDeliverySchedule extends BaseEntity {
   frequency: SCHEDULE_FREQUENCY;
   frequencyCount: number;
   isActive: boolean;
-  ppeItems: PpeScheduleItem[];
   specificDate: Date | null;
   dayOfMonth: number | null;
   dayOfWeek: WEEK_DAY | null;
@@ -94,6 +123,7 @@ export interface PpeDeliverySchedule extends BaseEntity {
   lastRun: Date | null;
 
   // Relations (optional, populated based on query)
+  items?: PpeScheduleItem[];
   deliveries?: PpeDelivery[];
   autoOrders?: Order[];
 }
@@ -175,6 +205,13 @@ export interface PpeDeliveryIncludes {
 // PPE configuration includes are not needed as PPE config is stored directly on Item
 
 export interface PpeDeliveryScheduleIncludes {
+  items?:
+    | boolean
+    | {
+        include?: {
+          item?: boolean;
+        };
+      };
   deliveries?:
     | boolean
     | {
@@ -232,6 +269,7 @@ export interface PpeSizeWhere {
   shirts?: SHIRT_SIZE | { equals?: SHIRT_SIZE; not?: SHIRT_SIZE; in?: SHIRT_SIZE[]; notIn?: SHIRT_SIZE[] } | null;
   boots?: BOOT_SIZE | { equals?: BOOT_SIZE; not?: BOOT_SIZE; in?: BOOT_SIZE[]; notIn?: BOOT_SIZE[] } | null;
   pants?: PANTS_SIZE | { equals?: PANTS_SIZE; not?: PANTS_SIZE; in?: PANTS_SIZE[]; notIn?: PANTS_SIZE[] } | null;
+  shorts?: PANTS_SIZE | { equals?: PANTS_SIZE; not?: PANTS_SIZE; in?: PANTS_SIZE[]; notIn?: PANTS_SIZE[] } | null;
   sleeves?: SLEEVES_SIZE | { equals?: SLEEVES_SIZE; not?: SLEEVES_SIZE; in?: SLEEVES_SIZE[]; notIn?: SLEEVES_SIZE[] } | null;
   mask?: MASK_SIZE | { equals?: MASK_SIZE; not?: MASK_SIZE; in?: MASK_SIZE[]; notIn?: MASK_SIZE[] } | null;
   gloves?: GLOVES_SIZE | { equals?: GLOVES_SIZE; not?: GLOVES_SIZE; in?: GLOVES_SIZE[]; notIn?: GLOVES_SIZE[] } | null;
@@ -290,7 +328,12 @@ export interface PpeDeliveryScheduleWhere {
   frequency?: SCHEDULE_FREQUENCY | { equals?: SCHEDULE_FREQUENCY; not?: SCHEDULE_FREQUENCY; in?: SCHEDULE_FREQUENCY[]; notIn?: SCHEDULE_FREQUENCY[] };
   frequencyCount?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] };
   isActive?: boolean | { equals?: boolean; not?: boolean };
-  ppeItems?: any; // JSON field - supports complex JSON queries
+  // items relation - query by PPE types in the schedule
+  items?: {
+    some?: { ppeType?: PPE_TYPE | { in?: PPE_TYPE[] } };
+    none?: { ppeType?: PPE_TYPE | { in?: PPE_TYPE[] } };
+    every?: { ppeType?: PPE_TYPE | { in?: PPE_TYPE[] } };
+  };
   dayOfMonth?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] } | null;
   dayOfWeek?: WEEK_DAY | { equals?: WEEK_DAY; not?: WEEK_DAY; in?: WEEK_DAY[]; notIn?: WEEK_DAY[] } | null;
   month?: MONTH | { equals?: MONTH; not?: MONTH; in?: MONTH[]; notIn?: MONTH[] } | null;
@@ -369,6 +412,7 @@ export interface PpeSizeOrderBy {
   shirts?: ORDER_BY_DIRECTION;
   boots?: ORDER_BY_DIRECTION;
   pants?: ORDER_BY_DIRECTION;
+  shorts?: ORDER_BY_DIRECTION;
   sleeves?: ORDER_BY_DIRECTION;
   mask?: ORDER_BY_DIRECTION;
   gloves?: ORDER_BY_DIRECTION;

@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
+import { MessageViewersTable } from "@/components/administration/message/detail";
 
 export const MessageDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -324,6 +325,9 @@ export const MessageDetailsPage = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Message Viewers Table */}
+          <MessageViewersTable message={message} />
         </div>
       </div>
     </div>

@@ -49,42 +49,259 @@ const PDF_CONFIG = {
 };
 
 /**
- * Calculate available space for services on page 1
- * and determine if we need to split services across pages
+ * BULLETPROOF Adaptive Layout Calculator for Budget PDF
+ *
+ * This calculator ensures ALL content ALWAYS fits on page 1 of an A4 page.
+ * It uses precise measurements and proportional compression when needed.
+ *
+ * Strategy:
+ * 1. Calculate exact total height needed at default sizes
+ * 2. If overflow, calculate how much compression is needed
+ * 3. Distribute compression across all compressible elements proportionally
+ * 4. Each element has a default and minimum value - compression reduces towards minimum
  */
-function calculateServicesLayout(
+
+interface LayoutElement {
+  default: number;
+  min: number;
+  current: number;
+}
+
+interface AdaptiveLayoutConfig {
+  // Page margins (mm)
+  marginTop: number;
+  marginBottom: number;
+  marginSide: number;
+  // Header
+  logoHeight: number;
+  headerMarginBottom: number;
+  headerLineMargin: number;
+  budgetNumberFontSize: number;
+  // Title
+  titleFontSize: number;
+  titleMarginBottom: number;
+  // Customer section
+  customerMarginBottom: number;
+  customerNameMarginBottom: number;
+  introFontSize: number;
+  introLineHeight: number;
+  // Services
+  servicesTitleFontSize: number;
+  servicesTitleMargin: number;
+  serviceItemPadding: number;
+  serviceFontSize: number;
+  // Totals
+  totalsMarginTop: number;
+  totalRowPadding: number;
+  totalFontSize: number;
+  // Terms sections
+  termsMarginBottom: number;
+  termsTitleFontSize: number;
+  termsTitleMargin: number;
+  termsContentFontSize: number;
+  termsLineHeight: number;
+  // Footer
+  footerPaddingTop: number;
+}
+
+function calculateAdaptiveLayout(
   itemCount: number,
   hasDeliveryTerm: boolean,
   hasPaymentConditions: boolean,
   hasGuarantee: boolean,
   hasDiscount: boolean
-): { maxItemsPage1: number; needsSplit: boolean } {
-  // Available height on page 1 for services
-  let usedHeight = PDF_CONFIG.headerHeight + PDF_CONFIG.headerLineHeight + PDF_CONFIG.sectionSpacing;
-  usedHeight += PDF_CONFIG.titleSectionHeight; // ORÇAMENTO title
-  usedHeight += PDF_CONFIG.customerSectionHeight; // Customer section
-  usedHeight += PDF_CONFIG.sectionTitleHeight; // "Serviços" title
+): AdaptiveLayoutConfig {
+  // A4 page height = 297mm
+  const PAGE_HEIGHT = 297;
+  // IMPORTANT: Use larger safety buffer because browser text rendering varies
+  // and text can wrap unexpectedly. This prevents overflow in edge cases.
+  const SAFETY_BUFFER = 12; // mm safety margin - increased for reliability
+  const AVAILABLE_HEIGHT = PAGE_HEIGHT - SAFETY_BUFFER;
 
-  // Calculate terms sections height
-  let termsHeight = 0;
-  if (hasDeliveryTerm) termsHeight += PDF_CONFIG.termsSectionHeight;
-  if (hasPaymentConditions) termsHeight += PDF_CONFIG.termsSectionHeight;
-  if (hasGuarantee) termsHeight += PDF_CONFIG.termsSectionHeight;
+  // Count terms sections
+  const termsCount = (hasDeliveryTerm ? 1 : 0) + (hasPaymentConditions ? 1 : 0) + (hasGuarantee ? 1 : 0);
 
-  // Totals section height
-  const totalsHeight = hasDiscount ? 20 : 15;
+  // Define all compressible elements with their DEFAULT and MINIMUM values
+  // Heights are CONSERVATIVE estimates accounting for text wrapping
+  // 1pt font ≈ 0.35mm, plus line-height multiplier and padding
+  const elements: Record<string, LayoutElement> = {
+    // Margins
+    marginTop:           { default: 10, min: 4, current: 10 },
+    marginBottom:        { default: 10, min: 4, current: 10 },
+    marginSide:          { default: 22, min: 15, current: 22 },
+    // Header section (logo + number + info)
+    logoHeight:          { default: 14, min: 10, current: 14 },
+    headerMarginBottom:  { default: 2, min: 1, current: 2 },
+    headerLineMargin:    { default: 4, min: 2, current: 4 },
+    // Title section
+    titleHeight:         { default: 6, min: 5, current: 6 },
+    titleMarginBottom:   { default: 3, min: 1, current: 3 },
+    // Customer section - INCREASED to account for customer name + contact + intro text with serial/plate
+    customerHeight:      { default: 28, min: 18, current: 28 },
+    customerMarginBottom:{ default: 4, min: 1, current: 4 },
+    // Services section
+    servicesTitle:       { default: 5, min: 4, current: 5 },
+    servicesTitleMargin: { default: 2, min: 1, current: 2 },
+    // Service items - INCREASED to account for potential text wrapping
+    serviceItemHeight:   { default: 5.5, min: 3.0, current: 5.5 },
+    // Totals
+    totalsMarginTop:     { default: 3, min: 1, current: 3 },
+    totalsHeight:        { default: hasDiscount ? 16 : 10, min: hasDiscount ? 10 : 7, current: hasDiscount ? 16 : 10 },
+    // Terms sections (per section) - INCREASED for guarantee text which can be 2-3 lines
+    termsSectionHeight:  { default: 20, min: 12, current: 20 },
+    // Footer
+    footerHeight:        { default: 16, min: 12, current: 16 },
+  };
 
-  // Footer height
-  usedHeight += PDF_CONFIG.footerHeight;
+  // Calculate total height at current values
+  function calculateTotalHeight(): number {
+    return (
+      elements.marginTop.current +
+      elements.marginBottom.current +
+      elements.logoHeight.current +
+      elements.headerMarginBottom.current +
+      1 + // header line height
+      elements.headerLineMargin.current +
+      elements.titleHeight.current +
+      elements.titleMarginBottom.current +
+      elements.customerHeight.current +
+      elements.customerMarginBottom.current +
+      elements.servicesTitle.current +
+      elements.servicesTitleMargin.current +
+      (itemCount * elements.serviceItemHeight.current) +
+      elements.totalsMarginTop.current +
+      elements.totalsHeight.current +
+      (termsCount * elements.termsSectionHeight.current) +
+      elements.footerHeight.current
+    );
+  }
 
-  // Calculate available space for services + totals + terms
-  const availableHeight = PDF_CONFIG.contentHeight - usedHeight - termsHeight - totalsHeight - 10; // 10mm buffer
+  // Calculate total "compressibility" (how much we CAN reduce in total)
+  function calculateTotalCompressibility(): number {
+    let total = 0;
+    for (const key of Object.keys(elements)) {
+      if (key === 'serviceItemHeight') {
+        total += (elements[key].default - elements[key].min) * itemCount;
+      } else if (key === 'termsSectionHeight') {
+        total += (elements[key].default - elements[key].min) * termsCount;
+      } else {
+        total += elements[key].default - elements[key].min;
+      }
+    }
+    return total;
+  }
 
-  // Calculate max items that fit
-  const maxItemsPage1 = Math.floor(availableHeight / PDF_CONFIG.serviceItemHeight);
-  const needsSplit = itemCount > maxItemsPage1;
+  // Calculate initial height
+  let totalHeight = calculateTotalHeight();
 
-  return { maxItemsPage1: Math.max(maxItemsPage1, 3), needsSplit };
+  if (totalHeight <= AVAILABLE_HEIGHT) {
+    // Content fits! Optionally expand service items if lots of extra space
+    const extraSpace = AVAILABLE_HEIGHT - totalHeight;
+    if (extraSpace > 20 && itemCount > 0) {
+      // Only expand if we have significant extra space
+      const extraPerItem = Math.min(extraSpace / itemCount * 0.3, 1.0);
+      elements.serviceItemHeight.current = Math.min(6.5, elements.serviceItemHeight.default + extraPerItem);
+    }
+  } else {
+    // Need to compress - calculate how much
+    const overflow = totalHeight - AVAILABLE_HEIGHT;
+    const totalCompressibility = calculateTotalCompressibility();
+
+    if (overflow <= totalCompressibility) {
+      // PHASE 1: Proportional compression with 20% extra aggressiveness
+      // The extra aggressiveness ensures we don't barely fit and risk overflow
+      const compressionRatio = Math.min(1, (overflow * 1.2) / totalCompressibility);
+
+      for (const key of Object.keys(elements)) {
+        const elem = elements[key];
+        const compressibleAmount = elem.default - elem.min;
+        const reduction = compressibleAmount * compressionRatio;
+        elem.current = elem.default - reduction;
+      }
+    } else {
+      // Even at minimum, might not fit - use all minimums
+      for (const key of Object.keys(elements)) {
+        elements[key].current = elements[key].min;
+      }
+    }
+  }
+
+  // PHASE 2: Recalculate and apply additional compression if needed
+  totalHeight = calculateTotalHeight();
+
+  // If still overflowing, aggressively compress service items first (they have most impact)
+  if (totalHeight > AVAILABLE_HEIGHT && itemCount > 0) {
+    const stillOverflow = totalHeight - AVAILABLE_HEIGHT;
+    // Compress service items more aggressively - they're the most variable
+    const additionalReduction = (stillOverflow / itemCount) * 1.5;
+    elements.serviceItemHeight.current = Math.max(2.5, elements.serviceItemHeight.current - additionalReduction);
+
+    // Recalculate
+    totalHeight = calculateTotalHeight();
+  }
+
+  // PHASE 3: If STILL overflowing, compress everything to absolute minimum
+  if (totalHeight > AVAILABLE_HEIGHT) {
+    for (const key of Object.keys(elements)) {
+      elements[key].current = elements[key].min;
+    }
+    // Extra compression on margins as last resort
+    elements.marginTop.current = Math.max(3, elements.marginTop.min - 1);
+    elements.marginBottom.current = Math.max(3, elements.marginBottom.min - 1);
+    elements.headerLineMargin.current = Math.max(1, elements.headerLineMargin.min - 1);
+    elements.customerMarginBottom.current = Math.max(0.5, elements.customerMarginBottom.min - 0.5);
+  }
+
+  // Calculate derived font sizes based on element heights
+  const serviceItemHeight = elements.serviceItemHeight.current;
+  const termsSectionHeight = elements.termsSectionHeight.current;
+  const customerHeight = elements.customerHeight.current;
+
+  // Map heights to font sizes (approximate: 1pt ≈ 0.35mm)
+  // More aggressive compression for smaller heights
+  const serviceFontSize = serviceItemHeight >= 5 ? 10 : serviceItemHeight >= 4 ? 9 : serviceItemHeight >= 3.5 ? 8 : 7;
+  const termsTitleFontSize = termsSectionHeight >= 18 ? 11 : termsSectionHeight >= 15 ? 10 : 9;
+  const termsContentFontSize = termsSectionHeight >= 18 ? 10 : termsSectionHeight >= 15 ? 9 : 8;
+  const termsLineHeight = termsSectionHeight >= 18 ? 1.4 : termsSectionHeight >= 15 ? 1.3 : 1.15;
+  const introFontSize = customerHeight >= 25 ? 10 : customerHeight >= 22 ? 9 : 8;
+  const introLineHeight = customerHeight >= 25 ? 1.4 : customerHeight >= 22 ? 1.3 : 1.2;
+
+  return {
+    // Margins
+    marginTop: elements.marginTop.current,
+    marginBottom: elements.marginBottom.current,
+    marginSide: elements.marginSide.current,
+    // Header
+    logoHeight: elements.logoHeight.current,
+    headerMarginBottom: elements.headerMarginBottom.current,
+    headerLineMargin: elements.headerLineMargin.current,
+    budgetNumberFontSize: elements.logoHeight.current >= 12 ? 13 : 11,
+    // Title
+    titleFontSize: elements.titleHeight.current >= 6 ? 13 : 11,
+    titleMarginBottom: elements.titleMarginBottom.current,
+    // Customer
+    customerMarginBottom: elements.customerMarginBottom.current,
+    customerNameMarginBottom: Math.max(0.5, elements.customerMarginBottom.current / 2),
+    introFontSize,
+    introLineHeight,
+    // Services
+    servicesTitleFontSize: elements.servicesTitle.current >= 5 ? 11 : 10,
+    servicesTitleMargin: elements.servicesTitleMargin.current,
+    serviceItemPadding: Math.max(0.2, (serviceItemHeight - 2.5) / 2.5),
+    serviceFontSize,
+    // Totals
+    totalsMarginTop: elements.totalsMarginTop.current,
+    totalRowPadding: Math.max(0.2, elements.totalsHeight.current / (hasDiscount ? 7 : 5) - 1.5),
+    totalFontSize: serviceFontSize,
+    // Terms
+    termsMarginBottom: Math.max(1.5, termsSectionHeight / 8),
+    termsTitleFontSize,
+    termsTitleMargin: Math.max(0.8, termsSectionHeight / 15),
+    termsContentFontSize,
+    termsLineHeight,
+    // Footer
+    footerPaddingTop: Math.max(1.5, elements.footerHeight.current / 8),
+  };
 }
 
 /**
@@ -105,7 +322,7 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
   const currentDate = formatDate(new Date());
   const termDate = task.term ? formatDate(task.term) : "";
 
-  // Calculate validity in days (based on date difference, ignoring time)
+  // Calculate validity in days (budget expiration, NOT delivery time)
   const validityDays = task.pricing.expiresAt
     ? (() => {
         const today = new Date();
@@ -116,6 +333,9 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
         return Math.round((expires.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       })()
     : 30;
+
+  // Custom delivery days (production time) - used when no term date is set
+  const customDeliveryDays = task.pricing.customForecastDays || null;
 
   // Format budget number with leading zeros (e.g., "0042")
   const budgetNumber = task.pricing.budgetNumber
@@ -150,10 +370,14 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     discountValue: task.pricing.discountValue,
     total: task.pricing.total,
     termDate,
+    customDeliveryDays,
     paymentText,
     guaranteeText,
     layoutImageUrl,
     customerSignatureUrl: signatureImageUrl,
+    // Vehicle identification
+    serialNumber: task.serialNumber || null,
+    plate: task.truck?.plate || null,
   });
 
   // Open print window
@@ -189,25 +413,34 @@ interface BudgetHtmlData {
   discountValue: number | null;
   total: number;
   termDate: string;
+  customDeliveryDays: number | null; // Custom delivery time in working days
   paymentText: string;
   guaranteeText: string;
   layoutImageUrl: string | null;
   customerSignatureUrl: string | null;
+  // Vehicle identification
+  serialNumber: string | null;
+  plate: string | null;
 }
 
 /**
  * Generates the HTML content for the budget PDF (2 pages)
  */
 function generateBudgetHtml(data: BudgetHtmlData): string {
-  // Calculate layout
+  // Calculate adaptive layout based on content
   const hasDiscount = data.discountType !== 'NONE' && data.discountValue && data.discountValue > 0;
-  const { maxItemsPage1 } = calculateServicesLayout(
+  const hasDeliveryTerm = !!(data.customDeliveryDays || data.termDate);
+
+  const layout = calculateAdaptiveLayout(
     data.items.length,
-    !!data.termDate,
+    hasDeliveryTerm,
     !!data.paymentText,
     !!data.guaranteeText,
     hasDiscount
   );
+
+  // All layout values are now from the adaptive calculator
+  const L = layout; // Shorthand for cleaner CSS
 
   // Generate services list with numbers
   // Description + observation shown inline (e.g., "Pintura Geral Azul Firenze")
@@ -229,7 +462,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     })
     .join("");
 
-  // Generate totals section (only shown when there's discount)
+  // Generate totals section
   const discountLabel = data.discountType === 'PERCENTAGE'
     ? `Desconto (${data.discountValue}%)`
     : 'Desconto';
@@ -237,7 +470,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     ? (data.subtotal * (data.discountValue || 0) / 100)
     : (data.discountValue || 0);
 
-  // Only show totals section if there's a discount, otherwise just show total after services
+  // Always show total, only show subtotal/discount rows when there's a discount
   const totalsHtml = hasDiscount ? `
     <div class="totals-section">
       <div class="total-row subtotal-row">
@@ -253,7 +486,14 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
         <span class="total-value total-final">${formatCurrency(data.total)}</span>
       </div>
     </div>
-  ` : '';
+  ` : `
+    <div class="totals-section">
+      <div class="total-row final-total-row">
+        <span class="total-label">Total</span>
+        <span class="total-value total-final">${formatCurrency(data.total)}</span>
+      </div>
+    </div>
+  `;
 
   // Layout section for page 2 (only if layout exists)
   const layoutHtml = data.layoutImageUrl
@@ -298,8 +538,8 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       width: 210mm;
       height: 297mm;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      font-size: 10pt;
-      line-height: 1.4;
+      font-size: ${L.serviceFontSize}pt;
+      line-height: 1.3;
       color: ${PDF_CONFIG.textDark};
       background: #fff;
     }
@@ -317,7 +557,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       width: 210mm;
       height: 297mm;
       max-height: 297mm;
-      padding: ${PDF_CONFIG.marginTop}mm ${PDF_CONFIG.marginRight}mm ${PDF_CONFIG.marginBottom}mm ${PDF_CONFIG.marginLeft}mm;
+      padding: ${L.marginTop}mm ${L.marginSide}mm ${L.marginBottom}mm ${L.marginSide}mm;
       display: flex;
       flex-direction: column;
       page-break-after: always;
@@ -335,12 +575,12 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 4mm;
+      margin-bottom: ${L.headerMarginBottom}mm;
       flex-shrink: 0;
     }
 
     .logo {
-      height: 18mm;
+      height: ${L.logoHeight}mm;
       width: auto;
     }
 
@@ -349,16 +589,16 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     }
 
     .budget-number {
-      font-size: 14pt;
+      font-size: ${L.budgetNumberFontSize}pt;
       font-weight: bold;
       color: ${PDF_CONFIG.textDark};
-      margin-bottom: 2mm;
+      margin-bottom: 1mm;
     }
 
     .header-info {
-      font-size: 9pt;
+      font-size: ${L.serviceFontSize - 1}pt;
       color: #333;
-      line-height: 1.6;
+      line-height: 1.4;
     }
 
     .header-info-label {
@@ -368,90 +608,90 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     .header-line {
       height: 1px;
       background: linear-gradient(to right, #888 0%, ${PDF_CONFIG.primaryGreen} 30%);
-      margin-bottom: 8mm;
+      margin-bottom: ${L.headerLineMargin}mm;
       flex-shrink: 0;
     }
 
     /* Document Title */
     .document-title {
-      font-size: 14pt;
+      font-size: ${L.titleFontSize}pt;
       font-weight: bold;
       color: ${PDF_CONFIG.primaryGreen};
       text-decoration: underline;
       text-underline-offset: 2px;
-      margin-bottom: 6mm;
+      margin-bottom: ${L.titleMarginBottom}mm;
       flex-shrink: 0;
     }
 
     /* Customer Info */
     .customer-section {
-      margin-bottom: 6mm;
+      margin-bottom: ${L.customerMarginBottom}mm;
       flex-shrink: 0;
     }
 
     .customer-name {
-      font-size: 10pt;
+      font-size: ${L.introFontSize}pt;
       font-weight: bold;
       color: ${PDF_CONFIG.primaryGreen};
-      margin-bottom: 2mm;
+      margin-bottom: ${L.customerNameMarginBottom}mm;
     }
 
     .contact-line {
-      font-size: 10pt;
+      font-size: ${L.introFontSize}pt;
       color: ${PDF_CONFIG.textDark};
-      margin-bottom: 2mm;
+      margin-bottom: ${L.customerNameMarginBottom}mm;
     }
 
     .intro-text {
-      font-size: 10pt;
+      font-size: ${L.introFontSize}pt;
       color: ${PDF_CONFIG.textDark};
-      line-height: 1.5;
+      line-height: ${L.introLineHeight};
     }
 
     /* Services Section */
     .services-section {
-      margin-bottom: 8mm;
+      margin-bottom: ${L.termsMarginBottom}mm;
       flex-shrink: 0;
     }
 
     .section-title-green {
-      font-size: 11pt;
+      font-size: ${L.servicesTitleFontSize}pt;
       font-weight: bold;
       color: ${PDF_CONFIG.primaryGreen};
-      margin-bottom: 4mm;
+      margin-bottom: ${L.servicesTitleMargin}mm;
     }
 
     .services-list {
-      padding-left: 5mm;
+      padding-left: 4mm;
     }
 
     .service-item {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      padding: 1.2mm 0;
-      font-size: 10pt;
-      line-height: 1.4;
+      padding: ${L.serviceItemPadding}mm 0;
+      font-size: ${L.serviceFontSize}pt;
+      line-height: 1.2;
     }
 
     .service-desc {
       color: ${PDF_CONFIG.textDark};
       flex: 1;
-      padding-right: 10mm;
+      padding-right: 8mm;
     }
 
     .service-value {
       color: ${PDF_CONFIG.textDark};
       font-weight: normal;
       white-space: nowrap;
-      min-width: 80px;
+      min-width: 70px;
       text-align: right;
     }
 
     /* Totals Section */
     .totals-section {
-      margin-top: 6mm;
-      padding-left: 5mm;
+      margin-top: ${L.totalsMarginTop}mm;
+      padding-left: 4mm;
       flex-shrink: 0;
     }
 
@@ -459,8 +699,8 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      padding: 1mm 0;
-      font-size: 10pt;
+      padding: ${L.totalRowPadding}mm 0;
+      font-size: ${L.totalFontSize}pt;
     }
 
     .total-label {
@@ -491,61 +731,65 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 
     .total-final {
       font-weight: bold;
-      font-size: 11pt;
+      font-size: ${L.totalFontSize + 1}pt;
       color: ${PDF_CONFIG.primaryGreen};
     }
 
     /* Terms Sections */
     .terms-section {
-      margin-bottom: 6mm;
+      margin-bottom: ${L.termsMarginBottom}mm;
       flex-shrink: 0;
     }
 
     .terms-title {
-      font-size: 11pt;
+      font-size: ${L.termsTitleFontSize}pt;
       font-weight: bold;
       color: ${PDF_CONFIG.primaryGreen};
-      margin-bottom: 2mm;
+      margin-bottom: ${L.termsTitleMargin}mm;
     }
 
     .terms-content {
-      font-size: 10pt;
+      font-size: ${L.termsContentFontSize}pt;
       color: ${PDF_CONFIG.textDark};
-      line-height: 1.5;
+      line-height: ${L.termsLineHeight};
     }
 
     .terms-content strong {
       font-weight: bold;
     }
 
-    /* Content area that can flex */
+    /* Content area - flex to fill available space, overflow hidden to contain content */
     .page-content {
       flex: 1;
       display: flex;
       flex-direction: column;
       min-height: 0;
+      overflow: hidden;
     }
 
-    /* Footer */
+    /* Footer - always at bottom, never overlaps content */
     .footer {
-      padding-top: 4mm;
+      padding-top: ${L.footerPaddingTop}mm;
       border-top: 1px solid;
       border-image: linear-gradient(to right, #888 0%, ${PDF_CONFIG.primaryGreen} 30%) 1;
       flex-shrink: 0;
       margin-top: auto;
+      background: white; /* Ensure footer has solid background */
+      position: relative;
+      z-index: 10;
     }
 
     .footer-company {
-      font-size: 11pt;
+      font-size: ${L.termsTitleFontSize}pt;
       font-weight: bold;
       color: ${PDF_CONFIG.primaryGreen};
       margin-bottom: 1mm;
     }
 
     .footer-info {
-      font-size: 9pt;
+      font-size: ${L.termsContentFontSize - 1}pt;
       color: #333;
-      line-height: 1.6;
+      line-height: 1.5;
     }
 
     .footer-link {
@@ -679,7 +923,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       <div class="customer-section">
         <div class="customer-name">À ${escapeHtml(corporateName(data.corporateName))}</div>
         ${data.contactName ? `<div class="contact-line">Caro ${escapeHtml(data.contactName)}</div>` : ""}
-        <p class="intro-text">Conforme solicitado, apresentamos nossa proposta de preço para execução dos serviços abaixo descriminados.</p>
+        <p class="intro-text">Conforme solicitado, apresentamos nossa proposta de preço para execução dos serviços abaixo descriminados${data.serialNumber || data.plate ? ` no veículo${data.serialNumber ? ` nº série: <strong>${escapeHtml(data.serialNumber)}</strong>` : ''}${data.serialNumber && data.plate ? ',' : ''}${data.plate ? ` placa: <strong style="font-weight: 600;">${escapeHtml(data.plate)}</strong>` : ''}` : ''}.</p>
       </div>
 
       <!-- Services -->
@@ -691,8 +935,13 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
         ${totalsHtml}
       </section>
 
-      <!-- Delivery Term -->
-      ${data.termDate ? `
+      <!-- Delivery Term - customDeliveryDays takes priority over termDate -->
+      ${data.customDeliveryDays ? `
+      <section class="terms-section">
+        <h2 class="terms-title">Prazo de entrega</h2>
+        <p class="terms-content">O prazo de entrega é de ${data.customDeliveryDays} dias úteis a partir da data de liberação.</p>
+      </section>
+      ` : data.termDate ? `
       <section class="terms-section">
         <h2 class="terms-title">Prazo de entrega</h2>
         <p class="terms-content">O prazo de entrega é de ${data.termDate}, desde que o implemento esteja nas condições previamente informada e não haja alterações nos serviços descritos.</p>

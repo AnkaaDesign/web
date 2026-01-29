@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { IconColumns, IconSearch, IconRefresh, IconLock } from "@tabler/icons-react";
+import { getHeaderText } from "@/components/ui/column-visibility-utils";
 import type { ItemSelectorColumn } from "./item-selector-types";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -38,7 +39,7 @@ export function ItemSelectorColumnVisibility({
 
   const filteredColumns = useMemo(() => {
     if (!searchQuery) return manageableColumns;
-    return manageableColumns.filter((col) => col.header.toLowerCase().includes(searchQuery.toLowerCase()));
+    return manageableColumns.filter((col) => getHeaderText(col.header).toLowerCase().includes(searchQuery.toLowerCase()));
   }, [manageableColumns, searchQuery]);
 
   const handleToggle = (columnKey: string, checked: boolean | undefined) => {

@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
 import { getDefaultVisibleColumns } from "./paint-type-table-columns";
+import { getHeaderText } from "@/components/ui/column-visibility-utils";
 import type { PaintType } from "../../../../types";
 
 // Define column interface directly to avoid import issues
@@ -38,7 +39,7 @@ export const ColumnVisibilityManager = React.memo(function ColumnVisibilityManag
   const filteredColumns = useMemo(() => {
     if (!searchQuery) return columns;
     return columns.filter((col) => {
-      const headerText = typeof col.header === "string" ? col.header : col.key;
+      const headerText = getHeaderText(col.header);
       return headerText.toLowerCase().includes(searchQuery.toLowerCase());
     });
   }, [columns, searchQuery]);
@@ -120,7 +121,7 @@ export const ColumnVisibilityManager = React.memo(function ColumnVisibilityManag
                 className="flex items-center justify-between space-x-3 p-2 hover:bg-accent hover:text-accent-foreground rounded-md cursor-pointer"
                 htmlFor={`column-${column.key}`}
               >
-                <span className="text-sm">{typeof column.header === "string" ? column.header : column.key}</span>
+                <span className="text-sm">{getHeaderText(column.header) || column.key}</span>
                 <Switch id={`column-${column.key}`} checked={localVisible.has(column.key)} onCheckedChange={(checked) => handleToggle(column.key, checked)} />
               </Label>
             ))}

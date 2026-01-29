@@ -8,8 +8,26 @@ interface InlineContentProps {
 }
 
 /**
+ * Renders text content with newlines converted to <br /> elements
+ */
+const renderTextWithLineBreaks = (text: string): React.ReactNode => {
+  if (!text.includes('\n')) {
+    return text;
+  }
+
+  const parts = text.split('\n');
+  return parts.map((part, i) => (
+    <React.Fragment key={i}>
+      {part}
+      {i < parts.length - 1 && <br />}
+    </React.Fragment>
+  ));
+};
+
+/**
  * Renders inline formatted text content with support for bold, italic, and links.
  * Handles nested formatting and ensures proper semantic HTML.
+ * Preserves line breaks by converting \n to <br /> elements.
  */
 export const InlineContent = React.memo<InlineContentProps>(({ content, className }) => {
   return (
@@ -19,19 +37,19 @@ export const InlineContent = React.memo<InlineContentProps>(({ content, classNam
 
         switch (format.type) {
           case 'text':
-            return <React.Fragment key={key}>{format.content}</React.Fragment>;
+            return <React.Fragment key={key}>{renderTextWithLineBreaks(format.content)}</React.Fragment>;
 
           case 'bold':
             return (
               <strong key={key} className="font-semibold text-foreground">
-                {format.content}
+                {renderTextWithLineBreaks(format.content)}
               </strong>
             );
 
           case 'italic':
             return (
               <em key={key} className="italic">
-                {format.content}
+                {renderTextWithLineBreaks(format.content)}
               </em>
             );
 
@@ -45,7 +63,7 @@ export const InlineContent = React.memo<InlineContentProps>(({ content, classNam
                 rel="noopener noreferrer"
                 aria-label={`Link to ${format.url}`}
               >
-                {format.content}
+                {renderTextWithLineBreaks(format.content)}
               </a>
             );
 

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
 import { SECTOR_PRIVILEGES } from "@/constants";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
+import { getHeaderText } from "@/components/ui/column-visibility-utils";
 
 // Define column interface to match the task table structure
 interface TaskScheduleColumn {
@@ -117,7 +118,7 @@ export function ColumnVisibilityManager({
 
   const filteredColumns = useMemo(() => {
     if (!searchQuery) return columns;
-    return columns.filter((col) => col.header.toLowerCase().includes(searchQuery.toLowerCase()));
+    return columns.filter((col) => getHeaderText(col.header).toLowerCase().includes(searchQuery.toLowerCase()));
   }, [columns, searchQuery]);
 
   const handleToggle = (columnKey: string, checked: boolean | undefined) => {

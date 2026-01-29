@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/utils/number';
+import { formatCurrency, formatNumberWithDecimals } from '@/utils/number';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TABLE_LAYOUT } from '@/components/ui/table-constants';
@@ -420,7 +420,9 @@ export const AutomaticOrderListPage = () => {
                                         )}
                                       >
                                         <TableCell className="font-medium py-2">{item.itemName}</TableCell>
-                                        <TableCell className="text-center py-2">{item.currentStock}</TableCell>
+                                        <TableCell className="text-center py-2">
+                                          {formatNumberWithDecimals(item.currentStock, item.currentStock % 1 === 0 ? 0 : 2)}
+                                        </TableCell>
                                         <TableCell
                                           className={cn(
                                             'text-center font-semibold py-2',
@@ -444,7 +446,7 @@ export const AutomaticOrderListPage = () => {
                                         <TableCell className="text-center font-bold text-primary py-2">
                                           <div className="flex items-center justify-center gap-1">
                                             <IconPackage className="h-3 w-3" />
-                                            {item.recommendedOrderQuantity}
+                                            {formatNumberWithDecimals(item.recommendedOrderQuantity, item.recommendedOrderQuantity % 1 === 0 ? 0 : 2)}
                                           </div>
                                         </TableCell>
                                         <TableCell className="py-2">{getUrgencyBadge(item.urgency)}</TableCell>

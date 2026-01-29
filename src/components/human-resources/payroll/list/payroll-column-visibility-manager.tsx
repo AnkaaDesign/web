@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
 import { getDefaultVisibleColumns } from "./payroll-table-columns";
+import { getHeaderText } from "@/components/ui/column-visibility-utils";
 
 interface PayrollColumn {
   key: string;
@@ -40,7 +41,7 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
 
   const filteredColumns = useMemo(() => {
     if (!searchQuery) return PAYROLL_COLUMNS;
-    return PAYROLL_COLUMNS.filter((col) => col.header.toLowerCase().includes(searchQuery.toLowerCase()));
+    return PAYROLL_COLUMNS.filter((col) => getHeaderText(col.header).toLowerCase().includes(searchQuery.toLowerCase()));
   }, [searchQuery]);
 
   const handleToggle = (columnKey: string, checked: boolean | undefined) => {
