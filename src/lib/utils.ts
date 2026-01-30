@@ -38,8 +38,31 @@ export function getBadgeVariant(status: string): string {
   return variants[status] || "default";
 }
 
+// Get API URL dynamically based on how the app is accessed
+export function getApiBaseUrl(): string {
+  // Use cached value if available
+  if ((window as any).__ANKAA_API_URL__) {
+    return (window as any).__ANKAA_API_URL__;
+  }
+
+  const hostname = window.location.hostname;
+
+  // Local IP access - use local API
+  if (hostname === "192.168.10.180" || hostname.startsWith("192.168.")) {
+    return `http://${hostname}:3030`;
+  }
+
+  // Localhost development
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return import.meta.env.VITE_API_URL || "http://localhost:3030";
+  }
+
+  // Domain access - use production API
+  return import.meta.env.VITE_API_URL || "https://api.ankaadesign.com.br";
+}
+
 export function backendFileToFileWithPreview(backendFile: BackendFile): FileWithPreview {
-  const apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:3030";
+  const apiBaseUrl = getApiBaseUrl();
 
   // Create a minimal File-like object that satisfies the FileWithPreview interface
   const fileWithPreview = Object.create(File.prototype);
