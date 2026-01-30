@@ -646,10 +646,10 @@ function ServiceRow({
           <div className="py-4">
             <Textarea
               value={tempObservation}
-              onChange={(e) => setTempObservation(toTitleCase(e.target.value))}
+              onChange={(e) => setTempObservation(e.target.value)}
               placeholder="Digite a observação..."
               rows={4}
-              className="resize-none capitalize"
+              className="resize-none"
             />
           </div>
           <DialogFooter>

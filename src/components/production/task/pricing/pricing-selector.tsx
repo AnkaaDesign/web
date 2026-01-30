@@ -31,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatCurrency, toTitleCase } from "../../../../utils";
+import { formatCurrency } from "../../../../utils";
 import { DISCOUNT_TYPE, SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
@@ -927,10 +927,10 @@ const PricingItemRow = forwardRef<HTMLDivElement, PricingItemRowProps>(
             <div className="py-4">
               <Textarea
                 value={tempObservation}
-                onChange={(e) => setTempObservation(toTitleCase(e.target.value))}
+                onChange={(e) => setTempObservation(e.target.value)}
                 placeholder="Digite a observação..."
                 rows={4}
-                className="resize-none capitalize"
+                className="resize-none"
               />
             </div>
             <DialogFooter>

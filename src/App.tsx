@@ -187,6 +187,7 @@ const OrderStatistics = lazy(() => import("@/pages/order/statistics/orders").the
 
 // Personal
 const Personal = lazy(() => import("@/pages/personal/root").then((module) => ({ default: module.Personal })));
+const PersonalMyMessages = lazy(() => import("@/pages/personal/my-messages").then((module) => ({ default: module.MyMessagesPage })));
 const PersonalMyHolidays = lazy(() => import("@/pages/personal/my-holidays").then((module) => ({ default: module.MyHolidaysPage })));
 const PersonalMyVacations = lazy(() => import("@/pages/personal/my-vacations").then((module) => ({ default: module.MyVacationsPage })));
 const PersonalMyPpes = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.MyPpesPage })));
@@ -1478,6 +1479,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <Personal />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personal.myMessages.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonalMyMessages />
                     </Suspense>
                   }
                 />

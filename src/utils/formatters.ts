@@ -291,15 +291,30 @@ const PORTUGUESE_LOWERCASE_WORDS = new Set([
 ]);
 
 /**
+ * Brazilian company suffixes that should remain uppercase
+ */
+const COMPANY_SUFFIXES = new Set([
+  "ltda", "ltda.",                 // Limitada
+  "eireli",                        // Empresa Individual de Responsabilidade Limitada
+  "s/a", "s.a.", "s.a",            // Sociedade Anônima
+  "cia", "cia.",                   // Companhia
+  "mei",                           // Microempreendedor Individual
+  "ss",                            // Sociedade Simples
+]);
+
+/**
  * Convert a string to Title Case (capitalize first letter of each word)
  * Keeps Portuguese prepositions and articles lowercase (except at the start)
  * Words with 2-3 characters become entirely uppercase (except prepositions)
+ * Company suffixes (LTDA, EIRELI, S/A, etc.) remain uppercase
  * Example: "pintura de cabine" -> "Pintura de Cabine"
  * Example: "TROCA DA LONA DO CAMINHAO" -> "Troca da Lona do Caminhão"
  * Example: "AZUL FIRENZE" -> "Azul Firenze"
  * Example: "Tp Transportes" -> "TP Transportes"
  * Example: "Tmr Transportes" -> "TMR Transportes"
  * Example: "TRF Logistic" -> "TRF Logistic"
+ * Example: "empresa abc ltda" -> "Empresa Abc LTDA"
+ * Example: "comercio eireli" -> "Comercio EIRELI"
  */
 export const toTitleCase = (str: string): string => {
   if (!str) return "";
@@ -313,6 +328,11 @@ export const toTitleCase = (str: string): string => {
       // Keep Portuguese prepositions/articles lowercase (except first word)
       if (index > 0 && PORTUGUESE_LOWERCASE_WORDS.has(lowerWord)) {
         return lowerWord;
+      }
+
+      // Keep company suffixes uppercase
+      if (COMPANY_SUFFIXES.has(lowerWord)) {
+        return word.toUpperCase();
       }
 
       // Words with 2-3 characters become entirely uppercase (likely acronyms/abbreviations)

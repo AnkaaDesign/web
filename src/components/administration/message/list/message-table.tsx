@@ -65,12 +65,12 @@ const STATUS_LABELS: Record<string, string> = {
   ARCHIVED: "Arquivada",
 };
 
-const STATUS_VARIANTS: Record<string, "secondary" | "default" | "outline" | "destructive"> = {
+const STATUS_VARIANTS: Record<string, "secondary" | "active" | "pending" | "expired" | "muted"> = {
   DRAFT: "secondary",
-  SCHEDULED: "outline",
-  ACTIVE: "default",
-  EXPIRED: "destructive",
-  ARCHIVED: "outline",
+  SCHEDULED: "pending",
+  ACTIVE: "active",
+  EXPIRED: "expired",
+  ARCHIVED: "muted",
 };
 
 export function MessageTable({

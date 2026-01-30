@@ -354,7 +354,8 @@ export const TRUCK_CATEGORY_LABELS: Record<TRUCK_CATEGORY, string> = {
 };
 
 export const IMPLEMENT_TYPE_LABELS: Record<IMPLEMENT_TYPE, string> = {
-  [IMPLEMENT_TYPE.CORRUGATED]: 'Corrugado',
+  [IMPLEMENT_TYPE.DRY_CARGO]: 'Carga Seca',
+  [IMPLEMENT_TYPE.REFRIGERATED]: 'Refrigerado',
   [IMPLEMENT_TYPE.INSULATED]: 'Isoplastic',
   [IMPLEMENT_TYPE.CURTAIN_SIDE]: 'Sider',
   [IMPLEMENT_TYPE.TANK]: 'Tanque',
@@ -835,6 +836,7 @@ export const PANTS_SIZE_LABELS: Record<PANTS_SIZE, string> = {
   [PANTS_SIZE.SIZE_44]: "44",
   [PANTS_SIZE.SIZE_46]: "46",
   [PANTS_SIZE.SIZE_48]: "48",
+  [PANTS_SIZE.SIZE_50]: "50",
 };
 
 export const SHIRT_SIZE_LABELS: Record<SHIRT_SIZE, string> = {
@@ -944,6 +946,7 @@ export const PPE_SIZE_LABELS: Record<PPE_SIZE, string> = {
   [PPE_SIZE.SIZE_46]: "46",
   [PPE_SIZE.SIZE_47]: "47",
   [PPE_SIZE.SIZE_48]: "48",
+  [PPE_SIZE.SIZE_50]: "50",
 };
 
 export const PPE_DELIVERY_MODE_LABELS: Record<PPE_DELIVERY_MODE, string> = {

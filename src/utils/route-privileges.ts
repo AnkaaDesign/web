@@ -93,6 +93,7 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
 
   // Personal - All authenticated users can access (personal info)
   "/pessoal": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  "/pessoal/mensagens": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
   "/pessoal/*": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
 
   // Meu Pessoal - Team leader access (sector employee management)

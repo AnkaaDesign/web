@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { IconBuilding } from "@tabler/icons-react";
 import { useFormContext } from "react-hook-form";
 import type { CustomerCreateFormData, CustomerUpdateFormData } from "../../../../schemas";
+import { toTitleCase } from "../../../../utils";
 
 type FormData = CustomerCreateFormData | CustomerUpdateFormData;
 
@@ -26,7 +27,14 @@ export function FantasyNameInput({ disabled }: FantasyNameInputProps) {
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              value={field.value || ""}
+              onChange={(value) => {
+                const rawValue = typeof value === "string" ? value : (value as any)?.target?.value || "";
+                field.onChange(toTitleCase(rawValue));
+              }}
+              name={field.name}
+              onBlur={field.onBlur}
+              ref={field.ref}
               placeholder="Ex: Cliente ABC Ltda"
               disabled={disabled}
               className="bg-transparent transition-all duration-200"

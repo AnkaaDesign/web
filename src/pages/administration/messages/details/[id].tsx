@@ -23,6 +23,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
 import { MessageViewersTable } from "@/components/administration/message/detail";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const MessageDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -68,12 +73,12 @@ export const MessageDetailsPage = () => {
     ARCHIVED: "Arquivada",
   };
 
-  const STATUS_VARIANTS: Record<string, "secondary" | "default" | "outline" | "destructive"> = {
+  const STATUS_VARIANTS: Record<string, "secondary" | "active" | "pending" | "expired" | "muted"> = {
     DRAFT: "secondary",
-    SCHEDULED: "outline",
-    ACTIVE: "default",
-    EXPIRED: "destructive",
-    ARCHIVED: "outline",
+    SCHEDULED: "pending",
+    ACTIVE: "active",
+    EXPIRED: "expired",
+    ARCHIVED: "muted",
   };
 
   const TARGET_TYPE_LABELS: Record<string, string> = {
@@ -161,176 +166,171 @@ export const MessageDetailsPage = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto pb-6">
-          <div className="space-y-6">
-          {/* Info and Stats Grid */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Status and Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Informações da Mensagem</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <div className="text-sm text-muted-foreground mb-1">Status</div>
+          <div className="space-y-4">
+            {/* Main Grid: Info (1/3) + Content Preview (2/3) */}
+            <div className="grid gap-4 lg:grid-cols-3">
+              {/* Message Info + Stats (1/3) */}
+              <Card className="lg:col-span-1">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Informações</CardTitle>
                     <Badge variant={STATUS_VARIANTS[message.status]}>
                       {STATUS_LABELS[message.status]}
                     </Badge>
                   </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground mb-1">Criado por</div>
-                    <div className="text-sm">
-                      {message.createdBy?.name || "Não informado"}
-                    </div>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-2">
+                  {/* Target */}
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground">Público-Alvo</span>
+                    {!message.targets || message.targets.length === 0 ? (
+                      <span className="text-sm font-semibold text-foreground">Todos os usuários</span>
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-sm font-semibold text-foreground cursor-help underline decoration-dotted underline-offset-2">
+                            {message.targets.length} usuário(s)
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-xs">
+                          <div className="space-y-1">
+                            {message.targets.map((target: any) => (
+                              <div key={target.id} className="text-sm">
+                                {target.user?.name || target.userId}
+                              </div>
+                            ))}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground mb-1">Público-Alvo</div>
-                    <div className="text-sm">
-                      {!message.targets || message.targets.length === 0
-                        ? "Todos os usuários"
-                        : `${message.targets.length} usuário(s) específico(s)`}
-                    </div>
+
+                  {/* Created by */}
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground">Criado por</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {message.createdBy?.name || "—"}
+                    </span>
                   </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground mb-1">Criada em</div>
-                    <div className="text-sm">
-                      {format(new Date(message.createdAt), "dd/MM/yyyy 'às' HH:mm", {
-                        locale: ptBR,
-                      })}
-                    </div>
+
+                  {/* Created at */}
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground">Criada em</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {format(new Date(message.createdAt), "dd/MM/yyyy", { locale: ptBR })}
+                    </span>
                   </div>
+
+                  {/* Published at */}
                   {message.publishedAt && (
-                    <div>
-                      <div className="text-sm text-muted-foreground mb-1">Publicada em</div>
-                      <div className="text-sm">
-                        {format(new Date(message.publishedAt), "dd/MM/yyyy 'às' HH:mm", {
-                          locale: ptBR,
-                        })}
-                      </div>
+                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                      <span className="text-sm font-medium text-muted-foreground">Publicada em</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        {format(new Date(message.publishedAt), "dd/MM/yyyy", { locale: ptBR })}
+                      </span>
                     </div>
                   )}
+
+                  {/* Date range */}
                   {message.startDate && (
-                    <div>
-                      <div className="text-sm text-muted-foreground mb-1">
-                        Data de Início
-                      </div>
-                      <div className="text-sm">
-                        {format(
-                          new Date(message.startDate),
-                          "dd/MM/yyyy 'às' HH:mm",
-                          { locale: ptBR }
-                        )}
-                      </div>
+                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                      <span className="text-sm font-medium text-muted-foreground">Início</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        {format(new Date(message.startDate), "dd/MM/yyyy", { locale: ptBR })}
+                      </span>
                     </div>
                   )}
                   {message.endDate && (
-                    <div>
-                      <div className="text-sm text-muted-foreground mb-1">
-                        Data de Término
-                      </div>
-                      <div className="text-sm">
-                        {format(
-                          new Date(message.endDate),
-                          "dd/MM/yyyy 'às' HH:mm",
-                          { locale: ptBR }
-                        )}
-                      </div>
+                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                      <span className="text-sm font-medium text-muted-foreground">Término</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        {format(new Date(message.endDate), "dd/MM/yyyy", { locale: ptBR })}
+                      </span>
                     </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Statistics */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Estatísticas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingStats ? (
-                  <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                  </div>
-                ) : stats ? (
-                  <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                    <div className="flex flex-col">
-                      <div className="text-2xl font-bold">{stats.totalViews}</div>
-                      <div className="text-sm text-muted-foreground">Visualizações</div>
-                    </div>
-                    <div className="flex flex-col">
-                      <div className="text-2xl font-bold">{stats.uniqueViewers}</div>
-                      <div className="text-sm text-muted-foreground">
-                        Visualizadores Únicos
+                  {/* Stats Section */}
+                  <div className="pt-3 mt-3 border-t border-border/40">
+                    <div className="text-sm font-medium mb-2">Estatísticas</div>
+                    {isLoadingStats ? (
+                      <div className="space-y-2">
+                        <Skeleton className="h-10 w-full rounded-lg" />
+                        <Skeleton className="h-10 w-full rounded-lg" />
                       </div>
-                    </div>
-                    <div className="flex flex-col">
-                      <div className="text-2xl font-bold">{stats.totalDismissals ?? 0}</div>
-                      <div className="text-sm text-muted-foreground">
-                        Dispensadas
+                    ) : stats ? (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                          <span className="text-sm font-medium text-muted-foreground">Visualizações</span>
+                          <span className="text-sm font-semibold text-foreground">{stats.totalViews}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                          <span className="text-sm font-medium text-muted-foreground">Únicos</span>
+                          <span className="text-sm font-semibold text-foreground">{stats.uniqueViewers}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                          <span className="text-sm font-medium text-muted-foreground">Dispensadas</span>
+                          <span className="text-sm font-semibold text-foreground">{stats.totalDismissals ?? 0}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                          <span className="text-sm font-medium text-muted-foreground">Usuários Alvo</span>
+                          <span className="text-sm font-semibold text-foreground">{stats.targetedUsers}</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col">
-                      <div className="text-2xl font-bold">{stats.targetedUsers}</div>
-                      <div className="text-sm text-muted-foreground">Usuários Alvo</div>
-                    </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        Não disponível
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground text-center py-4">
-                    Estatísticas não disponíveis
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                </CardContent>
+              </Card>
 
-          {/* Message Content Preview */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Prévia do Conteúdo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-lg p-6 bg-card">
-                {(() => {
-                  // Handle content - API returns { blocks: [...], version: "1.0" }
-                  let blocks = message.content?.blocks || message.content;
+              {/* Content Preview (2/3) */}
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Prévia do Conteúdo</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="border border-border/40 rounded-lg px-4 py-3 bg-card">
+                    {(() => {
+                      // Handle content - API returns { blocks: [...], version: "1.0" }
+                      let blocks = message.content?.blocks || message.content;
 
-                  // If content is a string, try to parse it
-                  if (typeof blocks === 'string') {
-                    try {
-                      blocks = JSON.parse(blocks);
-                      // After parsing, check if it has blocks property
-                      if (blocks?.blocks) {
-                        blocks = blocks.blocks;
+                      // If content is a string, try to parse it
+                      if (typeof blocks === 'string') {
+                        try {
+                          blocks = JSON.parse(blocks);
+                          // After parsing, check if it has blocks property
+                          if (blocks?.blocks) {
+                            blocks = blocks.blocks;
+                          }
+                        } catch (e) {
+                          console.error('Failed to parse content:', e);
+                          blocks = null;
+                        }
                       }
-                    } catch (e) {
-                      console.error('Failed to parse content:', e);
-                      blocks = null;
-                    }
-                  }
 
-                  // Check if we have valid blocks
-                  if (blocks && Array.isArray(blocks) && blocks.length > 0) {
-                    return <MessageBlockRenderer blocks={transformBlocksForDisplay(blocks)} />;
-                  }
+                      // Check if we have valid blocks
+                      if (blocks && Array.isArray(blocks) && blocks.length > 0) {
+                        return <MessageBlockRenderer blocks={transformBlocksForDisplay(blocks)} />;
+                      }
 
-                  return (
-                    <div className="text-sm text-muted-foreground text-center py-8">
-                      Nenhum conteúdo disponível
-                    </div>
-                  );
-                })()}
-              </div>
-            </CardContent>
-          </Card>
+                      return (
+                        <div className="text-sm text-muted-foreground text-center py-8">
+                          Nenhum conteúdo disponível
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Message Viewers Table */}
-          <MessageViewersTable message={message} />
+            {/* Message Viewers Table - Full Width */}
+            <MessageViewersTable message={message} />
+          </div>
         </div>
       </div>
-    </div>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

@@ -488,6 +488,7 @@ export const PANTS_SIZE_ORDER: Record<string, number> = {
   [PANTS_SIZE.SIZE_44]: 5,
   [PANTS_SIZE.SIZE_46]: 6,
   [PANTS_SIZE.SIZE_48]: 7,
+  [PANTS_SIZE.SIZE_50]: 8,
 };
 
 export const SHIRT_SIZE_ORDER: Record<SHIRT_SIZE, number> = {
@@ -565,6 +566,7 @@ export const PPE_SIZE_ORDER: Record<string, number> = {
   [PPE_SIZE.SIZE_46]: 17,
   [PPE_SIZE.SIZE_47]: 18,
   [PPE_SIZE.SIZE_48]: 19,
+  [PPE_SIZE.SIZE_50]: 20,
 };
 
 // =====================

@@ -65,7 +65,7 @@ export const TaskCreateForm = () => {
       plates: [],
       serialNumbers: [],
       category: "",
-      implementType: IMPLEMENT_TYPE.CORRUGATED,
+      implementType: IMPLEMENT_TYPE.REFRIGERATED,
       forecastDate: null,
       serviceOrderDescription: DEFAULT_TASK_SERVICE_ORDER.description,
     },

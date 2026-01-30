@@ -62,7 +62,7 @@ import { ArtworkFileUploadField } from "./artwork-file-upload-field";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { formatCNPJ, formatCPF, toTitleCase } from "../../../../utils";
+import { formatCNPJ, formatCPF } from "../../../../utils";
 import {
   getPricingItemsToAddFromServiceOrders,
   getServiceOrdersToAddFromPricingItems,
@@ -2690,7 +2690,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                 value={field.value || ""}
                                 onChange={(value) => {
                                   const rawValue = typeof value === "string" ? value : (value as any)?.target?.value || "";
-                                  field.onChange(toTitleCase(rawValue));
+                                  field.onChange(rawValue.toUpperCase());
                                 }}
                                 name={field.name}
                                 onBlur={field.onBlur}

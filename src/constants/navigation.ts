@@ -784,6 +784,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.DESIGNER,
   },
   {
+    id: "meus-pontos-designer",
+    title: "Meus Pontos",
+    icon: "fingerprint",
+    path: "/pessoal/meus-pontos",
+    requiredPrivilege: SECTOR_PRIVILEGES.DESIGNER,
+  },
+  {
     id: "minhas-ferias-designer",
     title: "Minhas Férias",
     icon: "calendarWeek",
@@ -791,10 +798,10 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.DESIGNER,
   },
   {
-    id: "meus-pontos-designer",
-    title: "Meus Pontos",
-    icon: "fingerprint",
-    path: "/pessoal/meus-pontos",
+    id: "minhas-mensagens-designer",
+    title: "Minhas Mensagens",
+    icon: "message",
+    path: "/pessoal/mensagens",
     requiredPrivilege: SECTOR_PRIVILEGES.DESIGNER,
   },
 
@@ -825,6 +832,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Histórico",
     icon: "history",
     path: "/producao/historico",
+    requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
+  },
+  {
+    id: "minhas-mensagens-financeiro",
+    title: "Minhas Mensagens",
+    icon: "message",
+    path: "/pessoal/mensagens",
     requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
   },
 
@@ -863,6 +877,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Histórico",
     icon: "history",
     path: "/producao/historico",
+    requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
+  },
+  {
+    id: "minhas-mensagens-logistic",
+    title: "Minhas Mensagens",
+    icon: "message",
+    path: "/pessoal/mensagens",
     requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
   },
 
@@ -919,6 +940,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
   },
   {
+    id: "minhas-mensagens-commercial",
+    title: "Minhas Mensagens",
+    icon: "message",
+    path: "/pessoal/mensagens",
+    requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+  },
+  {
     id: "observacoes-commercial",
     title: "Observações",
     icon: "note",
@@ -950,6 +978,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.PLOTTING,
   },
   {
+    id: "meus-pontos-plotting",
+    title: "Meus Pontos",
+    icon: "fingerprint",
+    path: "/pessoal/meus-pontos",
+    requiredPrivilege: SECTOR_PRIVILEGES.PLOTTING,
+  },
+  {
     id: "minhas-ferias-plotting",
     title: "Minhas Férias",
     icon: "calendarWeek",
@@ -957,10 +992,10 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.PLOTTING,
   },
   {
-    id: "meus-pontos-plotting",
-    title: "Meus Pontos",
-    icon: "fingerprint",
-    path: "/pessoal/meus-pontos",
+    id: "minhas-mensagens-plotting",
+    title: "Minhas Mensagens",
+    icon: "message",
+    path: "/pessoal/mensagens",
     requiredPrivilege: SECTOR_PRIVILEGES.PLOTTING,
   },
   {
@@ -983,6 +1018,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
       { id: "manutencao-detalhes", title: "Detalhes", icon: "eye", path: "/manutencao/detalhes/:id", isDynamic: true },
       { id: "manutencao-editar", title: "Editar", icon: "edit", path: "/manutencao/editar/:id", isDynamic: true },
     ],
+  },
+  {
+    id: "minhas-mensagens-maintenance",
+    title: "Minhas Mensagens",
+    icon: "message",
+    path: "/pessoal/mensagens",
+    requiredPrivilege: SECTOR_PRIVILEGES.MAINTENANCE,
   },
 
   // MINHA EQUIPE - Team leaders only (checked via managedSector relation, not privilege)
@@ -1013,6 +1055,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     path: "/pessoal",
     requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE],
     children: [
+      {
+        id: "assinaturas-pendentes",
+        title: "Assinaturas Pendentes",
+        icon: "signature",
+        path: "/pessoal/assinaturas-pendentes",
+        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE],
+      },
       { id: "meus-feriados", title: "Feriados", icon: "holiday", path: "/pessoal/feriados" },
       {
         id: "meus-emprestimos",
@@ -1033,13 +1082,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "meus-epis-solicitar", title: "Solicitar EPI", icon: "plus", path: "/pessoal/meus-epis/solicitar" },
         ],
       },
-      {
-        id: "assinaturas-pendentes",
-        title: "Assinaturas Pendentes",
-        icon: "signature",
-        path: "/pessoal/assinaturas-pendentes",
-        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE],
-      },
       { id: "meus-pontos", title: "Meus Pontos", icon: "fingerprint", path: "/pessoal/meus-pontos", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE] },
       {
         id: "minhas-advertencias",
@@ -1056,6 +1098,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         path: "/pessoal/ferias",
         children: [{ id: "minhas-ferias-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/ferias/detalhes/:id", isDynamic: true }],
       },
+      { id: "minhas-mensagens", title: "Minhas Mensagens", icon: "message", path: "/pessoal/mensagens" },
       {
         id: "minhas-movimentacoes",
         title: "Minhas Movimentações",
@@ -1289,6 +1332,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       // { id: "folha-de-pagamento", title: "Folha de Pagamento", icon: "payroll", path: "/recursos-humanos/folha-de-pagamento" }, // Temporarily hidden for testing
+      { id: "minhas-mensagens-rh", title: "Minhas Mensagens", icon: "message", path: "/pessoal/mensagens", requiredPrivilege: SECTOR_PRIVILEGES.HUMAN_RESOURCES },
       { id: "requisicoes", title: "Requisições", icon: "clipboardList", path: "/recursos-humanos/requisicoes" },
     ],
   },

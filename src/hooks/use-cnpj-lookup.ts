@@ -103,33 +103,57 @@ function mapSituacaoCadastral(code: number): "ACTIVE" | "SUSPENDED" | "UNFIT" | 
   return mapping[code] || null;
 }
 
+// Portuguese prepositions and articles that should remain lowercase in Title Case
+const PORTUGUESE_LOWERCASE_WORDS = new Set([
+  "de", "da", "do", "das", "dos",  // of, from
+  "e",                              // and
+  "em", "na", "no", "nas", "nos",  // in, on, at
+  "para", "pra",                   // for, to
+  "por", "pela", "pelo",           // by, through
+  "com",                           // with
+  "sem",                           // without
+  "a", "o", "as", "os",            // the (articles)
+  "um", "uma", "uns", "umas",      // a/an (articles)
+  "ao", "aos", "à", "às",          // contractions
+]);
+
+// Brazilian company suffixes that should remain uppercase
+const COMPANY_SUFFIXES = new Set([
+  "ltda", "ltda.",                 // Limitada
+  "eireli",                        // Empresa Individual de Responsabilidade Limitada
+  "s/a", "s.a.", "s.a",            // Sociedade Anônima
+  "cia", "cia.",                   // Companhia
+  "mei",                           // Microempreendedor Individual
+  "ss",                            // Sociedade Simples
+]);
+
 function toTitleCase(str: string): string {
   if (!str) return str;
 
-  // Words that should remain uppercase
-  const uppercaseWords = ['LTDA', 'ME', 'EPP', 'EIRELI', 'SA', 'S/A', 'S.A.', 'CIA', 'E', 'DE', 'DA', 'DO', 'DOS', 'DAS'];
-
-  // Words that should be lowercase (prepositions, articles, conjunctions)
-  const lowercaseWords = ['e', 'de', 'da', 'do', 'dos', 'das', 'para', 'com', 'sem'];
-
   return str
-    .toLowerCase()
     .split(' ')
     .map((word, index) => {
-      const upperWord = word.toUpperCase();
+      if (word.length === 0) return word;
 
-      // Keep specific words in uppercase
-      if (uppercaseWords.includes(upperWord)) {
-        return upperWord;
+      const lowerWord = word.toLowerCase();
+
+      // Keep Portuguese prepositions/articles lowercase (except first word)
+      if (index > 0 && PORTUGUESE_LOWERCASE_WORDS.has(lowerWord)) {
+        return lowerWord;
       }
 
-      // Keep prepositions/articles lowercase unless it's the first word
-      if (index > 0 && lowercaseWords.includes(word.toLowerCase())) {
-        return word.toLowerCase();
+      // Keep company suffixes uppercase
+      if (COMPANY_SUFFIXES.has(lowerWord)) {
+        return word.toUpperCase();
       }
 
-      // Capitalize first letter of each word
-      return word.charAt(0).toUpperCase() + word.slice(1);
+      // Words with 2-3 characters become entirely uppercase (likely acronyms/abbreviations)
+      if (word.length >= 2 && word.length <= 3) {
+        return word.toUpperCase();
+      }
+
+      // Capitalize first letter, lowercase the rest
+      return lowerWord.charAt(0).toUpperCase() + lowerWord.slice(1);
     })
     .join(' ');
 }

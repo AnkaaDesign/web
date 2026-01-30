@@ -120,6 +120,11 @@ export class MessageService {
     return response.data.data;
   }
 
+  async getMyMessages(): Promise<(Message & { viewedAt?: Date | null; dismissedAt?: Date | null })[]> {
+    const response = await apiClient.get<{ success: boolean; data: (Message & { viewedAt?: Date | null; dismissedAt?: Date | null })[]; meta: { count: number } }>(`${this.basePath}/my-messages`);
+    return response.data.data;
+  }
+
   async markAsViewed(messageId: string): Promise<ViewedMessageCreateResponse> {
     const response = await apiClient.post<ViewedMessageCreateResponse>(`${this.basePath}/${messageId}/mark-viewed`);
     return response.data;

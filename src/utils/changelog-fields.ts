@@ -235,6 +235,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "ppeSize.shirts": "Tamanho de Camiseta",
     "ppeSize.boots": "Tamanho de Botas",
     "ppeSize.pants": "Tamanho de Calças",
+    "ppeSize.shorts": "Tamanho de Bermudas",
     "ppeSize.sleeves": "Tamanho de Mangas",
     "ppeSize.mask": "Tamanho de Máscara",
     "ppeSize.gloves": "Tamanho de Luvas",
@@ -402,6 +403,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     userId: "Funcionário",
     shirts: "Tamanho de Camisa",
     pants: "Tamanho de Calça",
+    shorts: "Tamanho de Bermuda",
     boots: "Tamanho de Bota",
     sleeves: "Tamanho de Manga",
     mask: "Tamanho de Máscara",
@@ -1142,6 +1144,9 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     if (field === "ppeSize.pants") {
       return PANTS_SIZE_LABELS[value as keyof typeof PANTS_SIZE_LABELS] || value;
     }
+    if (field === "ppeSize.shorts") {
+      return PANTS_SIZE_LABELS[value as keyof typeof PANTS_SIZE_LABELS] || value;
+    }
     if (field === "ppeSize.sleeves") {
       return SLEEVES_SIZE_LABELS[value as keyof typeof SLEEVES_SIZE_LABELS] || value;
     }
@@ -1239,11 +1244,13 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   // Handle truck implement type
   if ((field === "implementType" || field === "truck.implementType") && typeof value === "string") {
     const implementTypeLabels: Record<string, string> = {
-      CORRUGATED: "Corrugado",
+      DRY_CARGO: "Carga Seca",
+      REFRIGERATED: "Refrigerado",
       INSULATED: "Isoplastic",
       CURTAIN_SIDE: "Sider",
       TANK: "Tanque",
       FLATBED: "Carroceria",
+      CORRUGATED: "Baú (Legado)", // Legacy value - migrated to REFRIGERATED
     };
     return implementTypeLabels[value] || value;
   }

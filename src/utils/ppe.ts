@@ -25,7 +25,7 @@ import {
 // Clothing sizes (P to XG) - used for shirts, sleeves, and masks
 const CLOTHING_SIZES: PPE_SIZE[] = [PPE_SIZE.P, PPE_SIZE.M, PPE_SIZE.G, PPE_SIZE.GG, PPE_SIZE.XG];
 
-// Numeric sizes (35 to 48) - used for pants and boots
+// Numeric sizes (35 to 50) - used for pants, shorts, and boots
 const NUMERIC_SIZES: PPE_SIZE[] = [
   PPE_SIZE.SIZE_35,
   PPE_SIZE.SIZE_36,
@@ -41,6 +41,7 @@ const NUMERIC_SIZES: PPE_SIZE[] = [
   PPE_SIZE.SIZE_46,
   PPE_SIZE.SIZE_47,
   PPE_SIZE.SIZE_48,
+  PPE_SIZE.SIZE_50,
 ];
 
 /**

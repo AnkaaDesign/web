@@ -392,6 +392,9 @@ export const routes = {
 
   // Personal - Pessoal - Personal (User-specific data)
   personal: {
+    myMessages: {
+      root: "/pessoal/mensagens",
+    },
     myHolidays: {
       root: "/pessoal/feriados",
     },
