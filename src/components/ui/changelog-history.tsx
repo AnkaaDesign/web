@@ -2408,7 +2408,7 @@ export function ChangelogHistory({
     ];
 
     // Define restricted fields that should only be visible to privileged users (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER)
-    const restrictedFields = ["forecastDate", "negotiatingWith", "invoiceTo"];
+    const restrictedFields = ["forecastDate", "negotiatingWith", "invoiceTo", "invoiceToId"];
 
     // Filter out sensitive field changes and restricted fields for non-privileged users
     const filteredLogs = logs.filter((log) => {

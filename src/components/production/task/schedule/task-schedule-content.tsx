@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
-import { useSectors, useTasks, useCurrentUser, useTaskBatchMutations } from "../../../../hooks";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSectors, useTasks, useCurrentUser, useTaskBatchMutations, taskKeys } from "../../../../hooks";
 import { SECTOR_PRIVILEGES, TASK_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
@@ -41,6 +42,9 @@ const initialCopyFromTaskState: CopyFromTaskState = {
 };
 
 export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
+  // Query client for manual cache invalidation
+  const queryClient = useQueryClient();
+
   // Shared selection state across all tables
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
 
@@ -276,7 +280,10 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
 
         // Refresh task list to show updated data
         if (successCount > 0) {
-          // Note: The refetch will happen automatically via React Query invalidation
+          // Invalidate task queries to refresh the UI with fresh data
+          queryClient.invalidateQueries({
+            queryKey: taskKeys.all,
+          });
         }
       } catch (error) {
         console.error('[CopyFromTask] Unexpected error:', error);

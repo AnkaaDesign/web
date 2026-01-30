@@ -1,4 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -11,7 +12,7 @@ import { FileUploadField, type FileWithPreview } from "@/components/common/file"
 import { GeneralPaintingSelector } from "../form/general-painting-selector";
 import { LogoPaintsSelector } from "../form/logo-paints-selector";
 import { MultiCutSelector, type MultiCutSelectorRef } from "../form/multi-cut-selector";
-import { useTaskBatchMutations } from "../../../../hooks";
+import { useTaskBatchMutations, taskKeys, serviceOrderKeys } from "../../../../hooks";
 import { taskService } from "../../../../api-client/task";
 import { fileService } from "../../../../api-client/file";
 import { IconPhoto, IconFileText, IconPalette, IconCut, IconLoader2, IconPlus, IconFileInvoice, IconLayout } from "@tabler/icons-react";
@@ -68,6 +69,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
   { openModal: (type: BulkOperationType, taskIds: string[]) => void },
   AdvancedBulkActionsHandlerProps
 >(({ selectedTaskIds, onClearSelection }, ref) => {
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [operationType, setOperationType] = useState<BulkOperationType | null>(null);
   const [currentTaskIds, setCurrentTaskIds] = useState<string[]>([]);
@@ -923,6 +925,14 @@ export const AdvancedBulkActionsHandler = forwardRef<
             console.log('[DEBUG] Executing', operations.length, 'operations...');
             await Promise.all(operations);
             console.log('[DEBUG] All operations completed');
+
+            // Invalidate task and service order queries to refresh the UI with fresh data
+            queryClient.invalidateQueries({
+              queryKey: taskKeys.all,
+            });
+            queryClient.invalidateQueries({
+              queryKey: serviceOrderKeys.all,
+            });
           } else {
             console.log('[DEBUG] No operations to execute');
           }

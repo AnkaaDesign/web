@@ -240,7 +240,7 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `historico_tarefas_${formatDate(new Date()).replace(/\//g, "-")}.csv`);
+    link.setAttribute("download", `historico_de_tarefas_${formatDate(new Date()).replace(/\//g, "-")}.csv`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -264,7 +264,7 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
       // Create worksheet from data
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Histórico");
+      XLSX.utils.book_append_sheet(wb, ws, "Histórico de Tarefas");
 
       // Auto-size columns based on content
       const maxWidth = 50;
@@ -281,7 +281,7 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
       ws["!cols"] = colWidths;
 
       // Write file with proper .xlsx extension and options for UTF-8
-      XLSX.writeFile(wb, `historico_tarefas_${formatDate(new Date()).replace(/\//g, "-")}.xlsx`, {
+      XLSX.writeFile(wb, `historico_de_tarefas_${formatDate(new Date()).replace(/\//g, "-")}.xlsx`, {
         bookType: 'xlsx',
         bookSST: false,
         type: 'binary'

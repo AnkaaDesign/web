@@ -539,16 +539,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     ],
   },
 
-  // CATÁLOGO - View-only for Team Leaders (Designers now have direct flattened menu)
-  {
-    id: "catalogo",
-    title: "Catálogo",
-    icon: "palette",
-    path: "/pintura/catalogo-basico",
-    requiredPrivilege: [SECTOR_PRIVILEGES.TEAM_LEADER],
-    children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo/detalhes/:id", isDynamic: true }],
-  },
-
   // ESTATÍSTICAS
   {
     id: "estatisticas",
@@ -1025,6 +1015,17 @@ export const NAVIGATION_MENU: MenuItem[] = [
     icon: "message",
     path: "/pessoal/mensagens",
     requiredPrivilege: SECTOR_PRIVILEGES.MAINTENANCE,
+  },
+
+  // CATÁLOGO - View-only for Team Leaders (Designers now have direct flattened menu)
+  // Positioned here to maintain alphabetical order with other TEAM_LEADER items (Catálogo < Minha Equipe)
+  {
+    id: "catalogo",
+    title: "Catálogo",
+    icon: "palette",
+    path: "/pintura/catalogo-basico",
+    requiredPrivilege: [SECTOR_PRIVILEGES.TEAM_LEADER],
+    children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo/detalhes/:id", isDynamic: true }],
   },
 
   // MINHA EQUIPE - Team leaders only (checked via managedSector relation, not privilege)

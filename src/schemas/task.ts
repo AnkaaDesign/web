@@ -1100,7 +1100,7 @@ const taskServiceOrderCreateSchema = z.object({
       errorMap: () => ({ message: "Selecione um status válido" }),
     })
     .default(SERVICE_ORDER_STATUS.PENDING),
-  statusOrder: z.number().int().min(1).max(4).default(1).optional(),
+  statusOrder: z.number().int().min(1).max(5).default(1).optional(),
   description: z.string({
     required_error: "Selecione um serviço",
     invalid_type_error: "Selecione um serviço",

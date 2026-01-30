@@ -329,6 +329,30 @@ function ServiceRow({
     defaultValue: SERVICE_ORDER_TYPE.PRODUCTION,
   });
 
+  // Determine which sector privileges to include based on service order type
+  // Each service order type has specific sectors that can be assigned
+  const includeSectorPrivileges = useMemo(() => {
+    switch (selectedType) {
+      case SERVICE_ORDER_TYPE.PRODUCTION:
+        // Production service orders: only production sector users
+        return [SECTOR_PRIVILEGES.PRODUCTION];
+      case SERVICE_ORDER_TYPE.LOGISTIC:
+        // Logistic service orders: logistic and admin users
+        return [SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.ADMIN];
+      case SERVICE_ORDER_TYPE.COMMERCIAL:
+        // Commercial service orders: commercial and admin users
+        return [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN];
+      case SERVICE_ORDER_TYPE.ARTWORK:
+        // Artwork service orders: designer and admin users
+        return [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN];
+      case SERVICE_ORDER_TYPE.FINANCIAL:
+        // Financial service orders: commercial, financial, and admin users
+        return [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN];
+      default:
+        return undefined;
+    }
+  }, [selectedType]);
+
   // Watch the current status
   const currentStatus = useWatch({
     control,
@@ -563,6 +587,7 @@ function ServiceRow({
             placeholder="Responsável"
             disabled={disabled}
             required={false}
+            includeSectorPrivileges={includeSectorPrivileges}
           />
         </div>
 

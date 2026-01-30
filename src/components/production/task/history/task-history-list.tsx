@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Task } from "@/types";
 import type { TaskGetManyFormData } from "@/schemas";
-import { useSectors, useCustomers, useUsers, useCurrentUser, useTaskBatchMutations } from "@/hooks";
+import { useSectors, useCustomers, useUsers, useCurrentUser, useTaskBatchMutations, taskKeys } from "@/hooks";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "@/constants";
 import { taskService } from "@/api-client/task";
 import { useTableFilters } from "@/hooks/use-table-filters";
@@ -59,6 +60,9 @@ export function TaskHistoryList({
   navigationRoute = 'history',
   hideStatusFilter = false,
 }: TaskHistoryListProps) {
+  // Query client for manual cache invalidation
+  const queryClient = useQueryClient();
+
   // Load entity data for filter labels
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" } });
   const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" } });
@@ -505,6 +509,14 @@ export function TaskHistoryList({
 
         setCopyFromTaskState(initialCopyFromTaskState);
         resetSelection();
+
+        // Refresh task list to show updated data
+        if (successCount > 0) {
+          // Invalidate task queries to refresh the UI with fresh data
+          queryClient.invalidateQueries({
+            queryKey: taskKeys.all,
+          });
+        }
       } catch (error) {
         console.error('Unexpected error:', error);
         toast.error("Erro ao copiar campos", {
@@ -512,7 +524,7 @@ export function TaskHistoryList({
         });
       }
     },
-    [copyFromTaskState, resetSelection]
+    [copyFromTaskState, resetSelection, queryClient]
   );
 
   const handleCopyFromTaskCancel = useCallback(() => {

@@ -131,7 +131,7 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `cronograma_${formatDate(new Date()).replace(/\//g, "-")}.csv`);
+    link.setAttribute("download", `cronograma_de_producao_${formatDate(new Date()).replace(/\//g, "-")}.csv`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -155,7 +155,7 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
       // Create worksheet from data
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Cronograma");
+      XLSX.utils.book_append_sheet(wb, ws, "Cronograma de Produção");
 
       // Auto-size columns based on content
       const maxWidth = 50;
@@ -172,7 +172,7 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
       ws["!cols"] = colWidths;
 
       // Write file with proper .xlsx extension and options for UTF-8
-      XLSX.writeFile(wb, `cronograma_${formatDate(new Date()).replace(/\//g, "-")}.xlsx`, {
+      XLSX.writeFile(wb, `cronograma_de_producao_${formatDate(new Date()).replace(/\//g, "-")}.xlsx`, {
         bookType: 'xlsx',
         bookSST: false,
         type: 'binary'

@@ -62,7 +62,7 @@ import { ArtworkFileUploadField } from "./artwork-file-upload-field";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { formatCNPJ, formatCPF } from "../../../../utils";
+import { formatCNPJ, formatCPF, toTitleCase } from "../../../../utils";
 import {
   getPricingItemsToAddFromServiceOrders,
   getServiceOrdersToAddFromPricingItems,
@@ -2690,10 +2690,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                 value={field.value || ""}
                                 onChange={(value) => {
                                   const rawValue = typeof value === "string" ? value : (value as any)?.target?.value || "";
-                                  field.onChange(rawValue.toUpperCase());
+                                  field.onChange(rawValue);
                                 }}
                                 name={field.name}
-                                onBlur={field.onBlur}
+                                onBlur={() => {
+                                  // Apply title case formatting when user finishes typing
+                                  if (field.value) {
+                                    field.onChange(toTitleCase(field.value));
+                                  }
+                                  field.onBlur();
+                                }}
                                 ref={field.ref}
                                 placeholder="Ex: Pintura completa do caminhão"
                                 disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser}

@@ -6,6 +6,7 @@ import { IconFileText, IconLoader2 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/hooks";
 import { useDebounce } from "@/hooks/use-debounce";
+import { toTitleCase } from "@/utils/formatters";
 
 interface TaskNameAutocompleteProps {
   control: any;
@@ -186,12 +187,11 @@ export function TaskNameAutocomplete({ control, disabled }: TaskNameAutocomplete
                 value={inputValue}
                 onChange={(value) => {
                   const rawValue = typeof value === "string" ? value : (value as any)?.target?.value || "";
-                  const newValue = rawValue.toUpperCase();
-                  setInputValue(newValue);
-                  field.onChange(newValue);
+                  setInputValue(rawValue);
+                  field.onChange(rawValue);
 
                   // Allow dropdown to open when typing
-                  if (newValue.length >= 2) {
+                  if (rawValue.length >= 2) {
                     setShouldPreventOpen(false);
                   }
                 }}
@@ -206,6 +206,12 @@ export function TaskNameAutocomplete({ control, disabled }: TaskNameAutocomplete
                   }
                 }}
                 onBlur={() => {
+                  // Apply title case formatting when user finishes typing
+                  if (inputValue) {
+                    const formatted = toTitleCase(inputValue);
+                    setInputValue(formatted);
+                    field.onChange(formatted);
+                  }
                   // When input loses focus, prevent auto-reopening
                   setTimeout(() => {
                     setIsOpen(false);

@@ -258,14 +258,14 @@ export const PricingSelector = forwardRef<
       setValue("pricing.subtotal", 0);
       setValue("pricing.total", 0);
     }
-    // Use append to preserve addition order (first added = first position)
-    // Incomplete items are displayed at top via the grouping logic
+    // Append adds to the end, so new item appears right above the button
     append({ description: "", observation: null, amount: undefined });
-    // Focus the new item (will be shown at top in the incomplete section)
+    // Focus the new item (last one in the list)
     setTimeout(() => {
-      const incompleteSection = document.querySelector('[data-incomplete-section]');
-      const combobox = incompleteSection?.querySelector('[role="combobox"]') as HTMLElement;
-      combobox?.focus();
+      if (lastRowRef.current) {
+        const combobox = lastRowRef.current.querySelector('[role="combobox"]') as HTMLElement;
+        combobox?.focus();
+      }
     }, 100);
   }, [append, clearErrors, fields.length, setValue]);
 
@@ -349,26 +349,6 @@ export const PricingSelector = forwardRef<
 
   const hasPricingItems = pricingItems && pricingItems.length > 0;
 
-  // Separate incomplete items (shown at top) from complete items (shown below in order)
-  // An item is complete if it has a description with at least 3 characters
-  const { incompleteIndices, completeIndices } = useMemo(() => {
-    const incomplete: number[] = [];
-    const complete: number[] = [];
-
-    fields.forEach((field, index) => {
-      const item = pricingItems?.[index];
-      const isComplete = item?.description && item.description.trim().length >= 3;
-
-      if (isComplete) {
-        complete.push(index);
-      } else {
-        incomplete.push(index);
-      }
-    });
-
-    return { incompleteIndices: incomplete, completeIndices: complete };
-  }, [fields, pricingItems]);
-
   // Handler to remove an item and track deletion
   const handleRemoveItem = useCallback((index: number) => {
     const item = pricingItems?.[index];
@@ -380,7 +360,26 @@ export const PricingSelector = forwardRef<
 
   return (
     <div className="space-y-4">
-      {/* Add Service Button - Full width above rows */}
+      {/* Pricing Items - displayed in order, newest at bottom */}
+      {fields.length > 0 && (
+        <div className="space-y-3">
+          {fields.map((field, index) => (
+            <PricingItemRow
+              key={field.id}
+              control={control}
+              index={index}
+              disabled={disabled}
+              readOnly={readOnly}
+              onRemove={() => handleRemoveItem(index)}
+              isFirstRow={index === 0}
+              isLastRow={index === fields.length - 1}
+              ref={index === fields.length - 1 ? lastRowRef : null}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Add Service Button - Always at bottom, new items appear above */}
       {!readOnly && !disabled && (
         <Button
           type="button"
@@ -393,52 +392,6 @@ export const PricingSelector = forwardRef<
           <IconPlus className="h-4 w-4 mr-2" />
           Adicionar Serviço
         </Button>
-      )}
-
-      {/* Incomplete Items Section - Items being configured (shown at top) */}
-      {incompleteIndices.length > 0 && (
-        <div className="space-y-3 pb-3 border-b border-dashed border-muted" data-incomplete-section>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">
-              Configurando Serviço
-            </span>
-            <span className="text-xs text-muted-foreground">
-              Preencha a descrição
-            </span>
-          </div>
-          {incompleteIndices.map((index, i) => (
-            <PricingItemRow
-              key={fields[index].id}
-              control={control}
-              index={index}
-              disabled={disabled}
-              readOnly={readOnly}
-              onRemove={() => handleRemoveItem(index)}
-              isFirstRow={i === 0 && completeIndices.length === 0}
-              isLastRow={false}
-              ref={null}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Complete Items Section - Items with description (in their position order) */}
-      {completeIndices.length > 0 && (
-        <div className="space-y-3">
-          {completeIndices.map((index, i) => (
-            <PricingItemRow
-              key={fields[index].id}
-              control={control}
-              index={index}
-              disabled={disabled}
-              readOnly={readOnly}
-              onRemove={() => handleRemoveItem(index)}
-              isFirstRow={i === 0 && incompleteIndices.length === 0}
-              isLastRow={index === fields.length - 1}
-              ref={index === fields.length - 1 ? lastRowRef : null}
-            />
-          ))}
-        </div>
       )}
 
       {/* Spacing between items and configuration sections */}

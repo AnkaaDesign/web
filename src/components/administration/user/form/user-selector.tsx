@@ -4,7 +4,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Combobox } from "@/components/ui/combobox";
 import { getUsers } from "../../../../api-client";
 import { toast } from "@/components/ui/sonner";
-import { USER_STATUS } from "../../../../constants";
+import { USER_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useUserMutations } from "../../../../hooks";
 import type { User } from "../../../../types";
 
@@ -16,6 +16,10 @@ interface UserSelectorProps<T extends FieldValues = FieldValues> {
   placeholder?: string;
   required?: boolean;
   initialUser?: User;
+  /** Exclude users from sectors with these privileges */
+  excludeSectorPrivileges?: SECTOR_PRIVILEGES[];
+  /** Only include users from sectors with these privileges */
+  includeSectorPrivileges?: SECTOR_PRIVILEGES[];
 }
 
 export function AdminUserSelector<T extends FieldValues = FieldValues>({
@@ -26,6 +30,8 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
   placeholder = "Selecione um usuário",
   required = false,
   initialUser,
+  excludeSectorPrivileges,
+  includeSectorPrivileges,
 }: UserSelectorProps<T>) {
   const [isCreating, setIsCreating] = useState(false);
   const { createAsync: createUserAsync } = useUserMutations();
@@ -59,6 +65,14 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
         queryParams.searchingFor = searchTerm.trim();
       }
 
+      // Add sector privilege filters if provided
+      if (excludeSectorPrivileges && excludeSectorPrivileges.length > 0) {
+        queryParams.excludeSectorPrivileges = excludeSectorPrivileges;
+      }
+      if (includeSectorPrivileges && includeSectorPrivileges.length > 0) {
+        queryParams.includeSectorPrivileges = includeSectorPrivileges;
+      }
+
       const response = await getUsers(queryParams);
       const users = response.data || [];
       const hasMore = response.meta?.hasNextPage || false;
@@ -82,7 +96,7 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
         hasMore: false,
       };
     }
-  }, []);
+  }, [excludeSectorPrivileges, includeSectorPrivileges]);
 
   const handleCreateUser = async (name: string) => {
     setIsCreating(true);
@@ -122,7 +136,7 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
           <FormControl>
             <Combobox
               async={true}
-              queryKey={["users", "active", name]}
+              queryKey={["users", "active", name, excludeSectorPrivileges?.join(",") ?? "", includeSectorPrivileges?.join(",") ?? ""]}
               queryFn={queryUsers}
               initialOptions={initialOptions}
               value={field.value || ""}

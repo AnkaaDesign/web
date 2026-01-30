@@ -1336,14 +1336,19 @@ const ChangelogTimelineItem = ({
                   return false;
                 }
 
-                // Filter out invoiceToId field for users who can't view it (only ADMIN, FINANCIAL, COMMERCIAL can see)
-                const canViewInvoiceToField =
+                // Filter out restricted fields (forecastDate, negotiatingWith, invoiceTo) for users who can't view them
+                // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER can see these
+                const canViewRestrictedFields =
                   userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
                   userSectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
-                  userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL;
+                  userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
+                  userSectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
+                  userSectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
+                const restrictedFields = ["forecastDate", "negotiatingWith", "invoiceTo", "invoiceToId"];
                 if (
-                  !canViewInvoiceToField &&
-                  changelog.field === "invoiceToId"
+                  !canViewRestrictedFields &&
+                  changelog.field &&
+                  restrictedFields.includes(changelog.field)
                 ) {
                   return false;
                 }

@@ -78,9 +78,9 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
       });
 
       if (format === "csv") {
-        exportToCSV(data, "tarefas-pagina-atual");
+        exportToCSV(data, "agenda_de_tarefas");
       } else {
-        await exportToExcel(data, "tarefas-pagina-atual");
+        await exportToExcel(data, "agenda_de_tarefas");
       }
 
       toast({
@@ -190,9 +190,9 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
       });
 
       if (format === "csv") {
-        exportToCSV(data, "tarefas-todas");
+        exportToCSV(data, "agenda_de_tarefas");
       } else {
-        await exportToExcel(data, "tarefas-todas");
+        await exportToExcel(data, "agenda_de_tarefas");
       }
 
       toast({
@@ -249,7 +249,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
 
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Tarefas");
+      XLSX.utils.book_append_sheet(wb, ws, "Agenda de Tarefas");
 
       // Auto-size columns
       const colWidths = columns.map(() => ({ wch: 20 }));

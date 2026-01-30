@@ -1417,6 +1417,15 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       LEAD: "Líder",
       HUMAN_RESOURCES: "Recursos Humanos",
       ADMIN: "Administrador",
+      PRODUCTION: "Produção",
+      COMMERCIAL: "Comercial",
+      FINANCIAL: "Financeiro",
+      WAREHOUSE: "Almoxarifado",
+      DESIGNER: "Designer",
+      LOGISTIC: "Logística",
+      PLOTTING: "Plotagem",
+      MAINTENANCE: "Manutenção",
+      EXTERNAL: "Externo",
     };
     return privilegeLabels[value] || value;
   }
