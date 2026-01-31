@@ -938,7 +938,11 @@ export const TaskDetailsPage = () => {
         },
       },
       baseFiles: true,
-      artworks: true,
+      artworks: {
+        include: {
+          file: true,
+        },
+      },
       pricing: {
         include: {
           items: true,
@@ -1035,7 +1039,11 @@ export const TaskDetailsPage = () => {
       taskId: id!,
       params: {
         include: {
-          artworks: true,
+          artworks: {
+            include: {
+              file: true,
+            },
+          },
           receipts: true,
           invoices: true,
         },

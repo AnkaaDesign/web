@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+// Use .js extension instead of .mjs to avoid MIME type issues (browsers may reject .mjs with application/octet-stream)
+pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
 
 type PDFDocumentProxy = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>;
 type RenderTask = ReturnType<Awaited<ReturnType<PDFDocumentProxy["getPage"]>>["render"]>;
