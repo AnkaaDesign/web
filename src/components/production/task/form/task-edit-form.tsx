@@ -27,11 +27,16 @@ import {
   IconMapPin,
   IconUser,
   IconPhone,
+  IconTrash,
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
 import { useTaskMutations, useCutsByTask, useCutMutations } from "../../../../hooks";
 import { cutService } from "../../../../api-client/cut";
+import { representativeService } from "@/services/representativeService";
+import type { Representative, RepresentativeCreateInlineFormData, RepresentativeRowData } from "@/types/representative";
+import { RepresentativeRole, REPRESENTATIVE_ROLE_LABELS } from "@/types/representative";
+import { RepresentativeManager } from "@/components/representatives/RepresentativeManager";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { useAuth } from "../../../../contexts/auth-context";
@@ -364,6 +369,26 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     task.pricing?.layoutFile ? convertToFileWithPreview([task.pricing.layoutFile]) : []
   );
 
+  // Representatives state - using row-based system
+  const [representativeRows, setRepresentativeRows] = useState<RepresentativeRowData[]>(() => {
+    // Initialize from task representatives
+    if (task.representatives && task.representatives.length > 0) {
+      return task.representatives.map(rep => ({
+        id: rep.id,
+        name: rep.name,
+        phone: rep.phone,
+        email: rep.email || '',
+        role: rep.role,
+        isActive: rep.isActive,
+        isNew: false,
+        isEditing: false,
+        isSaving: false,
+        error: null,
+      }));
+    }
+    return [];
+  });
+
   // Accordion state - track which section is open (only one at a time)
   const [openAccordion, setOpenAccordion] = useState<string | undefined>("basic-information");
 
@@ -608,6 +633,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       invoiceToId: taskData.invoiceToId || null,
       negotiatingWith: taskData.negotiatingWith || { name: null, phone: null },
       sectorId: taskData.sectorId || null,
+      representativeIds: taskData.representativeIds || [],
       paintId: taskData.paintId || null,
       // Initialize pricing with default structure - default row is part of initial state, not a change
       pricing: taskData.pricing ? {
@@ -802,14 +828,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
       // DEBUG: Log current form values for date fields
       const currentFormValues = form.getValues();
-      console.log('[TaskEditForm] DEBUG - Current form values for dates:', {
-        forecastDate: currentFormValues.forecastDate,
-        forecastDateType: typeof currentFormValues.forecastDate,
-        forecastDateIsNull: currentFormValues.forecastDate === null,
-        forecastDateIsUndefined: currentFormValues.forecastDate === undefined,
-        entryDate: currentFormValues.entryDate,
-        term: currentFormValues.term,
-      });
+      // Current form values for dates: {
+      //   forecastDate: currentFormValues.forecastDate,
+      //   forecastDateType: typeof currentFormValues.forecastDate,
+      //   forecastDateIsNull: currentFormValues.forecastDate === null,
+      //   forecastDateIsUndefined: currentFormValues.forecastDate === undefined,
+      //   entryDate: currentFormValues.entryDate,
+      //   term: currentFormValues.term,
+      // }
 
       // CRITICAL: Log deleted items for debugging
       console.log('[TaskEditForm] Deleted service orders tracked:', Array.from(deletedServiceOrderDescriptionsRef.current));
@@ -1166,6 +1192,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           changedData._onlyCuts = true; // Marker field to prevent empty body
         }
 
+        // If only new representatives exist (no other changes), we still need to update the task
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate && hasNewRepresentatives) {
+          console.log('[TaskEditForm] Only new representatives detected, adding marker field');
+          changedData._onlyNewRepresentatives = true; // Marker field to prevent empty body
+        }
+
         // Check if we have new files that need to be uploaded
         
         const newBudgetFiles = budgetFile.filter(f => !f.uploaded);
@@ -1509,6 +1541,46 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             console.log('[Task Update] 📦 FormData - Including newArtworkStatuses:', newArtworkStatuses);
           }
 
+          // Handle representatives - send existing IDs and new reps to create
+          console.log('[Task Update] Processing representatives:', {
+            representativeRows,
+            filtered: representativeRows.filter(row => row.isNew && row.name.trim() && row.phone.trim())
+          });
+
+          // Collect existing representative IDs
+          const existingRepIds = representativeRows
+            .filter(row => !row.isNew && row.id && !row.id.startsWith('temp-'))
+            .map(row => row.id);
+
+          // Include existing representative IDs
+          if (existingRepIds.length > 0) {
+            dataForFormData.representativeIds = existingRepIds;
+            console.log('[Task Update] Including existing representative IDs:', existingRepIds);
+          }
+
+          // Prepare new representatives to create inline
+          const newReps = representativeRows
+            .filter(row => row.isNew && row.name.trim() && row.phone.trim())
+            .map(row => ({
+              name: row.name.trim(),
+              phone: row.phone.trim(),
+              email: row.email?.trim() || undefined,
+              role: row.role,
+              isActive: row.isActive !== undefined ? row.isActive : true, // Default to true if undefined
+            }));
+
+          // Include new representatives to be created by the backend
+          if (newReps.length > 0) {
+            dataForFormData.newRepresentatives = newReps;
+            console.log('[Task Update] Including new representatives to create:', JSON.stringify(newReps, null, 2));
+          } else {
+            console.log('[Task Update] No new representatives to create');
+          }
+
+          // Remove marker fields before sending to API
+          delete dataForFormData._onlyCuts;
+          delete dataForFormData._onlyNewRepresentatives;
+
           // Use the helper to create FormData with proper context
           const formData = createFormDataWithContext(
             dataForFormData,
@@ -1727,6 +1799,26 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
           // CRITICAL: paintIds is already in changedData (not excluded in JSON path)
           // No need to add it separately like in FormData path
+
+          // Add new representatives to be created inline
+          const newReps = representativeRows
+            .filter(row => row.isNew && row.name.trim() && row.phone.trim())
+            .map(row => ({
+              name: row.name.trim(),
+              phone: row.phone.trim(),
+              email: row.email?.trim() || undefined,
+              role: row.role,
+              isActive: row.isActive,
+            }));
+
+          if (newReps.length > 0) {
+            submitData.newRepresentatives = newReps;
+            console.log('[TaskEditForm] 📤 JSON - Including newRepresentatives:', newReps);
+          }
+
+          // Remove marker fields before sending to API
+          delete submitData._onlyCuts;
+          delete submitData._onlyNewRepresentatives;
 
           // DEBUG: Log submitData right before API call
           console.log('[TaskEditForm] JSON path - submitData before API call:', JSON.stringify(submitData, (key, value) => {
@@ -2049,6 +2141,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     name: 'forecastDate',
   });
 
+  const customerIdValue = useWatch({
+    control: form.control,
+    name: 'customerId',
+  });
+
+  // Representatives are now managed by the RepresentativeManager component
+
   // =====================================================================
   // BIDIRECTIONAL SYNC: Pricing Items ↔ Production Service Orders
   // When user adds a PRODUCTION service order, auto-add pricing item
@@ -2105,6 +2204,49 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       console.log('[PRICING↔SO SYNC] Tracking deleted pricing item:', normalizedDesc, 'New count ref:', lastSyncedPricingItemCountRef.current);
     }
   }, []);
+
+  // Representative rows are now managed by RepresentativeManager component
+  // Handler to update representative rows and sync with form
+  const handleRepresentativeRowsChange = useCallback((rows: RepresentativeRowData[]) => {
+    console.log('[TaskEditForm] handleRepresentativeRowsChange called:', {
+      rows,
+      rowsWithData: rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        phone: r.phone,
+        isNew: r.isNew,
+        hasValidData: r.isNew && !!r.name?.trim() && !!r.phone?.trim()
+      }))
+    });
+
+    // Update representative rows state
+    setRepresentativeRows(rows);
+
+    // Update the form's representativeIds with existing representatives
+    const existingRepIds = rows
+      .filter(row => !row.isNew && row.id && row.id.trim() !== '')
+      .map(row => row.id);
+
+    // Check if there are new representatives with data to mark form as dirty
+    const hasNewRepsWithData = rows.some(row =>
+      row.isNew && row.name && row.name.trim() && row.phone && row.phone.trim()
+    );
+
+    console.log('[TaskEditForm] Representative state:', {
+      existingRepIds,
+      hasNewRepsWithData
+    });
+
+    // Update form values with representative IDs
+    // Always mark as dirty if we have new representatives with data, even if existingRepIds is empty
+    const shouldMarkDirty = hasNewRepsWithData || (existingRepIds.length > 0 && existingRepIds.join(',') !== (task.representatives?.map(r => r.id).join(',') || ''));
+
+    form.setValue("representativeIds", existingRepIds, {
+      shouldDirty: shouldMarkDirty,
+      shouldTouch: shouldMarkDirty,
+      shouldValidate: true
+    });
+  }, [form]);
 
   // Fetch historical PRODUCTION service order descriptions on mount
   useEffect(() => {
@@ -2460,8 +2602,41 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     });
   }, [cutsValues]);
 
-  // Compute hasChanges including cuts to create and artwork status changes
-  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges || hasCutsToCreate;
+  // Check if there are new representatives to be created
+  const hasNewRepresentatives = useMemo(() => {
+    const result = representativeRows.some(row =>
+      row.isNew && row.name && row.name.trim() && row.phone && row.phone.trim()
+    );
+    console.log('[TaskEditForm] hasNewRepresentatives calculation:', {
+      result,
+      representativeRows,
+      rowsDetail: representativeRows.map(r => ({
+        id: r.id,
+        name: r.name,
+        phone: r.phone,
+        isNew: r.isNew,
+        hasName: !!r.name?.trim(),
+        hasPhone: !!r.phone?.trim(),
+        qualifies: r.isNew && !!r.name?.trim() && !!r.phone?.trim()
+      }))
+    });
+    return result;
+  }, [representativeRows]);
+
+  // Compute hasChanges including cuts to create, artwork status changes, and new representatives
+  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges || hasCutsToCreate || hasNewRepresentatives;
+
+  console.log('[TaskEditForm] hasChanges calculation:', {
+    hasChanges,
+    formFieldChangesCount: Object.keys(formFieldChanges).length,
+    formFieldChanges: Object.keys(formFieldChanges),
+    hasLayoutChanges,
+    hasFileChanges,
+    hasArtworkStatusChanges,
+    hasCutsToCreate,
+    hasNewRepresentatives
+  });
+
 
   // Check for validation errors that should prevent submission
   // Cuts without files will be filtered out on submit, not blocked
@@ -2560,7 +2735,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   useEffect(() => {
     if (onFormStateChange) {
       const changedFields = getChangedFields();
-      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges;
+      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges || hasCutsToCreate || hasNewRepresentatives;
 
       // Check if form is valid (no blocking validation errors)
       // This matches the form's internal validation but WITHOUT the hasChanges check
@@ -2583,6 +2758,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     hasLayoutChanges,
     hasFileChanges,
     hasArtworkStatusChanges,
+    hasCutsToCreate,
+    hasNewRepresentatives,
     isSubmitting,
     hasCutsWithoutFiles,
     hasIncompletePricing,
@@ -2604,6 +2781,20 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const navigationActions = useMemo(() => {
     const isSubmitDisabled = isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompletePricing || hasIncompleteServices || hasIncompleteObservation || !!layoutWidthError;
 
+    console.log('[TaskEditForm] Submit button disabled state:', {
+      isSubmitDisabled,
+      isSubmitting,
+      hasChanges,
+      hasNewRepresentatives,
+      formFieldChangesCount: Object.keys(formFieldChanges).length,
+      hasCutsWithoutFiles,
+      hasIncompletePricing,
+      hasIncompleteServices,
+      hasIncompleteObservation,
+      hasLayoutError: !!layoutWidthError
+    });
+
+
     return [
       {
         key: "cancel",
@@ -2623,7 +2814,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         loading: isSubmitting,
       },
     ];
-  }, [isSubmitting, hasChanges, hasCutsWithoutFiles, hasIncompletePricing, hasIncompleteServices, hasIncompleteObservation, layoutWidthError, handleCancel, handleSubmitChanges]);
+  }, [isSubmitting, hasChanges, hasCutsWithoutFiles, hasIncompletePricing, hasIncompleteServices, hasIncompleteObservation, layoutWidthError, handleCancel, handleSubmitChanges, hasNewRepresentatives]);
 
   return (
     <Form {...form}>
@@ -2725,60 +2916,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isLogisticUser}
                         initialCustomer={task.invoiceTo}
                       />
-                    )}
-
-                    {/* Negotiating With - Name and Phone (only visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER) */}
-                    {canViewRestrictedFields && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Contact Name */}
-                      <FormField
-                        control={form.control}
-                        name="negotiatingWith.name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="flex items-center gap-2">
-                              <IconUser className="h-4 w-4" />
-                              Responsável pela Negociação
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                value={field.value || ""}
-                                placeholder="Ex: João Silva"
-                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser}
-                                className="bg-transparent"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* Contact Phone */}
-                      <FormField
-                        control={form.control}
-                        name="negotiatingWith.phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="flex items-center gap-2">
-                              <IconPhone className="h-4 w-4" />
-                              Telefone do Responsável
-                            </FormLabel>
-                            <FormControl>
-                              <BasePhoneInput
-                                value={field.value || ""}
-                                onChange={(value) => field.onChange(value || null)}
-                                onBlur={field.onBlur}
-                                placeholder="(00) 00000-0000"
-                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser}
-                                className="bg-transparent"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
                     )}
 
                     {/* Truck Category and Implement Type - Side by Side */}
@@ -3063,6 +3200,40 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                   </AccordionContent>
                 </Card>
           </AccordionItem>
+
+          {/* Representatives Section - Visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC (edit), DESIGNER (view only) */}
+          {canViewRestrictedFields && (
+            <AccordionItem
+              value="representatives"
+              id="accordion-item-representatives"
+              className="border border-border/40 rounded-lg"
+            >
+              <Card className="border-0">
+                <AccordionTrigger className="px-0 hover:no-underline">
+                  <CardHeader className="flex-1 py-4">
+                    <CardTitle className="flex items-center gap-2">
+                      <IconUser className="h-5 w-5" />
+                      Representantes
+                    </CardTitle>
+                  </CardHeader>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <CardContent className="pt-0">
+                    <RepresentativeManager
+                      customerId={customerIdValue}
+                      value={representativeRows}
+                      onChange={handleRepresentativeRowsChange}
+                      disabled={isSubmitting || isDesignerUser}
+                      readOnly={isDesignerUser}
+                      minRows={0}
+                      maxRows={10}
+                      control={form.control}
+                    />
+                  </CardContent>
+                </AccordionContent>
+              </Card>
+            </AccordionItem>
+          )}
 
                 {/* Dates Card - Hidden for Warehouse users, Disabled for Financial and Designer users */}
                 {!isWarehouseUser && (

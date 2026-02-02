@@ -43,6 +43,7 @@ import { exportBudgetPdf } from "@/utils/budget-pdf-generator";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text-generators";
 import { getApiBaseUrl } from "@/utils/file";
 import { SERVICE_ORDER_TYPE } from "../../../../constants";
+import { REPRESENTATIVE_ROLE_LABELS } from "@/types/representative";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import {
   AlertDialog,
@@ -110,6 +111,7 @@ import {
   IconPhone,
   IconCalendarTime,
   IconBrandWhatsapp,
+  IconMail,
   IconNote,
   IconRuler,
   IconCreditCard,
@@ -592,8 +594,7 @@ const TASK_SECTIONS: SectionConfig[] = [
     fields: [
       { id: "customer", label: "Cliente", sectionId: "overview", required: true },
       { id: "invoiceTo", label: "Faturar Para", sectionId: "overview" },
-      { id: "negotiatingWithName", label: "Responsável pela Negociação", sectionId: "overview" },
-      { id: "negotiatingWithPhone", label: "Telefone do Responsável", sectionId: "overview" },
+      { id: "representatives", label: "Representantes", sectionId: "overview" },
       { id: "sector", label: "Setor", sectionId: "overview" },
       { id: "commission", label: "Comissão", sectionId: "overview" },
       { id: "serialNumber", label: "Número de Série", sectionId: "overview" },
@@ -803,8 +804,8 @@ export const TaskDetailsPage = () => {
   const COMMISSION_RESTRICTED_FIELDS = ['commission'];
 
   // Fields that should only be visible to privileged users (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER only)
-  // Includes: forecastDate, negotiatingWith (name/phone), invoiceTo
-  const PRIVILEGED_RESTRICTED_FIELDS = ['negotiatingWithName', 'negotiatingWithPhone', 'forecast', 'invoiceTo'];
+  // Includes: forecastDate, representatives, invoiceTo
+  const PRIVILEGED_RESTRICTED_FIELDS = ['representatives', 'forecast', 'invoiceTo'];
 
   // Check if user can view layout section (ADMIN, LOGISTIC, or PRODUCTION team leaders only)
   const canViewLayoutSection = currentUser && (
@@ -932,6 +933,7 @@ export const TaskDetailsPage = () => {
         },
       },
       createdBy: true,
+      representatives: true,
       serviceOrders: {
         include: {
           assignedTo: true,
@@ -1464,47 +1466,70 @@ export const TaskDetailsPage = () => {
                   </div>
                 )}
 
-                {/* Negotiating With - Name */}
-                {sectionVisibility.isFieldVisible("negotiatingWithName") && task.negotiatingWith?.name && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                {/* Representatives */}
+                {sectionVisibility.isFieldVisible("representatives") && task.representatives && task.representatives.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground flex items-center gap-2 mb-2">
                       <IconUser className="h-4 w-4" />
-                      Responsável pela Negociação
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">{task.negotiatingWith.name}</span>
+                      Representantes
+                    </div>
+                    {task.representatives.map((rep) => {
+                      const cleanPhone = rep.phone.replace(/\D/g, "");
+                      const whatsappNumber = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+                      const formatPhone = (phone: string) => {
+                        const numbers = phone.replace(/\D/g, "");
+                        if (numbers.length === 11) {
+                          return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+                        }
+                        if (numbers.length === 10) {
+                          return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6, 10)}`;
+                        }
+                        return phone;
+                      };
+
+                      return (
+                        <div key={rep.id} className="bg-muted/50 rounded-lg px-4 py-3 space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="font-semibold text-foreground">{rep.name}</div>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {REPRESENTATIVE_ROLE_LABELS[rep.role] || rep.role}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <a
+                                href={`tel:${rep.phone}`}
+                                className="text-sm font-medium text-green-600 dark:text-green-600 hover:underline font-mono"
+                              >
+                                {formatPhone(rep.phone)}
+                              </a>
+                              <a
+                                href={`https://wa.me/${whatsappNumber}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green-600 dark:text-green-600 hover:text-green-700 dark:hover:text-green-500 transition-colors"
+                                title="Enviar mensagem no WhatsApp"
+                              >
+                                <IconBrandWhatsapp className="h-5 w-5" />
+                              </a>
+                            </div>
+                          </div>
+                          {rep.email && (
+                            <div className="flex items-center gap-2">
+                              <IconMail className="h-3.5 w-3.5 text-muted-foreground" />
+                              <a
+                                href={`mailto:${rep.email}`}
+                                className="text-xs text-primary hover:underline"
+                              >
+                                {rep.email}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-
-                {/* Negotiating With - Phone */}
-                {sectionVisibility.isFieldVisible("negotiatingWithPhone") && task.negotiatingWith?.phone && (() => {
-                  const cleanPhone = task.negotiatingWith.phone.replace(/\D/g, "");
-                  const whatsappNumber = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
-                  return (
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <IconPhone className="h-4 w-4" />
-                        Telefone do Responsável
-                      </span>
-                      <div className="flex items-center gap-3">
-                        <a
-                          href={`tel:${task.negotiatingWith.phone}`}
-                          className="text-sm font-semibold text-green-600 dark:text-green-600 hover:underline font-mono"
-                        >
-                          {formatBrazilianPhone(task.negotiatingWith.phone)}
-                        </a>
-                        <a
-                          href={`https://wa.me/${whatsappNumber}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-green-600 dark:text-green-600 hover:text-green-700 dark:hover:text-green-500 transition-colors"
-                          title="Enviar mensagem no WhatsApp"
-                        >
-                          <IconBrandWhatsapp className="h-5 w-5" />
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })()}
 
                 {/* Sector */}
                 {sectionVisibility.isFieldVisible("sector") && (

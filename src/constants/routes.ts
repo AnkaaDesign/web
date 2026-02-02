@@ -87,6 +87,15 @@ export const routes = {
     root: "/administracao/clientes",
   },
 
+  // Representatives - Representantes - Customer Representatives Management
+  representatives: {
+    create: "/representatives/new",
+    details: (id: string) => `/representatives/${id}`,
+    edit: (id: string) => `/representatives/${id}/edit`,
+    password: (id: string) => `/representatives/${id}/password`,
+    root: "/representatives",
+  },
+
   // Favorites - Favoritos - User Favorites
   favorites: "/favoritos",
 

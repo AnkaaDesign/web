@@ -13,6 +13,7 @@ import type { Airbrushing, AirbrushingIncludes } from "./airbrushing";
 import type { Cut, CutIncludes } from "./cut";
 import type { Truck, TruckIncludes } from "./truck";
 import type { TaskPricing } from "./task-pricing";
+import type { Representative } from "./representative";
 
 // =====================
 // Task Interface
@@ -34,7 +35,8 @@ export interface Task extends BaseEntity {
   customerId: string | null;
   invoiceToId: string | null;
   sectorId: string | null;
-  negotiatingWith: { name: string; phone: string } | null;
+  representatives?: Representative[];
+  representativeIds?: string[];
   budgetIds?: string[];
   invoiceIds?: string[];
   receiptIds?: string[];

@@ -7,6 +7,7 @@ import { TASK_STATUS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../consta
 import { cutCreateNestedSchema } from "./cut";
 import { airbrushingCreateNestedSchema } from "./airbrushing";
 import { taskPricingCreateNestedSchema } from "./task-pricing";
+import { representativeCreateInlineSchema } from "./representative";
 
 // =====================
 // Include Schema Based on Prisma Schema (Second Level Only)
@@ -1217,13 +1218,8 @@ export const taskCreateSchema = z
     customerId: z.string().uuid("Cliente inválido").nullable().optional(),
     invoiceToId: z.string().uuid('Cliente para faturamento inválido').nullable().optional(),
     sectorId: z.string().uuid("Setor inválido").nullable().optional(),
-    negotiatingWith: z
-      .object({
-        name: z.string().optional(),
-        phone: z.string().optional(),
-      })
-      .nullable()
-      .optional(),
+    representativeIds: z.array(z.string().uuid("ID de representante inválido")).optional(),
+    newRepresentatives: z.array(representativeCreateInlineSchema).optional(),
 
     // Relations - Many-to-many file relations (arrays)
     budgetIds: z.array(z.string().uuid("Budget inválido")).optional(),
@@ -1347,13 +1343,8 @@ export const taskUpdateSchema = z
     customerId: z.string().uuid("Cliente inválido").nullable().optional(),
     invoiceToId: z.string().uuid('Cliente para faturamento inválido').nullable().optional(),
     sectorId: z.string().uuid("Setor inválido").nullable().optional(),
-    negotiatingWith: z
-      .object({
-        name: z.string().nullable().optional(),
-        phone: z.string().nullable().optional(),
-      })
-      .nullable()
-      .optional(),
+    representativeIds: z.array(z.string().uuid("ID de representante inválido")).optional(),
+    newRepresentatives: z.array(representativeCreateInlineSchema).optional(),
 
     // Relations - Many-to-many file relations (arrays)
     budgetIds: z.array(z.string().uuid("Budget inválido")).optional(),

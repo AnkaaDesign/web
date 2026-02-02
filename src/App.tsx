@@ -50,6 +50,12 @@ const Administration = lazy(() => import("@/pages/administration/root").then((mo
 
 const AdministrationCustomers = lazy(() => import("@/pages/administration/customers/list").then((module) => ({ default: module.CustomerListPage })));
 
+// Representatives
+const RepresentativesList = lazy(() => import("@/pages/representatives/index"));
+const RepresentativesNew = lazy(() => import("@/pages/representatives/new"));
+const RepresentativesEdit = lazy(() => import("@/pages/representatives/[id]/edit"));
+const RepresentativesPassword = lazy(() => import("@/pages/representatives/[id]/password"));
+
 // Financial
 const FinancialCustomersList = lazy(() => import("@/pages/financial/customers/list").then((module) => ({ default: module.FinancialCustomersListPage })));
 const FinancialCustomersDetails = lazy(() => import("@/pages/financial/customers/details/[id]").then((module) => ({ default: module.FinancialCustomersDetailsPage })));
@@ -655,6 +661,41 @@ function App() {
                     </Suspense>
                   }
                 />
+
+                {/* Representatives Routes */}
+                <Route
+                  path={routes.representatives.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RepresentativesList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.representatives.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RepresentativesNew />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.representatives.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RepresentativesEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.representatives.password(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RepresentativesPassword />
+                    </Suspense>
+                  }
+                />
+
                 <Route
                   path={routes.administration.collaborators.root}
                   element={

@@ -1,0 +1,1 @@
+export { RepresentativeListPage as default } from './list';
