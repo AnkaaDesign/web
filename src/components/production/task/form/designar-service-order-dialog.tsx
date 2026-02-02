@@ -92,7 +92,12 @@ export function DesignarServiceOrderDialog({
       ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
-      return [SERVICE_ORDER_TYPE.FINANCIAL];
+      // Financial users can create FINANCIAL, COMMERCIAL, and LOGISTIC service orders
+      return [
+        SERVICE_ORDER_TYPE.FINANCIAL,
+        SERVICE_ORDER_TYPE.COMMERCIAL,
+        SERVICE_ORDER_TYPE.LOGISTIC,
+      ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
       return [SERVICE_ORDER_TYPE.ARTWORK];
