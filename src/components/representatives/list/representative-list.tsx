@@ -10,10 +10,14 @@ import { RepresentativeTable } from "./representative-table";
 import { IconFilter } from "@tabler/icons-react";
 import { RepresentativeFilters } from "./representative-filters";
 import { FilterIndicators } from "./filter-indicator";
+import { ColumnVisibilityManager } from "./column-visibility-manager";
+import { RepresentativeExport } from "./representative-export";
+import { createRepresentativeColumns, DEFAULT_VISIBLE_COLUMNS } from "./representative-columns";
 import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/use-table-state";
 import { useTableFilters } from "@/hooks/use-table-filters";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { representativeService } from "@/services/representativeService";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -51,55 +55,85 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
     items: Representative[];
     isBulk: boolean;
   } | null>(null);
-  const [displaySearchText, setDisplaySearchText] = useState("");
 
-  // Table state
+  // Table state for selection only
   const {
-    searchingFor,
     selectionCount,
     showSelectedOnly,
-    setSearch,
     toggleShowSelectedOnly,
-    clearAllFilters,
   } = useTableState({
     defaultPageSize: DEFAULT_PAGE_SIZE,
     resetSelectionOnPageChange: false,
   });
 
-  // Filters
-  const { filters, updateFilters, clearFilters, activeFilterCount } = useTableFilters<
-    Partial<RepresentativeGetManyFormData>
-  >({
+  // Visible columns state with localStorage persistence
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility(
+    "representative-list-visible-columns",
+    DEFAULT_VISIBLE_COLUMNS
+  );
+
+  // Get all available columns for column visibility manager
+  const allColumns = useMemo(() => createRepresentativeColumns(), []);
+
+  // Custom deserializer for representative filters
+  const deserializeRepresentativeFilters = useCallback((params: URLSearchParams): Partial<RepresentativeGetManyFormData> => {
+    const filters: Partial<RepresentativeGetManyFormData> = {};
+
+    // Parse role filter
+    const role = params.get("role");
+    if (role) filters.role = role as any;
+
+    // Parse status filter
+    const isActive = params.get("isActive");
+    if (isActive !== null) {
+      filters.isActive = isActive === "true";
+    }
+
+    // Keep customerId if it was provided
+    if (customerId) {
+      filters.customerId = customerId;
+    }
+
+    return filters;
+  }, [customerId]);
+
+  // Custom serializer for representative filters
+  const serializeRepresentativeFilters = useCallback((filters: Partial<RepresentativeGetManyFormData>): Record<string, string> => {
+    const params: Record<string, string> = {};
+
+    if (filters.role) params.role = filters.role;
+    if (filters.isActive !== undefined) params.isActive = String(filters.isActive);
+
+    return params;
+  }, []);
+
+  // Use the unified table filters hook (like customer-list does)
+  const {
+    filters,
+    setFilters: updateFilters,
+    searchingFor,
+    displaySearchText,
+    setSearch,
+    clearAllFilters,
+    clearFilter: clearFilters,
+    hasActiveFilters,
+  } = useTableFilters<Partial<RepresentativeGetManyFormData>>({
     defaultFilters: customerId ? { customerId } : {},
-    deserializer: (params) => {
-      const filters: Partial<RepresentativeGetManyFormData> = {};
-
-      // Parse role filter
-      const role = params.get("role");
-      if (role) filters.role = role as any;
-
-      // Parse status filter
-      const isActive = params.get("isActive");
-      if (isActive !== null) {
-        filters.isActive = isActive === "true";
-      }
-
-      // Keep customerId if it was provided
-      if (customerId) {
-        filters.customerId = customerId;
-      }
-
-      return filters;
-    },
-    serializer: (filters) => {
-      const params = new URLSearchParams();
-
-      if (filters.role) params.set("role", filters.role);
-      if (filters.isActive !== undefined) params.set("isActive", String(filters.isActive));
-
-      return params;
-    },
+    searchDebounceMs: 300,
+    searchParamName: "search",
+    serializeToUrl: serializeRepresentativeFilters,
+    deserializeFromUrl: deserializeRepresentativeFilters,
+    excludeFromUrl: ["customerId"],
   });
+
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.role) count++;
+    if (filters.isActive !== undefined) count++;
+    if (searchingFor) count++;
+    return count;
+  }, [filters.role, filters.isActive, searchingFor]);
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -241,7 +275,6 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
             ref={searchInputRef}
             value={displaySearchText}
             onChange={(value) => {
-              setDisplaySearchText(value);
               setSearch(value);
             }}
             placeholder="Buscar por nome, telefone, email..."
@@ -265,6 +298,8 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
                 {activeFilterCountWithoutSearch > 0 ? ` (${activeFilterCountWithoutSearch})` : ""}
               </span>
             </Button>
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
+            <RepresentativeExport filters={filters} currentRepresentatives={tableData.representatives} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
           </div>
         </div>
 
@@ -287,6 +322,7 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
         <div className="flex-1 min-h-0 overflow-auto">
           <RepresentativeTable
             filters={filters}
+            visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}
             onDelete={handleBulkDelete}
             onUpdatePassword={handleUpdatePassword}

@@ -86,6 +86,7 @@ export const TaskEditPage = () => {
         },
       },
       logoPaints: true,
+      representatives: true,
       airbrushings: {
         include: {
           receipts: true,

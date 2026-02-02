@@ -33,7 +33,9 @@ export const representativeCreateSchema = z.object({
   password: passwordSchema,
   customerId: z
     .string()
-    .uuid('ID do cliente inválido'),
+    .uuid('ID do cliente inválido')
+    .optional()
+    .nullable(),
   role: z.nativeEnum(RepresentativeRole, {
     errorMap: () => ({ message: 'Função inválida' }),
   }),
@@ -43,7 +45,7 @@ export const representativeCreateSchema = z.object({
     .default(true),
 });
 
-// Representative inline create schema (without customerId for inline context)
+// Representative inline create schema (customerId is optional for inline context)
 // Email and password are optional for inline creation as they can be set later
 export const representativeCreateInlineSchema = z.object({
   email: z
@@ -67,6 +69,11 @@ export const representativeCreateInlineSchema = z.object({
     .optional()
     .or(z.literal(''))
     .transform(val => val === '' ? undefined : val),
+  customerId: z
+    .string()
+    .uuid('ID do cliente inválido')
+    .optional()
+    .nullable(),
   role: z.nativeEnum(RepresentativeRole, {
     errorMap: () => ({ message: 'Função inválida' }),
   }),

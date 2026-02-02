@@ -5,10 +5,6 @@ import { representativeService } from "@/services/representativeService";
 import type { Representative } from "@/types/representative";
 import type { RepresentativeGetManyFormData } from "@/types/representative";
 import {
-  REPRESENTATIVE_ROLE_LABELS,
-  REPRESENTATIVE_ROLE_COLORS,
-} from "@/types/representative";
-import {
   Table,
   TableBody,
   TableCell,
@@ -18,39 +14,40 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   IconEdit,
   IconTrash,
   IconDots,
-  IconPhone,
-  IconMail,
   IconLock,
   IconLockOpen,
-  IconUser,
   IconChevronUp,
   IconChevronDown,
   IconSelector,
+  IconEye,
+  IconUsers,
+  IconPlus,
 } from "@tabler/icons-react";
 import {
   DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { RepresentativeTableSkeleton } from "./representative-table-skeleton";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { TABLE_LAYOUT } from "@/components/ui/table-constants";
+import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
+import { createRepresentativeColumns, type RepresentativeColumn } from "./representative-columns";
 
 interface RepresentativeTableProps {
   filters: Partial<RepresentativeGetManyFormData>;
-  onEdit?: (representative: Representative) => void;
-  onDelete?: (representative: Representative) => void;
+  visibleColumns: Set<string>;
+  onEdit?: (representatives: Representative[]) => void;
+  onDelete?: (representatives: Representative[]) => void;
   onToggleActive?: (representative: Representative) => void;
   onUpdatePassword?: (representative: Representative) => void;
   onDataChange?: (data: { representatives: Representative[]; totalRecords: number }) => void;
@@ -60,6 +57,7 @@ interface RepresentativeTableProps {
 
 export function RepresentativeTable({
   filters,
+  visibleColumns,
   onEdit,
   onDelete,
   onToggleActive,
@@ -71,6 +69,9 @@ export function RepresentativeTable({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Get scrollbar width info
+  const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
 
   // Use URL state management for pagination and selection
   const {
@@ -96,6 +97,12 @@ export function RepresentativeTable({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
   });
+
+  // Define all available columns
+  const allColumns: RepresentativeColumn[] = useMemo(() => createRepresentativeColumns(), []);
+
+  // Filter columns based on visibility
+  const columns = useMemo(() => allColumns.filter((col) => visibleColumns.has(col.key)), [allColumns, visibleColumns]);
 
   // Memoize query parameters
   const queryParams = useMemo(() => {
@@ -152,283 +159,283 @@ export function RepresentativeTable({
     },
   });
 
-  const handleEdit = (representative: Representative) => {
-    if (onEdit) {
-      onEdit(representative);
+  // All data-derived values
+  const representatives = data?.data || [];
+  const totalRecords = data?.meta?.total || 0;
+  const totalPages = Math.ceil(totalRecords / pageSize);
+
+  // Get current page representative IDs for selection
+  const currentPageRepresentativeIds = useMemo(
+    () => representatives.map((rep) => rep.id),
+    [representatives]
+  );
+
+  // Selection state for current page
+  const allSelected = isAllSelected(currentPageRepresentativeIds);
+  const partiallySelected = isPartiallySelected(currentPageRepresentativeIds);
+
+  const handleSelectAll = () => {
+    toggleSelectAll(currentPageRepresentativeIds);
+  };
+
+  const handleSelectRepresentative = (representativeId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(representativeId, currentPageRepresentativeIds, event?.shiftKey || false);
+  };
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = React.useState<{
+    x: number;
+    y: number;
+    representatives: Representative[];
+    isBulk: boolean;
+  } | null>(null);
+
+  const renderSortIndicator = (columnKey: string) => {
+    const sortDirection = getSortDirection(columnKey);
+    const sortOrder = getSortOrder(columnKey);
+
+    return (
+      <div className="inline-flex items-center ml-1">
+        {sortDirection === null && <IconSelector className="h-4 w-4 text-muted-foreground" />}
+        {sortDirection === "asc" && <IconChevronUp className="h-4 w-4 text-foreground" />}
+        {sortDirection === "desc" && <IconChevronDown className="h-4 w-4 text-foreground" />}
+        {sortOrder !== null && sortConfigs.length > 1 && <span className="text-xs ml-0.5">{sortOrder + 1}</span>}
+      </div>
+    );
+  };
+
+  // Context menu handlers
+  const handleContextMenu = (e: React.MouseEvent, representative: Representative) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const isRepresentativeSelected = isSelected(representative.id);
+    const hasSelection = selectionCount > 0;
+
+    if (hasSelection && isRepresentativeSelected) {
+      const selectedRepresentativesList = representatives.filter((r) => isSelected(r.id));
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        representatives: selectedRepresentativesList,
+        isBulk: true,
+      });
     } else {
-      navigate(`/representatives/${representative.id}/edit`);
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        representatives: [representative],
+        isBulk: false,
+      });
     }
   };
 
-  const handleToggleActive = (representative: Representative) => {
-    if (onToggleActive) {
-      onToggleActive(representative);
-    } else {
-      toggleActiveMutation.mutate(representative.id);
+  const handleViewDetails = () => {
+    if (contextMenu && !contextMenu.isBulk) {
+      navigate(`/representatives/${contextMenu.representatives[0].id}`);
+      setContextMenu(null);
     }
   };
 
-  const handleUpdatePassword = (representative: Representative) => {
-    if (onUpdatePassword) {
-      onUpdatePassword(representative);
-    } else {
-      navigate(`/representatives/${representative.id}/password`);
+  const handleEdit = () => {
+    if (contextMenu) {
+      if (onEdit) {
+        onEdit(contextMenu.representatives);
+      } else {
+        navigate(`/representatives/${contextMenu.representatives[0].id}/edit`);
+      }
+      setContextMenu(null);
     }
   };
 
-  const handleRowClick = (e: React.MouseEvent, representative: Representative) => {
-    // Check if the click was on an interactive element
-    const target = e.target as HTMLElement;
-    const isInteractive = target.closest('button, a, input, [role="button"]');
-
-    if (!isInteractive) {
-      handleRowClickSelection(e, representative.id);
+  const handleToggleActive = () => {
+    if (contextMenu && !contextMenu.isBulk) {
+      const representative = contextMenu.representatives[0];
+      if (onToggleActive) {
+        onToggleActive(representative);
+      } else {
+        toggleActiveMutation.mutate(representative.id);
+      }
+      setContextMenu(null);
     }
   };
+
+  const handleUpdatePassword = () => {
+    if (contextMenu && !contextMenu.isBulk) {
+      const representative = contextMenu.representatives[0];
+      if (onUpdatePassword) {
+        onUpdatePassword(representative);
+      } else {
+        navigate(`/representatives/${representative.id}/password`);
+      }
+      setContextMenu(null);
+    }
+  };
+
+  const handleDelete = () => {
+    if (contextMenu) {
+      if (onDelete) {
+        onDelete(contextMenu.representatives);
+        const deletedIds = contextMenu.representatives.map((rep) => rep.id);
+        removeFromSelection(deletedIds);
+      }
+      setContextMenu(null);
+    }
+  };
+
+  // Close context menu when clicking outside
+  React.useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
 
   if (isLoading && !data) {
     return <RepresentativeTableSkeleton />;
   }
 
-  if (error) {
-    return (
-      <div className="p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          Erro ao carregar representantes. Por favor, tente novamente.
-        </p>
-      </div>
-    );
-  }
-
-  const representatives = data?.data || [];
-  const totalRecords = data?.meta.total || 0;
-  const totalPages = Math.ceil(totalRecords / pageSize);
-
   return (
-    <div className={cn("flex flex-col gap-4", className)}>
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={isAllSelected()}
-                  indeterminate={isPartiallySelected()}
-                  onCheckedChange={toggleSelectAll}
-                  aria-label="Selecionar todos"
-                />
+    <div className={cn("rounded-lg flex flex-col overflow-hidden", className)}>
+      {/* Fixed Header Table */}
+      <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
+        <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
+          <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
+            <TableRow className="bg-muted hover:bg-muted even:bg-muted">
+              {/* Selection column */}
+              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                <div className="flex items-center justify-center h-full w-full px-2 min-h-[2.5rem]">
+                  <Checkbox
+                    checked={allSelected}
+                    indeterminate={partiallySelected}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Selecionar todos"
+                    disabled={isLoading || representatives.length === 0}
+                    data-checkbox
+                  />
+                </div>
               </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="-ml-3 h-8 data-[state=open]:bg-accent"
-                  onClick={() => toggleSort("name")}
-                >
-                  Nome
-                  {getSortDirection("name") === "desc" ? (
-                    <IconChevronDown className="ml-2 h-4 w-4" />
-                  ) : getSortDirection("name") === "asc" ? (
-                    <IconChevronUp className="ml-2 h-4 w-4" />
+
+              {/* Data columns */}
+              {columns.map((column) => (
+                <TableHead key={column.key} className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0", column.className)}>
+                  {column.sortable ? (
+                    <button
+                      onClick={() => toggleSort(column.key)}
+                      className={cn(
+                        "flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent",
+                        column.align === "center" && "justify-center",
+                        column.align === "right" && "justify-end",
+                        !column.align && "justify-start",
+                      )}
+                    >
+                      <TruncatedTextWithTooltip text={column.header} />
+                      {renderSortIndicator(column.key)}
+                    </button>
                   ) : (
-                    <IconSelector className="ml-2 h-4 w-4" />
+                    <div
+                      className={cn(
+                        "flex items-center h-full min-h-[2.5rem] px-4 py-2",
+                        column.align === "center" && "justify-center text-center",
+                        column.align === "right" && "justify-end text-right",
+                        !column.align && "justify-start text-left",
+                      )}
+                    >
+                      <TruncatedTextWithTooltip text={column.header} />
+                    </div>
                   )}
-                  {getSortOrder("name") > 0 && (
-                    <span className="ml-1 text-xs">{getSortOrder("name")}</span>
-                  )}
-                </Button>
-              </TableHead>
-              <TableHead>Função</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Contato</TableHead>
-              <TableHead>Acesso</TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="-ml-3 h-8 data-[state=open]:bg-accent"
-                  onClick={() => toggleSort("isActive")}
-                >
-                  Status
-                  {getSortDirection("isActive") === "desc" ? (
-                    <IconChevronDown className="ml-2 h-4 w-4" />
-                  ) : getSortDirection("isActive") === "asc" ? (
-                    <IconChevronUp className="ml-2 h-4 w-4" />
-                  ) : (
-                    <IconSelector className="ml-2 h-4 w-4" />
-                  )}
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="-ml-3 h-8 data-[state=open]:bg-accent"
-                  onClick={() => toggleSort("createdAt")}
-                >
-                  Criado em
-                  {getSortDirection("createdAt") === "desc" ? (
-                    <IconChevronDown className="ml-2 h-4 w-4" />
-                  ) : getSortDirection("createdAt") === "asc" ? (
-                    <IconChevronUp className="ml-2 h-4 w-4" />
-                  ) : (
-                    <IconSelector className="ml-2 h-4 w-4" />
-                  )}
-                </Button>
-              </TableHead>
-              <TableHead className="w-12">
-                <span className="sr-only">Ações</span>
-              </TableHead>
+                </TableHead>
+              ))}
+
+              {/* Scrollbar spacer - only show if not overlay scrollbar */}
+              {!isOverlay && <TableHead style={{ width: `${scrollbarWidth}px`, minWidth: `${scrollbarWidth}px` }} className="bg-muted p-0 border-0 !border-r-0 shrink-0" />}
             </TableRow>
           </TableHeader>
+        </Table>
+      </div>
+
+      {/* Scrollable Body Table */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden border-l border-r border-border">
+        <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableBody>
-            {representatives.length === 0 ? (
+            {error ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center">
-                  <div className="py-8 text-sm text-muted-foreground">
-                    Nenhum representante encontrado
+                <TableCell colSpan={columns.length + 1} className="p-0">
+                  <div className="flex flex-col items-center justify-center p-8 text-center text-destructive">
+                    <div className="text-lg font-medium mb-2">Não foi possível carregar os representantes</div>
+                    <div className="text-sm text-muted-foreground">Tente novamente mais tarde.</div>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : representatives.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length + 1} className="p-0">
+                  <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                    <IconUsers className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                    <div className="text-lg font-medium mb-2">Nenhum representante encontrado</div>
+                    {filters && Object.keys(filters).length > 1 ? (
+                      <div className="text-sm">Ajuste os filtros para ver mais resultados.</div>
+                    ) : (
+                      <>
+                        <div className="text-sm mb-4">Comece cadastrando o primeiro representante.</div>
+                        <Button onClick={() => navigate("/representatives/new")} variant="outline">
+                          <IconPlus className="h-4 w-4 mr-2" />
+                          Cadastrar Representante
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
-              representatives.map((representative) => {
-                const hasSystemAccess = !!representative.email && !!representative.password;
-                const selected = isSelected(representative.id);
+              representatives.map((representative, index) => {
+                const representativeIsSelected = isSelected(representative.id);
 
                 return (
                   <TableRow
                     key={representative.id}
-                    data-state={selected ? "selected" : undefined}
-                    onClick={(e) => handleRowClick(e, representative)}
+                    data-state={representativeIsSelected ? "selected" : undefined}
                     className={cn(
-                      "cursor-pointer",
-                      selected && "bg-muted/50"
+                      "cursor-pointer transition-colors border-b border-border",
+                      index % 2 === 1 && "bg-muted/10",
+                      "hover:bg-muted/20",
+                      representativeIsSelected && "bg-muted/30 hover:bg-muted/40",
                     )}
+                    onClick={() => navigate(`/representatives/${representative.id}`)}
+                    onContextMenu={(e) => handleContextMenu(e, representative)}
                   >
-                    <TableCell>
-                      <Checkbox
-                        checked={selected}
-                        onCheckedChange={() => toggleSelection(representative.id)}
-                        aria-label="Selecionar linha"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                          <IconUser className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-medium text-sm">{representative.name}</span>
-                        </div>
+                    {/* Selection checkbox */}
+                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                      <div
+                        className="flex items-center justify-center h-full w-full px-2 py-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectRepresentative(representative.id, e);
+                        }}
+                      >
+                        <Checkbox
+                          checked={representativeIsSelected}
+                          aria-label={`Selecionar ${representative.name}`}
+                          data-checkbox
+                        />
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={REPRESENTATIVE_ROLE_COLORS[representative.role] as any}
-                        className="text-xs"
-                      >
-                        {REPRESENTATIVE_ROLE_LABELS[representative.role]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">
-                        {representative.customer?.name || "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5">
-                          <IconPhone className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-xs">{representative.phone}</span>
-                        </div>
-                        {representative.email && (
-                          <div className="flex items-center gap-1.5">
-                            <IconMail className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-xs">{representative.email}</span>
-                          </div>
+
+                    {/* Data columns */}
+                    {columns.map((column) => (
+                      <TableCell
+                        key={column.key}
+                        className={cn(
+                          column.className,
+                          "p-0 !border-r-0",
+                          column.align === "center" && "text-center",
+                          column.align === "right" && "text-right",
+                          column.align === "left" && "text-left",
+                          !column.align && "text-left",
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {hasSystemAccess ? (
-                        <div className="flex items-center gap-1.5">
-                          <IconLockOpen className="h-4 w-4 text-green-600" />
-                          <span className="text-xs text-green-600">Com acesso</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          <IconLock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">Sem acesso</span>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={representative.isActive ? "success" : "secondary"}
-                        className="text-xs"
                       >
-                        {representative.isActive ? "Ativo" : "Inativo"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {representative.createdAt ? (
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(representative.createdAt), "dd/MM/yyyy", { locale: ptBR })}
-                        </span>
-                      ) : (
-                        "-"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <IconDots className="h-4 w-4" />
-                            <span className="sr-only">Abrir menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(representative)}>
-                            <IconEdit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          {representative.email && (
-                            <DropdownMenuItem onClick={() => handleUpdatePassword(representative)}>
-                              <IconLock className="mr-2 h-4 w-4" />
-                              Alterar Senha
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleToggleActive(representative)}>
-                            {representative.isActive ? (
-                              <>
-                                <IconLock className="mr-2 h-4 w-4" />
-                                Desativar
-                              </>
-                            ) : (
-                              <>
-                                <IconLockOpen className="mr-2 h-4 w-4" />
-                                Ativar
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => onDelete?.(representative)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <IconTrash className="mr-2 h-4 w-4" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+                        <div className="px-4 py-2">{column.accessor(representative)}</div>
+                      </TableCell>
+                    ))}
                   </TableRow>
                 );
               })
@@ -437,18 +444,77 @@ export function RepresentativeTable({
         </Table>
       </div>
 
-      {/* Pagination */}
-      {totalRecords > 0 && (
+      {/* Pagination Footer */}
+      <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
         <SimplePaginationAdvanced
           currentPage={page}
           totalPages={totalPages}
-          pageSize={pageSize}
-          totalRecords={totalRecords}
           onPageChange={setPage}
+          pageSize={pageSize}
+          totalItems={totalRecords}
+          pageSizeOptions={[20, 40, 60, 100]}
           onPageSizeChange={setPageSize}
-          pageSizeOptions={[10, 20, 40, 60, 100]}
+          showPageSizeSelector={true}
+          showGoToPage={true}
+          showPageInfo={true}
         />
-      )}
+      </div>
+
+      {/* Context Menu */}
+      <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+        <PositionedDropdownMenuContent
+          position={contextMenu}
+          isOpen={!!contextMenu}
+          className="w-56 ![position:fixed]"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.representatives.length} representantes selecionados</div>}
+
+          {!contextMenu?.isBulk && (
+            <DropdownMenuItem onClick={handleViewDetails}>
+              <IconEye className="mr-2 h-4 w-4" />
+              Ver Detalhes
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuItem onClick={handleEdit}>
+            <IconEdit className="mr-2 h-4 w-4" />
+            {contextMenu?.isBulk && contextMenu.representatives.length > 1 ? "Editar em lote" : "Editar"}
+          </DropdownMenuItem>
+
+          {!contextMenu?.isBulk && contextMenu?.representatives[0]?.email && (
+            <DropdownMenuItem onClick={handleUpdatePassword}>
+              <IconLock className="mr-2 h-4 w-4" />
+              Alterar Senha
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuSeparator />
+
+          {!contextMenu?.isBulk && (
+            <DropdownMenuItem onClick={handleToggleActive}>
+              {contextMenu?.representatives[0]?.isActive ? (
+                <>
+                  <IconLock className="mr-2 h-4 w-4" />
+                  Desativar
+                </>
+              ) : (
+                <>
+                  <IconLockOpen className="mr-2 h-4 w-4" />
+                  Ativar
+                </>
+              )}
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+            <IconTrash className="mr-2 h-4 w-4" />
+            {contextMenu?.isBulk && contextMenu.representatives.length > 1 ? "Deletar selecionados" : "Deletar"}
+          </DropdownMenuItem>
+        </PositionedDropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

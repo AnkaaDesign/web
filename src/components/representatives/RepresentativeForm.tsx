@@ -5,9 +5,7 @@ import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import {
   IconInfoCircle,
-  IconPhone,
   IconLock,
-  IconUser,
   IconBuilding
 } from '@tabler/icons-react';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
@@ -29,7 +27,7 @@ const representativeSchema = z.object({
   phone: z.string().min(1, 'Telefone é obrigatório'),
   email: z.string().email('E-mail inválido').optional().nullable().or(z.literal('')),
   password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres').optional().nullable().or(z.literal('')),
-  customerId: z.string().min(1, 'Cliente é obrigatório'),
+  customerId: z.string().optional().nullable().or(z.literal('')),
   role: z.nativeEnum(RepresentativeRole),
   isActive: z.boolean().default(true),
   hasSystemAccess: z.boolean().default(false),
@@ -86,12 +84,21 @@ export function RepresentativeForm({
       email: initialData?.email || '',
       password: '',
       customerId: initialData?.customerId || '',
-      role: initialData?.role || RepresentativeRole.OPERATIONAL,
+      role: initialData?.role || RepresentativeRole.COMMERCIAL,
       isActive: initialData?.isActive ?? true,
       hasSystemAccess: !!(initialData?.email && initialData?.password),
     },
     mode: 'onBlur',
+    reValidateMode: 'onChange',
   });
+
+  // Trigger validation on mount for edit mode to enable submit button
+  useEffect(() => {
+    if (mode === 'edit' && initialData) {
+      form.trigger();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, initialData?.id]);
 
   const hasSystemAccess = form.watch('hasSystemAccess');
 
@@ -117,8 +124,10 @@ export function RepresentativeForm({
     // Clean up data before submitting
     const submitData: any = {
       ...data,
-      email: hasSystemAccess ? data.email : null,
-      password: hasSystemAccess ? data.password : null,
+      // Convert empty strings to null for optional fields
+      email: hasSystemAccess && data.email ? data.email : null,
+      password: hasSystemAccess && data.password ? data.password : null,
+      customerId: data.customerId || null,
     };
 
     // Remove hasSystemAccess as it's not part of the API
@@ -158,17 +167,14 @@ export function RepresentativeForm({
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nome *</FormLabel>
+                      <FormLabel>Nome <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <IconUser className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-                          <Input
-                            {...field}
-                            placeholder="Nome completo"
-                            disabled={isSubmitting}
-                            className="pl-10 bg-transparent"
-                          />
-                        </div>
+                        <Input
+                          {...field}
+                          placeholder="Nome completo"
+                          disabled={isSubmitting}
+                          className="bg-transparent"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -180,17 +186,15 @@ export function RepresentativeForm({
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Telefone *</FormLabel>
+                      <FormLabel>Telefone <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <IconPhone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-                          <Input
-                            {...field}
-                            placeholder="(00) 00000-0000"
-                            disabled={isSubmitting}
-                            className="pl-10 bg-transparent"
-                          />
-                        </div>
+                        <Input
+                          {...field}
+                          type="phone"
+                          placeholder="(00) 00000-0000"
+                          disabled={isSubmitting}
+                          className="bg-transparent"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -205,7 +209,7 @@ export function RepresentativeForm({
                   name="customerId"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Cliente *</FormLabel>
+                      <FormLabel>Cliente</FormLabel>
                       <FormControl>
                         <Combobox
                           options={customerOptions}
@@ -228,7 +232,7 @@ export function RepresentativeForm({
                   name="role"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Função *</FormLabel>
+                      <FormLabel>Função <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Combobox
                           options={roleOptions}
@@ -290,7 +294,7 @@ export function RepresentativeForm({
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>E-mail *</FormLabel>
+                        <FormLabel>E-mail <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
                           <Input
                             {...field}
@@ -312,7 +316,7 @@ export function RepresentativeForm({
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Senha *</FormLabel>
+                          <FormLabel>Senha <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input
                               {...field}

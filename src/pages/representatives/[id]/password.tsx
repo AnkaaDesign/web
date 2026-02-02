@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { routes } from '@/constants';
 import {
   Form,
   FormControl,
@@ -133,7 +134,9 @@ export default function UpdatePasswordPage() {
           title="Alterar Senha"
           icon={IconLock}
           breadcrumbs={[
-            { label: 'Início', href: '/' },
+            { label: 'Início', href: routes.home },
+            { label: 'Administração', href: routes.administration.root },
+            { label: 'Clientes', href: routes.administration.customers.root },
             { label: 'Representantes', href: '/representatives' },
             { label: representative.name, href: `/representatives/${id}/edit` },
             { label: 'Alterar Senha' },

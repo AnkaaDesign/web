@@ -302,6 +302,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     relatedTasks: "Tarefas Relacionadas",
     relatedTo: "Relacionado a",
     trucks: "Caminhões",
+    representatives: "Representantes",
+    representativeIds: "Representantes",
     // Direct truck fields (when truck data is embedded in task changelog)
     category: "Categoria do Caminhão",
     implementType: "Tipo de Implemento",
@@ -1037,6 +1039,18 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       }
       if (field === "relatedTasks" || field === "relatedTo") {
         return `${value.length} ${value.length === 1 ? "tarefa relacionada" : "tarefas relacionadas"}`;
+      }
+      if (field === "representatives" || field === "representativeIds") {
+        // Format representatives with name and phone
+        if (value.length > 0 && typeof value[0] === "object" && value[0].name) {
+          return value.map((rep: { name?: string; phone?: string; role?: string }) => {
+            const name = rep.name || "Representante";
+            const phone = rep.phone ? formatBrazilianPhone(rep.phone) : "";
+            return phone ? `${name} - ${phone}` : name;
+          }).join("\n");
+        }
+        // Fallback to count for IDs only
+        return `${value.length} ${value.length === 1 ? "representante" : "representantes"}`;
       }
     }
 

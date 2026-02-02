@@ -45,13 +45,13 @@ export class TaskService {
    * Process representatives and create new ones if needed.
    * This should be called before creating or updating a task.
    *
-   * @param customerId - The customer ID for the new representatives
+   * @param customerId - The customer ID for the new representatives (optional - can be empty/null)
    * @param representativeIds - Array of representative IDs (may include existing IDs)
    * @param newRepresentatives - Array of new representatives to create
    * @returns Updated array of representative IDs with newly created ones
    */
   private async processRepresentatives(
-    customerId: string,
+    customerId: string | null | undefined,
     representativeIds: string[] = [],
     newRepresentatives: RepresentativeCreateInlineFormData[] = []
   ): Promise<string[]> {
@@ -65,9 +65,12 @@ export class TaskService {
     // Create each new representative
     for (const repData of newRepresentatives) {
       try {
+        // Use repData.customerId if available, otherwise use the passed customerId
+        // Pass undefined if empty string to let backend handle optional field
+        const effectiveCustomerId = repData.customerId || customerId || undefined;
         const created = await representativeService.create({
           ...repData,
-          customerId,
+          customerId: effectiveCustomerId,
         });
         createdRepresentativeIds.push(created.id);
       } catch (error) {
@@ -117,14 +120,14 @@ export class TaskService {
     if (!(data instanceof FormData)) {
       // JSON payload - can directly access and modify properties
       if (data.newRepresentatives && data.newRepresentatives.length > 0) {
-        if (!data.customerId) {
-          throw new Error('customerId is required when creating new representatives');
-        }
+        // Get customerId from data or from the first newRepresentative (they all have the same customerId)
+        // customerId is now optional - representatives can be created without a customer
+        const customerId = data.customerId || data.newRepresentatives[0]?.customerId;
 
         try {
           // Create representatives and get their IDs
           const updatedRepIds = await this.processRepresentatives(
-            data.customerId,
+            customerId || '', // Pass empty string if no customerId - backend handles optional
             data.representativeIds,
             data.newRepresentatives
           );
@@ -144,18 +147,45 @@ export class TaskService {
       }
     } else {
       // FormData payload - need to extract and process
-      const newRepresentativesJson = data.get('newRepresentatives');
-      const customerIdValue = data.get('customerId');
+      // FormData arrays are serialized with indexed keys like newRepresentatives[0], newRepresentatives[1], etc.
+      const newRepresentatives: any[] = [];
+      for (const [key, value] of data.entries()) {
+        if (key.startsWith('newRepresentatives[') && key.endsWith(']')) {
+          try {
+            newRepresentatives.push(JSON.parse(value as string));
+          } catch {
+            // Skip invalid JSON entries
+          }
+        }
+      }
 
-      if (newRepresentativesJson && customerIdValue) {
+      if (newRepresentatives.length > 0) {
         try {
-          const newRepresentatives = JSON.parse(newRepresentativesJson as string);
-          const representativeIdsJson = data.get('representativeIds');
-          const existingRepIds = representativeIdsJson ? JSON.parse(representativeIdsJson as string) : [];
+          // Get customerId from FormData OR from the first newRepresentative (they all have the same customerId)
+          const customerIdFromFormData = data.get('customerId') as string | null;
+          const customerId = customerIdFromFormData || newRepresentatives[0]?.customerId || '';
+
+          // Get existing representative IDs (also may be indexed)
+          const existingRepIds: string[] = [];
+          for (const [key, value] of data.entries()) {
+            if (key.startsWith('representativeIds[') && key.endsWith(']')) {
+              existingRepIds.push(value as string);
+            } else if (key === 'representativeIds') {
+              try {
+                const parsed = JSON.parse(value as string);
+                if (Array.isArray(parsed)) {
+                  existingRepIds.push(...parsed);
+                }
+              } catch {
+                // Single value
+                if (value) existingRepIds.push(value as string);
+              }
+            }
+          }
 
           // Create representatives and get their IDs
           const updatedRepIds = await this.processRepresentatives(
-            customerIdValue as string,
+            customerId,
             existingRepIds,
             newRepresentatives
           );
@@ -165,12 +195,12 @@ export class TaskService {
 
           // Copy all existing entries except representativeIds and newRepresentatives
           for (const [key, value] of data.entries()) {
-            if (key !== 'representativeIds' && key !== 'newRepresentatives') {
+            if (!key.startsWith('representativeIds') && !key.startsWith('newRepresentatives')) {
               processedData.append(key, value);
             }
           }
 
-          // Add updated representative IDs
+          // Add updated representative IDs as JSON array
           processedData.append('representativeIds', JSON.stringify(updatedRepIds));
         } catch (error: any) {
           // Re-throw with more context
@@ -193,14 +223,14 @@ export class TaskService {
     if (!(data instanceof FormData)) {
       // JSON payload - can directly access and modify properties
       if (data.newRepresentatives && data.newRepresentatives.length > 0) {
-        if (!data.customerId) {
-          throw new Error('customerId is required when creating new representatives');
-        }
+        // Get customerId from data or from the first newRepresentative (they all have the same customerId)
+        // customerId is now optional - representatives can be created without a customer
+        const customerId = data.customerId || data.newRepresentatives[0]?.customerId;
 
         try {
           // Create representatives and get their IDs
           const updatedRepIds = await this.processRepresentatives(
-            data.customerId,
+            customerId || '', // Pass empty string if no customerId - backend handles optional
             data.representativeIds,
             data.newRepresentatives
           );
@@ -220,18 +250,45 @@ export class TaskService {
       }
     } else {
       // FormData payload - need to extract and process
-      const newRepresentativesJson = data.get('newRepresentatives');
-      const customerIdValue = data.get('customerId');
+      // FormData arrays are serialized with indexed keys like newRepresentatives[0], newRepresentatives[1], etc.
+      const newRepresentatives: any[] = [];
+      for (const [key, value] of data.entries()) {
+        if (key.startsWith('newRepresentatives[') && key.endsWith(']')) {
+          try {
+            newRepresentatives.push(JSON.parse(value as string));
+          } catch {
+            // Skip invalid JSON entries
+          }
+        }
+      }
 
-      if (newRepresentativesJson && customerIdValue) {
+      if (newRepresentatives.length > 0) {
         try {
-          const newRepresentatives = JSON.parse(newRepresentativesJson as string);
-          const representativeIdsJson = data.get('representativeIds');
-          const existingRepIds = representativeIdsJson ? JSON.parse(representativeIdsJson as string) : [];
+          // Get customerId from FormData OR from the first newRepresentative (they all have the same customerId)
+          const customerIdFromFormData = data.get('customerId') as string | null;
+          const customerId = customerIdFromFormData || newRepresentatives[0]?.customerId || '';
+
+          // Get existing representative IDs (also may be indexed)
+          const existingRepIds: string[] = [];
+          for (const [key, value] of data.entries()) {
+            if (key.startsWith('representativeIds[') && key.endsWith(']')) {
+              existingRepIds.push(value as string);
+            } else if (key === 'representativeIds') {
+              try {
+                const parsed = JSON.parse(value as string);
+                if (Array.isArray(parsed)) {
+                  existingRepIds.push(...parsed);
+                }
+              } catch {
+                // Single value
+                if (value) existingRepIds.push(value as string);
+              }
+            }
+          }
 
           // Create representatives and get their IDs
           const updatedRepIds = await this.processRepresentatives(
-            customerIdValue as string,
+            customerId,
             existingRepIds,
             newRepresentatives
           );
@@ -241,12 +298,12 @@ export class TaskService {
 
           // Copy all existing entries except representativeIds and newRepresentatives
           for (const [key, value] of data.entries()) {
-            if (key !== 'representativeIds' && key !== 'newRepresentatives') {
+            if (!key.startsWith('representativeIds') && !key.startsWith('newRepresentatives')) {
               processedData.append(key, value);
             }
           }
 
-          // Add updated representative IDs
+          // Add updated representative IDs as JSON array
           processedData.append('representativeIds', JSON.stringify(updatedRepIds));
         } catch (error: any) {
           // Re-throw with more context

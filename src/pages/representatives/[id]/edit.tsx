@@ -8,6 +8,7 @@ import { representativeService } from '@/services/representativeService';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { routes } from '@/constants';
 import type { RepresentativeUpdateFormData } from '@/types/representative';
 
 export default function EditRepresentativePage() {
@@ -100,9 +101,11 @@ export default function EditRepresentativePage() {
           title="Editar Representante"
           icon={IconUsers}
           breadcrumbs={[
-            { label: 'Início', href: '/' },
+            { label: 'Início', href: routes.home },
+            { label: 'Administração', href: routes.administration.root },
+            { label: 'Clientes', href: routes.administration.customers.root },
             { label: 'Representantes', href: '/representatives' },
-            { label: representative.name },
+            { label: representative.name, href: `/representatives/${id}` },
             { label: 'Editar' },
           ]}
           actions={actions}

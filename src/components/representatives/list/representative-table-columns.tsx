@@ -71,7 +71,7 @@ export function createRepresentativeColumns({
     },
     {
       accessorKey: "name",
-      header: "Nome",
+      header: () => <span className="font-bold uppercase text-xs">NOME</span>,
       cell: ({ row }) => {
         const representative = row.original;
         return (
@@ -93,7 +93,7 @@ export function createRepresentativeColumns({
     },
     {
       accessorKey: "role",
-      header: "Função",
+      header: () => <span className="font-bold uppercase text-xs">FUNÇÃO</span>,
       cell: ({ row }) => {
         const role = row.original.role;
         return (
@@ -108,7 +108,7 @@ export function createRepresentativeColumns({
     },
     {
       id: "contact",
-      header: "Contato",
+      header: () => <span className="font-bold uppercase text-xs">CONTATO</span>,
       cell: ({ row }) => {
         const representative = row.original;
         return (
@@ -129,7 +129,7 @@ export function createRepresentativeColumns({
     },
     {
       id: "access",
-      header: "Acesso",
+      header: () => <span className="font-bold uppercase text-xs">ACESSO</span>,
       cell: ({ row }) => {
         const representative = row.original;
         const hasSystemAccess = !!representative.email && !!representative.password;
@@ -152,7 +152,7 @@ export function createRepresentativeColumns({
     },
     {
       accessorKey: "isActive",
-      header: "Status",
+      header: () => <span className="font-bold uppercase text-xs">STATUS</span>,
       cell: ({ row }) => {
         const isActive = row.original.isActive;
         return (
@@ -167,7 +167,7 @@ export function createRepresentativeColumns({
     },
     {
       accessorKey: "createdAt",
-      header: "Criado em",
+      header: () => <span className="font-bold uppercase text-xs">CRIADO EM</span>,
       cell: ({ row }) => {
         const date = row.original.createdAt;
         return date ? (

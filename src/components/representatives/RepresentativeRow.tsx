@@ -42,16 +42,21 @@ export const RepresentativeRow = forwardRef<HTMLDivElement, RepresentativeRowPro
     // Determine if we're in create mode based on the value
     const showCreateInputs = value.isEditing && value.id?.startsWith('temp-');
 
-    // Filter representatives by selected role and customer (if provided)
+    // Filter representatives by selected role
+    // Show: reps matching the role that either belong to this customer OR have no customer (global)
     const filteredRepresentatives = value.role
       ? availableRepresentatives.filter(rep => {
-          // Filter by role
+          // Filter by role first
           if (rep.role !== value.role) return false;
 
-          // If customerId is provided, only show representatives for that customer
-          // Otherwise show all representatives for the role
-          if (customerId && rep.customerId !== customerId) return false;
+          // If task has a customer, show reps that:
+          // 1. Belong to this customer, OR
+          // 2. Have no customer (global representatives)
+          if (customerId) {
+            return rep.customerId === customerId || !rep.customerId;
+          }
 
+          // If no customer on task, show all representatives with this role
           return true;
         })
       : [];
@@ -73,9 +78,18 @@ export const RepresentativeRow = forwardRef<HTMLDivElement, RepresentativeRowPro
 
     // Handle representative selection
     const handleRepresentativeChange = useCallback((selectedValue: string | null | undefined) => {
-      // Handle null/undefined (when clicking the same value again in single mode)
+      // Handle null/undefined - allow clearing the selection
       if (!selectedValue) {
-        return; // Don't do anything if value is cleared
+        onChange({
+          ...value,
+          id: '',
+          name: '',
+          phone: '',
+          email: '',
+          isNew: false,
+          isEditing: false,
+        });
+        return;
       }
 
       if (selectedValue === CREATE_NEW_VALUE) {

@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { IconUsers, IconCheck, IconLoader2 } from '@tabler/icons-react';
 import { representativeService } from '@/services/representativeService';
 import { useToast } from '@/hooks/use-toast';
+import { routes } from '@/constants';
 import type { RepresentativeCreateFormData } from '@/types/representative';
 
 export default function NewRepresentativePage() {
@@ -67,7 +68,9 @@ export default function NewRepresentativePage() {
           title="Cadastrar Representante"
           icon={IconUsers}
           breadcrumbs={[
-            { label: 'Início', href: '/' },
+            { label: 'Início', href: routes.home },
+            { label: 'Administração', href: routes.administration.root },
+            { label: 'Clientes', href: routes.administration.customers.root },
             { label: 'Representantes', href: '/representatives' },
             { label: 'Cadastrar' },
           ]}

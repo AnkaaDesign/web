@@ -1071,7 +1071,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           hasArtworkStatusChanges,
           hasCutsToCreate,
         });
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate) {
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate && !hasNewRepresentatives) {
           console.log('[TaskEditForm] ❌ Early return: no changes detected');
           return;
         }
@@ -1559,6 +1559,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           }
 
           // Prepare new representatives to create inline
+          // Get the customerId from the task - required for creating new representatives
+          const taskCustomerId = changedData.customerId || task.customerId;
           const newReps = representativeRows
             .filter(row => row.isNew && row.name.trim() && row.phone.trim())
             .map(row => ({
@@ -1567,6 +1569,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
               email: row.email?.trim() || undefined,
               role: row.role,
               isActive: row.isActive !== undefined ? row.isActive : true, // Default to true if undefined
+              customerId: taskCustomerId, // Include the task's customerId
             }));
 
           // Include new representatives to be created by the backend
@@ -1801,6 +1804,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // No need to add it separately like in FormData path
 
           // Add new representatives to be created inline
+          // Get the customerId from the task - required for creating new representatives
+          const taskCustomerIdForJson = changedData.customerId || task.customerId;
           const newReps = representativeRows
             .filter(row => row.isNew && row.name.trim() && row.phone.trim())
             .map(row => ({
@@ -1809,6 +1814,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
               email: row.email?.trim() || undefined,
               role: row.role,
               isActive: row.isActive,
+              customerId: taskCustomerIdForJson, // Include the task's customerId
             }));
 
           if (newReps.length > 0) {

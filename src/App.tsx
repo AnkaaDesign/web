@@ -53,6 +53,7 @@ const AdministrationCustomers = lazy(() => import("@/pages/administration/custom
 // Representatives
 const RepresentativesList = lazy(() => import("@/pages/representatives/index"));
 const RepresentativesNew = lazy(() => import("@/pages/representatives/new"));
+const RepresentativesDetails = lazy(() => import("@/pages/representatives/details/[id]"));
 const RepresentativesEdit = lazy(() => import("@/pages/representatives/[id]/edit"));
 const RepresentativesPassword = lazy(() => import("@/pages/representatives/[id]/password"));
 
@@ -676,6 +677,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <RepresentativesNew />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.representatives.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RepresentativesDetails />
                     </Suspense>
                   }
                 />

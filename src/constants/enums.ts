@@ -1572,6 +1572,7 @@ export enum CHANGE_LOG_ENTITY_TYPE {
   PRICE = "PRICE",
   PRODUCTION = "PRODUCTION",
   PURCHASE = "PURCHASE",
+  REPRESENTATIVE = "REPRESENTATIVE",
   SECTOR = "SECTOR",
   SEEN_NOTIFICATION = "SEEN_NOTIFICATION",
   SERVICE = "SERVICE",
@@ -1966,6 +1967,7 @@ export enum FAVORITE_PAGES {
   // Administration - List Pages
   ADMINISTRACAO_COMISSOES_LISTAR = "/administracao/comissoes",
   ADMINISTRACAO_CLIENTES_LISTAR = "/administracao/clientes",
+  ADMINISTRACAO_REPRESENTANTES_LISTAR = "/representatives",
   ADMINISTRACAO_COLABORADORES_LISTAR = "/administracao/colaboradores",
   ADMINISTRACAO_ORCAMENTOS_LISTAR = "/administracao/orcamentos",
   ADMINISTRACAO_REGISTROS_ALTERACOES_LISTAR = "/administracao/registros-de-alteracoes",

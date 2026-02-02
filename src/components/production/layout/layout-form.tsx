@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { IconDownload, IconTrash, IconPlus, IconCopy, IconFlipHorizontal, IconCamera } from "@tabler/icons-react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { IconDownload, IconTrash, IconPlus, IconCopy, IconFlipHorizontal, IconCamera, IconZoomIn, IconZoomOut, IconZoomReset } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useTheme } from "@/contexts/theme-context";
 import type { LayoutCreateFormData } from "../../../schemas";
 
 interface LayoutFormProps {
@@ -304,6 +305,96 @@ export const LayoutForm = ({
   onSideChange,
   validationError
 }: LayoutFormProps) => {
+  // Theme detection for SVG colors (matching mobile version)
+  const { theme } = useTheme();
+  const isDark = useMemo(() => {
+    if (theme === 'system') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return theme === 'dark';
+  }, [theme]);
+
+  // Theme-aware SVG colors matching mobile version
+  const svgColors = useMemo(() => ({
+    stroke: isDark ? '#e5e5e5' : '#171717',
+    divider: isDark ? '#a3a3a3' : '#525252',
+    dimension: isDark ? '#60a5fa' : '#0066cc',
+  }), [isDark]);
+
+  // Zoom state (separate from base display scale)
+  const [zoomScale, setZoomScale] = useState(1);
+  const [translateX, setTranslateX] = useState(0);
+  const [translateY, setTranslateY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const MIN_SCALE = 0.5;
+  const MAX_SCALE = 3;
+
+  // Zoom control functions
+  const handleZoomIn = useCallback(() => {
+    setZoomScale(prev => Math.min(prev + 0.5, MAX_SCALE));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomScale(prev => Math.max(prev - 0.5, MIN_SCALE));
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    setZoomScale(1);
+    setTranslateX(0);
+    setTranslateY(0);
+  }, []);
+
+  // Mouse wheel zoom handler - uses native event to properly prevent scroll
+  const handleWheelZoom = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const delta = e.deltaY > 0 ? -0.25 : 0.25; // Fast zoom
+    setZoomScale(prev => Math.min(Math.max(prev + delta, MIN_SCALE), MAX_SCALE));
+  }, []);
+
+  // Attach wheel event listener with passive: false to prevent page scroll
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    container.addEventListener('wheel', handleWheelZoom, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleWheelZoom);
+    };
+  }, [handleWheelZoom]);
+
+  // Pan handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (zoomScale <= 1) return; // Only allow pan when zoomed
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      translateX,
+      translateY,
+    };
+  }, [zoomScale, translateX, translateY]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const deltaX = e.clientX - dragStartRef.current.x;
+    const deltaY = e.clientY - dragStartRef.current.y;
+    setTranslateX(dragStartRef.current.translateX + deltaX);
+    setTranslateY(dragStartRef.current.translateY + deltaY);
+  }, [isDragging]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Reset zoom when side changes
+  useEffect(() => {
+    handleResetZoom();
+  }, [selectedSide, handleResetZoom]);
+
   // Store photo state for back side only
   const [photoState, setPhotoState] = useState<PhotoState>({});
 
@@ -992,71 +1083,87 @@ export const LayoutForm = ({
     updateCurrentSide({ doors: updatedDoors });
   }, [currentState, updateCurrentSide]);
 
-  // Generate SVG
+  // Generate SVG for export (always uses black strokes for print/export)
+  // Internal values are in cm, export uses mm for precision
   const generateSVG = useCallback(() => {
-    const margin = 50;
-    const svgWidth = currentState.totalWidth + margin * 2 + 100;
-    const svgHeight = currentState.height + margin * 2 + 100;
+    // Convert cm to mm (multiply by 10)
+    const totalWidthMm = currentState.totalWidth * 10;
+    const heightMm = currentState.height * 10;
+    const marginMm = 500; // 50mm margin
+    const svgWidth = totalWidthMm + marginMm * 2 + 1000;
+    const svgHeight = heightMm + marginMm * 2 + 1000;
+
+    // Export colors - always black for printing/export
+    const exportColors = {
+      stroke: '#000000',
+      dimension: '#0066cc',
+    };
 
     let svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${svgWidth}mm" height="${svgHeight}mm" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
-  <text x="${margin}" y="25" text-anchor="start" font-size="14" font-weight="bold" fill="#000">${getSideLabel(selectedSide)}</text>
-  <rect x="${margin}" y="${margin}" width="${currentState.totalWidth}" height="${currentState.height}" fill="none" stroke="#000" stroke-width="1"/>`;
+  <text x="${marginMm}" y="250" text-anchor="start" font-size="140" font-weight="bold" fill="${exportColors.stroke}">${getSideLabel(selectedSide)}</text>
+  <rect x="${marginMm}" y="${marginMm}" width="${totalWidthMm}" height="${heightMm}" fill="none" stroke="${exportColors.stroke}" stroke-width="10"/>`;
 
     // Add doors - doorHeight is measured from bottom of layout to top of door opening
+    // All values converted from cm to mm (multiply by 10)
     currentState.doors.forEach(door => {
-      const doorTopY = margin + (currentState.height - door.doorHeight);
+      const doorPositionMm = door.position * 10;
+      const doorWidthMm = door.width * 10;
+      const doorHeightMm = door.doorHeight * 10;
+      const doorTopY = marginMm + (heightMm - doorHeightMm);
       svg += `
-  <line x1="${margin + door.position}" y1="${doorTopY}" x2="${margin + door.position}" y2="${margin + currentState.height}" stroke="#000" stroke-width="1"/>
-  <line x1="${margin + door.position + door.width}" y1="${doorTopY}" x2="${margin + door.position + door.width}" y2="${margin + currentState.height}" stroke="#000" stroke-width="1"/>
-  <line x1="${margin + door.position}" y1="${doorTopY}" x2="${margin + door.position + door.width}" y2="${doorTopY}" stroke="#000" stroke-width="1"/>`;
+  <line x1="${marginMm + doorPositionMm}" y1="${doorTopY}" x2="${marginMm + doorPositionMm}" y2="${marginMm + heightMm}" stroke="${exportColors.stroke}" stroke-width="10"/>
+  <line x1="${marginMm + doorPositionMm + doorWidthMm}" y1="${doorTopY}" x2="${marginMm + doorPositionMm + doorWidthMm}" y2="${marginMm + heightMm}" stroke="${exportColors.stroke}" stroke-width="10"/>
+  <line x1="${marginMm + doorPositionMm}" y1="${doorTopY}" x2="${marginMm + doorPositionMm + doorWidthMm}" y2="${doorTopY}" stroke="${exportColors.stroke}" stroke-width="10"/>`;
     });
 
-    // Add width dimensions with arrows
+    // Add width dimensions with arrows (values in mm, labels show cm)
     segments.forEach(segment => {
-      const startX = margin + segment.start;
-      const endX = margin + segment.start + segment.width;
-      const centerX = startX + segment.width / 2;
-      const dimY = margin + currentState.height + 20;
+      const segmentStartMm = segment.start * 10;
+      const segmentWidthMm = segment.width * 10;
+      const startX = marginMm + segmentStartMm;
+      const endX = marginMm + segmentStartMm + segmentWidthMm;
+      const centerX = startX + segmentWidthMm / 2;
+      const dimY = marginMm + heightMm + 200;
 
       // Dimension line
       svg += `
-  <line x1="${startX}" y1="${dimY}" x2="${endX}" y2="${dimY}" stroke="#0066cc" stroke-width="1"/>`;
+  <line x1="${startX}" y1="${dimY}" x2="${endX}" y2="${dimY}" stroke="${exportColors.dimension}" stroke-width="10"/>`;
 
       // Left arrow
       svg += `
-  <polygon points="${startX},${dimY} ${startX + 5},${dimY - 3} ${startX + 5},${dimY + 3}" fill="#0066cc"/>`;
+  <polygon points="${startX},${dimY} ${startX + 50},${dimY - 30} ${startX + 50},${dimY + 30}" fill="${exportColors.dimension}"/>`;
 
       // Right arrow
       svg += `
-  <polygon points="${endX},${dimY} ${endX - 5},${dimY - 3} ${endX - 5},${dimY + 3}" fill="#0066cc"/>`;
+  <polygon points="${endX},${dimY} ${endX - 50},${dimY - 30} ${endX - 50},${dimY + 30}" fill="${exportColors.dimension}"/>`;
 
-      // Dimension text
+      // Dimension text (show original cm value)
       svg += `
-  <text x="${centerX}" y="${dimY + 15}" text-anchor="middle" font-size="12" fill="#0066cc">${segment.width}</text>`;
+  <text x="${centerX}" y="${dimY + 150}" text-anchor="middle" font-size="120" fill="${exportColors.dimension}">${segment.width}</text>`;
     });
 
     // Height dimension with arrows
-    const dimX = margin - 20;
-    const startY = margin;
-    const endY = margin + currentState.height;
-    const centerY = startY + currentState.height / 2;
+    const dimX = marginMm - 200;
+    const startY = marginMm;
+    const endY = marginMm + heightMm;
+    const centerY = startY + heightMm / 2;
 
     // Dimension line
     svg += `
-  <line x1="${dimX}" y1="${startY}" x2="${dimX}" y2="${endY}" stroke="#0066cc" stroke-width="1"/>`;
+  <line x1="${dimX}" y1="${startY}" x2="${dimX}" y2="${endY}" stroke="${exportColors.dimension}" stroke-width="10"/>`;
 
     // Top arrow
     svg += `
-  <polygon points="${dimX},${startY} ${dimX - 3},${startY + 5} ${dimX + 3},${startY + 5}" fill="#0066cc"/>`;
+  <polygon points="${dimX},${startY} ${dimX - 30},${startY + 50} ${dimX + 30},${startY + 50}" fill="${exportColors.dimension}"/>`;
 
     // Bottom arrow
     svg += `
-  <polygon points="${dimX},${endY} ${dimX - 3},${endY - 5} ${dimX + 3},${endY - 5}" fill="#0066cc"/>`;
+  <polygon points="${dimX},${endY} ${dimX - 30},${endY - 50} ${dimX + 30},${endY - 50}" fill="${exportColors.dimension}"/>`;
 
-    // Height text
+    // Height text (show original cm value)
     svg += `
-  <text x="${dimX - 10}" y="${centerY}" text-anchor="middle" font-size="12" fill="#0066cc" transform="rotate(-90, ${dimX - 10}, ${centerY})">${currentState.height}</text>
+  <text x="${dimX - 100}" y="${centerY}" text-anchor="middle" font-size="120" fill="${exportColors.dimension}" transform="rotate(-90, ${dimX - 100}, ${centerY})">${currentState.height}</text>
 </svg>`;
 
     return svg;
@@ -1179,10 +1286,11 @@ export const LayoutForm = ({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      // Create filename with task name and side
+      // Create filename with task name and side (convert cm to mm for filename)
       const sideLabel = getSideLabel(selectedSide).toLowerCase();
       const taskPrefix = taskName ? `${taskName}-` : '';
-      link.download = `${taskPrefix}layout-${sideLabel}-${currentState.totalWidth}mm.svg`;
+      const totalWidthMm = currentState.totalWidth * 10;
+      link.download = `${taskPrefix}layout-${sideLabel}-${totalWidthMm}mm.svg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1206,58 +1314,113 @@ export const LayoutForm = ({
     <div className="space-y-4">
       {/* Preview Container with centered content */}
       <div className="p-4 border border-border/40 rounded-lg bg-background/50">
-        {/* Centered Layout Container */}
-        <div className="flex flex-col items-center">
-          {/* Main Layout with Height Input and Width Inputs */}
-          <div className="flex gap-4">
-            {/* Height Input - Left Side */}
-            <div className="flex flex-col items-center" style={{ height: `${30 + currentState.height * scale + 30}px`, paddingTop: '30px' }}>
-              <div className="flex-1 flex items-center">
-                <MeasurementInput
-                  value={currentState.height}
-                  onChange={(value) => updateCurrentSide({ height: value })}
-                  placeholder="2,40"
-                  suffix="cm"
-                  min={100}
-                  max={400}
-                  disabled={disabled}
-                  className="w-14 text-center text-xs"
-                />
-              </div>
-            </div>
+        {/* Zoom Controls */}
+        <div className="flex justify-end items-center gap-1 mb-3 pb-3 border-b border-border/30">
+          <span className="text-xs text-muted-foreground mr-2">
+            {Math.round(zoomScale * 100)}%
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleZoomOut}
+            disabled={zoomScale <= MIN_SCALE}
+            className="h-8 w-8 p-0"
+          >
+            <IconZoomOut size={18} />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleResetZoom}
+            className="h-8 w-8 p-0"
+          >
+            <IconZoomReset size={18} />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleZoomIn}
+            disabled={zoomScale >= MAX_SCALE}
+            className="h-8 w-8 p-0"
+          >
+            <IconZoomIn size={18} />
+          </Button>
+        </div>
 
-            {/* Layout and Width Inputs Container */}
-            <div className="flex flex-col">
-              {/* Door height inputs above the truck layout */}
-              <div className="mb-2 relative" style={{ width: `${currentState.totalWidth * scale}px`, height: '30px' }}>
-                {currentState.doors.map(door => (
-                  <div
-                    key={door.id}
-                    className="absolute flex justify-center"
-                    style={{
-                      left: `${door.position * scale}px`,
-                      width: `${door.width * scale}px`,
-                    }}
-                  >
-                    <DoorHeightInput
-                      doorId={door.id}
-                      defaultValue={door.doorHeight}
-                      layoutHeight={currentState.height}
-                      disabled={disabled}
-                      onBlur={(value) => updateDoorHeight(door.id, value)}
-                    />
-                  </div>
-                ))}
+        {/* Zoomable Container */}
+        <div
+          ref={containerRef}
+          className="overflow-hidden cursor-grab active:cursor-grabbing"
+          style={{ minHeight: '200px' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          {/* Centered Layout Container */}
+          <div
+            className="flex flex-col items-center"
+            style={{
+              transform: `scale(${zoomScale}) translate(${translateX / zoomScale}px, ${translateY / zoomScale}px)`,
+              transformOrigin: 'center center',
+              transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+            }}
+          >
+            {/* Main Layout with Height Input and Width Inputs */}
+            <div className="flex gap-4">
+              {/* Height Input - Left Side */}
+              <div className="flex flex-col items-center" style={{ height: `${30 + currentState.height * scale + 30}px`, paddingTop: '30px' }}>
+                <div className="flex-1 flex items-center">
+                  <MeasurementInput
+                    value={currentState.height}
+                    onChange={(value) => updateCurrentSide({ height: value })}
+                    placeholder="2,40"
+                    suffix="cm"
+                    min={100}
+                    max={400}
+                    disabled={disabled}
+                    className="w-14 text-center text-xs"
+                  />
+                </div>
               </div>
 
-              {/* Main Layout Rectangle */}
-              <div
-                className="border-2 border-foreground/70 bg-muted/30 relative overflow-hidden"
-                style={{
-                  width: `${currentState.totalWidth * scale}px`,
-                  height: `${currentState.height * scale}px`
-                }}
-              >
+              {/* Layout and Width Inputs Container */}
+              <div className="flex flex-col">
+                {/* Door height inputs above the truck layout */}
+                <div className="mb-2 relative" style={{ width: `${currentState.totalWidth * scale}px`, height: '30px' }}>
+                  {currentState.doors.map(door => (
+                    <div
+                      key={door.id}
+                      className="absolute flex justify-center"
+                      style={{
+                        left: `${door.position * scale}px`,
+                        width: `${door.width * scale}px`,
+                      }}
+                    >
+                      <DoorHeightInput
+                        doorId={door.id}
+                        defaultValue={door.doorHeight}
+                        layoutHeight={currentState.height}
+                        disabled={disabled}
+                        onBlur={(value) => updateDoorHeight(door.id, value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Main Layout Rectangle */}
+                <div
+                  className="border-2 relative overflow-hidden"
+                  style={{
+                    width: `${currentState.totalWidth * scale}px`,
+                    height: `${currentState.height * scale}px`,
+                    borderColor: svgColors.stroke,
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                  }}
+                >
                 {/* Photo background for back side */}
                 {selectedSide === 'back' && photoState.imageUrl && (
                   <img
@@ -1275,22 +1438,30 @@ export const LayoutForm = ({
                     <div key={door.id}>
                       {/* Door vertical lines - only below the door top line */}
                       <div
-                        className="absolute border-l-2 border-r-2 border-foreground/70 pointer-events-none"
+                        className="absolute pointer-events-none"
                         style={{
                           left: `${door.position * scale}px`,
                           top: `${doorTopPosition * scale}px`,
                           width: `${door.width * scale}px`,
                           height: `${door.doorHeight * scale - 2}px`,
+                          borderLeftWidth: '2px',
+                          borderRightWidth: '2px',
+                          borderLeftStyle: 'solid',
+                          borderRightStyle: 'solid',
+                          borderColor: svgColors.stroke,
                         }}
                       />
 
                       {/* Door top line */}
                       <div
-                        className="absolute border-t-2 border-foreground/70 pointer-events-none"
+                        className="absolute pointer-events-none"
                         style={{
                           left: `${door.position * scale}px`,
                           top: `${doorTopPosition * scale}px`,
                           width: `${door.width * scale}px`,
+                          borderTopWidth: '2px',
+                          borderTopStyle: 'solid',
+                          borderColor: svgColors.stroke,
                         }}
                       />
 
@@ -1346,6 +1517,7 @@ export const LayoutForm = ({
                 ))}
               </div>
             </div>
+          </div>
           </div>
         </div>
 

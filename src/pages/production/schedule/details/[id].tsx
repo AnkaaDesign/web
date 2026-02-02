@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useTheme } from "@/contexts/theme-context";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useTaskDetail, useTaskMutations, useServiceOrderMutations, useCutsByTask, useLayoutsByTruck, useCurrentUser, useAirbrushingsByTask } from "../../../../hooks";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -119,6 +120,9 @@ import {
   IconPhoto,
   IconWriting,
   IconReceipt,
+  IconZoomIn,
+  IconZoomOut,
+  IconZoomReset,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -136,6 +140,94 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
   const { data: layouts } = useLayoutsByTruck(truckId);
   const [selectedSide, setSelectedSide] = useState<'left' | 'right' | 'back'>('left');
 
+  // Theme detection for SVG colors (matching mobile version)
+  const { theme } = useTheme();
+  const isDark = useMemo(() => {
+    if (theme === 'system') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return theme === 'dark';
+  }, [theme]);
+
+  // Theme-aware SVG colors matching mobile version
+  const svgColors = useMemo(() => ({
+    stroke: isDark ? '#e5e5e5' : '#171717',
+    divider: isDark ? '#a3a3a3' : '#525252',
+    dimension: isDark ? '#60a5fa' : '#0066cc',
+  }), [isDark]);
+
+  // Zoom state
+  const [zoomScale, setZoomScale] = useState(1);
+  const [translateX, setTranslateX] = useState(0);
+  const [translateY, setTranslateY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0, translateX: 0, translateY: 0 });
+  const zoomContainerRef = useRef<HTMLDivElement>(null);
+
+  const MIN_SCALE = 0.5;
+  const MAX_SCALE = 3;
+
+  // Zoom control functions
+  const handleZoomIn = useCallback(() => {
+    setZoomScale(prev => Math.min(prev + 0.5, MAX_SCALE));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomScale(prev => Math.max(prev - 0.5, MIN_SCALE));
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    setZoomScale(1);
+    setTranslateX(0);
+    setTranslateY(0);
+  }, []);
+
+  // Mouse wheel zoom handler - uses native event to properly prevent scroll
+  const handleWheelZoom = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const delta = e.deltaY > 0 ? -0.25 : 0.25; // Fast zoom
+    setZoomScale(prev => Math.min(Math.max(prev + delta, MIN_SCALE), MAX_SCALE));
+  }, []);
+
+  // Attach wheel event listener with passive: false to prevent page scroll
+  useEffect(() => {
+    const container = zoomContainerRef.current;
+    if (!container) return;
+
+    container.addEventListener('wheel', handleWheelZoom, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleWheelZoom);
+    };
+  }, [handleWheelZoom]);
+
+  // Pan handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (zoomScale <= 1) return;
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      translateX,
+      translateY,
+    };
+  }, [zoomScale, translateX, translateY]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const deltaX = e.clientX - dragStartRef.current.x;
+    const deltaY = e.clientY - dragStartRef.current.y;
+    setTranslateX(dragStartRef.current.translateX + deltaX);
+    setTranslateY(dragStartRef.current.translateY + deltaY);
+  }, [isDragging]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Reset zoom when side changes - need to use useEffect but component can return early
+  // So we'll handle this in the side button click handlers instead
+
   if (!layouts) return null;
 
   const hasLayouts = layouts.leftSideLayout || layouts.rightSideLayout || layouts.backSideLayout;
@@ -148,8 +240,8 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
 
   if (!currentLayout) return null;
 
-  // Generate SVG preview - uses <path> instead of <line> to prevent CorelDRAW locking
-  const generatePreviewSVG = (layout: any, side: string, includeLabels: boolean = false) => {
+  // Generate SVG preview - uses theme colors for display, black for export
+  const generatePreviewSVG = (layout: any, side: string, forExport: boolean = false) => {
     const getSideLabel = (s: string) => {
       switch (s) {
         case 'left': return 'Motorista';
@@ -159,37 +251,49 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
       }
     };
 
+    // Use theme colors for display, black for export
+    const colors = forExport ? {
+      stroke: '#000000',
+      divider: '#333333',
+      dimension: '#0066cc',
+    } : svgColors;
+
     const height = layout.height * 100;
     const sections = layout.layoutSections;
     const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-    const margin = 50;
-    const extraSpace = includeLabels ? 100 : 50;
-    const svgWidth = totalWidth + margin * 2 + extraSpace;
-    const svgHeight = height + margin * 2 + extraSpace;
 
-    let svg = includeLabels
+    // For export: convert to mm (multiply by 10)
+    const margin = forExport ? 500 : 50;
+    const extraSpace = forExport ? 1000 : 50;
+    const scaleFactor = forExport ? 10 : 1;
+    const strokeWidth = forExport ? 10 : 1;
+    const fontSize = forExport ? 120 : 12;
+    const arrowSize = forExport ? 50 : 5;
+
+    const scaledWidth = totalWidth * scaleFactor;
+    const scaledHeight = height * scaleFactor;
+    const svgWidth = scaledWidth + margin * 2 + extraSpace;
+    const svgHeight = scaledHeight + margin * 2 + extraSpace;
+
+    let svg = forExport
       ? `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${svgWidth}mm" height="${svgHeight}mm" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">`
+<svg width="${svgWidth}mm" height="${svgHeight}mm" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
+  <text x="${margin}" y="${forExport ? 250 : 25}" font-family="Arial, sans-serif" font-size="${forExport ? 140 : 14}" font-weight="bold" fill="${colors.stroke}">${getSideLabel(side)}</text>`
       : `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
 
-    if (includeLabels) {
-      svg += `
-  <text x="${margin}" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#000000">${getSideLabel(side)}</text>`;
-    }
-
     svg += `
-  <rect x="${margin}" y="${margin}" width="${totalWidth}" height="${height}" fill="none" stroke="#000000" stroke-width="1"/>`;
+  <rect x="${margin}" y="${margin}" width="${scaledWidth}" height="${scaledHeight}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>`;
 
     // Section dividers using path
     let currentPos = 0;
     sections.forEach((section: any, index: number) => {
-      const sectionWidth = section.width * 100;
+      const sectionWidth = section.width * 100 * scaleFactor;
       if (index > 0) {
         const prevSection = sections[index - 1];
         if (!section.isDoor && !prevSection.isDoor) {
           const lineX = margin + currentPos;
           svg += `
-  <path d="M${lineX},${margin} L${lineX},${margin + height}" fill="none" stroke="#333333" stroke-width="0.5"/>`;
+  <path d="M${lineX},${margin} L${lineX},${margin + scaledHeight}" fill="none" stroke="${colors.divider}" stroke-width="${strokeWidth * 0.5}"/>`;
         }
       }
       currentPos += sectionWidth;
@@ -198,29 +302,29 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     // Doors using path
     if (layout.doors && layout.doors.length > 0) {
       layout.doors.forEach((door: any) => {
-        const doorX = margin + (door.position || 0) * 100;
-        const doorWidth = (door.width || 0) * 100;
-        const doorOffsetTop = (door.offsetTop || door.topOffset || 0) * 100;
+        const doorX = margin + (door.position || 0) * 100 * scaleFactor;
+        const doorWidth = (door.width || 0) * 100 * scaleFactor;
+        const doorOffsetTop = (door.offsetTop || door.topOffset || 0) * 100 * scaleFactor;
         const doorY = margin + doorOffsetTop;
-        const doorBottomY = margin + height;
+        const doorBottomY = margin + scaledHeight;
         svg += `
-  <path d="M${doorX},${doorY} L${doorX},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
-  <path d="M${doorX + doorWidth},${doorY} L${doorX + doorWidth},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
-  <path d="M${doorX},${doorY} L${doorX + doorWidth},${doorY}" fill="none" stroke="#000000" stroke-width="1"/>`;
+  <path d="M${doorX},${doorY} L${doorX},${doorBottomY}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>
+  <path d="M${doorX + doorWidth},${doorY} L${doorX + doorWidth},${doorBottomY}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>
+  <path d="M${doorX},${doorY} L${doorX + doorWidth},${doorY}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>`;
       });
     } else if (layout.layoutSections) {
       let currentPos = 0;
       layout.layoutSections.forEach((section: any) => {
-        const sectionWidth = section.width * 100;
+        const sectionWidth = section.width * 100 * scaleFactor;
         const sectionX = margin + currentPos;
         if (section.isDoor && section.doorHeight !== null && section.doorHeight !== undefined) {
-          const doorHeightCm = section.doorHeight * 100;
-          const doorTopY = margin + (height - doorHeightCm);
-          const doorBottomY = margin + height;
+          const doorHeightCm = section.doorHeight * 100 * scaleFactor;
+          const doorTopY = margin + (scaledHeight - doorHeightCm);
+          const doorBottomY = margin + scaledHeight;
           svg += `
-  <path d="M${sectionX},${doorTopY} L${sectionX},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
-  <path d="M${sectionX + sectionWidth},${doorTopY} L${sectionX + sectionWidth},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
-  <path d="M${sectionX},${doorTopY} L${sectionX + sectionWidth},${doorTopY}" fill="none" stroke="#000000" stroke-width="1"/>`;
+  <path d="M${sectionX},${doorTopY} L${sectionX},${doorBottomY}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>
+  <path d="M${sectionX + sectionWidth},${doorTopY} L${sectionX + sectionWidth},${doorBottomY}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>
+  <path d="M${sectionX},${doorTopY} L${sectionX + sectionWidth},${doorTopY}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>`;
         }
         currentPos += sectionWidth;
       });
@@ -229,33 +333,34 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     // Width dimensions using path
     currentPos = 0;
     sections.forEach((section: any) => {
-      const sectionWidth = section.width * 100;
+      const sectionWidth = section.width * 100 * scaleFactor;
       const startX = margin + currentPos;
       const endX = margin + currentPos + sectionWidth;
       const centerX = startX + sectionWidth / 2;
-      const dimY = margin + height + 20;
+      const dimY = margin + scaledHeight + (forExport ? 200 : 20);
       svg += `
-  <path d="M${startX},${dimY} L${endX},${dimY}" fill="none" stroke="#0066cc" stroke-width="1"/>
-  <path d="M${startX},${dimY} L${startX + 5},${dimY - 3} L${startX + 5},${dimY + 3} Z" fill="#0066cc" stroke="none"/>
-  <path d="M${endX},${dimY} L${endX - 5},${dimY - 3} L${endX - 5},${dimY + 3} Z" fill="#0066cc" stroke="none"/>
-  <text x="${centerX}" y="${dimY + 15}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#0066cc">${Math.round(sectionWidth)}</text>`;
+  <path d="M${startX},${dimY} L${endX},${dimY}" fill="none" stroke="${colors.dimension}" stroke-width="${strokeWidth}"/>
+  <path d="M${startX},${dimY} L${startX + arrowSize},${dimY - arrowSize * 0.6} L${startX + arrowSize},${dimY + arrowSize * 0.6} Z" fill="${colors.dimension}" stroke="none"/>
+  <path d="M${endX},${dimY} L${endX - arrowSize},${dimY - arrowSize * 0.6} L${endX - arrowSize},${dimY + arrowSize * 0.6} Z" fill="${colors.dimension}" stroke="none"/>
+  <text x="${centerX}" y="${dimY + fontSize * 1.25}" font-family="Arial, sans-serif" font-size="${fontSize}" text-anchor="middle" fill="${colors.dimension}">${Math.round(section.width * 100)}</text>`;
       currentPos += sectionWidth;
     });
 
     // Height dimension using path (no transform)
-    const dimX = margin - 20;
+    const dimX = margin - (forExport ? 200 : 20);
     svg += `
-  <path d="M${dimX},${margin} L${dimX},${margin + height}" fill="none" stroke="#0066cc" stroke-width="1"/>
-  <path d="M${dimX},${margin} L${dimX - 3},${margin + 5} L${dimX + 3},${margin + 5} Z" fill="#0066cc" stroke="none"/>
-  <path d="M${dimX},${margin + height} L${dimX - 3},${margin + height - 5} L${dimX + 3},${margin + height - 5} Z" fill="#0066cc" stroke="none"/>
-  <text x="${dimX - 15}" y="${margin + height / 2 + 4}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#0066cc" writing-mode="tb">${Math.round(height)}</text>
+  <path d="M${dimX},${margin} L${dimX},${margin + scaledHeight}" fill="none" stroke="${colors.dimension}" stroke-width="${strokeWidth}"/>
+  <path d="M${dimX},${margin} L${dimX - arrowSize * 0.6},${margin + arrowSize} L${dimX + arrowSize * 0.6},${margin + arrowSize} Z" fill="${colors.dimension}" stroke="none"/>
+  <path d="M${dimX},${margin + scaledHeight} L${dimX - arrowSize * 0.6},${margin + scaledHeight - arrowSize} L${dimX + arrowSize * 0.6},${margin + scaledHeight - arrowSize} Z" fill="${colors.dimension}" stroke="none"/>
+  <text x="${dimX - fontSize * 1.25}" y="${margin + scaledHeight / 2 + 4}" font-family="Arial, sans-serif" font-size="${fontSize}" text-anchor="middle" fill="${colors.dimension}" writing-mode="tb">${Math.round(height)}</text>
 </svg>`;
 
     return svg;
   };
 
-  // Generate a single SVG element for one layout (used in combined SVG)
+  // Generate a single SVG element for one layout (used in combined SVG for export)
   // Uses <path> instead of <line> and avoids transforms to prevent CorelDRAW locking
+  // All values in mm (scaled by 10 from cm)
   const generateLayoutElement = (layout: any, side: string, offsetX: number, offsetY: number) => {
     const getSideLabel = (s: string) => {
       switch (s) {
@@ -266,28 +371,40 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
       }
     };
 
-    const height = layout.height * 100;
+    // Export uses mm (multiply by 10)
+    const scaleFactor = 10;
+    const height = layout.height * 100 * scaleFactor;
     const sections = layout.layoutSections;
-    const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-    const margin = 50;
+    const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0) * scaleFactor;
+    const margin = 500; // 50mm margin
+    const strokeWidth = 10;
+    const fontSize = 120;
+    const arrowSize = 50;
 
     const ox = offsetX;
     const oy = offsetY;
 
+    // Export colors - always black
+    const colors = {
+      stroke: '#000000',
+      divider: '#333333',
+      dimension: '#0066cc',
+    };
+
     let svg = `
-  <text x="${ox + margin}" y="${oy + 25}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#000000">${getSideLabel(side)}</text>
-  <rect x="${ox + margin}" y="${oy + margin}" width="${totalWidth}" height="${height}" fill="none" stroke="#000000" stroke-width="1"/>`;
+  <text x="${ox + margin}" y="${oy + 250}" font-family="Arial, sans-serif" font-size="140" font-weight="bold" fill="${colors.stroke}">${getSideLabel(side)}</text>
+  <rect x="${ox + margin}" y="${oy + margin}" width="${totalWidth}" height="${height}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>`;
 
     // Add section dividers using path
     let currentPos = 0;
     sections.forEach((section: any, index: number) => {
-      const sectionWidth = section.width * 100;
+      const sectionWidth = section.width * 100 * scaleFactor;
       if (index > 0) {
         const prevSection = sections[index - 1];
         if (!section.isDoor && !prevSection.isDoor) {
           const lineX = ox + margin + currentPos;
           svg += `
-  <path d="M${lineX},${oy + margin} L${lineX},${oy + margin + height}" fill="none" stroke="#333333" stroke-width="0.5"/>`;
+  <path d="M${lineX},${oy + margin} L${lineX},${oy + margin + height}" fill="none" stroke="${colors.divider}" stroke-width="${strokeWidth * 0.5}"/>`;
         }
       }
       currentPos += sectionWidth;
@@ -296,66 +413,67 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     // Add doors using path
     currentPos = 0;
     sections.forEach((section: any) => {
-      const sectionWidth = section.width * 100;
+      const sectionWidth = section.width * 100 * scaleFactor;
       const sectionX = ox + margin + currentPos;
       if (section.isDoor && section.doorHeight !== null && section.doorHeight !== undefined) {
-        const doorHeightCm = section.doorHeight * 100;
-        const doorTopY = oy + margin + (height - doorHeightCm);
+        const doorHeightMm = section.doorHeight * 100 * scaleFactor;
+        const doorTopY = oy + margin + (height - doorHeightMm);
         const doorBottomY = oy + margin + height;
         svg += `
-  <path d="M${sectionX},${doorTopY} L${sectionX},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
-  <path d="M${sectionX + sectionWidth},${doorTopY} L${sectionX + sectionWidth},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
-  <path d="M${sectionX},${doorTopY} L${sectionX + sectionWidth},${doorTopY}" fill="none" stroke="#000000" stroke-width="1"/>`;
+  <path d="M${sectionX},${doorTopY} L${sectionX},${doorBottomY}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>
+  <path d="M${sectionX + sectionWidth},${doorTopY} L${sectionX + sectionWidth},${doorBottomY}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>
+  <path d="M${sectionX},${doorTopY} L${sectionX + sectionWidth},${doorTopY}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>`;
       }
       currentPos += sectionWidth;
     });
 
-    // Add width dimensions using path
+    // Add width dimensions using path (labels show cm values)
     currentPos = 0;
     sections.forEach((section: any) => {
-      const sectionWidth = section.width * 100;
+      const sectionWidthMm = section.width * 100 * scaleFactor;
       const startX = ox + margin + currentPos;
-      const endX = ox + margin + currentPos + sectionWidth;
-      const centerX = startX + sectionWidth / 2;
-      const dimY = oy + margin + height + 20;
+      const endX = ox + margin + currentPos + sectionWidthMm;
+      const centerX = startX + sectionWidthMm / 2;
+      const dimY = oy + margin + height + 200;
       svg += `
-  <path d="M${startX},${dimY} L${endX},${dimY}" fill="none" stroke="#0066cc" stroke-width="1"/>
-  <path d="M${startX},${dimY} L${startX + 5},${dimY - 3} L${startX + 5},${dimY + 3} Z" fill="#0066cc" stroke="none"/>
-  <path d="M${endX},${dimY} L${endX - 5},${dimY - 3} L${endX - 5},${dimY + 3} Z" fill="#0066cc" stroke="none"/>
-  <text x="${centerX}" y="${dimY + 15}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#0066cc">${Math.round(sectionWidth)}</text>`;
-      currentPos += sectionWidth;
+  <path d="M${startX},${dimY} L${endX},${dimY}" fill="none" stroke="${colors.dimension}" stroke-width="${strokeWidth}"/>
+  <path d="M${startX},${dimY} L${startX + arrowSize},${dimY - arrowSize * 0.6} L${startX + arrowSize},${dimY + arrowSize * 0.6} Z" fill="${colors.dimension}" stroke="none"/>
+  <path d="M${endX},${dimY} L${endX - arrowSize},${dimY - arrowSize * 0.6} L${endX - arrowSize},${dimY + arrowSize * 0.6} Z" fill="${colors.dimension}" stroke="none"/>
+  <text x="${centerX}" y="${dimY + fontSize * 1.25}" font-family="Arial, sans-serif" font-size="${fontSize}" text-anchor="middle" fill="${colors.dimension}">${Math.round(section.width * 100)}</text>`;
+      currentPos += sectionWidthMm;
     });
 
-    // Height dimension using path (no rotate transform - draw text manually positioned)
-    const dimX = ox + margin - 20;
+    // Height dimension using path (label shows cm value)
+    const dimX = ox + margin - 200;
     const dimTopY = oy + margin;
     const dimBottomY = oy + margin + height;
     svg += `
-  <path d="M${dimX},${dimTopY} L${dimX},${dimBottomY}" fill="none" stroke="#0066cc" stroke-width="1"/>
-  <path d="M${dimX},${dimTopY} L${dimX - 3},${dimTopY + 5} L${dimX + 3},${dimTopY + 5} Z" fill="#0066cc" stroke="none"/>
-  <path d="M${dimX},${dimBottomY} L${dimX - 3},${dimBottomY - 5} L${dimX + 3},${dimBottomY - 5} Z" fill="#0066cc" stroke="none"/>
-  <text x="${dimX - 15}" y="${oy + margin + height / 2 + 4}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#0066cc" writing-mode="tb">${Math.round(height)}</text>`;
+  <path d="M${dimX},${dimTopY} L${dimX},${dimBottomY}" fill="none" stroke="${colors.dimension}" stroke-width="${strokeWidth}"/>
+  <path d="M${dimX},${dimTopY} L${dimX - arrowSize * 0.6},${dimTopY + arrowSize} L${dimX + arrowSize * 0.6},${dimTopY + arrowSize} Z" fill="${colors.dimension}" stroke="none"/>
+  <path d="M${dimX},${dimBottomY} L${dimX - arrowSize * 0.6},${dimBottomY - arrowSize} L${dimX + arrowSize * 0.6},${dimBottomY - arrowSize} Z" fill="${colors.dimension}" stroke="none"/>
+  <text x="${dimX - fontSize * 1.25}" y="${oy + margin + height / 2 + 4}" font-family="Arial, sans-serif" font-size="${fontSize}" text-anchor="middle" fill="${colors.dimension}" writing-mode="tb">${Math.round(layout.height * 100)}</text>`;
 
     return svg;
   };
 
-  // Calculate dimensions for a layout element
+  // Calculate dimensions for a layout element (in mm for export)
   const getLayoutDimensions = (layout: any) => {
-    const height = layout.height * 100;
+    const scaleFactor = 10; // cm to mm
+    const height = layout.height * 100 * scaleFactor;
     const sections = layout.layoutSections;
-    const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-    const margin = 50;
-    const extraSpace = 50; // Space for dimensions
+    const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0) * scaleFactor;
+    const margin = 500; // 50mm margin
+    const extraSpace = 500; // Space for dimensions
     return {
       width: totalWidth + margin * 2 + extraSpace,
       height: height + margin * 2 + extraSpace
     };
   };
 
-  // Generate combined SVG with all layouts
+  // Generate combined SVG with all layouts (in mm for export)
   const generateCombinedSVG = () => {
-    const gap = 50; // Gap between layouts
-    const margin = 30; // Overall margin
+    const gap = 500; // 50mm gap between layouts
+    const margin = 300; // 30mm overall margin
 
     // Calculate dimensions for each layout
     const leftDims = layouts.leftSideLayout ? getLayoutDimensions(layouts.leftSideLayout) : null;
@@ -403,7 +521,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
   const downloadSVG = () => {
     if (!currentLayout) return;
 
-    const svgContent = generatePreviewSVG(currentLayout, selectedSide, true); // Include labels for download
+    const svgContent = generatePreviewSVG(currentLayout, selectedSide, true); // forExport = true
     const blob = new Blob([svgContent], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -421,7 +539,8 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     const taskPrefix = taskName ? `${taskName}-` : '';
     const sections = currentLayout.layoutSections;
     const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-    link.download = `${taskPrefix}layout-${getSideLabel(selectedSide)}-${Math.round(totalWidth)}mm.svg`;
+    // Filename shows mm (multiply by 10)
+    link.download = `${taskPrefix}layout-${getSideLabel(selectedSide)}-${Math.round(totalWidth * 10)}mm.svg`;
 
     document.body.appendChild(link);
     link.click();
@@ -448,7 +567,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
             type="button"
             variant={selectedSide === 'left' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setSelectedSide('left')}
+            onClick={() => { setSelectedSide('left'); handleResetZoom(); }}
             disabled={!layouts.leftSideLayout}
           >
             Motorista
@@ -457,7 +576,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
             type="button"
             variant={selectedSide === 'right' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setSelectedSide('right')}
+            onClick={() => { setSelectedSide('right'); handleResetZoom(); }}
             disabled={!layouts.rightSideLayout}
           >
             Sapo
@@ -466,7 +585,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
             type="button"
             variant={selectedSide === 'back' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setSelectedSide('back')}
+            onClick={() => { setSelectedSide('back'); handleResetZoom(); }}
             disabled={!layouts.backSideLayout}
           >
             Traseira
@@ -481,16 +600,70 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
         )}
       </div>
 
-      {/* SVG Preview */}
+      {/* SVG Preview with Zoom Controls */}
       {currentLayout && (
-        <div className="border rounded-lg bg-white/50 backdrop-blur-sm">
-          <div className="p-8 flex items-center justify-center min-h-[300px]">
+        <div className="border border-border/40 rounded-lg bg-background/50 backdrop-blur-sm">
+          {/* Zoom Controls */}
+          <div className="flex justify-end items-center gap-1 p-2 border-b border-border/30">
+            <span className="text-xs text-muted-foreground mr-2">
+              {Math.round(zoomScale * 100)}%
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleZoomOut}
+              disabled={zoomScale <= MIN_SCALE}
+              className="h-8 w-8 p-0"
+            >
+              <IconZoomOut size={18} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleResetZoom}
+              className="h-8 w-8 p-0"
+            >
+              <IconZoomReset size={18} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleZoomIn}
+              disabled={zoomScale >= MAX_SCALE}
+              className="h-8 w-8 p-0"
+            >
+              <IconZoomIn size={18} />
+            </Button>
+          </div>
+
+          {/* Zoomable Container */}
+          <div
+            ref={zoomContainerRef}
+            className="overflow-hidden cursor-grab active:cursor-grabbing"
+            style={{ minHeight: '300px' }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
             <div
-              dangerouslySetInnerHTML={{
-                __html: generatePreviewSVG(currentLayout, selectedSide, false) // No labels for display
+              className="p-8 flex items-center justify-center min-h-[300px]"
+              style={{
+                transform: `scale(${zoomScale}) translate(${translateX / zoomScale}px, ${translateY / zoomScale}px)`,
+                transformOrigin: 'center center',
+                transition: isDragging ? 'none' : 'transform 0.2s ease-out',
               }}
-              className="w-full max-w-full overflow-auto [&>svg]:mx-auto [&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-full [&>svg]:max-h-[400px]"
-            />
+            >
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: generatePreviewSVG(currentLayout, selectedSide, false) // forExport = false (use theme colors)
+                }}
+                className="w-full max-w-full [&>svg]:mx-auto [&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-full [&>svg]:max-h-[400px]"
+              />
+            </div>
           </div>
         </div>
       )}

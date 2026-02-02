@@ -196,6 +196,26 @@ export const customerKeys = {
 };
 
 // =====================================================
+// Representative Query Keys
+// =====================================================
+
+export const representativeKeys = {
+  all: ["representatives"] as const,
+  lists: () => ["representatives", "list"] as const,
+  list: (filters?: any) => (filters ? (["representatives", "list", filters] as const) : (["representatives", "list"] as const)),
+  details: () => ["representatives", "detail"] as const,
+  detail: (id: string, include?: any) => (include ? (["representatives", "detail", id, include] as const) : (["representatives", "detail", id] as const)),
+  byIds: (ids: string[]) => ["representatives", "byIds", ids] as const,
+
+  // Specialized queries
+  byCustomer: (customerId: string, filters?: any) =>
+    filters ? (["representatives", "byCustomer", customerId, filters] as const) : (["representatives", "byCustomer", customerId] as const),
+  byCustomerAndRole: (customerId: string, role: string) =>
+    ["representatives", "byCustomerAndRole", customerId, role] as const,
+  statistics: () => ["representatives", "statistics"] as const,
+};
+
+// =====================================================
 // Cut Query Keys
 // =====================================================
 

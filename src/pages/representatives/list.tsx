@@ -1,6 +1,6 @@
 import { RepresentativeList } from "@/components/representatives/list";
 import { PageHeader } from "@/components/ui/page-header";
-import { routes } from "@/constants";
+import { routes, FAVORITE_PAGES } from "@/constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { IconPlus } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
@@ -19,8 +19,11 @@ export const RepresentativeListPage = () => {
       <PageHeader
         variant="list"
         title="Representantes"
+        favoritePage={FAVORITE_PAGES.ADMINISTRACAO_REPRESENTANTES_LISTAR}
         breadcrumbs={[
           { label: "Início", href: routes.home },
+          { label: "Administração", href: routes.administration.root },
+          { label: "Clientes", href: routes.administration.customers.root },
           { label: "Representantes" }
         ]}
         actions={[

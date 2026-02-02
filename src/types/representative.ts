@@ -15,14 +15,14 @@ export interface Representative {
   phone: string;
   name: string;
   password?: string | null;
-  customerId: string;
+  customerId?: string | null;
   role: RepresentativeRole;
   isActive: boolean;
   lastLogin?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
-  customer?: Customer;
+  customer?: Customer | null;
   tasks?: Task[];
 }
 
@@ -31,7 +31,7 @@ export interface RepresentativeCreateFormData {
   phone: string;
   name: string;
   password?: string;
-  customerId: string;
+  customerId?: string | null;
   role: RepresentativeRole;
   isActive?: boolean;
 }

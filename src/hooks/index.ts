@@ -65,6 +65,7 @@ export * from "./useUser";
 export * from "./usePosition";
 export * from "./usePositionRemuneration";
 export * from "./useSector";
+export * from "./useRepresentative";
 export * from "./bonus";
 export * from "./payroll";
 export * from "./useHoliday";
