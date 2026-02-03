@@ -316,7 +316,7 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
 
   // Get customer info
   const corporateName = task.customer?.corporateName || task.customer?.fantasyName || "Cliente";
-  const contactName = task.negotiatingWith?.name || "";
+  const contactName = task.representatives?.[0]?.name || "";
 
   // Get dates
   const currentDate = formatDate(new Date());

@@ -355,15 +355,15 @@ export const createTaskHistoryColumns = (options?: {
     },
   },
   {
-    id: "negotiatingWith.name",
-    header: "NEGOCIANDO COM",
-    accessorFn: (row) => row.negotiatingWith?.name || "",
+    id: "representatives",
+    header: "REPRESENTANTES",
+    accessorFn: (row) => row.representatives?.map(r => r.name).join(", ") || "",
     sortable: true,
     filterable: true,
     defaultVisible: false,
     width: "150px",
     formatter: (value: string, row: Task) => {
-      if (!row.negotiatingWith) return <span className="text-muted-foreground">-</span>;
+      if (!row.representatives || row.representatives.length === 0) return <span className="text-muted-foreground">-</span>;
       return <TruncatedTextWithTooltip text={value} className="truncate" />;
     },
   },
@@ -848,13 +848,21 @@ export const createTaskHistoryColumns = (options?: {
     filteredColumns = filteredColumns.filter(col => col.id !== 'price');
   }
 
-  // Define privileged sectors that can view restricted fields (invoiceTo, negotiatingWith, forecastDate)
+  // Define privileged sectors that can view restricted fields (representatives, forecastDate)
   const canViewRestrictedFields = sectorPrivilege && (
     sectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
     sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
     sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
     sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
     sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER
+  );
+
+  // Define sectors that can view invoiceTo field (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC - NOT Designer)
+  const canViewInvoiceToField = sectorPrivilege && (
+    sectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+    sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
+    sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
+    sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC
   );
 
   // Define sectors that can view commission field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
@@ -866,13 +874,17 @@ export const createTaskHistoryColumns = (options?: {
   );
 
   // Filter out restricted columns for users without permission
-  // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, and DESIGNER can see these columns
+  // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, and DESIGNER can see representatives and forecastDate
   if (!canViewRestrictedFields) {
     filteredColumns = filteredColumns.filter(col =>
-      col.id !== 'invoiceTo.fantasyName' &&
-      col.id !== 'negotiatingWith.name' &&
+      col.id !== 'representatives' &&
       col.id !== 'forecastDate'
     );
+  }
+
+  // Filter out invoiceTo column - DESIGNER cannot see it (only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC)
+  if (!canViewInvoiceToField) {
+    filteredColumns = filteredColumns.filter(col => col.id !== 'invoiceTo.fantasyName');
   }
 
   // Filter out commission column for users without permission (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only)

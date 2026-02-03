@@ -469,7 +469,7 @@ export const ENTITY_BADGE_CONFIG = {
     [PPE_DELIVERY_STATUS.PENDING]: "gray" as BadgeVariant,
     [PPE_DELIVERY_STATUS.APPROVED]: "blue" as BadgeVariant,
     [PPE_DELIVERY_STATUS.DELIVERED]: "delivered" as BadgeVariant,
-    [PPE_DELIVERY_STATUS.WAITING_SIGNATURE]: "yellow" as BadgeVariant,
+    [PPE_DELIVERY_STATUS.WAITING_SIGNATURE]: "amber" as BadgeVariant,
     [PPE_DELIVERY_STATUS.COMPLETED]: "green" as BadgeVariant,
     [PPE_DELIVERY_STATUS.REPROVED]: "red" as BadgeVariant,
     [PPE_DELIVERY_STATUS.SIGNATURE_REJECTED]: "red" as BadgeVariant,

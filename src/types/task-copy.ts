@@ -10,7 +10,7 @@ export type CopyableTaskField =
   | 'term'
   | 'forecastDate'
   | 'commission'
-  | 'negotiatingWith'
+  | 'representatives'
   | 'customerId'
   | 'invoiceToId'
   | 'pricingId'
@@ -42,7 +42,7 @@ export const COPYABLE_TASK_FIELDS: CopyableTaskField[] = [
   'term',
   'forecastDate',
   'commission',
-  'negotiatingWith',
+  'representatives',
   'customerId',
   'invoiceToId',
   'pricingId',
@@ -71,7 +71,7 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
   entryDate: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
   term: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
   forecastDate: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
-  negotiatingWith: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  representatives: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
   customerId: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Commission - disabled for Financial, Designer, Logistic, Warehouse
@@ -202,11 +202,11 @@ export const COPYABLE_FIELD_METADATA: Record<CopyableTaskField, CopyableFieldMet
     isShared: false,
     createNewInstances: false,
   },
-  negotiatingWith: {
-    label: 'Negociando Com',
-    description: 'Informações de contato da negociação',
+  representatives: {
+    label: 'Representantes',
+    description: 'Representantes associados à tarefa',
     category: 'Básico',
-    isShared: false,
+    isShared: true,
     createNewInstances: false,
   },
   customerId: {

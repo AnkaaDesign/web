@@ -8,6 +8,7 @@ import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemU
 import { useItemCategories } from "../../../../hooks";
 import { ITEM_CATEGORY_TYPE } from "../../../../constants";
 import { serializeItemFormToUrlParams, debounce } from "@/utils/url-form-state";
+import type { Supplier, ItemBrand, ItemCategory } from "../../../../types";
 // Import all form components
 import { NameInput } from "@/components/inventory/item/form/name-input";
 import { UnicodeInput } from "@/components/inventory/item/form/unicode-input";
@@ -27,6 +28,9 @@ import { PpeConfigSection } from "@/components/inventory/item/form/ppe-config-se
 
 interface BaseEpiFormProps {
   isSubmitting?: boolean;
+  initialSupplier?: Supplier;
+  initialBrand?: ItemBrand;
+  initialCategory?: ItemCategory;
 }
 
 interface CreateEpiFormProps extends BaseEpiFormProps {
@@ -44,7 +48,7 @@ interface UpdateEpiFormProps extends BaseEpiFormProps {
 type EpiFormProps = CreateEpiFormProps | UpdateEpiFormProps;
 
 export function EpiForm(props: EpiFormProps) {
-  const { isSubmitting, defaultValues, mode } = props;
+  const { isSubmitting, defaultValues, mode, initialSupplier, initialBrand, initialCategory } = props;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>();
@@ -224,8 +228,8 @@ export function EpiForm(props: EpiFormProps) {
                   <NameInput disabled={isSubmitting} required={isRequired} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <ItemBrandSelector disabled={isSubmitting} />
-                  <ItemSupplierSelector disabled={isSubmitting} />
+                  <ItemBrandSelector disabled={isSubmitting} initialBrand={initialBrand} />
+                  <ItemSupplierSelector disabled={isSubmitting} initialSupplier={initialSupplier} />
                 </div>
               </CardContent>
             </Card>

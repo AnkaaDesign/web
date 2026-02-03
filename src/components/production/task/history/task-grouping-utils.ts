@@ -99,7 +99,7 @@ function shouldGroupTasks(
 }
 
 export interface TaskGroup {
-  type: 'single' | 'group-first' | 'group-collapsed' | 'group-last';
+  type: 'single' | 'group-first' | 'group-collapsed';
   task?: Task;
   groupId?: string;
   collapsedTasks?: Task[];
@@ -177,8 +177,7 @@ export function groupSequentialTasks(
     // If we found a group of minGroupSize or more, create a collapsible group
     if (groupTasks.length >= minGroupSize) {
       const firstTask = groupTasks[0];
-      const lastTask = groupTasks[groupTasks.length - 1];
-      const middleTasks = groupTasks.slice(1, -1);
+      const restTasks = groupTasks.slice(1); // All tasks except the first
       const groupId = `group-${firstTask.id}`;
 
       // First task
@@ -189,19 +188,11 @@ export function groupSequentialTasks(
         totalCount: groupTasks.length,
       });
 
-      // Collapsed row representing middle tasks
+      // Collapsed row representing all remaining tasks (no separate "last" row)
       result.push({
         type: 'group-collapsed',
         groupId,
-        collapsedTasks: middleTasks,
-        totalCount: groupTasks.length,
-      });
-
-      // Last task
-      result.push({
-        type: 'group-last',
-        task: lastTask,
-        groupId,
+        collapsedTasks: restTasks,
         totalCount: groupTasks.length,
       });
     } else {

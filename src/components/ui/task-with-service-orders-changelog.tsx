@@ -1336,7 +1336,7 @@ const ChangelogTimelineItem = ({
                   return false;
                 }
 
-                // Filter out restricted fields (forecastDate, negotiatingWith, invoiceTo) for users who can't view them
+                // Filter out restricted fields (forecastDate, representatives) for users who can't view them
                 // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER can see these
                 const canViewRestrictedFields =
                   userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
@@ -1344,11 +1344,26 @@ const ChangelogTimelineItem = ({
                   userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
                   userSectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
                   userSectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
-                const restrictedFields = ["forecastDate", "negotiatingWith", "invoiceTo", "invoiceToId"];
+                const restrictedFields = ["forecastDate", "representatives", "representativeIds", "negotiatingWith"]; // invoiceTo removed - has its own check
                 if (
                   !canViewRestrictedFields &&
                   changelog.field &&
                   restrictedFields.includes(changelog.field)
+                ) {
+                  return false;
+                }
+
+                // Filter out invoiceTo fields - DESIGNER cannot see (only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC)
+                const canViewInvoiceToField =
+                  userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+                  userSectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
+                  userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
+                  userSectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC;
+                const invoiceToFields = ["invoiceTo", "invoiceToId"];
+                if (
+                  !canViewInvoiceToField &&
+                  changelog.field &&
+                  invoiceToFields.includes(changelog.field)
                 ) {
                   return false;
                 }
@@ -2614,7 +2629,7 @@ export function TaskWithServiceOrdersChangelog({
           truckIds.add(changelog.newValue);
       }
 
-      // Extract user IDs from negotiatingWith field
+      // Extract user IDs from negotiatingWith field (DEPRECATED - kept for historical data)
       if (changelog.field === "negotiatingWith") {
         const extractUserIdsFromNegotiating = (value: any) => {
           if (!value) return;
@@ -2628,6 +2643,27 @@ export function TaskWithServiceOrdersChangelog({
         };
         extractUserIdsFromNegotiating(changelog.oldValue);
         extractUserIdsFromNegotiating(changelog.newValue);
+      }
+
+      // Extract representative IDs from representatives/representativeIds fields
+      if (changelog.field === "representatives" || changelog.field === "representativeIds") {
+        const extractRepresentativeIds = (value: any) => {
+          if (!value) return;
+          try {
+            const parsed =
+              typeof value === "string" ? JSON.parse(value) : value;
+            if (Array.isArray(parsed)) {
+              parsed.forEach((rep: any) => {
+                if (typeof rep === "string") userIds.add(rep);
+                else if (rep?.id) userIds.add(rep.id);
+              });
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        };
+        extractRepresentativeIds(changelog.oldValue);
+        extractRepresentativeIds(changelog.newValue);
       }
     });
 

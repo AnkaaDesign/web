@@ -34,9 +34,11 @@ interface PaintFormulasCardProps {
   error?: Error | null;
   onRetry?: () => void;
   onFormulaDeleted?: () => void;
+  /** If false, formulas are displayed but not clickable */
+  canNavigate?: boolean;
 }
 
-export function PaintFormulasCard({ paint, className, isLoading = false, error = null, onRetry, onFormulaDeleted }: PaintFormulasCardProps) {
+export function PaintFormulasCard({ paint, className, isLoading = false, error = null, onRetry, onFormulaDeleted, canNavigate = true }: PaintFormulasCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -46,9 +48,15 @@ export function PaintFormulasCard({ paint, className, isLoading = false, error =
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Permission checks
-  const isWarehouseUser = user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
-  const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
-  const showPrices = !isWarehouseUser;
+  const userPrivilege = user?.sector?.privileges;
+  const isAdmin = userPrivilege === SECTOR_PRIVILEGES.ADMIN;
+
+  // Only COMMERCIAL, ADMIN, FINANCIAL can see prices (WAREHOUSE excluded)
+  const canSeePrices = userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
+    userPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+    userPrivilege === SECTOR_PRIVILEGES.FINANCIAL;
+
+  const showPrices = canSeePrices;
   const canDelete = isAdmin;
 
   const handleCreateFormula = () => {
@@ -146,9 +154,12 @@ export function PaintFormulasCard({ paint, className, isLoading = false, error =
             {[...paint.formulas!].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((formula, index) => (
               <div key={formula.id}>
                 <div
-                  className="bg-muted/50 rounded-lg p-4 hover:bg-muted/70 transition-all duration-200 cursor-pointer"
-                  onClick={() => handleFormulaClick(formula.id)}
-                  onContextMenu={(e) => handleContextMenu(e, formula)}
+                  className={cn(
+                    "bg-muted/50 rounded-lg p-4 transition-all duration-200",
+                    canNavigate ? "hover:bg-muted/70 cursor-pointer" : "cursor-default"
+                  )}
+                  onClick={canNavigate ? () => handleFormulaClick(formula.id) : undefined}
+                  onContextMenu={canNavigate ? (e) => handleContextMenu(e, formula) : undefined}
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-2 flex-1">
@@ -170,7 +181,7 @@ export function PaintFormulasCard({ paint, className, isLoading = false, error =
                         </div>
                       </div>
                     </div>
-                    {formula.components && formula.components.length > 0 && (
+                    {canNavigate && formula.components && formula.components.length > 0 && (
                       <Badge variant="outline" className="ml-2">
                         <IconCalculator className="h-3 w-3 mr-1" />
                         Calculadora
@@ -182,16 +193,18 @@ export function PaintFormulasCard({ paint, className, isLoading = false, error =
               </div>
             ))}
 
-            <div className="pt-2 flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => navigate(routes.painting.catalog.formulas(paint.id))} className="flex-1">
-                <IconList className="h-4 w-4 mr-2" />
-                Mostrar Todos
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleCreateFormula} className="flex-1">
-                <IconPlus className="h-4 w-4 mr-2" />
-                Nova Fórmula
-              </Button>
-            </div>
+            {canNavigate && (
+              <div className="pt-2 flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => navigate(routes.painting.catalog.formulas(paint.id))} className="flex-1">
+                  <IconList className="h-4 w-4 mr-2" />
+                  Mostrar Todos
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCreateFormula} className="flex-1">
+                  <IconPlus className="h-4 w-4 mr-2" />
+                  Nova Fórmula
+                </Button>
+              </div>
+            )}
           </>
         ) : (
           <div className="text-center py-8 space-y-4">
@@ -199,19 +212,23 @@ export function PaintFormulasCard({ paint, className, isLoading = false, error =
               <IconFlask className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">Nenhuma fórmula cadastrada</p>
-                <p className="text-xs text-muted-foreground">Crie a primeira fórmula para esta tinta e comece a produzir</p>
+                {canNavigate && (
+                  <p className="text-xs text-muted-foreground">Crie a primeira fórmula para esta tinta e comece a produzir</p>
+                )}
               </div>
             </div>
-            <div className="flex gap-2 justify-center">
-              <Button variant="outline" size="sm" onClick={() => navigate(routes.painting.catalog.formulas(paint.id))}>
-                <IconList className="h-4 w-4 mr-2" />
-                Mostrar Todos
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleCreateFormula}>
-                <IconPlus className="h-4 w-4 mr-2" />
-                Criar Primeira Fórmula
-              </Button>
-            </div>
+            {canNavigate && (
+              <div className="flex gap-2 justify-center">
+                <Button variant="outline" size="sm" onClick={() => navigate(routes.painting.catalog.formulas(paint.id))}>
+                  <IconList className="h-4 w-4 mr-2" />
+                  Mostrar Todos
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleCreateFormula}>
+                  <IconPlus className="h-4 w-4 mr-2" />
+                  Criar Primeira Fórmula
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

@@ -92,7 +92,7 @@ export function PaintMergeDialog({ open, onOpenChange, selectedPaints, onConfirm
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {paint.formulas?.length || 0} fórmula{(paint.formulas?.length || 0) !== 1 ? "s" : ""}
+                      {paint._count?.formulas || 0} fórmula{(paint._count?.formulas || 0) !== 1 ? "s" : ""}
                     </p>
                   </div>
 

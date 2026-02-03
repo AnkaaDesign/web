@@ -2,7 +2,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { IconFlask, IconRefresh } from "@tabler/icons-react";
 
 import { usePaintFormula, usePaintProductionMutations } from "../../../../../../../hooks";
-import { routes } from "../../../../../../../constants";
+import { routes, SECTOR_PRIVILEGES } from "../../../../../../../constants";
+import { useAuth } from "@/contexts/auth-context";
 import type { PaintProductionCreateFormData } from "../../../../../../../schemas";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +16,13 @@ import { PAGE_SPACING } from "@/lib/layout-constants";
 export default function FormulaDetailsPage() {
   const { id: paintId, formulaId } = useParams<{ id: string; formulaId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Only COMMERCIAL, ADMIN, FINANCIAL can see prices (WAREHOUSE excluded)
+  const userPrivilege = user?.sector?.privileges;
+  const canSeePrices = userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
+    userPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+    userPrivilege === SECTOR_PRIVILEGES.FINANCIAL;
 
   // Fetch formula with all necessary includes
   const {
@@ -110,7 +118,7 @@ export default function FormulaDetailsPage() {
         <div className="mt-4">
           <Card className="shadow-sm border border-border animate-in fade-in-50 duration-500">
             <CardContent className="pt-6">
-              <FormulaCalculator formula={formula} onStartProduction={handleStartProduction} />
+              <FormulaCalculator formula={formula} onStartProduction={handleStartProduction} allowPriceVisibility={canSeePrices} />
             </CardContent>
           </Card>
         </div>

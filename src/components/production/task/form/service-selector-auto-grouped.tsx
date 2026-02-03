@@ -182,8 +182,40 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     remove(index);
   }, [servicesValues, onItemDeleted, remove]);
 
+  // Determine which service order types should be visible for the current user
+  // This controls which grouped service cards are shown
+  const visibleServiceOrderTypes = useMemo(() => {
+    if (!userPrivilege) return Object.values(SERVICE_ORDER_TYPE);
+
+    if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) {
+      return Object.values(SERVICE_ORDER_TYPE);
+    }
+    if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
+      // Financial can only see COMMERCIAL, LOGISTIC, FINANCIAL (not PRODUCTION, ARTWORK)
+      return [
+        SERVICE_ORDER_TYPE.COMMERCIAL,
+        SERVICE_ORDER_TYPE.LOGISTIC,
+        SERVICE_ORDER_TYPE.FINANCIAL,
+      ];
+    }
+    if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
+      // Designer can only see PRODUCTION, ARTWORK (not COMMERCIAL, LOGISTIC, FINANCIAL)
+      return [
+        SERVICE_ORDER_TYPE.PRODUCTION,
+        SERVICE_ORDER_TYPE.ARTWORK,
+      ];
+    }
+    // All other sectors see all types
+    return Object.values(SERVICE_ORDER_TYPE);
+  }, [userPrivilege]);
+
   // Render a service group card
   const renderServiceGroup = (type: SERVICE_ORDER_TYPE) => {
+    // Skip if this type is not visible for the current user
+    if (!visibleServiceOrderTypes.includes(type)) {
+      return null;
+    }
+
     const serviceIndices = groupedServices[type];
 
     // Skip if this type doesn't exist in our groups (e.g., old NEGOTIATION enum value)
@@ -497,8 +529,12 @@ function ServiceRow({
       ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
-      // Financial can CREATE financial, but can only UPDATE financial
-      return [SERVICE_ORDER_TYPE.FINANCIAL];
+      // Financial can CREATE commercial, logistic, and financial service orders
+      return [
+        SERVICE_ORDER_TYPE.COMMERCIAL,
+        SERVICE_ORDER_TYPE.LOGISTIC,
+        SERVICE_ORDER_TYPE.FINANCIAL,
+      ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
       // Designer can CREATE artwork, but can only UPDATE artwork

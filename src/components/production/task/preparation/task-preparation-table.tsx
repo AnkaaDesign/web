@@ -160,7 +160,7 @@ export function TaskPreparationTable({
     if (onOrderedTaskIdsChange) {
       const orderedIds: string[] = [];
       for (const group of groupedTasks) {
-        if (group.type === 'group-first' || group.type === 'group-last' || group.type === 'single') {
+        if (group.type === 'group-first' || group.type === 'single') {
           if (group.task) orderedIds.push(group.task.id);
         } else if (group.type === 'group-collapsed') {
           if (group.collapsedTasks) {
@@ -232,13 +232,13 @@ export function TaskPreparationTable({
    * Get comprehensive group information for a task
    *
    * This helper determines:
-   * - Whether the task is part of a group (first/last task)
+   * - Whether the task is part of a group (first task only, since we no longer have last)
    * - Whether that group is currently expanded or collapsed
-   * - All task IDs in the group (first + middle + last)
+   * - All task IDs in the group (first + rest)
    *
    * Used to implement context-aware selection:
-   * - COLLAPSED: Clicking first/last task selects entire group
-   * - EXPANDED: Each task (first/middle/last) is independent
+   * - COLLAPSED: Clicking first task selects entire group
+   * - EXPANDED: Each task is independent
    *
    * @param taskId - The ID of the task to check
    * @returns Group information object
@@ -249,24 +249,18 @@ export function TaskPreparationTable({
     isExpanded: boolean;
     allTaskIds: string[];
   } => {
-    // Find if this task belongs to a group
+    // Find if this task belongs to a group (only check group-first now)
     let foundGroupId: string | undefined;
 
     for (const group of groupedTasks) {
       if (group.type === 'group-first' && group.task?.id === taskId) {
         foundGroupId = group.groupId;
-        console.log('[getGroupInfo] Found as FIRST task in group:', foundGroupId);
-        break;
-      } else if (group.type === 'group-last' && group.task?.id === taskId) {
-        foundGroupId = group.groupId;
-        console.log('[getGroupInfo] Found as LAST task in group:', foundGroupId);
         break;
       }
     }
 
     // If not in a group, return single task info
     if (!foundGroupId) {
-      console.log('[getGroupInfo] NOT in a group, taskId:', taskId);
       return {
         isInGroup: false,
         isExpanded: false,
@@ -274,47 +268,37 @@ export function TaskPreparationTable({
       };
     }
 
-    // Collect all task IDs in the group
+    // Collect all task IDs in the group (first + collapsed)
     const allTaskIds: string[] = [];
     for (const g of groupedTasks) {
       if (g.groupId === foundGroupId) {
         if (g.type === 'group-first' && g.task) {
           allTaskIds.push(g.task.id);
-          console.log('[getGroupInfo] Added FIRST task:', g.task.id);
         } else if (g.type === 'group-collapsed' && g.collapsedTasks) {
-          const middleIds = g.collapsedTasks.map(t => t.id);
-          allTaskIds.push(...middleIds);
-          console.log('[getGroupInfo] Added MIDDLE tasks:', middleIds.length, 'tasks');
-        } else if (g.type === 'group-last' && g.task) {
-          allTaskIds.push(g.task.id);
-          console.log('[getGroupInfo] Added LAST task:', g.task.id);
+          allTaskIds.push(...g.collapsedTasks.map(t => t.id));
         }
       }
     }
 
     const isExpanded = expandedGroups.has(foundGroupId);
-    console.log('[getGroupInfo] Group', foundGroupId, '- Total tasks:', allTaskIds.length, '- Expanded:', isExpanded);
 
     return {
       isInGroup: true,
       groupId: foundGroupId,
       isExpanded: isExpanded,
-      allTaskIds: allTaskIds.length > 0 ? allTaskIds : [taskId], // Fallback to single task
+      allTaskIds: allTaskIds.length > 0 ? allTaskIds : [taskId],
     };
   }, [groupedTasks, expandedGroups]);
 
-  // Helper function to find all task IDs in a group (first + middle + last)
+  // Helper function to find all task IDs in a group (first + rest)
   // Returns single task ID if not in a group OR if group is expanded
   const getGroupTaskIds = useCallback((taskId: string, respectExpansion: boolean = true): string[] => {
     // Find the group this task belongs to and return all IDs
     let foundGroupId: string | undefined;
 
-    // First pass: find if this task belongs to a group
+    // First pass: find if this task belongs to a group (only check group-first)
     for (const group of groupedTasks) {
       if (group.type === 'group-first' && group.task?.id === taskId) {
-        foundGroupId = group.groupId;
-        break;
-      } else if (group.type === 'group-last' && group.task?.id === taskId) {
         foundGroupId = group.groupId;
         break;
       }
@@ -330,7 +314,7 @@ export function TaskPreparationTable({
       return [taskId];
     }
 
-    // Second pass: collect all task IDs in the group
+    // Second pass: collect all task IDs in the group (first + collapsed)
     const result: string[] = [];
     for (const g of groupedTasks) {
       if (g.groupId === foundGroupId) {
@@ -338,8 +322,6 @@ export function TaskPreparationTable({
           result.push(g.task.id);
         } else if (g.type === 'group-collapsed' && g.collapsedTasks) {
           result.push(...g.collapsedTasks.map(t => t.id));
-        } else if (g.type === 'group-last' && g.task) {
-          result.push(g.task.id);
         }
       }
     }
@@ -436,53 +418,41 @@ export function TaskPreparationTable({
               const collapsedTasks = group.collapsedTasks!;
               const isExpanded = expandedGroups.has(groupId);
 
-              // Calculate selection state for the group - need to check first, middle, and last tasks
+              // Find first task for this group
+              const firstTaskGroup = groupedTasks.find(g => g.groupId === groupId && g.type === 'group-first');
+              const firstTask = firstTaskGroup?.task;
+
+              // Calculate selection state for the group - need to check first + collapsed tasks
               const allGroupTaskIds: string[] = [];
 
-              // Find first task
-              const firstTaskGroup = groupedTasks.find(g => g.groupId === groupId && g.type === 'group-first');
-              if (firstTaskGroup?.task) allGroupTaskIds.push(firstTaskGroup.task.id);
+              // Add first task
+              if (firstTask) allGroupTaskIds.push(firstTask.id);
 
-              // Add middle tasks
+              // Add collapsed tasks (rest of the group)
               allGroupTaskIds.push(...collapsedTasks.map(t => t.id));
-
-              // Find last task
-              const lastTaskGroup = groupedTasks.find(g => g.groupId === groupId && g.type === 'group-last');
-              if (lastTaskGroup?.task) allGroupTaskIds.push(lastTaskGroup.task.id);
 
               const selectedCountInGroup = allGroupTaskIds.filter(id => isSelected(id)).length;
               const allTasksSelected = selectedCountInGroup === allGroupTaskIds.length;
 
-              // Handle select all in group - includes first, middle, and last tasks
+              // Handle select all in group - includes first + collapsed tasks
               const handleSelectAllInGroup = () => {
-                console.log('[handleSelectAllInGroup] Called for group:', groupId);
-                console.log('[handleSelectAllInGroup] All task IDs:', allGroupTaskIds);
-                console.log('[handleSelectAllInGroup] All selected?', allTasksSelected);
-                console.log('[handleSelectAllInGroup] Currently selected:', selectedIds);
-
                 // Build the new selection set in ONE operation to avoid race conditions
                 const currentSelection = new Set(selectedIds);
 
                 if (allTasksSelected) {
-                  // Deselect all tasks in the group (first, middle, last)
-                  console.log('[handleSelectAllInGroup] DESELECTING all tasks');
+                  // Deselect all tasks in the group
                   allGroupTaskIds.forEach(id => {
                     currentSelection.delete(id);
-                    console.log('[handleSelectAllInGroup] Removed:', id);
                   });
                 } else {
-                  // Select all tasks in the group (first, middle, last)
-                  console.log('[handleSelectAllInGroup] SELECTING all tasks');
+                  // Select all tasks in the group
                   allGroupTaskIds.forEach(id => {
                     currentSelection.add(id);
-                    console.log('[handleSelectAllInGroup] Added:', id);
                   });
                 }
 
                 // Update selection in ONE call
-                const newSelection = Array.from(currentSelection);
-                console.log('[handleSelectAllInGroup] New selection:', newSelection);
-                setSelectedIds(newSelection);
+                setSelectedIds(Array.from(currentSelection));
               };
 
               // If expanded, render all individual task rows
@@ -554,11 +524,15 @@ export function TaskPreparationTable({
               }
 
               // If collapsed, render the collapsed group row
+              // Skip rendering if firstTask is not found (shouldn't happen)
+              if (!firstTask) return null;
+
               return (
                 <CollapsedGroupRow
                   key={groupId}
                   groupId={groupId}
                   collapsedTasks={collapsedTasks}
+                  firstTask={firstTask}
                   totalCount={group.totalCount!}
                   isExpanded={isExpanded}
                   onToggle={() => {
@@ -576,7 +550,7 @@ export function TaskPreparationTable({
                   isSelected={allTasksSelected}
                   onSelectAll={handleSelectAllInGroup}
                   canEdit={canEdit}
-                  columnCount={columns.length}
+                  columns={columns}
                   selectedCount={selectedCountInGroup}
                 />
               );
@@ -633,13 +607,11 @@ export function TaskPreparationTable({
                         let tasksToToggle: string[];
 
                         if (groupInfo.isInGroup && !groupInfo.isExpanded) {
-                          // COLLAPSED GROUP: Select all tasks in group (first + middle + last)
+                          // COLLAPSED GROUP: Select all tasks in group (first + rest)
                           tasksToToggle = groupInfo.allTaskIds;
-                          console.log('[Checkbox Click] COLLAPSED GROUP - Selecting all:', tasksToToggle);
                         } else {
                           // SINGLE TASK or EXPANDED GROUP: Select only this task
                           tasksToToggle = [task.id];
-                          console.log('[Checkbox Click] SINGLE/EXPANDED - Selecting one:', tasksToToggle);
                         }
 
                         // Determine if we're selecting or deselecting

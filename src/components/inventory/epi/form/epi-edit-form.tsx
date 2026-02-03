@@ -10,6 +10,11 @@ interface EpiEditFormProps {
 }
 
 export function EpiEditForm({ item, onSubmit, isSubmitting }: EpiEditFormProps) {
+  // Memoize the supplier, brand, and category to pass to the form
+  const initialSupplier = React.useMemo(() => item.supplier, [item.supplier]);
+  const initialBrand = React.useMemo(() => item.brand, [item.brand]);
+  const initialCategory = React.useMemo(() => item.category, [item.category]);
+
   // Map API data to form data
   const getDefaultValues = React.useCallback(() => {
     // Get the most recent price if available
@@ -83,5 +88,15 @@ export function EpiEditForm({ item, onSubmit, isSubmitting }: EpiEditFormProps) 
     }
   };
 
-  return <EpiForm mode="update" defaultValues={getDefaultValues()} onSubmit={handleSubmit} isSubmitting={isSubmitting} />;
+  return (
+    <EpiForm
+      mode="update"
+      defaultValues={getDefaultValues()}
+      onSubmit={handleSubmit}
+      isSubmitting={isSubmitting}
+      initialSupplier={initialSupplier}
+      initialBrand={initialBrand}
+      initialCategory={initialCategory}
+    />
+  );
 }

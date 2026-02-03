@@ -270,7 +270,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     generalPainting: "Pintura Geral",
     observationId: "Observação",
     truckId: "Caminhão",
-    negotiatingWith: "Negociando Com",
+    negotiatingWith: "Negociando Com", // DEPRECATED - kept for historical changelog records
+    representatives: "Representantes",
     // Relationship fields
     sector: "Setor",
     customer: "Cliente",
@@ -1095,6 +1096,8 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       PARTIALLY_RETURNED: "Parcialmente Devolvido",
       FULLY_RETURNED: "Totalmente Devolvido",
       CHARGED: "Cobrado",
+      LIQUIDATED: "Liquidado",
+      DELIVERED: "Entregue",
       CANCELLED: "Cancelado",
     };
     return externalWithdrawalStatusLabels[value] || value;

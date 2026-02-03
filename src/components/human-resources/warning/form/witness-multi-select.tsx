@@ -37,7 +37,7 @@ export function WitnessMultiSelect({ control, disabled, excludeIds = [], initial
     });
   }, [initialWitnesses?.map(w => w.id).join(',')]);
 
-  // Memoize queryFn
+  // Memoize queryFn - filter by isActive: true for warning witnesses
   const queryFn = useCallback(async (search: string, page: number = 1) => {
     const validExcludeIds = excludeIds.filter((id) => id && id.trim() !== "");
     const whereClause: any = { isActive: true };
@@ -50,7 +50,16 @@ export function WitnessMultiSelect({ control, disabled, excludeIds = [], initial
       page,
       take: 50,
       where: whereClause,
-      include: { position: true },
+      select: {
+        id: true,
+        name: true,
+        position: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     };
 
     if (search && search.trim()) {

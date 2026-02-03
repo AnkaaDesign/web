@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { IconFilter, IconSearch } from "@tabler/icons-react";
+import { IconFilter } from "@tabler/icons-react";
 import { parseISO } from "date-fns";
 
 import { useSecullumHolidays } from "../../../../../hooks";
@@ -11,7 +11,7 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { TableSearchInput } from "@/components/ui/table-search-input";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { HolidaysTable } from "./holidays-table";
@@ -222,16 +222,12 @@ export function HolidaysList({ className }: HolidaysListProps) {
       <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden min-h-0 pb-6">
         {/* Search and Controls */}
         <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1 relative">
-            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Buscar feriados..."
-              value={displaySearchText}
-              onChange={(value) => handleSearchChange(typeof value === "string" ? value : "")}
-              className="pl-9"
-            />
-          </div>
+          <TableSearchInput
+            value={displaySearchText}
+            onChange={handleSearchChange}
+            placeholder="Buscar feriados..."
+            isPending={displaySearchText !== searchText}
+          />
           <div className="flex gap-2">
             <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setIsFilterModalOpen(true)}>
               <IconFilter className="h-4 w-4 mr-2" />

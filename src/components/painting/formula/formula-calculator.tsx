@@ -19,14 +19,19 @@ import { cn } from "@/lib/utils";
 interface FormulaCalculatorProps {
   formula: PaintFormula;
   onStartProduction: (data: { formulaId: string; weight: number }) => Promise<void>;
+  /** If false, the price toggle and all price columns will be hidden */
+  allowPriceVisibility?: boolean;
 }
 
-export function FormulaCalculator({ formula, onStartProduction }: FormulaCalculatorProps) {
+export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibility = true }: FormulaCalculatorProps) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Initialize state from URL params
   const [desiredVolume, setDesiredVolume] = useState(() => searchParams.get("volume") || "2000");
   const [showPrices, setShowPrices] = useState(false);
+
+  // Effective price visibility: user must have permission AND toggle must be on
+  const effectiveShowPrices = allowPriceVisibility && showPrices;
   const [isProducing, setIsProducing] = useState(false);
   const [selectedComponents, setSelectedComponents] = useState<string[]>(() => {
     const used = searchParams.get("used");
@@ -440,13 +445,15 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
 
         {/* Toggles */}
         <div className="flex items-center justify-end gap-6 flex-1">
-          {/* Price Toggle */}
-          <div className="flex items-center space-x-3">
-            <Label htmlFor="show-prices" className="text-sm font-medium">
-              Exibir Preços
-            </Label>
-            <Switch id="show-prices" checked={showPrices} onCheckedChange={setShowPrices} />
-          </div>
+          {/* Price Toggle - only show if user has permission to see prices */}
+          {allowPriceVisibility && (
+            <div className="flex items-center space-x-3">
+              <Label htmlFor="show-prices" className="text-sm font-medium">
+                Exibir Preços
+              </Label>
+              <Switch id="show-prices" checked={showPrices} onCheckedChange={setShowPrices} />
+            </div>
+          )}
 
           {/* Correction Mode Toggle */}
           <div className="flex items-center space-x-3">
@@ -499,7 +506,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                 <TableHead className="font-semibold text-xs uppercase">Item</TableHead>
                 <TableHead className="text-right font-semibold text-xs uppercase w-48">Peso (g)</TableHead>
                 {correctionMode && <TableHead className="text-right font-semibold text-xs uppercase w-48">Correção</TableHead>}
-                {showPrices && <TableHead className="text-right font-semibold text-xs uppercase w-48">Preço</TableHead>}
+                {effectiveShowPrices && <TableHead className="text-right font-semibold text-xs uppercase w-48">Preço</TableHead>}
                 <TableHead className="text-right font-semibold text-xs uppercase w-40">Proporção</TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
@@ -573,7 +580,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                       </div>
                     </TableCell>
                   )}
-                  {showPrices && (
+                  {effectiveShowPrices && (
                     <TableCell className="p-0 text-right">
                       <div className="px-4 py-2 tabular-nums text-base">{formatCurrency(component.price)}</div>
                     </TableCell>
@@ -600,7 +607,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                     </div>
                   </TableCell>
                 )}
-                {showPrices && (
+                {effectiveShowPrices && (
                   <TableCell className="p-0 text-right">
                     <div className="px-4 py-2 tabular-nums text-base text-primary">{formatCurrency(totals.price)}</div>
                   </TableCell>
@@ -630,7 +637,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                     : formatNumberWithDecimals(totals.weight * (correctionMode ? errorRatio : 1), 1)}{" "}
                   g
                 </p>
-                {showPrices && <p className="text-sm text-muted-foreground">Custo de Produção: {formatCurrency(totals.productionCost)}</p>}
+                {effectiveShowPrices && <p className="text-sm text-muted-foreground">Custo de Produção: {formatCurrency(totals.productionCost)}</p>}
               </div>
 
               {!totals.allInStock && (
@@ -664,6 +671,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                 <p className="text-sm font-semibold">{formatNumberWithDecimals(Number(formula.density), 3)} g/ml</p>
               </div>
 
+{allowPriceVisibility && (
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground">Preço por Litro</p>
                 <p className="text-sm font-semibold">
@@ -673,6 +681,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                   })()}
                 </p>
               </div>
+              )}
 
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground">Descrição</p>

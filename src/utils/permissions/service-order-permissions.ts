@@ -70,13 +70,11 @@ export function getVisibleServiceOrderTypes(sectorPrivilege: SECTOR_PRIVILEGES |
       ];
 
     case SECTOR_PRIVILEGES.FINANCIAL:
-      // Financial sees: ALL service orders (same as commercial)
+      // Financial sees: COMMERCIAL, LOGISTIC, FINANCIAL (not PRODUCTION, ARTWORK)
       return [
-        SERVICE_ORDER_TYPE.PRODUCTION,
-        SERVICE_ORDER_TYPE.FINANCIAL,
         SERVICE_ORDER_TYPE.COMMERCIAL,
         SERVICE_ORDER_TYPE.LOGISTIC,
-        SERVICE_ORDER_TYPE.ARTWORK,
+        SERVICE_ORDER_TYPE.FINANCIAL,
       ];
 
     case SECTOR_PRIVILEGES.LOGISTIC:

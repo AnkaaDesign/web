@@ -26,6 +26,8 @@ export function BorrowUserSelector({ control, disabled, selectedUserId, initialU
   }, [initialUser?.id]);
 
   // Async query function for Combobox with pagination
+  // Filter: isActive: true includes all active users regardless of status
+  // (includes dismissed third-party workers who still have isActive: true)
   const queryFn = useCallback(async (searchTerm: string, page: number = 1) => {
     const pageSize = 50;
     const response = await getUsers({
@@ -42,10 +44,23 @@ export function BorrowUserSelector({ control, disabled, selectedUserId, initialU
         } : {}),
       },
       orderBy: { name: "asc" },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        cpf: true,
+        status: true,
+        isActive: true,
         position: {
-          include: {
-            sector: true,
+          select: {
+            id: true,
+            name: true,
+            sector: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },

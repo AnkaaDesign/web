@@ -86,8 +86,8 @@ interface NotificationPreferences {
     sector: NotificationEventPreference;
     // Artwork
     artworks: NotificationEventPreference;
-    // Negotiation
-    negotiatingWith: NotificationEventPreference;
+    // Representatives
+    representatives: NotificationEventPreference;
     // Production
     paint: NotificationEventPreference;
     logoPaints: NotificationEventPreference;
@@ -105,9 +105,9 @@ interface NotificationPreferences {
   service_order: {
     created: NotificationEventPreference;
     assigned: NotificationEventPreference;
-    "assigned.updated": NotificationEventPreference;
-    "my.updated": NotificationEventPreference;
-    "my.completed": NotificationEventPreference;
+    assigned_updated: NotificationEventPreference;
+    my_updated: NotificationEventPreference;
+    my_completed: NotificationEventPreference;
   };
   stock: {
     low: NotificationEventPreference;
@@ -162,8 +162,8 @@ const notificationPreferencesSchema = z.object({
     sector: channelSchema,
     // Artwork
     artworks: channelSchema,
-    // Negotiation
-    negotiatingWith: channelSchema,
+    // Representatives
+    representatives: channelSchema,
     // Production
     paint: channelSchema,
     logoPaints: channelSchema,
@@ -181,9 +181,9 @@ const notificationPreferencesSchema = z.object({
   service_order: z.object({
     created: channelSchema,
     assigned: channelSchema,
-    "assigned.updated": channelSchema,
-    "my.updated": channelSchema,
-    "my.completed": channelSchema,
+    assigned_updated: channelSchema,
+    my_updated: channelSchema,
+    my_completed: channelSchema,
   }),
   stock: z.object({
     low: channelSchema,
@@ -401,8 +401,8 @@ const TASK_EVENT_ALLOWED_SECTORS: Record<string, SectorPrivilege[]> = {
   sector: ["ADMIN", "PRODUCTION", "FINANCIAL", "LOGISTIC"],
   // artworks: ADMIN, PRODUCTION, DESIGNER, COMMERCIAL
   artworks: ["ADMIN", "PRODUCTION", "DESIGNER", "COMMERCIAL"],
-  // negotiatingWith: ADMIN, PRODUCTION, FINANCIAL, LOGISTIC
-  negotiatingWith: ["ADMIN", "PRODUCTION", "FINANCIAL", "LOGISTIC"],
+  // representatives: ADMIN, PRODUCTION, FINANCIAL, LOGISTIC
+  representatives: ["ADMIN", "PRODUCTION", "FINANCIAL", "LOGISTIC"],
   // paint: ADMIN, PRODUCTION, WAREHOUSE
   paint: ["ADMIN", "PRODUCTION", "WAREHOUSE"],
   // logoPaints: ADMIN, PRODUCTION, WAREHOUSE
@@ -419,13 +419,12 @@ const SERVICE_ORDER_EVENT_ALLOWED_SECTORS: Record<string, SectorPrivilege[]> = {
   created: ["ADMIN"],
   // assigned: All sectors that can access service orders (when assigned to them)
   assigned: [],
-  // assigned.updated: All sectors (when a service order assigned to them is updated)
-  "assigned.updated": [],
-  // status.changed: Removed - covered by assigned.updated and my.updated
-  // my.updated: All sectors (when a service order they created is updated)
-  "my.updated": [],
-  // my.completed: All sectors (when a service order they created is completed)
-  "my.completed": [],
+  // assigned_updated: All sectors (when a service order assigned to them is updated)
+  assigned_updated: [],
+  // my_updated: All sectors (when a service order they created is updated)
+  my_updated: [],
+  // my_completed: All sectors (when a service order they created is completed)
+  my_completed: [],
 };
 
 /**
@@ -493,7 +492,7 @@ const notificationSections: NotificationSection[] = [
       // Artwork - with mandatory channels
       { key: "artworks", label: "Atualização de Arte", description: "Quando arquivos de arte são adicionados/removidos", mandatoryChannels: ["IN_APP", "PUSH"] },
       // Negotiation - optional
-      { key: "negotiatingWith", label: "Negociação", description: "Quando o contato de negociação é alterado", mandatoryChannels: [] },
+      { key: "representatives", label: "Representantes", description: "Quando os representantes da tarefa são alterados", mandatoryChannels: [] },
       // Production - optional
       { key: "paint", label: "Pintura Geral", description: "Quando a pintura geral é definida ou alterada", mandatoryChannels: [] },
       { key: "logoPaints", label: "Pinturas do Logotipo", description: "Quando as cores do logotipo são alteradas", mandatoryChannels: [] },
@@ -521,9 +520,9 @@ const notificationSections: NotificationSection[] = [
     events: [
       { key: "created", label: "Nova Ordem de Serviço", description: "Quando uma nova ordem de serviço é criada", mandatoryChannels: ["IN_APP", "PUSH"] },
       { key: "assigned", label: "Atribuída a Mim", description: "Quando uma ordem de serviço é atribuída a você", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
-      { key: "assigned.updated", label: "Atribuída a Mim Atualizada", description: "Quando uma ordem de serviço atribuída a você é atualizada", mandatoryChannels: ["IN_APP", "PUSH"] },
-      { key: "my.updated", label: "Que Criei Atualizada", description: "Quando uma ordem de serviço que você criou é atualizada", mandatoryChannels: ["IN_APP", "PUSH"] },
-      { key: "my.completed", label: "Que Criei Concluída", description: "Quando uma ordem de serviço que você criou é concluída", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
+      { key: "assigned_updated", label: "Atribuída a Mim Atualizada", description: "Quando uma ordem de serviço atribuída a você é atualizada", mandatoryChannels: ["IN_APP", "PUSH"] },
+      { key: "my_updated", label: "Que Criei Atualizada", description: "Quando uma ordem de serviço que você criou é atualizada", mandatoryChannels: ["IN_APP", "PUSH"] },
+      { key: "my_completed", label: "Que Criei Concluída", description: "Quando uma ordem de serviço que você criou é concluída", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
     ],
   },
   {
@@ -596,54 +595,54 @@ const createDefaultPreference = (
 const defaultPreferences: NotificationPreferencesFormData = {
   task: {
     // Lifecycle
-    created: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
-    status: createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
-    finishedAt: createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
-    overdue: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    created: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    status: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
+    finishedAt: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
+    overdue: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH", "WHATSAPP"]),
     // Dates
-    term: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
-    deadline: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
-    forecastDate: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    term: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    deadline: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    forecastDate: createDefaultPreference(["IN_APP"], []),
     // Basic info
-    details: createDefaultPreference(["IN_APP", "EMAIL"], []),
-    serialNumber: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    details: createDefaultPreference(["IN_APP"], []),
+    serialNumber: createDefaultPreference(["IN_APP"], []),
     // Assignment
-    sector: createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
+    sector: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
     // Artwork
-    artworks: createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
-    // Negotiation
-    negotiatingWith: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    artworks: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
+    // Representatives
+    representatives: createDefaultPreference(["IN_APP"], []),
     // Production
-    paint: createDefaultPreference(["IN_APP", "EMAIL"], []),
-    logoPaints: createDefaultPreference(["IN_APP", "EMAIL"], []),
-    observation: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    paint: createDefaultPreference(["IN_APP"], []),
+    logoPaints: createDefaultPreference(["IN_APP"], []),
+    observation: createDefaultPreference(["IN_APP"], []),
     // Financial
-    commission: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    commission: createDefaultPreference(["IN_APP"], []),
   },
   order: {
     created: createDefaultPreference(["IN_APP"], []),
-    status: createDefaultPreference(["IN_APP", "EMAIL"], []),
-    fulfilled: createDefaultPreference(["IN_APP", "EMAIL"], []),
-    cancelled: createDefaultPreference(["IN_APP", "EMAIL"], []),
-    overdue: createDefaultPreference(["IN_APP", "EMAIL", "PUSH"], []),
+    status: createDefaultPreference(["IN_APP"], []),
+    fulfilled: createDefaultPreference(["IN_APP"], []),
+    cancelled: createDefaultPreference(["IN_APP"], []),
+    overdue: createDefaultPreference(["IN_APP", "PUSH"], []),
   },
   service_order: {
     created: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
-    assigned: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
-    "assigned.updated": createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
-    "my.updated": createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
-    "my.completed": createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    assigned: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    assigned_updated: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
+    my_updated: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
+    my_completed: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH", "WHATSAPP"]),
   },
   stock: {
-    low: createDefaultPreference(["IN_APP", "EMAIL"], []),
-    out: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    low: createDefaultPreference(["IN_APP"], []),
+    out: createDefaultPreference(["IN_APP"], []),
     restock: createDefaultPreference(["IN_APP"], []),
   },
   cut: {
     created: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP"]),
     started: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP"]),
     completed: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP"]),
-    request: createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
+    request: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
   },
   ppe: {
     requested: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
@@ -652,15 +651,15 @@ const defaultPreferences: NotificationPreferencesFormData = {
     delivered: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
   },
   system: {
-    maintenance: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    maintenance: createDefaultPreference(["IN_APP"], []),
     update: createDefaultPreference(["IN_APP"], []),
-    security: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    security: createDefaultPreference(["IN_APP"], []),
   },
   vacation: {
     requested: createDefaultPreference(["IN_APP"], []),
-    approved: createDefaultPreference(["IN_APP", "EMAIL", "PUSH"], []),
-    rejected: createDefaultPreference(["IN_APP", "EMAIL", "PUSH"], []),
-    reminder: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    approved: createDefaultPreference(["IN_APP", "PUSH"], []),
+    rejected: createDefaultPreference(["IN_APP", "PUSH"], []),
+    reminder: createDefaultPreference(["IN_APP"], []),
   },
 };
 

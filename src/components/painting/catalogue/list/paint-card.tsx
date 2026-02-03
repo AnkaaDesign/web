@@ -14,6 +14,7 @@ import type { PaintGetManyFormData } from "../../../../schemas";
 import { usePaintSelection } from "./paint-selection-context";
 import { useAuth } from "../../../../contexts/auth-context";
 import { cn } from "@/lib/utils";
+import { canEditPaints, canDeletePaints } from "../../../../utils/permissions/entity-permissions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,7 +49,7 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
   const selected = isSelected(paint.id);
 
   // Check if user can navigate to paint catalogue detail page
-  // Allowed roles: ADMIN, LOGISTIC, COMMERCIAL, FINANCIAL, WAREHOUSE, and PRODUCTION team leaders
+  // Allowed roles: ADMIN, LOGISTIC, COMMERCIAL, FINANCIAL, WAREHOUSE, DESIGNER, and PRODUCTION team leaders
   const isTeamLeader = Boolean(user?.managedSector?.id);
   const userPrivilege = user?.sector?.privileges;
   const canViewPaintDetails = userPrivilege === SECTOR_PRIVILEGES.ADMIN ||
@@ -56,7 +57,12 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
     userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
     userPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
     userPrivilege === SECTOR_PRIVILEGES.WAREHOUSE ||
+    userPrivilege === SECTOR_PRIVILEGES.DESIGNER ||
     (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader);
+
+  // Check if user can edit/delete paints (only WAREHOUSE and ADMIN)
+  const canEdit = canEditPaints(user);
+  const canDelete = canDeletePaints(user);
 
   // Context menu state
   const [contextMenu, setContextMenu] = React.useState<{
@@ -89,8 +95,8 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
   };
   const codeOverlayStyle = getCodeOverlayStyle();
 
-  // Formula and task counts
-  const formulaCount = paint.formulas?.length || 0;
+  // Formula and task counts - use _count for performance (avoids fetching full data)
+  const formulaCount = paint._count?.formulas || 0;
   const taskCount = (paint._count?.logoTasks || 0) + (paint._count?.generalPaintings || 0);
 
   // Handle edit action
@@ -378,17 +384,23 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            Editar
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              Editar
+            </DropdownMenuItem>
+          )}
 
-          <DropdownMenuSeparator />
+          {canDelete && (
+            <>
+              <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive">
-            <IconTrash className="mr-2 h-4 w-4" />
-            Excluir
-          </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive">
+                <IconTrash className="mr-2 h-4 w-4" />
+                Excluir
+              </DropdownMenuItem>
+            </>
+          )}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
 

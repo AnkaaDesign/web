@@ -46,6 +46,7 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
   }, [initialUser]);
 
   // Async query function for the combobox
+  // Filter by isActive: true and specific statuses for admin user selection
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
     try {
       const queryParams: any = {
@@ -58,6 +59,10 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
         orderBy: { name: "asc" },
         page: page,
         take: 50,
+        select: {
+          id: true,
+          name: true,
+        },
       };
 
       // Only add searchingFor if there's a search term

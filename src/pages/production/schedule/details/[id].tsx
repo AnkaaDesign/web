@@ -191,6 +191,8 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
   }, []);
 
   // Attach wheel event listener with passive: false to prevent page scroll
+  // Note: We depend on `layouts` because the container ref isn't available until layouts load
+  // (component returns null while loading, so the ref doesn't exist yet)
   useEffect(() => {
     const container = zoomContainerRef.current;
     if (!container) return;
@@ -199,7 +201,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     return () => {
       container.removeEventListener('wheel', handleWheelZoom);
     };
-  }, [handleWheelZoom]);
+  }, [handleWheelZoom, layouts]);
 
   // Pan handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -935,7 +937,7 @@ export const TaskDetailsPage = () => {
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
   );
 
-  // Check if user can view restricted fields (forecastDate, negotiatingWith) - ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER only
+  // Check if user can view restricted fields (forecastDate, representatives) - ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER only
   const canViewRestrictedFields = canViewArtworkBadges;
 
   // Get visible service order types based on user's sector privilege

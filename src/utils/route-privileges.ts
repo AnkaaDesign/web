@@ -101,10 +101,10 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/meu-pessoal": "TEAM_LEADER",
 
   // Pintura - Warehouse operations (PRODUCTION excluded from paint catalog)
-  "/pintura": ["WAREHOUSE", "DESIGNER", "ADMIN"],
-  "/pintura/catalogo": ["WAREHOUSE", "DESIGNER", "ADMIN", "COMMERCIAL"], // PRODUCTION excluded
+  "/pintura": ["WAREHOUSE", "DESIGNER", "LOGISTIC", "ADMIN"],
+  "/pintura/catalogo": ["WAREHOUSE", "DESIGNER", "ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION"],
   // NOTE: /pintura/catalogo-basico privileges defined using routes.catalog.root on line 193 to avoid duplication
-  "/pintura/catalogo/detalhes/:id": ["WAREHOUSE", "DESIGNER", "ADMIN", "COMMERCIAL"], // Paint detail pages - PRODUCTION excluded
+  "/pintura/catalogo/detalhes/:id": ["WAREHOUSE", "DESIGNER", "ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION"],
   "/pintura/catalogo/editar/:id": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can edit paints
   "/pintura/catalogo/cadastrar": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can create paints
   "/pintura/producoes": ["PRODUCTION", "WAREHOUSE", "ADMIN"], // Designer excluded from paint productions
@@ -191,9 +191,9 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/human-resources/employees/create": "ADMIN", // Employee creation requires admin
   "/human-resources/vacations": "HUMAN_RESOURCES",
 
-  // Catalog routes (view-only for designers, commercial, team leaders - NOTE: uses same details path as painting.catalog, so privileges defined on line 87)
+  // Catalog routes (view-only for designers, commercial, logistic, team leaders - NOTE: uses same details path as painting.catalog, so privileges defined on line 87)
   // Team leaders check at component level via isTeamLeader()
-  [routes.catalog.root]: ["DESIGNER", "COMMERCIAL", "TEAM_LEADER", "ADMIN"],
+  [routes.catalog.root]: ["DESIGNER", "COMMERCIAL", "LOGISTIC", "TEAM_LEADER", "ADMIN"],
   // [routes.catalog.details(":id")]: "DESIGNER", // REMOVED: Conflicts with painting.catalog.details (same path), using hardcoded entry on line 87 instead
 
   // Maintenance routes (maintenance access for technicians and warehouse)
@@ -216,7 +216,7 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   // Note: Specific routes for /administracao/clientes are defined above, wildcards won't override them
   "/administracao/*": "ADMIN",
   [`${routes.inventory.root}/*`]: "WAREHOUSE",
-  "/pintura/*": ["WAREHOUSE", "DESIGNER", "COMMERCIAL", "TEAM_LEADER", "ADMIN"], // PRODUCTION excluded from paint routes
+  "/pintura/*": ["WAREHOUSE", "DESIGNER", "COMMERCIAL", "LOGISTIC", "TEAM_LEADER", "ADMIN"], // PRODUCTION excluded from paint routes
   [`${routes.production.root}/*`]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL"], // DESIGNER, FINANCIAL, LOGISTIC, PLOTTING have read access to production routes
   "/recursos-humanos/*": "HUMAN_RESOURCES",
   "/human-resources/*": "HUMAN_RESOURCES",

@@ -24,12 +24,24 @@ export function CollaboratorSelect({ control, disabled, required, initialCollabo
   }, [initialCollaborator?.id]);
 
   // Memoize queryFn callback
+  // Filter: isActive: true includes all active users regardless of status
   const queryFn = useCallback(async (search: string, page: number = 1) => {
     const queryParams: any = {
       page,
       take: 50,
       where: { isActive: true },
-      include: { position: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        status: true,
+        position: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     };
 
     if (search && search.trim()) {

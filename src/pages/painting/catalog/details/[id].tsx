@@ -3,9 +3,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { IconPaint, IconTrash, IconRefresh, IconEdit } from "@tabler/icons-react";
 
 import { usePaint, usePaintMutations } from "../../../../hooks";
-import { routes } from "../../../../constants";
+import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditPaints } from "@/utils/permissions/entity-permissions";
+import { hasAnyPrivilege, isTeamLeader } from "@/utils";
 import { PAGE_SPACING } from "@/lib/layout-constants";
 import {
   AlertDialog,
@@ -30,6 +31,40 @@ export default function PaintDetailsPage() {
   const { user } = useAuth();
   const canEdit = canEditPaints(user);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // Determine which catalogue link to use based on user privileges
+  // Full catalogue is only for WAREHOUSE and ADMIN
+  // Basic catalogue is for everyone else (DESIGNER, COMMERCIAL, LOGISTIC, FINANCIAL, PRODUCTION team leader)
+  const shouldUseFullCatalogue = hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+
+  // Use full catalogue only for WAREHOUSE and ADMIN, everyone else uses basic catalogue
+  const catalogueLink = shouldUseFullCatalogue
+    ? routes.painting.catalog.root
+    : routes.catalog.root;
+
+  // Get user privilege for section visibility
+  const userPrivilege = user?.sector?.privileges;
+
+  // Only WAREHOUSE and ADMIN can see production history
+  const canSeeProductionHistory = userPrivilege === SECTOR_PRIVILEGES.WAREHOUSE ||
+    userPrivilege === SECTOR_PRIVILEGES.ADMIN;
+
+  // Only WAREHOUSE, ADMIN, and PRODUCTION team leaders can navigate to formula details
+  const canNavigateToFormulas = userPrivilege === SECTOR_PRIVILEGES.WAREHOUSE ||
+    userPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+    (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader(user));
+
+  // Only COMMERCIAL, ADMIN, FINANCIAL can see prices (WAREHOUSE excluded)
+  const canSeePrices = userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
+    userPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+    userPrivilege === SECTOR_PRIVILEGES.FINANCIAL;
+
+  // Only WAREHOUSE and ADMIN can see changelog
+  const canSeeChangelog = userPrivilege === SECTOR_PRIVILEGES.WAREHOUSE ||
+    userPrivilege === SECTOR_PRIVILEGES.ADMIN;
 
   const {
     data: response,
@@ -97,7 +132,7 @@ export default function PaintDetailsPage() {
 
   const { deleteMutation } = usePaintMutations({
     onDeleteSuccess: () => {
-      navigate(routes.painting.catalog.root);
+      navigate(catalogueLink);
     },
   });
 
@@ -118,7 +153,7 @@ export default function PaintDetailsPage() {
         <ErrorCard
           title={isNetworkError ? "Erro de conexão" : "Tinta não encontrada"}
           description={isNetworkError ? "Não foi possível carregar os dados da tinta. Verifique sua conexão." : "A tinta que você está procurando não existe ou foi excluída."}
-          onRetry={isNetworkError ? refetch : () => navigate(routes.painting.catalog.root)}
+          onRetry={isNetworkError ? refetch : () => navigate(catalogueLink)}
         />
       </div>
     );
@@ -172,7 +207,7 @@ export default function PaintDetailsPage() {
       breadcrumbs={[
         { label: "Início", href: routes.home },
         { label: "Pintura", href: routes.painting.root },
-        { label: "Catálogo", href: routes.painting.catalog.root },
+        { label: "Catálogo", href: catalogueLink },
         { label: paint.name },
       ]}
         className="flex-shrink-0"
@@ -183,7 +218,7 @@ export default function PaintDetailsPage() {
           {/* Mobile: Single column */}
           <div className="block lg:hidden space-y-4">
             <PaintSpecificationsCard paint={paint} className="h-auto" />
-            <PaintFormulasCard paint={paint} className="h-auto" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} onFormulaDeleted={refetch} />
+            <PaintFormulasCard paint={paint} className="h-auto" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} onFormulaDeleted={refetch} canNavigate={canNavigateToFormulas} />
             {paint.paintGrounds && paint.paintGrounds.length > 0 && (
               <GroundPaintsCard paint={paint} className="h-auto" />
             )}
@@ -197,7 +232,7 @@ export default function PaintDetailsPage() {
 
               {/* Column 2: Formulas + Fundos Recomendados */}
               <div className="flex flex-col h-full gap-4">
-                <PaintFormulasCard paint={paint} className="flex-1 min-h-0" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} onFormulaDeleted={refetch} />
+                <PaintFormulasCard paint={paint} className="flex-1 min-h-0" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} onFormulaDeleted={refetch} canNavigate={canNavigateToFormulas} />
                 {paint.paintGrounds && paint.paintGrounds.length > 0 && (
                   <GroundPaintsCard paint={paint} className="h-[200px] flex-shrink-0" />
                 )}
@@ -218,15 +253,19 @@ export default function PaintDetailsPage() {
           <PaintTasksTable paint={paint} />
         </div>
 
-        {/* Row 4: Production History - Full Width */}
-        <div className="animate-in fade-in-50 duration-900 transition-all">
-          <PaintProductionHistoryCard paint={paint} className="h-auto lg:h-[550px]" />
-        </div>
+        {/* Row 4: Production History - Full Width (only for WAREHOUSE and ADMIN) */}
+        {canSeeProductionHistory && (
+          <div className="animate-in fade-in-50 duration-900 transition-all">
+            <PaintProductionHistoryCard paint={paint} className="h-auto lg:h-[550px]" />
+          </div>
+        )}
 
-        {/* Row 5: Changelog - Full Width */}
-        <div className="animate-in fade-in-50 duration-1000 transition-all">
-          <PaintWithFormulasChangelogHistory paint={paint} className="h-auto lg:h-[600px]" />
-        </div>
+        {/* Row 5: Changelog - Full Width (only for WAREHOUSE and ADMIN) */}
+        {canSeeChangelog && (
+          <div className="animate-in fade-in-50 duration-1000 transition-all">
+            <PaintWithFormulasChangelogHistory paint={paint} className="h-auto lg:h-[600px]" />
+          </div>
+        )}
       </div>
 
         {/* Delete Confirmation Dialog */}

@@ -319,9 +319,9 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
       include: {
         paintType: true,
         paintBrand: true,
-        formulas: true,
         _count: {
           select: {
+            formulas: true,
             logoTasks: true,
             generalPaintings: true,
           },

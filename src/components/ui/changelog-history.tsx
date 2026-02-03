@@ -2368,7 +2368,7 @@ export function ChangelogHistory({
         SECTOR_PRIVILEGES.PRODUCTION,
       ]);
 
-    // Check if user can view restricted fields (forecastDate, negotiatingWith, invoiceTo)
+    // Check if user can view restricted fields (forecastDate, representatives)
     // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER can see these
     const canViewRestrictedFields =
       user &&
@@ -2378,6 +2378,17 @@ export function ChangelogHistory({
         SECTOR_PRIVILEGES.COMMERCIAL,
         SECTOR_PRIVILEGES.LOGISTIC,
         SECTOR_PRIVILEGES.DESIGNER,
+      ]);
+
+    // Check if user can view invoiceTo field - DESIGNER cannot see it
+    // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC can see invoiceTo
+    const canViewInvoiceToField =
+      user &&
+      hasAnyPrivilege(user, [
+        SECTOR_PRIVILEGES.ADMIN,
+        SECTOR_PRIVILEGES.FINANCIAL,
+        SECTOR_PRIVILEGES.COMMERCIAL,
+        SECTOR_PRIVILEGES.LOGISTIC,
       ]);
 
     // Define sensitive fields that should not be displayed
@@ -2390,6 +2401,11 @@ export function ChangelogHistory({
       "token",
       "apiKey",
       "secret",
+    ];
+
+    // Define internal/system fields that should be hidden from changelog (ordering, internal state, etc.)
+    const hiddenFields = [
+      "colorOrder",
     ];
 
     // Define financial/document fields that should only be visible to FINANCIAL and ADMIN
@@ -2408,7 +2424,10 @@ export function ChangelogHistory({
     ];
 
     // Define restricted fields that should only be visible to privileged users (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER)
-    const restrictedFields = ["forecastDate", "negotiatingWith", "invoiceTo", "invoiceToId"];
+    const restrictedFields = ["forecastDate", "representatives", "representativeIds", "negotiatingWith"]; // invoiceTo removed - has its own check
+
+    // Define invoiceTo fields - DESIGNER cannot see these (only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC)
+    const invoiceToFields = ["invoiceTo", "invoiceToId"];
 
     // Filter out sensitive field changes and restricted fields for non-privileged users
     const filteredLogs = logs.filter((log) => {
@@ -2421,6 +2440,15 @@ export function ChangelogHistory({
       if (
         sensitiveFields.some((sensitive) =>
           fieldLower.includes(sensitive.toLowerCase()),
+        )
+      ) {
+        return false;
+      }
+
+      // Always filter out hidden/internal fields (ordering, internal state, etc.)
+      if (
+        hiddenFields.some((hidden) =>
+          fieldLower.includes(hidden.toLowerCase()),
         )
       ) {
         return false;
@@ -2441,11 +2469,21 @@ export function ChangelogHistory({
         return false;
       }
 
-      // Filter out restricted fields (forecastDate, negotiatingWith, invoiceTo) for non-privileged users
+      // Filter out restricted fields (forecastDate, representatives) for non-privileged users
       if (
         !canViewRestrictedFields &&
         restrictedFields.some((restricted) =>
           fieldLower.includes(restricted.toLowerCase()),
+        )
+      ) {
+        return false;
+      }
+
+      // Filter out invoiceTo fields - DESIGNER cannot see (only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC)
+      if (
+        !canViewInvoiceToField &&
+        invoiceToFields.some((invoiceTo) =>
+          fieldLower.includes(invoiceTo.toLowerCase()),
         )
       ) {
         return false;

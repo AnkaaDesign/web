@@ -1,9 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useExternalWithdrawal, useExternalWithdrawalStatusMutations, useExternalWithdrawalMutations } from "../../../../hooks";
-import { routes, EXTERNAL_WITHDRAWAL_STATUS, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
+import { routes, EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { Button } from "@/components/ui/button";
 import type { Icon as TablerIcon } from "@tabler/icons-react";
-import { IconAlertTriangle, IconPackage, IconRefresh, IconEdit, IconCheck, IconLoader2 } from "@tabler/icons-react";
+import { IconAlertTriangle, IconPackage, IconRefresh, IconEdit, IconCheck, IconLoader2, IconCurrencyReal, IconTruckDelivery } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/page-header";
 import { ExternalWithdrawalInfoCard, ExternalWithdrawalItemsCard } from "@/components/inventory/external-withdrawal/detail";
@@ -35,7 +35,7 @@ const ExternalWithdrawalDetailsPage = () => {
   const navigate = useNavigate();
   const [showActionDialog, setShowActionDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [actionType, setActionType] = useState<"FULL_RETURN" | null>(null);
+  const [actionType, setActionType] = useState<"FULL_RETURN" | "CHARGE" | "DELIVER" | null>(null);
   const [actionNotes, setActionNotes] = useState("");
   const { user } = useAuth();
   const canManageWarehouse = canEditExternalWithdrawals(user);
@@ -132,7 +132,7 @@ const ExternalWithdrawalDetailsPage = () => {
     }
   };
 
-  const handleAction = (type: "FULL_RETURN") => {
+  const handleAction = (type: "FULL_RETURN" | "CHARGE" | "DELIVER") => {
     setActionType(type);
     setActionNotes("");
     setShowActionDialog(true);
@@ -148,6 +148,12 @@ const ExternalWithdrawalDetailsPage = () => {
         case "FULL_RETURN":
           await statusMutations.markAsFullyReturned.mutateAsync({ id: withdrawal.id, data });
           break;
+        case "CHARGE":
+          await statusMutations.markAsCharged.mutateAsync({ id: withdrawal.id, data });
+          break;
+        case "DELIVER":
+          await statusMutations.markAsDelivered.mutateAsync({ id: withdrawal.id, data });
+          break;
       }
 
       setShowActionDialog(false);
@@ -160,7 +166,7 @@ const ExternalWithdrawalDetailsPage = () => {
   };
 
   const getActionConfig = (
-    type: "FULL_RETURN",
+    type: "FULL_RETURN" | "CHARGE" | "DELIVER",
   ): {
     label: string;
     icon: TablerIcon;
@@ -181,6 +187,26 @@ const ExternalWithdrawalDetailsPage = () => {
           confirmText: "Esta ação marcará todos os itens como devolvidos.",
           requiresNotes: false,
         };
+      case "CHARGE":
+        return {
+          label: "Cobrar",
+          icon: IconCurrencyReal as TablerIcon,
+          variant: "default" as const,
+          description: "Cobrar o valor dos itens",
+          confirmTitle: "Confirmar Cobrança",
+          confirmText: "Esta ação marcará a retirada como cobrada.",
+          requiresNotes: false,
+        };
+      case "DELIVER":
+        return {
+          label: "Marcar como Entregue",
+          icon: IconTruckDelivery as TablerIcon,
+          variant: "default" as const,
+          description: "Marcar como entregue (cortesia)",
+          confirmTitle: "Confirmar Entrega",
+          confirmText: "Esta ação marcará a retirada como entregue.",
+          requiresNotes: false,
+        };
     }
   };
 
@@ -199,8 +225,12 @@ const ExternalWithdrawalDetailsPage = () => {
     variant?: "default" | "outline";
   }> = [];
 
-  // Check if withdrawal can be edited (only pending and partially returned)
-  const canEdit = canManageWarehouse && [EXTERNAL_WITHDRAWAL_STATUS.PENDING, EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED].includes(withdrawal.status);
+  // Check if withdrawal can be edited (only pending and partially returned for RETURNABLE)
+  const editableStatuses = [EXTERNAL_WITHDRAWAL_STATUS.PENDING];
+  if (withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE) {
+    editableStatuses.push(EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED);
+  }
+  const canEdit = canManageWarehouse && editableStatuses.includes(withdrawal.status);
 
   // Build actions based on status
   const withdrawalActions: Array<{
@@ -211,31 +241,56 @@ const ExternalWithdrawalDetailsPage = () => {
     variant?: "default" | "outline" | "secondary" | "destructive" | "ghost" | "link";
   }> = [];
 
-  // Only show status actions for active or partially returned withdrawals
-  const canChangeStatus =
-    canManageWarehouse && ![EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED, EXTERNAL_WITHDRAWAL_STATUS.CHARGED, EXTERNAL_WITHDRAWAL_STATUS.CANCELLED].includes(withdrawal.status);
+  // Only show status actions for withdrawals that are not in a final state
+  const finalStatuses = [
+    EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED,
+    EXTERNAL_WITHDRAWAL_STATUS.CHARGED,
+    EXTERNAL_WITHDRAWAL_STATUS.LIQUIDATED,
+    EXTERNAL_WITHDRAWAL_STATUS.DELIVERED,
+    EXTERNAL_WITHDRAWAL_STATUS.CANCELLED,
+  ];
+  const canChangeStatus = canManageWarehouse && !finalStatuses.includes(withdrawal.status);
 
   if (canChangeStatus) {
-    if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING) {
-      withdrawalActions.push({
-        key: "full-return",
-        label: "Devolução Total",
-        icon: IconCheck,
-        onClick: () => handleAction("FULL_RETURN"),
-        variant: "default" as const,
-      });
-    } else if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED) {
-      withdrawalActions.push({
-        key: "full-return",
-        label: "Devolução Total",
-        icon: IconCheck,
-        onClick: () => handleAction("FULL_RETURN"),
-        variant: "default" as const,
-      });
+    // RETURNABLE type: Show "Devolução Total" action
+    if (withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE) {
+      if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING || withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED) {
+        withdrawalActions.push({
+          key: "full-return",
+          label: "Devolução Total",
+          icon: IconCheck,
+          onClick: () => handleAction("FULL_RETURN"),
+          variant: "default" as const,
+        });
+      }
+    }
+    // CHARGEABLE type: Show "Cobrar" action
+    else if (withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
+      if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING) {
+        withdrawalActions.push({
+          key: "charge",
+          label: "Cobrar",
+          icon: IconCurrencyReal,
+          onClick: () => handleAction("CHARGE"),
+          variant: "default" as const,
+        });
+      }
+    }
+    // COMPLIMENTARY type: Show "Marcar como Entregue" action
+    else if (withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY) {
+      if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING) {
+        withdrawalActions.push({
+          key: "deliver",
+          label: "Marcar como Entregue",
+          icon: IconTruckDelivery,
+          onClick: () => handleAction("DELIVER"),
+          variant: "default" as const,
+        });
+      }
     }
   }
 
-  const isActionLoading = statusMutations.markAsFullyReturned.isPending;
+  const isActionLoading = statusMutations.markAsFullyReturned.isPending || statusMutations.markAsCharged.isPending || statusMutations.markAsDelivered.isPending;
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>

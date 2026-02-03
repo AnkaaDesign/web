@@ -1,25 +1,29 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery } from '@tanstack/react-query';
 import {
   IconInfoCircle,
   IconLock,
-  IconBuilding
+  IconBuilding,
+  IconUser
 } from '@tabler/icons-react';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Combobox } from '@/components/ui/combobox';
-import { customerService } from '@/api-client/customer';
+import { getCustomers, quickCreateCustomer } from '@/api-client';
 import type { Representative } from '@/types/representative';
+import type { Customer } from '@/types/customer';
 import {
   REPRESENTATIVE_ROLE_LABELS,
   RepresentativeRole
 } from '@/types/representative';
 import { cn } from '@/lib/utils';
+import { CustomerLogoDisplay } from '@/components/ui/avatar-display';
+import { formatCNPJ } from '@/utils';
+import { useCnpjAutocomplete } from '@/hooks/use-cnpj-autocomplete';
 
 // Schema for representative form
 const representativeSchema = z.object({
@@ -38,6 +42,7 @@ type RepresentativeFormData = z.infer<typeof representativeSchema>;
 interface RepresentativeFormProps {
   mode: 'create' | 'edit';
   initialData?: Representative;
+  initialCustomer?: Customer; // Customer object for proper display in combobox
   onSubmit: (data: any) => void | Promise<void>;
   isSubmitting?: boolean;
   onFormStateChange?: (state: { isValid: boolean; isDirty: boolean }) => void;
@@ -46,27 +51,95 @@ interface RepresentativeFormProps {
 export function RepresentativeForm({
   mode,
   initialData,
+  initialCustomer,
   onSubmit,
   isSubmitting = false,
   onFormStateChange,
 }: RepresentativeFormProps) {
-  // Fetch customers for combobox
-  const { data: customersData } = useQuery({
-    queryKey: ['customers', 'all'],
-    queryFn: async () => {
-      const response = await customerService.getAll({ limit: 1000 });
-      return response.data;
-    },
-  });
+  // Use initialCustomer from props, or fall back to initialData.customer
+  const effectiveInitialCustomer = initialCustomer || initialData?.customer;
 
-  // Prepare customer options for combobox
-  const customerOptions = useMemo(() => {
-    if (!customersData) return [];
-    return customersData.map(customer => ({
-      value: customer.id,
-      label: customer.fantasyName || customer.name || customer.corporateName || '',
-    }));
-  }, [customersData]);
+  // State for customer creation
+  const [isCreatingCustomer, setIsCreatingCustomer] = React.useState(false);
+
+  // CNPJ autocomplete integration
+  const {
+    isLookingUp,
+    getCreateLabel,
+    buildCustomerData,
+    processInput,
+    reset: resetCnpjState,
+  } = useCnpjAutocomplete();
+
+  // Memoize initialOptions to prevent infinite loop
+  const initialCustomerOptions = useMemo(() =>
+    effectiveInitialCustomer ? [effectiveInitialCustomer] : [],
+    [effectiveInitialCustomer?.id]
+  );
+
+  // Memoize callbacks to prevent infinite loop
+  const getCustomerOptionLabel = useCallback((customer: Customer) => customer.fantasyName, []);
+  const getCustomerOptionValue = useCallback((customer: Customer) => customer.id, []);
+
+  // Search function for Customer Combobox
+  const searchCustomers = useCallback(async (
+    search: string,
+    page: number = 1,
+  ): Promise<{
+    data: Customer[];
+    hasMore: boolean;
+  }> => {
+    // Process input for CNPJ detection
+    processInput(search);
+
+    const params: any = {
+      orderBy: { fantasyName: "asc" },
+      page: page,
+      take: 50,
+      include: { logo: true },
+    };
+
+    // Only add search filter if there's a search term
+    if (search && search.trim()) {
+      params.searchingFor = search.trim();
+    }
+
+    try {
+      const response = await getCustomers(params);
+      const customers = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      return {
+        data: customers,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      return { data: [], hasMore: false };
+    }
+  }, [processInput]);
+
+  // Handle customer creation with CNPJ data support
+  const handleCreateCustomer = useCallback(async (searchText: string): Promise<Customer | undefined> => {
+    setIsCreatingCustomer(true);
+    try {
+      const customerData = buildCustomerData(searchText);
+      const result = await quickCreateCustomer(customerData);
+
+      if (result.success && result.data) {
+        resetCnpjState();
+        return result.data;
+      }
+    } catch (error) {
+      throw error;
+    } finally {
+      setIsCreatingCustomer(false);
+    }
+  }, [buildCustomerData, resetCnpjState]);
+
+  // Dynamic create label based on CNPJ lookup state
+  const dynamicCreateLabel = useCallback((value: string) => {
+    return getCreateLabel(value);
+  }, [getCreateLabel]);
 
   // Role options for combobox
   const roleOptions = useMemo(() => {
@@ -209,16 +282,62 @@ export function RepresentativeForm({
                   name="customerId"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Cliente</FormLabel>
+                      <FormLabel className="flex items-center gap-2">
+                        <IconUser className="h-4 w-4" />
+                        Cliente
+                      </FormLabel>
                       <FormControl>
-                        <Combobox
-                          options={customerOptions}
-                          value={field.value}
-                          onValueChange={field.onChange}
+                        <Combobox<Customer>
+                          value={field.value || ""}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            if (value) {
+                              resetCnpjState();
+                            }
+                          }}
                           placeholder="Selecione um cliente"
-                          searchPlaceholder="Buscar cliente..."
-                          emptyText="Nenhum cliente encontrado"
-                          disabled={isSubmitting}
+                          emptyText={isLookingUp ? "Buscando CNPJ..." : "Nenhum cliente encontrado"}
+                          searchPlaceholder="Pesquisar por nome ou CNPJ..."
+                          disabled={isSubmitting || isCreatingCustomer}
+                          async={true}
+                          allowCreate={true}
+                          createLabel={dynamicCreateLabel}
+                          onCreate={handleCreateCustomer}
+                          isCreating={isCreatingCustomer || isLookingUp}
+                          queryKey={["customers", "search", "representative-form"]}
+                          queryFn={searchCustomers}
+                          initialOptions={initialCustomerOptions}
+                          getOptionLabel={getCustomerOptionLabel}
+                          getOptionValue={getCustomerOptionValue}
+                          renderOption={(customer, isSelected) => (
+                            <div className="flex items-center gap-3">
+                              <CustomerLogoDisplay
+                                logo={customer.logo}
+                                customerName={customer.fantasyName}
+                                size="sm"
+                                shape="rounded"
+                                className="flex-shrink-0"
+                              />
+                              <div className="flex flex-col gap-1 min-w-0 flex-1">
+                                <div className="font-medium truncate">{customer.fantasyName}</div>
+                                <div className="flex items-center gap-2 text-sm truncate group-hover:text-white transition-colors">
+                                  {customer.corporateName && <span className="truncate">{customer.corporateName}</span>}
+                                  {customer.cnpj && (
+                                    <>
+                                      {customer.corporateName && <span>•</span>}
+                                      <span>{formatCNPJ(customer.cnpj)}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          loadMoreText="Carregar mais clientes"
+                          loadingMoreText="Carregando..."
+                          minSearchLength={0}
+                          pageSize={20}
+                          debounceMs={500}
+                          loadOnMount={false}
                           className="w-full"
                         />
                       </FormControl>

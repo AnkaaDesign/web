@@ -490,7 +490,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "clientes-cadastrar", title: "Cadastrar", icon: "plus", path: "/administracao/clientes/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
           { id: "clientes-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/clientes/detalhes/:id", isDynamic: true },
           { id: "clientes-editar", title: "Editar", icon: "edit", path: "/administracao/clientes/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
-          { id: "representantes", title: "Representantes", icon: "users", path: "/representatives", requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "representantes", title: "Representantes", icon: "users", path: "/representatives", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
         ],
       },
       {
@@ -819,13 +819,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
   },
   {
-    id: "representantes-financeiro",
-    title: "Representantes",
-    icon: "users",
-    path: "/representatives",
-    requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
-  },
-  {
     id: "historico-financeiro",
     title: "Histórico",
     icon: "history",
@@ -857,17 +850,18 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
   },
   {
+    id: "catalogo-logistic",
+    title: "Catálogo",
+    icon: "palette",
+    path: "/pintura/catalogo-basico",
+    requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
+    children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo/detalhes/:id", isDynamic: true }],
+  },
+  {
     id: "clientes-logistic",
     title: "Clientes",
     icon: "users",
     path: "/administracao/clientes",
-    requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
-  },
-  {
-    id: "representantes-logistic",
-    title: "Representantes",
-    icon: "users",
-    path: "/representatives",
     requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
   },
   {

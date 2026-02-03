@@ -12,7 +12,16 @@ import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { FormInput } from "@/components/ui/form-input";
 import { PageHeader } from "@/components/ui/page-header";
-import { routes } from "@/constants";
+import {
+  routes,
+  SHIRT_SIZE_LABELS,
+  PANTS_SIZE_LABELS,
+  BOOT_SIZE_LABELS,
+  GLOVES_SIZE_LABELS,
+  MASK_SIZE_LABELS,
+  SLEEVES_SIZE_LABELS,
+  RAIN_BOOTS_SIZE_LABELS,
+} from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
 import { useCepLookup } from "@/hooks/use-cep-lookup";
 import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
@@ -397,43 +406,43 @@ export function ProfilePage() {
                     {user.ppeSize.shirts && (
                       <div>
                         <label className="text-sm font-medium">Camisa</label>
-                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.shirts}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{SHIRT_SIZE_LABELS[user.ppeSize.shirts]}</p>
                       </div>
                     )}
                     {user.ppeSize.pants && (
                       <div>
                         <label className="text-sm font-medium">Calça</label>
-                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.pants}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{PANTS_SIZE_LABELS[user.ppeSize.pants]}</p>
                       </div>
                     )}
                     {user.ppeSize.boots && (
                       <div>
                         <label className="text-sm font-medium">Bota</label>
-                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.boots}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{BOOT_SIZE_LABELS[user.ppeSize.boots]}</p>
                       </div>
                     )}
                     {user.ppeSize.gloves && (
                       <div>
                         <label className="text-sm font-medium">Luvas</label>
-                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.gloves}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{GLOVES_SIZE_LABELS[user.ppeSize.gloves]}</p>
                       </div>
                     )}
                     {user.ppeSize.mask && (
                       <div>
                         <label className="text-sm font-medium">Máscara</label>
-                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.mask}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{MASK_SIZE_LABELS[user.ppeSize.mask]}</p>
                       </div>
                     )}
                     {user.ppeSize.sleeves && (
                       <div>
                         <label className="text-sm font-medium">Mangas</label>
-                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.sleeves}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{SLEEVES_SIZE_LABELS[user.ppeSize.sleeves]}</p>
                       </div>
                     )}
                     {user.ppeSize.rainBoots && (
                       <div>
                         <label className="text-sm font-medium">Galocha</label>
-                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.rainBoots}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{RAIN_BOOTS_SIZE_LABELS[user.ppeSize.rainBoots]}</p>
                       </div>
                     )}
                   </CardContent>

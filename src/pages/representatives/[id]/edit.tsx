@@ -115,6 +115,7 @@ export default function EditRepresentativePage() {
         <RepresentativeForm
           mode="edit"
           initialData={representative}
+          initialCustomer={representative?.customer}
           onSubmit={handleSubmit}
           isSubmitting={updateMutation.isPending}
           onFormStateChange={setFormState}

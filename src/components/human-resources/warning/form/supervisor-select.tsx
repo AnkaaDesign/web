@@ -24,7 +24,7 @@ export function SupervisorSelect({ control, disabled, required, initialSuperviso
   const getOptionLabel = useCallback((user: User) => user.name, []);
   const getOptionValue = useCallback((user: User) => user.id, []);
 
-  // Memoize queryFn
+  // Memoize queryFn - filter by isActive: true and sector privileges for supervisors
   const queryFn = useCallback(async (search: string, page: number = 1) => {
     const queryParams: any = {
       page,
@@ -37,7 +37,22 @@ export function SupervisorSelect({ control, disabled, required, initialSuperviso
           },
         },
       },
-      include: { position: true, sector: true },
+      select: {
+        id: true,
+        name: true,
+        position: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        sector: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     };
 
     if (search && search.trim()) {

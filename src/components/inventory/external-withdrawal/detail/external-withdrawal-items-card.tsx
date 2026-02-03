@@ -43,6 +43,9 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
   // Check if withdrawal allows inline editing
   const canEditItems = withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE && [EXTERNAL_WITHDRAWAL_STATUS.PENDING, EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED].includes(withdrawal.status);
 
+  // Check withdrawal type for conditional rendering
+  const isReturnable = withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE;
+
   // Check if there are unsaved changes
   const hasChanges = useMemo(() => {
     return Object.keys(itemChanges).length > 0;
@@ -221,6 +224,21 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
   // Get row status for external withdrawal items
   const getRowStatus = useCallback(
     (item: ExternalWithdrawalItem) => {
+      // For non-returnable types, show status based on withdrawal status
+      if (!isReturnable) {
+        if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.DELIVERED) {
+          return "delivered";
+        } else if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.CHARGED) {
+          return "charged";
+        } else if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.LIQUIDATED) {
+          return "liquidated";
+        } else if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.CANCELLED) {
+          return "cancelled";
+        }
+        return "pending";
+      }
+
+      // For returnable types, show status based on returned quantities
       const current = getItemValue(item);
 
       if (itemChanges[item.id]) {
@@ -235,7 +253,7 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
         return "partial";
       }
     },
-    [itemChanges, getItemValue],
+    [itemChanges, getItemValue, isReturnable, withdrawal.status],
   );
 
   if (items.length === 0) {
@@ -272,7 +290,7 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
       </CardHeader>
       <CardContent className="pt-0 flex-1 space-y-6 pb-24">
         {/* Summary Statistics */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={cn("grid gap-4 grid-cols-1 sm:grid-cols-2", isReturnable ? "lg:grid-cols-4" : "lg:grid-cols-2")}>
           <div className="bg-muted/50 rounded-lg px-4 py-3">
             <div className="flex items-center gap-2 mb-1">
               <IconBoxMultiple className="h-4 w-4 text-muted-foreground" />
@@ -281,13 +299,15 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
             <span className="text-lg font-semibold text-foreground">{summary.totalWithdrawed.toLocaleString("pt-BR")}</span>
           </div>
 
-          <div className="bg-muted/50 rounded-lg px-4 py-3">
-            <div className="flex items-center gap-2 mb-1">
-              <IconCheck className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Quantidade Devolvida</span>
+          {isReturnable && (
+            <div className="bg-muted/50 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <IconCheck className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Quantidade Devolvida</span>
+              </div>
+              <span className="text-lg font-semibold text-foreground">{summary.totalReturned.toLocaleString("pt-BR")}</span>
             </div>
-            <span className="text-lg font-semibold text-foreground">{summary.totalReturned.toLocaleString("pt-BR")}</span>
-          </div>
+          )}
 
           <div className="bg-muted/50 rounded-lg px-4 py-3">
             <div className="flex items-center gap-2 mb-1">
@@ -297,18 +317,20 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
             <span className="text-lg font-semibold text-foreground">{formatCurrency(summary.totalValue)}</span>
           </div>
 
-          <div className="bg-muted/50 rounded-lg px-4 py-3">
-            <div className="flex items-center gap-2 mb-1">
-              <IconCheck className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Progresso</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div className="bg-primary h-2 rounded-full transition-all duration-300" style={{ width: `${Math.min(100, summary.percentComplete)}%` }} />
+          {isReturnable && (
+            <div className="bg-muted/50 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <IconCheck className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Progresso</span>
               </div>
-              <span className="text-sm font-semibold text-foreground">{summary.percentComplete.toFixed(0)}%</span>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div className="bg-primary h-2 rounded-full transition-all duration-300" style={{ width: `${Math.min(100, summary.percentComplete)}%` }} />
+                </div>
+                <span className="text-sm font-semibold text-foreground">{summary.percentComplete.toFixed(0)}%</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Action Buttons */}
@@ -340,20 +362,22 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
           <Table>
             <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
               <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                  <div className="flex items-center justify-center h-full w-full px-2">
-                    <Checkbox
-                      checked={allSelected}
-                      onCheckedChange={handleSelectAll}
-                      aria-label="Select all items"
-                      className={cn("h-4 w-4", someSelected && "data-[state=checked]:bg-muted data-[state=checked]:text-muted-foreground ")}
-                      disabled={!canEditItems || items.length === 0}
-                    />
-                  </div>
-                </TableHead>
+                {isReturnable && (
+                  <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                    <div className="flex items-center justify-center h-full w-full px-2">
+                      <Checkbox
+                        checked={allSelected}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all items"
+                        className={cn("h-4 w-4", someSelected && "data-[state=checked]:bg-muted data-[state=checked]:text-muted-foreground ")}
+                        disabled={!canEditItems || items.length === 0}
+                      />
+                    </div>
+                  </TableHead>
+                )}
                 <TableHead>Item</TableHead>
                 <TableHead className="text-center">Qtd. Retirada</TableHead>
-                <TableHead className="text-center">Qtd. Devolvida</TableHead>
+                {isReturnable && <TableHead className="text-center">Qtd. Devolvida</TableHead>}
                 <TableHead className="text-right">Preço Unit.</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-center">Status</TableHead>
@@ -379,20 +403,25 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
                       rowStatus === "complete" && "bg-green-50/50 dark:bg-green-900/10",
                       rowStatus === "partial" && "bg-orange-50/50 dark:bg-orange-900/10",
                       rowStatus === "excess" && "bg-blue-50/50 dark:bg-blue-900/10",
+                      rowStatus === "delivered" && "bg-green-50/50 dark:bg-green-900/10",
+                      rowStatus === "charged" && "bg-blue-50/50 dark:bg-blue-900/10",
+                      rowStatus === "liquidated" && "bg-green-50/50 dark:bg-green-900/10",
                       isSelected && "bg-accent",
                     )}
                   >
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={(checked) => handleSelectItem(withdrawalItem.id, checked as boolean)}
-                          aria-label={`Select ${item?.name || "item"}`}
-                          className="h-4 w-4"
-                          disabled={!canEditItems}
-                        />
-                      </div>
-                    </TableCell>
+                    {isReturnable && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => handleSelectItem(withdrawalItem.id, checked as boolean)}
+                            aria-label={`Select ${item?.name || "item"}`}
+                            className="h-4 w-4"
+                            disabled={!canEditItems}
+                          />
+                        </div>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -417,31 +446,33 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
                     <TableCell className="text-center">
                       <span className="font-mono text-sm">{withdrawalItem.withdrawedQuantity || 0}</span>
                     </TableCell>
-                    <TableCell className="text-center">
-                      {canEditItems ? (
-                        <div className="flex justify-center">
-                          <Input
-                            type="decimal"
-                            decimals={2}
-                            value={currentValues.returnedQuantity}
-                            onChange={(value) => handleQuantityChange(withdrawalItem.id, value?.toString() || "0")}
-                            disabled={isSaving}
-                            min={0}
-                            max={withdrawalItem.withdrawedQuantity}
-                            className={cn(
-                              "w-20 h-8 text-center font-mono text-sm",
-                              currentValues.returnedQuantity > withdrawalItem.withdrawedQuantity && "text-blue-600 dark:text-blue-400",
-                              currentValues.returnedQuantity === withdrawalItem.withdrawedQuantity && "text-green-600 dark:text-green-400",
-                              currentValues.returnedQuantity > 0 && currentValues.returnedQuantity < withdrawalItem.withdrawedQuantity && "text-orange-600 dark:text-orange-400",
-                            )}
-                          />
-                        </div>
-                      ) : (
-                        <span className={cn("font-mono text-sm", withdrawalItem.returnedQuantity === withdrawalItem.withdrawedQuantity && "text-green-600 dark:text-green-400")}>
-                          {withdrawalItem.returnedQuantity || 0}
-                        </span>
-                      )}
-                    </TableCell>
+                    {isReturnable && (
+                      <TableCell className="text-center">
+                        {canEditItems ? (
+                          <div className="flex justify-center">
+                            <Input
+                              type="decimal"
+                              decimals={2}
+                              value={currentValues.returnedQuantity}
+                              onChange={(value) => handleQuantityChange(withdrawalItem.id, value?.toString() || "0")}
+                              disabled={isSaving}
+                              min={0}
+                              max={withdrawalItem.withdrawedQuantity}
+                              className={cn(
+                                "w-20 h-8 text-center font-mono text-sm",
+                                currentValues.returnedQuantity > withdrawalItem.withdrawedQuantity && "text-blue-600 dark:text-blue-400",
+                                currentValues.returnedQuantity === withdrawalItem.withdrawedQuantity && "text-green-600 dark:text-green-400",
+                                currentValues.returnedQuantity > 0 && currentValues.returnedQuantity < withdrawalItem.withdrawedQuantity && "text-orange-600 dark:text-orange-400",
+                              )}
+                            />
+                          </div>
+                        ) : (
+                          <span className={cn("font-mono text-sm", withdrawalItem.returnedQuantity === withdrawalItem.withdrawedQuantity && "text-green-600 dark:text-green-400")}>
+                            {withdrawalItem.returnedQuantity || 0}
+                          </span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">
                       <span className="font-mono text-sm">{formatCurrency(withdrawalItem.price || 0)}</span>
                     </TableCell>
@@ -472,6 +503,26 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
                       {rowStatus === "changed" && (
                         <Badge variant="warning" className="text-xs">
                           Alterado
+                        </Badge>
+                      )}
+                      {rowStatus === "delivered" && (
+                        <Badge variant="success" className="text-xs">
+                          Entregue
+                        </Badge>
+                      )}
+                      {rowStatus === "charged" && (
+                        <Badge variant="default" className="text-xs">
+                          Cobrado
+                        </Badge>
+                      )}
+                      {rowStatus === "liquidated" && (
+                        <Badge variant="success" className="text-xs">
+                          Liquidado
+                        </Badge>
+                      )}
+                      {rowStatus === "cancelled" && (
+                        <Badge variant="destructive" className="text-xs">
+                          Cancelado
                         </Badge>
                       )}
                     </TableCell>

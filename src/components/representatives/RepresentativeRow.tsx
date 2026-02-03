@@ -8,10 +8,17 @@ import { FormLabel } from '@/components/ui/form';
 import type { Representative, RepresentativeRole, RepresentativeRowData } from '@/types/representative';
 import { REPRESENTATIVE_ROLE_LABELS } from '@/types/representative';
 
+interface CustomerOption {
+  id: string;
+  name: string;
+}
+
 interface RepresentativeRowProps {
   control?: any;
   index: number;
   customerId: string;
+  invoiceToId?: string; // Billing customer - representatives from this customer are also valid
+  customerOptions?: CustomerOption[]; // Options for customer selection when creating new representatives
   disabled?: boolean;
   readOnly?: boolean;
   onRemove: () => void;
@@ -30,6 +37,8 @@ export const RepresentativeRow = forwardRef<HTMLDivElement, RepresentativeRowPro
     control,
     index,
     customerId,
+    invoiceToId,
+    customerOptions = [],
     disabled,
     readOnly,
     onRemove,
@@ -42,18 +51,42 @@ export const RepresentativeRow = forwardRef<HTMLDivElement, RepresentativeRowPro
     // Determine if we're in create mode based on the value
     const showCreateInputs = value.isEditing && value.id?.startsWith('temp-');
 
+    // Show customer selector only when:
+    // 1. In create mode (showCreateInputs)
+    // 2. There are multiple customer options (customer and invoiceTo are different)
+    const showCustomerSelector = showCreateInputs && customerOptions.length > 1;
+
+    // Handle customer selection for new representatives
+    const handleCustomerChange = useCallback((selectedCustomerId: string) => {
+      onChange({
+        ...value,
+        customerId: selectedCustomerId || null,
+      });
+    }, [onChange, value]);
+
+    // Build customer options for the dropdown
+    const customerSelectOptions = customerOptions.map(opt => ({
+      value: opt.id,
+      label: opt.name,
+    }));
+
     // Filter representatives by selected role
-    // Show: reps matching the role that either belong to this customer OR have no customer (global)
+    // Show: reps matching the role that belong to customer, invoiceTo, or are global
     const filteredRepresentatives = value.role
       ? availableRepresentatives.filter(rep => {
           // Filter by role first
           if (rep.role !== value.role) return false;
 
-          // If task has a customer, show reps that:
-          // 1. Belong to this customer, OR
-          // 2. Have no customer (global representatives)
-          if (customerId) {
-            return rep.customerId === customerId || !rep.customerId;
+          // If task has a customer or invoiceTo, show reps that:
+          // 1. Belong to the primary customer (customerId), OR
+          // 2. Belong to the billing customer (invoiceToId), OR
+          // 3. Have no customer (global representatives)
+          if (customerId || invoiceToId) {
+            return (
+              rep.customerId === customerId ||
+              rep.customerId === invoiceToId ||
+              !rep.customerId
+            );
           }
 
           // If no customer on task, show all representatives with this role
@@ -175,7 +208,7 @@ export const RepresentativeRow = forwardRef<HTMLDivElement, RepresentativeRowPro
           <div className="sm:col-span-8">
             {showCreateInputs ? (
               /* Inline Create Representative Inputs */
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid gap-2 ${showCustomerSelector ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 <div className="space-y-2">
                   {isFirstRow && <FormLabel>Nome do Representante</FormLabel>}
                   <Input
@@ -222,6 +255,22 @@ export const RepresentativeRow = forwardRef<HTMLDivElement, RepresentativeRowPro
                     className="bg-transparent"
                   />
                 </div>
+
+                {/* Customer Selector - only shown when there are multiple customer options */}
+                {showCustomerSelector && (
+                  <div className="space-y-2">
+                    {isFirstRow && <FormLabel>Cliente</FormLabel>}
+                    <Combobox
+                      value={value.customerId || customerOptions[0]?.id || ''}
+                      onValueChange={handleCustomerChange}
+                      options={customerSelectOptions}
+                      placeholder="Selecione o cliente"
+                      emptyMessage="Nenhum cliente"
+                      disabled={disabled || readOnly}
+                      searchable={false}
+                    />
+                  </div>
+                )}
               </div>
             ) : (
               /* Representative Selection */

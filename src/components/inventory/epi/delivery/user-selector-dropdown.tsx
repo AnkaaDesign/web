@@ -13,6 +13,7 @@ interface UserSelectorDropdownProps {
 
 export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione um funcionário", disabled = false }: UserSelectorDropdownProps) {
   // Async query function for the combobox
+  // Filter by isActive: true to only show active users for EPI delivery
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
     try {
       const queryParams: any = {
@@ -22,9 +23,21 @@ export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione
         where: {
           isActive: true
         },
-        include: {
-          position: true,
-          sector: true,
+        select: {
+          id: true,
+          name: true,
+          position: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          sector: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       };
 
