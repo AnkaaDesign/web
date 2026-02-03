@@ -51,16 +51,37 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint, onDes
     const params: any = {
       orderBy: { name: "asc" },
       page: page,
-      take: 50,
-      include: {
-        paintType: true,
-        paintBrand: true,
-        formulas: true,
+      take: 20, // Reduced page size for better performance
+      // Use select instead of include to avoid loading full formulas
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        hex: true,
+        finish: true,
+        colorPreview: true,
+        manufacturer: true,
+        // Only get the IDs and names of related entities
+        paintType: {
+          select: {
+            id: true,
+            name: true,
+            needGround: true,
+          },
+        },
+        paintBrand: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        // Only get the count of formulas, not the actual data
         _count: {
           select: {
             formulas: true,
           },
         },
+        // DO NOT include formulas data - only count is needed
       },
     };
 
@@ -191,9 +212,10 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint, onDes
                   getOptionValue={getOptionValue}
                   renderOption={(paint, isSelected) => renderPaintItem(paint, isSelected)}
                   minSearchLength={0}
-                  pageSize={50}
-                  debounceMs={300}
+                  pageSize={20}
+                  debounceMs={500}
                   clearable={true}
+                  loadOnMount={false}  // Enable lazy loading - only load when dropdown opens
                   initialOptions={initialOptions}
                   customEmptyAction={onDesignarServiceOrder ? {
                     label: "Designar Ordem de Serviço",

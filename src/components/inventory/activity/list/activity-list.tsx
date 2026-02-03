@@ -156,7 +156,7 @@ export function ActivityList({ className }: ActivityListProps) {
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search",
     serializeToUrl: serializeActivityFilters,
     deserializeFromUrl: deserializeActivityFilters,

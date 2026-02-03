@@ -129,7 +129,7 @@ export function VacationList({ selectedStatus, userId, onDataUpdate, className, 
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "searchingFor",
     serializeToUrl: serializeVacationFilters,
     deserializeFromUrl: deserializeVacationFilters,

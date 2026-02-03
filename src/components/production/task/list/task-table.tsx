@@ -98,7 +98,15 @@ export function TaskTable({
   const includeConfig = React.useMemo(
     () => ({
       sector: true,
-      customer: true,
+      customer: {
+        select: {
+          id: true,
+          fantasyName: true,
+          corporateName: true,
+          cnpj: true,
+          logo: true, // For avatar display
+        },
+      },
       createdBy: true,
       serviceOrders: true,
       files: true,

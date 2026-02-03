@@ -44,7 +44,7 @@ export function SectorTasksTable({ sector }: SectorTasksTableProps) {
     setSearch,
   } = useTableFilters<TaskGetManyFormData>({
     defaultFilters: {},
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "sectorTaskSearch",
   });
 

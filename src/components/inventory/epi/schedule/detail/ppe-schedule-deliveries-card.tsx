@@ -37,7 +37,7 @@ export function PpeScheduleDeliveriesCard({ scheduleId, className }: PpeSchedule
   // Use table filters for search functionality
   const { searchingFor, displaySearchText, setSearch } = useTableFilters<PpeDeliveryGetManyFormData>({
     defaultFilters: {},
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "deliverySearch",
   });
 

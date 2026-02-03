@@ -119,7 +119,7 @@ export function PpeSizesList({ className }: PpeSizesListProps) {
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search",
     serializeToUrl: serializePpeSizeFilters,
     deserializeFromUrl: deserializePpeSizeFilters,

@@ -133,7 +133,7 @@ export function CutList({ className }: CutListProps) {
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search",
     serializeToUrl: serializeCutFilters,
     deserializeFromUrl: deserializeCutFilters,

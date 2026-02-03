@@ -167,7 +167,7 @@ export function OrderList({ className }: OrderListProps) {
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search", // Use "search" for URL compatibility
     serializeToUrl: serializeOrderFilters,
     deserializeFromUrl: deserializeOrderFilters,

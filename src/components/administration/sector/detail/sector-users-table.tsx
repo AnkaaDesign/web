@@ -37,7 +37,7 @@ export function SectorUsersTable({ sector }: SectorUsersTableProps) {
     setSearch,
   } = useTableFilters<UserGetManyFormData>({
     defaultFilters: {},
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "userSearch",
   });
 

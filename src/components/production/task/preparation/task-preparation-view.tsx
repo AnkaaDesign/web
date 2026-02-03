@@ -272,7 +272,7 @@ export function TaskPreparationView({
     defaultFilters: {
       status: [TASK_STATUS.PREPARATION],
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search",
     serializeToUrl: serializeTaskFilters,
     deserializeFromUrl: deserializeTaskFilters,

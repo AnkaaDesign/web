@@ -34,7 +34,7 @@ export function ItemsNeededList({ itemsConfig, className }: ItemsNeededListProps
   // Filter state management with search only
   const { searchingFor, displaySearchText, setSearch, queryFilters } = useTableFilters({
     defaultFilters: {},
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "itemsNeededSearch",
     excludeFromUrl: ["limit", "orderBy"],
   });

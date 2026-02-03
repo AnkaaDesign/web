@@ -50,16 +50,37 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
     const params: any = {
       orderBy: { name: "asc" },
       page: page,
-      take: 50,
-      include: {
-        paintType: true,
-        paintBrand: true,
-        formulas: true,
+      take: 15, // Reduced page size for multi-select performance
+      // Use select instead of include to avoid loading full formulas
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        hex: true,
+        finish: true,
+        colorPreview: true,
+        manufacturer: true,
+        // Only get the IDs and names of related entities
+        paintType: {
+          select: {
+            id: true,
+            name: true,
+            needGround: true,
+          },
+        },
+        paintBrand: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        // Only get the count of formulas, not the actual data
         _count: {
           select: {
             formulas: true,
           },
         },
+        // DO NOT include formulas data - only count is needed
       },
     };
 
@@ -197,11 +218,12 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
                   getOptionValue={getOptionValue}
                   renderOption={(paint, isSelected) => renderPaintItem(paint, isSelected)}
                   minSearchLength={0}
-                  pageSize={50}
-                  debounceMs={300}
+                  pageSize={15}  // Reduced for multi-select performance
+                  debounceMs={500}  // Increased debounce for less API calls
                   showCount={true}
                   singleMode={false}
                   clearable={true}
+                  loadOnMount={false}  // Enable lazy loading
                   initialOptions={initialOptions}
                   hideDefaultBadges={true}
                 />

@@ -164,7 +164,7 @@ export function MaintenanceList({ className }: MaintenanceListProps) {
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search", // Use "search" for URL compatibility
     serializeToUrl: serializeMaintenanceFilters,
     deserializeFromUrl: deserializeMaintenanceFilters,

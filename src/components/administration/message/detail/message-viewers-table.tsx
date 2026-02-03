@@ -24,7 +24,7 @@ export function MessageViewersTable({ message }: MessageViewersTableProps) {
     setSearch,
   } = useTableFilters<UserGetManyFormData>({
     defaultFilters: {},
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "viewerSearch",
   });
 

@@ -279,7 +279,7 @@ export function TaskHistoryList({
     defaultFilters: {
       status: statusFilter,
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search",
     serializeToUrl: serializeTaskFilters,
     deserializeFromUrl: deserializeTaskFilters,

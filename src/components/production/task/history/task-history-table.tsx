@@ -126,40 +126,77 @@ export function TaskHistoryTable({
   // Memoize include configuration to prevent re-renders
   const includeConfig = React.useMemo(
     () => ({
-      customer: true,
-      sector: true,
+      customer: {
+        select: {
+          id: true,
+          fantasyName: true,
+          corporateName: true,
+        },
+      },
+      sector: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
       serviceOrders: {
-        include: {
-          service: true,
-          assignedTo: true,
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          type: true,
+          assignedTo: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
-      observation: true,
+      observation: {
+        select: {
+          id: true,
+          description: true,
+        },
+      },
       generalPainting: {
-        include: {
-          paintType: true,
-          paintBrand: true,
+        select: {
+          id: true,
+          name: true,
+          hex: true,
+          finish: true,
+          paintType: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          paintBrand: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
-      createdBy: true,
-      updatedBy: true,
+      createdBy: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      updatedBy: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
       truck: {
-        include: {
-          backSideLayout: {
-            include: {
-              layoutSections: true,
-            },
-          },
-          leftSideLayout: {
-            include: {
-              layoutSections: true,
-            },
-          },
-          rightSideLayout: {
-            include: {
-              layoutSections: true,
-            },
-          },
+        select: {
+          id: true,
+          plate: true,
+          chassisNumber: true,
+          // Don't load layouts for history list view - not displayed
         },
       },
       // Note: commission is a direct field on Task, not a relation, so it's always included

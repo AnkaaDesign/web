@@ -193,7 +193,7 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search",
     serializeToUrl: serializePaintProductionFilters,
     deserializeFromUrl: deserializePaintProductionFilters,

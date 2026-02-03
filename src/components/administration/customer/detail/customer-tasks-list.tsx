@@ -48,7 +48,7 @@ export function CustomerTasksList({
     defaultFilters: {
       // Show all tasks, not just completed ones
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "customerTaskSearch",
     excludeFromUrl: ["limit", "orderBy"],
   });

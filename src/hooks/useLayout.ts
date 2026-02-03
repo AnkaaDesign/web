@@ -34,26 +34,51 @@ export const useLayoutDetail = (
 };
 
 // Get layouts by truck ID
-export const useLayoutsByTruck = (truckId: string, enabled = true) => {
+export const useLayoutsByTruck = (
+  truckId: string,
+  options?: {
+    enabled?: boolean;
+    includePhoto?: boolean;  // Only include photo when needed (e.g., library view)
+  }
+) => {
+  const enabled = options?.enabled ?? true;
+  const includePhoto = options?.includePhoto ?? false;
+
   return useQuery({
-    queryKey: layoutQueryKeys.byTruck(truckId),
+    queryKey: layoutQueryKeys.byTruck(truckId, includePhoto),
     queryFn: async () => {
-      const response = await layoutService.getByTruckId(truckId);
+      // Single API call - backend now returns everything needed for previews
+      // Only includes photo if explicitly requested
+      const response = await layoutService.getByTruckId(truckId, {
+        includePhoto: includePhoto
+      });
       const layoutsData = response.data.data;
 
-      // If layouts exist, fetch each one with sections included
+      // If backend already includes layoutSections (which it should after our fix),
+      // we don't need additional fetches
+      if (layoutsData.leftSideLayout?.layoutSections ||
+          layoutsData.rightSideLayout?.layoutSections ||
+          layoutsData.backSideLayout?.layoutSections) {
+        return layoutsData;
+      }
+
+      // Fallback: If sections aren't included (old API version),
+      // fetch them separately but without photos for preview
       const fetchWithSections = async (layout: any) => {
         if (!layout?.id) return layout;
         try {
           const detailResponse = await layoutService.getById(layout.id, {
-            include: { layoutSections: true, photo: true }
+            include: {
+              layoutSections: true,
+              ...(includePhoto && { photo: true })
+            }
           });
           return detailResponse.data.data;
         } catch (error) {
           if (process.env.NODE_ENV !== 'production') {
             console.error('[useLayoutsByTruck] Error fetching layout details:', error);
           }
-          return layout; // Return original if fetch fails
+          return layout;
         }
       };
 

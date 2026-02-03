@@ -160,7 +160,7 @@ export function BorrowList({ className }: BorrowListProps) {
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search", // Use "search" for URL compatibility
     serializeToUrl: serializeBorrowFilters,
     deserializeFromUrl: deserializeBorrowFilters,

@@ -88,7 +88,7 @@ export function SectorList({ selectedPrivilege, onDataUpdate, className }: Secto
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search",
     serializeToUrl: serializeSectorFilters,
     deserializeFromUrl: deserializeSectorFilters,

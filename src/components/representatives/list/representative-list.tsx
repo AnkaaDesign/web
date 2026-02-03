@@ -119,7 +119,7 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
     hasActiveFilters,
   } = useTableFilters<Partial<RepresentativeGetManyFormData>>({
     defaultFilters: customerId ? { customerId } : {},
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search",
     serializeToUrl: serializeRepresentativeFilters,
     deserializeFromUrl: deserializeRepresentativeFilters,

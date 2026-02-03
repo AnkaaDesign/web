@@ -42,7 +42,22 @@ export function PaintSelector({ control, disabled, initialPaints }: PaintSelecto
       const queryParams: any = {
         orderBy: { name: "asc" },
         page: page,
-        take: 50,
+        take: 20, // Reduced page size for better performance
+        // Use select to only fetch needed fields
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          hex: true,
+          finish: true,
+          colorPreview: true,
+          // Only count formulas, don't load the data
+          _count: {
+            select: {
+              formulas: true,
+            },
+          },
+        },
       };
 
       // Only add searchingFor if there's a search term
@@ -112,8 +127,9 @@ export function PaintSelector({ control, disabled, initialPaints }: PaintSelecto
               className="w-full"
               renderOption={renderOption}
               minSearchLength={0}
-              pageSize={50}
-              debounceMs={300}
+              pageSize={20}  // Reduced for better performance
+              debounceMs={500}  // Increased debounce
+              loadOnMount={false}  // Enable lazy loading
             />
           </FormControl>
           <FormMessage />

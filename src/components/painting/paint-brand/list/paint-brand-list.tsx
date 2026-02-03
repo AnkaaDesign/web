@@ -75,7 +75,7 @@ export function PaintBrandList({ className }: PaintBrandListProps) {
     hasActiveFilters,
   } = useTableFilters<PaintBrandGetManyFormData>({
     defaultFilters: DEFAULT_FILTERS,
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search", // Use "search" for URL compatibility
     excludeFromUrl: EXCLUDE_FROM_URL,
   });

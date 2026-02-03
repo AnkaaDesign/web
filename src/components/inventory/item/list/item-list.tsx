@@ -249,7 +249,7 @@ export function ItemList({ className }: ItemListProps) {
       limit: DEFAULT_PAGE_SIZE,
       isActive: true, // Show only active items by default
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "search", // Use "search" for URL compatibility
     serializeToUrl: serializeItemFilters,
     deserializeFromUrl: deserializeItemFilters,

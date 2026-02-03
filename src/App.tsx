@@ -45,6 +45,9 @@ const FavoritesPage = lazy(() => import("@/pages/favorites").then((module) => ({
 const ProfilePage = lazy(() => import("@/pages/profile").then((module) => ({ default: module.ProfilePage })));
 const NotificationPreferencesPage = lazy(() => import("@/pages/profile/notification-preferences").then((module) => ({ default: module.NotificationPreferencesPage })));
 
+// Test Notification Workflow
+const TestNotificationWorkflow = lazy(() => import("@/pages/test-notification-workflow"));
+
 // Administration
 const Administration = lazy(() => import("@/pages/administration/root").then((module) => ({ default: module.AdministrationRootPage })));
 
@@ -407,6 +410,16 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <NotificationPreferencesPage />
+                    </Suspense>
+                  }
+                />
+
+                {/* Test Notification Workflow */}
+                <Route
+                  path="/test-notifications"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <TestNotificationWorkflow />
                     </Suspense>
                   }
                 />

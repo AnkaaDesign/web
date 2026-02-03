@@ -104,7 +104,7 @@ export function WarningList({ selectedSeverity, onDataUpdate, className }: Warni
         where: { severity: selectedSeverity },
       }),
     },
-    searchDebounceMs: 300,
+    searchDebounceMs: 500,
     searchParamName: "searchingFor",
     serializeToUrl: serializeWarningFilters,
     deserializeFromUrl: deserializeWarningFilters,

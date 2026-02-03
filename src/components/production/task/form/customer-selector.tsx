@@ -164,8 +164,9 @@ export function CustomerSelector({ control, disabled, required, initialCustomer,
               loadMoreText="Carregar mais clientes"
               loadingMoreText="Carregando..."
               minSearchLength={0}
-              pageSize={50}
-              debounceMs={300}
+              pageSize={20}  // Reduced for better performance
+              debounceMs={500}  // Increased debounce
+              loadOnMount={false}  // Enable lazy loading
             />
           </FormControl>
           <FormMessage />
