@@ -22,6 +22,13 @@ export const routes = {
       details: (id: string) => `/administracao/notificacoes/detalhes/${id}`,
       edit: (id: string) => `/administracao/notificacoes/editar/${id}`,
       root: "/administracao/notificacoes",
+      configurations: {
+        root: "/administracao/notificacoes/configuracoes",
+        create: "/administracao/notificacoes/configuracoes/cadastrar",
+        details: (key: string) => `/administracao/notificacoes/configuracoes/detalhes/${key}`,
+        edit: (key: string) => `/administracao/notificacoes/configuracoes/editar/${key}`,
+        test: (key: string) => `/administracao/notificacoes/configuracoes/testar/${key}`,
+      },
     },
     messages: {
       create: "/administracao/mensagens/criar",

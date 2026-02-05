@@ -503,13 +503,13 @@ export const Sidebar = memo(() => {
             return filteredChild;
           }
 
-          // Check if this is a contextual item (cadastrar, criar, editar, detalhes)
-          const isContextualItem = ["cadastrar", "criar", "editar", "detalhes"].some((action) => child.id?.includes(action) || child.path?.includes(`/${action}`));
+          // Check if this is a contextual item (cadastrar, criar, editar, detalhes, testar)
+          const isContextualItem = ["cadastrar", "criar", "editar", "detalhes", "testar"].some((action) => child.id?.includes(action) || child.path?.includes(`/${action}`));
 
           // For dynamic routes (with :id), check if we're on a specific instance
           if (child.isDynamic && child.path) {
             // Known static route segments that should NOT be treated as dynamic IDs
-            const knownStaticSegments = ["criar", "cadastrar", "editar", "detalhes", "editar-em-lote", "editar-lote", "list", "novo"];
+            const knownStaticSegments = ["criar", "cadastrar", "editar", "detalhes", "testar", "editar-em-lote", "editar-lote", "list", "novo"];
 
             // Extract base path and check if current path segment is a static route
             const basePathMatch = child.path.match(/^(.+?)\/:[^/]+/);

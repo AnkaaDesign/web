@@ -93,6 +93,13 @@ const AdministrationNotificationsEdit = lazy(() => import("@/pages/administratio
 const AdministrationNotificationsDetails = lazy(() => import("@/pages/administration/notifications/details/[id]").then((module) => ({ default: module.NotificationDetailsPage })));
 const AdministrationNotificationsSend = lazy(() => import("@/pages/administration/notifications/create").then((module) => ({ default: module.CreateNotificationPage })));
 
+// Notification Configurations
+const AdministrationNotificationConfigurationsList = lazy(() => import("@/pages/administration/notifications/configurations/list").then((module) => ({ default: module.NotificationConfigurationListPage })));
+const AdministrationNotificationConfigurationsDetails = lazy(() => import("@/pages/administration/notifications/configurations/details").then((module) => ({ default: module.NotificationConfigurationDetailsPage })));
+const AdministrationNotificationConfigurationsCreate = lazy(() => import("@/pages/administration/notifications/configurations/create").then((module) => ({ default: module.NotificationConfigurationCreatePage })));
+const AdministrationNotificationConfigurationsEdit = lazy(() => import("@/pages/administration/notifications/configurations/edit").then((module) => ({ default: module.NotificationConfigurationEditPage })));
+const AdministrationNotificationConfigurationsTest = lazy(() => import("@/pages/administration/notifications/configurations/test").then((module) => ({ default: module.NotificationConfigurationTestPage })));
+
 const AdministrationMessages = lazy(() => import("@/pages/administration/messages/list").then((module) => ({ default: module.MessageListPage })));
 const AdministrationMessagesCreate = lazy(() => import("@/pages/administration/messages/create").then((module) => ({ default: module.CreateMessagePage })));
 const AdministrationMessagesDetails = lazy(() => import("@/pages/administration/messages/details/[id]").then((module) => ({ default: module.MessageDetailsPage })));
@@ -877,6 +884,48 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <AdministrationNotificationsSend />
+                    </Suspense>
+                  }
+                />
+
+                {/* Notification Configuration Routes */}
+                <Route
+                  path={routes.administration.notifications.configurations.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdministrationNotificationConfigurationsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.notifications.configurations.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdministrationNotificationConfigurationsCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.notifications.configurations.details(":key")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdministrationNotificationConfigurationsDetails />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.notifications.configurations.edit(":key")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdministrationNotificationConfigurationsEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.notifications.configurations.test(":key")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdministrationNotificationConfigurationsTest />
                     </Suspense>
                   }
                 />

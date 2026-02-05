@@ -510,9 +510,22 @@ export const NAVIGATION_MENU: MenuItem[] = [
         icon: "notification",
         path: "/administracao/notificacoes",
         children: [
-          { id: "notificacoes-admin-cadastrar", title: "Cadastrar", icon: "external", path: "/administracao/notificacoes/cadastrar/enviar" },
+          { id: "notificacoes-admin-cadastrar", title: "Enviar", icon: "external", path: "/administracao/notificacoes/cadastrar/enviar" },
           { id: "notificacoes-admin-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/notificacoes/detalhes/:id", isDynamic: true },
           { id: "notificacoes-admin-editar", title: "Editar", icon: "edit", path: "/administracao/notificacoes/editar/:id", isDynamic: true },
+          {
+            id: "notificacoes-configuracoes",
+            title: "Configurações",
+            icon: "cog",
+            path: "/administracao/notificacoes/configuracoes",
+            requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
+            children: [
+              { id: "notificacoes-configuracoes-cadastrar", title: "Cadastrar", icon: "plus", path: "/administracao/notificacoes/configuracoes/cadastrar" },
+              { id: "notificacoes-configuracoes-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/notificacoes/configuracoes/detalhes/:key", isDynamic: true },
+              { id: "notificacoes-configuracoes-editar", title: "Editar", icon: "edit", path: "/administracao/notificacoes/configuracoes/editar/:key", isDynamic: true },
+              { id: "notificacoes-configuracoes-testar", title: "Testar", icon: "check", path: "/administracao/notificacoes/configuracoes/testar/:key", isDynamic: true },
+            ],
+          },
         ],
       },
       {

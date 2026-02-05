@@ -371,8 +371,48 @@ export const ROUTE_FIXES: Record<string, string> = {
 
 /**
  * Fix a navigation path to ensure it points to a valid route
+ * If the path contains dynamic segments (like :id, :key), replace them with
+ * actual values from the current URL when possible
  */
 export function fixNavigationPath(path: string): string {
+  // If path contains dynamic parameters, try to replace them with actual values from current URL
+  if (path.includes(":")) {
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+
+    // Split both paths into segments
+    const pathSegments = path.split("/");
+    const currentSegments = currentPath.split("/");
+
+    // If same number of segments, try to replace dynamic params with actual values
+    if (pathSegments.length === currentSegments.length) {
+      const resolvedSegments = pathSegments.map((segment, index) => {
+        if (segment.startsWith(":")) {
+          // Replace dynamic segment with actual value from current URL
+          const actualValue = currentSegments[index];
+          // Only use the actual value if it's not also a dynamic param
+          if (actualValue && !actualValue.startsWith(":")) {
+            return actualValue;
+          }
+        }
+        return segment;
+      });
+
+      const resolvedPath = resolvedSegments.join("/");
+      // Only use resolved path if it no longer contains dynamic params
+      if (!resolvedPath.includes(":")) {
+        return resolvedPath;
+      }
+    }
+
+    // If we couldn't resolve all params, return current path if it matches the pattern
+    // This prevents navigating to literal :key URLs
+    const pathPattern = path.replace(/:[^/]+/g, "[^/]+");
+    const regex = new RegExp(`^${pathPattern}$`);
+    if (regex.test(currentPath)) {
+      return currentPath;
+    }
+  }
+
   // Check if there's a direct fix available
   if (ROUTE_FIXES[path]) {
     return ROUTE_FIXES[path];

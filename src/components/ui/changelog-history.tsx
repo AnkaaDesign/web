@@ -114,7 +114,7 @@ const LogoDisplay = ({
   }
 
   // Use the same API URL configuration as the API client
-  const apiUrl = import.meta.env.VITE_API_URL || "http://192.168.10.161:3030";
+  const apiUrl = import.meta.env.VITE_API_URL || "http://192.168.0.16:3030";
   // Use thumbnail endpoint for file previews, serve endpoint for logos
   const imageUrl = useThumbnail
     ? `${apiUrl}/files/thumbnail/${logoId}`

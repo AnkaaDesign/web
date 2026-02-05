@@ -341,8 +341,11 @@ export function TaskPreparationView({
   );
 
   // Determine preparation exclusion flags based on user's sector privilege
+  // For filtering: use hasPrivilege() so admins can see all service order types
   const isFinancialUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL);
   const isLogisticUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC);
+  // For table ordering: use exact match so admins get regular table order (not financial order)
+  const useFinancialTableOrder = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
   const isDesignerUser = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
 
   // Prepare final query filters with preparation-specific logic
@@ -663,7 +666,7 @@ export function TaskPreparationView({
 
         {/* Three tables grouped by status */}
         {/* For FINANCIAL users: Show Completed first, then In Production, then Preparation */}
-        {isFinancialUser ? (
+        {useFinancialTableOrder ? (
           <div className="space-y-8 pb-8">
             {/* Table 1: Concluído - First for financial */}
             <div>
