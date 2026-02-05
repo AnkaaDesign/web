@@ -17,6 +17,8 @@ interface FilterUtilsOptions {
   users?: Array<{ id: string; name: string }>;
   /** When true, status filter tags will not be displayed */
   hideStatusTags?: boolean;
+  /** Default status filter - when current filter matches this, don't show badge */
+  defaultStatus?: TASK_STATUS[];
 }
 
 export function extractActiveFilters(
@@ -25,7 +27,7 @@ export function extractActiveFilters(
   options: FilterUtilsOptions = {},
 ): FilterIndicator[] {
   const activeFilters: FilterIndicator[] = [];
-  const { sectors = [], customers = [], users = [], hideStatusTags = false } = options;
+  const { sectors = [], customers = [], users = [], hideStatusTags = false, defaultStatus = [TASK_STATUS.COMPLETED] } = options;
 
   // Search filter - handle both search and searchingFor for backward compatibility
   const searchValue = (filters as any).search || filters.searchingFor;
@@ -40,17 +42,30 @@ export function extractActiveFilters(
   }
 
   // Status filter - show individual badges for each status (only if not hidden)
+  // Don't show badge if status matches the default (like user table behavior)
   if (!hideStatusTags && filters.status && filters.status.length > 0) {
-    filters.status.forEach((status: TASK_STATUS) => {
-      activeFilters.push({
-        key: `status-${status}`,
-        label: "Status",
-        value: TASK_STATUS_LABELS[status] || status,
-        iconType: "checklist",
-        itemId: status,
-        onRemove: () => onRemoveFilter("status", status),
+    // Check if current status filter matches the default
+    const isDefaultStatus =
+      filters.status.length === defaultStatus.length &&
+      filters.status.every((s: TASK_STATUS) => defaultStatus.includes(s));
+
+    // Only show status badges if NOT the default status
+    if (!isDefaultStatus) {
+      filters.status.forEach((status: TASK_STATUS) => {
+        // Only show badge if it's a valid status with a label
+        const statusLabel = TASK_STATUS_LABELS[status];
+        if (statusLabel) {
+          activeFilters.push({
+            key: `status-${status}`,
+            label: "Status",
+            value: statusLabel,
+            iconType: "checklist",
+            itemId: status,
+            onRemove: () => onRemoveFilter("status", status),
+          });
+        }
       });
-    });
+    }
   }
 
   // Entity filters - Sectors (individual badges for each sector)
@@ -274,12 +289,12 @@ export function createFilterRemover(currentFilters: Partial<TaskGetManyFormData>
           if (filteredStatuses.length > 0) {
             newFilters.status = filteredStatuses;
           } else {
-            // If no statuses left, reset to default (COMPLETED, INVOICED, SETTLED)
-            newFilters.status = [TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED];
+            // If no statuses left, reset to default (COMPLETED only)
+            newFilters.status = [TASK_STATUS.COMPLETED];
           }
         } else {
           // Remove all statuses and reset to default
-          newFilters.status = [TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED];
+          newFilters.status = [TASK_STATUS.COMPLETED];
         }
         break;
       case "sectorIds":

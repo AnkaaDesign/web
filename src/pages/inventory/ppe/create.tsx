@@ -118,19 +118,19 @@ export const PpeCreatePage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col px-4 pt-4">
-      <PageHeader
-        variant="form"
-        title="Cadastrar EPI"
-        icon={IconShield}
-        breadcrumbs={[{ label: "Estoque", href: routes.inventory.root }, { label: "EPIs", href: routes.inventory.ppe.root }, { label: "Cadastrar" }]}
-        actions={actions}
-        favoritePage={FAVORITE_PAGES.ESTOQUE_EPI_CADASTRAR}
-      />
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <PageHeader
+          variant="form"
+          title="Cadastrar EPI"
+          icon={IconShield}
+          breadcrumbs={[{ label: "Estoque", href: routes.inventory.root }, { label: "EPIs", href: routes.inventory.ppe.root }, { label: "Cadastrar" }]}
+          actions={actions}
+          favoritePage={FAVORITE_PAGES.ESTOQUE_EPI_CADASTRAR}
+        />
+      </div>
       <div className="flex-1 overflow-y-auto pb-6">
-        <div className="mt-4 space-y-4">
-          <EpiForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} defaultValues={defaultValues} />
-        </div>
+        <EpiForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} defaultValues={defaultValues} />
       </div>
     </div>
   );

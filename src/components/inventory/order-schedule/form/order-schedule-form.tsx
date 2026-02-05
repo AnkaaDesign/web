@@ -1,14 +1,12 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
-import { Form, FormDescription } from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { IconLoader, IconDeviceFloppy, IconX } from "@tabler/icons-react";
 
 // Form components
-import { OrderScheduleSupplierSelector } from "./supplier-selector";
-import { OrderScheduleCategorySelector } from "./category-selector";
 import { ItemsSelector } from "./items-selector";
 import { ScheduleForm } from "@/components/ui/schedule-form";
 
@@ -83,19 +81,9 @@ export function OrderScheduleForm({ initialData, onSubmit, onCancel, isSubmittin
         <Card>
           <CardHeader>
             <CardTitle>Informações Básicas</CardTitle>
-            <CardDescription>Defina o status, fornecedor ou categoria e os itens do cronograma</CardDescription>
+            <CardDescription>Defina os itens do cronograma de pedidos</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Supplier Selector */}
-              <OrderScheduleSupplierSelector control={form.control} disabled={isLoading} />
-
-              {/* Category Selector */}
-              <OrderScheduleCategorySelector control={form.control} disabled={isLoading} />
-            </div>
-
-            <FormDescription>Selecione um fornecedor OU uma categoria para o cronograma</FormDescription>
-
             {/* Items Selector */}
             <ItemsSelector control={form.control} disabled={isLoading} required />
           </CardContent>

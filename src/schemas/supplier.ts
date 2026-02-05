@@ -670,7 +670,7 @@ export const supplierCreateSchema = z.object({
   cnpj: cnpjOptionalSchema,
   corporateName: corporateNameSchema,
   email: emailSchema.nullable().optional(),
-  streetType: z.enum(["RUA", "AVENIDA", "ALAMEDA", "TRAVESSA", "PRACA", "RODOVIA", "ESTRADA", "VIA", "LARGO", "VIELA", "BECO", "RUELA", "CAMINHO", "PASSAGEM", "JARDIM", "QUADRA", "LOTE", "SITIO", "PARQUE", "FAZENDA", "CHACARA", "CONDOMINIO", "CONJUNTO", "RESIDENCIAL", "OUTRO"]).nullable().optional(),
+  streetType: z.enum(["STREET", "AVENUE", "ALLEY", "CROSSING", "SQUARE", "HIGHWAY", "ROAD", "WAY", "PLAZA", "LANE", "DEADEND", "SMALL_STREET", "PATH", "PASSAGE", "GARDEN", "BLOCK", "LOT", "SITE", "PARK", "FARM", "RANCH", "CONDOMINIUM", "COMPLEX", "RESIDENTIAL", "OTHER"]).nullable().optional(),
   address: addressSchema,
   addressNumber: z.string().max(10, "Número deve ter no máximo 10 caracteres").nullable().optional(),
   addressComplement: z.string().max(100, "Complemento deve ter no máximo 100 caracteres").nullable().optional(),
@@ -750,7 +750,7 @@ export const supplierCreateSchema = z.object({
     }
     return val;
   }, z.array(phoneSchema).default([]).optional()),
-  pix: z.string().max(100, "Chave Pix deve ter no máximo 100 caracteres").nullable().optional(),
+  pix: z.string().max(500, "Chave Pix deve ter no máximo 500 caracteres").nullable().optional(),
   tags: z.array(z.string()).default([]),
   logoId: z.string().uuid("Logo inválido").nullable().optional(),
 });
@@ -798,7 +798,7 @@ export const supplierUpdateSchema = z.object({
     .optional(),
   corporateName: corporateNameSchema.optional(),
   email: emailSchema.nullable().optional(),
-  streetType: z.enum(["RUA", "AVENIDA", "ALAMEDA", "TRAVESSA", "PRACA", "RODOVIA", "ESTRADA", "VIA", "LARGO", "VIELA", "BECO", "RUELA", "CAMINHO", "PASSAGEM", "JARDIM", "QUADRA", "LOTE", "SITIO", "PARQUE", "FAZENDA", "CHACARA", "CONDOMINIO", "CONJUNTO", "RESIDENCIAL", "OUTRO"]).nullable().optional(),
+  streetType: z.enum(["STREET", "AVENUE", "ALLEY", "CROSSING", "SQUARE", "HIGHWAY", "ROAD", "WAY", "PLAZA", "LANE", "DEADEND", "SMALL_STREET", "PATH", "PASSAGE", "GARDEN", "BLOCK", "LOT", "SITE", "PARK", "FARM", "RANCH", "CONDOMINIUM", "COMPLEX", "RESIDENTIAL", "OTHER"]).nullable().optional(),
   address: addressSchema.optional(),
   addressNumber: z.string().max(10, "Número deve ter no máximo 10 caracteres").nullable().optional(),
   addressComplement: z.string().max(100, "Complemento deve ter no máximo 100 caracteres").nullable().optional(),
@@ -887,7 +887,7 @@ export const supplierUpdateSchema = z.object({
 
     return val;
   }, z.array(phoneSchema).optional()),
-  pix: z.string().max(100, "Chave Pix deve ter no máximo 100 caracteres").nullable().optional(),
+  pix: z.string().max(500, "Chave Pix deve ter no máximo 500 caracteres").nullable().optional(),
   tags: z.array(z.string()).optional(),
   logoId: z.string().uuid("Logo inválido").nullable().optional(),
 });

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX } from "@tabler/icons-react";
+import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
@@ -87,6 +87,10 @@ export function TaskHistoryContextMenu({
   const canLiberar = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN ||
                      user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC ||
                      user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
+
+  // Users who can use "Dar Entrada" action: ADMIN and LOGISTIC only
+  const canDarEntrada = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN ||
+                        user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC;
 
   // LOGISTIC and COMMERCIAL users can see limited context menu options (Visualizar, Editar, Liberar)
   const isLogisticOrCommercial = user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC ||
@@ -355,9 +359,9 @@ export function TaskHistoryContextMenu({
 
   const handleLiberar = async () => {
     try {
-      // Update all PREPARATION tasks to set forecast date to today
+      // Update PREPARATION and WAITING_PRODUCTION tasks to set forecast date to today
       for (const t of tasks) {
-        if (t.status === TASK_STATUS.PREPARATION) {
+        if (t.status === TASK_STATUS.PREPARATION || t.status === TASK_STATUS.WAITING_PRODUCTION) {
           await update({
             id: t.id,
             data: { forecastDate: new Date() },
@@ -379,6 +383,37 @@ export function TaskHistoryContextMenu({
       }
       toast.error("Erro ao liberar tarefa(s)", {
         description: "Não foi possível atualizar a previsão. Tente novamente.",
+      });
+    }
+    setDropdownOpen(false);
+  };
+
+  const handleDarEntrada = async () => {
+    try {
+      // Update all PREPARATION or WAITING_PRODUCTION tasks to set entry date to now
+      for (const t of tasks) {
+        if (t.status === TASK_STATUS.PREPARATION || t.status === TASK_STATUS.WAITING_PRODUCTION) {
+          await update({
+            id: t.id,
+            data: { entryDate: new Date() },
+          });
+        }
+      }
+
+      toast.success(
+        isBulk ? "Entrada registrada" : "Entrada registrada",
+        {
+          description: isBulk
+            ? `${tasks.length} tarefa(s) com data de entrada atualizada para agora`
+            : "Data de entrada atualizada para agora",
+        }
+      );
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error setting entry date:", error);
+      }
+      toast.error("Erro ao dar entrada", {
+        description: "Não foi possível atualizar a data de entrada. Tente novamente.",
       });
     }
     setDropdownOpen(false);
@@ -593,11 +628,19 @@ export function TaskHistoryContextMenu({
             </div>
           )}
 
-          {/* Liberar action - Only for PREPARATION status tasks and ADMIN/LOGISTIC/COMMERCIAL users */}
-          {hasPreparationTasks && canLiberar && (
+          {/* Liberar action - For PREPARATION/WAITING_PRODUCTION tasks and ADMIN/LOGISTIC/COMMERCIAL users */}
+          {(hasPreparationTasks || hasWaitingProductionTasks) && canLiberar && (
             <DropdownMenuItem onClick={handleLiberar} className="text-blue-600 hover:text-white">
               <IconCalendarCheck className="mr-2 h-4 w-4" />
               Liberar
+            </DropdownMenuItem>
+          )}
+
+          {/* Dar Entrada action - Only for PREPARATION/WAITING_PRODUCTION tasks and ADMIN/LOGISTIC users */}
+          {(hasPreparationTasks || hasWaitingProductionTasks) && canDarEntrada && (
+            <DropdownMenuItem onClick={handleDarEntrada} className="text-emerald-600 hover:text-white">
+              <IconDoorEnter className="mr-2 h-4 w-4" />
+              Dar Entrada
             </DropdownMenuItem>
           )}
 

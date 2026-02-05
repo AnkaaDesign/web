@@ -53,7 +53,7 @@ export function WebsiteInput({ disabled }: WebsiteInputProps) {
               value={value || ""}
               placeholder="https://www.fornecedor.com.br"
               disabled={disabled}
-              className="transition-all duration-200"
+              transparent={true}
               onChange={(inputValue) => {
                 // Input component passes value directly, not an event
                 const val = inputValue as string | null;

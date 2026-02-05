@@ -7,13 +7,12 @@ import type { SecullumHolidayData } from "../../../../../schemas";
 import { debounce } from "../../../../../utils";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
-import { LoadingSpinner } from "@/components/ui/loading";
+import { Skeleton } from "@/components/ui/skeleton";
 import { HolidaysTable } from "./holidays-table";
 import { HolidaysFilters } from "./holidays-filters";
 import { HolidaysEmpty } from "./holidays-empty";
@@ -25,12 +24,16 @@ interface HolidaysListProps {
   className?: string;
 }
 
+const DEFAULT_PAGE_SIZE = 20;
+
 export function HolidaysList({ className }: HolidaysListProps) {
   const currentYear = new Date().getFullYear();
 
   const [displaySearchText, setDisplaySearchText] = useState("");
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   // Fetch holidays for selected year
   const { data: holidaysData, isLoading } = useSecullumHolidays({ year: selectedYear });
@@ -105,6 +108,30 @@ export function HolidaysList({ className }: HolidaysListProps) {
 
     return holidays;
   }, [holidaysData, searchText, monthFilter]);
+
+  // Paginate the filtered results
+  const paginatedHolidays = useMemo(() => {
+    const startIndex = page * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredHolidays.slice(startIndex, endIndex);
+  }, [filteredHolidays, page, pageSize]);
+
+  const totalRecords = filteredHolidays.length;
+  const totalPages = Math.ceil(totalRecords / pageSize);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(0);
+  }, [searchText, monthFilter, yearFilter]);
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setPage(0);
+  };
 
   // Update search in URL with debounce
   const updateSearchParams = useMemo(
@@ -218,8 +245,8 @@ export function HolidaysList({ className }: HolidaysListProps) {
   const filterCount = (yearFilter && yearFilter !== currentYear.toString() ? 1 : 0) + (monthFilter ? 1 : 0);
 
   return (
-    <Card className={cn("flex flex-col shadow-sm border border-border overflow-hidden", className)}>
-      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden min-h-0 pb-6">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and Controls */}
         <div className="flex flex-col sm:flex-row gap-3">
           <TableSearchInput
@@ -236,21 +263,34 @@ export function HolidaysList({ className }: HolidaysListProps) {
           </div>
         </div>
 
-        {/* Filter Indicators */}
+        {/* Active Filters */}
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} />}
 
-        {/* Table */}
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <LoadingSpinner size="lg" />
-          </div>
-        ) : filteredHolidays.length === 0 ? (
-          <HolidaysEmpty hasFilters={activeFilters.length > 0} />
-        ) : (
-          <div className="flex-1 overflow-auto rounded-md border border-border min-h-0">
-            <HolidaysTable holidays={filteredHolidays} onEdit={handleEdit} />
-          </div>
-        )}
+        {/* Table with integrated pagination */}
+        <div className="flex-1 min-h-0 overflow-auto">
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : paginatedHolidays.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <HolidaysEmpty hasFilters={activeFilters.length > 0} />
+            </div>
+          ) : (
+            <HolidaysTable
+              holidays={paginatedHolidays}
+              onEdit={handleEdit}
+              currentPage={page}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalItems={totalRecords}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          )}
+        </div>
       </CardContent>
 
       {/* Filters Modal */}

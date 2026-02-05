@@ -2,7 +2,65 @@ import { apiClient } from "../axiosClient";
 import type { UserNotificationPreference } from "../../types";
 
 // =====================
-// Request/Response Types
+// Notification Channel Types
+// =====================
+
+export type NotificationChannel = "IN_APP" | "EMAIL" | "PUSH" | "WHATSAPP";
+export type NotificationImportance = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+
+// =====================
+// Configuration-Driven API Types (New)
+// =====================
+
+export interface ChannelPreferenceDetail {
+  channel: NotificationChannel;
+  enabled: boolean;
+  mandatory: boolean;
+  defaultOn: boolean;
+  userEnabled: boolean;
+}
+
+export interface UserPreferenceConfig {
+  configKey: string;
+  name: string | null;
+  description: string;
+  importance: NotificationImportance;
+  channels: ChannelPreferenceDetail[];
+}
+
+export interface NotificationTypeGroup {
+  notificationType: string;
+  configurations: UserPreferenceConfig[];
+}
+
+export type GroupedConfigurationsResponse = NotificationTypeGroup[];
+
+export interface AvailableConfigurationsApiResponse {
+  success: boolean;
+  message: string;
+  data?: GroupedConfigurationsResponse;
+}
+
+export interface UpdateUserPreferencePayload {
+  channels: NotificationChannel[];
+}
+
+export interface UpdateUserPreferenceApiResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    configKey: string;
+    channels: NotificationChannel[];
+  };
+}
+
+export interface ResetPreferenceApiResponse {
+  success: boolean;
+  message: string;
+}
+
+// =====================
+// Legacy Request/Response Types
 // =====================
 
 export interface UserNotificationPreferenceGetManyResponse {
@@ -124,6 +182,37 @@ export const notificationPreferenceService = {
 };
 
 // =====================
+// Configuration-Driven User Preference Service (New)
+// =====================
+
+export const notificationUserPreferenceService = {
+  /**
+   * Get all available notification configurations grouped by type.
+   * This returns the user's current preference state for each configuration.
+   */
+  getAvailableConfigurations: () =>
+    apiClient.get<AvailableConfigurationsApiResponse>("/api/notifications/preferences/available-configurations"),
+
+  /**
+   * Update user preference for a specific configuration.
+   * The channels array should contain the channels the user wants enabled.
+   */
+  updatePreference: (configKey: string, data: UpdateUserPreferencePayload) =>
+    apiClient.put<UpdateUserPreferenceApiResponse>(
+      `/api/notifications/preferences/my-preferences/${configKey}`,
+      data
+    ),
+
+  /**
+   * Reset user preference for a specific configuration to defaults.
+   */
+  resetPreference: (configKey: string) =>
+    apiClient.post<ResetPreferenceApiResponse>(
+      `/api/notifications/preferences/my-preferences/${configKey}/reset`
+    ),
+};
+
+// =====================
 // WhatsApp QR Code Types
 // =====================
 
@@ -205,4 +294,14 @@ export type {
   WhatsAppQRResponse,
   WhatsAppStatusResponse,
   WhatsAppDisconnectResponse,
+  // New configuration-driven types
+  NotificationChannel,
+  NotificationImportance,
+  ChannelPreferenceDetail,
+  UserPreferenceConfig,
+  GroupedConfigurationsResponse,
+  AvailableConfigurationsApiResponse,
+  UpdateUserPreferencePayload,
+  UpdateUserPreferenceApiResponse,
+  ResetPreferenceApiResponse,
 };

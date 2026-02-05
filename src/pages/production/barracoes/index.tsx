@@ -173,12 +173,24 @@ export function GaragesPage() {
           0
         );
 
-        // Add cabin if needed (trucks < 10m get 1.8m cabin - average Brazilian truck cab)
-        const CABIN_THRESHOLD = 10;
-        const CABIN_LENGTH = 1.8;
-        const truckLength = sectionsSum > 0
-          ? (sectionsSum < CABIN_THRESHOLD ? sectionsSum + CABIN_LENGTH : sectionsSum)
-          : 10; // Default 10m if no sections
+        // Add cabin if needed - two-tier system based on truck body length
+        // < 7m body: 2.0m cabin (small trucks)
+        // 7-10m body: 2.4m cabin (larger trucks)
+        // >= 10m body: no cabin (semi-trailers)
+        const CABIN_THRESHOLD_SMALL = 7;
+        const CABIN_THRESHOLD_LARGE = 10;
+        const CABIN_LENGTH_SMALL = 2.0;
+        const CABIN_LENGTH_LARGE = 2.4;
+        let truckLength = 10; // Default 10m if no sections
+        if (sectionsSum > 0) {
+          if (sectionsSum < CABIN_THRESHOLD_SMALL) {
+            truckLength = sectionsSum + CABIN_LENGTH_SMALL;
+          } else if (sectionsSum < CABIN_THRESHOLD_LARGE) {
+            truckLength = sectionsSum + CABIN_LENGTH_LARGE;
+          } else {
+            truckLength = sectionsSum;
+          }
+        }
 
         // Check if there's a pending change for this truck
         const pendingChange = pendingChanges.get(truck?.id);

@@ -111,7 +111,7 @@ export const createPpeScheduleColumns = (): PpeScheduleColumn[] => [
     key: "isActive",
     header: "ATIVO",
     accessor: (schedule: PpeDeliverySchedule) => (
-      <Badge variant={schedule.isActive ? "active" : "inactive"} className="whitespace-nowrap">
+      <Badge variant={schedule.isActive ? "active" : "destructive"} className="whitespace-nowrap">
         {schedule.isActive ? "Sim" : "Não"}
       </Badge>
     ),

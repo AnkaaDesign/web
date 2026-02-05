@@ -35,7 +35,7 @@ import { apiClient } from "@/api-client/axiosClient";
 const notificationSchema = z.object({
   title: z.string().min(3, "Título deve ter no mínimo 3 caracteres"),
   body: z.string().min(10, "Mensagem deve ter no mínimo 10 caracteres"),
-  type: z.enum(["SYSTEM", "GENERAL", "WARNING"]),
+  type: z.enum(["SYSTEM", "PRODUCTION", "STOCK", "USER", "GENERAL"]),
   importance: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]),
   channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])).min(1, "Selecione pelo menos um canal"),
   actionUrl: z.string().optional(),
@@ -281,7 +281,9 @@ export const CreateNotificationPage = () => {
                   placeholder="Selecione o tipo"
                   options={[
                     { value: "SYSTEM", label: "Sistema (Obrigatória)" },
-                    { value: "WARNING", label: "Aviso" },
+                    { value: "PRODUCTION", label: "Produção" },
+                    { value: "STOCK", label: "Estoque" },
+                    { value: "USER", label: "Usuário" },
                     { value: "GENERAL", label: "Geral" },
                   ]}
                   searchable={false}

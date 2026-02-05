@@ -16,14 +16,9 @@ import {
   IconRefresh,
   IconInfoCircle,
   IconClipboardList,
-  IconShoppingCart,
-  IconClipboardCheck,
   IconPackage,
   IconShield,
-  IconCalendar,
-  IconScissors,
   IconSettings,
-  IconAlertTriangle,
   IconChevronDown,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
@@ -99,15 +94,10 @@ const IMPORTANCE_CONFIG = {
 } as const;
 
 const NOTIFICATION_TYPE_CONFIG: Record<string, { label: string; icon: typeof IconBell }> = {
-  TASK: { label: "Tarefas", icon: IconClipboardList },
-  ORDER: { label: "Pedidos", icon: IconShoppingCart },
-  SERVICE_ORDER: { label: "Ordens de Serviço", icon: IconClipboardCheck },
-  STOCK: { label: "Estoque", icon: IconPackage },
-  PPE: { label: "EPI", icon: IconShield },
-  VACATION: { label: "Férias", icon: IconCalendar },
-  WARNING: { label: "Advertências", icon: IconAlertTriangle },
-  CUT: { label: "Recortes", icon: IconScissors },
   SYSTEM: { label: "Sistema", icon: IconSettings },
+  PRODUCTION: { label: "Produção", icon: IconClipboardList },
+  STOCK: { label: "Estoque", icon: IconPackage },
+  USER: { label: "Usuário", icon: IconShield },
   GENERAL: { label: "Geral", icon: IconBell },
 };
 
@@ -462,7 +452,7 @@ export function NotificationPreferencesV2Page() {
   const groupedConfigurations = useMemo(() => {
     if (!configurations) return [];
 
-    const typeOrder = ["TASK", "SERVICE_ORDER", "ORDER", "STOCK", "CUT", "PPE", "VACATION", "WARNING", "SYSTEM", "GENERAL"];
+    const typeOrder = ["SYSTEM", "PRODUCTION", "STOCK", "USER", "GENERAL"];
 
     return Object.entries(configurations)
       .sort(([a], [b]) => {

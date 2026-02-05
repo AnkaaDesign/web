@@ -60,7 +60,7 @@ export function PpeScheduleInfoCard({ schedule, className }: PpeScheduleInfoCard
             <IconCalendar className="h-5 w-5 text-muted-foreground" />
             Informações do Agendamento
           </CardTitle>
-          <Badge variant={schedule.isActive ? "success" : "secondary"}>
+          <Badge variant={schedule.isActive ? "active" : "destructive"}>
             {schedule.isActive ? "Ativo" : "Inativo"}
           </Badge>
         </div>

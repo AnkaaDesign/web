@@ -35,7 +35,7 @@ export function FantasyNameInput({ disabled }: FantasyNameInputProps) {
               ref={field.ref}
               placeholder="Ex: Fornecedor ABC Ltda"
               disabled={disabled}
-              className="transition-all duration-200"
+              transparent={true}
             />
           </FormControl>
           <FormMessage />

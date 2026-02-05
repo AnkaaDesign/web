@@ -29,7 +29,7 @@ import type {
   OrderScheduleBatchUpdateResponse,
   OrderScheduleBatchDeleteResponse,
 } from "../types";
-import { orderScheduleKeys, orderKeys, supplierKeys } from "./queryKeys";
+import { orderScheduleKeys, orderKeys } from "./queryKeys";
 import { createEntityHooks, createSpecializedQueryHook } from "./createEntityHooks";
 
 // =====================================================
@@ -70,7 +70,7 @@ const baseOrderScheduleHooks = createEntityHooks<
   queryKeys: orderScheduleKeys,
   service: orderScheduleService,
   staleTime: 1000 * 60 * 10, // 10 minutes - schedules don't change often
-  relatedQueryKeys: [orderKeys, supplierKeys], // Order schedules affect orders and suppliers
+  relatedQueryKeys: [orderKeys], // Order schedules affect orders
 });
 
 // Export base hooks with standard names
@@ -89,13 +89,6 @@ export const useActiveOrderSchedules = createSpecializedQueryHook<Partial<OrderS
   staleTime: 1000 * 60 * 10, // 10 minutes
 });
 
-// Order schedules by supplier
-export const useOrderSchedulesBySupplier = createSpecializedQueryHook<{ supplierId: string; filters?: Partial<OrderScheduleGetManyFormData> }, OrderScheduleGetManyResponse>({
-  queryKeyFn: ({ supplierId, filters }) => orderScheduleKeys.bySupplier(supplierId, filters),
-  queryFn: ({ supplierId, filters }) => getOrderSchedules({ ...filters, supplierIds: [supplierId] }),
-  staleTime: 1000 * 60 * 10, // 10 minutes
-});
-
 // =====================================================
 // Custom OrderSchedule Mutations with Enhanced Invalidation
 // =====================================================
@@ -107,7 +100,7 @@ export const useOrderScheduleMutations = (options?: {
 }) => {
   const queryClient = useQueryClient();
 
-  const invalidateQueries = (supplierId?: string) => {
+  const invalidateQueries = () => {
     // Invalidate order schedule queries
     queryClient.invalidateQueries({
       queryKey: orderScheduleKeys.all,
@@ -117,16 +110,6 @@ export const useOrderScheduleMutations = (options?: {
     queryClient.invalidateQueries({
       queryKey: orderScheduleKeys.active(),
     });
-
-    // Invalidate supplier queries
-    if (supplierId) {
-      queryClient.invalidateQueries({
-        queryKey: orderScheduleKeys.bySupplier(supplierId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: supplierKeys.detail(supplierId),
-      });
-    }
 
     // Invalidate order queries
     queryClient.invalidateQueries({
@@ -198,9 +181,6 @@ export const useOrderScheduleBatchMutations = (options?: {
     });
     queryClient.invalidateQueries({
       queryKey: orderKeys.all,
-    });
-    queryClient.invalidateQueries({
-      queryKey: supplierKeys.all,
     });
   };
 

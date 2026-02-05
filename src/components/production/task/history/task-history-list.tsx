@@ -27,6 +27,7 @@ import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { hasPrivilege } from "@/utils";
 import { toast } from "sonner";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
+import { canViewCancelledTasks } from "@/utils/permissions/entity-permissions";
 
 // Copy from task state type
 interface CopyFromTaskState {
@@ -75,11 +76,9 @@ export function TaskHistoryList({
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
   );
 
-  // Check if user can view/change status filter (Admin or Financial only, and not explicitly hidden)
-  const canViewStatusFilter = !hideStatusFilter && currentUser && (
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
-  );
+  // Check if user can view/change status filter (Admin, Commercial, or Financial only, and not explicitly hidden)
+  // This allows these sectors to see cancelled tasks in the history by selecting them in the filter
+  const canViewStatusFilter = !hideStatusFilter && canViewCancelledTasks(currentUser);
 
   // Get table state for selected tasks functionality
   const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds, resetSelection } = useTableState({
@@ -406,9 +405,10 @@ export function TaskHistoryList({
       sectors: sectorsData?.data || [],
       customers: customersData?.data || [],
       users: usersData?.data || [],
-      hideStatusTags: hideStatusFilter || !canViewStatusFilter,
+      hideStatusTags: !canViewStatusFilter,
+      defaultStatus: statusFilter,
     });
-  }, [filters, searchingFor, sectorsData?.data, customersData?.data, usersData?.data, onRemoveFilter, canViewStatusFilter, hideStatusFilter]);
+  }, [filters, searchingFor, sectorsData?.data, customersData?.data, usersData?.data, onRemoveFilter, canViewStatusFilter, statusFilter]);
 
   // Handle table data changes
   const handleTableDataChange = useCallback((data: { items: Task[]; totalRecords: number }) => {

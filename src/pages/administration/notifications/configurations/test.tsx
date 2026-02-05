@@ -67,30 +67,30 @@ const CHANNEL_CONFIG = {
   IN_APP: {
     icon: IconBell,
     label: "No App",
-    color: "text-orange-500",
-    borderColor: "border-orange-500",
-    bgColor: "bg-orange-500/20",
+    color: "text-orange-600 dark:text-orange-400",
+    borderColor: "border-orange-200 dark:border-orange-800",
+    bgColor: "bg-orange-50 dark:bg-orange-950",
   },
   PUSH: {
     icon: IconDeviceMobile,
     label: "Push",
-    color: "text-blue-500",
-    borderColor: "border-blue-500",
-    bgColor: "bg-blue-500/20",
+    color: "text-blue-600 dark:text-blue-400",
+    borderColor: "border-blue-200 dark:border-blue-800",
+    bgColor: "bg-blue-50 dark:bg-blue-950",
   },
   EMAIL: {
     icon: IconMail,
     label: "E-mail",
-    color: "text-purple-500",
-    borderColor: "border-purple-500",
-    bgColor: "bg-purple-500/20",
+    color: "text-purple-600 dark:text-purple-400",
+    borderColor: "border-purple-200 dark:border-purple-800",
+    bgColor: "bg-purple-50 dark:bg-purple-950",
   },
   WHATSAPP: {
     icon: IconBrandWhatsapp,
     label: "WhatsApp",
-    color: "text-green-500",
-    borderColor: "border-green-500",
-    bgColor: "bg-green-500/20",
+    color: "text-green-600 dark:text-green-400",
+    borderColor: "border-green-200 dark:border-green-800",
+    bgColor: "bg-green-50 dark:bg-green-950",
   },
 };
 
@@ -421,13 +421,13 @@ export function NotificationConfigurationTestPage() {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-6 overflow-auto">
         <PageHeader
           variant="detail"
-          title={`Testar: ${config.key}`}
+          title={`Testar: ${config.name || config.key}`}
           breadcrumbs={[
             { label: "Início", href: "/" },
             { label: "Administração", href: "/administracao" },
             { label: "Notificações", href: routes.administration.notifications.root },
             { label: "Configurações", href: routes.administration.notifications.configurations.root },
-            { label: config.key, href: routes.administration.notifications.configurations.details(config.key) },
+            { label: config.name || config.key, href: routes.administration.notifications.configurations.details(config.key) },
             { label: "Testar" },
           ]}
           actions={[

@@ -11,6 +11,8 @@ import {
   IconSettings,
   IconPackage,
   IconEye,
+  IconFileText,
+  IconNotes,
 } from "@tabler/icons-react";
 import type { OrderScheduleCreateFormData } from "../../../../schemas";
 import { orderScheduleCreateSchema } from "../../../../schemas";
@@ -24,8 +26,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { ItemsSelector } from "./items-selector";
+import { ItemSelectorTable } from "../../common/item-selector/item-selector-table";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 
 export const OrderScheduleCreateForm = () => {
@@ -62,6 +65,44 @@ export const OrderScheduleCreateForm = () => {
     mode: "onTouched",
     reValidateMode: "onChange",
   });
+
+  // Item selection state for ItemSelectorTable (uses Set<string>)
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+
+  // Sync selected items with form
+  useEffect(() => {
+    form.setValue("items", Array.from(selectedItems));
+  }, [selectedItems, form]);
+
+  // Handle single item selection (toggle)
+  const handleSelectItem = useCallback((itemId: string) => {
+    setSelectedItems((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Handle batch selection (itemData is ignored for order schedule - no quantities/prices needed)
+  const handleBatchSelectItems = useCallback((itemIds: string[], _itemData?: Record<string, { quantity?: number; price?: number; icms?: number; ipi?: number }>) => {
+    setSelectedItems((prev) => {
+      const newSet = new Set(prev);
+      // Check if all items are already selected
+      const allSelected = itemIds.every((id) => newSet.has(id));
+      if (allSelected) {
+        // Deselect all
+        itemIds.forEach((id) => newSet.delete(id));
+      } else {
+        // Select all
+        itemIds.forEach((id) => newSet.add(id));
+      }
+      return newSet;
+    });
+  }, []);
 
   // Group frequencies by their behavior for optimized rendering
   const frequencyGroups = useMemo(
@@ -241,6 +282,8 @@ export const OrderScheduleCreateForm = () => {
   }
 
   const watchedItems = form.watch("items") || [];
+  const watchedName = form.watch("name");
+  const watchedDescription = form.watch("description");
   const watchedFrequency = form.watch("frequency");
   const watchedFrequencyCount = form.watch("frequencyCount");
   const watchedDayOfWeek = form.watch("dayOfWeek");
@@ -289,6 +332,55 @@ export const OrderScheduleCreateForm = () => {
                         <CardDescription>Defina a frequência e período de execução</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
+                          {/* Name and Description */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="flex items-center gap-2">
+                                    <IconFileText className="h-4 w-4" />
+                                    Nome do Agendamento
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="Ex: Pedido semanal de materiais"
+                                      disabled={isSubmitting}
+                                      transparent
+                                      {...field}
+                                      value={field.value || ""}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="flex items-center gap-2">
+                                    <IconNotes className="h-4 w-4" />
+                                    Descrição
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Textarea
+                                      placeholder="Descrição opcional do agendamento"
+                                      disabled={isSubmitting}
+                                      className="resize-none h-10 min-h-[40px]"
+                                      {...field}
+                                      value={field.value || ""}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          {/* Frequency Configuration */}
                           <div className="flex flex-wrap gap-4">
                                 <FormField
                                   control={form.control}
@@ -487,20 +579,27 @@ export const OrderScheduleCreateForm = () => {
 
                 {/* Step 2: Item Selection */}
                 {currentStep === 2 && (
-                  <div className="flex flex-col h-full">
-                    <Card className="w-full flex-1 flex flex-col min-h-0 shadow-sm border border-border">
-                      <CardHeader className="pb-4">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <IconPackage className="h-4 w-4" />
-                          Seleção de Itens
-                        </CardTitle>
-                        <CardDescription>Escolha os itens para este agendamento (mínimo 1)</CardDescription>
-                      </CardHeader>
-                      <CardContent className="flex-1 flex flex-col min-h-0 px-4 py-4">
-                        <ItemsSelector control={form.control} required />
-                      </CardContent>
-                    </Card>
-                  </div>
+                  <ItemSelectorTable
+                    selectedItems={selectedItems}
+                    onSelectItem={handleSelectItem}
+                    onSelectAll={() => {}}
+                    onBatchSelectItems={handleBatchSelectItems}
+                    editableColumns={{
+                      showQuantityInput: false,
+                      showPriceInput: false,
+                      showIcmsInput: false,
+                      showIpiInput: false,
+                    }}
+                    fixedColumnsConfig={{
+                      fixedColumns: ['name'],
+                      fixedReasons: {
+                        name: 'Essencial para identificar o item',
+                      },
+                    }}
+                    defaultColumns={['uniCode', 'name', 'brand', 'supplier', 'quantity', 'reorderPoint']}
+                    storageKey="order-schedule-item-selector"
+                    className="flex-1 min-h-0"
+                  />
                 )}
 
                 {/* Step 3: Review */}
@@ -515,6 +614,21 @@ export const OrderScheduleCreateForm = () => {
                         <CardDescription>Revise as informações antes de cadastrar</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3">
+                        {/* Name and Description */}
+                        {watchedName && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                            <span className="text-sm font-medium text-muted-foreground">Nome</span>
+                            <span className="text-sm font-semibold text-foreground">{watchedName}</span>
+                          </div>
+                        )}
+
+                        {watchedDescription && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                            <span className="text-sm font-medium text-muted-foreground">Descrição</span>
+                            <span className="text-sm font-semibold text-foreground">{watchedDescription}</span>
+                          </div>
+                        )}
+
                         {/* Schedule Information */}
                         <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                           <span className="text-sm font-medium text-muted-foreground">Frequência</span>

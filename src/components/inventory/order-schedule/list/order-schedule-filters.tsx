@@ -5,14 +5,12 @@ import { z } from "zod";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Combobox } from "@/components/ui/combobox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { IconCalendar, IconFilter, IconX, IconSearch } from "@tabler/icons-react";
+import { IconCalendar, IconFilter, IconX, IconTriangleInverted, IconCalendarRepeat } from "@tabler/icons-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -21,11 +19,8 @@ import { SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS } from "../../../../const
 import type { SCHEDULE_FREQUENCY as SCHEDULE_FREQUENCY_TYPE } from "../../../../constants";
 
 const filtersSchema = z.object({
-  searchingFor: z.string().optional(),
   isActive: z.boolean().optional(),
   frequency: z.array(z.enum(Object.values(SCHEDULE_FREQUENCY) as [string, ...string[]])).optional(),
-  supplierIds: z.array(z.string()).optional(),
-  categoryIds: z.array(z.string()).optional(),
   nextRunRange: z
     .object({
       gte: z.date().optional(),
@@ -49,11 +44,8 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
   const form = useForm<OrderScheduleFiltersFormData>({
     resolver: zodResolver(filtersSchema),
     defaultValues: {
-      searchingFor: "",
       isActive: undefined,
       frequency: [],
-      supplierIds: [],
-      categoryIds: [],
       nextRunRange: {
         gte: undefined,
         lte: undefined,
@@ -70,8 +62,6 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
       const cleanValue = {
         ...value,
         frequency: value.frequency?.filter((item): item is string => item !== undefined),
-        categoryIds: value.categoryIds?.filter((item): item is string => item !== undefined),
-        supplierIds: value.supplierIds?.filter((item): item is string => item !== undefined),
       };
       setLocalFilters(cleanValue);
     });
@@ -80,11 +70,8 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
 
   const handleReset = () => {
     form.reset({
-      searchingFor: "",
       isActive: undefined,
       frequency: [],
-      supplierIds: [],
-      categoryIds: [],
       nextRunRange: { gte: undefined, lte: undefined },
     });
   };
@@ -93,6 +80,17 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
     onFiltersChange(localFilters);
     onOpenChange(false);
   };
+
+  // Count active filters
+  const countActiveFilters = () => {
+    let count = 0;
+    if (typeof watchedValues.isActive === "boolean") count++;
+    if (watchedValues.frequency && watchedValues.frequency.length > 0) count++;
+    if (watchedValues.nextRunRange?.gte || watchedValues.nextRunRange?.lte) count++;
+    return count;
+  };
+
+  const activeFilterCount = countActiveFilters();
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -109,93 +107,96 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
 
         <div className="mt-6 space-y-6">
           <Form {...form}>
-            <form className="space-y-8">
-              {/* Search */}
+            <form className="space-y-6">
+              {/* Status Filter */}
               <div className="space-y-2">
-                <Label htmlFor="searchingFor">Buscar</Label>
-                <div className="relative">
-                  <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input {...form.register("searchingFor")} placeholder="Buscar por fornecedor, categoria..." className="pl-9" />
-                </div>
-              </div>
-
-              {/* Active Status Toggle */}
-              <div className="flex items-center justify-between">
-                <Label htmlFor="isActive">Apenas cronogramas ativos</Label>
-                <Switch id="isActive" checked={watchedValues.isActive === true} onCheckedChange={(checked) => form.setValue("isActive", checked ? true : undefined)} />
+                <Label className="flex items-center gap-2">
+                  <IconTriangleInverted className="h-4 w-4" />
+                  Status
+                </Label>
+                <Combobox
+                  mode="single"
+                  options={[
+                    { value: "ambos", label: "Ambos" },
+                    { value: "ativo", label: "Ativo" },
+                    { value: "inativo", label: "Inativo" },
+                  ]}
+                  value={
+                    watchedValues.isActive === true ? "ativo" :
+                    watchedValues.isActive === false ? "inativo" :
+                    "ambos"
+                  }
+                  onValueChange={(value) => {
+                    form.setValue("isActive", value === "ativo" ? true : value === "inativo" ? false : undefined);
+                  }}
+                  placeholder="Selecione..."
+                  emptyText="Nenhuma opção encontrada"
+                />
               </div>
 
               {/* Frequency Filter */}
               <div className="space-y-2">
-                <Label>Frequência</Label>
+                <Label className="flex items-center gap-2">
+                  <IconCalendarRepeat className="h-4 w-4" />
+                  Frequência
+                </Label>
                 <Combobox
-                  value=""
-                  onChange={(value) => {
-                    const currentFrequency = watchedValues.frequency || [];
-                    if (value && !currentFrequency.includes(value as SCHEDULE_FREQUENCY)) {
-                      form.setValue("frequency", [...currentFrequency, value as SCHEDULE_FREQUENCY]);
-                    }
-                  }}
+                  mode="multiple"
                   options={Object.values(SCHEDULE_FREQUENCY).map((frequency) => ({
                     value: frequency,
                     label: SCHEDULE_FREQUENCY_LABELS[frequency],
                   }))}
-                  placeholder="Adicionar frequência"
+                  value={watchedValues.frequency || []}
+                  onValueChange={(value) => {
+                    form.setValue("frequency", value.length > 0 ? value as SCHEDULE_FREQUENCY_TYPE[] : undefined);
+                  }}
+                  placeholder="Selecione frequências..."
+                  emptyText="Nenhuma frequência encontrada"
+                  searchPlaceholder="Buscar frequência..."
                 />
-
                 {watchedValues.frequency && watchedValues.frequency.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {watchedValues.frequency.map((freq) => (
-                      <Badge key={freq} variant="secondary" className="text-xs">
-                        {SCHEDULE_FREQUENCY_LABELS[freq as SCHEDULE_FREQUENCY_TYPE]}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-auto p-0 ml-1 text-muted-foreground hover:text-foreground"
-                          onClick={() => {
-                            const newFrequency = watchedValues.frequency!.filter((f) => f !== freq);
-                            form.setValue("frequency", newFrequency);
-                          }}
-                        >
-                          <IconX className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    ))}
+                  <div className="text-xs text-muted-foreground">
+                    {watchedValues.frequency.length} frequência{watchedValues.frequency.length !== 1 ? "s" : ""} selecionada{watchedValues.frequency.length !== 1 ? "s" : ""}
                   </div>
                 )}
               </div>
 
               {/* Date Range Filters */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Próxima execução - De</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !watchedValues.nextRunRange?.gte && "text-muted-foreground")}>
-                        <IconCalendar className="mr-2 h-4 w-4" />
-                        {watchedValues.nextRunRange?.gte ? format(watchedValues.nextRunRange.gte, "PPP", { locale: ptBR }) : "Selecione a data"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={watchedValues.nextRunRange?.gte} onSelect={(date) => form.setValue("nextRunRange.gte", date)} initialFocus />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <IconCalendar className="h-4 w-4" />
+                  Próxima Execução
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">De</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !watchedValues.nextRunRange?.gte && "text-muted-foreground")}>
+                          <IconCalendar className="mr-2 h-4 w-4" />
+                          {watchedValues.nextRunRange?.gte ? format(watchedValues.nextRunRange.gte, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={watchedValues.nextRunRange?.gte} onSelect={(date) => form.setValue("nextRunRange.gte", date)} initialFocus />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label>Próxima execução - Até</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !watchedValues.nextRunRange?.lte && "text-muted-foreground")}>
-                        <IconCalendar className="mr-2 h-4 w-4" />
-                        {watchedValues.nextRunRange?.lte ? format(watchedValues.nextRunRange.lte, "PPP", { locale: ptBR }) : "Selecione a data"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={watchedValues.nextRunRange?.lte} onSelect={(date) => form.setValue("nextRunRange.lte", date)} initialFocus />
-                    </PopoverContent>
-                  </Popover>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Até</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !watchedValues.nextRunRange?.lte && "text-muted-foreground")}>
+                          <IconCalendar className="mr-2 h-4 w-4" />
+                          {watchedValues.nextRunRange?.lte ? format(watchedValues.nextRunRange.lte, "dd/MM/yyyy", { locale: ptBR }) : "Selecione"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={watchedValues.nextRunRange?.lte} onSelect={(date) => form.setValue("nextRunRange.lte", date)} initialFocus />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
               </div>
             </form>
@@ -205,10 +206,15 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
           <div className="flex gap-2 mt-6 pt-4 border-t">
             <Button variant="outline" onClick={handleReset} className="flex-1">
               <IconX className="h-4 w-4 mr-2" />
-              Limpar
+              Limpar todos
             </Button>
             <Button onClick={handleApply} className="flex-1">
-              Aplicar Filtros
+              Aplicar filtros
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {activeFilterCount}
+                </Badge>
+              )}
             </Button>
           </div>
         </div>

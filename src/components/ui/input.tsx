@@ -430,12 +430,17 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       return baseSpeed + (Math.random() - 0.5) * variation;
     }, [typingSpeed]);
 
-    // Update internal value when prop changes
+    // Update internal value when prop changes (only in controlled mode)
+    // Skip when value is undefined - this means the input is uncontrolled (e.g., using react-hook-form register())
     React.useEffect(() => {
+      if (value === undefined) {
+        return;
+      }
+
       // For currency, handle special formatting
       if (type === "currency") {
         if (!inputRef.current?.matches(":focus")) {
-          const cents = value !== undefined && value !== null ? Math.round(value * 100) : 0;
+          const cents = value !== null ? Math.round(Number(value) * 100) : 0;
 
           if (cents === 0) {
             // Keep empty for placeholder
@@ -1526,6 +1531,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
     const currentDisplayValue = naturalTyping ? displayValue : internalValue;
 
+    // For simple text/email/password inputs without a value prop (uncontrolled mode with register()),
+    // don't set the value attribute - let react-hook-form control it via refs
+    const isUncontrolledTextInput = value === undefined && ["text", "email", "password"].includes(type);
+
     return (
       <div className="relative w-full">
         <input
@@ -1538,7 +1547,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             withIcon && "pr-10",
             className,
           )}
-          value={currentDisplayValue}
+          {...(isUncontrolledTextInput ? {} : { value: currentDisplayValue })}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onCompositionStart={handleCompositionStart}

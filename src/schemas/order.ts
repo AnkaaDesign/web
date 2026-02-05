@@ -780,8 +780,7 @@ const orderScheduleFilters = {
       }),
     )
     .optional(),
-  supplierIds: z.array(z.string()).optional(),
-  categoryIds: z.array(z.string()).optional(),
+  itemIds: z.array(z.string()).optional(),
   nextRunRange: z
     .object({
       gte: z.coerce.date().optional(),
@@ -1092,16 +1091,10 @@ const orderScheduleTransform = (data: any) => {
     delete data.frequency;
   }
 
-  // Handle supplierIds filter
-  if (data.supplierIds && Array.isArray(data.supplierIds) && data.supplierIds.length > 0) {
-    andConditions.push({ supplierId: { in: data.supplierIds } });
-    delete data.supplierIds;
-  }
-
-  // Handle categoryIds filter
-  if (data.categoryIds && Array.isArray(data.categoryIds) && data.categoryIds.length > 0) {
-    andConditions.push({ categoryId: { in: data.categoryIds } });
-    delete data.categoryIds;
+  // Handle itemIds filter (filter schedules that have any of the specified items)
+  if (data.itemIds && Array.isArray(data.itemIds) && data.itemIds.length > 0) {
+    andConditions.push({ items: { hasSome: data.itemIds } });
+    delete data.itemIds;
   }
 
   // Handle nextRunRange filter
@@ -1304,7 +1297,7 @@ export const orderCreateSchema = z
       })
       .nullable()
       .optional(),
-    paymentPix: z.string().max(100, "Chave Pix deve ter no máximo 100 caracteres").nullable().optional(),
+    paymentPix: z.string().max(500, "Chave Pix deve ter no máximo 500 caracteres").nullable().optional(),
     paymentDueDays: z
       .number()
       .int("Prazo de vencimento deve ser um número inteiro")
@@ -1390,7 +1383,7 @@ export const orderUpdateSchema = z
       })
       .nullable()
       .optional(),
-    paymentPix: z.string().max(100, "Chave Pix deve ter no máximo 100 caracteres").nullable().optional(),
+    paymentPix: z.string().max(500, "Chave Pix deve ter no máximo 500 caracteres").nullable().optional(),
     paymentDueDays: z
       .number()
       .int("Prazo de vencimento deve ser um número inteiro")

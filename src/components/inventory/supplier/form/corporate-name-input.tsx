@@ -31,7 +31,7 @@ export function CorporateNameInput({ disabled }: CorporateNameInputProps) {
               onBlur={field.onBlur}
               placeholder="Ex: Fornecedor ABC Comercial Ltda"
               disabled={disabled}
-              className="transition-all duration-200"
+              transparent={true}
             />
           </FormControl>
           <FormMessage />

@@ -135,6 +135,11 @@ export const routes = {
       list: "/recursos-humanos/feriados",
       root: "/recursos-humanos/feriados",
     },
+    horarios: {
+      root: "/recursos-humanos/horarios",
+      list: "/recursos-humanos/horarios",
+      details: (id: string) => `/recursos-humanos/horarios/detalhes/${id}`,
+    },
     positions: {
       batchEdit: "/recursos-humanos/cargos/editar-em-lote",
       create: "/recursos-humanos/cargos/cadastrar",

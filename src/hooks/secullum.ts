@@ -20,6 +20,8 @@ export const secullumKeys = {
   approvedRequests: (params?: any) => [...secullumKeys.all, "approved-requests", params] as const,
   pendencias: (userCpf?: string) => [...secullumKeys.all, "pendencias", userCpf] as const,
   timeEntries: (params?: any) => [...secullumKeys.all, "time-entries", params] as const,
+  horarios: (params?: any) => [...secullumKeys.all, "horarios", params] as const,
+  horarioDetail: (id: number | string) => [...secullumKeys.all, "horarios", "detail", id] as const,
 };
 
 // Authentication hooks
@@ -542,5 +544,23 @@ export const useSecullumSyncUserMapping = () => {
     onError: (_error: any) => {
       toast.error(_error.response?.data?.message || "Erro ao sincronizar mapeamento de usuários");
     },
+  });
+};
+
+// Schedules (Horarios) hooks
+export const useSecullumHorarios = (params?: { incluirDesativados?: boolean }) => {
+  return useQuery({
+    queryKey: secullumKeys.horarios(params),
+    queryFn: () => secullumService.getHorarios(params),
+    staleTime: 10 * 60 * 1000, // 10 minutes - schedules don't change often
+  });
+};
+
+export const useSecullumHorarioById = (id: number | string, options?: { enabled?: boolean }) => {
+  return useQuery({
+    queryKey: secullumKeys.horarioDetail(id),
+    queryFn: () => secullumService.getHorarioById(id),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    enabled: options?.enabled !== false && !!id,
   });
 };

@@ -48,15 +48,11 @@ import { toast } from 'sonner';
 
 // Enums (would come from your types file)
 enum NOTIFICATION_TYPE {
-  TASK = 'TASK',
-  ORDER = 'ORDER',
-  SERVICE_ORDER = 'SERVICE_ORDER',
-  PPE = 'PPE',
-  VACATION = 'VACATION',
-  WARNING = 'WARNING',
+  SYSTEM = 'SYSTEM',
+  PRODUCTION = 'PRODUCTION',
   STOCK = 'STOCK',
-  GENERAL = 'GENERAL',
-  SYSTEM = 'SYSTEM'
+  USER = 'USER',
+  GENERAL = 'GENERAL'
 }
 
 enum NOTIFICATION_CHANNEL {
@@ -158,7 +154,7 @@ const importanceColors = {
 export default function CreateNotificationConfiguration() {
   const [config, setConfig] = useState<NotificationConfiguration>({
     key: '',
-    notificationType: NOTIFICATION_TYPE.TASK,
+    notificationType: NOTIFICATION_TYPE.PRODUCTION,
     eventType: '',
     description: '',
     enabled: true,

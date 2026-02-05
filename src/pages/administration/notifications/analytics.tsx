@@ -204,7 +204,7 @@ const fetchNotificationDetail = async (id: string): Promise<NotificationDetail> 
   // Mock data - replace with actual API call
   return {
     id,
-    type: "TASK",
+    type: "PRODUCTION",
     title: "New Task Assigned",
     body: "You have been assigned a new task: Complete project documentation",
     sentAt: new Date().toISOString(),

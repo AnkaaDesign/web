@@ -201,20 +201,19 @@ export function EpiForm(props: EpiFormProps) {
   const isRequired = mode === "create";
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4">
-        <Form {...form}>
-          <form
-            id="epi-form"
-            onSubmit={form.handleSubmit(handleSubmit, (errors) => {
-              if (process.env.NODE_ENV !== 'production') {
-                console.error("EPI form validation errors:", errors);
-              }
-            })}
-            className="container mx-auto max-w-4xl space-y-6"
-          >
-            {/* Hidden submit button for programmatic form submission */}
-            <button type="submit" id="epi-form-submit" className="hidden" aria-hidden="true" />
+    <Form {...form}>
+      <form
+        id="epi-form"
+        onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+          if (process.env.NODE_ENV !== 'production') {
+            console.error("EPI form validation errors:", errors);
+          }
+        })}
+        className="container mx-auto max-w-4xl"
+      >
+        {/* Hidden submit button for programmatic form submission */}
+        <button type="submit" id="epi-form-submit" className="hidden" aria-hidden="true" />
+        <div className="space-y-4">
 
             {/* Basic Information */}
             <Card>
@@ -352,9 +351,8 @@ export function EpiForm(props: EpiFormProps) {
                 </CardContent>
               </Card>
             )}
-          </form>
-        </Form>
-      </div>
-    </div>
+        </div>
+      </form>
+    </Form>
   );
 }

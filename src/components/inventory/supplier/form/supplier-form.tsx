@@ -14,6 +14,7 @@ import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
 import { FantasyNameInput } from "./fantasy-name-input";
 import { CorporateNameInput } from "./corporate-name-input";
 import { FormInput } from "@/components/ui/form-input";
+import { PixKeyInput } from "./pix-key-input";
 import { WebsiteInput } from "./website-input";
 import { PhoneArrayInput } from "@/components/ui/phone-array-input";
 import { AddressInput } from "@/components/ui/form-address-input";
@@ -114,8 +115,8 @@ export function SupplierForm(props: SupplierFormProps) {
       tags: [],
       logoId: null,
     }),
-    mode: "onTouched", // Validate only after field is touched to avoid premature validation
-    reValidateMode: "onChange", // After first validation, check on every change
+    mode: "onChange", // Validate on every change so isValid stays in sync with programmatic setValue calls
+    reValidateMode: "onChange", // Re-validate on every change
     shouldFocusError: true, // Focus on first error field when validation fails
     criteriaMode: "all", // Show all errors for better UX
   });
@@ -155,6 +156,10 @@ export function SupplierForm(props: SupplierFormProps) {
           form.setValue("phones", [...currentPhones, ...newPhones], { shouldDirty: true, shouldValidate: true });
         }
       }
+
+      // Trigger full form validation after autofill to update isValid state
+      // (mode: "onTouched" doesn't recompute isValid for programmatically set fields)
+      form.trigger();
     },
   });
 
@@ -407,12 +412,7 @@ export function SupplierForm(props: SupplierFormProps) {
               <CardDescription>Chave Pix para pagamentos</CardDescription>
             </CardHeader>
             <CardContent>
-              <FormInput<SupplierCreateFormData | SupplierUpdateFormData>
-                name="pix"
-                label="Chave Pix"
-                placeholder="CPF, CNPJ, E-mail, Telefone ou Chave Aleatória"
-                disabled={isSubmitting}
-              />
+              <PixKeyInput disabled={isSubmitting} />
             </CardContent>
           </Card>
 

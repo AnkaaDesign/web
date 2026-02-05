@@ -283,8 +283,10 @@ export function CollapsedGroupRow({
 
       {/* Service order columns with sums */}
       {visibleServiceOrderColumns.map((column) => (
-        <TableCell key={column.id} className={cn(column.cellClassName, column.className, "px-4 py-1")}>
-          {renderServiceOrderCell(column.id)}
+        <TableCell key={column.id} className={cn("overflow-hidden", column.cellClassName, column.className, "px-4 py-1")}>
+          <div className="truncate">
+            {renderServiceOrderCell(column.id)}
+          </div>
         </TableCell>
       ))}
     </TableRow>

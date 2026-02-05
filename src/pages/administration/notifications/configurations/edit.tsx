@@ -8,7 +8,7 @@
  * - Business rules (work hours, batching, frequency)
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm, FormProvider, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -61,12 +61,16 @@ const configurationSchema = z.object({
   key: z
     .string()
     .min(3, "Chave deve ter no mínimo 3 caracteres")
-    .regex(/^[A-Z][A-Z0-9_]*$/, "Chave deve começar com letra maiúscula e conter apenas letras, números e underscore"),
+    .regex(/^[a-z][a-z0-9_.]*$/, "Chave deve começar com letra minúscula e conter apenas letras minúsculas, números, underscore e ponto"),
+  name: z
+    .string()
+    .min(3, "Nome deve ter no mínimo 3 caracteres")
+    .max(100, "Nome deve ter no máximo 100 caracteres"),
   eventType: z
     .string()
     .min(3, "Tipo de evento deve ter no mínimo 3 caracteres"),
   description: z.string().optional(),
-  notificationType: z.enum(["SYSTEM", "TASK", "ORDER", "SERVICE_ORDER", "STOCK", "PPE", "VACATION", "WARNING", "CUT", "GENERAL"]),
+  notificationType: z.enum(["SYSTEM", "PRODUCTION", "STOCK", "USER", "GENERAL"]),
   importance: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]),
   enabled: z.boolean(),
   workHoursOnly: z.boolean(),
@@ -89,14 +93,9 @@ type ConfigurationFormData = z.infer<typeof configurationSchema>;
 
 const NOTIFICATION_TYPES = [
   { value: "SYSTEM", label: "Sistema" },
-  { value: "TASK", label: "Tarefas" },
-  { value: "ORDER", label: "Pedidos" },
-  { value: "SERVICE_ORDER", label: "Ordens de Serviço" },
+  { value: "PRODUCTION", label: "Produção" },
   { value: "STOCK", label: "Estoque" },
-  { value: "PPE", label: "EPI" },
-  { value: "VACATION", label: "Férias" },
-  { value: "WARNING", label: "Advertências" },
-  { value: "CUT", label: "Recortes" },
+  { value: "USER", label: "Usuário" },
   { value: "GENERAL", label: "Geral" },
 ];
 
@@ -286,11 +285,13 @@ export function NotificationConfigurationEditPage() {
   const { update: updateMutation } = useNotificationConfigurationMutations();
 
   const config = response?.data;
+  const initializedForKey = useRef<string | null>(null);
 
   const form = useForm<ConfigurationFormData>({
     resolver: zodResolver(configurationSchema),
     defaultValues: {
       key: "",
+      name: "",
       eventType: "",
       description: "",
       notificationType: "GENERAL",
@@ -314,14 +315,17 @@ export function NotificationConfigurationEditPage() {
     },
   });
 
-  // Load config data into form
+  // Load config data into form only once per config key
   useEffect(() => {
-    if (config) {
+    if (config && initializedForKey.current !== config.key) {
+      initializedForKey.current = config.key;
+
       // Map existing channel configs
       const channelMap = new Map(config.channelConfigs?.map((ch) => [ch.channel, ch]) || []);
 
       form.reset({
         key: config.key,
+        name: config.name || "",
         eventType: config.eventType,
         description: config.description || "",
         notificationType: config.notificationType as any,
@@ -347,7 +351,8 @@ export function NotificationConfigurationEditPage() {
         },
       });
     }
-  }, [config, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config]);
 
   const onSubmit = async (data: ConfigurationFormData) => {
     if (!config?.id) return;
@@ -357,6 +362,7 @@ export function NotificationConfigurationEditPage() {
 
       const payload = {
         key: data.key,
+        name: data.name,
         eventType: data.eventType,
         description: data.description || undefined,
         notificationType: data.notificationType as any,
@@ -454,14 +460,14 @@ export function NotificationConfigurationEditPage() {
         <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
           <div className="container mx-auto max-w-5xl flex-shrink-0">
             <PageHeader
-              title={`Editar: ${config.key}`}
+              title={`Editar: ${config.name || config.key}`}
               icon={IconSettings}
               breadcrumbs={[
                 { label: "Início", href: "/" },
                 { label: "Administração", href: "/administracao" },
                 { label: "Notificações", href: routes.administration.notifications.root },
                 { label: "Configurações", href: routes.administration.notifications.configurations.root },
-                { label: config.key, href: routes.administration.notifications.configurations.details(config.key) },
+                { label: config.name || config.key, href: routes.administration.notifications.configurations.details(config.key) },
                 { label: "Editar" },
               ]}
               variant="form"
@@ -505,7 +511,7 @@ export function NotificationConfigurationEditPage() {
                       </Label>
                       <Input
                         id="key"
-                        placeholder="Ex: TASK_CREATED"
+                        placeholder="Ex: service_order.completed"
                         transparent
                         {...form.register("key")}
                       />
@@ -518,19 +524,37 @@ export function NotificationConfigurationEditPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="eventType">
-                        Tipo de Evento <span className="text-destructive">*</span>
+                      <Label htmlFor="name">
+                        Nome <span className="text-destructive">*</span>
                       </Label>
                       <Input
-                        id="eventType"
-                        placeholder="Ex: task.created"
+                        id="name"
+                        placeholder="Ex: Ordem de Serviço Concluída"
                         transparent
-                        {...form.register("eventType")}
+                        {...form.register("name")}
                       />
-                      {form.formState.errors.eventType && (
-                        <p className="text-sm text-destructive">{form.formState.errors.eventType.message}</p>
+                      {form.formState.errors.name && (
+                        <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
                       )}
+                      <p className="text-xs text-muted-foreground">
+                        Nome amigável exibido aos usuários
+                      </p>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="eventType">
+                      Tipo de Evento <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="eventType"
+                      placeholder="Ex: task.created"
+                      transparent
+                      {...form.register("eventType")}
+                    />
+                    {form.formState.errors.eventType && (
+                      <p className="text-sm text-destructive">{form.formState.errors.eventType.message}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">

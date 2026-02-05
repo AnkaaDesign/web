@@ -386,6 +386,8 @@ export const OrderCreateForm = () => {
             toast.error(errors.description.message || "Erro na descrição");
           } else if (errors.items) {
             toast.error("Erro nos itens selecionados");
+          } else if (errors.paymentPix) {
+            toast.error(errors.paymentPix.message || "Erro na chave Pix");
           } else {
             toast.error("Por favor, corrija os erros no formulário");
           }
@@ -561,6 +563,8 @@ export const OrderCreateForm = () => {
         }
         if (errors.description) {
           toast.error(errors.description.message || "Erro na descrição");
+        } else if (errors.paymentPix) {
+          toast.error(errors.paymentPix.message || "Erro na chave Pix");
         } else {
           toast.error("Por favor, corrija os erros no formulário");
         }
@@ -1583,7 +1587,7 @@ export const OrderCreateForm = () => {
                       </CardHeader>
                       <CardContent>
                         {orderItemMode === "inventory" ? (
-                          <div className="rounded-md border overflow-hidden w-full">
+                          <div className="rounded-md border border-border/40 overflow-hidden w-full">
                             <Table>
                               <TableHeader>
                                 <TableRow className="bg-muted/50">
@@ -1646,7 +1650,7 @@ export const OrderCreateForm = () => {
                           </Table>
                         </div>
                         ) : (
-                          <div className="rounded-md border overflow-hidden w-full">
+                          <div className="rounded-md border border-border/40 overflow-hidden w-full">
                             <Table>
                               <TableHeader>
                                 <TableRow className="bg-muted/50">

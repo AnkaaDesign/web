@@ -350,7 +350,7 @@ export function TaskPreparationTable({
   }
 
   return (
-    <div className={cn("rounded-lg border border-border relative", className)}>
+    <div className={cn("rounded-lg border border-border relative overflow-clip", className)}>
       <Table className="w-full table-fixed [&>div]:border-0 [&>div]:rounded-none">
         <TableHeader>
           <TableRow className="bg-muted hover:bg-muted border-b-2 border-border">
@@ -506,17 +506,27 @@ export function TaskPreparationTable({
                       </TableCell>
                     )}
                     {columns.map((column) => (
-                      <TableCell key={column.id} className={cn(column.cellClassName, column.className, "px-4 py-1")}>
-                        {column.formatter
-                          ? column.formatter(
-                              column.accessorFn
-                                ? column.accessorFn(task)
-                                : task[column.accessorKey as keyof Task],
-                              task,
-                            )
-                          : column.accessorFn
-                            ? column.accessorFn(task)
-                            : task[column.accessorKey as keyof Task]}
+                      <TableCell
+                        key={column.id}
+                        className={cn("overflow-hidden", column.cellClassName, column.className, "px-4 py-1")}
+                        style={{
+                          width: getColumnWidth(column.id),
+                          minWidth: COLUMN_WIDTH_CONSTRAINTS.minWidth,
+                          maxWidth: COLUMN_WIDTH_CONSTRAINTS.maxWidth,
+                        }}
+                      >
+                        <div className="truncate">
+                          {column.formatter
+                            ? column.formatter(
+                                column.accessorFn
+                                  ? column.accessorFn(task)
+                                  : task[column.accessorKey as keyof Task],
+                                task,
+                              )
+                            : column.accessorFn
+                              ? column.accessorFn(task)
+                              : task[column.accessorKey as keyof Task]}
+                        </div>
                       </TableCell>
                     ))}
                   </TableRow>
@@ -663,17 +673,27 @@ export function TaskPreparationTable({
                   </TableCell>
                 )}
                 {columns.map((column) => (
-                  <TableCell key={column.id} className={cn(column.cellClassName, column.className, "px-4 py-1")}>
-                    {column.formatter
-                      ? column.formatter(
-                          column.accessorFn
-                            ? column.accessorFn(task)
-                            : task[column.accessorKey as keyof Task],
-                          task,
-                        )
-                      : column.accessorFn
-                        ? column.accessorFn(task)
-                        : task[column.accessorKey as keyof Task]}
+                  <TableCell
+                    key={column.id}
+                    className={cn("overflow-hidden", column.cellClassName, column.className, "px-4 py-1")}
+                    style={{
+                      width: getColumnWidth(column.id),
+                      minWidth: COLUMN_WIDTH_CONSTRAINTS.minWidth,
+                      maxWidth: COLUMN_WIDTH_CONSTRAINTS.maxWidth,
+                    }}
+                  >
+                    <div className="truncate">
+                      {column.formatter
+                        ? column.formatter(
+                            column.accessorFn
+                              ? column.accessorFn(task)
+                              : task[column.accessorKey as keyof Task],
+                            task,
+                          )
+                        : column.accessorFn
+                          ? column.accessorFn(task)
+                          : task[column.accessorKey as keyof Task]}
+                    </div>
                   </TableCell>
                 ))}
               </TableRow>

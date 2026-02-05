@@ -504,6 +504,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       const updateData: any = {};
       // Declare file arrays at function scope so they're accessible later
       let newArtworkFiles: File[] = [];
+      let newBaseFiles: File[] = [];
 
       switch (operationType) {
         case "arts":
@@ -568,8 +569,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
           break;
 
         case "baseFiles":
-          // Get new base files that need to be uploaded
-          const newBaseFiles = baseFiles.filter(f => f instanceof File) as File[];
+          // Get new base files that need to be uploaded (via FormData, like artworks)
+          newBaseFiles = baseFiles.filter(f => f instanceof File) as File[];
 
           // Get filenames that should be kept (from existing files in baseFiles state)
           // These are the COMMON base files that the user chose to keep
@@ -583,22 +584,13 @@ export const AdvancedBulkActionsHandler = forwardRef<
             (f: any) => f.originalName || f.name
           );
 
-          // Upload new base files FIRST to get their IDs
-          let uploadedBaseFileIds: string[] = [];
-          if (newBaseFiles.length > 0) {
-            const uploadResponse = await fileService.uploadFiles(newBaseFiles, {
-              fileContext: 'baseFile',
-              entityType: 'task',
-            });
-            if (uploadResponse.success && uploadResponse.data?.successful) {
-              uploadedBaseFileIds = uploadResponse.data.successful.map(f => f.id);
-            }
-          }
+          // NOTE: We no longer upload files separately. Files will be sent WITH the batch update request.
+          // The backend /tasks/batch endpoint now accepts FormData with both JSON data and files.
 
           // For each task, compute the final baseFileIds:
           // 1. Keep ALL non-common base files (unique to this task) - user couldn't remove them
           // 2. Keep common base files only if user kept them in keptBaseFileFilenames
-          // 3. Add newly uploaded files to all tasks (shared)
+          // 3. New files will be uploaded via FormData and backend will add them automatically
           const perTaskBaseFileIds: Record<string, string[]> = {};
           currentTasks.forEach(task => {
             const taskBaseFileIds: string[] = [];
@@ -623,15 +615,14 @@ export const AdvancedBulkActionsHandler = forwardRef<
               }
             });
 
-            // Add newly uploaded files (shared across all tasks)
-            taskBaseFileIds.push(...uploadedBaseFileIds);
-
+            // New base files will be appended by the backend when processing FormData
             perTaskBaseFileIds[task.id] = taskBaseFileIds;
           });
 
           // Store per-task data
           if (newBaseFiles.length > 0 || commonBaseFilenames.length > 0) {
             updateData._perTaskBaseFileIds = perTaskBaseFileIds;
+            updateData._hasNewBaseFiles = newBaseFiles.length > 0;
           }
           break;
 
@@ -948,12 +939,14 @@ export const AdvancedBulkActionsHandler = forwardRef<
       const perTaskBaseFileIds = updateData._perTaskBaseFileIds;
       const perTaskTruckUpdates = updateData._perTaskTruckUpdates;
       const hasNewArtworkFiles = updateData._hasNewArtworkFiles;
+      const hasNewBaseFiles = updateData._hasNewBaseFiles;
       const layoutPhotoFiles = updateData._layoutPhotoFiles as Array<{ side: string; file: File }> | undefined;
 
       delete updateData._perTaskArtworkIds;
       delete updateData._perTaskBaseFileIds;
       delete updateData._perTaskTruckUpdates;
       delete updateData._hasNewArtworkFiles;
+      delete updateData._hasNewBaseFiles;
       delete updateData._layoutPhotoFiles;
 
       const hasPerTaskData = perTaskArtworkIds || perTaskBaseFileIds || perTaskTruckUpdates;
@@ -997,8 +990,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
       // Check if we need to send as FormData (files present)
       const hasArtworkFilesToUpload = hasNewArtworkFiles && newArtworkFiles.length > 0;
+      const hasBaseFilesToUpload = hasNewBaseFiles && newBaseFiles.length > 0;
       const hasLayoutPhotoFiles = layoutPhotoFiles && layoutPhotoFiles.length > 0;
-      const needsFormData = hasArtworkFilesToUpload || hasLayoutPhotoFiles;
+      const needsFormData = hasArtworkFilesToUpload || hasBaseFilesToUpload || hasLayoutPhotoFiles;
 
       if (needsFormData) {
         const formData = new FormData();
@@ -1010,6 +1004,13 @@ export const AdvancedBulkActionsHandler = forwardRef<
         if (hasArtworkFilesToUpload) {
           newArtworkFiles.forEach((file) => {
             formData.append('artworks', file);
+          });
+        }
+
+        // Add base files if present (same pattern as artworks)
+        if (hasBaseFilesToUpload) {
+          newBaseFiles.forEach((file) => {
+            formData.append('baseFiles', file);
           });
         }
 

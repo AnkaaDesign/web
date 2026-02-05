@@ -1,11 +1,8 @@
 import React, { useState, useMemo } from "react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,27 +13,51 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { IconCalendar, IconClock, IconDots, IconPackage, IconPlayerPause, IconPlayerPlay, IconEdit, IconEye, IconCircleCheck, IconCircleX, IconTrash, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
+import {
+  IconEdit,
+  IconTrash,
+  IconChevronUp,
+  IconChevronDown,
+  IconSelector,
+  IconPlayerPlay,
+  IconPlayerPause,
+  IconCalendarRepeat,
+} from "@tabler/icons-react";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { useAuth } from "../../../../hooks/useAuth";
-import { canEditOrders, canDeleteOrders } from "@/utils/permissions/entity-permissions";
+import { canEditOrders, canDeleteOrders, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { useOrderSchedules, useOrderScheduleMutations } from "../../../../hooks";
 import type { OrderScheduleGetManyFormData } from "../../../../schemas";
-import { getDynamicFrequencyLabel } from "../../../../constants";
+import { routes } from "../../../../constants";
 import type { OrderSchedule } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
+import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
+import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { createOrderScheduleColumns, type OrderScheduleColumn } from "./order-schedule-table-columns";
 
 interface OrderScheduleTableProps {
   visibleColumns: Set<string>;
   className?: string;
-  onEdit?: (schedule: OrderSchedule) => void;
-  onView?: (schedule: OrderSchedule) => void;
   filters?: Partial<OrderScheduleGetManyFormData>;
+  onDataChange?: (data: { schedules: OrderSchedule[]; totalRecords: number }) => void;
+  onActivate?: (schedules: OrderSchedule[]) => void;
+  onDeactivate?: (schedules: OrderSchedule[]) => void;
+  onDelete?: (schedules: OrderSchedule[]) => void;
 }
 
-export function OrderScheduleTable({ visibleColumns, className, onEdit, onView, filters = {} }: OrderScheduleTableProps) {
+export function OrderScheduleTable({
+  visibleColumns,
+  className,
+  filters = {},
+  onDataChange,
+  onActivate,
+  onDeactivate,
+  onDelete,
+}: OrderScheduleTableProps) {
+  const navigate = useNavigate();
+
   // Delete confirmation dialog state
   const [deleteDialog, setDeleteDialog] = useState<{
     items: OrderSchedule[];
@@ -46,10 +67,14 @@ export function OrderScheduleTable({ visibleColumns, className, onEdit, onView, 
   // Permission checks
   const { user } = useAuth();
   const canEdit = user ? canEditOrders(user) : false;
-  const canDelete = user ? canDeleteOrders(user) : false;
+  const canDeleteSchedule = user ? canDeleteOrders(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, "order") : false;
 
   // Mutations
-  const { delete: deleteSchedule } = useOrderScheduleMutations();
+  const { delete: deleteSchedule, update: updateSchedule } = useOrderScheduleMutations();
+
+  // Get scrollbar width info
+  const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
 
   // Use URL state management for pagination and selection
   const {
@@ -63,10 +88,12 @@ export function OrderScheduleTable({ visibleColumns, className, onEdit, onView, 
     toggleSelectAll,
     toggleSort,
     getSortDirection,
+    getSortOrder,
     isSelected,
     isAllSelected,
     isPartiallySelected,
     selectionCount,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -79,252 +106,389 @@ export function OrderScheduleTable({ visibleColumns, className, onEdit, onView, 
       page: page + 1,
       limit: pageSize,
       orderBy: convertSortConfigsToOrderBy(
-        sortConfigs.length > 0
-          ? sortConfigs
-          : [{ column: "createdAt", direction: "desc" }],
+        sortConfigs.length > 0 ? sortConfigs : [{ column: "createdAt", direction: "desc" }]
       ),
     }),
-    [filters, page, pageSize, sortConfigs],
+    [filters, page, pageSize, sortConfigs]
   );
 
   // Fetch data
-  const { data, isLoading } = useOrderSchedules(queryParams);
+  const { data, isLoading, error } = useOrderSchedules(queryParams);
 
   const schedules = data?.data || [];
   const totalRecords = data?.totalRecords || 0;
   const totalPages = Math.ceil(totalRecords / pageSize);
 
-  // Column definitions
-  const allColumns = useMemo(
-    () => [
-      {
-        key: "status",
-        header: "STATUS",
-        sortable: true,
-        render: (_schedule: OrderSchedule) => (
-          <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
-            Ativo
-          </Badge>
-        ),
-      },
-      {
-        key: "frequency",
-        header: "FREQUÊNCIA",
-        sortable: true,
-        render: (schedule: OrderSchedule) => {
-          const frequencyLabel = getDynamicFrequencyLabel(schedule.frequency, schedule.frequencyCount);
-          return <span className="font-medium">{frequencyLabel}</span>;
-        },
-      },
-      {
-        key: "itemsCount",
-        header: "ITENS",
-        sortable: true,
-        render: (schedule: OrderSchedule) => (
-          <div className="flex items-center gap-2">
-            <IconPackage className="h-4 w-4 text-muted-foreground" />
-            <span>{schedule.items?.length || 0}</span>
-          </div>
-        ),
-      },
-      {
-        key: "nextRun",
-        header: "PRÓXIMA EXECUÇÃO",
-        sortable: true,
-        render: (schedule: OrderSchedule) => {
-          if (!schedule.nextRun) {
-            return <span className="text-muted-foreground text-sm">Não agendada</span>;
-          }
-          const date = typeof schedule.nextRun === "string" ? new Date(schedule.nextRun) : schedule.nextRun;
-          return (
-            <div className="flex items-center gap-2">
-              <IconCalendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{format(date, "dd/MM/yyyy", { locale: ptBR })}</span>
-            </div>
-          );
-        },
-      },
-      {
-        key: "lastRun",
-        header: "ÚLTIMA EXECUÇÃO",
-        sortable: true,
-        render: (schedule: OrderSchedule) => {
-          if (!schedule.lastRun) {
-            return <span className="text-muted-foreground text-sm">Nunca executado</span>;
-          }
-          const date = typeof schedule.lastRun === "string" ? new Date(schedule.lastRun) : schedule.lastRun;
-          return (
-            <div className="flex items-center gap-2">
-              <IconClock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{format(date, "dd/MM/yyyy", { locale: ptBR })}</span>
-            </div>
-          );
-        },
-      },
-    ],
-    [],
-  );
+  // Notify parent component of data changes
+  const lastNotifiedDataRef = React.useRef<string>("");
+
+  React.useEffect(() => {
+    if (onDataChange) {
+      const dataKey = schedules.length > 0 ? `${totalRecords}-${schedules.map((s) => s.id).join(",")}` : `empty-${totalRecords}`;
+      if (dataKey !== lastNotifiedDataRef.current) {
+        lastNotifiedDataRef.current = dataKey;
+        onDataChange({ schedules, totalRecords });
+      }
+    }
+  }, [schedules, totalRecords, onDataChange]);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    items: OrderSchedule[];
+    isBulk: boolean;
+  } | null>(null);
+
+  // Column definitions - use centralized columns from order-schedule-table-columns
+  const allColumns: OrderScheduleColumn[] = useMemo(() => createOrderScheduleColumns(), []);
 
   // Filter columns based on visibility
   const columns = useMemo(() => {
     return allColumns.filter((col) => visibleColumns.has(col.key));
   }, [allColumns, visibleColumns]);
 
-  // Handle delete confirmation
-  const confirmDelete = () => {
+  // Get current page item IDs for selection
+  const currentPageItemIds = useMemo(() => {
+    return schedules.map((schedule) => schedule.id);
+  }, [schedules]);
+
+  // Selection handlers
+  const allSelected = isAllSelected(currentPageItemIds);
+  const partiallySelected = isPartiallySelected(currentPageItemIds);
+
+  const handleSelectAll = () => {
+    toggleSelectAll(currentPageItemIds);
+  };
+
+  const handleSelectItem = (itemId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(itemId, currentPageItemIds, event?.shiftKey || false);
+  };
+
+  // Render sort indicator
+  const renderSortIndicator = (columnKey: string) => {
+    const sortDirection = getSortDirection(columnKey);
+    const sortOrder = getSortOrder(columnKey);
+
+    return (
+      <div className="inline-flex items-center ml-1">
+        {sortDirection === null && <IconSelector className="h-4 w-4 text-muted-foreground" />}
+        {sortDirection === "asc" && <IconChevronUp className="h-4 w-4 text-foreground" />}
+        {sortDirection === "desc" && <IconChevronDown className="h-4 w-4 text-foreground" />}
+        {sortOrder !== null && sortConfigs.length > 1 && <span className="text-xs ml-0.5">{sortOrder + 1}</span>}
+      </div>
+    );
+  };
+
+  // Context menu handlers
+  const handleContextMenu = (e: React.MouseEvent, schedule: OrderSchedule) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const isItemSelected = isSelected(schedule.id);
+    const hasSelection = selectionCount > 0;
+
+    if (hasSelection && isItemSelected) {
+      const selectedItemsList = schedules.filter((s) => isSelected(s.id));
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: selectedItemsList,
+        isBulk: true,
+      });
+    } else {
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: [schedule],
+        isBulk: false,
+      });
+    }
+  };
+
+  const handleEdit = () => {
+    if (contextMenu) {
+      navigate(routes.inventory.orders.schedules.edit(contextMenu.items[0].id));
+      setContextMenu(null);
+    }
+  };
+
+  const handleActivate = async () => {
+    if (contextMenu) {
+      if (onActivate) {
+        onActivate(contextMenu.items);
+      } else {
+        for (const schedule of contextMenu.items) {
+          await updateSchedule({ id: schedule.id, isActive: true });
+        }
+      }
+      setContextMenu(null);
+    }
+  };
+
+  const handleDeactivate = async () => {
+    if (contextMenu) {
+      if (onDeactivate) {
+        onDeactivate(contextMenu.items);
+      } else {
+        for (const schedule of contextMenu.items) {
+          await updateSchedule({ id: schedule.id, isActive: false });
+        }
+      }
+      setContextMenu(null);
+    }
+  };
+
+  const handleDelete = () => {
+    if (contextMenu) {
+      setDeleteDialog({ items: contextMenu.items, isBulk: contextMenu.isBulk });
+      setContextMenu(null);
+    }
+  };
+
+  const confirmDelete = async () => {
     if (!deleteDialog) return;
-    deleteDialog.items.forEach((schedule) => deleteSchedule(schedule.id));
+    for (const schedule of deleteDialog.items) {
+      await deleteSchedule(schedule.id);
+    }
     setDeleteDialog(null);
   };
 
-  // Render sort icon
-  const renderSortIcon = (columnKey: string) => {
-    const direction = getSortDirection(columnKey);
-    if (direction === "asc") {
-      return <IconChevronUp className="h-4 w-4" />;
-    } else if (direction === "desc") {
-      return <IconChevronDown className="h-4 w-4" />;
-    }
-    return <IconSelector className="h-4 w-4 opacity-50" />;
-  };
+  // Close context menu when clicking outside
+  React.useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
 
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-      {/* Table */}
-      <div className="flex-1 overflow-auto border border-border/40 rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {/* Selection checkbox */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={isAllSelected(schedules.map(s => s.id))}
-                    onCheckedChange={() => toggleSelectAll(schedules.map(s => s.id))}
-                  />
-                </div>
-              </TableHead>
+    <div className={cn("rounded-lg flex flex-col overflow-hidden", className)}>
+      {/* Fixed Header Table */}
+      <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
+        <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
+          <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
+            <TableRow className="bg-muted hover:bg-muted even:bg-muted">
+              {/* Selection column */}
+              {showInteractive && (
+                <TableHead
+                  className={cn(
+                    TABLE_LAYOUT.checkbox.className,
+                    "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0"
+                  )}
+                >
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all schedules"
+                      disabled={isLoading || schedules.length === 0}
+                    />
+                  </div>
+                </TableHead>
+              )}
 
-              {/* Column headers */}
+              {/* Data columns */}
               {columns.map((column) => (
                 <TableHead
                   key={column.key}
                   className={cn(
-                    "whitespace-nowrap font-bold uppercase text-xs",
-                    column.sortable && "cursor-pointer select-none hover:bg-muted/50"
+                    "whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0",
+                    column.className
                   )}
-                  onClick={() => column.sortable && toggleSort(column.key)}
                 >
-                  <div className="flex items-center gap-2">
-                    {column.header}
-                    {column.sortable && renderSortIcon(column.key)}
-                  </div>
+                  {column.sortable ? (
+                    <button
+                      onClick={() => toggleSort(column.key)}
+                      className={cn(
+                        "flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent",
+                        column.align === "center" && "justify-center",
+                        column.align === "right" && "justify-end",
+                        !column.align && "justify-start"
+                      )}
+                      disabled={isLoading || schedules.length === 0}
+                    >
+                      <TruncatedTextWithTooltip text={column.header} />
+                      {renderSortIndicator(column.key)}
+                    </button>
+                  ) : (
+                    <div
+                      className={cn(
+                        "flex items-center h-full min-h-[2.5rem] px-4 py-2",
+                        column.align === "center" && "justify-center text-center",
+                        column.align === "right" && "justify-end text-right",
+                        !column.align && "justify-start text-left"
+                      )}
+                    >
+                      <TruncatedTextWithTooltip text={column.header} />
+                    </div>
+                  )}
                 </TableHead>
               ))}
 
-              {/* Actions column */}
-              <TableHead className="whitespace-nowrap font-bold uppercase text-xs w-20">AÇÕES</TableHead>
+              {/* Scrollbar spacer */}
+              {!isOverlay && (
+                <TableHead
+                  style={{ width: `${scrollbarWidth}px`, minWidth: `${scrollbarWidth}px` }}
+                  className="bg-muted p-0 border-0 !border-r-0 shrink-0"
+                ></TableHead>
+              )}
             </TableRow>
           </TableHeader>
+        </Table>
+      </div>
 
+      {/* Scrollable Body Table */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden border-l border-r border-border">
+        <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableBody>
-            {isLoading ? (
+            {error ? (
               <TableRow>
-                <TableCell colSpan={columns.length + 2} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={columns.length + 1} className="p-0">
+                  <div className="flex flex-col items-center justify-center p-8 text-center text-destructive">
+                    <IconCalendarRepeat className="h-8 w-8 mb-4" />
+                    <div className="text-lg font-medium mb-2">Não foi possível carregar os agendamentos</div>
+                    <div className="text-sm text-muted-foreground">Tente novamente mais tarde.</div>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : isLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length + 1} className="text-center py-8 text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             ) : schedules.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length + 2} className="text-center py-8 text-muted-foreground">
-                  Nenhum resultado encontrado.
+                <TableCell colSpan={columns.length + 1} className="p-0">
+                  <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                    <IconCalendarRepeat className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                    <div className="text-lg font-medium mb-2">Nenhum agendamento encontrado</div>
+                    <div className="text-sm">Crie um agendamento para automatizar seus pedidos.</div>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
-              schedules.map((schedule) => (
-                <TableRow key={schedule.id} className="hover:bg-muted/30">
-                  {/* Selection checkbox */}
-                  <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                    <div
-                      className="flex items-center justify-center h-full w-full px-2 py-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleSelection(schedule.id);
-                      }}
-                    >
-                      <Checkbox
-                        checked={isSelected(schedule.id)}
-                        onCheckedChange={() => toggleSelection(schedule.id)}
-                      />
-                    </div>
-                  </TableCell>
+              schedules.map((schedule, index) => {
+                const itemIsSelected = isSelected(schedule.id);
 
-                  {/* Data columns */}
-                  {columns.map((column) => (
-                    <TableCell key={column.key}>
-                      {column.render(schedule)}
-                    </TableCell>
-                  ))}
+                return (
+                  <TableRow
+                    key={schedule.id}
+                    data-state={itemIsSelected ? "selected" : undefined}
+                    className={cn(
+                      "cursor-pointer transition-colors border-b border-border",
+                      index % 2 === 1 && "bg-muted/10",
+                      "hover:bg-muted/20",
+                      itemIsSelected && "bg-muted/30 hover:bg-muted/40"
+                    )}
+                    onClick={() => navigate(routes.inventory.orders.schedules.details(schedule.id))}
+                    onContextMenu={(e) => handleContextMenu(e, schedule)}
+                  >
+                    {/* Selection checkbox */}
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectItem(schedule.id, e);
+                          }}
+                        >
+                          <Checkbox checked={itemIsSelected} aria-label={`Select ${schedule.name || schedule.id}`} />
+                        </div>
+                      </TableCell>
+                    )}
 
-                  {/* Actions */}
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Abrir menu</span>
-                          <IconDots className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {onView && (
-                          <DropdownMenuItem onClick={() => onView(schedule)}>
-                            <IconEye className="mr-2 h-4 w-4" />
-                            Visualizar
-                          </DropdownMenuItem>
+                    {/* Data columns */}
+                    {columns.map((column) => (
+                      <TableCell
+                        key={column.key}
+                        className={cn(
+                          column.className,
+                          "p-0 !border-r-0",
+                          column.align === "center" && "text-center",
+                          column.align === "right" && "text-right",
+                          column.align === "left" && "text-left",
+                          !column.align && "text-left"
                         )}
-                        {canEdit && onEdit && (
-                          <DropdownMenuItem onClick={() => onEdit(schedule)}>
-                            <IconEdit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                        )}
-
-                        {canDelete && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => setDeleteDialog({ items: [schedule], isBulk: false })}
-                              className="text-destructive"
-                            >
-                              <IconTrash className="mr-2 h-4 w-4" />
-                              Deletar
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+                      >
+                        <div className="px-4 py-2">{column.accessor(schedule)}</div>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Pagination */}
-      {totalRecords > 0 && (
-        <div className="mt-4">
-          <SimplePaginationAdvanced
-            currentPage={page}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            totalRecords={totalRecords}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            pageSizeOptions={[20, 40, 60, 100]}
-          />
-        </div>
-      )}
+      {/* Pagination Footer */}
+      <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
+        <SimplePaginationAdvanced
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          pageSize={pageSize}
+          totalItems={totalRecords}
+          pageSizeOptions={[20, 40, 60, 100]}
+          onPageSizeChange={setPageSize}
+          showPageSizeSelector={true}
+          showGoToPage={true}
+          showPageInfo={true}
+        />
+      </div>
+
+      {/* Context Menu */}
+      <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+        <DropdownMenuContent
+          style={{
+            position: "fixed",
+            left: contextMenu?.x,
+            top: contextMenu?.y,
+          }}
+          className="w-56"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          {contextMenu?.isBulk && (
+            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+              {contextMenu.items.length} agendamentos selecionados
+            </div>
+          )}
+
+          {canEdit && !contextMenu?.isBulk && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              Editar
+            </DropdownMenuItem>
+          )}
+
+          {canEdit && contextMenu?.items.some((s) => !s.isActive) && (
+            <DropdownMenuItem onClick={handleActivate} className="text-green-700">
+              <IconPlayerPlay className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Ativar selecionados" : "Ativar"}
+            </DropdownMenuItem>
+          )}
+
+          {canEdit && contextMenu?.items.some((s) => s.isActive) && (
+            <DropdownMenuItem onClick={handleDeactivate} className="text-orange-600">
+              <IconPlayerPause className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Desativar selecionados" : "Desativar"}
+            </DropdownMenuItem>
+          )}
+
+          {canDeleteSchedule && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                <IconTrash className="mr-2 h-4 w-4" />
+                {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Deletar selecionados" : "Deletar"}
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
@@ -334,14 +498,15 @@ export function OrderScheduleTable({ visibleColumns, className, onEdit, onView, 
             <AlertDialogDescription>
               {deleteDialog?.isBulk && deleteDialog.items.length > 1
                 ? `Tem certeza que deseja deletar ${deleteDialog.items.length} agendamentos? Esta ação não pode ser desfeita.`
-                : deleteDialog?.items.length === 1
-                ? `Tem certeza que deseja deletar este agendamento? Esta ação não pode ser desfeita.`
-                : "Tem certeza que deseja deletar os agendamentos selecionados? Esta ação não pode ser desfeita."}
+                : "Tem certeza que deseja deletar este agendamento? Esta ação não pode ser desfeita."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Deletar
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -53,7 +53,7 @@ const FAKE_USER = {
 const NOTIFICATION_CONFIGS = [
   {
     key: 'task.created',
-    type: 'TASK',
+    type: 'PRODUCTION',
     eventType: 'created',
     label: 'New Task Assigned',
     description: 'When a new task is assigned to you',
@@ -68,7 +68,7 @@ const NOTIFICATION_CONFIGS = [
   },
   {
     key: 'task.deadline_approaching',
-    type: 'TASK',
+    type: 'PRODUCTION',
     eventType: 'deadline_approaching',
     label: 'Deadline Approaching',
     description: 'Reminders for upcoming task deadlines',
@@ -90,7 +90,7 @@ const NOTIFICATION_CONFIGS = [
   },
   {
     key: 'task.status_changed',
-    type: 'TASK',
+    type: 'PRODUCTION',
     eventType: 'status_changed',
     label: 'Task Status Update',
     description: 'When task status changes',
@@ -104,7 +104,7 @@ const NOTIFICATION_CONFIGS = [
   },
   {
     key: 'order.created',
-    type: 'ORDER',
+    type: 'STOCK',
     eventType: 'created',
     label: 'New Order',
     description: 'When a new order is created',
@@ -118,7 +118,7 @@ const NOTIFICATION_CONFIGS = [
   },
   {
     key: 'order.invoice_ready',
-    type: 'ORDER',
+    type: 'STOCK',
     eventType: 'invoice_ready',
     label: 'Invoice Ready',
     description: 'When an invoice is generated for your order',
@@ -140,7 +140,7 @@ const NOTIFICATION_CONFIGS = [
   },
   {
     key: 'service_order.completed',
-    type: 'SERVICE_ORDER',
+    type: 'PRODUCTION',
     eventType: 'completed',
     label: 'Service Order Completed',
     description: 'When a service order you created is completed',

@@ -235,6 +235,15 @@ export const secullumService = {
 
   deleteHoliday: (holidayId: string | number) => apiClient.delete<{ success: boolean; message: string }>(`/integrations/secullum/holidays/${holidayId}`),
 
+  // Schedules (Horarios)
+  getHorarios: (params?: { incluirDesativados?: boolean }) =>
+    apiClient.get<{ success: boolean; data: any[]; message: string }>("/integrations/secullum/horarios", {
+      params: { incluirDesativados: params?.incluirDesativados ?? true },
+    }),
+
+  getHorarioById: (id: number | string) =>
+    apiClient.get<{ success: boolean; data: any; message: string }>(`/integrations/secullum/horarios/${id}`),
+
   // Configuration
   getConfiguration: () => apiClient.get<{ success: boolean; data: any[] }>("/integrations/secullum/configuration"),
 

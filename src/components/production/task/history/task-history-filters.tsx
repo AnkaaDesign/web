@@ -140,7 +140,7 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          {/* Status Filter - only visible to admin/financial users */}
+          {/* Status Filter - only visible to admin/commercial/financial users */}
           {canViewStatusFilter && (
             <div className="space-y-2">
               <Label className="flex items-center gap-2">

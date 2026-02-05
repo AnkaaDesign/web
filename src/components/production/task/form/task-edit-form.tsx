@@ -462,7 +462,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const { data: layoutsData } = useLayoutsByTruck(truckId || "", !!truckId);
 
   // Calculate truck length from layout sections for spot selector
-  // Uses the same logic as garage view: sections sum + cabin (2.8m) if < 10m
+  // Uses the same two-tier cabin logic as garage view and API:
+  // < 7m body: 2.0m cabin (small trucks)
+  // 7-10m body: 2.4m cabin (larger trucks)
+  // >= 10m body: no cabin (semi-trailers)
   const truckLength = useMemo(() => {
     const layout = layoutsData?.leftSideLayout || layoutsData?.rightSideLayout;
     if (!layout?.layoutSections || layout.layoutSections.length === 0) {
@@ -472,10 +475,17 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       (sum: number, s: any) => sum + (s.width || 0),
       0
     );
-    // Add 2.8m cabin for trucks shorter than 10m
-    const CABIN_THRESHOLD = 10;
-    const CABIN_LENGTH = 2.8;
-    return sectionsSum < CABIN_THRESHOLD ? sectionsSum + CABIN_LENGTH : sectionsSum;
+    const CABIN_THRESHOLD_SMALL = 7;
+    const CABIN_THRESHOLD_LARGE = 10;
+    const CABIN_LENGTH_SMALL = 2.0;
+    const CABIN_LENGTH_LARGE = 2.4;
+    if (sectionsSum < CABIN_THRESHOLD_SMALL) {
+      return sectionsSum + CABIN_LENGTH_SMALL;
+    }
+    if (sectionsSum < CABIN_THRESHOLD_LARGE) {
+      return sectionsSum + CABIN_LENGTH_LARGE;
+    }
+    return sectionsSum;
   }, [layoutsData]);
 
   // Debug logging for layouts

@@ -142,7 +142,7 @@ export function PpeConfigSection({ disabled, required }: PpeConfigSectionProps) 
             />
 
             {/* Type */}
-            <PpeTypeSelector name="ppeType" disabled={disabled} required={required} />
+            <PpeTypeSelector control={form.control} name="ppeType" disabled={disabled} required={required} />
 
             {/* Size */}
             <FormItem>
@@ -166,8 +166,8 @@ export function PpeConfigSection({ disabled, required }: PpeConfigSectionProps) 
 
           {/* Delivery Configuration */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <PpeDeliveryModeSelector name="ppeDeliveryMode" disabled={disabled} required={required} />
-            <PpeDeliveryQuantityInput name="ppeStandardQuantity" disabled={disabled} required={required} />
+            <PpeDeliveryModeSelector control={form.control} name="ppeDeliveryMode" disabled={disabled} required={required} />
+            <PpeDeliveryQuantityInput control={form.control} name="ppeStandardQuantity" disabled={disabled} required={required} />
           </div>
         </div>
       </CardContent>

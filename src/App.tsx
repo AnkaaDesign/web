@@ -172,6 +172,7 @@ const InventoryOrdersDetails = lazy(() => import("@/pages/inventory/orders/detai
 const InventoryOrdersSchedules = lazy(() => import("@/pages/inventory/orders/schedules/list").then((module) => ({ default: module.OrderScheduleListPage })));
 const InventoryOrdersSchedulesCreate = lazy(() => import("@/pages/inventory/orders/schedules/create").then((module) => ({ default: module.OrderScheduleCreate })));
 const InventoryOrdersSchedulesEdit = lazy(() => import("@/pages/inventory/orders/schedules/edit/[id]").then((module) => ({ default: module.OrderScheduleEditPage })));
+const InventoryOrdersSchedulesDetails = lazy(() => import("@/pages/inventory/orders/schedules/details/[id]").then((module) => ({ default: module.OrderScheduleDetailsPage })));
 const InventoryOrdersAutomatic = lazy(() => import("@/pages/inventory/orders/automatic/list").then((module) => ({ default: module.AutomaticOrderListPage })));
 const InventoryOrdersAutomaticConfigure = lazy(() => import("@/pages/inventory/orders/automatic/configure").then((module) => ({ default: module.AutomaticOrderConfigurePage })));
 
@@ -294,6 +295,7 @@ const HumanResourcesRequisitions = lazy(() => import("@/pages/human-resources/re
 const HumanResourcesHolidays = lazy(() => import("@/pages/human-resources/holidays/list").then((module) => ({ default: module.HolidayListPage })));
 const HumanResourcesHolidaysCalendar = lazy(() => import("@/pages/human-resources/holidays/calendar").then((module) => ({ default: module.HolidayCalendarPage })));
 const HumanResourcesHolidaysCreate = lazy(() => import("@/pages/human-resources/holidays/cadastrar").then((module) => ({ default: module.HolidayCreatePage })));
+const HumanResourcesSchedules = lazy(() => import("@/pages/human-resources/schedules/list").then((module) => ({ default: module.SchedulesListPage })));
 const HumanResourcesVacations = lazy(() => import("@/pages/human-resources/vacations/list").then((module) => ({ default: module.VacationListPage })));
 const HumanResourcesVacationsCreate = lazy(() => import("@/pages/human-resources/vacations/create").then((module) => ({ default: module.CreateVacationPage })));
 const HumanResourcesVacationsDetails = lazy(() => import("@/pages/human-resources/vacations/details/[id]").then((module) => ({ default: module.VacationDetailsPage })));
@@ -1432,6 +1434,14 @@ function App() {
                   }
                 />
                 <Route
+                  path={routes.inventory.orders.schedules.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <InventoryOrdersSchedulesDetails />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path={routes.inventory.orders.automatic.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -2096,6 +2106,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesHolidaysCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.humanResources.horarios.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <HumanResourcesSchedules />
                     </Suspense>
                   }
                 />

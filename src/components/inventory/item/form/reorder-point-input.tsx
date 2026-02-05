@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import {
   FormControl,
@@ -25,13 +24,13 @@ export function ReorderPointInput({
   disabled,
   required,
   currentValue,
-  isManual: initialIsManual = false,
+  isManual: fallbackIsManual = false,
 }: ReorderPointInputProps) {
   const form = useFormContext();
-  const [isManualMode, setIsManualMode] = useState(initialIsManual);
+  // Watch the form value directly to stay in sync with form resets and data refetches
+  const isManualMode = form.watch('isManualReorderPoint') ?? fallbackIsManual;
 
   const handleModeToggle = (checked: boolean) => {
-    setIsManualMode(checked);
     form.setValue('isManualReorderPoint', checked, { shouldDirty: true });
 
     // If switching to automatic, clear the manual value

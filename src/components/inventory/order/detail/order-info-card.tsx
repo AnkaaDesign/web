@@ -1,15 +1,17 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { OrderStatusBadge } from "../common/order-status-badge";
 import { OrderTotalBadge } from "../common/order-total-calculator";
-import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFile, IconFileInvoice, IconReceipt, IconFileText, IconId, IconCreditCard } from "@tabler/icons-react";
+import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFile, IconFileInvoice, IconReceipt, IconFileText, IconId, IconCreditCard, IconCopy, IconQrcode } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { formatDate, formatDateTime, formatCNPJ, formatPixKey } from "../../../../utils";
+import { formatDate, formatDateTime, formatCNPJ } from "../../../../utils";
 import type { Order } from "../../../../types";
 import { PAYMENT_METHOD_LABELS } from "../../../../constants";
 import { FilePreviewCard } from "@/components/common/file";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
+import { toast } from "sonner";
 
 interface OrderInfoCardProps {
   order: Order;
@@ -168,9 +170,26 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
                 </div>
 
                 {order.paymentMethod === "PIX" && order.paymentPix && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground">Chave Pix</span>
-                    <span className="text-sm font-semibold text-foreground font-mono">{formatPixKey(order.paymentPix)}</span>
+                  <div className="bg-muted/50 rounded-lg px-4 py-3 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <IconQrcode className="h-4 w-4" />
+                        Chave Pix
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          navigator.clipboard.writeText(order.paymentPix!);
+                          toast.success("Chave Pix copiada!");
+                        }}
+                      >
+                        <IconCopy className="h-4 w-4 mr-1" />
+                        Copiar
+                      </Button>
+                    </div>
+                    <p className="text-sm font-semibold text-foreground font-mono break-all">{order.paymentPix}</p>
                   </div>
                 )}
 

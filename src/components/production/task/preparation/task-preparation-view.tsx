@@ -353,6 +353,10 @@ export function TaskPreparationView({
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
     const result: Record<string, any> = {
       ...filterWithoutOrderBy,
+      // Include serviceOrders for progress bar display
+      include: {
+        serviceOrders: true,
+      },
     };
 
     // DESIGNER users have special display logic: only show tasks with incomplete artwork SOs or no artwork SOs

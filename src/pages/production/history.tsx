@@ -28,7 +28,7 @@ export const TaskHistoryPage = () => {
         />
 
         <div className="flex-1 min-h-0 pb-6 flex flex-col">
-          <TaskHistoryList className="h-full" hideStatusFilter={true} />
+          <TaskHistoryList className="h-full" />
         </div>
       </div>
     </PrivilegeRoute>

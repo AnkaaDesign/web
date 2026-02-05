@@ -22,34 +22,34 @@ import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 
 // Individual garage configurations with real measurements
 // All garages standardized to 20m × 35m for consistency with minimal waste
-// Lane lengths are preserved to maintain truck positioning accuracy
+// Lane lengths: B1=30m, B2=25m, B3=30m
 const GARAGE_CONFIGS = {
   B1: {
     width: 20, // meters (standardized)
-    length: 35, // meters (standardized from 30m)
+    length: 35, // meters (standardized)
     paddingTop: 3, // meters - back margin from top
-    paddingBottom: 7.4, // meters - front margin from bottom (adjusted)
-    laneLength: 24.6, // meters (preserved: 35 - 3 - 7.4)
+    paddingBottom: 2, // meters - front margin from bottom (35 - 3 - 30 = 2)
+    laneLength: 30, // meters
     laneWidth: 3, // meters
     laneSpacing: (20 - 9) / 4, // 2.75m - equal spacing between and around lanes
     lanePaddingX: (20 - 9) / 4, // 2.75m - padding on left/right
   },
   B2: {
-    width: 20, // meters (standardized from 18.5m)
-    length: 35, // meters (standardized from 30.5m)
+    width: 20, // meters (standardized)
+    length: 35, // meters (standardized)
     paddingTop: 3, // meters - back margin from top
-    paddingBottom: 7.5, // meters - front margin from bottom (adjusted)
-    laneLength: 24.5, // meters (preserved: 35 - 3 - 7.5)
+    paddingBottom: 7, // meters - front margin from bottom (35 - 3 - 25 = 7)
+    laneLength: 25, // meters
     laneWidth: 3, // meters
-    laneSpacing: (20 - 9) / 4, // 2.75m - equal spacing between and around lanes (standardized)
-    lanePaddingX: (20 - 9) / 4, // 2.75m - padding on left/right (standardized)
+    laneSpacing: (20 - 9) / 4, // 2.75m - equal spacing between and around lanes
+    lanePaddingX: (20 - 9) / 4, // 2.75m - padding on left/right
   },
   B3: {
     width: 20, // meters (standardized)
-    length: 35, // meters (standardized from 40m)
+    length: 35, // meters (standardized)
     paddingTop: 3, // meters - back margin from top
-    paddingBottom: 2, // meters - front margin from bottom (reduced from 7m)
-    laneLength: 30, // meters (preserved: 35 - 3 - 2)
+    paddingBottom: 2, // meters - front margin from bottom (35 - 3 - 30 = 2)
+    laneLength: 30, // meters
     laneWidth: 3, // meters
     laneSpacing: (20 - 9) / 4, // 2.75m - equal spacing between and around lanes
     lanePaddingX: (20 - 9) / 4, // 2.75m - padding on left/right
@@ -158,6 +158,42 @@ function calculateGarageWidth(garageId: GarageId): number {
   return config.width;
 }
 
+// Calculate if a truck can fit in a lane by SWAPPING with an existing truck
+// This is used for visual preview during drag when hovering over occupied spots
+function calculateSwapAvailability(
+  garageId: GarageId,
+  laneId: LaneId,
+  trucks: GarageTruck[],
+  draggedTruckLength: number,
+  draggedTruckId: string,
+  swapTargetTruckId: string
+): boolean {
+  const config = GARAGE_CONFIGS[garageId];
+  const laneLength = config.laneLength;
+
+  // Find all trucks in this lane EXCLUDING both the dragged truck AND the swap target
+  const trucksInLaneAfterSwap = trucks.filter(t => {
+    if (t.id === draggedTruckId || t.id === swapTargetTruckId) return false;
+    if (!t.spot || t.spot === 'PATIO') return false;
+    const parsed = parseSpot(t.spot);
+    return parsed.garage === garageId && parsed.lane === laneId;
+  });
+
+  // Calculate space after swap (remaining trucks + dragged truck)
+  const currentTruckLengths = trucksInLaneAfterSwap.reduce((sum, truck) => sum + truck.length, 0);
+  const newTotalTruckLengths = currentTruckLengths + draggedTruckLength;
+  const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP;
+  const newTruckCount = trucksInLaneAfterSwap.length + 1;
+
+  let gapsBetweenTrucks = 0;
+  if (newTruckCount === 3) {
+    gapsBetweenTrucks = 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
+  }
+
+  const totalRequiredSpace = margins + newTotalTruckLengths + gapsBetweenTrucks;
+  return totalRequiredSpace <= laneLength && trucksInLaneAfterSwap.length < 3;
+}
+
 // Calculate available space in a lane and whether a truck can fit
 function calculateLaneAvailability(
   garageId: GarageId,
@@ -184,11 +220,10 @@ function calculateLaneAvailability(
   // - 2 trucks -> 3 trucks: NOW we need gaps (V1 top, V2 middle, V3 bottom)
   //   - V2 in middle requires: 1m gap from V1, 1m gap from V3
 
-  // CRITICAL: Use originalLength (without cabin) for garage space calculation!
-  // The cabin extends outside the garage, so we only count the trailer/body length
+  // Use full truck length (including cabin) for garage space calculation
+  // The cabin is part of the truck and cannot be removed
   const currentTruckLengths = trucksInLane.reduce((sum, truck) => {
-    const garageLength = truck.originalLength ?? truck.length;
-    return sum + garageLength;
+    return sum + truck.length;
   }, 0);
   const newTotalTruckLengths = currentTruckLengths + truckLength;
   const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP; // 0.4m total (always constant)
@@ -653,11 +688,12 @@ interface DroppableLaneProps {
   requiredSpace?: number;
   isDragging?: boolean;
   draggedTruckLength?: number;
+  draggedTruckId?: string;
   trucks?: GarageTruck[];
   children: React.ReactNode;
 }
 
-function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = true, canFit, availableSpace, requiredSpace, isDragging = false, draggedTruckLength, trucks, children }: DroppableLaneProps) {
+function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = true, canFit, availableSpace, requiredSpace, isDragging = false, draggedTruckLength, draggedTruckId, trucks, children }: DroppableLaneProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${garageId}_${laneId}`,
     data: { garageId, laneId },
@@ -670,12 +706,13 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
   const height = config.laneLength * scale;
 
   // Calculate where the dragged truck would be placed in this lane
-  // Support multiple previews for small trucks
+  // Support multiple previews for small trucks and swap indicators for occupied spots
   let previews: Array<{ y: number; height: number; color: 'green' | 'red' }> = [];
 
-  if (isDragging && draggedTruckLength && trucks) {
-    // Get trucks currently in this lane
+  if (isDragging && draggedTruckLength && trucks && draggedTruckId) {
+    // Get trucks currently in this lane (excluding the dragged truck)
     const trucksInLane = trucks.filter((t) => {
+      if (t.id === draggedTruckId) return false;
       if (!t.spot || t.spot === 'PATIO') return false;
       const parsed = parseSpot(t.spot);
       return parsed.garage === garageId && parsed.lane === laneId;
@@ -683,28 +720,89 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
 
     const laneLength = config.laneLength;
     const spotNumbers = trucksInLane.map(t => parseSpot(t.spot!).spotNumber!).filter(Boolean).sort();
-    const maxSpots = 3;
     const isLargeTruck = draggedTruckLength > laneLength * 0.5;
 
-    // Determine color based on canFit (undefined means still calculating, show as green)
-    const previewColor: 'green' | 'red' = canFit === false ? 'red' : 'green';
+    // Determine color for adding (not swapping) based on canFit
+    const addPreviewColor: 'green' | 'red' = canFit === false ? 'red' : 'green';
 
-    // Case 1: Large truck (>50% lane) - show entire lane
+    // Helper to calculate swap color for a specific truck
+    const getSwapColor = (swapTargetTruck: GarageTruck): 'green' | 'red' => {
+      const canSwap = calculateSwapAvailability(
+        garageId,
+        laneId,
+        trucks,
+        draggedTruckLength,
+        draggedTruckId,
+        swapTargetTruck.id
+      );
+      return canSwap ? 'green' : 'red';
+    };
+
+    // Case 1: Large truck (>50% lane) - show indicators on occupied spots (swap) or entire lane (add)
     if (isLargeTruck) {
-      if (canFit === false) {
-        // Red preview - show only available space to prevent overflow
-        const maxFitHeight = Math.min(draggedTruckLength, availableSpace || 0);
-        previews.push({
-          y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
-          height: maxFitHeight,
-          color: 'red',
+      if (trucksInLane.length > 0) {
+        // Lane has trucks - show swap indicators on EACH existing truck position
+        // Preview shows the DRAGGED truck's size at the target position
+        trucksInLane.forEach(existingTruck => {
+          const parsed = parseSpot(existingTruck.spot!);
+          const swapColor = getSwapColor(existingTruck);
+
+          // Show preview of dragged truck at the spot position
+          if (parsed.spotNumber === 1) {
+            // V1 - at top - show dragged truck preview
+            previews.push({
+              y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
+              height: draggedTruckLength,
+              color: swapColor,
+            });
+          } else if (parsed.spotNumber === 2) {
+            // V2 - at bottom - show dragged truck preview
+            previews.push({
+              y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
+              height: draggedTruckLength,
+              color: swapColor,
+            });
+          } else if (parsed.spotNumber === 3) {
+            // V3 - in middle (between V1 and V2)
+            const v1Truck = trucksInLane.find(t => parseSpot(t.spot!).spotNumber === 1);
+            const v2Truck = trucksInLane.find(t => parseSpot(t.spot!).spotNumber === 2);
+            if (v1Truck && v2Truck) {
+              const v1Bottom = COMMON_CONFIG.TRUCK_MARGIN_TOP + v1Truck.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
+              const v2Top = laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - v2Truck.length - COMMON_CONFIG.TRUCK_MIN_SPACING;
+              previews.push({
+                y: v1Bottom + (v2Top - v1Bottom - draggedTruckLength) / 2,
+                height: draggedTruckLength,
+                color: swapColor,
+              });
+            }
+          }
         });
+
+        // Also show indicator for empty spots if any
+        if (trucksInLane.length < 2) {
+          // Can still add to lane - show empty spot preview
+          if (!spotNumbers.includes(1)) {
+            // V1 is empty
+            previews.push({
+              y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
+              height: draggedTruckLength,
+              color: addPreviewColor,
+            });
+          } else if (!spotNumbers.includes(2)) {
+            // V2 is empty
+            previews.push({
+              y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
+              height: draggedTruckLength,
+              color: addPreviewColor,
+            });
+          }
+        }
       } else {
-        // Green preview - show entire lane
+        // Empty lane - show entire lane preview
         previews.push({
           y: 0,
           height: laneLength,
-          color: 'green',
+          color: addPreviewColor,
         });
       }
     }
@@ -717,50 +815,112 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
           {
             y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
             height: draggedTruckLength,
-            color: previewColor,
+            color: addPreviewColor,
           },
           {
             y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
             height: draggedTruckLength,
-            color: previewColor,
+            color: addPreviewColor,
           }
         );
       } else if (spotNumbers.length === 1) {
-        // One truck exists - show available spot
+        // One truck exists - show available spot AND swap indicator on occupied spot
+        const existingTruck = trucksInLane[0];
+        const swapColor = getSwapColor(existingTruck);
+
         if (spotNumbers[0] === 1) {
-          // V1 exists - show V2 at bottom
+          // V1 exists - show swap indicator on V1 (with dragged truck size) and add indicator on V2
+          previews.push({
+            y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
+            height: draggedTruckLength,
+            color: swapColor,
+          });
           previews.push({
             y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
             height: draggedTruckLength,
-            color: previewColor,
+            color: addPreviewColor,
           });
         } else {
-          // V2 or V3 exists - show V1 at top
+          // V2 or V3 exists - show add indicator on V1 and swap indicator on occupied spot
           previews.push({
             y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
             height: draggedTruckLength,
-            color: previewColor,
+            color: addPreviewColor,
+          });
+          previews.push({
+            y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
+            height: draggedTruckLength,
+            color: swapColor,
           });
         }
       } else if (spotNumbers.length === 2) {
-        // 2 trucks exist - show the empty spot
-        if (!spotNumbers.includes(1)) {
+        // 2 trucks exist - show swap indicators on occupied spots and add indicator on empty spot
+        const v1Truck = trucksInLane.find(t => parseSpot(t.spot!).spotNumber === 1);
+        const v2Truck = trucksInLane.find(t => parseSpot(t.spot!).spotNumber === 2);
+        const v3Truck = trucksInLane.find(t => parseSpot(t.spot!).spotNumber === 3);
+
+        // Determine positions based on which trucks exist
+        // V1 always at top, V3 always at bottom, V2 at bottom (if no V3) or middle (if V3 exists)
+
+        // V1 swap indicator (always at top)
+        if (v1Truck) {
           previews.push({
             y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
             height: draggedTruckLength,
-            color: previewColor,
+            color: getSwapColor(v1Truck),
+          });
+        }
+
+        // V2 swap indicator - position depends on whether V3 exists
+        if (v2Truck) {
+          if (v3Truck) {
+            // V2 is in MIDDLE when V3 exists
+            const v1Bottom = v1Truck
+              ? COMMON_CONFIG.TRUCK_MARGIN_TOP + v1Truck.length + COMMON_CONFIG.TRUCK_MIN_SPACING
+              : COMMON_CONFIG.TRUCK_MARGIN_TOP;
+            const v3Top = laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - v3Truck.length - COMMON_CONFIG.TRUCK_MIN_SPACING;
+            previews.push({
+              y: v1Bottom + (v3Top - v1Bottom - draggedTruckLength) / 2,
+              height: draggedTruckLength,
+              color: getSwapColor(v2Truck),
+            });
+          } else {
+            // V2 is at BOTTOM when no V3
+            previews.push({
+              y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
+              height: draggedTruckLength,
+              color: getSwapColor(v2Truck),
+            });
+          }
+        }
+
+        // V3 swap indicator (always at bottom)
+        if (v3Truck) {
+          previews.push({
+            y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
+            height: draggedTruckLength,
+            color: getSwapColor(v3Truck),
+          });
+        }
+
+        // Show add indicator for empty spot
+        if (!spotNumbers.includes(1)) {
+          // V1 is empty - show at top
+          previews.push({
+            y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
+            height: draggedTruckLength,
+            color: addPreviewColor,
           });
         } else if (!spotNumbers.includes(2)) {
-          // V2 is free - calculate middle position between V1 and V3
-          const v1Truck = trucksInLane.find(t => parseSpot(t.spot!).spotNumber === 1);
-          const v3Truck = trucksInLane.find(t => parseSpot(t.spot!).spotNumber === 3);
+          // V2 is free - position depends on whether V1 and V3 exist
           if (v1Truck && v3Truck) {
+            // V2 goes in middle between V1 and V3
             const v1Bottom = COMMON_CONFIG.TRUCK_MARGIN_TOP + v1Truck.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
             const v3Top = laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - v3Truck.length - COMMON_CONFIG.TRUCK_MIN_SPACING;
             previews.push({
               y: v1Bottom + (v3Top - v1Bottom - draggedTruckLength) / 2,
               height: draggedTruckLength,
-              color: previewColor,
+              color: addPreviewColor,
             });
           }
         } else if (!spotNumbers.includes(3)) {
@@ -768,7 +928,7 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
           previews.push({
             y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
             height: draggedTruckLength,
-            color: previewColor,
+            color: addPreviewColor,
           });
         }
       }
@@ -1345,7 +1505,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
     if (!activeTruck || !enableDragDrop) return null;
 
     const availability: Record<string, { canFit: boolean; availableSpace: number; requiredSpace: number }> = {};
-    const truckGarageLength = activeTruck.originalLength ?? activeTruck.length;
+    const truckGarageLength = activeTruck.length;
 
     (['B1', 'B2', 'B3'] as GarageId[]).forEach(garageId => {
       LANES.forEach(laneId => {
@@ -1471,16 +1631,10 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
         isDroppedInTopHalf = dropY < laneCenterY;
       }
 
-      // Determine preferred spot: V1 (top) or V2 (bottom)
-      // Only use 2 spots for regular trucks
-      let preferredSpotNum: number;
-      if (isDroppedInTopHalf) {
-        // User dropped in top half - prefer V1, fallback to V2
-        preferredSpotNum = !v1Truck ? 1 : 2;
-      } else {
-        // User dropped in bottom half - prefer V2, fallback to V1
-        preferredSpotNum = !v2Truck ? 2 : 1;
-      }
+      // Determine preferred spot based on drop position
+      // V1 = top, V2 = bottom - user's drop position determines their intent
+      // If the spot is occupied, we'll handle swapping later (don't auto-fallback here!)
+      const preferredSpotNum = isDroppedInTopHalf ? 1 : 2;
 
       // Check if dragged truck is already at the target lane
       const isAlreadyInTargetLane =
@@ -1511,10 +1665,9 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
         });
 
         const currentTruckLengths = trucksInTargetLane.reduce((sum, truck) => {
-          const garageLength = truck.originalLength ?? truck.length;
-          return sum + garageLength;
+          return sum + truck.length;
         }, 0);
-        const draggedTruckGarageLength = draggedTruck.originalLength ?? draggedTruck.length;
+        const draggedTruckGarageLength = draggedTruck.length;
         const newTotalTruckLengths = currentTruckLengths + draggedTruckGarageLength;
         const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP;
         const newTruckCount = trucksInTargetLane.length + 1;
@@ -1543,7 +1696,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
       }
 
       // Preferred spot is empty - validate if truck fits
-      const draggedTruckGarageLength = draggedTruck.originalLength ?? draggedTruck.length;
+      const draggedTruckGarageLength = draggedTruck.length;
       const availability = calculateLaneAvailability(
         targetGarageId,
         targetLaneId,
@@ -1657,6 +1810,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
                               requiredSpace={availability?.requiredSpace}
                               isDragging={!!activeTruck}
                               draggedTruckLength={activeTruck?.length}
+                              draggedTruckId={activeTruck?.id}
                               trucks={trucks}
                             >
                               {lane.trucks.map((truck) => (
@@ -1979,8 +2133,8 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
     const garageId = currentAreaId as GarageId;
     const availability: Record<LaneId, { canFit: boolean; availableSpace: number; requiredSpace: number }> = {} as any;
 
-    // Use originalLength (without cabin) for garage space calculation
-    const truckGarageLength = activeTruck.originalLength ?? activeTruck.length;
+    // Use full truck length (including cabin) for garage space calculation
+    const truckGarageLength = activeTruck.length;
 
     LANES.forEach(laneId => {
       availability[laneId] = calculateLaneAvailability(
@@ -2224,10 +2378,9 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
         });
 
         const currentTruckLengths = trucksInTargetLane.reduce((sum, truck) => {
-          const garageLength = truck.originalLength ?? truck.length;
-          return sum + garageLength;
+          return sum + truck.length;
         }, 0);
-        const draggedTruckGarageLength = draggedTruck.originalLength ?? draggedTruck.length;
+        const draggedTruckGarageLength = draggedTruck.length;
         const newTotalTruckLengths = currentTruckLengths + draggedTruckGarageLength;
         const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP;
         const newTruckCount = trucksInTargetLane.length + 1;
@@ -2319,10 +2472,9 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
         });
 
         const currentTruckLengths = trucksInTargetLane.reduce((sum, truck) => {
-          const garageLength = truck.originalLength ?? truck.length;
-          return sum + garageLength;
+          return sum + truck.length;
         }, 0);
-        const draggedTruckGarageLength = draggedTruck.originalLength ?? draggedTruck.length;
+        const draggedTruckGarageLength = draggedTruck.length;
         const newTotalTruckLengths = currentTruckLengths + draggedTruckGarageLength;
         const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP;
         const newTruckCount = trucksInTargetLane.length + 1;
@@ -2368,7 +2520,7 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
 
       // Preferred spot is empty - check if truck fits before moving
       // Calculate if the truck actually fits in this lane
-      const draggedTruckGarageLength = draggedTruck.originalLength ?? draggedTruck.length;
+      const draggedTruckGarageLength = draggedTruck.length;
       const availability = calculateLaneAvailability(
         targetGarageId,
         targetLaneId,

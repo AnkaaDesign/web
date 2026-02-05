@@ -5,13 +5,9 @@ import { cn } from "@/lib/utils";
 import {
   IconBell,
   IconChecklist,
-  IconShoppingCart,
   IconShield,
-  IconBeach,
-  IconAlertTriangle,
   IconPackage,
   IconInfoCircle,
-  IconClipboardCheck,
   IconClock,
 } from "@tabler/icons-react";
 import type { Notification } from "@/types";
@@ -31,20 +27,12 @@ const getNotificationIcon = (type: NOTIFICATION_TYPE) => {
   switch (type) {
     case NOTIFICATION_TYPE.SYSTEM:
       return <IconBell {...iconProps} />;
-    case NOTIFICATION_TYPE.TASK:
+    case NOTIFICATION_TYPE.PRODUCTION:
       return <IconChecklist {...iconProps} />;
-    case NOTIFICATION_TYPE.ORDER:
-      return <IconShoppingCart {...iconProps} />;
-    case NOTIFICATION_TYPE.SERVICE_ORDER:
-      return <IconClipboardCheck {...iconProps} />;
-    case NOTIFICATION_TYPE.PPE:
-      return <IconShield {...iconProps} />;
-    case NOTIFICATION_TYPE.VACATION:
-      return <IconBeach {...iconProps} />;
-    case NOTIFICATION_TYPE.WARNING:
-      return <IconAlertTriangle {...iconProps} />;
     case NOTIFICATION_TYPE.STOCK:
       return <IconPackage {...iconProps} />;
+    case NOTIFICATION_TYPE.USER:
+      return <IconShield {...iconProps} />;
     case NOTIFICATION_TYPE.GENERAL:
     default:
       return <IconInfoCircle {...iconProps} />;
@@ -55,20 +43,12 @@ const getNotificationIconBgColor = (type: NOTIFICATION_TYPE) => {
   switch (type) {
     case NOTIFICATION_TYPE.SYSTEM:
       return "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400";
-    case NOTIFICATION_TYPE.TASK:
+    case NOTIFICATION_TYPE.PRODUCTION:
       return "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400";
-    case NOTIFICATION_TYPE.ORDER:
-      return "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400";
-    case NOTIFICATION_TYPE.SERVICE_ORDER:
-      return "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400";
-    case NOTIFICATION_TYPE.PPE:
-      return "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400";
-    case NOTIFICATION_TYPE.VACATION:
-      return "bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400";
-    case NOTIFICATION_TYPE.WARNING:
-      return "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400";
     case NOTIFICATION_TYPE.STOCK:
       return "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400";
+    case NOTIFICATION_TYPE.USER:
+      return "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400";
     case NOTIFICATION_TYPE.GENERAL:
     default:
       return "bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400";

@@ -11,18 +11,6 @@ import { SCHEDULE_FREQUENCY } from "../constants";
 
 export const orderScheduleIncludeSchema = z
   .object({
-    supplier: z
-      .union([
-        z.boolean(),
-        z.object({
-          include: z
-            .object({
-              contact: z.boolean().optional(),
-            })
-            .optional(),
-        }),
-      ])
-      .optional(),
     weeklyConfig: z
       .union([
         z.boolean(),
@@ -122,19 +110,6 @@ export const orderScheduleWhereSchema: z.ZodSchema = z.lazy(() =>
           z.object({
             equals: z.string().optional(),
             not: z.string().optional(),
-            in: z.array(z.string()).optional(),
-            notIn: z.array(z.string()).optional(),
-          }),
-        ])
-        .optional(),
-
-      supplierId: z
-        .union([
-          z.string(),
-          z.null(),
-          z.object({
-            equals: z.union([z.string(), z.null()]).optional(),
-            not: z.union([z.string(), z.null()]).optional(),
             in: z.array(z.string()).optional(),
             notIn: z.array(z.string()).optional(),
           }),
@@ -351,8 +326,6 @@ export const orderScheduleWhereSchema: z.ZodSchema = z.lazy(() =>
         .optional(),
 
       // Relations
-      supplier: z.any().optional(),
-      category: z.any().optional(),
       weeklyConfig: z.any().optional(),
       monthlyConfig: z.any().optional(),
       yearlyConfig: z.any().optional(),
@@ -374,7 +347,6 @@ const orderScheduleFilters = {
       }),
     )
     .optional(),
-  supplierIds: z.array(z.string().uuid("Fornecedor inválido")).optional(),
   itemIds: z.array(z.string().uuid("Item inválido")).optional(),
   isActive: z.boolean().optional(),
   hasReschedules: z.boolean().optional(),
@@ -401,10 +373,13 @@ const orderScheduleTransform = (data: any) => {
 
   const andConditions: any[] = [];
 
-  // Handle searchingFor - search in related supplier names
+  // Handle searchingFor - search in name and description fields
   if (data.searchingFor && typeof data.searchingFor === "string" && data.searchingFor.trim()) {
     andConditions.push({
-      OR: [{ supplier: { name: { contains: data.searchingFor.trim(), mode: "insensitive" } } }],
+      OR: [
+        { name: { contains: data.searchingFor.trim(), mode: "insensitive" } },
+        { description: { contains: data.searchingFor.trim(), mode: "insensitive" } },
+      ],
     });
     delete data.searchingFor;
   }
@@ -413,12 +388,6 @@ const orderScheduleTransform = (data: any) => {
   if (data.frequency && Array.isArray(data.frequency) && data.frequency.length > 0) {
     andConditions.push({ frequency: { in: data.frequency } });
     delete data.frequency;
-  }
-
-  // Handle supplierIds filter
-  if (data.supplierIds && Array.isArray(data.supplierIds) && data.supplierIds.length > 0) {
-    andConditions.push({ supplierId: { in: data.supplierIds } });
-    delete data.supplierIds;
   }
 
   // Handle itemIds filter (search in items array)
@@ -581,6 +550,10 @@ const toFormData = <T>(data: T) => data;
 
 export const orderScheduleCreateSchema = z
   .object({
+    // Identification fields
+    name: z.string().min(1, "Nome é obrigatório").max(255, "Nome muito longo").optional(),
+    description: z.string().max(1000, "Descrição muito longa").optional(),
+
     frequency: z.enum(Object.values(SCHEDULE_FREQUENCY) as [string, ...string[]], {
       errorMap: () => ({ message: "Frequência inválida" }),
     }),
@@ -588,11 +561,9 @@ export const orderScheduleCreateSchema = z
     isActive: z.boolean().default(true),
     items: uuidArraySchema("item"),
 
-    // Supplier selection (optional)
-    supplierId: z.string().uuid("Fornecedor inválido").optional(),
-
     // Specific scheduling fields - conditionally required based on frequency
     specificDate: z.coerce.date().optional(),
+    nextRun: z.coerce.date().optional(),
     dayOfMonth: z.number().int().min(1, "Dia do mês deve ser entre 1 e 31").max(31, "Dia do mês deve ser entre 1 e 31").optional(),
     dayOfWeek: z.string().optional(), // DayOfWeek enum values
     month: z.string().optional(), // Month enum values
@@ -609,9 +580,17 @@ export const orderScheduleCreateSchema = z
       switch (data.frequency) {
         case SCHEDULE_FREQUENCY.ONCE:
           return !!data.specificDate;
+        case SCHEDULE_FREQUENCY.DAILY:
+          return true; // No specific config needed
         case SCHEDULE_FREQUENCY.WEEKLY:
+        case SCHEDULE_FREQUENCY.BIWEEKLY:
           return !!data.dayOfWeek || !!data.weeklyConfigId;
         case SCHEDULE_FREQUENCY.MONTHLY:
+        case SCHEDULE_FREQUENCY.BIMONTHLY:
+        case SCHEDULE_FREQUENCY.QUARTERLY:
+        case SCHEDULE_FREQUENCY.TRIANNUAL:
+        case SCHEDULE_FREQUENCY.QUADRIMESTRAL:
+        case SCHEDULE_FREQUENCY.SEMI_ANNUAL:
           return !!data.dayOfMonth || !!data.monthlyConfigId;
         case SCHEDULE_FREQUENCY.ANNUAL:
           return (!!data.dayOfMonth && !!data.month) || !!data.yearlyConfigId;
@@ -630,6 +609,10 @@ export const orderScheduleCreateSchema = z
 
 export const orderScheduleUpdateSchema = z
   .object({
+    // Identification fields
+    name: z.string().min(1, "Nome é obrigatório").max(255, "Nome muito longo").optional(),
+    description: z.string().max(1000, "Descrição muito longa").nullable().optional(),
+
     frequency: z
       .enum(Object.values(SCHEDULE_FREQUENCY) as [string, ...string[]], {
         errorMap: () => ({ message: "Frequência inválida" }),
@@ -638,9 +621,6 @@ export const orderScheduleUpdateSchema = z
     frequencyCount: z.number().int().positive("Contagem de frequência deve ser positiva").optional(),
     isActive: z.boolean().optional(),
     items: uuidArraySchema("item").optional(),
-
-    // Supplier selection (optional)
-    supplierId: z.string().uuid("Fornecedor inválido").nullable().optional(),
 
     // Specific scheduling fields
     specificDate: z.coerce.date().nullable().optional(),
@@ -730,11 +710,12 @@ export type OrderScheduleWhere = z.infer<typeof orderScheduleWhereSchema>;
 // =====================
 
 export const mapOrderScheduleToFormData = createMapToFormDataHelper<OrderSchedule, OrderScheduleUpdateFormData>((orderSchedule) => ({
+  name: orderSchedule.name || undefined,
+  description: orderSchedule.description || null,
   frequency: orderSchedule.frequency as SCHEDULE_FREQUENCY,
   frequencyCount: orderSchedule.frequencyCount,
   isActive: orderSchedule.isActive,
   items: orderSchedule.items,
-  supplierId: orderSchedule.supplierId || null,
   specificDate: orderSchedule.specificDate || null,
   dayOfMonth: orderSchedule.dayOfMonth || null,
   dayOfWeek: orderSchedule.dayOfWeek || null,

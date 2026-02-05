@@ -79,6 +79,20 @@ export function canBatchOperateTasks(user: User | null): boolean {
 }
 
 /**
+ * Can user view cancelled tasks in task history?
+ * ADMIN, COMMERCIAL, and FINANCIAL can view cancelled tasks via status filter
+ * By default, only COMPLETED tasks are shown - user must explicitly select CANCELLED
+ */
+export function canViewCancelledTasks(user: User | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.FINANCIAL,
+  ]);
+}
+
+/**
  * Check if team leader can manage a specific task (sector-based validation)
  * Team leaders can manage tasks in their own sector OR tasks without a sector
  * When starting a task without sector, it will be assigned to leader's sector

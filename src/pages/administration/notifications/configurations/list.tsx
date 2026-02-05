@@ -87,45 +87,40 @@ const IMPORTANCE_VARIANTS: Record<string, { label: string; variant: string }> = 
 };
 
 const TYPE_LABELS: Record<string, string> = {
-  TASK: "Tarefas",
-  ORDER: "Pedidos",
-  SERVICE_ORDER: "Ordens de Serviço",
-  STOCK: "Estoque",
-  PPE: "EPI",
-  VACATION: "Férias",
-  WARNING: "Advertências",
-  CUT: "Recortes",
   SYSTEM: "Sistema",
+  PRODUCTION: "Produção",
+  STOCK: "Estoque",
+  USER: "Usuário",
   GENERAL: "Geral",
 };
 
 const CHANNEL_CONFIG: Record<string, { icon: typeof IconBell; color: string; borderColor: string; bgColor: string; label: string }> = {
   IN_APP: {
     icon: IconBell,
-    color: "text-orange-500",
-    borderColor: "border-orange-500",
-    bgColor: "bg-orange-500/20",
+    color: "text-orange-600 dark:text-orange-400",
+    borderColor: "border-orange-200 dark:border-orange-800",
+    bgColor: "bg-orange-50 dark:bg-orange-950",
     label: "No App",
   },
   PUSH: {
     icon: IconDeviceMobile,
-    color: "text-blue-500",
-    borderColor: "border-blue-500",
-    bgColor: "bg-blue-500/20",
+    color: "text-blue-600 dark:text-blue-400",
+    borderColor: "border-blue-200 dark:border-blue-800",
+    bgColor: "bg-blue-50 dark:bg-blue-950",
     label: "Push",
   },
   EMAIL: {
     icon: IconMail,
-    color: "text-purple-500",
-    borderColor: "border-purple-500",
-    bgColor: "bg-purple-500/20",
+    color: "text-purple-600 dark:text-purple-400",
+    borderColor: "border-purple-200 dark:border-purple-800",
+    bgColor: "bg-purple-50 dark:bg-purple-950",
     label: "E-mail",
   },
   WHATSAPP: {
     icon: IconBrandWhatsapp,
-    color: "text-green-500",
-    borderColor: "border-green-500",
-    bgColor: "bg-green-500/20",
+    color: "text-green-600 dark:text-green-400",
+    borderColor: "border-green-200 dark:border-green-800",
+    bgColor: "bg-green-50 dark:bg-green-950",
     label: "WhatsApp",
   },
 };
@@ -148,12 +143,12 @@ interface ConfigurationColumn {
 function createConfigurationColumns(): ConfigurationColumn[] {
   return [
     {
-      key: "key",
-      header: "Chave",
+      key: "name",
+      header: "Nome",
       sortable: true,
       className: "w-[280px] min-w-[280px]",
       accessor: (config) => (
-        <span className="font-mono text-sm">{config.key}</span>
+        <span className="text-sm font-medium">{config.name || config.key}</span>
       ),
     },
     {
@@ -209,15 +204,15 @@ function createConfigurationColumns(): ConfigurationColumn[] {
                 <div
                   key={channelKey}
                   className={cn(
-                    "p-2 rounded-lg border transition-all flex items-center justify-center",
+                    "p-2 rounded-lg border-2 transition-all flex items-center justify-center",
                     isEnabled
                       ? channelConfig.borderColor
-                      : "border-muted-foreground/30",
+                      : "border-muted bg-muted/50 opacity-50",
                     isMandatory && isEnabled && channelConfig.bgColor
                   )}
                   title={`${channelConfig.label}${isMandatory ? " (Obrigatório)" : ""}${!isEnabled ? " (Desativado)" : ""}`}
                 >
-                  <Icon className={cn("h-4 w-4", isEnabled ? channelConfig.color : "text-muted-foreground/50")} />
+                  <Icon className={cn("h-4 w-4", isEnabled ? channelConfig.color : "text-muted-foreground")} />
                 </div>
               );
             })}
@@ -286,7 +281,7 @@ export function NotificationConfigurationListPage() {
   } = useTableState({
     defaultPageSize: DEFAULT_PAGE_SIZE,
     resetSelectionOnPageChange: false,
-    defaultSort: [{ key: "key", direction: "asc" }],
+    defaultSort: [{ key: "name", direction: "asc" }],
   });
 
   // Filter serialization
@@ -542,7 +537,7 @@ export function NotificationConfigurationListPage() {
                 <TableSearchInput
                   value={displaySearchText}
                   onChange={setSearch}
-                  placeholder="Buscar por chave, descrição..."
+                  placeholder="Buscar por nome, descrição..."
                   isPending={displaySearchText !== searchingFor}
                   className="flex-1"
                 />

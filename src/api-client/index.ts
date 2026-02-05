@@ -40,7 +40,23 @@ export * from "./item-price";
 export * from "./maintenance";
 export * from "./message";
 export * from "./notification";
-export { notificationPreferenceService, whatsAppService } from "./services/notification.service";
+export {
+  notificationPreferenceService,
+  notificationUserPreferenceService,
+  whatsAppService,
+} from "./services/notification.service";
+export type {
+  NotificationChannel,
+  NotificationImportance,
+  ChannelPreferenceDetail,
+  UserPreferenceConfig,
+  NotificationTypeGroup,
+  GroupedConfigurationsResponse,
+  AvailableConfigurationsApiResponse,
+  UpdateUserPreferencePayload,
+  UpdateUserPreferenceApiResponse,
+  ResetPreferenceApiResponse,
+} from "./services/notification.service";
 export * from "./notify";
 export * from "./observation";
 export * from "./order";

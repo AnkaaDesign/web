@@ -1361,6 +1361,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "ferias-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/ferias/detalhes/:id", isDynamic: true },
         ],
       },
+      {
+        id: "horarios",
+        title: "Horários",
+        icon: "clock",
+        path: "/recursos-humanos/horarios",
+        children: [
+          { id: "horarios-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/horarios/detalhes/:id", isDynamic: true },
+        ],
+      },
       // { id: "folha-de-pagamento", title: "Folha de Pagamento", icon: "payroll", path: "/recursos-humanos/folha-de-pagamento" }, // Temporarily hidden for testing
       { id: "minhas-mensagens-rh", title: "Minhas Mensagens", icon: "message", path: "/pessoal/mensagens", requiredPrivilege: SECTOR_PRIVILEGES.HUMAN_RESOURCES },
       { id: "requisicoes", title: "Requisições", icon: "clipboardList", path: "/recursos-humanos/requisicoes" },

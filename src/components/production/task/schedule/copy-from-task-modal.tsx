@@ -241,24 +241,27 @@ export function CopyFromTaskModal({
     'Observações',
   ];
 
+  // All individual fields (excluding 'all' meta-option)
+  const individualFields = useMemo(
+    () => allowedFields.filter((f) => f !== 'all'),
+    [allowedFields]
+  );
+
+  const allIndividualSelected = individualFields.length > 0 &&
+    individualFields.every((f) => selectedFields.has(f));
+
   const handleToggleField = (field: CopyableTaskField) => {
     setSelectedFields((prev) => {
       const newSet = new Set(prev);
 
-      // If toggling 'all', clear other selections
       if (field === 'all') {
-        if (newSet.has('all')) {
-          newSet.delete('all');
-        } else {
+        // If all are already selected, deselect all; otherwise select all individual fields
+        if (allIndividualSelected) {
           newSet.clear();
-          newSet.add('all');
+        } else {
+          individualFields.forEach((f) => newSet.add(f));
         }
       } else {
-        // If selecting another field, remove 'all'
-        if (newSet.has('all')) {
-          newSet.delete('all');
-        }
-
         if (newSet.has(field)) {
           newSet.delete(field);
         } else {
@@ -277,8 +280,8 @@ export function CopyFromTaskModal({
 
   const handleConfirm = () => {
     if (!sourceTask || selectedFields.size === 0) return;
-    // Expand 'all' to only the fields user has permission to copy
-    const fieldsToSubmit = expandAllFieldsForUser(Array.from(selectedFields), userPrivilege);
+    // Submit the individually selected fields directly (no 'all' meta-value in the set)
+    const fieldsToSubmit = Array.from(selectedFields);
     onConfirm(fieldsToSubmit, sourceTask);
   };
 
@@ -333,7 +336,7 @@ export function CopyFromTaskModal({
                             <FieldSelectionItem
                               key={field}
                               field={field}
-                              isSelected={selectedFields.has(field)}
+                              isSelected={field === 'all' ? allIndividualSelected : selectedFields.has(field)}
                               onToggle={handleToggleField}
                             />
                           ))}
@@ -349,7 +352,7 @@ export function CopyFromTaskModal({
             {selectedFields.size > 0 && (
               <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20">
                 <span className="text-sm font-medium">
-                  {selectedFields.has('all')
+                  {allIndividualSelected
                     ? 'Todos os campos selecionados'
                     : `${selectedFields.size} campo${selectedFields.size > 1 ? 's' : ''} selecionado${selectedFields.size > 1 ? 's' : ''}`
                   }
@@ -399,7 +402,7 @@ export function CopyFromTaskModal({
               <p className="text-sm font-medium mb-3">Campos que serão copiados:</p>
               <ScrollArea className="h-[150px] pr-3">
                 <div className="space-y-2">
-                  {selectedFields.has('all') ? (
+                  {allIndividualSelected ? (
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
                       <IconCheck className="h-4 w-4 text-primary flex-shrink-0" />
                       <span className="text-sm font-medium">COPIAR TUDO</span>

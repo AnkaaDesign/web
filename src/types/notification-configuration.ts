@@ -10,6 +10,7 @@ import type { NOTIFICATION_TYPE, NOTIFICATION_CHANNEL, NOTIFICATION_IMPORTANCE, 
 
 export interface NotificationConfiguration extends BaseEntity {
   key: string;
+  name?: string | null;
   notificationType: NOTIFICATION_TYPE;
   eventType: string;
   description?: string | null;
@@ -257,15 +258,10 @@ export interface AvailableConfigurationsResponse {
 
 export const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   SYSTEM: "Sistema",
-  TASK: "Tarefas",
-  ORDER: "Pedidos",
-  SERVICE_ORDER: "Ordens de Serviço",
-  PPE: "EPI",
-  VACATION: "Férias",
-  WARNING: "Advertências",
+  PRODUCTION: "Produção",
   STOCK: "Estoque",
+  USER: "Usuário",
   GENERAL: "Geral",
-  CUT: "Recortes",
 };
 
 export const NOTIFICATION_CHANNEL_LABELS: Record<string, string> = {

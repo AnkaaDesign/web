@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import {
   FormControl,
@@ -20,13 +19,13 @@ interface MaxQuantityInputProps {
 export function MaxQuantityInput({
   disabled,
   currentValue,
-  isManual: initialIsManual = false,
+  isManual: fallbackIsManual = false,
 }: MaxQuantityInputProps) {
   const form = useFormContext();
-  const [isManualMode, setIsManualMode] = useState(initialIsManual);
+  // Watch the form value directly to stay in sync with form resets and data refetches
+  const isManualMode = form.watch('isManualMaxQuantity') ?? fallbackIsManual;
 
   const handleModeToggle = (checked: boolean) => {
-    setIsManualMode(checked);
     form.setValue('isManualMaxQuantity', checked, { shouldDirty: true });
 
     // If switching to automatic, clear the manual value

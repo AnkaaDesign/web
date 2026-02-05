@@ -550,8 +550,6 @@ export const orderScheduleKeys = {
   byIds: (ids: string[]) => ["orderSchedules", "byIds", ids] as const,
 
   // Specialized queries
-  bySupplier: (supplierId: string, filters?: Partial<OrderScheduleGetManyFormData>) =>
-    filters ? (["orderSchedules", "bySupplier", supplierId, filters] as const) : (["orderSchedules", "bySupplier", supplierId] as const),
   active: (filters?: Partial<OrderScheduleGetManyFormData>) => (filters ? (["orderSchedules", "active", filters] as const) : (["orderSchedules", "active"] as const)),
 };
 

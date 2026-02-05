@@ -390,13 +390,9 @@ export const WARNING_CATEGORY_LABELS: Record<WARNING_CATEGORY, string> = {
 
 export const NOTIFICATION_TYPE_LABELS: Record<NOTIFICATION_TYPE, string> = {
   [NOTIFICATION_TYPE.SYSTEM]: "Sistema",
-  [NOTIFICATION_TYPE.TASK]: "Tarefa",
-  [NOTIFICATION_TYPE.ORDER]: "Pedido",
-  [NOTIFICATION_TYPE.SERVICE_ORDER]: "Ordem de Serviço",
-  [NOTIFICATION_TYPE.PPE]: "EPI",
-  [NOTIFICATION_TYPE.VACATION]: "Férias",
-  [NOTIFICATION_TYPE.WARNING]: "Advertência",
+  [NOTIFICATION_TYPE.PRODUCTION]: "Produção",
   [NOTIFICATION_TYPE.STOCK]: "Estoque",
+  [NOTIFICATION_TYPE.USER]: "Usuário",
   [NOTIFICATION_TYPE.GENERAL]: "Geral",
 };
 
@@ -747,35 +743,35 @@ export const VACATION_TYPE_LABELS: Record<VACATION_TYPE, string> = {
 };
 
 export const WEEK_DAY_LABELS: Record<WEEK_DAY, string> = {
-  [WEEK_DAY.MONDAY]: "Monday",
-  [WEEK_DAY.TUESDAY]: "Tuesday",
-  [WEEK_DAY.WEDNESDAY]: "Wednesday",
-  [WEEK_DAY.THURSDAY]: "Thursday",
-  [WEEK_DAY.FRIDAY]: "Friday",
-  [WEEK_DAY.SATURDAY]: "Saturday",
-  [WEEK_DAY.SUNDAY]: "Sunday",
+  [WEEK_DAY.MONDAY]: "Segunda-feira",
+  [WEEK_DAY.TUESDAY]: "Terça-feira",
+  [WEEK_DAY.WEDNESDAY]: "Quarta-feira",
+  [WEEK_DAY.THURSDAY]: "Quinta-feira",
+  [WEEK_DAY.FRIDAY]: "Sexta-feira",
+  [WEEK_DAY.SATURDAY]: "Sábado",
+  [WEEK_DAY.SUNDAY]: "Domingo",
 };
 
 export const MONTH_LABELS: Record<MONTH, string> = {
-  [MONTH.JANUARY]: "January",
-  [MONTH.FEBRUARY]: "February",
-  [MONTH.MARCH]: "March",
-  [MONTH.APRIL]: "April",
-  [MONTH.MAY]: "May",
-  [MONTH.JUNE]: "June",
-  [MONTH.JULY]: "July",
-  [MONTH.AUGUST]: "August",
-  [MONTH.SEPTEMBER]: "September",
-  [MONTH.OCTOBER]: "October",
-  [MONTH.NOVEMBER]: "November",
-  [MONTH.DECEMBER]: "December",
+  [MONTH.JANUARY]: "Janeiro",
+  [MONTH.FEBRUARY]: "Fevereiro",
+  [MONTH.MARCH]: "Março",
+  [MONTH.APRIL]: "Abril",
+  [MONTH.MAY]: "Maio",
+  [MONTH.JUNE]: "Junho",
+  [MONTH.JULY]: "Julho",
+  [MONTH.AUGUST]: "Agosto",
+  [MONTH.SEPTEMBER]: "Setembro",
+  [MONTH.OCTOBER]: "Outubro",
+  [MONTH.NOVEMBER]: "Novembro",
+  [MONTH.DECEMBER]: "Dezembro",
 };
 
 export const MONTH_OCCURRENCE_LABELS: Record<MONTH_OCCURRENCE, string> = {
   [MONTH_OCCURRENCE.FIRST]: "Primeira",
-  [MONTH_OCCURRENCE.SECOND]: "Second",
+  [MONTH_OCCURRENCE.SECOND]: "Segunda",
   [MONTH_OCCURRENCE.THIRD]: "Terceira",
-  [MONTH_OCCURRENCE.FOURTH]: "Fourth",
+  [MONTH_OCCURRENCE.FOURTH]: "Quarta",
   [MONTH_OCCURRENCE.LAST]: "Última",
 };
 

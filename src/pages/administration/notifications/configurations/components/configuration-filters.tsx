@@ -25,15 +25,10 @@ import type { NotificationConfigurationQueryParams } from "@/types/notification-
 // =====================
 
 const TYPE_OPTIONS = [
-  { value: "TASK", label: "Tarefas" },
-  { value: "ORDER", label: "Pedidos" },
-  { value: "SERVICE_ORDER", label: "Ordens de Serviço" },
-  { value: "STOCK", label: "Estoque" },
-  { value: "PPE", label: "EPI" },
-  { value: "VACATION", label: "Férias" },
-  { value: "WARNING", label: "Advertências" },
-  { value: "CUT", label: "Recortes" },
   { value: "SYSTEM", label: "Sistema" },
+  { value: "PRODUCTION", label: "Produção" },
+  { value: "STOCK", label: "Estoque" },
+  { value: "USER", label: "Usuário" },
   { value: "GENERAL", label: "Geral" },
 ];
 

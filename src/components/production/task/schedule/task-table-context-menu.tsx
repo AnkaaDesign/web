@@ -32,6 +32,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
 
   // Permission checks
   const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  const isCommercial = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
   const isTeamLeaderUser = user ? isTeamLeader(user) : false;
   const canEdit = canEditTasks(user); // ADMIN, DESIGNER, FINANCIAL, LOGISTIC
   const canDelete = canDeleteTasks(user); // ADMIN only
@@ -87,8 +88,8 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           </DropdownMenuItem>
         )}
 
-        {/* Admin-only actions: duplicate, setSector, setStatus, bulk operations */}
-        {isAdmin && !isMultiSelection && (
+        {/* Duplicate - ADMIN and COMMERCIAL */}
+        {(isAdmin || isCommercial) && !isMultiSelection && (
           <DropdownMenuItem onClick={() => handleAction("duplicate")}>
             <IconCopy className="mr-2 h-4 w-4" />
             Criar Cópias

@@ -86,30 +86,30 @@ const CHANNEL_CONFIG = {
   IN_APP: {
     label: "No App",
     icon: IconBell,
-    color: "text-orange-500",
-    bgColor: "bg-orange-500/20",
-    borderColor: "border-orange-500",
+    color: "text-orange-600 dark:text-orange-400",
+    bgColor: "bg-orange-50 dark:bg-orange-950",
+    borderColor: "border-orange-200 dark:border-orange-800",
   },
   PUSH: {
     label: "Push",
     icon: IconDeviceMobile,
-    color: "text-blue-500",
-    bgColor: "bg-blue-500/20",
-    borderColor: "border-blue-500",
+    color: "text-blue-600 dark:text-blue-400",
+    bgColor: "bg-blue-50 dark:bg-blue-950",
+    borderColor: "border-blue-200 dark:border-blue-800",
   },
   EMAIL: {
     label: "E-mail",
     icon: IconMail,
-    color: "text-purple-500",
-    bgColor: "bg-purple-500/20",
-    borderColor: "border-purple-500",
+    color: "text-purple-600 dark:text-purple-400",
+    bgColor: "bg-purple-50 dark:bg-purple-950",
+    borderColor: "border-purple-200 dark:border-purple-800",
   },
   WHATSAPP: {
     label: "WhatsApp",
     icon: IconBrandWhatsapp,
-    color: "text-green-500",
-    bgColor: "bg-green-500/20",
-    borderColor: "border-green-500",
+    color: "text-green-600 dark:text-green-400",
+    bgColor: "bg-green-50 dark:bg-green-950",
+    borderColor: "border-green-200 dark:border-green-800",
   },
 };
 
@@ -169,16 +169,16 @@ function ChannelCard({ channel }: ChannelCardProps) {
   return (
     <div
       className={cn(
-        "p-3 rounded-lg border transition-all",
+        "p-3 rounded-lg border-2 transition-all",
         channel.enabled
           ? config.borderColor
-          : "border-muted-foreground/30 opacity-60",
+          : "border-muted bg-muted/50 opacity-50",
         channel.enabled && channel.mandatory && config.bgColor
       )}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Icon className={cn("w-5 h-5", channel.enabled ? config.color : "text-muted-foreground/50")} />
+          <Icon className={cn("w-5 h-5", channel.enabled ? config.color : "text-muted-foreground")} />
           <span className={cn("font-medium text-sm", channel.enabled ? "text-foreground" : "text-muted-foreground")}>
             {config.label}
           </span>
@@ -344,13 +344,13 @@ export function NotificationConfigurationDetailsPage() {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-6 overflow-auto">
         <PageHeader
           variant="detail"
-          title={config.key}
+          title={config.name || config.key}
           breadcrumbs={[
             { label: "Início", href: "/" },
             { label: "Administração", href: "/administracao" },
             { label: "Notificações", href: routes.administration.notifications.root },
             { label: "Configurações", href: routes.administration.notifications.configurations.root },
-            { label: config.key },
+            { label: config.name || config.key },
           ]}
           actions={[
             {

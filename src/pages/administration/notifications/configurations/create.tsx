@@ -55,12 +55,16 @@ const configurationSchema = z.object({
   key: z
     .string()
     .min(3, "Chave deve ter no mínimo 3 caracteres")
-    .regex(/^[A-Z][A-Z0-9_]*$/, "Chave deve começar com letra maiúscula e conter apenas letras, números e underscore"),
+    .regex(/^[a-z][a-z0-9_.]*$/, "Chave deve começar com letra minúscula e conter apenas letras minúsculas, números, underscore e ponto"),
+  name: z
+    .string()
+    .min(3, "Nome deve ter no mínimo 3 caracteres")
+    .max(100, "Nome deve ter no máximo 100 caracteres"),
   eventType: z
     .string()
     .min(3, "Tipo de evento deve ter no mínimo 3 caracteres"),
   description: z.string().optional(),
-  notificationType: z.enum(["SYSTEM", "TASK", "ORDER", "SERVICE_ORDER", "STOCK", "PPE", "VACATION", "WARNING", "CUT", "GENERAL"]),
+  notificationType: z.enum(["SYSTEM", "PRODUCTION", "STOCK", "USER", "GENERAL"]),
   importance: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]),
   enabled: z.boolean(),
   workHoursOnly: z.boolean(),
@@ -83,14 +87,9 @@ type ConfigurationFormData = z.infer<typeof configurationSchema>;
 
 const NOTIFICATION_TYPES = [
   { value: "SYSTEM", label: "Sistema" },
-  { value: "TASK", label: "Tarefas" },
-  { value: "ORDER", label: "Pedidos" },
-  { value: "SERVICE_ORDER", label: "Ordens de Serviço" },
+  { value: "PRODUCTION", label: "Produção" },
   { value: "STOCK", label: "Estoque" },
-  { value: "PPE", label: "EPI" },
-  { value: "VACATION", label: "Férias" },
-  { value: "WARNING", label: "Advertências" },
-  { value: "CUT", label: "Recortes" },
+  { value: "USER", label: "Usuário" },
   { value: "GENERAL", label: "Geral" },
 ];
 
@@ -232,6 +231,7 @@ export function NotificationConfigurationCreatePage() {
     resolver: zodResolver(configurationSchema),
     defaultValues: {
       key: "",
+      name: "",
       eventType: "",
       description: "",
       notificationType: "GENERAL",
@@ -261,6 +261,7 @@ export function NotificationConfigurationCreatePage() {
 
       const payload = {
         key: data.key,
+        name: data.name,
         eventType: data.eventType,
         description: data.description || undefined,
         notificationType: data.notificationType as any,
@@ -365,7 +366,7 @@ export function NotificationConfigurationCreatePage() {
                       </Label>
                       <Input
                         id="key"
-                        placeholder="Ex: TASK_CREATED"
+                        placeholder="Ex: service_order.completed"
                         transparent
                         {...form.register("key")}
                       />
@@ -378,19 +379,37 @@ export function NotificationConfigurationCreatePage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="eventType">
-                        Tipo de Evento <span className="text-destructive">*</span>
+                      <Label htmlFor="name">
+                        Nome <span className="text-destructive">*</span>
                       </Label>
                       <Input
-                        id="eventType"
-                        placeholder="Ex: task.created"
+                        id="name"
+                        placeholder="Ex: Ordem de Serviço Concluída"
                         transparent
-                        {...form.register("eventType")}
+                        {...form.register("name")}
                       />
-                      {form.formState.errors.eventType && (
-                        <p className="text-sm text-destructive">{form.formState.errors.eventType.message}</p>
+                      {form.formState.errors.name && (
+                        <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
                       )}
+                      <p className="text-xs text-muted-foreground">
+                        Nome amigável exibido aos usuários
+                      </p>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="eventType">
+                      Tipo de Evento <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="eventType"
+                      placeholder="Ex: task.created"
+                      transparent
+                      {...form.register("eventType")}
+                    />
+                    {form.formState.errors.eventType && (
+                      <p className="text-sm text-destructive">{form.formState.errors.eventType.message}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
