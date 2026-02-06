@@ -25,7 +25,10 @@ import {
   truckKeys,
   garageKeys,
   changeLogKeys,
+  cutKeys,
 } from "./queryKeys";
+import { layoutQueryKeys } from "./useLayout";
+import { layoutSectionQueryKeys } from "./useLayoutSection";
 
 // ===============================================
 // TASK HOOKS
@@ -359,6 +362,15 @@ export function useTaskBatchMutations() {
     queryClient.invalidateQueries({
       queryKey: changeLogKeys.all,
     });
+    queryClient.invalidateQueries({
+      queryKey: layoutQueryKeys.all,
+    });
+    queryClient.invalidateQueries({
+      queryKey: layoutSectionQueryKeys.all,
+    });
+    queryClient.invalidateQueries({
+      queryKey: cutKeys.all,
+    });
   };
 
   // BATCH CREATE
@@ -444,6 +456,18 @@ export function useTaskBatchMutations() {
           // Invalidate artworks for this task
           queryClient.invalidateQueries({
             queryKey: artworkKeys.byEntity("task", task.id),
+          });
+
+          // Invalidate layout queries for this task's truck
+          if ((task as any).truck?.id) {
+            queryClient.invalidateQueries({
+              queryKey: layoutQueryKeys.byTruck((task as any).truck.id),
+            });
+          }
+
+          // Invalidate cuts for this task
+          queryClient.invalidateQueries({
+            queryKey: cutKeys.byTask(task.id),
           });
 
           if (task.customerId) customerIds.add(task.customerId);

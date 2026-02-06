@@ -277,6 +277,7 @@ export const taskOrderBySchema = z
       status: orderByDirectionSchema.optional(),
       statusOrder: orderByDirectionSchema.optional(),
       serialNumber: orderByDirectionSchema.optional(),
+      commissionOrder: orderByDirectionSchema.optional(),
       entryDate: orderByDirectionSchema.optional(),
       term: orderByDirectionSchema.optional(),
       startedAt: orderByDirectionSchema.optional(),
@@ -292,6 +293,7 @@ export const taskOrderBySchema = z
         status: orderByDirectionSchema.optional(),
         statusOrder: orderByDirectionSchema.optional(),
         serialNumber: orderByDirectionSchema.optional(),
+        commissionOrder: orderByDirectionSchema.optional(),
         entryDate: orderByDirectionSchema.optional(),
         term: orderByDirectionSchema.optional(),
         startedAt: orderByDirectionSchema.optional(),
@@ -1178,10 +1180,14 @@ const taskTruckCreateSchema = z.object({
   xPosition: z.number().nullable().optional(),
   yPosition: z.number().nullable().optional(),
   garageId: z.string().uuid("Garagem inválida").nullable().optional(),
-  // Layout data - embedded in truck for single payload
+  // Layout data - embedded in truck for single payload (new layouts)
   leftSideLayout: layoutSideSchema,
   rightSideLayout: layoutSideSchema,
   backSideLayout: layoutSideSchema,
+  // Shared layout IDs - for batch creation (connect to existing layouts)
+  leftSideLayoutId: z.string().uuid().nullable().optional(),
+  rightSideLayoutId: z.string().uuid().nullable().optional(),
+  backSideLayoutId: z.string().uuid().nullable().optional(),
 });
 
 // =====================

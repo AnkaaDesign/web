@@ -123,6 +123,8 @@ import {
   IconZoomIn,
   IconZoomOut,
   IconZoomReset,
+  IconChevronLeft,
+  IconChevronRight,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -205,7 +207,6 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
 
   // Pan handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (zoomScale <= 1) return;
     setIsDragging(true);
     dragStartRef.current = {
       x: e.clientX,
@@ -213,7 +214,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
       translateX,
       translateY,
     };
-  }, [zoomScale, translateX, translateY]);
+  }, [translateX, translateY]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragging) return;
@@ -644,7 +645,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
           {/* Zoomable Container */}
           <div
             ref={zoomContainerRef}
-            className="overflow-hidden cursor-grab active:cursor-grabbing"
+            className="overflow-hidden cursor-grab active:cursor-grabbing select-none"
             style={{ minHeight: '300px' }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -1316,6 +1317,20 @@ export const TaskDetailsPage = () => {
 
   const breadcrumbConfig = getBreadcrumbConfig(source);
 
+  // Task navigation from preparation (agenda) page
+  const taskIds = (location.state as { taskIds?: string[] } | null)?.taskIds;
+  const taskNavigation = useMemo(() => {
+    if (!taskIds || !id) return null;
+    const currentIndex = taskIds.indexOf(id);
+    if (currentIndex === -1) return null;
+    return {
+      currentIndex,
+      total: taskIds.length,
+      previousTaskId: currentIndex > 0 ? taskIds[currentIndex - 1] : null,
+      nextTaskId: currentIndex < taskIds.length - 1 ? taskIds[currentIndex + 1] : null,
+    };
+  }, [taskIds, id]);
+
   // Get display name with fallbacks
   const getTaskDisplayName = (task: any) => {
     if (task.name) return task.name;
@@ -1528,6 +1543,40 @@ export const TaskDetailsPage = () => {
                 { label: taskDisplayName },
               ]}
               actions={[
+              ...(taskNavigation ? [
+                {
+                  key: "previous",
+                  label: "Anterior",
+                  icon: IconChevronLeft,
+                  onClick: () => taskNavigation.previousTaskId && navigate(
+                    routes.production.preparation.details(taskNavigation.previousTaskId),
+                    { state: { taskIds } }
+                  ),
+                  variant: "outline" as const,
+                  group: "secondary" as const,
+                  disabled: !taskNavigation.previousTaskId,
+                },
+                {
+                  key: "task-position",
+                  label: `${taskNavigation.currentIndex + 1} / ${taskNavigation.total}`,
+                  onClick: () => {},
+                  variant: "ghost" as const,
+                  group: "secondary" as const,
+                  className: "pointer-events-none tabular-nums",
+                },
+                {
+                  key: "next",
+                  label: "Próximo",
+                  icon: IconChevronRight,
+                  onClick: () => taskNavigation.nextTaskId && navigate(
+                    routes.production.preparation.details(taskNavigation.nextTaskId),
+                    { state: { taskIds } }
+                  ),
+                  variant: "outline" as const,
+                  group: "secondary" as const,
+                  disabled: !taskNavigation.nextTaskId,
+                },
+              ] : []),
               ...(canEdit && task.status === TASK_STATUS.WAITING_PRODUCTION
                 ? [
                     {

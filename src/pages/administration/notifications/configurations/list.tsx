@@ -66,7 +66,7 @@ import { routes, SECTOR_PRIVILEGES } from "@/constants";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/use-table-state";
 import { useTableFilters } from "@/hooks/use-table-filters";
 import {
   useNotificationConfigurations,
@@ -281,7 +281,7 @@ export function NotificationConfigurationListPage() {
   } = useTableState({
     defaultPageSize: DEFAULT_PAGE_SIZE,
     resetSelectionOnPageChange: false,
-    defaultSort: [{ key: "name", direction: "asc" }],
+    defaultSort: [{ column: "name", direction: "asc" }],
   });
 
   // Filter serialization
@@ -329,8 +329,9 @@ export function NotificationConfigurationListPage() {
     search: baseQueryFilters.searchingFor,
     page: page + 1,
     limit: pageSize,
-    ...(sortConfigs.length > 0 && {
-      orderBy: convertSortConfigsToOrderBy(sortConfigs),
+    ...(sortConfigs.length > 0 && sortConfigs[0]?.column && {
+      sortBy: sortConfigs[0].column,
+      sortOrder: sortConfigs[0].direction,
     }),
   }), [baseQueryFilters, page, pageSize, sortConfigs]);
 

@@ -69,7 +69,7 @@ export default function UpdatePasswordPage() {
         title: 'Sucesso',
         description: 'Senha atualizada com sucesso',
       });
-      navigate('/representatives');
+      navigate(routes.representatives.root);
     },
     onError: (error: any) => {
       toast({
@@ -85,7 +85,7 @@ export default function UpdatePasswordPage() {
   };
 
   const handleCancel = () => {
-    navigate('/representatives');
+    navigate(routes.representatives.root);
   };
 
   const actions = [
@@ -137,8 +137,8 @@ export default function UpdatePasswordPage() {
             { label: 'Início', href: routes.home },
             { label: 'Administração', href: routes.administration.root },
             { label: 'Clientes', href: routes.administration.customers.root },
-            { label: 'Representantes', href: '/representatives' },
-            { label: representative.name, href: `/representatives/${id}/edit` },
+            { label: 'Representantes', href: routes.representatives.root },
+            { label: representative.name, href: routes.representatives.edit(id!) },
             { label: 'Alterar Senha' },
           ]}
           actions={actions}

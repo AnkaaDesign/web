@@ -36,7 +36,7 @@ export default function EditRepresentativePage() {
         title: 'Sucesso',
         description: 'Representante atualizado com sucesso',
       });
-      navigate('/representatives');
+      navigate(routes.representatives.root);
     },
     onError: (error: any) => {
       toast({
@@ -52,7 +52,7 @@ export default function EditRepresentativePage() {
   };
 
   const handleCancel = () => {
-    navigate('/representatives');
+    navigate(routes.representatives.root);
   };
 
   const actions = [
@@ -104,8 +104,8 @@ export default function EditRepresentativePage() {
             { label: 'Início', href: routes.home },
             { label: 'Administração', href: routes.administration.root },
             { label: 'Clientes', href: routes.administration.customers.root },
-            { label: 'Representantes', href: '/representatives' },
-            { label: representative.name, href: `/representatives/${id}` },
+            { label: 'Representantes', href: routes.representatives.root },
+            { label: representative.name, href: routes.representatives.details(id!) },
             { label: 'Editar' },
           ]}
           actions={actions}

@@ -20,7 +20,7 @@ import {
   IconDeviceMobile,
   IconMail,
   IconBrandWhatsapp,
-  IconLock,
+
   IconClock,
   IconUsers,
   IconCheck,
@@ -176,7 +176,7 @@ function ChannelCard({ channel }: ChannelCardProps) {
         channel.enabled && channel.mandatory && config.bgColor
       )}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className={cn("w-5 h-5", channel.enabled ? config.color : "text-muted-foreground")} />
           <span className={cn("font-medium text-sm", channel.enabled ? "text-foreground" : "text-muted-foreground")}>
@@ -184,37 +184,27 @@ function ChannelCard({ channel }: ChannelCardProps) {
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          {channel.mandatory && (
-            <Badge variant="purple" className="flex items-center gap-0.5 text-xs px-1.5 py-0.5">
-              <IconLock className="w-3 h-3" />
-              Obrig.
-            </Badge>
-          )}
           {channel.enabled ? (
             <Badge variant="active" className="text-xs px-1.5 py-0.5">Ativo</Badge>
           ) : (
             <Badge variant="inactive" className="text-xs px-1.5 py-0.5">Inativo</Badge>
           )}
-        </div>
-      </div>
-
-      <div className="space-y-1.5 text-xs">
-        <div className="flex items-center justify-between bg-background/50 rounded px-2 py-1">
-          <span className="text-muted-foreground">Padrão ativo</span>
-          {channel.defaultOn ? (
-            <IconCheck className="w-3.5 h-3.5 text-green-600" />
+          {channel.mandatory ? (
+            <Badge variant="purple" className="text-xs px-1.5 py-0.5">Obrigatório</Badge>
           ) : (
-            <IconX className="w-3.5 h-3.5 text-muted-foreground" />
+            <Badge variant="outline" className="text-xs px-1.5 py-0.5">Opcional</Badge>
+          )}
+          {channel.defaultOn ? (
+            <Badge variant="active" className="text-xs px-1.5 py-0.5">Padrão ativo</Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs px-1.5 py-0.5">Padrão inativo</Badge>
+          )}
+          {channel.minImportance && (
+            <Badge variant={IMPORTANCE_CONFIG[channel.minImportance as keyof typeof IMPORTANCE_CONFIG]?.variant || "outline"} className="text-xs px-1.5 py-0.5">
+              Importância mín: {IMPORTANCE_CONFIG[channel.minImportance as keyof typeof IMPORTANCE_CONFIG]?.label}
+            </Badge>
           )}
         </div>
-        {channel.minImportance && (
-          <div className="flex items-center justify-between bg-background/50 rounded px-2 py-1">
-            <span className="text-muted-foreground">Importância mín.</span>
-            <Badge variant={IMPORTANCE_CONFIG[channel.minImportance as keyof typeof IMPORTANCE_CONFIG]?.variant || "outline"} className="text-xs px-1.5 py-0">
-              {IMPORTANCE_CONFIG[channel.minImportance as keyof typeof IMPORTANCE_CONFIG]?.label}
-            </Badge>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -431,10 +421,13 @@ export function NotificationConfigurationDetailsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0 flex-1">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {config.channelConfigs?.map((channel) => (
-                      <ChannelCard key={channel.channel} channel={channel} />
-                    ))}
+                  <div className="flex flex-col gap-3">
+                    {["IN_APP", "PUSH", "EMAIL", "WHATSAPP"]
+                      .map((key) => config.channelConfigs?.find((c) => c.channel === key))
+                      .filter(Boolean)
+                      .map((channel) => (
+                        <ChannelCard key={channel!.channel} channel={channel!} />
+                      ))}
                   </div>
                 </CardContent>
               </Card>

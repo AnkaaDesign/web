@@ -39,12 +39,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FormCombobox } from "@/components/ui/form-combobox";
 import { Separator } from "@/components/ui/separator";
-import { routes, SECTOR_PRIVILEGES } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, type NOTIFICATION_CHANNEL } from "@/constants";
 import { cn } from "@/lib/utils";
 import {
   useNotificationConfiguration,
   useNotificationConfigurationMutations,
 } from "@/hooks/useNotificationConfiguration";
+import { notificationConfigurationService } from "@/api-client/services/notification-configuration.service";
 
 // =====================
 // Schema
@@ -61,7 +62,7 @@ const configurationSchema = z.object({
   key: z
     .string()
     .min(3, "Chave deve ter no mínimo 3 caracteres")
-    .regex(/^[a-z][a-z0-9_.]*$/, "Chave deve começar com letra minúscula e conter apenas letras minúsculas, números, underscore e ponto"),
+    .regex(/^[a-z][a-zA-Z0-9_.]*$/, "Chave deve começar com letra minúscula e conter apenas letras, números, underscore e ponto"),
   name: z
     .string()
     .min(3, "Nome deve ter no mínimo 3 caracteres")
@@ -75,8 +76,22 @@ const configurationSchema = z.object({
   enabled: z.boolean(),
   workHoursOnly: z.boolean(),
   batchingEnabled: z.boolean(),
-  maxFrequencyPerDay: z.number().min(0).nullable().optional(),
-  deduplicationWindow: z.number().min(0).nullable().optional(),
+  maxFrequencyPerDay: z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return null;
+      const num = Number(val);
+      return isNaN(num) ? null : num;
+    },
+    z.number().min(0).nullable().optional()
+  ),
+  deduplicationWindow: z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return null;
+      const num = Number(val);
+      return isNaN(num) ? null : num;
+    },
+    z.number().min(0).nullable().optional()
+  ),
   channels: z.array(channelConfigSchema),
   targetRules: z.object({
     allowedSectors: z.array(z.string()),
@@ -190,7 +205,9 @@ function ChannelConfigCard({ channel, value, onChange }: ChannelConfigCardProps)
         </div>
         <Switch
           checked={value.enabled}
-          onCheckedChange={(enabled) => onChange({ ...value, enabled })}
+          onCheckedChange={(enabled) =>
+            onChange(enabled ? { ...value, enabled } : { enabled: false, mandatory: false, defaultOn: false })
+          }
         />
       </div>
 
@@ -360,8 +377,23 @@ export function NotificationConfigurationEditPage() {
     try {
       setIsSaving(true);
 
+      // 1. Update all channel configurations first (before main update invalidates cache)
+      await Promise.all(
+        data.channels.map((ch) =>
+          notificationConfigurationService.updateChannelConfig(
+            config.id,
+            ch.channel as NOTIFICATION_CHANNEL,
+            {
+              enabled: ch.enabled,
+              mandatory: ch.enabled ? ch.mandatory : false,
+              defaultOn: ch.enabled ? ch.defaultOn : false,
+            }
+          )
+        )
+      );
+
+      // 2. Update base configuration + target rules (mutation handles toast + cache invalidation)
       const payload = {
-        key: data.key,
         name: data.name,
         eventType: data.eventType,
         description: data.description || undefined,
@@ -370,8 +402,13 @@ export function NotificationConfigurationEditPage() {
         enabled: data.enabled,
         workHoursOnly: data.workHoursOnly,
         batchingEnabled: data.batchingEnabled,
-        maxFrequencyPerDay: data.maxFrequencyPerDay || undefined,
-        deduplicationWindow: data.deduplicationWindow || undefined,
+        maxFrequencyPerDay: data.maxFrequencyPerDay ?? undefined,
+        deduplicationWindow: data.deduplicationWindow ?? undefined,
+        targetRule: {
+          allowedSectors: data.targetRules.allowedSectors,
+          excludeInactive: data.targetRules.excludeInactive,
+          excludeOnVacation: data.targetRules.excludeOnVacation,
+        },
       };
 
       await updateMutation.mutateAsync({ id: config.id, data: payload });
@@ -610,7 +647,7 @@ export function NotificationConfigurationEditPage() {
                 <CardHeader>
                   <CardTitle>Configuração de Canais</CardTitle>
                   <CardDescription>
-                    Canais de entrega e suas configurações (edite via API para alterações em canais)
+                    Canais de entrega e suas configurações
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -636,9 +673,6 @@ export function NotificationConfigurationEditPage() {
                       />
                     ))}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-4">
-                    <strong>Nota:</strong> Alterações nos canais devem ser feitas via endpoints específicos da API.
-                  </p>
                 </CardContent>
               </Card>
 
@@ -761,9 +795,12 @@ export function NotificationConfigurationEditPage() {
                         placeholder="Sem limite"
                         transparent
                         {...form.register("maxFrequencyPerDay", {
-                          setValueAs: (v) => (v === "" ? null : parseInt(v, 10)),
+                          setValueAs: (v) => (v === "" || v == null ? null : parseInt(v, 10)),
                         })}
                       />
+                      {form.formState.errors.maxFrequencyPerDay && (
+                        <p className="text-sm text-destructive">{form.formState.errors.maxFrequencyPerDay.message}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         Deixe vazio para sem limite
                       </p>
@@ -778,9 +815,12 @@ export function NotificationConfigurationEditPage() {
                         placeholder="Desabilitada"
                         transparent
                         {...form.register("deduplicationWindow", {
-                          setValueAs: (v) => (v === "" ? null : parseInt(v, 10)),
+                          setValueAs: (v) => (v === "" || v == null ? null : parseInt(v, 10)),
                         })}
                       />
+                      {form.formState.errors.deduplicationWindow && (
+                        <p className="text-sm text-destructive">{form.formState.errors.deduplicationWindow.message}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         Tempo em minutos para ignorar notificações duplicadas
                       </p>

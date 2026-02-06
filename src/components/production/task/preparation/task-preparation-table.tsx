@@ -37,6 +37,7 @@ interface TaskPreparationTableProps {
   onGroupsDetected?: (groupIds: string[], hasGroups: boolean) => void;
   onOrderedTaskIdsChange?: (orderedIds: string[]) => void;
   showSelectedOnly?: boolean;
+  allOrderedTaskIds?: string[];
 }
 
 export function TaskPreparationTable({
@@ -55,6 +56,7 @@ export function TaskPreparationTable({
   onGroupsDetected,
   onOrderedTaskIdsChange,
   showSelectedOnly = false,
+  allOrderedTaskIds,
 }: TaskPreparationTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -140,8 +142,6 @@ export function TaskPreparationTable({
   // Group tasks
   const groupedTasks = useMemo(() => {
     const grouped = groupSequentialTasks(tasks, 3, 0.95);
-    console.log('[GroupedTasks] Total grouped items:', grouped.length);
-    console.log('[GroupedTasks] Structure:', grouped.map(g => ({ type: g.type, groupId: g.groupId, taskId: g.task?.id, middleCount: g.collapsedTasks?.length })));
     return grouped;
   }, [tasks]);
 
@@ -342,8 +342,10 @@ export function TaskPreparationTable({
     if (isCheckboxClick) return;
 
     // Navigate to detail page (normal click behavior)
-    navigate(routes.production.preparation.details(task.id));
-  }, [isSelectingSourceTask, onSourceTaskSelect, navigate]);
+    navigate(routes.production.preparation.details(task.id), {
+      state: allOrderedTaskIds ? { taskIds: allOrderedTaskIds } : undefined,
+    });
+  }, [isSelectingSourceTask, onSourceTaskSelect, navigate, allOrderedTaskIds]);
 
   if (isLoading) {
     return <TaskHistoryTableSkeleton />;
@@ -591,12 +593,10 @@ export function TaskPreparationTable({
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        console.log('[DIV onClick] Clicked, shiftKey:', e.shiftKey, 'task:', task.id);
 
                         // Handle shift-click for range selection
                         if (e.shiftKey && onShiftClickSelect) {
                           e.preventDefault(); // Prevent text selection when shift-clicking
-                          console.log('[DIV onClick] SHIFT-CLICK detected, calling onShiftClickSelect');
                           onShiftClickSelect(task.id);
                           return;
                         }
@@ -608,10 +608,6 @@ export function TaskPreparationTable({
 
                         // Get comprehensive group information
                         const groupInfo = getGroupInfo(task.id);
-
-                        // DEBUG: Log group info to diagnose issue
-                        console.log('[Checkbox Click] Task:', task.name, 'ID:', task.id);
-                        console.log('[Checkbox Click] Group Info:', groupInfo);
 
                         // Determine which tasks to toggle based on group state
                         let tasksToToggle: string[];

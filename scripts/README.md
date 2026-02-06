@@ -35,9 +35,9 @@ bash scripts/update-local-ip.sh
 
 ```
 🔍 Detecting local IP address...
-✅ Detected IP: 192.168.0.16
-📝 Current IP in .env: 192.168.0.16
-📝 Updating to: 192.168.0.16
+✅ Detected IP: 192.168.10.169
+📝 Current IP in .env: 192.168.10.169
+📝 Updating to: 192.168.10.169
 ✅ Updated .env
 ✅ Updated .env.development
 

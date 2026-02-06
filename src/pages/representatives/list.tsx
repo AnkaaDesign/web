@@ -31,7 +31,7 @@ export const RepresentativeListPage = () => {
             key: "create",
             label: "Cadastrar",
             icon: IconPlus,
-            onClick: () => navigate("/representatives/new"),
+            onClick: () => navigate(routes.representatives.create),
             variant: "default" as const,
           },
         ]}

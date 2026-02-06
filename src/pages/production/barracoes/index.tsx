@@ -79,22 +79,49 @@ export function GaragesPage() {
   const { data: tasksResponse, isLoading, error, refetch } = useTasks({
     page: 1,
     limit: 100,
-    include: {
+    where: {
       truck: {
-        include: {
+        isNot: null,
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      serialNumber: true,
+      forecastDate: true,
+      finishedAt: true,
+      entryDate: true,
+      term: true,
+      truck: {
+        select: {
+          id: true,
+          spot: true,
           leftSideLayout: {
-            include: {
-              layoutSections: true,
+            select: {
+              layoutSections: {
+                select: {
+                  width: true,
+                },
+              },
             },
           },
           rightSideLayout: {
-            include: {
-              layoutSections: true,
+            select: {
+              layoutSections: {
+                select: {
+                  width: true,
+                },
+              },
             },
           },
         },
       },
-      generalPainting: true,
+      generalPainting: {
+        select: {
+          hex: true,
+        },
+      },
     },
   });
 

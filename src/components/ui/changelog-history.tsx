@@ -114,7 +114,7 @@ const LogoDisplay = ({
   }
 
   // Use the same API URL configuration as the API client
-  const apiUrl = import.meta.env.VITE_API_URL || "http://192.168.0.16:3030";
+  const apiUrl = import.meta.env.VITE_API_URL || "http://192.168.10.169:3030";
   // Use thumbnail endpoint for file previews, serve endpoint for logos
   const imageUrl = useThumbnail
     ? `${apiUrl}/files/thumbnail/${logoId}`
@@ -2404,9 +2404,7 @@ export function ChangelogHistory({
     ];
 
     // Define internal/system fields that should be hidden from changelog (ordering, internal state, etc.)
-    const hiddenFields = [
-      "colorOrder",
-    ];
+    const hiddenFields = ["colorOrder"];
 
     // Define financial/document fields that should only be visible to FINANCIAL and ADMIN
     const financialFields = [
@@ -2424,7 +2422,12 @@ export function ChangelogHistory({
     ];
 
     // Define restricted fields that should only be visible to privileged users (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER)
-    const restrictedFields = ["forecastDate", "representatives", "representativeIds", "negotiatingWith"]; // invoiceTo removed - has its own check
+    const restrictedFields = [
+      "forecastDate",
+      "representatives",
+      "representativeIds",
+      "negotiatingWith",
+    ]; // invoiceTo removed - has its own check
 
     // Define invoiceTo fields - DESIGNER cannot see these (only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC)
     const invoiceToFields = ["invoiceTo", "invoiceToId"];
@@ -2447,9 +2450,7 @@ export function ChangelogHistory({
 
       // Always filter out hidden/internal fields (ordering, internal state, etc.)
       if (
-        hiddenFields.some((hidden) =>
-          fieldLower.includes(hidden.toLowerCase()),
-        )
+        hiddenFields.some((hidden) => fieldLower.includes(hidden.toLowerCase()))
       ) {
         return false;
       }

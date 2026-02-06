@@ -23,7 +23,7 @@ export default function NewRepresentativePage() {
         title: 'Sucesso',
         description: 'Representante cadastrado com sucesso',
       });
-      navigate(`/representatives/${data.id}/edit`);
+      navigate(routes.representatives.edit(data.id));
     },
     onError: (error: any) => {
       toast({
@@ -39,7 +39,7 @@ export default function NewRepresentativePage() {
   };
 
   const handleCancel = () => {
-    navigate('/representatives');
+    navigate(routes.representatives.root);
   };
 
   const actions = [
@@ -71,7 +71,7 @@ export default function NewRepresentativePage() {
             { label: 'Início', href: routes.home },
             { label: 'Administração', href: routes.administration.root },
             { label: 'Clientes', href: routes.administration.customers.root },
-            { label: 'Representantes', href: '/representatives' },
+            { label: 'Representantes', href: routes.representatives.root },
             { label: 'Cadastrar' },
           ]}
           actions={actions}

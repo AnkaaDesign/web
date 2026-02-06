@@ -490,7 +490,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "clientes-cadastrar", title: "Cadastrar", icon: "plus", path: "/administracao/clientes/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
           { id: "clientes-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/clientes/detalhes/:id", isDynamic: true },
           { id: "clientes-editar", title: "Editar", icon: "edit", path: "/administracao/clientes/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
-          { id: "representantes", title: "Representantes", icon: "users", path: "/representatives", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+          { id: "representantes", title: "Representantes", icon: "users", path: "/administracao/clientes/representantes", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
         ],
       },
       {
@@ -936,13 +936,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
     icon: "users",
     path: "/administracao/clientes",
     requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
-  },
-  {
-    id: "representantes-commercial",
-    title: "Representantes",
-    icon: "users",
-    path: "/representatives",
-    requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+    children: [
+      {
+        id: "representantes-commercial",
+        title: "Representantes",
+        icon: "users",
+        path: "/administracao/clientes/representantes",
+        requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+      },
+    ],
   },
   {
     id: "cronograma-commercial",

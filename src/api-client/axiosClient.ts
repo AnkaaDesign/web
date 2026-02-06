@@ -377,14 +377,68 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
           console.log("[AxiosClient] Serializing params:", JSON.stringify(params, null, 2));
         }
 
-        const queryString = qs.stringify(params, {
+        // Pre-process params: JSON-stringify complex nested objects
+        // This matches the mobile's approach and ensures null values inside nested
+        // objects (like where.truck.isNot=null) are preserved instead of being
+        // stripped by qs.stringify's skipNulls option
+        const processedParams: Record<string, any> = {};
+
+        for (const [key, value] of Object.entries(params)) {
+          if (value === null || value === undefined) {
+            continue; // Skip null/undefined top-level values
+          }
+
+          // Skip empty strings entirely - they cause API validation errors
+          if (value === "") {
+            continue;
+          }
+
+          // CRITICAL: Extra safeguard for similarColor - must be valid hex format
+          if (key === "similarColor") {
+            if (
+              typeof value !== "string" ||
+              value === "" ||
+              value === "#000000" ||
+              !/^#[0-9A-Fa-f]{6}$/.test(value)
+            ) {
+              continue;
+            }
+          }
+
+          // Check if this is a complex nested object (more than 1 level deep)
+          if (
+            typeof value === "object" &&
+            !Array.isArray(value) &&
+            !(value instanceof Date)
+          ) {
+            // Check if it has nested objects
+            const hasNestedObjects = Object.values(value).some(
+              (v) =>
+                v !== null &&
+                typeof v === "object" &&
+                !Array.isArray(v) &&
+                !(v instanceof Date),
+            );
+
+            if (hasNestedObjects) {
+              // JSON-stringify complex nested objects to preserve null values
+              // and avoid issues with deep dot notation parsing
+              processedParams[key] = JSON.stringify(value);
+            } else {
+              // Keep simple objects for qs.stringify
+              processedParams[key] = value;
+            }
+          } else {
+            processedParams[key] = value;
+          }
+        }
+
+        const queryString = qs.stringify(processedParams, {
           arrayFormat: "indices",
           encode: true, // CRITICAL: Must encode special characters like # in hex colors
           serializeDate: (date: Date) => date.toISOString(),
           skipNulls: true,
           addQueryPrefix: false,
-          // CRITICAL: Use dot notation for deeply nested objects (e.g., include.truck.include.leftSideLayout=true)
-          // Bracket notation has issues with 3+ levels of nesting in the backend parser
           allowDots: true,
           strictNullHandling: true,
           // Use indices for arrays to produce orderBy[0].name=asc instead of orderBy[].name=asc

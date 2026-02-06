@@ -211,7 +211,7 @@ export function useNotificationSocket() {
       // Show toast if there are missed notifications
       if (data.notifications && data.notifications.length > 0) {
         toast.info('Notificações sincronizadas', {
-          description: `${data.notifications.length} notificação(ões) recebida(s) enquanto você estava offline.`,
+          description: `${data.notifications.length} ${data.notifications.length === 1 ? 'notificação recebida' : 'notificações recebidas'} enquanto você estava offline.`,
         });
       }
     };

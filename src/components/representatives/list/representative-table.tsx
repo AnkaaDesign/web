@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { routes } from "@/constants";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { representativeService } from "@/services/representativeService";
 import type { Representative } from "@/types/representative";
@@ -232,7 +233,7 @@ export function RepresentativeTable({
 
   const handleViewDetails = () => {
     if (contextMenu && !contextMenu.isBulk) {
-      navigate(`/representatives/${contextMenu.representatives[0].id}`);
+      navigate(routes.representatives.details(contextMenu.representatives[0].id));
       setContextMenu(null);
     }
   };
@@ -242,7 +243,7 @@ export function RepresentativeTable({
       if (onEdit) {
         onEdit(contextMenu.representatives);
       } else {
-        navigate(`/representatives/${contextMenu.representatives[0].id}/edit`);
+        navigate(routes.representatives.edit(contextMenu.representatives[0].id));
       }
       setContextMenu(null);
     }
@@ -266,7 +267,7 @@ export function RepresentativeTable({
       if (onUpdatePassword) {
         onUpdatePassword(representative);
       } else {
-        navigate(`/representatives/${representative.id}/password`);
+        navigate(routes.representatives.password(representative.id));
       }
       setContextMenu(null);
     }
@@ -377,7 +378,7 @@ export function RepresentativeTable({
                     ) : (
                       <>
                         <div className="text-sm mb-4">Comece cadastrando o primeiro representante.</div>
-                        <Button onClick={() => navigate("/representatives/new")} variant="outline">
+                        <Button onClick={() => navigate(routes.representatives.create)} variant="outline">
                           <IconPlus className="h-4 w-4 mr-2" />
                           Cadastrar Representante
                         </Button>
@@ -400,7 +401,7 @@ export function RepresentativeTable({
                       "hover:bg-muted/20",
                       representativeIsSelected && "bg-muted/30 hover:bg-muted/40",
                     )}
-                    onClick={() => navigate(`/representatives/${representative.id}`)}
+                    onClick={() => navigate(routes.representatives.details(representative.id))}
                     onContextMenu={(e) => handleContextMenu(e, representative)}
                   >
                     {/* Selection checkbox */}

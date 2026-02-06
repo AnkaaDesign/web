@@ -195,20 +195,11 @@ export function MessageTable({
       className: "w-36",
       align: "left",
       accessor: (message) => {
-        const targeting = message.targeting;
-        if (!targeting || targeting.type === 'all') {
+        const targetCount = message.targetCount;
+        if (!targetCount || targetCount === 0) {
           return <div className="text-sm text-muted-foreground">Todos</div>;
         }
-        if (targeting.type === 'specific' && targeting.userIds?.length) {
-          return <div className="text-sm">{targeting.userIds.length} usuário(s)</div>;
-        }
-        if (targeting.type === 'sector' && targeting.sectorIds?.length) {
-          return <div className="text-sm">{targeting.sectorIds.length} setor(es)</div>;
-        }
-        if (targeting.type === 'position' && targeting.positionIds?.length) {
-          return <div className="text-sm">{targeting.positionIds.length} cargo(s)</div>;
-        }
-        return <div className="text-sm text-muted-foreground">-</div>;
+        return <div className="text-sm">{targetCount} usuário(s)</div>;
       },
     },
     {

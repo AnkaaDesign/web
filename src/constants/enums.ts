@@ -1962,7 +1962,7 @@ export enum FAVORITE_PAGES {
   // Administration - List Pages
   ADMINISTRACAO_COMISSOES_LISTAR = "/administracao/comissoes",
   ADMINISTRACAO_CLIENTES_LISTAR = "/administracao/clientes",
-  ADMINISTRACAO_REPRESENTANTES_LISTAR = "/representatives",
+  ADMINISTRACAO_REPRESENTANTES_LISTAR = "/administracao/clientes/representantes",
   ADMINISTRACAO_COLABORADORES_LISTAR = "/administracao/colaboradores",
   ADMINISTRACAO_ORCAMENTOS_LISTAR = "/administracao/orcamentos",
   ADMINISTRACAO_REGISTROS_ALTERACOES_LISTAR = "/administracao/registros-de-alteracoes",

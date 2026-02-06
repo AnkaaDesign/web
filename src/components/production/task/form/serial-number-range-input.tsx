@@ -133,11 +133,6 @@ export function SerialNumberRangeInput({ control, disabled }: SerialNumberRangeI
                   transparent={true}
                   className="flex-1"
                 />
-                {!disabled && (
-                  <p className="text-xs text-muted-foreground">
-                    Digite um número único (ex: 5) ou um intervalo separado por espaço (ex: 5 10 para criar de 5 a 10)
-                  </p>
-                )}
                 {disabled && (
                   <p className="text-xs text-muted-foreground">
                     Você só pode adicionar números de série se tiver no máximo 1 placa

@@ -194,7 +194,7 @@ export function SpotSelector({
     const isCurrentAtV3 = parsedSpot.spotNumber === 3 && parsedSpot.lane === selectedLane && parsedSpot.garage === selectedGarage;
     const v1Occupied = selectedLaneData.occupiedSpots.includes(1);
     const v2Occupied = selectedLaneData.occupiedSpots.includes(2);
-    const hasEnoughSpace = selectedLaneData.availableSpace >= 6;
+    const hasEnoughSpace = !!truckLength && selectedLaneData.availableSpace >= truckLength + 2;
     const v3IsOccupied = selectedLaneData.occupiedSpots.includes(3);
 
     if (isCurrentAtV3) {
@@ -220,7 +220,7 @@ export function SpotSelector({
     }
 
     return spots;
-  }, [selectedLaneData, selectedGarage, selectedLane, parsedSpot]);
+  }, [selectedLaneData, selectedGarage, selectedLane, parsedSpot, truckLength]);
 
   // Handle garage change
   const handleGarageChange = useCallback((value: string | null) => {

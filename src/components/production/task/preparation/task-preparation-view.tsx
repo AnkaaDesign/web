@@ -693,6 +693,7 @@ export function TaskPreparationView({
                 onGroupsDetected={handleGroupsDetected}
                 onOrderedTaskIdsChange={handleCompletedOrderedIdsChange}
                 showSelectedOnly={showSelectedOnly}
+                allOrderedTaskIds={allOrderedTaskIds}
               />
             </div>
 
@@ -717,6 +718,7 @@ export function TaskPreparationView({
                 onGroupsDetected={handleGroupsDetected}
                 onOrderedTaskIdsChange={handleProductionOrderedIdsChange}
                 showSelectedOnly={showSelectedOnly}
+                allOrderedTaskIds={allOrderedTaskIds}
               />
             </div>
 
@@ -741,6 +743,7 @@ export function TaskPreparationView({
                 onGroupsDetected={handleGroupsDetected}
                 onOrderedTaskIdsChange={handlePreparationOrderedIdsChange}
                 showSelectedOnly={showSelectedOnly}
+                allOrderedTaskIds={allOrderedTaskIds}
               />
             </div>
           </div>
@@ -767,6 +770,7 @@ export function TaskPreparationView({
                 onGroupsDetected={handleGroupsDetected}
                 onOrderedTaskIdsChange={handlePreparationOrderedIdsChange}
                 showSelectedOnly={showSelectedOnly}
+                allOrderedTaskIds={allOrderedTaskIds}
               />
             </div>
 
@@ -791,6 +795,7 @@ export function TaskPreparationView({
                 onGroupsDetected={handleGroupsDetected}
                 onOrderedTaskIdsChange={handleProductionOrderedIdsChange}
                 showSelectedOnly={showSelectedOnly}
+                allOrderedTaskIds={allOrderedTaskIds}
               />
             </div>
 
@@ -815,6 +820,7 @@ export function TaskPreparationView({
                 onGroupsDetected={handleGroupsDetected}
                 onOrderedTaskIdsChange={handleCompletedOrderedIdsChange}
                 showSelectedOnly={showSelectedOnly}
+                allOrderedTaskIds={allOrderedTaskIds}
               />
             </div>
           </div>

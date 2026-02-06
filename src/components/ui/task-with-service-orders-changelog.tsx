@@ -176,7 +176,7 @@ const LogoDisplay = ({
     );
   }
 
-  const apiUrl = import.meta.env.VITE_API_URL || "http://192.168.0.16:3030";
+  const apiUrl = import.meta.env.VITE_API_URL || "http://192.168.10.169:3030";
   const imageUrl = useThumbnail
     ? `${apiUrl}/files/thumbnail/${logoId}`
     : `${apiUrl}/files/serve/${logoId}`;
@@ -1344,7 +1344,12 @@ const ChangelogTimelineItem = ({
                   userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
                   userSectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
                   userSectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
-                const restrictedFields = ["forecastDate", "representatives", "representativeIds", "negotiatingWith"]; // invoiceTo removed - has its own check
+                const restrictedFields = [
+                  "forecastDate",
+                  "representatives",
+                  "representativeIds",
+                  "negotiatingWith",
+                ]; // invoiceTo removed - has its own check
                 if (
                   !canViewRestrictedFields &&
                   changelog.field &&
@@ -2646,7 +2651,10 @@ export function TaskWithServiceOrdersChangelog({
       }
 
       // Extract representative IDs from representatives/representativeIds fields
-      if (changelog.field === "representatives" || changelog.field === "representativeIds") {
+      if (
+        changelog.field === "representatives" ||
+        changelog.field === "representativeIds"
+      ) {
         const extractRepresentativeIds = (value: any) => {
           if (!value) return;
           try {

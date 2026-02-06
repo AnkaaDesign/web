@@ -303,7 +303,6 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     relatedTasks: "Tarefas Relacionadas",
     relatedTo: "Relacionado a",
     trucks: "Caminhões",
-    representatives: "Representantes",
     representativeIds: "Representantes",
     // Direct truck fields (when truck data is embedded in task changelog)
     category: "Categoria do Caminhão",

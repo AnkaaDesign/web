@@ -15,6 +15,18 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/administracao/clientes/editar/:id": ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can edit customers - explicit pattern
   [routes.administration.customers.create]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can create customers
   "/administracao/clientes/cadastrar": ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can create customers - explicit pattern
+  // Representatives - Admin and Commercial can manage representatives
+  [routes.representatives.root]: ["ADMIN", "COMMERCIAL"],
+  [routes.representatives.create]: ["ADMIN", "COMMERCIAL"],
+  [routes.representatives.details(":id")]: ["ADMIN", "COMMERCIAL"],
+  [routes.representatives.edit(":id")]: ["ADMIN", "COMMERCIAL"],
+  [routes.representatives.password(":id")]: ["ADMIN", "COMMERCIAL"],
+  "/administracao/clientes/representantes": ["ADMIN", "COMMERCIAL"],
+  "/administracao/clientes/representantes/cadastrar": ["ADMIN", "COMMERCIAL"],
+  "/administracao/clientes/representantes/detalhes/:id": ["ADMIN", "COMMERCIAL"],
+  "/administracao/clientes/representantes/editar/:id": ["ADMIN", "COMMERCIAL"],
+  "/administracao/clientes/representantes/senha/:id": ["ADMIN", "COMMERCIAL"],
+
   "/administracao/registros-de-alteracoes": "ADMIN",
   "/administracao/arquivos": "ADMIN",
   "/administracao/notificacoes": "ADMIN",

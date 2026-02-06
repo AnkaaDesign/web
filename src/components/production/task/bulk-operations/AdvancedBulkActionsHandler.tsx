@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
+import { ArtworkFileUploadField } from "../form/artwork-file-upload-field";
 import { GeneralPaintingSelector } from "../form/general-painting-selector";
 import { LogoPaintsSelector } from "../form/logo-paints-selector";
 import { MultiCutSelector, type MultiCutSelectorRef } from "../form/multi-cut-selector";
@@ -79,6 +80,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
   // States for file uploads (new files, like task form)
   const [artworkFiles, setArtworkFiles] = useState<FileWithPreview[]>([]);
+  const [artworkStatuses, setArtworkStatuses] = useState<Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>>({});
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
   const [cutsCount, setCutsCount] = useState(0);
 
@@ -144,6 +146,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
   const resetForm = (type: BulkOperationType) => {
     // Reset all file states
     setArtworkFiles([]);
+    setArtworkStatuses({});
     setBaseFiles([]);
     setCutsCount(0);
 
@@ -200,7 +203,13 @@ export const AdvancedBulkActionsHandler = forwardRef<
               cuts: { include: { file: true } },
               logoPaints: true,
               generalPainting: true,
-              truck: true,
+              truck: {
+                include: {
+                  leftSideLayout: { include: { layoutSections: true } },
+                  rightSideLayout: { include: { layoutSections: true } },
+                  backSideLayout: { include: { layoutSections: true } },
+                },
+              },
               serviceOrders: { include: { assignedTo: true } },
             },
           });
@@ -358,8 +367,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // Find service orders that ALL tasks have in common (by type + description)
           // A service order is "common" if all tasks have a service order with the same type AND description
           if (tasks.length > 0 && type === 'serviceOrder') {
-            console.log('[DEBUG] Computing common service orders for', tasks.length, 'tasks');
-
             // Build map of original service orders per task (for tracking updates later)
             const serviceOrdersPerTask: Record<string, any[]> = {};
             tasks.forEach(task => {
@@ -374,7 +381,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 assignedTo: so.assignedTo,
                 taskId: so.taskId,
               }));
-              console.log('[DEBUG] Task', task.id, 'has', (task.serviceOrders || []).length, 'service orders');
             });
             setOriginalServiceOrdersMap(serviceOrdersPerTask);
 
@@ -391,7 +397,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
               // Skip if we already processed this commonKey (handles duplicate SOs in same task)
               if (processedCommonKeys.has(commonKey)) {
-                console.log('[DEBUG] Skipping duplicate commonKey:', commonKey);
                 return;
               }
 
@@ -419,7 +424,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
                   }
                 });
                 keyToIdsMap[commonKey] = allIdsForThisKey;
-                console.log('[DEBUG] Common key:', commonKey, '-> IDs:', allIdsForThisKey);
 
                 // Use the first task's service order as the reference
                 // Include a unique identifier based on type + description for form tracking
@@ -437,10 +441,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 });
               }
             });
-
-            console.log('[DEBUG] Found', commonSOs.length, 'common service orders');
-            console.log('[DEBUG] keyToIdsMap:', keyToIdsMap);
-            console.log('[DEBUG] commonSOs:', commonSOs);
 
             computed.serviceOrders = commonSOs;
             setCommonServiceOrders(commonSOs);
@@ -460,11 +460,67 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // Pre-fill existing files for display
           if (type === 'arts') {
             setArtworkFiles(computed.artworkFiles as any);
+            // Initialize artwork statuses from existing artwork data
+            const initialStatuses: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
+            computed.artworkFiles.forEach((f: any) => {
+              if (f.uploadedFileId) {
+                initialStatuses[f.uploadedFileId] = f.status || 'DRAFT';
+              }
+            });
+            setArtworkStatuses(initialStatuses);
           } else if (type === 'baseFiles') {
             setBaseFiles(computed.baseFiles as any);
           } else if (type === 'cuttingPlans') {
             // Cuts are handled by form.reset above
             setCutsCount(computed.cuts.length);
+          } else if (type === 'layout') {
+            // Pre-load existing common layouts from trucks
+            // Check if all tasks share the same layout per side (by layoutId)
+            const tasksWithTrucks = tasks.filter((t: any) => t.truck);
+
+            if (tasksWithTrucks.length > 0) {
+              const convertLayoutToFormState = (layout: any) => {
+                if (!layout || !layout.layoutSections || layout.layoutSections.length === 0) return null;
+                return {
+                  height: layout.height,
+                  photoId: layout.photoId || null,
+                  layoutSections: layout.layoutSections
+                    .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+                    .map((s: any) => ({
+                      width: s.width,
+                      isDoor: s.isDoor || false,
+                      doorHeight: s.doorHeight,
+                      position: s.position,
+                    })),
+                };
+              };
+
+              // Check left side
+              const firstLeftId = tasksWithTrucks[0].truck?.leftSideLayoutId;
+              const allShareLeft = firstLeftId && tasksWithTrucks.every(
+                (t: any) => t.truck?.leftSideLayoutId === firstLeftId
+              );
+
+              // Check right side
+              const firstRightId = tasksWithTrucks[0].truck?.rightSideLayoutId;
+              const allShareRight = firstRightId && tasksWithTrucks.every(
+                (t: any) => t.truck?.rightSideLayoutId === firstRightId
+              );
+
+              // Check back side
+              const firstBackId = tasksWithTrucks[0].truck?.backSideLayoutId;
+              const allShareBack = firstBackId && tasksWithTrucks.every(
+                (t: any) => t.truck?.backSideLayoutId === firstBackId
+              );
+
+              const preloadedLayouts = {
+                left: allShareLeft ? convertLayoutToFormState(tasksWithTrucks[0].truck?.leftSideLayout) : null,
+                right: allShareRight ? convertLayoutToFormState(tasksWithTrucks[0].truck?.rightSideLayout) : null,
+                back: allShareBack ? convertLayoutToFormState(tasksWithTrucks[0].truck?.backSideLayout) : null,
+              };
+
+              setLayoutStates(preloadedLayouts);
+            }
           } else if (type === 'serviceOrder') {
             // Service orders are handled by form.reset above
             // The ServiceSelectorAutoGrouped component will use the form's serviceOrders field
@@ -508,63 +564,53 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
       switch (operationType) {
         case "arts":
-          // Get new artwork files that need to be uploaded
+          // New files to upload via FormData
           newArtworkFiles = artworkFiles.filter(f => f instanceof File) as File[];
 
-          // Get filenames that should be kept (from existing files in artworkFiles state)
-          // These are the COMMON artworks that the user chose to keep
-          const keptCommonFilenames = artworkFiles
+          // Determine which common artworks were explicitly REMOVED (user clicked X)
+          const currentFilenames = artworkFiles
             .filter(f => !(f instanceof File))
             .map((f: any) => f.originalName || f.name);
-
-          // Get filenames of COMMON artworks (files that were shown in the UI)
-          // These were pre-populated from commonValues.artworkFiles
-          const commonFilenames = commonValues.artworkFiles.map(
+          const originalCommonFilenames = commonValues.artworkFiles.map(
             (f: any) => f.originalName || f.name
           );
+          const removedFileIds = commonValues.artworkFiles
+            .filter((f: any) => !currentFilenames.includes(f.originalName || f.name))
+            .map((f: any) => f.uploadedFileId || f.id);
 
-          // NOTE: We no longer upload files separately. Files will be sent WITH the batch update request.
-          // The backend /tasks/batch endpoint now accepts FormData with both JSON data and files.
+          const hasRemovals = removedFileIds.length > 0;
 
-          // For each task, compute the final artworkIds:
-          // 1. Keep ALL non-common artworks (unique to this task) - user couldn't remove them
-          // 2. Keep common artworks only if user kept them in keptCommonFilenames
-          // 3. New files will be uploaded via FormData and backend will add them automatically
-          // NOTE: task.artworks are Artwork entities with { id, fileId, status, file?: File }
-          const perTaskArtworkIds: Record<string, string[]> = {};
-          currentTasks.forEach(task => {
-            const taskArtworkFileIds: string[] = [];
-
-            (task.artworks || []).forEach((artwork: any) => {
-              const file = artwork.file || artwork;
-              const filename = file.originalName || file.filename;
-              const fileId = artwork.fileId || artwork.file?.id;
-
-              if (!fileId) return;
-
-              // Check if this is a common artwork (was shown in UI)
-              const isCommon = commonFilenames.includes(filename);
-
-              if (isCommon) {
-                // Only keep if user kept it in the UI
-                if (keptCommonFilenames.includes(filename)) {
-                  taskArtworkFileIds.push(fileId);
+          // Only compute per-task artworkIds (SET mode) when files were REMOVED.
+          // When only adding new files (no removals), skip artworkIds so the backend
+          // uses ADD mode (merge with existing) instead of SET/REPLACE mode.
+          // For status-only changes, skip artworkIds entirely so the backend
+          // won't touch task-artwork connections — only updates Artwork entity statuses.
+          if (hasRemovals) {
+            const perTaskArtworkIds: Record<string, string[]> = {};
+            currentTasks.forEach(task => {
+              const keptIds: string[] = [];
+              (task.artworks || []).forEach((artwork: any) => {
+                // In flattened format from API: artwork.id = File ID, artwork.artworkId = Artwork entity ID
+                // artwork.fileId and artwork.file don't exist in flattened format
+                const file = artwork.file || artwork;
+                const artworkFileId = artwork.fileId || file.id;
+                if (artworkFileId && !removedFileIds.includes(artworkFileId)) {
+                  // Send File IDs so the backend conversion path applies artworkStatuses
+                  keptIds.push(artworkFileId);
                 }
-              } else {
-                // Non-common artwork - always keep (user couldn't modify it)
-                taskArtworkFileIds.push(fileId);
-              }
+              });
+              perTaskArtworkIds[task.id] = keptIds;
             });
-
-            // New artwork files will be appended by the backend when processing FormData
-            perTaskArtworkIds[task.id] = taskArtworkFileIds;
-          });
-
-          // Store per-task data - we'll use this when building the batch request
-          // Set if we have changes (new files to upload OR common artworks being managed)
-          if (newArtworkFiles.length > 0 || commonFilenames.length > 0) {
             updateData._perTaskArtworkIds = perTaskArtworkIds;
-            updateData._hasNewArtworkFiles = newArtworkFiles.length > 0;
+          }
+
+          if (newArtworkFiles.length > 0) {
+            updateData._hasNewArtworkFiles = true;
+          }
+
+          // Send artwork statuses for status changes
+          if (Object.keys(artworkStatuses).length > 0) {
+            updateData._artworkStatuses = artworkStatuses;
           }
           break;
 
@@ -653,44 +699,84 @@ export const AdvancedBulkActionsHandler = forwardRef<
         case "cuttingPlans":
           const cuts = form.getValues("cuts");
 
-          // For cuts, we replace entirely - if different from common
-          const cutsChanged = JSON.stringify(cuts) !== JSON.stringify(commonValues.cuts);
+          // Determine which cuts are new (added by user) vs existing (from commonValues)
+          // A cut is "existing" if it matches a commonValues cut by type+origin+fileId
+          const isExistingCut = (cut: any) => {
+            return commonValues.cuts.some((common: any) =>
+              common.type === cut.type &&
+              common.origin === cut.origin &&
+              (common.fileId === cut.fileId ||
+                common.fileId === cut.file?.id ||
+                common.fileId === cut.file?.uploadedFileId)
+            );
+          };
 
-          if (cutsChanged) {
-            if (cuts && cuts.length > 0) {
-              // Upload cut files FIRST to get their IDs
-              const cutsWithFileIds: any[] = [];
+          // Find NEW cuts (not in commonValues)
+          const newCuts = (cuts || []).filter((cut: any) => !isExistingCut(cut));
 
-              for (const cut of cuts) {
-                const cutData: any = {
-                  type: cut.type,
-                  quantity: cut.quantity || 1,
-                  origin: cut.origin || CUT_ORIGIN.PLAN,
-                };
+          // Find REMOVED cuts (in commonValues but not in current form)
+          const isKeptCut = (common: any) => {
+            return (cuts || []).some((cut: any) =>
+              common.type === cut.type &&
+              common.origin === cut.origin &&
+              (common.fileId === cut.fileId ||
+                common.fileId === cut.file?.id ||
+                common.fileId === cut.file?.uploadedFileId)
+            );
+          };
+          const removedCommonCuts = commonValues.cuts.filter((common: any) => !isKeptCut(common));
 
-                if (cut.file && cut.file instanceof File) {
-                  // Upload the file
-                  const uploadResponse = await fileService.uploadFiles([cut.file], {
-                    fileContext: 'cut',
-                    entityType: 'task',
-                  });
-                  if (uploadResponse.success && uploadResponse.data?.successful?.[0]) {
-                    cutData.fileId = uploadResponse.data.successful[0].id;
-                  }
-                } else if (cut.file && (cut.file.id || cut.file.uploadedFileId)) {
-                  cutData.fileId = cut.file.id || cut.file.uploadedFileId;
+          // Handle new cuts: upload files and send as additive cuts
+          if (newCuts.length > 0) {
+            const cutsToAdd: any[] = [];
+
+            for (const cut of newCuts) {
+              const cutData: any = {
+                type: cut.type,
+                quantity: cut.quantity || 1,
+                origin: cut.origin || CUT_ORIGIN.PLAN,
+              };
+
+              if (cut.file && cut.file instanceof File) {
+                // Upload the file
+                const uploadResponse = await fileService.uploadFiles([cut.file], {
+                  fileContext: 'cut',
+                  entityType: 'task',
+                });
+                if (uploadResponse.success && uploadResponse.data?.successful?.[0]) {
+                  cutData.fileId = uploadResponse.data.successful[0].id;
                 }
-
-                cutsWithFileIds.push(cutData);
+              } else if (cut.file && (cut.file.id || cut.file.uploadedFileId)) {
+                cutData.fileId = cut.file.id || cut.file.uploadedFileId;
               }
 
-              updateData.cuts = cutsWithFileIds;
-            } else {
-              // All cuts removed
-              const allCutIds = commonValues.cuts.map((c: any) => c.id).filter(Boolean);
-              if (allCutIds.length > 0) {
-                updateData.removeCutIds = allCutIds;
-              }
+              cutsToAdd.push(cutData);
+            }
+
+            // Send as additive cuts — backend will create without destroying existing ones
+            updateData.cuts = cutsToAdd;
+          }
+
+          // Handle removed cuts: send specific IDs to delete
+          if (removedCommonCuts.length > 0) {
+            // Collect cut IDs from ALL tasks for the removed common cuts
+            // Each common cut maps to one cut per task (matched by type+origin+file)
+            const removeCutIds: string[] = [];
+            currentTasks.forEach((task: any) => {
+              (task.cuts || []).forEach((taskCut: any) => {
+                const isRemoved = removedCommonCuts.some((removed: any) =>
+                  removed.type === taskCut.type &&
+                  removed.origin === taskCut.origin &&
+                  removed.fileId === taskCut.fileId
+                );
+                if (isRemoved && taskCut.id) {
+                  removeCutIds.push(taskCut.id);
+                }
+              });
+            });
+
+            if (removeCutIds.length > 0) {
+              updateData.removeCutIds = removeCutIds;
             }
           }
           break;
@@ -790,11 +876,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // Handle batch update/create of service orders
           const currentFormServiceOrders = form.getValues("serviceOrders") || [];
 
-          console.log('[DEBUG] handleSubmit - serviceOrder case');
-          console.log('[DEBUG] currentFormServiceOrders:', currentFormServiceOrders);
-          console.log('[DEBUG] commonKeyToIdsMap (from state):', commonKeyToIdsMap);
-          console.log('[DEBUG] commonServiceOrders (from state):', commonServiceOrders);
-
           // Build a map of original ID -> commonKey for robust matching
           // (in case form doesn't preserve _commonKey)
           const originalIdToCommonKey: Record<string, string> = {};
@@ -803,7 +884,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
               originalIdToCommonKey[origSO.id] = origSO._commonKey;
             }
           });
-          console.log('[DEBUG] originalIdToCommonKey:', originalIdToCommonKey);
 
           // Separate into updates (common service orders) and creates (new ones)
           const serviceOrdersToUpdate: Array<{ id: string; data: any }> = [];
@@ -819,21 +899,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
             const isCommonServiceOrder = commonKey && commonKeyToIdsMap[commonKey];
 
-            console.log(`[DEBUG] Processing formSO[${index}]:`, {
-              id: formSO.id,
-              type: formSO.type,
-              description: formSO.description,
-              _isCommon: formSO._isCommon,
-              _commonKey: formSO._commonKey,
-              resolvedCommonKey: commonKey,
-              isCommonServiceOrder,
-            });
-
             if (isCommonServiceOrder) {
               // This is a common service order - update ALL matching ones across tasks
               const allIds = commonKeyToIdsMap[commonKey];
               processedCommonKeys.add(commonKey);
-              console.log(`[DEBUG] -> Will UPDATE ${allIds.length} service orders for key:`, commonKey);
 
               allIds.forEach((soId: string) => {
                 serviceOrdersToUpdate.push({
@@ -850,7 +919,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
               });
             } else if (!formSO.id || (typeof formSO.id === 'string' && formSO.id.startsWith('temp-'))) {
               // This is a new service order - create for all tasks
-              console.log(`[DEBUG] -> Will CREATE new service order for all tasks`);
               currentTaskIds.forEach(taskId => {
                 serviceOrdersToCreate.push({
                   taskId,
@@ -862,8 +930,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
                   assignedToId: formSO.assignedToId || null,
                 });
               });
-            } else {
-              console.log(`[DEBUG] -> SKIPPED: not common, not new. id=${formSO.id}, _isCommon=${formSO._isCommon}, _commonKey=${formSO._commonKey}, resolvedCommonKey=${commonKey}`);
             }
           });
 
@@ -872,21 +938,14 @@ export const AdvancedBulkActionsHandler = forwardRef<
           Object.entries(commonKeyToIdsMap).forEach(([commonKey, ids]) => {
             if (!processedCommonKeys.has(commonKey)) {
               // This common key was removed from the form - delete all associated service orders
-              console.log(`[DEBUG] Common key ${commonKey} was removed - will delete ${ids.length} service orders`);
               serviceOrdersToDelete.push(...ids);
             }
           });
-
-          console.log('[DEBUG] Final counts:');
-          console.log('[DEBUG] - serviceOrdersToUpdate:', serviceOrdersToUpdate.length, serviceOrdersToUpdate);
-          console.log('[DEBUG] - serviceOrdersToCreate:', serviceOrdersToCreate.length, serviceOrdersToCreate);
-          console.log('[DEBUG] - serviceOrdersToDelete:', serviceOrdersToDelete.length, serviceOrdersToDelete);
 
           // Execute batch operations
           const operations: Promise<any>[] = [];
 
           if (serviceOrdersToUpdate.length > 0) {
-            console.log('[DEBUG] Calling batchUpdateServiceOrders...');
             operations.push(
               serviceOrderService.batchUpdateServiceOrders({
                 serviceOrders: serviceOrdersToUpdate,
@@ -895,7 +954,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
           }
 
           if (serviceOrdersToCreate.length > 0) {
-            console.log('[DEBUG] Calling batchCreateServiceOrders...');
             operations.push(
               serviceOrderService.batchCreateServiceOrders({
                 serviceOrders: serviceOrdersToCreate,
@@ -904,7 +962,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
           }
 
           if (serviceOrdersToDelete.length > 0) {
-            console.log('[DEBUG] Calling batchDeleteServiceOrders...');
             operations.push(
               serviceOrderService.batchDeleteServiceOrders({
                 serviceOrderIds: serviceOrdersToDelete,
@@ -913,9 +970,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
           }
 
           if (operations.length > 0) {
-            console.log('[DEBUG] Executing', operations.length, 'operations...');
             await Promise.all(operations);
-            console.log('[DEBUG] All operations completed');
 
             // Invalidate task and service order queries to refresh the UI with fresh data
             queryClient.invalidateQueries({
@@ -924,8 +979,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
             queryClient.invalidateQueries({
               queryKey: serviceOrderKeys.all,
             });
-          } else {
-            console.log('[DEBUG] No operations to execute');
           }
 
           // Close and clear after successful operations
@@ -941,6 +994,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       const hasNewArtworkFiles = updateData._hasNewArtworkFiles;
       const hasNewBaseFiles = updateData._hasNewBaseFiles;
       const layoutPhotoFiles = updateData._layoutPhotoFiles as Array<{ side: string; file: File }> | undefined;
+      const artworkStatusesMap = updateData._artworkStatuses as Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> | undefined;
 
       delete updateData._perTaskArtworkIds;
       delete updateData._perTaskBaseFileIds;
@@ -948,9 +1002,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
       delete updateData._hasNewArtworkFiles;
       delete updateData._hasNewBaseFiles;
       delete updateData._layoutPhotoFiles;
+      delete updateData._artworkStatuses;
 
       const hasPerTaskData = perTaskArtworkIds || perTaskBaseFileIds || perTaskTruckUpdates;
-      const hasData = Object.keys(updateData).length > 0 || hasPerTaskData;
+      const hasData = Object.keys(updateData).length > 0 || hasPerTaskData || artworkStatusesMap || hasNewArtworkFiles;
 
       if (!hasData) {
         handleClose();
@@ -979,6 +1034,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // Add per-task truck layout updates if available
           if (perTaskTruckUpdates && perTaskTruckUpdates[id]) {
             taskData.truck = perTaskTruckUpdates[id];
+          }
+
+          // Add artwork statuses for status changes
+          if (artworkStatusesMap) {
+            taskData.artworkStatuses = artworkStatusesMap;
           }
 
           return {
@@ -1085,13 +1145,15 @@ export const AdvancedBulkActionsHandler = forwardRef<
       case "arts":
         return (
           <div className="space-y-4">
-            <FileUploadField
+            <ArtworkFileUploadField
               onFilesChange={setArtworkFiles}
+              onStatusChange={(fileId, status) => {
+                setArtworkStatuses(prev => ({ ...prev, [fileId]: status }));
+              }}
               maxFiles={10}
               disabled={isSubmitting}
               showPreview={true}
               existingFiles={artworkFiles}
-              variant="compact"
               placeholder="Selecione artes para as tarefas"
               label="Artes"
             />

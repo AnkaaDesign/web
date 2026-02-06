@@ -923,14 +923,10 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
               color: addPreviewColor,
             });
           }
-        } else if (!spotNumbers.includes(3)) {
-          // V3 is free
-          previews.push({
-            y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
-            height: draggedTruckLength,
-            color: addPreviewColor,
-          });
         }
+        // NOTE: V3 add indicator is intentionally NOT shown when V1+V2 are occupied.
+        // V2 is at the bottom (same position as V3 would be), so the V3 add indicator
+        // would overlap the V2 swap indicator, hiding its green/red color.
       }
     }
   }

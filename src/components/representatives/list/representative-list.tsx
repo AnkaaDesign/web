@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { routes } from "@/constants";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Representative } from "@/types/representative";
 import type { RepresentativeGetManyFormData } from "@/types/representative";
@@ -173,7 +174,7 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
 
   const handleBulkEdit = useCallback((representatives: Representative[]) => {
     if (representatives.length === 1) {
-      navigate(`/representatives/${representatives[0].id}/edit`);
+      navigate(routes.representatives.edit(representatives[0].id));
     } else {
       // For now, we don't have batch edit for representatives
       // Could implement later if needed
@@ -198,7 +199,7 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
   }, [deleteDialog, deleteMutation]);
 
   const handleUpdatePassword = useCallback((representative: Representative) => {
-    navigate(`/representatives/${representative.id}/password`);
+    navigate(routes.representatives.password(representative.id));
   }, [navigate]);
 
   // Filter removal handler

@@ -624,6 +624,7 @@ export const orderScheduleUpdateSchema = z
 
     // Specific scheduling fields
     specificDate: z.coerce.date().nullable().optional(),
+    nextRun: z.coerce.date().nullable().optional(),
     dayOfMonth: z.number().int().min(1).max(31).nullable().optional(),
     dayOfWeek: z.string().nullable().optional(),
     month: z.string().nullable().optional(),
@@ -717,6 +718,7 @@ export const mapOrderScheduleToFormData = createMapToFormDataHelper<OrderSchedul
   isActive: orderSchedule.isActive,
   items: orderSchedule.items,
   specificDate: orderSchedule.specificDate || null,
+  nextRun: orderSchedule.nextRun || null,
   dayOfMonth: orderSchedule.dayOfMonth || null,
   dayOfWeek: orderSchedule.dayOfWeek || null,
   month: orderSchedule.month || null,

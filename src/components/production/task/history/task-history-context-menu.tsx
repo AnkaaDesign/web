@@ -96,8 +96,16 @@ export function TaskHistoryContextMenu({
   const isLogisticOrCommercial = user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC ||
                                   user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
 
-  // Users who can access advanced menu options: ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC
-  const canAccessAdvancedMenu = isAdmin || isFinancialUser || isLogisticOrCommercial;
+  const isDesigner = user?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
+  const isCommercial = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
+
+  // Users who can access advanced menu options: ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER
+  const canAccessAdvancedMenu = isAdmin || isFinancialUser || isLogisticOrCommercial || isDesigner;
+
+  // Per-item advanced menu permissions
+  const canAccessArtworks = isAdmin || isCommercial || isDesigner;
+  const canAccessCutPlan = isAdmin || isDesigner;
+  const canAccessPaints = canAccessAdvancedMenu && !isDesigner;
 
   // Users who can cancel tasks: ADMIN, LOGISTIC, FINANCIAL, COMMERCIAL
   const canCancel = isAdmin || isFinancialUser || isLogisticOrCommercial;
@@ -716,22 +724,28 @@ export function TaskHistoryContextMenu({
                 <span className="data-[state=open]:text-accent-foreground">Avançados</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuItem onClick={handleBulkArts}>
-                  <IconPhoto className="mr-2 h-4 w-4" />
-                  Adicionar Artes
-                </DropdownMenuItem>
+                {canAccessArtworks && (
+                  <DropdownMenuItem onClick={handleBulkArts}>
+                    <IconPhoto className="mr-2 h-4 w-4" />
+                    Adicionar Artes
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={handleBulkBaseFiles}>
                   <IconFileText className="mr-2 h-4 w-4" />
                   Arquivos Base
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleBulkPaints}>
-                  <IconPalette className="mr-2 h-4 w-4" />
-                  Adicionar Tintas
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleBulkCuttingPlans}>
-                  <IconCut className="mr-2 h-4 w-4" />
-                  Adicionar Plano de Corte
-                </DropdownMenuItem>
+                {canAccessPaints && (
+                  <DropdownMenuItem onClick={handleBulkPaints}>
+                    <IconPalette className="mr-2 h-4 w-4" />
+                    Adicionar Tintas
+                  </DropdownMenuItem>
+                )}
+                {canAccessCutPlan && (
+                  <DropdownMenuItem onClick={handleBulkCuttingPlans}>
+                    <IconCut className="mr-2 h-4 w-4" />
+                    Adicionar Plano de Corte
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={handleBulkServiceOrder}>
                   <IconFileInvoice className="mr-2 h-4 w-4" />
                   Ordem de Servico

@@ -32,9 +32,20 @@ import type {
   OrderBatchUpdateResponse,
   OrderBatchDeleteResponse,
 } from "../types";
-import { orderKeys, orderItemKeys, orderScheduleKeys, activityKeys, itemKeys, supplierKeys, changeLogKeys } from "./queryKeys";
+import {
+  orderKeys,
+  orderItemKeys,
+  orderScheduleKeys,
+  activityKeys,
+  itemKeys,
+  supplierKeys,
+  changeLogKeys,
+} from "./queryKeys";
 import { ORDER_STATUS } from "../constants";
-import { createEntityHooks, createSpecializedQueryHook } from "./createEntityHooks";
+import {
+  createEntityHooks,
+  createSpecializedQueryHook,
+} from "./createEntityHooks";
 
 // =====================================================
 // Order Service Adapter
@@ -43,11 +54,15 @@ import { createEntityHooks, createSpecializedQueryHook } from "./createEntityHoo
 const orderService = {
   getMany: (params?: OrderGetManyFormData) => getOrders(params || {}),
   getById: (id: string, params?: any) => getOrder(id, params),
-  create: (data: OrderCreateFormData, include?: OrderInclude) => createOrder(data, include ? { include } : undefined),
-  update: (id: string, data: OrderUpdateFormData, include?: OrderInclude) => updateOrder(id, data, include ? { include } : undefined),
+  create: (data: OrderCreateFormData, include?: OrderInclude) =>
+    createOrder(data, include ? { include } : undefined),
+  update: (id: string, data: OrderUpdateFormData, include?: OrderInclude) =>
+    updateOrder(id, data, include ? { include } : undefined),
   delete: (id: string) => deleteOrder(id),
-  batchCreate: (data: OrderBatchCreateFormData, include?: OrderInclude) => batchCreateOrders(data, include ? { include } : undefined),
-  batchUpdate: (data: OrderBatchUpdateFormData, include?: OrderInclude) => batchUpdateOrders(data, include ? { include } : undefined),
+  batchCreate: (data: OrderBatchCreateFormData, include?: OrderInclude) =>
+    batchCreateOrders(data, include ? { include } : undefined),
+  batchUpdate: (data: OrderBatchUpdateFormData, include?: OrderInclude) =>
+    batchUpdateOrders(data, include ? { include } : undefined),
   batchDelete: (data: OrderBatchDeleteFormData) => batchDeleteOrders(data),
 };
 
@@ -74,7 +89,14 @@ const baseOrderHooks = createEntityHooks<
   queryKeys: orderKeys,
   service: orderService,
   staleTime: 1000 * 60 * 5, // 5 minutes
-  relatedQueryKeys: [orderItemKeys, orderScheduleKeys, activityKeys, itemKeys, supplierKeys, changeLogKeys],
+  relatedQueryKeys: [
+    orderItemKeys,
+    orderScheduleKeys,
+    activityKeys,
+    itemKeys,
+    supplierKeys,
+    changeLogKeys,
+  ],
 });
 
 // Export base hooks with standard names
@@ -87,23 +109,37 @@ export const useOrder = baseOrderHooks.useDetail;
 // =====================================================
 
 // Pending orders
-export const usePendingOrders = createSpecializedQueryHook<Partial<OrderGetManyFormData>, OrderGetManyResponse>({
+export const usePendingOrders = createSpecializedQueryHook<
+  Partial<OrderGetManyFormData>,
+  OrderGetManyResponse
+>({
   queryKeyFn: (filters) => orderKeys.pending(filters),
-  queryFn: (filters) => getOrders({ ...filters, status: [ORDER_STATUS.CREATED] }),
+  queryFn: (filters) =>
+    getOrders({ ...filters, status: [ORDER_STATUS.CREATED] }),
   staleTime: 1000 * 60 * 5, // 5 minutes
 });
 
 // Completed orders
-export const useCompletedOrders = createSpecializedQueryHook<Partial<OrderGetManyFormData>, OrderGetManyResponse>({
-  queryKeyFn: (filters) => orderKeys.list({ ...filters, status: [ORDER_STATUS.RECEIVED] }),
-  queryFn: (filters) => getOrders({ ...filters, status: [ORDER_STATUS.RECEIVED] }),
+export const useCompletedOrders = createSpecializedQueryHook<
+  Partial<OrderGetManyFormData>,
+  OrderGetManyResponse
+>({
+  queryKeyFn: (filters) =>
+    orderKeys.list({ ...filters, status: [ORDER_STATUS.RECEIVED] }),
+  queryFn: (filters) =>
+    getOrders({ ...filters, status: [ORDER_STATUS.RECEIVED] }),
   staleTime: 1000 * 60 * 5, // 5 minutes
 });
 
 // Orders by supplier
-export const useOrdersBySupplier = createSpecializedQueryHook<{ supplierId: string; filters?: Partial<OrderGetManyFormData> }, OrderGetManyResponse>({
-  queryKeyFn: ({ supplierId, filters }) => orderKeys.bySupplier(supplierId, filters),
-  queryFn: ({ supplierId, filters }) => getOrders({ ...filters, supplierIds: [supplierId] }),
+export const useOrdersBySupplier = createSpecializedQueryHook<
+  { supplierId: string; filters?: Partial<OrderGetManyFormData> },
+  OrderGetManyResponse
+>({
+  queryKeyFn: ({ supplierId, filters }) =>
+    orderKeys.bySupplier(supplierId, filters),
+  queryFn: ({ supplierId, filters }) =>
+    getOrders({ ...filters, supplierIds: [supplierId] }),
   staleTime: 1000 * 60 * 5, // 5 minutes
 });
 
@@ -112,8 +148,14 @@ export const useOrdersBySupplier = createSpecializedQueryHook<{ supplierId: stri
 // =====================================================
 
 export const useOrderMutations = (options?: {
-  onCreateSuccess?: (data: OrderCreateResponse, variables: OrderCreateFormData) => void;
-  onUpdateSuccess?: (data: OrderUpdateResponse, variables: { id: string; data: OrderUpdateFormData }) => void;
+  onCreateSuccess?: (
+    data: OrderCreateResponse,
+    variables: OrderCreateFormData,
+  ) => void;
+  onUpdateSuccess?: (
+    data: OrderUpdateResponse,
+    variables: { id: string; data: OrderUpdateFormData },
+  ) => void;
   onDeleteSuccess?: (data: OrderDeleteResponse, variables: string) => void;
 }) => {
   const queryClient = useQueryClient();
@@ -164,14 +206,18 @@ export const useOrderMutations = (options?: {
   const createMutation = useMutation({
     mutationFn: (data: OrderCreateFormData) => createOrder(data),
     onSuccess: (data, variables) => {
-      invalidateQueries(data.data?.supplierId || undefined, data.data?.orderScheduleId || undefined);
+      invalidateQueries(
+        data.data?.supplierId || undefined,
+        data.data?.orderScheduleId || undefined,
+      );
       options?.onCreateSuccess?.(data, variables);
     },
   });
 
   // UPDATE
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: OrderUpdateFormData }) => updateOrder(id, data),
+    mutationFn: ({ id, data }: { id: string; data: OrderUpdateFormData }) =>
+      updateOrder(id, data),
     onSuccess: (data, variables) => {
       invalidateQueries(data.data?.supplierId || undefined);
 
@@ -198,9 +244,13 @@ export const useOrderMutations = (options?: {
     },
   });
 
-  const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const isLoading =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending;
 
-  const error = createMutation.error || updateMutation.error || deleteMutation.error;
+  const error =
+    createMutation.error || updateMutation.error || deleteMutation.error;
 
   return {
     create: createMutation.mutate,
@@ -220,9 +270,18 @@ export const useOrderMutations = (options?: {
 };
 
 export const useOrderBatchMutations = (options?: {
-  onBatchCreateSuccess?: (data: OrderBatchCreateResponse<OrderCreateFormData>, variables: OrderBatchCreateFormData) => void;
-  onBatchUpdateSuccess?: (data: OrderBatchUpdateResponse<OrderUpdateFormData>, variables: OrderBatchUpdateFormData) => void;
-  onBatchDeleteSuccess?: (data: OrderBatchDeleteResponse, variables: OrderBatchDeleteFormData) => void;
+  onBatchCreateSuccess?: (
+    data: OrderBatchCreateResponse<OrderCreateFormData>,
+    variables: OrderBatchCreateFormData,
+  ) => void;
+  onBatchUpdateSuccess?: (
+    data: OrderBatchUpdateResponse<OrderUpdateFormData>,
+    variables: OrderBatchUpdateFormData,
+  ) => void;
+  onBatchDeleteSuccess?: (
+    data: OrderBatchDeleteResponse,
+    variables: OrderBatchDeleteFormData,
+  ) => void;
 }) => {
   const queryClient = useQueryClient();
 
@@ -261,8 +320,16 @@ export const useOrderBatchMutations = (options?: {
 
       // Invalidate specific supplier and schedule queries
       if (response.data?.success) {
-        const supplierIds = new Set(response.data.success.map((order) => order.supplierId).filter((id): id is string => !!id));
-        const scheduleIds = new Set(response.data.success.map((order) => order.orderScheduleId).filter((id): id is string => !!id));
+        const supplierIds = new Set(
+          response.data.success
+            .map((order) => order.supplierId)
+            .filter((id): id is string => !!id),
+        );
+        const scheduleIds = new Set(
+          response.data.success
+            .map((order) => order.orderScheduleId)
+            .filter((id): id is string => !!id),
+        );
 
         supplierIds.forEach((supplierId) => {
           queryClient.invalidateQueries({
@@ -289,7 +356,9 @@ export const useOrderBatchMutations = (options?: {
 
       // Check for received orders and invalidate accordingly
       if (response.data?.success) {
-        const receivedOrders = response.data.success.filter((order) => order.status === ORDER_STATUS.RECEIVED);
+        const receivedOrders = response.data.success.filter(
+          (order) => order.status === ORDER_STATUS.RECEIVED,
+        );
         if (receivedOrders.length > 0) {
           queryClient.invalidateQueries({
             queryKey: itemKeys.all,
@@ -310,9 +379,15 @@ export const useOrderBatchMutations = (options?: {
     },
   });
 
-  const isLoading = batchCreateMutation.isPending || batchUpdateMutation.isPending || batchDeleteMutation.isPending;
+  const isLoading =
+    batchCreateMutation.isPending ||
+    batchUpdateMutation.isPending ||
+    batchDeleteMutation.isPending;
 
-  const error = batchCreateMutation.error || batchUpdateMutation.error || batchDeleteMutation.error;
+  const error =
+    batchCreateMutation.error ||
+    batchUpdateMutation.error ||
+    batchDeleteMutation.error;
 
   return {
     batchCreate: batchCreateMutation.mutate,
@@ -348,7 +423,8 @@ export const useUpdateOrder = (id: string) => {
   const mutations = useOrderMutations();
   return {
     mutate: (data: OrderUpdateFormData) => mutations.update({ id, data }),
-    mutateAsync: (data: OrderUpdateFormData) => mutations.updateAsync({ id, data }),
+    mutateAsync: (data: OrderUpdateFormData) =>
+      mutations.updateAsync({ id, data }),
     isPending: mutations.updateMutation.isPending,
     isError: mutations.updateMutation.isError,
     error: mutations.updateMutation.error,
@@ -407,7 +483,6 @@ export {
   useOrderSchedules,
   useOrderSchedule,
   useActiveOrderSchedules,
-  useOrderSchedulesBySupplier,
   useCreateOrderSchedule,
   useUpdateOrderSchedule,
   useDeleteOrderSchedule,

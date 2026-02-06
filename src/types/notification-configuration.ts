@@ -118,6 +118,7 @@ export interface CreateNotificationConfigurationDto {
 
 export interface UpdateNotificationConfigurationDto {
   key?: string;
+  name?: string;
   notificationType?: NOTIFICATION_TYPE;
   eventType?: string;
   description?: string;
@@ -129,6 +130,11 @@ export interface UpdateNotificationConfigurationDto {
   deduplicationWindow?: number;
   templates?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  targetRule?: {
+    allowedSectors?: string[];
+    excludeInactive?: boolean;
+    excludeOnVacation?: boolean;
+  };
 }
 
 export interface UpdateChannelConfigDto {
@@ -178,6 +184,8 @@ export interface NotificationConfigurationQueryParams {
   search?: string;
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 // =====================

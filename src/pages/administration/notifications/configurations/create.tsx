@@ -55,7 +55,7 @@ const configurationSchema = z.object({
   key: z
     .string()
     .min(3, "Chave deve ter no mínimo 3 caracteres")
-    .regex(/^[a-z][a-z0-9_.]*$/, "Chave deve começar com letra minúscula e conter apenas letras minúsculas, números, underscore e ponto"),
+    .regex(/^[a-z][a-zA-Z0-9_.]*$/, "Chave deve começar com letra minúscula e conter apenas letras, números, underscore e ponto"),
   name: z
     .string()
     .min(3, "Nome deve ter no mínimo 3 caracteres")
@@ -69,8 +69,22 @@ const configurationSchema = z.object({
   enabled: z.boolean(),
   workHoursOnly: z.boolean(),
   batchingEnabled: z.boolean(),
-  maxFrequencyPerDay: z.number().min(0).nullable().optional(),
-  deduplicationWindow: z.number().min(0).nullable().optional(),
+  maxFrequencyPerDay: z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return null;
+      const num = Number(val);
+      return isNaN(num) ? null : num;
+    },
+    z.number().min(0).nullable().optional()
+  ),
+  deduplicationWindow: z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return null;
+      const num = Number(val);
+      return isNaN(num) ? null : num;
+    },
+    z.number().min(0).nullable().optional()
+  ),
   channels: z.array(channelConfigSchema),
   targetRules: z.object({
     allowedSectors: z.array(z.string()),
@@ -620,9 +634,12 @@ export function NotificationConfigurationCreatePage() {
                         placeholder="Sem limite"
                         transparent
                         {...form.register("maxFrequencyPerDay", {
-                          setValueAs: (v) => (v === "" ? null : parseInt(v, 10)),
+                          setValueAs: (v) => (v === "" || v == null ? null : parseInt(v, 10)),
                         })}
                       />
+                      {form.formState.errors.maxFrequencyPerDay && (
+                        <p className="text-sm text-destructive">{form.formState.errors.maxFrequencyPerDay.message}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         Deixe vazio para sem limite
                       </p>
@@ -637,9 +654,12 @@ export function NotificationConfigurationCreatePage() {
                         placeholder="Desabilitada"
                         transparent
                         {...form.register("deduplicationWindow", {
-                          setValueAs: (v) => (v === "" ? null : parseInt(v, 10)),
+                          setValueAs: (v) => (v === "" || v == null ? null : parseInt(v, 10)),
                         })}
                       />
+                      {form.formState.errors.deduplicationWindow && (
+                        <p className="text-sm text-destructive">{form.formState.errors.deduplicationWindow.message}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         Tempo em minutos para ignorar notificações duplicadas
                       </p>

@@ -11,6 +11,7 @@ import {
   IconLockOpen,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { routes } from '@/constants';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { representativeService } from '@/services/representativeService';
@@ -183,7 +184,7 @@ export const RepresentativeList: React.FC<RepresentativeListProps> = ({
     if (onEdit) {
       onEdit(representative);
     } else {
-      navigate(`/representatives/${representative.id}/edit`);
+      navigate(routes.representatives.edit(representative.id));
     }
   };
 
@@ -220,7 +221,7 @@ export const RepresentativeList: React.FC<RepresentativeListProps> = ({
   };
 
   const handleUpdatePassword = (representative: Representative) => {
-    navigate(`/representatives/${representative.id}/password`);
+    navigate(routes.representatives.password(representative.id));
   };
 
   const isSelected = (id: string) => selected.indexOf(id) !== -1;
@@ -270,7 +271,7 @@ export const RepresentativeList: React.FC<RepresentativeListProps> = ({
             </SelectContent>
           </Select>
 
-          <Button onClick={() => navigate('/representatives/new')}>
+          <Button onClick={() => navigate(routes.representatives.create)}>
             <IconPlus className="mr-2 h-4 w-4" />
             Novo Representante
           </Button>

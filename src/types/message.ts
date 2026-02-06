@@ -31,11 +31,16 @@ export interface Message {
   title: string;
   content: any; // JSON blocks from editor
   status: MessageStatus;
-  targeting: MessageTargeting;
-  scheduling: MessageScheduling;
+  targeting?: MessageTargeting; // Only present in form/editor context, not in API responses
+  scheduling?: MessageScheduling;
   stats?: MessageStats;
+  targets?: Array<{ id: string; userId: string; user?: { id: string; name: string } }>; // From findOne (detail)
+  targetCount?: number; // From findAll (list) - 0 means all users
   createdAt: string | Date;
   updatedAt: string | Date;
+  publishedAt?: string | Date | null;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
   createdBy?: {
     id: string;
     name: string;
