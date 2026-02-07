@@ -49,13 +49,14 @@ import { PricingSelector, type PricingSelectorRef } from "../pricing/pricing-sel
 import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { LayoutForm } from "@/components/production/layout/layout-form";
-import { RepresentativeManager } from "@/components/representatives/RepresentativeManager";
+import { RepresentativeManager } from "@/components/administration/customer/representative";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { ArtworkFileUploadField } from "./artwork-file-upload-field";
 import type { RepresentativeRowData } from "@/types/representative";
 import { RepresentativeRole } from "@/types/representative";
 import { toast } from "sonner";
 import { getUniqueDescriptions } from "../../../../api-client/serviceOrder";
+import { uploadSingleFile } from "../../../../api-client/file";
 import {
   normalizeDescription,
   getPricingItemsToAddFromServiceOrders,
@@ -613,6 +614,46 @@ export const TaskCreateForm = () => {
 
         const { plates, serialNumbers, name, customerId, status, category, implementType, forecastDate, term, invoiceToId, details, paintId, paintIds } = data;
 
+        // Upload artwork files that haven't been uploaded yet
+        const artworkFileIds: string[] = [...uploadedFileIds];
+        const remappedArtworkStatuses: Record<string, string> = {};
+        for (const file of uploadedFiles) {
+          if (file.uploaded && file.uploadedFileId) {
+            // Already uploaded - keep existing ID and remap status
+            if (artworkStatuses[file.id]) {
+              remappedArtworkStatuses[file.uploadedFileId] = artworkStatuses[file.id];
+            }
+          } else if (!file.error) {
+            try {
+              const response = await uploadSingleFile(file, { fileContext: 'artwork' });
+              if (response.success && response.data) {
+                artworkFileIds.push(response.data.id);
+                // Remap artwork status from local file ID to backend File ID
+                if (artworkStatuses[file.id]) {
+                  remappedArtworkStatuses[response.data.id] = artworkStatuses[file.id];
+                }
+              }
+            } catch (error: any) {
+              toast.error(`Erro ao enviar artwork ${file.name}: ${error.message}`);
+            }
+          }
+        }
+
+        // Upload base files that haven't been uploaded yet
+        const uploadedBaseFileIds: string[] = [...baseFileIds];
+        for (const file of baseFiles) {
+          if (!file.uploaded && !file.error) {
+            try {
+              const response = await uploadSingleFile(file, { fileContext: 'basefile' });
+              if (response.success && response.data) {
+                uploadedBaseFileIds.push(response.data.id);
+              }
+            } catch (error: any) {
+              toast.error(`Erro ao enviar arquivo base ${file.name}: ${error.message}`);
+            }
+          }
+        }
+
         // Get service orders from form
         const serviceOrdersRaw = data.serviceOrders || [];
         const serviceOrders = serviceOrdersRaw.filter(
@@ -668,8 +709,9 @@ export const TaskCreateForm = () => {
             term: term || undefined,
             paintId: paintId || undefined,
             paintIds: paintIds && paintIds.length > 0 ? paintIds : undefined,
-            artworkIds: uploadedFileIds.length > 0 ? uploadedFileIds : undefined,
-            baseFileIds: baseFileIds.length > 0 ? baseFileIds : undefined,
+            artworkIds: artworkFileIds.length > 0 ? artworkFileIds : undefined,
+            artworkStatuses: artworkFileIds.length > 0 && Object.keys(remappedArtworkStatuses).length > 0 ? remappedArtworkStatuses : undefined,
+            baseFileIds: uploadedBaseFileIds.length > 0 ? uploadedBaseFileIds : undefined,
             representativeIds: existingRepIds.length > 0 ? existingRepIds : undefined,
             // Service orders and pricing are cloned per task (individual instances)
             serviceOrders: serviceOrders.length > 0 ? serviceOrders.map((so: any) => ({
@@ -818,7 +860,7 @@ export const TaskCreateForm = () => {
         isSubmittingRef.current = false;
       }
     },
-    [createAsync, representativeRows, customerIdValue, uploadedFileIds, baseFileIds, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, artworkStatuses],
+    [createAsync, representativeRows, customerIdValue, uploadedFileIds, baseFileIds, uploadedFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, artworkStatuses],
   );
 
   const handleCancel = useCallback(() => {

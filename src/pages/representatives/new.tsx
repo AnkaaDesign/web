@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { RepresentativeForm } from '@/components/representatives';
+import { RepresentativeForm } from '@/components/administration/customer/representative';
 import { PageHeader } from '@/components/ui/page-header';
 import { IconUsers, IconCheck, IconLoader2 } from '@tabler/icons-react';
 import { representativeService } from '@/services/representativeService';

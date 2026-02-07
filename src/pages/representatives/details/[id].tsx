@@ -9,7 +9,7 @@ import { hasAnyPrivilege } from "@/utils";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { BasicInfoCard, ContactDetailsCard, RepresentativeDetailSkeleton } from "@/components/representatives/detail";
+import { BasicInfoCard, ContactDetailsCard, RepresentativeDetailSkeleton } from "@/components/administration/customer/representative/detail";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";

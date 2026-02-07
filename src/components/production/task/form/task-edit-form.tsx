@@ -36,7 +36,7 @@ import { cutService } from "../../../../api-client/cut";
 import { representativeService } from "@/services/representativeService";
 import type { Representative, RepresentativeCreateInlineFormData, RepresentativeRowData } from "@/types/representative";
 import { RepresentativeRole, REPRESENTATIVE_ROLE_LABELS } from "@/types/representative";
-import { RepresentativeManager } from "@/components/representatives/RepresentativeManager";
+import { RepresentativeManager } from "@/components/administration/customer/representative";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { useAuth } from "../../../../contexts/auth-context";

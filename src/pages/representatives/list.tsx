@@ -1,4 +1,4 @@
-import { RepresentativeList } from "@/components/representatives/list";
+import { RepresentativeList } from "@/components/administration/customer/representative/list";
 import { PageHeader } from "@/components/ui/page-header";
 import { routes, FAVORITE_PAGES } from "@/constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
