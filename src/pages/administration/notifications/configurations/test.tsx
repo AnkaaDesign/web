@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 import {
   useNotificationConfiguration,
   useTestConfiguration,
-} from "@/hooks/useNotificationConfiguration";
+} from "@/hooks/use-notification-configuration";
 import type { TestConfigurationResponse } from "@/types/notification-configuration";
 
 // =====================

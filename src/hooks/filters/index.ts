@@ -3,15 +3,15 @@
  * React hooks for managing filter and grouping state
  */
 
-export { useFilterState } from "./useFilterState";
-export type { UseFilterStateOptions, UseFilterStateReturn } from "./useFilterState";
+export { useFilterState } from "./use-filter-state";
+export type { UseFilterStateOptions, UseFilterStateReturn } from "./use-filter-state";
 
-export { useGroupByState } from "./useGroupByState";
+export { useGroupByState } from "./use-group-by-state";
 export type {
   GroupByState,
   UseGroupByStateOptions,
   UseGroupByStateReturn,
-} from "./useGroupByState";
+} from "./use-group-by-state";
 
-export { useFilterPresets } from "./useFilterPresets";
-export type { UseFilterPresetsOptions, UseFilterPresetsReturn } from "./useFilterPresets";
+export { useFilterPresets } from "./use-filter-presets";
+export type { UseFilterPresetsOptions, UseFilterPresetsReturn } from "./use-filter-presets";

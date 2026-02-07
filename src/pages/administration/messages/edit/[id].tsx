@@ -6,7 +6,7 @@ import { IconPencil, IconCheck, IconLoader2, IconEye, IconArrowLeft, IconArrowRi
 import { MessageEditor } from "@/components/administration/message/editor/message-editor";
 import { MessagePreviewDialog } from "@/components/administration/message/editor/message-preview-dialog";
 import type { MessageFormData } from "@/components/administration/message/editor/types";
-import { useMessage, useUpdateMessage } from "@/hooks/useMessage";
+import { useMessage, useUpdateMessage } from "@/hooks/use-message";
 import type { MessageUpdateFormData } from "@/schemas/message";
 import { resolveTargetingToUserIds } from "@/utils/message-targeting";
 import { Skeleton } from "@/components/ui/skeleton";

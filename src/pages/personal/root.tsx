@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePageTracker } from "@/hooks/use-page-tracker";
-import { useCurrentUser } from "@/hooks/useAuth";
+import { useCurrentUser } from "@/hooks/use-auth";
 import { useBorrows, usePpeDeliveries, useMyVacations, useActivities } from "../../hooks";
 import { useNavigate } from "react-router-dom";
 import { routes, PPE_DELIVERY_STATUS, BORROW_STATUS, USER_STATUS_LABELS } from "../../constants";

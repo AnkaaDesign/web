@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { requestPpeDelivery } from "@/api-client";
-import { useItems } from "@/hooks/useItem";
+import { useItems } from "@/hooks/use-item";
 import { useDebounce } from "@/hooks/use-debounce";
 import type { Item } from "@/types";
 import type { ItemGetManyFormData } from "@/schemas";

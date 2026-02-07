@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEditForm } from "../../../../hooks/useEditForm";
+import { useEditForm } from "../../../../hooks/use-edit-form";
 import {
   IconLoader2,
   IconArrowLeft,

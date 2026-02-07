@@ -1,4 +1,4 @@
-import { useCurrentUser } from "@/hooks/useAuth";
+import { useCurrentUser } from "@/hooks/use-auth";
 import type { Task } from "@/types";
 import type { SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "@/constants";
 import { SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS as SO_STATUS, SERVICE_ORDER_STATUS_LABELS } from "@/constants";

@@ -8,7 +8,7 @@ import { MessageBlockRenderer } from "@/components/messaging/MessageBlockRendere
 import { transformBlocksForDisplay } from "@/utils/message-transformer";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useMessage, useDeleteMessage, useMessageStats } from "@/hooks/useMessage";
+import { useMessage, useDeleteMessage, useMessageStats } from "@/hooks/use-message";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {

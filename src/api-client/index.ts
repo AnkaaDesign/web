@@ -60,7 +60,7 @@ export type {
 export * from "./notify";
 export * from "./observation";
 export * from "./order";
-export * from "./paint";
+export * from "./paint-hooks";
 export * from "./position";
 export * from "./preferences";
 export * from "./profile";
@@ -76,7 +76,7 @@ export * from "./services/layoutSection";
 export * from "./services/team-staff";
 export * from "./user";
 export * from "./vacation";
-export * from "./dashboard";
+export * from "./use-dashboard";
 export * from "./server";
 export * from "./services/bonus";
 export { payrollService } from "./services/payroll";

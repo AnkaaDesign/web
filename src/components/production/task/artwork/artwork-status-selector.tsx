@@ -1,6 +1,6 @@
 import { Combobox } from "@/components/ui/combobox";
 import { ARTWORK_STATUS, ARTWORK_STATUS_LABELS, SECTOR_PRIVILEGES } from "@/constants/enums";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/use-auth";
 
 interface ArtworkStatusSelectorProps {
   value: string;

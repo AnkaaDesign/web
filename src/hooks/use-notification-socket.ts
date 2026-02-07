@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useSocket } from './use-socket';
-import { notificationKeys } from './queryKeys';
+import { notificationKeys } from './query-keys';
 import { socketService, type ConnectionState } from '@/lib/socket';
 import type { Notification } from '@/types';
 

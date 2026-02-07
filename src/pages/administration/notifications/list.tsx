@@ -32,7 +32,7 @@ import {
 import type { NotificationGetManyFormData } from "@/schemas";
 import type { Notification } from "@/types";
 import { whatsAppService, type WhatsAppStatus } from "@/api-client/services/notification.service";
-import { useCurrentUser } from "@/hooks/useAuth";
+import { useCurrentUser } from "@/hooks/use-auth";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,

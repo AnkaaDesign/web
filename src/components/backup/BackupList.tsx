@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useBackups, useBackupMutations } from '@/hooks/useBackup';
+import { useBackups, useBackupMutations } from '@/hooks/use-backup';
 import { BackupProgressBar } from './BackupProgress';
 import {
   Table,

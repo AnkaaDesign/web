@@ -1,6 +1,6 @@
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, DecimalValue } from "./common";
 import type { ORDER_BY_DIRECTION, BONUS_STATUS } from "../constants";
-import type { Bonus, BonusIncludes } from "./bonus";
+import type { Bonus, BonusIncludes } from "./use-bonus";
 import type { User, UserIncludes } from "./user";
 import type { Position, PositionIncludes } from "./position";
 

@@ -4,7 +4,7 @@ import type { Borrow } from "../../../../types";
 import { routes, BORROW_STATUS, BORROW_STATUS_LABELS, getBadgeVariant } from "../../../../constants";
 import type { BORROW_STATUS as BorrowStatusType } from "../../../../constants";
 import { formatDate, formatRelativeTime } from "../../../../utils";
-import { useAuth } from "../../../../hooks/useAuth";
+import { useAuth } from "../../../../hooks/use-auth";
 import { canEditBorrows, canDeleteBorrows, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";

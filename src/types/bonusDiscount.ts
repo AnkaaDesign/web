@@ -2,7 +2,7 @@
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, DecimalValue } from "./common";
 import type { ORDER_BY_DIRECTION } from "../constants";
-import type { Bonus, BonusIncludes } from "./bonus";
+import type { Bonus, BonusIncludes } from "./use-bonus";
 
 // =====================
 // Main Entity Interface

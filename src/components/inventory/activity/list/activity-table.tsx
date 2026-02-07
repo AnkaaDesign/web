@@ -5,7 +5,7 @@ import type { Activity } from "../../../../types";
 import type { ActivityGetManyFormData } from "../../../../schemas";
 import { useActivityMutations, useActivities } from "../../../../hooks";
 import { shouldShowInteractiveElements, canEditItems, canDeleteItems } from "@/utils/permissions/entity-permissions";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/use-auth";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";

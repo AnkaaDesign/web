@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { IconUsers } from "@tabler/icons-react";
-import { useAuth } from "../../../../hooks/useAuth";
+import { useAuth } from "../../../../hooks/use-auth";
 import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { usePayrolls } from "../../../../hooks";
 import { createPayrollColumns } from "./payroll-table-columns";

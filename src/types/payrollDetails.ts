@@ -2,7 +2,7 @@
 
 import type { BaseGetUniqueResponse } from "./common";
 import type { BONUS_STATUS } from "../constants";
-import type { Bonus, BonusIncludes } from "./bonus";
+import type { Bonus, BonusIncludes } from "./use-bonus";
 import type { Task } from "./task";
 import type { User } from "./user";
 import type { Position } from "./position";

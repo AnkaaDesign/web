@@ -4,7 +4,7 @@ import type { Task } from "../../../../types";
 import { routes, TASK_STATUS } from "../../../../constants";
 import { isValidTaskStatusTransition, getTaskStatusLabel } from "../../../../utils";
 import { shouldShowInteractiveElements, canEditTasks, canDeleteTasks } from "@/utils/permissions/entity-permissions";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/use-auth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

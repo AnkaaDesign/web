@@ -34,7 +34,7 @@ import { ptBR } from "date-fns/locale";
 import type { Notification } from "@/types";
 import type { NotificationGetManyFormData } from "@/schemas";
 import { useNotificationMutations, useSendNotification } from "@/hooks";
-import { useNotifications } from "@/hooks/useNotificationAdmin";
+import { useNotifications } from "@/hooks/use-notification-admin";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { useTableState } from "@/hooks/use-table-state";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";

@@ -6,7 +6,7 @@ import { IconMessagePlus, IconCheck, IconLoader2, IconEye, IconArrowLeft, IconAr
 import { MessageEditor } from "@/components/administration/message/editor/message-editor";
 import { MessagePreviewDialog } from "@/components/administration/message/editor/message-preview-dialog";
 import type { MessageFormData } from "@/components/administration/message/editor/types";
-import { useCreateMessage } from "@/hooks/useMessage";
+import { useCreateMessage } from "@/hooks/use-message";
 import type { MessageCreateFormData } from "@/schemas/message";
 import { resolveTargetingToUserIds } from "@/utils/message-targeting";
 

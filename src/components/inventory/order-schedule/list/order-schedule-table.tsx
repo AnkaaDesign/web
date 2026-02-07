@@ -24,7 +24,7 @@ import {
   IconCalendarRepeat,
 } from "@tabler/icons-react";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
-import { useAuth } from "../../../../hooks/useAuth";
+import { useAuth } from "../../../../hooks/use-auth";
 import { canEditOrders, canDeleteOrders, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { useOrderSchedules, useOrderScheduleMutations } from "../../../../hooks";

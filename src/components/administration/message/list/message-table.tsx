@@ -32,7 +32,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { Message } from "@/types/message";
 import type { MessageGetManyFormData } from "@/schemas/message";
-import { useMessages, useMessageMutations } from "@/hooks/useMessage";
+import { useMessages, useMessageMutations } from "@/hooks/use-message";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";

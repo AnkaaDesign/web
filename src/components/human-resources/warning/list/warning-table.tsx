@@ -5,7 +5,7 @@ import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, Icon
 import type { Warning } from "../../../../types";
 import type { WarningGetManyFormData } from "../../../../schemas";
 import { routes, WARNING_SEVERITY_LABELS, WARNING_CATEGORY_LABELS } from "../../../../constants";
-import { useAuth } from "../../../../hooks/useAuth";
+import { useAuth } from "../../../../hooks/use-auth";
 import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate } from "../../../../utils";
 import { useWarningMutations, useWarnings, useMyWarnings } from "../../../../hooks";

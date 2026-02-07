@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { IconFlask, IconChevronDown, IconChevronRight, IconCurrencyReal, IconDroplet, IconFilter } from "@tabler/icons-react";
 
 import { usePaintFormulas } from "../../../hooks";
-import { useCurrentUser } from "../../../hooks/useAuth";
+import { useCurrentUser } from "../../../hooks/use-auth";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { formatCurrency, formatNumberWithDecimals } from "../../../utils";
 

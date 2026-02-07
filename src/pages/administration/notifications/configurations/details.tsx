@@ -55,7 +55,7 @@ import { cn } from "@/lib/utils";
 import {
   useNotificationConfiguration,
   useNotificationConfigurationMutations,
-} from "@/hooks/useNotificationConfiguration";
+} from "@/hooks/use-notification-configuration";
 import type { NotificationChannelConfig } from "@/types/notification-configuration";
 
 // =====================

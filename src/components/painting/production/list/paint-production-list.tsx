@@ -5,7 +5,7 @@ import type { PaintProduction } from "../../../../types";
 import type { PaintProductionGetManyFormData } from "../../../../schemas";
 import { routes } from "../../../../constants";
 import { shouldShowInteractiveElements, canEditPaintProductions, canDeletePaintProductions } from "@/utils/permissions/entity-permissions";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";

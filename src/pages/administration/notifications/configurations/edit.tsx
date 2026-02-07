@@ -44,7 +44,7 @@ import { cn } from "@/lib/utils";
 import {
   useNotificationConfiguration,
   useNotificationConfigurationMutations,
-} from "@/hooks/useNotificationConfiguration";
+} from "@/hooks/use-notification-configuration";
 import { notificationConfigurationService } from "@/api-client/services/notification-configuration.service";
 
 // =====================

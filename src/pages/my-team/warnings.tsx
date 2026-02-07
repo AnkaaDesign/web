@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/use-auth";
 import { routes } from "../../constants";
 import { IconLoader2 } from "@tabler/icons-react";
 import { useTeamStaffWarnings, useTeamStaffUsers } from "../../hooks";

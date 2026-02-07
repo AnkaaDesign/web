@@ -71,10 +71,10 @@ export {
   type OrderItemOrderBy,
   type OrderItemWhere,
 } from "./order";
-export * from "./paint";
+export * from "./paint-hooks";
 export * from "./position";
 export * from "./preferences";
-export * from "./secullum";
+export * from "./use-secullum";
 export * from "./warning";
 export * from "./sector";
 export * from "./serviceOrder";
@@ -83,12 +83,12 @@ export * from "./task";
 export * from "./layout";
 export * from "./user";
 export * from "./vacation";
-export * from "./dashboard";
+export * from "./use-dashboard";
 export * from "./auth";
 export * from "./server";
-export * from "./bonus";
+export * from "./use-bonus";
 export * from "./bonusDiscount";
-export * from "./payroll";
+export * from "./use-payroll";
 // Discount exports (to avoid naming conflicts with payroll and bonusDiscount)
 export {
   discountIncludeSchema,
@@ -106,4 +106,4 @@ export {
   type DiscountOrderBy,
   type DiscountWhere,
 } from "./discount";
-export * from "./deployment";
+export * from "./use-deployment";

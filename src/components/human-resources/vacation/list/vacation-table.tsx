@@ -5,7 +5,7 @@ import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, Icon
 import type { Vacation } from "../../../../types";
 import type { VacationGetManyFormData } from "../../../../schemas";
 import { routes, VACATION_STATUS_LABELS } from "../../../../constants";
-import { useAuth } from "../../../../hooks/useAuth";
+import { useAuth } from "../../../../hooks/use-auth";
 import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate, getWorkdaysBetween } from "../../../../utils";
 import { useVacationMutations, useVacations, useMyVacations, useTeamVacations } from "../../../../hooks";

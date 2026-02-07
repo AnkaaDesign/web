@@ -6,8 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { useTaskBatchMutations } from "../../../../hooks/useTask";
-import { useSectors } from "../../../../hooks/useSector";
+import { useTaskBatchMutations } from "../../../../hooks/use-task";
+import { useSectors } from "../../../../hooks/use-sector";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
 import type { Task } from "../../../../types";

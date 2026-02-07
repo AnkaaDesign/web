@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MessageService } from "@/api-client/message";
 import type { Message } from "@/types/message";
 import { useAuth } from "@/contexts/auth-context";
-import { useMarkAsViewed, useDismissMessage } from "@/hooks/useMessage";
+import { useMarkAsViewed, useDismissMessage } from "@/hooks/use-message";
 
 const messageService = new MessageService();
 

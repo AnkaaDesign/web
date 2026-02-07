@@ -3,24 +3,24 @@
 // =====================================================
 // Core Utilities & Factories
 // =====================================================
-export * from "./queryKeys";
+export * from "./query-keys";
 export {
   createEntityHooks,
   createSpecializedQueryHook,
-} from "./createEntityHooks";
+} from "./create-entity-hooks";
 export type {
   EntityService,
   QueryKeys,
   EntityHooksConfig,
   SpecializedQueryConfig,
-} from "./createEntityHooks";
-export * from "./useEditForm";
+} from "./create-entity-hooks";
+export * from "./use-edit-form";
 
 // =====================================================
 // Authentication Hooks
 // =====================================================
-export * from "./useAuth";
-export * from "./usePrivileges";
+export * from "./use-auth";
+export * from "./use-privileges";
 
 // =====================================================
 // UI & Form Hooks
@@ -38,63 +38,62 @@ export type {
 // =====================================================
 // Work Module Hooks
 // =====================================================
-export * from "./useActivity";
-export * from "./useTask";
-export * from "./useOrder";
-export * from "./useOrderItem";
-export * from "./useOrderSchedule";
-export * from "./useServiceOrder";
-export * from "./useObservation";
-export * from "./useCut";
-export * from "./useAirbrushing";
+export * from "./use-activity";
+export * from "./use-task";
+export * from "./use-order";
+export * from "./use-order-item";
+export * from "./use-order-schedule";
+export * from "./use-service-order";
+export * from "./use-observation";
+export * from "./use-cut";
+export * from "./use-airbrushing";
 
 // =====================================================
 // Paint Module Hooks
 // =====================================================
-export * from "./paint"; // Consolidated paint hooks
-export * from "./usePaint";
-export * from "./paintType";
-export * from "./usePaintBrand";
-export * from "./usePaintFormula";
-export * from "./usePaintFormulaComponent";
-export * from "./usePaintProduction";
+export * from "./paint-hooks"; // Consolidated paint hooks
+export * from "./use-paint";
+export * from "./use-paint-type";
+export * from "./use-paint-brand";
+export * from "./use-paint-formula";
+export * from "./use-paint-formula-component";
+export * from "./use-paint-production";
 // =====================================================
 // People Module Hooks
 // =====================================================
-export * from "./useUser";
-export * from "./usePosition";
-export * from "./usePositionRemuneration";
-export * from "./useSector";
-export * from "./useRepresentative";
-export * from "./bonus";
-export * from "./payroll";
-export * from "./useHoliday";
-export * from "./useVacation";
-export * from "./useWarning";
-export * from "./useBorrow";
-export * from "./usePpe";
-export * from "./useTeamStaff";
+export * from "./use-user";
+export * from "./use-position";
+export * from "./use-position-remuneration";
+export * from "./use-sector";
+export * from "./use-representative";
+export * from "./use-bonus";
+export * from "./use-payroll";
+export * from "./use-holiday";
+export * from "./use-vacation";
+export * from "./use-warning";
+export * from "./use-borrow";
+export * from "./use-ppe";
+export * from "./use-team-staff";
 
 // =====================================================
 // Stock Module Hooks
 // =====================================================
-export * from "./useItem";
-export * from "./useItemBrand";
-export * from "./useItemCategory";
-export * from "./usePrice";
-export * from "./useSupplier";
-export * from "./useExternalWithdrawal";
-export * from "./useMaintenance";
+export * from "./use-item";
+export * from "./use-item-brand";
+export * from "./use-item-category";
+export * from "./use-supplier";
+export * from "./use-external-withdrawal";
+export * from "./use-maintenance";
 
 // =====================================================
 // Common Module Hooks
 // =====================================================
-export * from "./useFile";
-export * from "./useNotification";
-export * from "./usePreferences";
-export * from "./useChangelog";
-export * from "./dashboard";
-export * from "./useMediaViewer";
+export * from "./use-file";
+export * from "./use-notification";
+export * from "./use-preferences";
+export * from "./use-changelog";
+export * from "./use-dashboard";
+export * from "./use-media-viewer";
 
 // =====================================================
 // Real-time Communication Hooks
@@ -105,22 +104,22 @@ export * from "./use-notification-socket";
 // =====================================================
 // Other Module Hooks
 // =====================================================
-export * from "./useCustomer";
+export * from "./use-customer";
 export * from "./use-cnpj-autocomplete";
-export * from "./useLayout";
-export * from "./useLayoutSection";
+export * from "./use-layout";
+export * from "./use-layout-section";
 
 // =====================================================
 // Server Management Hooks
 // =====================================================
-export * from "./useServer";
-export * from "./useBackup";
-export * from "./deployment";
+export * from "./use-server";
+export * from "./use-backup";
+export * from "./use-deployment";
 
 // =====================================================
 // Integration Hooks
 // =====================================================
-export * from "./secullum";
+export * from "./use-secullum";
 
 // =====================================================
 // Table & UI Utilities

@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
-import { useNotifications, useMarkAsRead, useMarkAllAsRead } from "./useNotification";
+import { useNotifications, useMarkAsRead, useMarkAllAsRead } from "./use-notification";
 import { toast } from "@/components/ui/sonner";
 import { socketService } from "@/lib/socket";
-import { getLocalStorage } from "@/lib/storage";
 import type { Notification } from "@/types";
 
 interface UseNotificationCenterReturn {
@@ -73,98 +72,21 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
     setUnreadCount(count);
   }, [notifications, user]);
 
-  // Socket.io real-time notifications setup
+  // Socket connection status tracking
+  // Real-time events are handled by SocketNotificationsListener component
+  // to avoid duplicate listeners and toasts
   useEffect(() => {
     if (!user) {
       setIsConnected(false);
       return;
     }
 
-    const token = getLocalStorage("token");
-    if (!token) {
-      setIsConnected(false);
-      return;
-    }
+    const checkConnection = () => setIsConnected(socketService.isConnected());
+    const interval = setInterval(checkConnection, 5000);
+    checkConnection();
 
-    // Connect to Socket.io server with authentication
-    const socket = socketService.connect(token);
-
-    // Track connection status
-    const handleConnect = () => {
-      setIsConnected(true);
-    };
-
-    const handleDisconnect = () => {
-      setIsConnected(false);
-    };
-
-    // Listen for new notifications
-    const handleNewNotification = (notification: Notification) => {
-
-      // Invalidate ALL notification queries using partial key match
-      // This ensures we catch the query regardless of the exact key structure
-      queryClient.invalidateQueries({
-        queryKey: ["notifications"],
-        refetchType: 'active', // Only refetch active queries
-      });
-
-      // Show toast notification
-      toast.info(notification.title, notification.body);
-
-      // Update count (will be corrected by refetch if needed)
-      setUnreadCount((prev) => prev + 1);
-    };
-
-    // Listen for notification count updates
-    const handleNotificationCount = (data: { count: number }) => {
-      setUnreadCount(data.count);
-    };
-
-    // Listen for notification updates (e.g., marked as read)
-    const handleNotificationUpdate = (updatedNotification: Notification) => {
-      // Invalidate ALL notification queries
-      queryClient.invalidateQueries({
-        queryKey: ["notifications"],
-        refetchType: 'active',
-      });
-    };
-
-    // Listen for notification deletions
-    const handleNotificationDelete = (notificationId: string) => {
-      // Invalidate ALL notification queries
-      queryClient.invalidateQueries({
-        queryKey: ["notifications"],
-        refetchType: 'active',
-      });
-    };
-
-    // Register event listeners
-    socket.on("connect", handleConnect);
-    socket.on("disconnect", handleDisconnect);
-    socket.on("notification:new", handleNewNotification);
-    socket.on("notification:count", handleNotificationCount);
-    socket.on("notification:update", handleNotificationUpdate);
-    socket.on("notification:delete", handleNotificationDelete);
-
-    // Note: socket:reconnect-failed is handled by SocketReconnectHandler component
-    // to avoid duplicate toasts. It shows a persistent toast with an action button.
-
-    // Set initial connection state
-    setIsConnected(socketService.isConnected());
-
-    // Cleanup on unmount
-    return () => {
-      socket.off("connect", handleConnect);
-      socket.off("disconnect", handleDisconnect);
-      socket.off("notification:new", handleNewNotification);
-      socket.off("notification:count", handleNotificationCount);
-      socket.off("notification:update", handleNotificationUpdate);
-      socket.off("notification:delete", handleNotificationDelete);
-
-      // Don't disconnect socket on unmount - let it persist for the session
-      // socketService.disconnect();
-    };
-  }, [user, queryClient]);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const markAsRead = useCallback(
     async (notificationId: string) => {

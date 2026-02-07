@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import type { PaintFormula } from "../../../types";
 import { formatCurrency, formatNumberWithDecimals } from "../../../utils";
-import { useCurrentUser } from "../../../hooks/useAuth";
+import { useCurrentUser } from "../../../hooks/use-auth";
 import { cn } from "@/lib/utils";
 
 interface PaintFormulaListItemProps {

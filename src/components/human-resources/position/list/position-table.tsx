@@ -5,7 +5,7 @@ import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, Icon
 import type { Position } from "../../../../types";
 import type { PositionGetManyFormData } from "../../../../schemas";
 import { routes } from "../../../../constants";
-import { useAuth } from "../../../../hooks/useAuth";
+import { useAuth } from "../../../../hooks/use-auth";
 import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate, formatCurrency } from "../../../../utils";
 import { usePositionMutations, usePositions } from "../../../../hooks";

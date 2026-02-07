@@ -71,7 +71,7 @@ import { useTableFilters } from "@/hooks/use-table-filters";
 import {
   useNotificationConfigurations,
   useNotificationConfigurationMutations,
-} from "@/hooks/useNotificationConfiguration";
+} from "@/hooks/use-notification-configuration";
 import type { NotificationConfiguration, NotificationConfigurationQueryParams } from "@/types/notification-configuration";
 import { NotificationConfigurationFilters } from "./components/configuration-filters";
 

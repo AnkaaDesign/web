@@ -56,8 +56,8 @@ import {
   useBackupSystemHealthSummary,
   useBackupMutations,
   useBackupUtils,
-} from "@/hooks/useBackup";
-import { useBackupProgress } from "@/hooks/useBackupProgress";
+} from "@/hooks/use-backup";
+import { useBackupProgress } from "@/hooks/use-backup-progress";
 import { useAuth } from "@/contexts/auth-context";
 import { getLocalStorage } from "@/lib/storage";
 import { useTableState } from "@/hooks/use-table-state";
