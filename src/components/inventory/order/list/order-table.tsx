@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Order } from "../../../../types";
 import { routes, ORDER_STATUS } from "../../../../constants";
-import { useAuth } from "../../../../hooks/use-auth";
+import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditOrders, canDeleteOrders, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,9 +25,9 @@ import { useOrders, useOrderMutations, useOrderBatchMutations } from "../../../.
 import { toast } from "sonner";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { OrderGetManyFormData } from "../../../../schemas";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { OrderTableSkeleton } from "./order-table-skeleton";
 import { createOrderColumns } from "./order-table-columns";
 

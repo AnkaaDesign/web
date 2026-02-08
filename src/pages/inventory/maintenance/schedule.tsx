@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconCalendar, IconPlus } from "@tabler/icons-react";
 import { MaintenanceScheduleList } from "@/components/inventory/maintenance/schedule/maintenance-schedule-list";
 import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";

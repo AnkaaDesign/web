@@ -28,7 +28,7 @@ import { TASK_STATUS, TASK_STATUS_LABELS, COMMISSION_STATUS, COMMISSION_STATUS_L
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getBadgeVariantFromStatus } from "@/components/ui/badge";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 
 interface RelatedTasksCardProps {
   tasks: Task[];

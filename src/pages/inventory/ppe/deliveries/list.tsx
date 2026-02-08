@@ -2,7 +2,7 @@ import { PpeDeliveryList } from "@/components/inventory/epi/delivery/ppe-deliver
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { FAVORITE_PAGES, SECTOR_PRIVILEGES, routes } from "../../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconPlus } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../hooks";

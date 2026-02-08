@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { routes, FAVORITE_PAGES } from '@/constants';
-import { usePageTracker } from '@/hooks/use-page-tracker';
-import { useOrderAnalytics } from '@/hooks/use-order-analytics';
+import { usePageTracker } from '@/hooks/common/use-page-tracker';
+import { useOrderAnalytics } from '@/hooks/inventory/use-order-analytics';
 import type { OrderAnalyticsFilters, OrderChartType } from '@/types/order-analytics';
 import {
   IconChartBar,

@@ -24,10 +24,10 @@ import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { PageHeader } from "@/components/ui/page-header";
 import { useServerMetrics, useCpuTemperature, useSsdHealth, useRaidStatus } from "../../hooks";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/common/use-toast";
 
 export function ServerMetricsPage() {
   const { user } = useAuth();

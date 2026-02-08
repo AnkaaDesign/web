@@ -5,9 +5,9 @@ import type { Position } from "../../../../types";
 import type { PositionGetManyFormData } from "../../../../schemas";
 import { formatCurrency } from "../../../../utils";
 import { cn } from "@/lib/utils";
-import { useTableState } from "@/hooks/use-table-state";
-import { useTableFilters } from "@/hooks/use-table-filters";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useTableState } from "@/hooks/common/use-table-state";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

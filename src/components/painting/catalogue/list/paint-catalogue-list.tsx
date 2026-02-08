@@ -18,7 +18,7 @@ import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { extractActiveFilters, createFilterRemover } from "./filter-utils";
 import { cn } from "@/lib/utils";
 import { ContextMenuProvider } from "@/components/ui/context-menu";
-import { useTableFilters } from "@/hooks/use-table-filters";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { PaintSelectionProvider, usePaintSelection } from "./paint-selection-context";
 import { PaintMergeDialog } from "../merge/paint-merge-dialog";
 import { IconX } from "@tabler/icons-react";

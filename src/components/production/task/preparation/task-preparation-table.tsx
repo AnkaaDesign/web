@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { SECTOR_PRIVILEGES } from "@/constants";
 import { hasPrivilege } from "@/utils/user";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { TaskHistoryContextMenu } from "../history/task-history-context-menu";
 import { createTaskHistoryColumns } from "../history/task-history-columns";
 import { TaskHistoryTableSkeleton } from "../history/task-history-table-skeleton";
@@ -18,7 +18,7 @@ import { routes } from "@/constants";
 import { groupSequentialTasks } from "../history/task-grouping-utils";
 import { CollapsedGroupRow } from "../history/collapsed-group-row";
 import { ColumnHeader } from "@/components/ui/column-header";
-import { useColumnWidths, DEFAULT_COLUMN_WIDTHS, COLUMN_WIDTH_CONSTRAINTS } from "@/hooks/use-column-widths";
+import { useColumnWidths, DEFAULT_COLUMN_WIDTHS, COLUMN_WIDTH_CONSTRAINTS } from "@/hooks/common/use-column-widths";
 import { IconAlertTriangle } from "@tabler/icons-react";
 
 interface TaskPreparationTableProps {

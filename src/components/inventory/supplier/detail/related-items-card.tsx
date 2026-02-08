@@ -12,7 +12,7 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { ColumnVisibilityManager } from "../../item/list/column-visibility-manager";
 import { createItemColumns } from "../../item/list/item-table-columns";
 

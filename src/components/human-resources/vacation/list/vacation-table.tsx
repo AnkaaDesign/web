@@ -5,7 +5,7 @@ import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, Icon
 import type { Vacation } from "../../../../types";
 import type { VacationGetManyFormData } from "../../../../schemas";
 import { routes, VACATION_STATUS_LABELS } from "../../../../constants";
-import { useAuth } from "../../../../hooks/use-auth";
+import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate, getWorkdaysBetween } from "../../../../utils";
 import { useVacationMutations, useVacations, useMyVacations, useTeamVacations } from "../../../../hooks";
@@ -29,9 +29,9 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { VacationListSkeleton } from "./vacation-list-skeleton";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 
 type VacationTableMode = 'hr' | 'personal' | 'team';
 

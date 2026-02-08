@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 import { OrderItemSelector } from "./order-item-selector";
 import { TemporaryItemsInput } from "./temporary-items-input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useOrderFormUrlState } from "@/hooks/use-order-form-url-state";
+import { useOrderFormUrlState } from "@/hooks/inventory/use-order-form-url-state";
 import { formatCurrency, formatDate, formatDateTime, formatPixKey } from "../../../../utils";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";

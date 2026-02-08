@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { PageHeader } from "@/components/ui/page-header";
 import { useSystemServices, useStartService, useStopService, useRestartService, useServiceLogs } from "../../hooks";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";

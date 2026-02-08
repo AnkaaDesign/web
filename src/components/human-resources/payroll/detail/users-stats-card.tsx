@@ -9,7 +9,7 @@ import { formatCurrency, formatDate } from "../../../../utils";
 import type { User, Bonus } from "../../../../types";
 import { IconUsers, IconDownload } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 
 // Extended User interface for stats display
 export interface UserStatsRow extends User {

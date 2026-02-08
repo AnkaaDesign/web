@@ -10,9 +10,9 @@ import { PerformanceLevelTable, type PerformanceLevelTableRef } from "./performa
 import { PerformanceLevelExport } from "./performance-level-export";
 import { PerformanceLevelFilters } from "./performance-level-filters";
 import { useUsers, useSectors } from "../../../hooks";
-import { useTableFilters } from "@/hooks/use-table-filters";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { IconFilter, IconDownload } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { USER_STATUS } from "../../../constants";

@@ -14,7 +14,7 @@ import { useState } from "react";
 import type { Cut } from "../../../../types";
 import { CUT_STATUS, CUT_STATUS_LABELS, CUT_TYPE_LABELS } from "../../../../constants";
 import { useCutMutations } from "../../../../hooks";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/common/use-toast";
 import { formatDate, formatDateTime } from "../../../../utils";
 
 const statusUpdateSchema = z.object({

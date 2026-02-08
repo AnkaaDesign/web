@@ -4,7 +4,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { ObservationForm } from "@/components/production/observation/form";
 import { PageHeader } from "@/components/ui/page-header";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import type { Observation } from "../../../types";
 import { IconCheck, IconNotebook, IconArrowRight, IconArrowLeft } from "@tabler/icons-react";
 

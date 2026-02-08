@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { IconSearch, IconFilter, IconUpload } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import {
   AlertDialog,

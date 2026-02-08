@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import {
   IconUsers,
   IconCurrencyReal,

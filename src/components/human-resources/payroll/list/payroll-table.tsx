@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { IconUsers } from "@tabler/icons-react";
-import { useAuth } from "../../../../hooks/use-auth";
+import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { usePayrolls } from "../../../../hooks";
 import { createPayrollColumns } from "./payroll-table-columns";
 import type { PayrollColumn, PayrollUserRow } from "./payroll-table-columns";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 import { routes } from "../../../../constants";
 
 

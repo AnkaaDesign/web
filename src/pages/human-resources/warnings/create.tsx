@@ -4,7 +4,7 @@ import { IconAlertTriangle, IconX, IconCheck } from "@tabler/icons-react";
 import { routes, FAVORITE_PAGES } from "../../../constants";
 import { PageHeader } from "@/components/ui/page-header";
 import { WarningForm } from "@/components/human-resources/warning/form";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const WarningCreatePage = () => {
   const navigate = useNavigate();

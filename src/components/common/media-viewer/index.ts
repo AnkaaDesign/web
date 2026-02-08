@@ -6,9 +6,6 @@
  */
 
 export { MediaViewer } from '../MediaViewer';
-export { MediaViewerEnhanced } from '../MediaViewerEnhanced';
-export { MediaGallery } from '../MediaGallery';
-export { MediaViewerDemo } from '../MediaViewerDemo';
 export { MediaViewerExamples } from '../MediaViewerExamples';
 
 export type { MediaItem } from '../MediaViewer';

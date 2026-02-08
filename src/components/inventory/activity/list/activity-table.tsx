@@ -5,7 +5,7 @@ import type { Activity } from "../../../../types";
 import type { ActivityGetManyFormData } from "../../../../schemas";
 import { useActivityMutations, useActivities } from "../../../../hooks";
 import { shouldShowInteractiveElements, canEditItems, canDeleteItems } from "@/utils/permissions/entity-permissions";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/common/use-auth";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
@@ -15,9 +15,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { getActivityColumns } from "./activity-table-columns";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { ActivityListSkeleton } from "./activity-list-skeleton";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 
 interface ActivityTableProps {
   filters: Partial<ActivityGetManyFormData>;

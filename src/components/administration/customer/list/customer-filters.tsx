@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
 import { IconFilter, IconX, IconBriefcase, IconMapPin, IconCalendarPlus } from "@tabler/icons-react";
-import { useCustomerFilters } from "@/hooks/use-customer-filters";
+import { useCustomerFilters } from "@/hooks/administration/use-customer-filters";
 import { BRAZILIAN_STATES, BRAZILIAN_STATE_NAMES } from "../../../../constants";
 
 interface CustomerFiltersProps {

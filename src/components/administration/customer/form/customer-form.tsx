@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { customerCreateSchema, customerUpdateSchema, type CustomerCreateFormData, type CustomerUpdateFormData } from "../../../../schemas";
 import { serializeCustomerFormToUrlParams, getDefaultCustomerFormValues, debounce } from "@/utils/url-form-state";
 import { createCustomerFormData } from "@/utils/form-data-helper";
-import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
+import { useCnpjLookup } from "@/hooks/common/use-cnpj-lookup";
 import { getEconomicActivities, createEconomicActivity } from "@/api-client/economic-activity";
 
 // Import all form components

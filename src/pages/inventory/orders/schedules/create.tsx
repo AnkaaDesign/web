@@ -1,5 +1,5 @@
 import { OrderScheduleCreateForm } from "@/components/inventory/order-schedule/form/order-schedule-create-form";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const OrderScheduleCreate = () => {
   // Track page access

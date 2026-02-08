@@ -23,7 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { CustomerLogoDisplay } from '@/components/ui/avatar-display';
 import { formatCNPJ } from '@/utils';
-import { useCnpjAutocomplete } from '@/hooks/use-cnpj-autocomplete';
+import { useCnpjAutocomplete } from '@/hooks/common/use-cnpj-autocomplete';
 
 // Schema for representative form
 const representativeSchema = z.object({

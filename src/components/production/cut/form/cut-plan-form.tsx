@@ -15,7 +15,7 @@ import { useState } from "react";
 import type { Cut, File as FileType, Task } from "../../../../types";
 import { CUT_TYPE, CUT_ORIGIN, CUT_TYPE_LABELS } from "../../../../constants";
 import { useCutMutations } from "../../../../hooks";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/common/use-toast";
 
 // Schema for individual cut plan item
 const cutPlanItemSchema = z.object({

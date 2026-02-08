@@ -44,7 +44,7 @@ import {
   getActionLabel,
 } from "../../utils";
 import { useChangeLogs } from "../../hooks";
-import { useEntityDetails } from "@/hooks/use-entity-details";
+import { useEntityDetails } from "@/hooks/common/use-entity-details";
 import { cn } from "@/lib/utils";
 
 // Helper function to generate layout SVG for changelog display

@@ -1,7 +1,7 @@
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES, routes } from "../../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useTaskDetail } from "../../../../hooks";
 import { TaskEditForm } from "@/components/production/task/form/task-edit-form";
 import { TaskEditSkeleton } from "@/components/production/task/skeleton/task-edit-skeleton";

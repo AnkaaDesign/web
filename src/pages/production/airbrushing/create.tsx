@@ -6,7 +6,7 @@ import { AirbrushingForm } from "@/components/production/airbrushing/form/airbru
 import type { AirbrushingFormHandle } from "@/components/production/airbrushing/form/airbrushing-form";
 import { IconSpray, IconCheck, IconLoader2 } from "@tabler/icons-react";
 import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import type { Airbrushing } from "../../../types";
 
 export const AirbrushingCreate = () => {

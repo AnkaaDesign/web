@@ -18,7 +18,7 @@ import type { CopyableTaskField } from "@/types/task-copy";
 import { IconSearch, IconFilter, IconX, IconHandClick } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { hasPrivilege } from "@/utils";
 import { toast } from "sonner";
 

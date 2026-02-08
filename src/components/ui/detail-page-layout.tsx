@@ -6,8 +6,8 @@ import {
 } from "@/lib/layout-constants";
 import { PageHeader, PageHeaderProps } from "@/components/ui/page-header";
 import { SectionVisibilityManager } from "@/components/ui/section-visibility-manager";
-import { useSectionVisibility } from "@/hooks/use-section-visibility";
-import type { SectionConfig } from "@/hooks/use-section-visibility";
+import { useSectionVisibility } from "@/hooks/common/use-section-visibility";
+import type { SectionConfig } from "@/hooks/common/use-section-visibility";
 
 interface DetailPageLayoutProps {
   /** Page header configuration */

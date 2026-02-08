@@ -4,7 +4,7 @@ import type { Borrow } from "../../../../types";
 import { routes, BORROW_STATUS, BORROW_STATUS_LABELS, getBadgeVariant } from "../../../../constants";
 import type { BORROW_STATUS as BorrowStatusType } from "../../../../constants";
 import { formatDate, formatRelativeTime } from "../../../../utils";
-import { useAuth } from "../../../../hooks/use-auth";
+import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditBorrows, canDeleteBorrows, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,14 +24,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useBorrowMutations, useBorrowBatchMutations, useBorrows } from "../../../../hooks";
-import { useBatchResultDialog } from "@/hooks/use-batch-result-dialog";
+import { useBatchResultDialog } from "@/hooks/common/use-batch-result-dialog";
 import { BorrowBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { BorrowGetManyFormData } from "../../../../schemas";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { BorrowTableSkeleton } from "../common/borrow-skeleton";
 
 interface BorrowTableProps {

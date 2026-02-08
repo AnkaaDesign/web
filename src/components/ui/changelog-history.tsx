@@ -58,7 +58,7 @@ import {
 } from "../../utils";
 import { useChangeLogs } from "../../hooks";
 import { cn } from "@/lib/utils";
-import { useEntityDetails } from "@/hooks/use-entity-details";
+import { useEntityDetails } from "@/hooks/common/use-entity-details";
 import { rollbackFieldChange } from "@/api-client/task";
 
 interface ChangelogHistoryProps {

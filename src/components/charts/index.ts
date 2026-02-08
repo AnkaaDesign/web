@@ -15,12 +15,6 @@ export * from './BarChartComponent';
 export * from './PieChartComponent';
 export * from './AreaChartComponent';
 
-// Business-specific charts
-export * from './business';
-
-// Composition components
-export * from './composed';
-
 // New configurable chart system
 export { ChartContainer } from './ChartContainer';
 export { ConfigurableChart } from './ConfigurableChart';

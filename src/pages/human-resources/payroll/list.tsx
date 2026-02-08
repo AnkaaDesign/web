@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { usePageTracker } from "@/hooks/use-page-tracker";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
-import { useTableState } from "@/hooks/use-table-state";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
+import { useTableState } from "@/hooks/common/use-table-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   IconFilter,

@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { BorrowTable } from "@/components/inventory/borrow/list/borrow-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { FAVORITE_PAGES, routes } from "../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconPackageExport, IconFilter } from "@tabler/icons-react";
 import { useAuth } from "@/contexts/auth-context";
 import type { BorrowGetManyFormData } from "../../schemas";
@@ -10,13 +10,13 @@ import type { Borrow } from "../../types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
-import { useTableFilters } from "@/hooks/use-table-filters";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
+import { useTableState } from "@/hooks/common/use-table-state";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { BorrowFilters } from "@/components/inventory/borrow/list/borrow-filters";
 import { BorrowExport } from "@/components/inventory/borrow/list/borrow-export";
 import { ColumnVisibilityManager } from "@/components/inventory/borrow/list/column-visibility-manager";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 
 /**
  * My Loans Page (Meus Empréstimos)

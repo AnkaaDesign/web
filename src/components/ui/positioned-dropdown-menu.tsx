@@ -1,6 +1,6 @@
 import * as React from "react";
 import { DropdownMenuContent } from "./dropdown-menu";
-import { useSmartMenuPosition, type MenuPosition } from "@/hooks/use-smart-menu-position";
+import { useSmartMenuPosition, type MenuPosition } from "@/hooks/common/use-smart-menu-position";
 import { cn } from "@/lib/utils";
 
 export interface PositionedDropdownMenuContentProps

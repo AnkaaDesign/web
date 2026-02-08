@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AirbrushingInfoCard } from "@/components/production/airbrushing/detail/airbrushing-info-card";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { IconEdit, IconTrash } from "@tabler/icons-react";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 import {
   AlertDialog,

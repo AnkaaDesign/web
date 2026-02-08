@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { ItemForm } from "@/components/inventory/item/form";
 import { PageHeader } from "@/components/ui/page-header";
 import { useItemMutations } from "../../../hooks";

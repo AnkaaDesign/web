@@ -2,7 +2,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { PpeSizesList } from "@/components/inventory/epi/sizes/ppe-sizes-list";
 import { FAVORITE_PAGES, SECTOR_PRIVILEGES, routes } from "../../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const PpeSizeListPage = () => {
   usePageTracker({

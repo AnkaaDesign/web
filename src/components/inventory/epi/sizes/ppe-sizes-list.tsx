@@ -11,8 +11,8 @@ import { IconFilter } from "@tabler/icons-react";
 import { PpeSizesTable, createPpeSizeColumns, DEFAULT_PPE_SIZE_VISIBLE_COLUMNS } from "./ppe-sizes-table";
 import { PpeSizesFilters } from "./ppe-sizes-filters";
 import { PpeSizesColumnVisibility } from "./ppe-sizes-column-visibility";
-import { useTableFilters } from "@/hooks/use-table-filters";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { FilterIndicators as StandardFilterIndicators } from "@/components/ui/filter-indicator";
 import { USER_STATUS_LABELS } from "../../../../constants";
 import {

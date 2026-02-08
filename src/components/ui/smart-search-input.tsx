@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { Badge } from "./badge";
 import { IconSearch, IconX, IconLoader2, IconHistory, IconArrowUp, IconArrowDown, IconCornerDownLeft, IconClock } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import type { SearchSuggestion, UseAdvancedSearchReturn } from "@/hooks/use-advanced-search";
+import type { SearchSuggestion, UseAdvancedSearchReturn } from "@/hooks/common/use-advanced-search";
 
 interface SmartSearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> {
   /** Search hook return object */

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { canEditItems, canDeleteItems } from "@/utils/permissions/entity-permissions";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/common/use-auth";
 import {
   AlertDialog,
   AlertDialogAction,

@@ -13,10 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
-import { useDebounce } from "@/hooks/use-debounce";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
+import { useDebounce } from "@/hooks/common/use-debounce";
 import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { formatDate } from "../../../../utils";
 import type { Task } from "../../../../types";

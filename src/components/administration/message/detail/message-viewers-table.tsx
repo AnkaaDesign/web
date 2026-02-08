@@ -9,8 +9,8 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { UserTable } from "@/components/administration/user/list/user-table";
 import { ColumnVisibilityManager } from "@/components/administration/user/list/column-visibility-manager";
 import { createUserColumns } from "@/components/administration/user/list/user-table-columns";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
-import { useTableFilters } from "@/hooks/use-table-filters";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
 
 interface MessageViewersTableProps {
   message: Message & { views?: Array<{ userId: string; viewedAt: string | Date; dismissedAt?: string | Date | null }> };

@@ -65,13 +65,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { routes, SECTOR_PRIVILEGES } from "@/constants";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
-import { useTableState } from "@/hooks/use-table-state";
-import { useTableFilters } from "@/hooks/use-table-filters";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
+import { useTableState } from "@/hooks/common/use-table-state";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
 import {
   useNotificationConfigurations,
   useNotificationConfigurationMutations,
-} from "@/hooks/use-notification-configuration";
+} from "@/hooks/administration/use-notification-configuration";
 import type { NotificationConfiguration, NotificationConfigurationQueryParams } from "@/types/notification-configuration";
 import { NotificationConfigurationFilters } from "./components/configuration-filters";
 

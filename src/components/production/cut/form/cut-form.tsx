@@ -16,7 +16,7 @@ import { cutCreateSchema, cutUpdateSchema } from "../../../../schemas";
 import { CUT_TYPE, CUT_STATUS, CUT_ORIGIN, CUT_REQUEST_REASON, CUT_TYPE_LABELS, CUT_STATUS_LABELS, CUT_ORIGIN_LABELS, CUT_REQUEST_REASON_LABELS } from "../../../../constants";
 import { useCutMutations, useCut } from "../../../../hooks";
 import { mapCutToFormData } from "../../../../schemas";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/common/use-toast";
 import { formatDate } from "../../../../utils";
 
 interface CutFormProps {

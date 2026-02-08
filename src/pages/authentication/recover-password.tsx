@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { LoadingSpinner } from "@/components/ui/loading";
 import { getAuthStyles, authLayoutVariants, authCardVariants, inputVariants } from "@/lib/design-system";
 import { cn } from "@/lib/utils";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { routes } from "../../constants";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 

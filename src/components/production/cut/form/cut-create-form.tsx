@@ -14,7 +14,7 @@ import type { CutCreateFormData } from "../../../../schemas";
 import { cutCreateNestedSchema } from "../../../../schemas";
 import { CUT_TYPE, CUT_ORIGIN, CUT_REQUEST_REASON, CUT_TYPE_LABELS, CUT_ORIGIN_LABELS, CUT_REQUEST_REASON_LABELS } from "../../../../constants";
 import { useCutMutations } from "../../../../hooks";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/common/use-toast";
 
 interface CutCreateFormProps {
   fileId?: string;

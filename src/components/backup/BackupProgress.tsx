@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useBackupProgress } from '@/hooks/use-backup-progress';
+import { useBackupProgress } from '@/hooks/server/use-backup-progress';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

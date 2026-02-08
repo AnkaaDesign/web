@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { IconFileText, IconLoader2 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/hooks";
-import { useDebounce } from "@/hooks/use-debounce";
+import { useDebounce } from "@/hooks/common/use-debounce";
 import { toTitleCase } from "@/utils/formatters";
 
 interface TaskNameAutocompleteProps {

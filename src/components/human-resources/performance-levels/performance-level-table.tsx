@@ -17,7 +17,7 @@ import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-to
 import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { IconSelector, IconChevronUp, IconChevronDown } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useUserMutations } from "../../../hooks/use-user";
+import { useUserMutations } from "../../../hooks/human-resources/use-user";
 import { useTasks } from "../../../hooks";
 import { formatCurrency, getCurrentPayrollPeriod, getBonusPeriod } from "../../../utils";
 import { calculateBonusForPosition } from "../../../utils/bonus";

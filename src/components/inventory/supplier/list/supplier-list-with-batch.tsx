@@ -11,7 +11,7 @@ import { SupplierBatchOperationsToolbar } from "./supplier-batch-operations-tool
 import { SupplierFilters } from "./supplier-filters";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createSupplierColumns } from "./supplier-table-columns";
-import { useSupplierFilters } from "@/hooks/use-supplier-filters";
+import { useSupplierFilters } from "@/hooks/inventory/use-supplier-filters";
 import { useNavigate } from "react-router-dom";
 import { routes } from "../../../../constants";
 import { toast } from "sonner";

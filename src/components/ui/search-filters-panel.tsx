@@ -24,7 +24,7 @@ import {
   IconSortAscending,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import type { UseAdvancedSearchReturn } from "@/hooks/use-advanced-search";
+import type { UseAdvancedSearchReturn } from "@/hooks/common/use-advanced-search";
 import {
   type FilterIndicator,
   extractActiveFilters,

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { routes } from "../../constants";
 import {
   IconDatabase,
@@ -13,7 +13,7 @@ import {
   IconLoader,
   IconArrowRight
 } from "@tabler/icons-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/common/use-toast";
 import { apiClient as api } from "../../api-client/client-exports";
 
 interface SyncStatus {

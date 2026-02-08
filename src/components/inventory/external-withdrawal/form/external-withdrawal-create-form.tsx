@@ -22,7 +22,7 @@ import { FormSteps } from "@/components/ui/form-steps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
-import { useExternalWithdrawalFormUrlState } from "@/hooks/use-external-withdrawal-form-url-state";
+import { useExternalWithdrawalFormUrlState } from "@/hooks/inventory/use-external-withdrawal-form-url-state";
 import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { createWithdrawalFormData } from "@/utils/form-data-helper";

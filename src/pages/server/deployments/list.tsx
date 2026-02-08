@@ -5,7 +5,7 @@ import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { DeploymentManager } from "@/components/server/deployment/deployment-manager";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const DeploymentListPage = () => {
   usePageTracker({

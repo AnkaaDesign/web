@@ -31,7 +31,7 @@ import { getUsers } from '@/api-client/user';
 import { getItems } from '@/api-client/item';
 import { getItemBrands } from '@/api-client/item-brand';
 import { getItemCategories } from '@/api-client/item-category';
-import { sectorKeys, userKeys, itemKeys, itemBrandKeys, itemCategoryKeys } from '@/hooks/query-keys';
+import { sectorKeys, userKeys, itemKeys, itemBrandKeys, itemCategoryKeys } from '@/hooks/common/query-keys';
 import { ACTIVITY_OPERATION } from '@/constants';
 import { formatDate } from '@/utils';
 

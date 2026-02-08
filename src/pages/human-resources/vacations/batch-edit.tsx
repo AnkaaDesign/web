@@ -10,7 +10,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
 import { VacationBatchForm } from "@/components/human-resources/vacation/batch-edit/vacation-batch-form";
 import { Card, CardContent } from "@/components/ui/card";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 import { cn } from "@/lib/utils";
 

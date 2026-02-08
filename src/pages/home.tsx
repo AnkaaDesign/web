@@ -5,7 +5,7 @@ import { getMostAccessedPages, getRecentPages, getIconInfoByPath } from "../util
 import { IconStar, IconClock, IconFlame } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { usePageTracker } from "../hooks/use-page-tracker";
+import { usePageTracker } from "../hooks/common/use-page-tracker";
 
 function getGreeting(): string {
   const hour = new Date().getHours();

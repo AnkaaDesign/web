@@ -6,8 +6,8 @@ import { ItemsNeededTable } from "./items-needed-table";
 import { ItemsNeededColumnVisibilityManager, getDefaultVisibleColumns } from "./items-needed-column-visibility-manager";
 import { createItemsNeededColumns } from "./items-needed-columns";
 import { cn } from "@/lib/utils";
-import { useTableFilters } from "@/hooks/use-table-filters";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { IconPackage } from "@tabler/icons-react";
 
 interface ItemConfig {

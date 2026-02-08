@@ -5,7 +5,7 @@ import { RepresentativeForm } from '@/components/administration/customer/represe
 import { PageHeader } from '@/components/ui/page-header';
 import { IconUsers, IconCheck, IconLoader2 } from '@tabler/icons-react';
 import { representativeService } from '@/services/representativeService';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/common/use-toast';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { routes } from '@/constants';

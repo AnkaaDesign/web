@@ -11,7 +11,7 @@ import { PageHeader } from "@/components/page-header";
 import { WarningBatchEditTable } from "@/components/human-resources/warning/batch-edit";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const WarningBatchEditPage = () => {
   usePageTracker({ title: "Edição em Lote de Advertências", icon: "edit" });

@@ -25,7 +25,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { usePositions, usePositionBatchMutations } from "@/hooks";
 import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 import { cn } from "@/lib/utils";

@@ -16,7 +16,7 @@ import type { Cut } from "../../../../types";
 import { CUT_REQUEST_REASON, CUT_ORIGIN, CUT_STATUS } from "../../../../constants";
 import { CUT_REQUEST_REASON_LABELS, CUT_TYPE_LABELS, CUT_STATUS_LABELS, getBadgeVariant } from "../../../../constants";
 import { useCutMutations } from "../../../../hooks";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/common/use-toast";
 import { formatDate } from "../../../../utils";
 
 const requestSchema = z.object({

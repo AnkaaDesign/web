@@ -8,8 +8,8 @@ import { TaskHistoryContextMenu } from "@/components/production/task/history/tas
 import { createTaskHistoryColumns } from "@/components/production/task/history/task-history-columns";
 import { cn } from "@/lib/utils";
 import { routes } from "../../../../constants";
-import { useTableState } from "@/hooks/use-table-state";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useTableState } from "@/hooks/common/use-table-state";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { IconChevronUp, IconChevronDown, IconSelector, IconHistory } from "@tabler/icons-react";

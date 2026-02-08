@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { IconAlertTriangle, IconPackage } from "@tabler/icons-react";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES } from "../../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ExternalWithdrawalEditForm } from "@/components/inventory/external-withdrawal/form/external-withdrawal-edit-form";

@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { PageHeader } from '@/components/ui/page-header';
 import { IconLock, IconEye, IconEyeOff, IconCheck, IconLoader2 } from '@tabler/icons-react';
 import { representativeService } from '@/services/representativeService';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/common/use-toast';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

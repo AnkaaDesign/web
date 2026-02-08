@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { PrivilegeRoute } from '@/components/navigation/privilege-route';
 import { PageHeader } from '@/components/ui/page-header';
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from '../../../../constants';
-import { usePageTracker } from '@/hooks/use-page-tracker';
+import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import {
   IconRefresh,
   IconShoppingCart,
@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/common/use-toast';
 import { formatCurrency, formatNumberWithDecimals } from '@/utils/number';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';

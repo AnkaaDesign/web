@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { formatDate, formatRelativeTime } from "../../../../utils";
 import { MAINTENANCE_STATUS, MAINTENANCE_STATUS_LABELS, routes } from "../../../../constants";
 import { ENTITY_BADGE_CONFIG } from "../../../../constants";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { TableSearchInput } from "@/components/ui/table-search-input";

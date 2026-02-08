@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/common/use-auth";
 import { routes } from "../../constants";
 import { IconLoader2 } from "@tabler/icons-react";
 import { useTeamStaffWarnings, useTeamStaffUsers } from "../../hooks";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate } from "../../utils";
 import { IconFilter, IconRefresh, IconUser, IconCalendar, IconX, IconAlertTriangle } from "@tabler/icons-react";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import type { WarningGetManyFormData } from "../../schemas";

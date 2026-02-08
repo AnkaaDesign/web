@@ -7,8 +7,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { IconChevronDown, IconX, IconSearch, IconCheck, IconLoader2, IconFilter, IconPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useCancelableQuery } from "@/hooks/use-cancelable-query";
-import { useDebounce } from "@/hooks/use-debounce";
+import { useCancelableQuery } from "@/hooks/common/use-cancelable-query";
+import { useDebounce } from "@/hooks/common/use-debounce";
 
 /**
  * Filter suggestion data structure

@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { SectionConfig, VisibilityState } from "@/hooks/use-section-visibility";
+import type { SectionConfig, VisibilityState } from "@/hooks/common/use-section-visibility";
 
 interface SectionVisibilityManagerProps {
   sections: SectionConfig[];

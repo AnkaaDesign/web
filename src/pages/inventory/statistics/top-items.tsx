@@ -8,7 +8,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconTrophy, IconDownload, IconFilter, IconReload, IconMedal, IconCrown, IconStar, IconTrendingUp, IconTrendingDown, IconArrowUp, IconArrowDown } from "@tabler/icons-react";
 import { addDays, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from "date-fns";
 import { ptBR } from "date-fns/locale";

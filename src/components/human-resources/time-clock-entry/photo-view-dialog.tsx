@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { IconCamera, IconDownload, IconLoader2 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
-import { useSecullumIntegration } from "@/hooks/use-secullum-integration";
+import { useSecullumIntegration } from "@/hooks/integrations/use-secullum-integration";
 
 interface PhotoViewDialogProps {
   isOpen: boolean;

@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "./table";
 import { TABLE_LAYOUT } from "./table-constants";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { Checkbox } from "./checkbox";
 import { SimplePaginationAdvanced } from "./pagination-advanced";
 import { TruncatedTextWithTooltip } from "./truncated-text-with-tooltip";

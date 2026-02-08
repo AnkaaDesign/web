@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { TemporaryItemsInput } from "./temporary-items-input";
-import { useOrderFormUrlState } from "@/hooks/use-order-form-url-state";
+import { useOrderFormUrlState } from "@/hooks/inventory/use-order-form-url-state";
 import { formatCurrency, formatDate, formatDateTime, measureUtils, formatPixKey } from "../../../../utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";

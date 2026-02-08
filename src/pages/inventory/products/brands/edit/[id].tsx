@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { BrandForm } from "@/components/inventory/item/brand/form/brand-form";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading";

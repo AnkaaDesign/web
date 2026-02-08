@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { hasPrivilege } from "../../../../../utils";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { getDetailGridClasses } from "@/lib/layout-constants";
 
 export function PPEScheduleDetailsPage() {

@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { HolidaysList } from "@/components/integrations/secullum/holidays/list";
 import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const HolidayListPage = () => {
   const navigate = useNavigate();

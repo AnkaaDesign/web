@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { NotificationBadge } from "./notification-badge";
 import { NotificationList } from "./notification-list";
-import { useNotificationCenter } from "@/hooks/use-notification-center";
+import { useNotificationCenter } from "@/hooks/common/use-notification-center";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 import type { Notification } from "@/types";

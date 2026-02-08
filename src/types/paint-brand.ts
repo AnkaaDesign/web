@@ -2,7 +2,7 @@
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
 import type { ORDER_BY_DIRECTION } from "../constants";
-import type { Paint, PaintIncludes } from "./paint";
+import type { Paint, PaintIncludes } from "./paint-hooks";
 import type { Item } from "./item";
 
 // =====================

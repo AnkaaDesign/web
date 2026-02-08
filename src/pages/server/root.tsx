@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SkeletonCard, LoadingSpinner } from "@/components/ui/loading";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { PageHeader } from "@/components/ui/page-header";
 import { useServerMetrics, useServerStatus } from "../../hooks";
 import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";

@@ -8,7 +8,7 @@ import { Badge } from "./badge";
 import { Checkbox } from "./checkbox";
 import { IconCheck, IconChevronDown, IconPlus, IconSearch, IconX, IconLoader2, IconArrowDown } from "@tabler/icons-react";
 import { cn } from "../../lib/utils";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useDebouncedValue } from "@/hooks/common/use-debounced-value";
 
 export interface ComboboxOption {
   value: string;

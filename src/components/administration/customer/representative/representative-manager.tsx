@@ -3,7 +3,7 @@ import { IconPlus } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { representativeService } from '@/services/representativeService';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/common/use-toast';
 import type {
   Representative,
   RepresentativeRole,

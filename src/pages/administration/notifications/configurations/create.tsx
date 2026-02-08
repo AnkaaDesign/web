@@ -38,7 +38,7 @@ import { FormCombobox } from "@/components/ui/form-combobox";
 import { Separator } from "@/components/ui/separator";
 import { routes, SECTOR_PRIVILEGES } from "@/constants";
 import { cn } from "@/lib/utils";
-import { useNotificationConfigurationMutations } from "@/hooks/use-notification-configuration";
+import { useNotificationConfigurationMutations } from "@/hooks/administration/use-notification-configuration";
 
 // =====================
 // Schema

@@ -5,7 +5,7 @@ import type { Item } from "../../../../types";
 import { formatCurrency } from "../../../../utils";
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
 import { usePaintFormulas } from "../../../../hooks";
-import { useCurrentUser } from "../../../../hooks/use-auth";
+import { useCurrentUser } from "../../../../hooks/common/use-auth";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

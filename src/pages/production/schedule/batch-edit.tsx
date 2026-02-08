@@ -9,7 +9,7 @@ import { TaskBatchEditTable } from "@/components/production/task/batch-edit/task
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { IconClipboardList, IconAlertTriangle, IconLoader, IconDeviceFloppy, IconArrowLeft } from "@tabler/icons-react";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const TaskBatchEditPage = () => {
   const [searchParams] = useSearchParams();

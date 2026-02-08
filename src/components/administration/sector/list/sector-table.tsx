@@ -4,7 +4,7 @@ import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, Icon
 
 import type { Sector, SectorGetManyFormData, SectorOrderBy } from "../../../../types";
 import { routes, SECTOR_PRIVILEGES_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
-import { useAuth } from "../../../../hooks/use-auth";
+import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate } from "../../../../utils";
 import { useSectorMutations, useSectors } from "../../../../hooks";
@@ -18,9 +18,9 @@ import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { SectorListSkeleton } from "./sector-list-skeleton";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 import {
   AlertDialog,
   AlertDialogAction,

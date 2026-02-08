@@ -56,11 +56,11 @@ import {
   useBackupSystemHealthSummary,
   useBackupMutations,
   useBackupUtils,
-} from "@/hooks/use-backup";
-import { useBackupProgress } from "@/hooks/use-backup-progress";
+} from "@/hooks/server/use-backup";
+import { useBackupProgress } from "@/hooks/server/use-backup-progress";
 import { useAuth } from "@/contexts/auth-context";
 import { getLocalStorage } from "@/lib/storage";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 
 // Retention options for auto-delete
 type RetentionPeriod = "1_day" | "3_days" | "1_week" | "2_weeks" | "1_month" | "3_months" | "6_months" | "1_year";

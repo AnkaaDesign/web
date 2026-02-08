@@ -8,7 +8,7 @@ import { routes } from "../../../../constants";
 import { IconLoader2, IconTool, IconCheck } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui";
 import { Card, CardContent } from "@/components/ui/card";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const EditMaintenancePage = () => {
   const { id } = useParams<{ id: string }>();

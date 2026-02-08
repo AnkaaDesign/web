@@ -16,9 +16,9 @@ import { extractActiveFilters, createFilterRemover } from "./filter-utils";
 import { getDefaultVisibleColumns, createPpeScheduleColumns } from "./ppe-schedule-table-columns";
 import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 import { Badge } from "@/components/ui/badge";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import {
   AlertDialog,
   AlertDialogAction,

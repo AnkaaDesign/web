@@ -14,10 +14,10 @@ import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
-import { useDebounce } from "@/hooks/use-debounce";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
+import { useDebounce } from "@/hooks/common/use-debounce";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import type { Item } from "../../../../types";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import type {

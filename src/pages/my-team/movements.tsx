@@ -14,7 +14,7 @@ import { formatDate, formatDateTime } from "../../utils";
 import type { ActivityGetManyFormData } from "../../schemas";
 import { IconDownload, IconFileTypeCsv, IconFileTypeXls, IconFilter, IconX, IconCalendar, IconUser, IconRefresh, IconActivity, IconPackage } from "@tabler/icons-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Navigate } from "react-router-dom";

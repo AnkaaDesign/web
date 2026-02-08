@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 
 interface DeploymentTableProps {
   filters?: Partial<DeploymentGetManyFormData>;

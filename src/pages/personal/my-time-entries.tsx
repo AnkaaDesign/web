@@ -1,7 +1,7 @@
 import { IconCalculator } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { FAVORITE_PAGES, routes } from "../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useAuth } from "@/contexts/auth-context";
 import { CalculationList } from "@/components/integrations/secullum/calculations/list";
 

@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate, Navigate } from "react-router-dom";
 import { routes } from "../../constants";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/common/use-auth";
 import { IconLoader2 } from "@tabler/icons-react";
 
 const teamMenuItems = [

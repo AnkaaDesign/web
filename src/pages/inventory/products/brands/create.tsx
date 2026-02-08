@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { BrandForm } from "@/components/inventory/item/brand/form/brand-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconTag, IconCheck, IconLoader2 } from "@tabler/icons-react";

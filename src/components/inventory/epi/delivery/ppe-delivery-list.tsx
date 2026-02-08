@@ -18,9 +18,9 @@ import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createPpeDeliveryColumns, getDefaultVisibleColumns } from "./ppe-delivery-table-columns";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
-import { useTableState } from "@/hooks/use-table-state";
-import { useBatchResultDialog } from "@/hooks/use-batch-result-dialog";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
+import { useTableState } from "@/hooks/common/use-table-state";
+import { useBatchResultDialog } from "@/hooks/common/use-batch-result-dialog";
 import { BatchOperationResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 

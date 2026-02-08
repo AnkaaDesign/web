@@ -6,7 +6,7 @@ import type { Customer } from "../../../../types";
 import { formatCNPJ } from "../../../../utils";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { IconUser } from "@tabler/icons-react";
-import { useCnpjAutocomplete } from "@/hooks/use-cnpj-autocomplete";
+import { useCnpjAutocomplete } from "@/hooks/common/use-cnpj-autocomplete";
 
 interface CustomerSelectorProps {
   control: any;

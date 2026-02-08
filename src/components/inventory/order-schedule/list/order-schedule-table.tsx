@@ -24,9 +24,9 @@ import {
   IconCalendarRepeat,
 } from "@tabler/icons-react";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
-import { useAuth } from "../../../../hooks/use-auth";
+import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditOrders, canDeleteOrders, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { useOrderSchedules, useOrderScheduleMutations } from "../../../../hooks";
 import type { OrderScheduleGetManyFormData } from "../../../../schemas";
 import { routes } from "../../../../constants";
@@ -34,7 +34,7 @@ import type { OrderSchedule } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { createOrderScheduleColumns, type OrderScheduleColumn } from "./order-schedule-table-columns";
 
 interface OrderScheduleTableProps {

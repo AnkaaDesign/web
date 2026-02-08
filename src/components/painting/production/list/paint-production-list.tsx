@@ -5,14 +5,14 @@ import type { PaintProduction } from "../../../../types";
 import type { PaintProductionGetManyFormData } from "../../../../schemas";
 import { routes } from "../../../../constants";
 import { shouldShowInteractiveElements, canEditPaintProductions, canDeletePaintProductions } from "@/utils/permissions/entity-permissions";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/common/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Badge } from "@/components/ui/badge";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
-import { useTableFilters } from "@/hooks/use-table-filters";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { IconFilter, IconFlask, IconExternalLink, IconChevronDown, IconChevronUp, IconSelector, IconTrash, IconAlertTriangle } from "@tabler/icons-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -27,10 +27,10 @@ import { createPaintProductionColumns, getDefaultVisibleColumns } from "./paint-
 import type { PaintProductionColumn } from "./paint-production-table-columns";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { PaintProductionExport } from "./paint-production-export";
 import {
   AlertDialog,

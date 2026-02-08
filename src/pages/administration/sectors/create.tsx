@@ -5,7 +5,7 @@ import type { SectorCreateFormData } from "../../../schemas";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { SectorForm } from "@/components/administration/sector/form";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useSectorMutations } from "../../../hooks";
 
 export const SectorCreatePage = () => {

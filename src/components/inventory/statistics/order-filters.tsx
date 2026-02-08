@@ -27,7 +27,7 @@ import { getSuppliers } from '@/api-client/supplier';
 import { getItems } from '@/api-client/item';
 import { getItemBrands } from '@/api-client/item-brand';
 import { getItemCategories } from '@/api-client/item-category';
-import { supplierKeys, itemKeys, itemBrandKeys, itemCategoryKeys } from '@/hooks/query-keys';
+import { supplierKeys, itemKeys, itemBrandKeys, itemCategoryKeys } from '@/hooks/common/query-keys';
 import { formatDate } from '@/utils';
 
 // Page size for async combobox

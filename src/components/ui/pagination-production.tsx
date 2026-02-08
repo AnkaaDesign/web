@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
-import { usePaginationState } from "@/hooks/use-pagination-state";
-import type { PaginationMeta } from "@/hooks/use-pagination-state";
+import { usePaginationState } from "@/hooks/common/use-pagination-state";
+import type { PaginationMeta } from "@/hooks/common/use-pagination-state";
 
 export interface ProductionPaginationProps {
   // Data

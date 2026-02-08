@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { TASK_STATUS, routes } from "../../../../constants";
-import { useTableFilters } from "@/hooks/use-table-filters";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
+import { useTableState } from "@/hooks/common/use-table-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { CustomerTasksTable } from "./customer-tasks-table";
 import { ColumnVisibilityManager } from "@/components/production/task/history/column-visibility-manager";
 import { createTaskHistoryColumns } from "@/components/production/task/history/task-history-columns";
 import { cn } from "@/lib/utils";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { IconChecklist } from "@tabler/icons-react";
 
 interface CustomerTasksListProps {

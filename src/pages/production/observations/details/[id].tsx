@@ -12,7 +12,7 @@ import { ObservationInfoCard, ObservationDetailSkeleton } from "@/components/pro
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { generateFileUrls } from "@/utils/file-viewer";
 import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 

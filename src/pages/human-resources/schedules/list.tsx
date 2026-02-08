@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SchedulesList } from "@/components/integrations/secullum/schedules/list";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const SchedulesListPage = () => {
   usePageTracker({ title: "Horários", icon: "clock" });

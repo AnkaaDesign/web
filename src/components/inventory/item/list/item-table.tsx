@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Item } from "../../../../types";
 import { routes } from "../../../../constants";
-import { useAuth } from "../../../../hooks/use-auth";
+import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditItems, canDeleteItems, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -14,12 +14,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useItemMutations, useItemBatchMutations, useItems } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { ItemGetManyFormData } from "../../../../schemas";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { createItemColumns } from "./item-table-columns";
 import type { ItemColumn } from "./types";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { PriceAdjustmentModal } from "../modals/price-adjustment-modal";
 
 interface ItemTableProps {

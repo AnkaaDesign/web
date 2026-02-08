@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileViewerProvider } from "@/components/common/file";
 import { toast } from "sonner";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditSuppliers } from "@/utils/permissions/entity-permissions";
 import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";

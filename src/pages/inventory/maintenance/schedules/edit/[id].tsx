@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "@/components/ui/page-header";
 import { routes, FAVORITE_PAGES } from "../../../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconCalendar, IconCheck, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
 import { MaintenanceScheduleForm } from "@/components/inventory/maintenance/schedule/form";
 import { useMaintenanceSchedule, useMaintenanceScheduleMutations } from "../../../../../hooks";

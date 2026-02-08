@@ -12,9 +12,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Combobox } from "@/components/ui/combobox";
 import { PageHeader } from "@/components/ui/page-header";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
-import { useBorrowFormUrlState } from "@/hooks/use-borrow-form-url-state";
+import { useBorrowFormUrlState } from "@/hooks/inventory/use-borrow-form-url-state";
 import { BorrowBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
-import { useBatchResultDialog } from "@/hooks/use-batch-result-dialog";
+import { useBatchResultDialog } from "@/hooks/common/use-batch-result-dialog";
 
 // Form schema for batch borrow creation
 const borrowBatchFormSchema = z

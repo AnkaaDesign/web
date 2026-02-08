@@ -21,7 +21,7 @@ import {
   TASK_STATUS_LABELS
 } from "../../../../constants";
 import { getBadgeVariant } from "../../../../constants";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import type { Task, Commission } from "../../../../types";
 
 // Extended task interface for display with commission data

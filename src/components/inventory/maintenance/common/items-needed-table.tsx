@@ -7,12 +7,12 @@ import { IconChevronUp, IconChevronDown, IconSelector, IconAlertTriangle, IconPa
 import { cn } from "@/lib/utils";
 import { useItems } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { createItemsNeededColumns } from "./items-needed-columns";
 import type { ItemNeededColumn } from "./items-needed-columns";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 
 interface ItemConfig {
   itemId: string;

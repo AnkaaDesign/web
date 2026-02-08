@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../../constants";
 import { usePpeDeliveryScheduleMutations } from "../../../../hooks";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconCalendar, IconX, IconCheck, IconLoader2 } from "@tabler/icons-react";
 import type { PpeDeliveryScheduleCreateFormData, PpeDeliveryScheduleCreateResponse } from "../../../../schemas";
 import { PpeScheduleForm } from "@/components/inventory/epi/schedule/ppe-schedule-form";

@@ -91,7 +91,7 @@ if (typeof window !== "undefined") {
 // Setup error monitoring for development
 if (import.meta.env.DEV) {
   // Import the monitor directly to avoid bundling it with all hook imports
-  import("./hooks/query-error-monitor")
+  import("./hooks/common/query-error-monitor")
     .then(({ queryErrorMonitor }) => {
       queryErrorMonitor.setup(queryClient);
       if (process.env.NODE_ENV !== 'production') {

@@ -9,9 +9,9 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
-import { useStockBalanceFormUrlState } from "@/hooks/use-stock-balance-form-url-state";
+import { useStockBalanceFormUrlState } from "@/hooks/inventory/use-stock-balance-form-url-state";
 import { StockBalanceBatchResultDialog } from "@/components/inventory/stock-balance/stock-balance-batch-result-dialog";
-import { useBatchResultDialog } from "@/hooks/use-batch-result-dialog";
+import { useBatchResultDialog } from "@/hooks/common/use-batch-result-dialog";
 
 export const StockBalanceCreatePage = () => {
   const navigate = useNavigate();

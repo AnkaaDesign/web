@@ -23,7 +23,7 @@ import {
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useAuth } from "@/contexts/auth-context";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { hasPrivilege } from "@/utils/user";
 import { routes } from "@/constants/routes";
 import { SECTOR_PRIVILEGES } from "@/constants/enums";
@@ -32,11 +32,11 @@ import {
   useThrottlerKeys,
   useBlockedKeys,
   useThrottlerMutations,
-} from "@/hooks/use-throttler";
+} from "@/hooks/common/use-throttler";
 import { ThrottlerKeysTable } from "@/components/server/throttler/throttler-keys-table";
 import { ThrottlerFilters } from "@/components/server/throttler/throttler-filters";
 import type { ThrottlerFiltersData } from "@/components/server/throttler/throttler-filters";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 import type { ThrottlerKey, BlockedKey } from "@/api-client/throttler";
 import { debounce } from "lodash";
 

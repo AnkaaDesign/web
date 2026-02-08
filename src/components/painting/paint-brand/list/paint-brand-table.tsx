@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { PaintBrand } from "../../../../types";
 import { routes } from "../../../../constants";
-import { useAuth } from "../../../../hooks/use-auth";
+import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditPaints, canDeletePaints, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,11 +13,11 @@ import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdo
 import { usePaintBrandMutations, usePaintBrandBatchMutations, usePaintBrands } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { PaintBrandGetManyFormData } from "../../../../schemas";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { PaintBrandTableSkeleton } from "./paint-brand-table-skeleton";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { createPaintBrandColumns } from "./paint-brand-table-columns";
 import type { PaintBrandColumn } from "./paint-brand-table-columns";
 import {

@@ -14,7 +14,7 @@ import type { ComboboxOption } from "@/components/ui/combobox";
 import { useUsers } from "../../../hooks";
 import { PageHeader } from "@/components/ui/page-header";
 import { routes, FAVORITE_PAGES, USER_STATUS } from "../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 import { cn } from "@/lib/utils";
 

@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, ORDER_STATUS_LABELS, STOCK_LEVEL } from "../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useInventoryDashboard, useOrders, useBorrows, usePpeDeliveries, useItems, useSuppliers, useActivities } from "../../hooks";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency, formatNumber } from "../../utils";

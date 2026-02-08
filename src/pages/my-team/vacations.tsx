@@ -10,7 +10,7 @@ import { formatDate } from "../../utils";
 import { isTeamLeader } from "@/utils/user";
 import { useAuth } from "@/contexts/auth-context";
 import { IconFilter, IconRefresh, IconUser, IconCalendar, IconX } from "@tabler/icons-react";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { VacationGetManyFormData } from "../../schemas";
 import { Navigate } from "react-router-dom";

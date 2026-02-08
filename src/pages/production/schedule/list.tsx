@@ -2,7 +2,7 @@ import { TaskScheduleContent } from "@/components/production/task/schedule/task-
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const TaskListPage = () => {
   // Track page access

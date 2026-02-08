@@ -4,8 +4,8 @@ import { IconFilter } from "@tabler/icons-react";
 import type { Sector, SectorGetManyFormData } from "../../../../types";
 import { SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS } from "../../../../constants";
 import { cn } from "@/lib/utils";
-import { useTableState } from "@/hooks/use-table-state";
-import { useTableFilters } from "@/hooks/use-table-filters";
+import { useTableState } from "@/hooks/common/use-table-state";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

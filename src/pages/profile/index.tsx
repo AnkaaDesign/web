@@ -23,7 +23,7 @@ import {
   RAIN_BOOTS_SIZE_LABELS,
 } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
-import { useCepLookup } from "@/hooks/use-cep-lookup";
+import { useCepLookup } from "@/hooks/common/use-cep-lookup";
 import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 import { cn } from "@/lib/utils";
 import { UserAvatarDisplay } from "@/components/ui/avatar-display";

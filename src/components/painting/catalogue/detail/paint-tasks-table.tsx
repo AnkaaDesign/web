@@ -11,7 +11,7 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { CustomerTasksTable } from "@/components/administration/customer/detail/customer-tasks-table";
 import { ColumnVisibilityManager } from "@/components/production/task/history/column-visibility-manager";
 import { createTaskHistoryColumns } from "@/components/production/task/history/task-history-columns";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 
 interface PaintTasksTableProps {
   paint: Paint;

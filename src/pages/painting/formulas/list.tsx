@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { IconFlask, IconChevronDown, IconChevronRight, IconCurrencyReal, IconDroplet, IconFilter } from "@tabler/icons-react";
 
 import { usePaintFormulas } from "../../../hooks";
-import { useCurrentUser } from "../../../hooks/use-auth";
+import { useCurrentUser } from "../../../hooks/common/use-auth";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { formatCurrency, formatNumberWithDecimals } from "../../../utils";
 
@@ -17,7 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { IconPlus, IconSearch, IconAlertCircle } from "@tabler/icons-react";
-import { useDebounce } from "@/hooks/use-debounce";
+import { useDebounce } from "@/hooks/common/use-debounce";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormulaFilters } from "@/components/painting/formula/formula-filters";

@@ -6,7 +6,7 @@ import type { Sector, SectorIncludes, SectorOrderBy } from "./sector";
 import type { Customer, CustomerIncludes, CustomerOrderBy } from "./customer";
 import type { File, FileIncludes } from "./file";
 import type { Observation, ObservationIncludes } from "./observation";
-import type { Paint, PaintIncludes, PaintOrderBy } from "./paint";
+import type { Paint, PaintIncludes, PaintOrderBy } from "./paint-hooks";
 import type { User, UserIncludes, UserOrderBy } from "./user";
 import type { ServiceOrder, ServiceOrderIncludes } from "./serviceOrder";
 import type { Airbrushing, AirbrushingIncludes } from "./airbrushing";

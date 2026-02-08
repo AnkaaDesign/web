@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supplierCreateSchema, supplierUpdateSchema, type SupplierCreateFormData, type SupplierUpdateFormData } from "../../../../schemas";
 import { serializeSupplierFormToUrlParams, getDefaultSupplierFormValues, debounce } from "@/utils/url-form-state";
 import { createSupplierFormData } from "@/utils/form-data-helper";
-import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
+import { useCnpjLookup } from "@/hooks/common/use-cnpj-lookup";
 
 // Import all form components
 import { FantasyNameInput } from "./fantasy-name-input";

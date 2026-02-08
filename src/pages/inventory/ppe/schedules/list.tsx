@@ -2,7 +2,7 @@ import { PpeScheduleList } from "@/components/inventory/epi/schedule/ppe-schedul
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { FAVORITE_PAGES, SECTOR_PRIVILEGES, routes } from "../../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useCurrentUser } from "../../../../hooks";
 import { hasPrivilege } from "../../../../utils";
 import { IconPlus } from "@tabler/icons-react";

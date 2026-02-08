@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { IconShield, IconX, IconCheck, IconLoader2 } from "@tabler/icons-react";
 import type { PpeDeliveryBatchCreateFormData } from "../../../../schemas";
 import { PpeDeliveryForm } from "@/components/inventory/epi/delivery/ppe-delivery-form";
-import { useBatchResultDialog } from "@/hooks/use-batch-result-dialog";
+import { useBatchResultDialog } from "@/hooks/common/use-batch-result-dialog";
 import { PpeDeliveryBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
 
 export const EPIDeliveryCreate = () => {

@@ -24,7 +24,7 @@ import {
   parseCurrency,
   formatBrazilianPhone,
 } from "../../utils";
-import { useCepLookup } from "@/hooks/use-cep-lookup";
+import { useCepLookup } from "@/hooks/common/use-cep-lookup";
 import { IconLoader2 } from "@tabler/icons-react";
 
 type InputType =

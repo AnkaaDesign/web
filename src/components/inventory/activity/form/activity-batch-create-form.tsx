@@ -11,9 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { PageHeader } from "@/components/ui/page-header";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
-import { useActivityFormUrlState } from "@/hooks/use-activity-form-url-state";
+import { useActivityFormUrlState } from "@/hooks/production/use-activity-form-url-state";
 import { ActivityBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
-import { useBatchResultDialog } from "@/hooks/use-batch-result-dialog";
+import { useBatchResultDialog } from "@/hooks/common/use-batch-result-dialog";
 
 export const ActivityBatchCreateForm = () => {
   const navigate = useNavigate();

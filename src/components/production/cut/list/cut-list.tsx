@@ -9,14 +9,14 @@ import { CutItemTable } from "./cut-item-table";
 import { IconFilter } from "@tabler/icons-react";
 import { CutItemFilters } from "./cut-item-filters";
 import { cn } from "@/lib/utils";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { FilterIndicators } from "./filter-indicator";
 import { buildFilterTags } from "./filter-utils";
-import { useTableFilters } from "@/hooks/use-table-filters";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createCutColumns } from "./cut-item-table-columns";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 
 interface CutListProps {
   className?: string;

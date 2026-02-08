@@ -15,10 +15,10 @@ import { FilterIndicators } from "./filter-indicators";
 import { extractActiveFilters, createFilterRemover } from "./filter-utils";
 import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
-import { useTableState } from "@/hooks/use-table-state";
-import { useTableFilters } from "@/hooks/use-table-filters";
+import { useTableState } from "@/hooks/common/use-table-state";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { Badge } from "@/components/ui/badge";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { getDefaultVisibleColumns, createMaintenanceColumns } from "./maintenance-table-columns";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import {

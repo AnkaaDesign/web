@@ -7,7 +7,7 @@ import { useWarning } from "../../../../hooks";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
 import { WarningForm } from "@/components/human-resources/warning/form";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const WarningEditPage = () => {
   usePageTracker({ title: "Editar Advertência", icon: "edit" });

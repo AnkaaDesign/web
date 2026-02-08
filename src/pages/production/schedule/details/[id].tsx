@@ -45,7 +45,7 @@ import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text
 import { getApiBaseUrl } from "@/utils/file";
 import { SERVICE_ORDER_TYPE } from "../../../../constants";
 import { REPRESENTATIVE_ROLE_LABELS } from "@/types/representative";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -129,8 +129,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
-import { useSectionVisibility } from "@/hooks/use-section-visibility";
-import type { SectionConfig } from "@/hooks/use-section-visibility";
+import { useSectionVisibility } from "@/hooks/common/use-section-visibility";
+import type { SectionConfig } from "@/hooks/common/use-section-visibility";
 import { SectionVisibilityManager } from "@/components/ui/section-visibility-manager";
 
 // Paint badge style - unified neutral, more subtle (no icons)

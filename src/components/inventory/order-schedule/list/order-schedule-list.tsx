@@ -10,7 +10,7 @@ import { IconFilter } from "@tabler/icons-react";
 import { OrderScheduleFilters, OrderScheduleTable } from "./index";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createOrderScheduleColumns, getDefaultVisibleColumns } from "./order-schedule-table-columns";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { cn } from "@/lib/utils";
 
 interface OrderScheduleListProps {

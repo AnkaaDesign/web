@@ -6,7 +6,7 @@ import { type MaintenanceCreateFormData } from "../../../schemas";
 import { routes, FAVORITE_PAGES } from "../../../constants";
 import { PageHeader } from "@/components/ui";
 import { IconCheck, IconLoader2, IconTool } from "@tabler/icons-react";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const CreateMaintenancePage = () => {
   usePageTracker({

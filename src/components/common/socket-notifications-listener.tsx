@@ -6,7 +6,7 @@
  * the root level of the application, inside the AuthProvider context.
  */
 
-import { useNotificationSocket } from '@/hooks/use-notification-socket';
+import { useNotificationSocket } from '@/hooks/common/use-notification-socket';
 
 export function SocketNotificationsListener(): null {
   // Initialize socket connection and notification listeners

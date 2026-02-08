@@ -12,8 +12,8 @@ import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { ActivityUserSelector } from "./activity-user-selector";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
-import { useTableState } from "@/hooks/use-table-state";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
+import { useTableState } from "@/hooks/common/use-table-state";
 
 interface ActivityField {
   itemId: string;

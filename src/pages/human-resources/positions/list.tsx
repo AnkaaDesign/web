@@ -6,7 +6,7 @@ import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
 import { PositionList } from "@/components/human-resources/position/list";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const PositionListPage = () => {
   usePageTracker({ title: "Page", icon: "star" });

@@ -579,9 +579,8 @@ export const deleteFile = (id: string, deleteFromStorage = true) => fileService.
 // File Upload Operations Exports
 // =====================
 
-// DEPRECATED: These upload functions are no longer used. Files should be submitted with forms using FormData.
-// export const uploadFiles = (files: any[] | ArrayLike<any>, options?: FileUploadOptions) => fileService.uploadFiles(files, options);
-// export const uploadSingleFile = (file: any, options?: FileUploadOptions) => fileService.uploadSingleFile(file, options);
+export const uploadFiles = (files: any[] | ArrayLike<any>, options?: FileUploadOptions) => fileService.uploadFiles(files, options);
+export const uploadSingleFile = (file: any, options?: FileUploadOptions) => fileService.uploadSingleFile(file, options);
 export const cancelUpload = (uploadId: string) => fileService.cancelUpload(uploadId);
 export const cancelAllUploads = () => fileService.cancelAllUploads();
 

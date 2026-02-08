@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { AirbrushingForm, type AirbrushingFormHandle } from "@/components/production/airbrushing/form/airbrushing-form";
 import { IconBrush, IconCheck, IconArrowLeft } from "@tabler/icons-react";
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import type { Airbrushing } from "../../../../types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";

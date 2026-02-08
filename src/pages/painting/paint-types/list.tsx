@@ -2,7 +2,7 @@ import { PaintTypeList } from "@/components/painting/paint-type/list/paint-type-
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconPaint, IconPlus } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useMemo } from "react";

@@ -14,10 +14,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { cn } from "@/lib/utils";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
-import { useDebounce } from "@/hooks/use-debounce";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
+import { useDebounce } from "@/hooks/common/use-debounce";
 import { getItemCategories, getItemBrands, getSuppliers } from "../../../api-client";
 import type { ItemCategory, ItemBrand, Supplier } from "../../../types";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";

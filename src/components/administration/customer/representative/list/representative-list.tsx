@@ -16,11 +16,11 @@ import { RepresentativeExport } from "./representative-export";
 import { createRepresentativeColumns, DEFAULT_VISIBLE_COLUMNS } from "./representative-columns";
 import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
-import { useTableState } from "@/hooks/use-table-state";
-import { useTableFilters } from "@/hooks/use-table-filters";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useTableState } from "@/hooks/common/use-table-state";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { representativeService } from "@/services/representativeService";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/common/use-toast";
 import {
   AlertDialog,
   AlertDialogAction,

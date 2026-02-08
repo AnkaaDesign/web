@@ -12,7 +12,7 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { UserTable } from "@/components/administration/user/list/user-table";
 import { ColumnVisibilityManager } from "@/components/administration/user/list/column-visibility-manager";
 import { createUserColumns } from "@/components/administration/user/list/user-table-columns";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 
 interface RelatedUsersCardProps {
   position: Position;

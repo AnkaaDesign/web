@@ -1,4 +1,4 @@
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES } from "../../../constants";
 import { ActivityBatchCreateForm } from "@/components/inventory/activity/form/activity-batch-create-form";

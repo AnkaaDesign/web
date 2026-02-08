@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ObservationForm } from "@/components/production/observation/form";
 import { IconAlertCircle } from "@tabler/icons-react";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import type { Observation } from "../../../../types";
 
 export const ObservationEdit = () => {

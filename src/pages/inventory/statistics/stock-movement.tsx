@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { Card, CardContent } from "@/components/ui/card";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
   IconTrendingUp,
   IconTool,

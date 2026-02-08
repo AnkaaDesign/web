@@ -9,11 +9,11 @@ import { IconPaint, IconFlask, IconChevronDown, IconChevronUp, IconSelector } fr
 import type { Paint, PaintProduction } from "../../../../types";
 import { formatDate } from "../../../../utils";
 import { cn } from "@/lib/utils";
-import { useTableState } from "@/hooks/use-table-state";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useTableState } from "@/hooks/common/use-table-state";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { routes } from "../../../../constants";
 import { createPaintProductionColumns, getDefaultVisibleColumns } from "@/components/painting/production/list/paint-production-table-columns";
 import type { PaintProductionColumn } from "@/components/painting/production/list/paint-production-table-columns";

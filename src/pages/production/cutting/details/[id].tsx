@@ -24,7 +24,7 @@ import {
   ENTITY_BADGE_CONFIG,
 } from "../../../../constants";
 import { formatDate, formatRelativeTime } from "../../../../utils";
-import { usePageTracker } from "@/hooks/use-page-tracker";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
   AlertDialog,
   AlertDialogAction,

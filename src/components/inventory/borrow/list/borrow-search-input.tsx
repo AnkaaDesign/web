@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { IconSearch, IconLoader2, IconUser, IconBox } from "@tabler/icons-react";
-import { useDebounce } from "@/hooks/use-debounce";
+import { useDebounce } from "@/hooks/common/use-debounce";
 import { useItems, useUsers } from "../../../../hooks";
 import { cn } from "@/lib/utils";
 import type { Item, User } from "../../../../types";

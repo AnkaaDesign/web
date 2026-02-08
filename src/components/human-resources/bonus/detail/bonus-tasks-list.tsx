@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from "react";
 import type { Task } from "../../../../types";
-import { useTableState } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
@@ -8,7 +8,7 @@ import { BonusTasksTable } from "./bonus-tasks-table";
 import { ColumnVisibilityManager } from "@/components/production/task/history/column-visibility-manager";
 import { createTaskHistoryColumns } from "@/components/production/task/history/task-history-columns";
 import { cn } from "@/lib/utils";
-import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { IconClipboardList } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { COMMISSION_STATUS, getBadgeVariant } from "../../../../constants";
