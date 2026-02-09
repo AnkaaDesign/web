@@ -16,6 +16,7 @@ export * from "./holiday";
 export * from "./item";
 export * from "./maintenance";
 export * from "./measure";
+export * from "./message";
 export * from "./notification";
 export * from "./notification-preference";
 export * from "./observation";
@@ -71,10 +72,11 @@ export {
   type OrderItemOrderBy,
   type OrderItemWhere,
 } from "./order";
-export * from "./paint-hooks";
+export * from "./paint";
 export * from "./position";
 export * from "./preferences";
-export * from "./use-secullum";
+export * from "./representative";
+export * from "./secullum";
 export * from "./warning";
 export * from "./sector";
 export * from "./serviceOrder";
@@ -83,12 +85,12 @@ export * from "./task";
 export * from "./layout";
 export * from "./user";
 export * from "./vacation";
-export * from "./use-dashboard";
+export * from "./dashboard";
 export * from "./auth";
 export * from "./server";
-export * from "./use-bonus";
+export * from "./bonus";
 export * from "./bonusDiscount";
-export * from "./use-payroll";
+export * from "./payroll";
 // Discount exports (to avoid naming conflicts with payroll and bonusDiscount)
 export {
   discountIncludeSchema,
@@ -106,4 +108,5 @@ export {
   type DiscountOrderBy,
   type DiscountWhere,
 } from "./discount";
-export * from "./use-deployment";
+export * from "./deployment";
+export * from "./economic-activity";

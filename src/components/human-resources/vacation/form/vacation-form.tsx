@@ -48,7 +48,7 @@ export function VacationForm(props: VacationFormProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { createAsync, updateAsync } = useVacationMutations();
-  const { isSubmitting, defaultValues, mode, onDirtyChange, onFormStateChange, onCancel, onFormSubmit } = props;
+  const { isSubmitting, defaultValues, mode, onDirtyChange, onFormStateChange, onFormSubmit } = props;
 
   // Create a custom resolver based on mode
   const customResolver = useMemo(() => {

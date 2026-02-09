@@ -152,10 +152,6 @@ function calculateLaneXPosition(laneIndex: number, garageId: GarageId): number {
   return config.lanePaddingX + laneIndex * (config.laneWidth + config.laneSpacing);
 }
 
-function calculateGarageWidth(garageId: GarageId): number {
-  const config = GARAGE_CONFIGS[garageId];
-  return config.width;
-}
 
 // Calculate if a truck can fit in a lane by SWAPPING with an existing truck
 // This is used for visual preview during drag when hovering over occupied spots
@@ -284,7 +280,6 @@ function calculateAreaLayout(areaId: AreaId, trucks: GarageTruck[], patioColumns
     const laneSpacing = PATIO_CONFIG.LANE_SPACING;
     const padding = PATIO_CONFIG.PADDING;
     const truckMargin = PATIO_CONFIG.TRUCK_MARGIN;
-    const minLaneLength = PATIO_CONFIG.MIN_LANE_LENGTH;
     const truckOffset = (laneWidth - COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW) / 2;
 
     // First pass: calculate content heights per column (trucks + margins)
@@ -295,9 +290,6 @@ function calculateAreaLayout(areaId: AreaId, trucks: GarageTruck[], patioColumns
     });
 
     // Calculate actual content height (replace last spacing with bottom margin)
-    const maxContentHeight = patioTrucksList.length > 0
-      ? Math.max(...columnContentHeights) - COMMON_CONFIG.TRUCK_MIN_SPACING + truckMargin
-      : truckMargin * 2;
 
     // Apply minimum lane length (25m)
 
@@ -1051,7 +1043,6 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
         // CORRECT PATIO HEIGHT CALCULATION - calculate actual column heights!
         // Trucks are distributed across columns and stacked vertically
         const truckMargin = PATIO_CONFIG.TRUCK_MARGIN;
-        const minLaneLength = PATIO_CONFIG.MIN_LANE_LENGTH;
 
         // Calculate content height for each column
         const columnContentHeights: number[] = Array(columns).fill(truckMargin);
@@ -1512,17 +1503,12 @@ interface GarageViewProps {
 }
 
 export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, className, readOnly = false, viewMode = 'all', selectedDate }: GarageViewProps) {
-  const [currentAreaIndex, setCurrentAreaIndex] = useState(0);
-  const [activeTruck, setActiveTruck] = useState<PositionedTruck | null>(null);
-  const [_activeTruckSourceArea, setActiveTruckSourceArea] = useState<AreaId | null>(null);
-  const [dragOverEdge, setDragOverEdge] = useState<'left' | 'right' | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 400, height: 500 });
   const [movedTruckIds, setMovedTruckIds] = useState<Set<string>>(new Set());
   // Track current truck positions locally (for trucks that have been moved but not saved)
   const [localTruckPositions, setLocalTruckPositions] = useState<Map<string, string>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
   const switchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastDragYRef = useRef<number | null>(null); // Track drop Y position for snap decision
 
   // Store original trucks (before any moves) to keep non-moved trucks in place
   const [originalTrucks, setOriginalTrucks] = useState<GarageTruck[]>(trucks);
@@ -1542,8 +1528,7 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
 
   // Detect save/restore and reset tracking
   useEffect(() => {
-    const prevTrucks = prevTrucksRef.current;
-    prevTrucksRef.current = trucks;
+      prevTrucksRef.current = trucks;
 
     // If movedTruckIds is empty, just update original trucks
     if (movedTruckIds.size === 0) {
@@ -1598,534 +1583,37 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
     return () => observer.disconnect();
   }, []);
 
-  const currentAreaId = AREAS[currentAreaIndex];
-  const isPatio = currentAreaId === 'PATIO';
-
-  // Calculate patio columns based on container width (minimum 5 lanes)
-  const patioColumns = useMemo(() => {
-    const minLanes = PATIO_CONFIG.MIN_LANES;
-    if (containerSize.width < 400) return minLanes;
-    if (containerSize.width < 600) return minLanes;
-    return Math.max(minLanes, 5);
-  }, [containerSize.width]);
-
-  // Calculate ORIGINAL layout (stable positions for non-moved trucks)
-  const originalAreaLayout = useMemo(
-    () => calculateAreaLayout(currentAreaId, originalTrucks, patioColumns),
-    [currentAreaId, originalTrucks, patioColumns]
-  );
-
-  // Calculate layout with LOCAL positions applied (for moved truck positions)
-  // Must use trucksWithLocalPositions so visual positions match logical state
-  const currentAreaLayout = useMemo(
-    () => calculateAreaLayout(currentAreaId, trucksWithLocalPositions, patioColumns),
-    [currentAreaId, trucksWithLocalPositions, patioColumns]
-  );
-
   // Merge layouts: original positions for non-moved, current positions for moved
   // EXCEPTION: For patio, when trucks are added/removed, we must recalculate ALL positions
   // because patio uses dynamic column layout that depends on total truck count and sizes
 
-  // Calculate dimensions based on content
-  const garageWidth = isPatio ? 0 : calculateGarageWidth(currentAreaId as GarageId);
-  const garageHeight = isPatio ? 0 : GARAGE_CONFIGS[currentAreaId as GarageId].length;
 
-  // Calculate patio dimensions dynamically using PATIO_CONFIG
-  const patioTrucksList = trucks
-    .filter((t) => !t.spot || t.spot === 'PATIO')
-    .sort((a, b) => b.length - a.length); // Same sort as layout
-  const patioLaneWidth = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW + 0.4;
-  const patioPadding = PATIO_CONFIG.PADDING;
-  const patioLaneSpacing = PATIO_CONFIG.LANE_SPACING;
-  const patioTruckMargin = PATIO_CONFIG.TRUCK_MARGIN;
-  const patioMinLaneLength = PATIO_CONFIG.MIN_LANE_LENGTH;
-  const patioWidth = patioPadding * 2 + patioColumns * patioLaneWidth + (patioColumns - 1) * patioLaneSpacing;
 
-  // Calculate patio height with minimum lane length of 25m
-  const getPatioHeight = () => {
-    // First pass: calculate content heights per column
-    const columnContentHeights: number[] = Array(patioColumns).fill(patioTruckMargin);
-    patioTrucksList.forEach((truck, index) => {
-      const col = index % patioColumns;
-      columnContentHeights[col] += truck.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
-    });
 
-    // Calculate actual content height
-    const maxContentHeight = patioTrucksList.length > 0
-      ? Math.max(...columnContentHeights) - COMMON_CONFIG.TRUCK_MIN_SPACING + patioTruckMargin
-      : patioTruckMargin * 2;
 
-    // Apply minimum lane length (25m)
-    const actualLaneLength = Math.max(maxContentHeight, patioMinLaneLength);
-    return actualLaneLength + patioPadding * 2;
-  };
-  const patioHeight = getPatioHeight();
 
-  const contentWidth = isPatio ? patioWidth : garageWidth;
-  const contentHeight = isPatio ? patioHeight : garageHeight;
-
-  // Ruler dimensions - apply to both garage and patio
-  const rulerOffset = 35; // Space for left ruler
-  const bottomRulerOffset = 25; // Space for bottom ruler
-
-  // Calculate scale based on available container space (fill available height)
-  const availableWidth = containerSize.width - 80 - rulerOffset; // Nav buttons + ruler
-  const availableHeight = containerSize.height - 80 - bottomRulerOffset; // Header + footer + ruler
-  const scaleX = availableWidth / contentWidth;
-  const scaleY = availableHeight / contentHeight;
-  const scale = Math.min(scaleX, scaleY, 15); // Cap at scale 15 (increased)
-
-  // Offset to center the garage (not the ruler+garage group)
-  const _centeringOffset = -rulerOffset / 2;
-
-  const _sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    })
-  );
-
-  const _handleDragStart = useCallback((event: DragStartEvent) => {
-    const { active } = event;
-    const truck = active.data.current?.truck as PositionedTruck;
-    setActiveTruck(truck);
-    setActiveTruckSourceArea(currentAreaId);
-  }, [currentAreaId]);
-
-  const _handleDragCancel = useCallback(() => {
-    setActiveTruck(null);
-    setActiveTruckSourceArea(null);
-  }, []);
-
-  // Calculate lane availability for visual feedback during drag
-  const _laneAvailability = useMemo(() => {
-    if (!activeTruck || isPatio) return null;
-
-    const garageId = currentAreaId as GarageId;
-    const availability: Record<LaneId, { canFit: boolean; availableSpace: number; requiredSpace: number }> = {} as any;
-
-    // Use full truck length (including cabin) for garage space calculation
-    const truckGarageLength = activeTruck.length;
-
-    LANES.forEach(laneId => {
-      availability[laneId] = calculateLaneAvailability(
-        garageId,
-        laneId,
-        trucksWithLocalPositions,
-        truckGarageLength,
-        activeTruck.id
-      );
-    });
-
-    return availability;
-  }, [activeTruck, isPatio, currentAreaId, trucksWithLocalPositions]);
-
-  // Handle navigation WITH truck - move truck to target garage
-  const handleNavigateWithTruck = useCallback(
-    (direction: 'prev' | 'next') => {
-      if (!activeTruck || !onTruckMove) return;
-
-      const newIndex = direction === 'prev'
-        ? (currentAreaIndex > 0 ? currentAreaIndex - 1 : AREAS.length - 1)
-        : (currentAreaIndex < AREAS.length - 1 ? currentAreaIndex + 1 : 0);
-
-      const newAreaId = AREAS[newIndex];
-      const truckId = activeTruck.id;
-
-      // If navigating to PATIO, move truck to PATIO
-      if (newAreaId === 'PATIO') {
-        setMovedTruckIds(prev => new Set(prev).add(truckId));
-        onTruckMove(truckId, 'PATIO');
-        setCurrentAreaIndex(newIndex);
-        
-        return;
-      }
-
-      // If navigating to a garage, try to find an available spot
-      const targetGarageId = newAreaId as GarageId;
-
-      // Get all trucks in target garage
-      const trucksInTargetGarage = trucks.filter((t) => {
-        if (!t.spot || t.id === truckId) return false;
-        const parsed = parseSpot(t.spot);
-        return parsed.garage === targetGarageId;
-      });
-
-      // Find first available spot in target garage (V1 and V2 only - typical usage)
-      let newSpot: string | null = null;
-      for (const laneId of LANES) {
-        const trucksInLane = trucksInTargetGarage.filter((t) => {
-          const parsed = parseSpot(t.spot!);
-          return parsed.lane === laneId;
-        });
-        const occupiedSpots = new Set(trucksInLane.map((t) => parseSpot(t.spot!).spotNumber));
-
-        // Only use V1 and V2 (typical lane capacity is 2 trucks)
-        for (let spotNum = 1; spotNum <= 2; spotNum++) {
-          if (!occupiedSpots.has(spotNum)) {
-            newSpot = `${targetGarageId}_${laneId}_V${spotNum}`;
-            break;
-          }
-        }
-        if (newSpot) break;
-      }
-
-      // If no spot found, move to PATIO instead
-      if (!newSpot) {
-        newSpot = 'PATIO';
-        
-      } else {
-        
-      }
-
-      // Move the truck
-      setMovedTruckIds(prev => new Set(prev).add(truckId));
-      onTruckMove(truckId, newSpot);
-
-      // Navigate to new area
-      setCurrentAreaIndex(newIndex);
-    },
-    [activeTruck, currentAreaIndex, trucks, onTruckMove]
-  );
-
-  const _handleDragMove = useCallback((event: DragMoveEvent) => {
-    if (!containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = event.activatorEvent instanceof MouseEvent
-      ? event.activatorEvent.clientX + (event.delta?.x || 0)
-      : 0;
-    const y = event.activatorEvent instanceof MouseEvent
-      ? event.activatorEvent.clientY + (event.delta?.y || 0)
-      : 0;
-
-    // Store Y position for snap decision on drop
-    lastDragYRef.current = y - rect.top;
-
-    const edgeThreshold = 60;
-
-    if (x < rect.left + edgeThreshold) {
-      if (dragOverEdge !== 'left') {
-        setDragOverEdge('left');
-        if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current);
-        switchTimeoutRef.current = setTimeout(() => {
-          handleNavigateWithTruck('prev');
-        }, 500);
-      }
-    } else if (x > rect.right - edgeThreshold) {
-      if (dragOverEdge !== 'right') {
-        setDragOverEdge('right');
-        if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current);
-        switchTimeoutRef.current = setTimeout(() => {
-          handleNavigateWithTruck('next');
-        }, 500);
-      }
-    } else {
-      if (dragOverEdge !== null) {
-        setDragOverEdge(null);
-        if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current);
-      }
-    }
-  }, [dragOverEdge, handleNavigateWithTruck]);
-
-  const _handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      const dropY = lastDragYRef.current;
-      setActiveTruck(null);
-      setActiveTruckSourceArea(null); // Clear source area tracking
-      setDragOverEdge(null);
-      lastDragYRef.current = null;
-      if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current);
-
-      if (!over || !onTruckMove) return;
-
-      const truckId = active.id as string;
-      // Use trucksWithLocalPositions to get the CURRENT position (including unsaved moves)
-      const draggedTruck = trucksWithLocalPositions.find((t) => t.id === truckId);
-      if (!draggedTruck) return;
-
-      const dropData = over.data.current as { garageId?: GarageId; laneId?: LaneId; isPatio?: boolean } | undefined;
-
-      if (dropData?.isPatio) {
-        setMovedTruckIds(prev => new Set(prev).add(truckId));
-        setLocalTruckPositions(prev => new Map(prev).set(truckId, 'PATIO'));
-        onTruckMove(truckId, 'PATIO');
-        return;
-      }
-
-      if (!dropData?.garageId || !dropData?.laneId) return;
-
-      const targetGarageId = dropData.garageId;
-      const targetLaneId = dropData.laneId;
-      const config = GARAGE_CONFIGS[targetGarageId];
-
-      // Get dragged truck's CURRENT spot info (from local positions if moved, otherwise from original)
-      const draggedTruckParsed = draggedTruck.spot ? parseSpot(draggedTruck.spot) : null;
-      const draggedTruckCurrentSpot = draggedTruck.spot;
-
-      // Build map of spot -> truck for target lane (excluding dragged truck)
-      // Use trucksWithLocalPositions to get current positions
-      // Also build a map of truck Y positions for direct hit detection
-      const spotToTruck = new Map<number, typeof trucksWithLocalPositions[0]>();
-      const truckYPositions: Array<{ truck: typeof trucksWithLocalPositions[0]; spotNumber: number; yStart: number; yEnd: number }> = [];
-
-      trucksWithLocalPositions.forEach((t) => {
-        if (!t.spot || t.id === truckId) return;
-        const parsed = parseSpot(t.spot);
-        if (parsed.garage === targetGarageId && parsed.lane === targetLaneId && parsed.spotNumber) {
-          spotToTruck.set(parsed.spotNumber, t);
-
-          // Calculate Y position for this truck (same logic as calculateAreaLayout)
-          let yPosition: number;
-          const v1Truck = parsed.spotNumber === 1 ? t : trucksWithLocalPositions.find(tr => tr.spot && parseSpot(tr.spot).garage === targetGarageId && parseSpot(tr.spot).lane === targetLaneId && parseSpot(tr.spot).spotNumber === 1);
-          const v3Truck = trucksWithLocalPositions.find(tr => tr.spot && parseSpot(tr.spot).garage === targetGarageId && parseSpot(tr.spot).lane === targetLaneId && parseSpot(tr.spot).spotNumber === 3);
-
-          if (parsed.spotNumber === 1) {
-            yPosition = COMMON_CONFIG.TRUCK_MARGIN_TOP;
-          } else if (parsed.spotNumber === 3) {
-            yPosition = config.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - t.length;
-          } else {
-            // V2: Bottom aligned when alone, middle when V3 exists
-            if (v3Truck) {
-              const v1Bottom = v1Truck
-                ? COMMON_CONFIG.TRUCK_MARGIN_TOP + v1Truck.length + COMMON_CONFIG.TRUCK_MIN_SPACING
-                : COMMON_CONFIG.TRUCK_MARGIN_TOP;
-              const v3Top = config.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - v3Truck.length - COMMON_CONFIG.TRUCK_MIN_SPACING;
-              yPosition = v1Bottom + (v3Top - v1Bottom - t.length) / 2;
-            } else {
-              yPosition = config.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - t.length;
-            }
-          }
-
-          truckYPositions.push({
-            truck: t,
-            spotNumber: parsed.spotNumber,
-            yStart: yPosition,
-            yEnd: yPosition + t.length,
-          });
-        }
-      });
-
-      // Convert dropY from container coords to lane-relative coords
-      // dropY is relative to container top, we need it relative to lane top
-      // Lane starts at: (header ~40px) + (padding/2 + rulerOffset ~55px) + (config.paddingTop * scale)
-      const headerOffset = 40; // Approximate header height
-      const svgOffset = 20 + rulerOffset + 5; // translate(20 + rulerOffset, 5)
-      const laneTopInContainer = headerOffset + svgOffset + (config.paddingTop * scale);
-      const laneRelativeDropY = dropY !== null ? (dropY - laneTopInContainer) / scale : null;
-
-      // PRIORITY 1: Check for direct hit on any truck in the lane
-      // If dropping directly on a truck, swap with that specific truck regardless of snap preference
-      let directHitTruck: { truck: typeof trucks[0]; spotNumber: number } | null = null;
-      const TOLERANCE = 0.5; // meters tolerance for hit detection
-
-      if (laneRelativeDropY !== null) {
-        for (const tp of truckYPositions) {
-          if (laneRelativeDropY >= tp.yStart - TOLERANCE && laneRelativeDropY <= tp.yEnd + TOLERANCE) {
-            directHitTruck = { truck: tp.truck, spotNumber: tp.spotNumber };
-            break;
-          }
-        }
-      }
-
-      // If direct hit on another truck, swap with that truck
-      if (directHitTruck) {
-        const targetTruckSpot = directHitTruck.truck.spot!;
-        const swapTargetSpot = draggedTruckCurrentSpot && draggedTruckCurrentSpot !== 'PATIO'
-          ? draggedTruckCurrentSpot
-          : 'PATIO';
-
-        // Don't swap if it's the same truck (shouldn't happen but safety check)
-        if (directHitTruck.truck.id === truckId) return;
-
-        // Validate the swap: Check if dragged truck fits in target lane after swap
-        // Exclude both trucks from the lane and check if draggedTruck fits
-        const trucksInTargetLane = trucksWithLocalPositions.filter(t => {
-          if (t.id === truckId || t.id === directHitTruck!.truck.id) return false;
-          if (!t.spot || t.spot === 'PATIO') return false;
-          const parsed = parseSpot(t.spot);
-          return parsed.garage === targetGarageId && parsed.lane === targetLaneId;
-        });
-
-        const currentTruckLengths = trucksInTargetLane.reduce((sum, truck) => {
-          return sum + truck.length;
-        }, 0);
-        const draggedTruckGarageLength = draggedTruck.length;
-        const newTotalTruckLengths = currentTruckLengths + draggedTruckGarageLength;
-        const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP;
-        const newTruckCount = trucksInTargetLane.length + 1;
-
-        // Use correct gap logic: 0 for 1-2 trucks, 2m for 3 trucks
-        let gapsBetweenTrucks = 0;
-        if (newTruckCount === 3) {
-          gapsBetweenTrucks = 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
-        }
-
-        const totalRequiredSpace = margins + newTotalTruckLengths + gapsBetweenTrucks;
-        const canFitInTargetLane = totalRequiredSpace <= config.laneLength && trucksInTargetLane.length < 3;
-
-        if (!canFitInTargetLane) {
-          
-          return;
-        }
-
-        // Swap is valid - proceed
-        setMovedTruckIds(prev => {
-          const next = new Set(prev);
-          next.add(truckId);
-          next.add(directHitTruck!.truck.id);
-          return next;
-        });
-
-        // Track local positions for both trucks
-        setLocalTruckPositions(prev => {
-          const next = new Map(prev);
-          next.set(truckId, targetTruckSpot);
-          next.set(directHitTruck!.truck.id, swapTargetSpot);
-          return next;
-        });
-
-        if (onTruckSwap) {
-          onTruckSwap(truckId, targetTruckSpot, directHitTruck.truck.id, swapTargetSpot);
-        } else {
-          onTruckMove(truckId, targetTruckSpot);
-          onTruckMove(directHitTruck.truck.id, swapTargetSpot);
-        }
-        return;
-      }
-
-      // PRIORITY 2: No direct hit - use snap-to-lane logic based on lane position
-      // Use lane-relative coordinates for proper top/bottom detection
-      const laneLength = config.laneLength;
-      const isDroppedInTopHalf = laneRelativeDropY !== null && laneRelativeDropY < laneLength / 2;
-      const preferredSpotNum = isDroppedInTopHalf ? 1 : 2;
-
-      // Check if dragged truck is already in the target lane at the preferred spot
-      const isAlreadyAtPreferredSpot =
-        draggedTruckParsed?.garage === targetGarageId &&
-        draggedTruckParsed?.lane === targetLaneId &&
-        draggedTruckParsed?.spotNumber === preferredSpotNum;
-
-      if (isAlreadyAtPreferredSpot) {
-        // Truck is being dropped at its own position - no change needed
-        return;
-      }
-
-      // Check if preferred spot is occupied by another truck
-      const truckAtPreferredSpot = spotToTruck.get(preferredSpotNum);
-
-      if (truckAtPreferredSpot) {
-        // SWAP: Preferred spot is occupied - validate if swap would work
-        const newSpotForDragged = `${targetGarageId}_${targetLaneId}_V${preferredSpotNum}`;
-        const swapTargetSpot = draggedTruckCurrentSpot && draggedTruckCurrentSpot !== 'PATIO'
-          ? draggedTruckCurrentSpot
-          : 'PATIO';
-
-        // Validate the swap: Check if dragged truck fits in target lane after swap
-        // The swap removes truckAtPreferredSpot and adds draggedTruck
-        // We need to check if the lane can accommodate this
-        const _availability = calculateLaneAvailability(
-          targetGarageId,
-          targetLaneId,
-          trucksWithLocalPositions,
-          draggedTruck.length,
-          truckId // Exclude dragged truck from current count
-        );
-
-        // For swap, we also need to exclude the truck being swapped out
-        // Recalculate considering both trucks are removed, then draggedTruck is added
-        const trucksInTargetLane = trucksWithLocalPositions.filter(t => {
-          if (t.id === truckId || t.id === truckAtPreferredSpot.id) return false;
-          if (!t.spot || t.spot === 'PATIO') return false;
-          const parsed = parseSpot(t.spot);
-          return parsed.garage === targetGarageId && parsed.lane === targetLaneId;
-        });
-
-        const currentTruckLengths = trucksInTargetLane.reduce((sum, truck) => {
-          return sum + truck.length;
-        }, 0);
-        const draggedTruckGarageLength = draggedTruck.length;
-        const newTotalTruckLengths = currentTruckLengths + draggedTruckGarageLength;
-        const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP;
-        const newTruckCount = trucksInTargetLane.length + 1;
-
-        // Use correct gap logic: 0 for 1-2 trucks, 2m for 3 trucks
-        let gapsBetweenTrucks = 0;
-        if (newTruckCount === 3) {
-          gapsBetweenTrucks = 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
-        }
-
-        const totalRequiredSpace = margins + newTotalTruckLengths + gapsBetweenTrucks;
-        const canFitInTargetLane = totalRequiredSpace <= config.laneLength && trucksInTargetLane.length < 3;
-
-        if (!canFitInTargetLane) {
-          
-          return;
-        }
-
-        // Swap is valid - proceed
-        setMovedTruckIds(prev => {
-          const next = new Set(prev);
-          next.add(truckId);
-          next.add(truckAtPreferredSpot.id);
-          return next;
-        });
-
-        // Track local positions for both trucks
-        setLocalTruckPositions(prev => {
-          const next = new Map(prev);
-          next.set(truckId, newSpotForDragged);
-          next.set(truckAtPreferredSpot.id, swapTargetSpot);
-          return next;
-        });
-
-        if (onTruckSwap) {
-          onTruckSwap(truckId, newSpotForDragged, truckAtPreferredSpot.id, swapTargetSpot);
-        } else {
-          onTruckMove(truckId, newSpotForDragged);
-          onTruckMove(truckAtPreferredSpot.id, swapTargetSpot);
-        }
-        return;
-      }
-
-      // Preferred spot is empty - check if truck fits before moving
-      // Calculate if the truck actually fits in this lane
-      const draggedTruckGarageLength = draggedTruck.length;
-      const availability = calculateLaneAvailability(
-        targetGarageId,
-        targetLaneId,
-        trucksWithLocalPositions,
-        draggedTruckGarageLength,
-        truckId
-      );
-
-      if (!availability.canFit) {
-        // Truck doesn't fit - reject the drop (do nothing, truck stays in original position)
-        
-        return;
-      }
-
-      // Truck fits - move there
-      const newSpot = `${targetGarageId}_${targetLaneId}_V${preferredSpotNum}`;
-      setMovedTruckIds(prev => new Set(prev).add(truckId));
-      setLocalTruckPositions(prev => new Map(prev).set(truckId, newSpot));
-      onTruckMove(truckId, newSpot);
-    },
-    [trucksWithLocalPositions, onTruckMove, onTruckSwap, scale, rulerOffset]
-  );
+  // Calculate lane availability for visual feedback during drag (unused - keeping for future feature)
+  // const _laneAvailability = useMemo(() => {
+  //   if (!activeTruck || isPatio) return null;
+  //   const garageId = currentAreaId as GarageId;
+  //   const availability: Record<LaneId, { canFit: boolean; availableSpace: number; requiredSpace: number }> = {} as any;
+  //   const truckGarageLength = activeTruck.length;
+  //   LANES.forEach(laneId => {
+  //     availability[laneId] = calculateLaneAvailability(
+  //       garageId,
+  //       laneId,
+  //       trucksWithLocalPositions,
+  //       truckGarageLength,
+  //       activeTruck.id
+  //     );
+  //   });
+  //   return availability;
+  // }, [activeTruck, isPatio, currentAreaId, trucksWithLocalPositions]);
 
   useEffect(() => {
     return () => {
       if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current);
     };
-  }, []);
-
-  const _handlePrevArea = useCallback(() => {
-    setCurrentAreaIndex((prev) => (prev > 0 ? prev - 1 : AREAS.length - 1));
-  }, []);
-
-  const _handleNextArea = useCallback(() => {
-    setCurrentAreaIndex((prev) => (prev < AREAS.length - 1 ? prev + 1 : 0));
   }, []);
 
   // Display logic is handled by the parent component (barracoes/index.tsx):

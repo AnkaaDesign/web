@@ -179,3 +179,6 @@ export interface FileMultipleUploadResponse extends BaseCreateResponse<File[]> {
 export interface FileBatchCreateResponse<T> extends BaseBatchResponse<File, T> {}
 export interface FileBatchUpdateResponse<T> extends BaseBatchResponse<File, T & { id: string }> {}
 export interface FileBatchDeleteResponse extends BaseBatchResponse<{ id: string; deleted: boolean }, { id: string }> {}
+
+// Re-export FileWithPreview from components (used for file upload previews)
+export type { FileWithPreview } from "../components/common/file";

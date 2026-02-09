@@ -57,3 +57,53 @@ export interface MessageBatchUpdateFormData {
   ids: string[];
   data: MessageUpdateFormData;
 }
+
+export interface MessageBatchCreateFormData {
+  messages: MessageCreateFormData[];
+}
+
+// ViewedMessage schemas
+export interface ViewedMessageGetManyFormData {
+  page?: number;
+  limit?: number;
+  take?: number;
+  skip?: number;
+  where?: any;
+  userIds?: string[];
+  messageIds?: string[];
+}
+
+export interface ViewedMessageGetByIdFormData {
+  id: string;
+  include?: any;
+}
+
+export interface ViewedMessageCreateFormData {
+  messageId: string;
+  userId: string;
+  dismissed?: boolean;
+}
+
+export interface ViewedMessageUpdateFormData {
+  dismissed?: boolean;
+  dismissedAt?: Date | string;
+}
+
+export interface ViewedMessageQueryFormData {
+  include?: any;
+}
+
+export interface ViewedMessageBatchCreateFormData {
+  viewedMessages: ViewedMessageCreateFormData[];
+}
+
+export interface ViewedMessageBatchUpdateFormData {
+  viewedMessages: {
+    id: string;
+    data: ViewedMessageUpdateFormData;
+  }[];
+}
+
+export interface ViewedMessageBatchDeleteFormData {
+  viewedMessageIds: string[];
+}

@@ -26,9 +26,11 @@ export {
 } from "./use-bonus";
 export type {
   BonusCalculationResult,
+} from "./use-bonus";
+export type {
   BonusPayrollParams,
   PayrollData,
   BonusDiscountCreateFormData,
-} from "./use-bonus";
+} from "../../api-client";
 export * from "./use-payroll";
 export * from "./use-team-staff";

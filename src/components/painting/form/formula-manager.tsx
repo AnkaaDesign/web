@@ -77,40 +77,6 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
     return () => subscription.unsubscribe();
   }, [form.watch, formulas, onFormulasChange]);
 
-  // Calculate formula validation status
-  const _validationStatus = React.useMemo(() => {
-    const currentFormula = formulas[0];
-    if (!currentFormula) return { isValid: false, errors: [], warnings: [] };
-
-    const errors: string[] = [];
-    const warnings: string[] = [];
-
-    // Check if description is provided
-    if (!currentFormula.description || currentFormula.description.trim() === "") {
-      errors.push("Descrição da fórmula é obrigatória");
-    }
-
-    // Check components
-    const validComponents = currentFormula.components?.filter((c) => c.itemId && c.ratio > 0) || [];
-
-    if (validComponents.length > 0) {
-      // Check for duplicate items
-      const itemIds = validComponents.map((c) => c.itemId);
-      const uniqueItemIds = new Set(itemIds);
-      if (itemIds.length !== uniqueItemIds.size) {
-        errors.push("Existem componentes duplicados na fórmula");
-      }
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      warnings,
-      componentCount: validComponents.length,
-      totalRatio: validComponents.reduce((sum, c) => sum + c.ratio, 0),
-    };
-  }, [formulas]);
-
   return (
     <FormProvider {...form}>
       <div className="space-y-6">

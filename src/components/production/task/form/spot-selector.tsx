@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Combobox } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
-import {
-  getGaragesAvailability,
-} from '../../../../api-client/truck';
+// TODO: Truck API client module doesn't exist - needs to be implemented
+// import {
+//   getGaragesAvailability,
+// } from '../../../../api-client/truck';
 import { TRUCK_SPOT } from '../../../../constants';
 
 type GarageId = 'B1' | 'B2' | 'B3';

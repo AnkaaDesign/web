@@ -13,7 +13,7 @@ import type { Task, TaskIncludes } from "./task";
 import type { Activity, ActivityIncludes } from "./activity";
 import type { Borrow, BorrowIncludes } from "./borrow";
 import type { ChangeLog, ChangeLogIncludes } from "./changelog";
-import type { Bonus, BonusIncludes } from "./use-bonus";
+import type { Bonus, BonusIncludes } from "./bonus";
 import type { File } from "./file";
 
 // =====================

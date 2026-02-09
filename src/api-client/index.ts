@@ -60,7 +60,7 @@ export type {
 export * from "./notify";
 export * from "./observation";
 export * from "./order";
-export * from "./paint-hooks";
+export * from "./paint";
 export * from "./position";
 export * from "./preferences";
 export * from "./profile";
@@ -70,13 +70,14 @@ export * from "./serviceOrder";
 export * from "./supplier";
 export * from "./task";
 export * from "./throttler";
-export * from "./truck";
+// export * from "./truck"; // Module doesn't exist - truck types/schemas exist in src/types/ and src/schemas/
 export * from "./layout";
 export * from "./services/layoutSection";
 export * from "./services/team-staff";
 export * from "./user";
 export * from "./vacation";
-export * from "./use-dashboard";
+export * from "./dashboard";
+export * from "./economic-activity";
 export * from "./server";
 export * from "./services/bonus";
 export { payrollService } from "./services/payroll";

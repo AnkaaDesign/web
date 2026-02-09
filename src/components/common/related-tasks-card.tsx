@@ -9,11 +9,6 @@ import { StandardizedTable, type StandardizedColumn } from "@/components/ui/stan
 import {
   IconChecklist,
   IconAlertCircle,
-  IconCircleCheckFilled,
-  IconClock,
-  IconPlayerPause,
-  IconX,
-  IconHourglass,
   IconUser,
   IconCalendar,
   IconSearch,

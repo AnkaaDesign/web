@@ -23,21 +23,12 @@ import {
   IconFileDescription,
   IconPhoto,
   IconArchive,
-  IconFileZip,
   IconFolders,
   IconFiles,
   IconArrowRight,
   IconChevronRight,
-  IconFile,
   IconList,
   IconLayoutGrid,
-  IconFileTypePdf,
-  IconFileTypeDoc,
-  IconFileTypeXls,
-  IconFileTypePpt,
-  IconFileMusic,
-  IconVideo,
-  IconFileCode,
 } from "@tabler/icons-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -374,17 +365,6 @@ export function ServerSharedFoldersPage() {
   };
 
   // Helper functions for file type detection
-  const getFileExtension = (filename: string): string => {
-    const parts = filename.split(".");
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : "";
-  };
-
-  const isImageFile = (filename: string): boolean => {
-    const imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "ico", "tiff", "tif"];
-    return imageExtensions.includes(getFileExtension(filename));
-  };
-
-
   const getBreadcrumbs = () => {
     const breadcrumbs = [
       {

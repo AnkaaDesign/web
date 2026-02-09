@@ -58,7 +58,6 @@ export function FileList({ className }: FileListProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [filesToDelete, setFilesToDelete] = useState<File[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
-  const _filters = filters;
 
   // Get table state for selected items functionality
   const { selectionCount, showSelectedOnly, toggleShowSelectedOnly } = useTableState({
@@ -107,7 +106,7 @@ export function FileList({ className }: FileListProps) {
     return filters;
   };
 
-  const [filters, setFilters] = useState<Partial<FileGetManyFormData>>(() => {
+  const [filters] = useState<Partial<FileGetManyFormData>>(() => {
     return getFiltersFromUrl();
   });
 

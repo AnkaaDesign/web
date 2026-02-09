@@ -31,6 +31,13 @@ export function toNumber(value: DecimalValue | null | undefined): number {
 // Base Response Types
 // =====================
 
+export interface BaseResponse<T = unknown> {
+  success: boolean;
+  message: string;
+  data?: T;
+  error?: string;
+}
+
 export interface BaseGetUniqueResponse<T> {
   success: boolean;
   message: string;

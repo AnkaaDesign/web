@@ -120,7 +120,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     unreadCount,
     isLoading,
     isLoadingMore,
-    _isConnected,
     markAsRead,
     markAllAsRead,
     dismissNotification,

@@ -177,12 +177,6 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
 
-    // Update discount orders
-    const _updatedDiscounts = items.map((discount, index) => ({
-      ...discount,
-      calculationOrder: index + 1
-    }));
-
     // Optimistically update UI and persist changes
     // This would require backend support for reordering
     // TODO: Implement backend endpoint for reordering

@@ -174,8 +174,8 @@ const BackupManagementPage = () => {
 
   // Fetch backups data (only when authenticated)
   const { data: backupsData, isLoading, refetch: refetchBackups } = useBackups(undefined, isAuthenticated);
-  const { data: scheduledBackupsData, refetch: refetchScheduled } = useScheduledBackups(isAuthenticated);
-  const { data: systemHealth, refetch: refetchHealth } = useBackupSystemHealthSummary(isAuthenticated);
+  const { data: scheduledBackupsData } = useScheduledBackups(isAuthenticated);
+  const { data: systemHealth } = useBackupSystemHealthSummary(isAuthenticated);
 
   // Mutations
   const mutations = useBackupMutations();

@@ -392,34 +392,6 @@ export function NotificationPreferencesPage() {
   );
 
   // =====================
-  // Handle Reset
-  // =====================
-
-  const _handleResetPreference = useCallback(
-    async (configKey: string) => {
-      setSavingKeys((prev) => new Set(prev).add(configKey));
-      try {
-        const response = await notificationUserPreferenceService.resetPreference(configKey);
-        if (response.data?.success) {
-          // Reload configurations to get updated defaults
-          await loadConfigurations();
-          toast.success("Preferência restaurada para o padrão");
-        } else {
-          toast.error(response.data?.message || "Erro ao restaurar preferência");
-        }
-      } catch (error: any) {
-        console.error("[NotificationPreferences] Error resetting:", error);
-        toast.error(error?.response?.data?.message || "Erro ao restaurar preferência");
-      } finally {
-        setSavingKeys((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(configKey);
-          return newSet;
-        });
-      }
-    },
-    [loadConfigurations]
-  );
 
   // =====================
   // Computed Values

@@ -33,7 +33,6 @@ import {
   TimePeriodSelector,
   type Activity,
   type AnalysisData,
-  type PatternData,
 } from "@/components/dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";

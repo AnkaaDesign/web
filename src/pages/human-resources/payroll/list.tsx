@@ -209,32 +209,6 @@ interface PayrollRow {
 }
 
 // Helper functions for payroll period logic
-function isAfterDay26(year: number, month: number): boolean {
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth() + 1;
-  const currentDay = today.getDate();
-
-  // If it's a future period, bonuses are not yet available
-  if (year > currentYear || (year === currentYear && month > currentMonth)) {
-    return false;
-  }
-
-  // If it's a past period, bonuses should be confirmed
-  if (year < currentYear || (year === currentYear && month < currentMonth)) {
-    return true;
-  }
-
-  // For current period, check if we're after day 26
-  return currentDay > 26;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(value);
-}
 
 // PayrollTableComponent - Simple table for displaying payroll data
 interface PayrollTableComponentProps {

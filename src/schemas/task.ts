@@ -1525,3 +1525,13 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   paintIds: task.logoPaints?.map((paint) => paint.id),
   // Complex relations need to be handled separately
 }));
+
+
+// =====================
+// Task Copy Request
+// =====================
+
+export interface TaskCopyRequest {
+  sourceTaskId: string;
+  fields: string[];
+}

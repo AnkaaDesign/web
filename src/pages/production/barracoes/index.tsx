@@ -6,7 +6,8 @@ import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, TASK_STATUS } from '@/consta
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { usePrivileges } from '@/hooks/common/use-privileges';
 import { useTasks } from '@/hooks/production/use-task';
-import { truckService } from '@/api-client';
+// TODO: Truck API client module doesn't exist - needs to be implemented
+// import { truckService } from '@/api-client';
 import { GarageView, TruckDetailModal } from '@/components/production/garage';
 import type { GarageTruck } from '@/components/production/garage';
 import { IconDeviceFloppy, IconRestore } from '@tabler/icons-react';

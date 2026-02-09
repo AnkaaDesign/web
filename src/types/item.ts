@@ -547,3 +547,6 @@ export interface AnalyzeReorderPointsResponse {
     };
   }>;
 }
+
+// Re-export schema types that are commonly used with Item types
+export type { ItemGetManyFormData } from "../schemas/item";

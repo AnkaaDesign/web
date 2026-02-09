@@ -3,7 +3,7 @@ export * from "./airbrushing";
 export * from "./analyticsEnumGetters";
 export * from "./auth";
 export * from "./batch-toast";
-export * from "./use-bonus";
+export * from "./bonus";
 export * from "./borrow";
 export * from "./changelog";
 export * from "./changelog-fields";
@@ -57,7 +57,6 @@ export * from "./number";
 export * from "./observation";
 export * from "./order";
 export * from "./page-tracker";
-export * from "./paint-hooks";
 export * from "./position";
 export * from "./privilege";
 export * from "./warning";
@@ -78,6 +77,9 @@ export * from "./vacation";
 export * from "./verification-code";
 export * from "./verification-errors";
 export * from "./work";
+// Re-export dashboard and chart types used by utility components
+export type { ExportFormat, ExportOptions } from "../types/dashboard";
+export type { ExportConfig, ChartExportData } from "./types";
 // file-viewer-utils: exclude duplicates (formatFileSize, getFileExtension, getApiBaseUrl, isImageFile, isVideoFile, isDocumentFile, getFileTypeInfo)
 export {
   FileTypeEnum,

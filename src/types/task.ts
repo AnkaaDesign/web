@@ -6,8 +6,11 @@ import type { Sector, SectorIncludes, SectorOrderBy } from "./sector";
 import type { Customer, CustomerIncludes, CustomerOrderBy } from "./customer";
 import type { File, FileIncludes } from "./file";
 import type { Observation, ObservationIncludes } from "./observation";
-import type { Paint, PaintIncludes, PaintOrderBy } from "./paint-hooks";
+import type { Paint, PaintIncludes, PaintOrderBy } from "./paint";
 import type { User, UserIncludes, UserOrderBy } from "./user";
+
+// Re-export Commission as alias for COMMISSION_STATUS for compatibility
+export type { COMMISSION_STATUS as Commission } from "../constants";
 import type { ServiceOrder, ServiceOrderIncludes } from "./serviceOrder";
 import type { Airbrushing, AirbrushingIncludes } from "./airbrushing";
 import type { Cut, CutIncludes } from "./cut";

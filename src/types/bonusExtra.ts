@@ -1,7 +1,7 @@
 // packages/types/src/bonusExtra.ts
 
 import type { BaseEntity, DecimalValue } from "./common";
-import type { Bonus, BonusIncludes } from "./use-bonus";
+import type { Bonus, BonusIncludes } from "./bonus";
 
 // =====================
 // Main Entity Interface

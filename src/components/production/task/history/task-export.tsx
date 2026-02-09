@@ -2,7 +2,7 @@ import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/compo
 import { toast } from "@/components/ui/sonner";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { formatCurrency, formatDate, formatDateTime, getDurationBetweenDates } from "../../../../utils";
+import { formatDate, formatDateTime, getDurationBetweenDates } from "../../../../utils";
 import { TASK_STATUS, TASK_STATUS_LABELS, COMMISSION_STATUS_LABELS, COMMISSION_STATUS } from "../../../../constants";
 import { taskService } from "../../../../api-client";
 

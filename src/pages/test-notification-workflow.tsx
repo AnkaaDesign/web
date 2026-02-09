@@ -6,8 +6,8 @@ import { Bell, Settings, Users, TestTube, ArrowRight } from 'lucide-react';
 
 // Import the three pages we created
 import CreateNotificationConfiguration from './admin/notification-configuration/create';
-import EnhancedNotificationPreferences from './profile/enhanced-notification-preferences';
-import NotificationTestingDashboard from './admin/notification-testing-dashboard';
+import { NotificationPreferencesPage } from './profile/notification-preferences';
+// import NotificationTestingDashboard from './admin/notification-testing-dashboard'; // File doesn't exist
 
 export default function TestNotificationWorkflow() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -244,11 +244,14 @@ export default function TestNotificationWorkflow() {
         </TabsContent>
 
         <TabsContent value="preferences" className="mt-0">
-          <EnhancedNotificationPreferences />
+          <NotificationPreferencesPage />
         </TabsContent>
 
         <TabsContent value="testing" className="mt-0">
-          <NotificationTestingDashboard />
+          {/* <NotificationTestingDashboard /> */}
+          <div className="container mx-auto py-8">
+            <p>Testing dashboard component not yet implemented</p>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
