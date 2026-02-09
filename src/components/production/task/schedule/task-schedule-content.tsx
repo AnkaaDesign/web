@@ -1,6 +1,6 @@
-import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSectors, useTasks, useCurrentUser, useTaskBatchMutations, taskKeys } from "../../../../hooks";
+import { useSectors, useTasks, useCurrentUser, taskKeys } from "../../../../hooks";
 import { SECTOR_PRIVILEGES, TASK_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
@@ -61,8 +61,6 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   const { data: currentUser } = useCurrentUser();
 
   // Batch mutations for copy operation
-  const { batchUpdateAsync } = useTaskBatchMutations();
-
   // Check if user can export (Admin or Financial only)
   const canExport = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL));
 

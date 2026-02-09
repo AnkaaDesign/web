@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback, MouseEvent } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import type { MouseEvent } from "react";
 import { IconSearch, IconFilter, IconChevronUp, IconChevronDown, IconRefresh, IconSelector } from "@tabler/icons-react";
 import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
 import { Button } from "@/components/ui/button";

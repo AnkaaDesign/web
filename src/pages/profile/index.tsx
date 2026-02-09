@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, Camera, Trash2, User as UserIcon, Mail, Phone, MapPin, Briefcase, Save, RefreshCw, Ruler, Bell } from "lucide-react";
+import { Loader2, Camera, Trash2, User as UserIcon, MapPin, Save, RefreshCw, Ruler, Bell } from "lucide-react";
 import { getProfile, updateProfile, uploadPhoto, deletePhoto } from "@/api-client";
 import type { User } from "@/types";
 import type { UserUpdateFormData } from "@/schemas";

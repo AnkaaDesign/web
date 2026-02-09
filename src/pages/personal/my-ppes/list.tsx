@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { getMyPpeDeliveries } from "@/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/common/use-debounce";
-import type { PpeDelivery } from "@/types";
 import type { PpeDeliveryGetManyFormData } from "@/schemas";
 import { PPE_DELIVERY_STATUS, PPE_DELIVERY_STATUS_LABELS, routes } from "@/constants";
 import { formatDateTime } from "@/utils";
@@ -132,7 +131,7 @@ export const MyPpesPage = () => {
   });
 
   const deliveries = deliveriesData?.data || [];
-  const totalRecords = deliveriesData?.meta?.total || 0;
+  const totalRecords = deliveriesData?.meta?.totalRecords || 0;
   const totalPages = Math.ceil(totalRecords / pageSize);
 
   // Status badge helper

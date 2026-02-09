@@ -1,8 +1,7 @@
 import { useMemo, useCallback } from "react";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
-import { USER_STATUS } from "../../../../constants";
 import type { User } from "../../../../types";
 import { getUsers } from "../../../../api-client";
 
@@ -13,7 +12,7 @@ interface UserSelectorProps {
   initialUser?: User;
 }
 
-export function BorrowUserSelector({ control, disabled, selectedUserId, initialUser }: UserSelectorProps) {
+export function BorrowUserSelector({ control, disabled, selectedUserId: _selectedUserId, initialUser }: UserSelectorProps) {
   // Memoize initialOptions with stable dependency
   const initialOptions = useMemo(() => {
     if (!initialUser) return [];
@@ -67,7 +66,7 @@ export function BorrowUserSelector({ control, disabled, selectedUserId, initialU
     });
 
     const users = response.data || [];
-    const total = response.total || 0;
+    const total = response.meta?.totalRecords || 0;
     const hasMore = (page * pageSize) < total;
 
     return {

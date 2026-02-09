@@ -234,7 +234,7 @@ export function getPricingItemsToAddFromServiceOrders(
 export function getServiceOrdersToAddFromPricingItems(
   pricingItems: SyncPricingItem[],
   existingServiceOrders: SyncServiceOrder[],
-  historicalDescriptions: string[] = [],
+  _historicalDescriptions: string[] = [],
 ): SyncServiceOrder[] {
   const ordersToAdd: SyncServiceOrder[] = [];
 

@@ -46,7 +46,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
   (
     {
       url,
-      filename,
+      filename: _filename,
       onLoadSuccess,
       onLoadError,
       onDownload,

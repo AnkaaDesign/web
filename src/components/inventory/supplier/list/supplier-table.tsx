@@ -33,9 +33,9 @@ interface SupplierTableProps {
 
 export function SupplierTable({ visibleColumns, className, onEdit, onDelete, filters = {}, onDataChange }: SupplierTableProps) {
   const navigate = useNavigate();
-  const { user, isLoading: isAuthLoading } = useAuth();
-  const { delete: deleteSupplier } = useSupplierMutations();
-  const { delete: batchDelete } = useSupplierBatchMutations();
+  const { user, isLoading: _isAuthLoading } = useAuth();
+  const { delete: _deleteSupplier } = useSupplierMutations();
+  const { delete: _batchDelete } = useSupplierBatchMutations();
 
   // Permission checks
   const canEdit = user ? canEditSuppliers(user) : false;
@@ -54,7 +54,7 @@ export function SupplierTable({ visibleColumns, className, onEdit, onDelete, fil
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,
@@ -64,7 +64,7 @@ export function SupplierTable({ visibleColumns, className, onEdit, onDelete, fil
     isPartiallySelected,
     selectionCount,
     resetSelection: _resetSelection,
-    removeFromSelection,
+    removeFromSelection: _removeFromSelection,
     handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,

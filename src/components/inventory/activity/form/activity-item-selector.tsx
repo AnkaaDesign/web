@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback, MouseEvent } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import type { MouseEvent } from "react";
 import { IconSearch, IconFilter, IconChevronUp, IconChevronDown, IconRefresh, IconSelector } from "@tabler/icons-react";
 import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
 import { Button } from "@/components/ui/button";
@@ -452,8 +453,6 @@ export const ActivityItemSelector = ({
   // Handle row selection with shift+click support
   const handleRowSelection = useCallback(
     (item: typeof items[0], event?: MouseEvent) => {
-      const itemIsSelected = selectedItems.has(item.id);
-
       // Shift+click: select range of items
       if (event?.shiftKey && lastClickedIdRef.current) {
         const lastIndex = currentPageItemIds.indexOf(lastClickedIdRef.current);

@@ -1,5 +1,5 @@
 import { formatCPF, formatBrazilianPhone, formatDate, formatDateTime } from "../../../../utils";
-import { USER_STATUS_LABELS, SHIRT_SIZE_LABELS, PANTS_SIZE_LABELS, BOOT_SIZE_LABELS, SLEEVES_SIZE_LABELS, MASK_SIZE_LABELS, GLOVES_SIZE_LABELS, RAIN_BOOTS_SIZE_LABELS } from "../../../../constants";
+import { SHIRT_SIZE_LABELS, PANTS_SIZE_LABELS, BOOT_SIZE_LABELS, SLEEVES_SIZE_LABELS, MASK_SIZE_LABELS, GLOVES_SIZE_LABELS, RAIN_BOOTS_SIZE_LABELS } from "../../../../constants";
 import { getUserStatusBadgeText } from "../../../../utils/user";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import type { User } from "../../../../types";

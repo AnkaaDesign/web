@@ -7,7 +7,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconArrowRight, IconCheck, IconLoader2, IconUsers, IconInfoCircle } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
 import type { User } from "@types";
 
 interface ConflictField {
@@ -35,7 +34,6 @@ interface UserMergeDialogProps {
 export function UserMergeDialog({ open, onOpenChange, users, onMerge }: UserMergeDialogProps) {
   const [targetUserId, setTargetUserId] = useState<string>("");
   const [resolutions, setResolutions] = useState<Map<string, MergeResolution>>(new Map());
-  const [customValues, setCustomValues] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
 
   // Detect conflicts between users
@@ -171,10 +169,6 @@ export function UserMergeDialog({ open, onOpenChange, users, onMerge }: UserMerg
 
   const handleResolutionChange = (field: string, resolution: MergeResolution) => {
     setResolutions(new Map(resolutions.set(field, resolution)));
-  };
-
-  const handleCustomValueChange = (field: string, value: string) => {
-    setCustomValues(new Map(customValues.set(field, value)));
   };
 
   const handleMerge = async () => {

@@ -178,7 +178,7 @@ export const createBonusSimulationColumns = (): BonusSimulationColumn[] => [
     header: "CARGO",
     accessor: (
       user: BonusSimulationRow,
-      averageTasksPerUser: number,
+      _averageTasksPerUser: number,
       positions: Position[],
       onUpdate: (userId: string, field: string, value: any) => void
     ) => {
@@ -223,8 +223,8 @@ export const createBonusSimulationColumns = (): BonusSimulationColumn[] => [
     header: "PERFORMANCE",
     accessor: (
       user: BonusSimulationRow,
-      averageTasksPerUser: number,
-      positions: Position[],
+      _averageTasksPerUser: number,
+      _positions: Position[],
       onUpdate: (userId: string, field: string, value: any) => void
     ) => {
       const currentLevel = user.simulatedPerformanceLevel || user.performanceLevel || 1;

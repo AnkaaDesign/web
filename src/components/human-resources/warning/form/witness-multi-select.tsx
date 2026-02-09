@@ -1,10 +1,8 @@
 import { useMemo, useCallback, useRef } from "react";
 import { IconUsers } from "@tabler/icons-react";
 
-import type { WarningCreateFormData, WarningUpdateFormData } from "../../../../schemas";
 import type { User } from "../../../../types";
 import { userService } from "../../../../api-client";
-import { USER_STATUS } from "../../../../constants";
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";

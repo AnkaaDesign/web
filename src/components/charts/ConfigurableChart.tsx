@@ -6,7 +6,7 @@
  */
 
 import * as React from 'react';
-import { ChartConfiguration } from '@/lib/charts/chart-config';
+import type { ChartConfiguration } from '@/lib/charts/chart-config';
 import { ChartContainer } from './ChartContainer';
 import { ChartFilters } from './ChartFilters';
 import { LineChart } from './LineChart';

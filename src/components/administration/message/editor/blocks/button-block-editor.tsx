@@ -32,7 +32,7 @@ export const ButtonBlockEditor = ({ block, onUpdate }: ButtonBlockEditorProps) =
         <Label className="text-xs">Texto do Botão</Label>
         <Input
           value={block.text}
-          onChange={(value) => onUpdate({ text: value as string })}
+          onChange={(value: string | number | null) => onUpdate({ text: value as string })}
           placeholder="Ex: Saiba Mais, Clique Aqui..."
           className="h-9 dark:border-muted"
           transparent
@@ -43,7 +43,7 @@ export const ButtonBlockEditor = ({ block, onUpdate }: ButtonBlockEditorProps) =
         <Label className="text-xs">URL de Destino</Label>
         <Input
           value={block.url}
-          onChange={(value) => handleUrlChange(value as string)}
+          onChange={(value: string | number | null) => handleUrlChange(value as string)}
           onBlur={(e) => handleUrlChange(e.target.value)}
           placeholder="https://exemplo.com ou /rota-interna"
           className="h-9 dark:border-muted"

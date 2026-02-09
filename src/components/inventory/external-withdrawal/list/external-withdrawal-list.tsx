@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useExternalWithdrawalBatchMutations } from "../../../../hooks";
 import type { ExternalWithdrawal } from "../../../../types";

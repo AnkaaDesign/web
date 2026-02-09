@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useMemo } from "react";
-import { useQuery, useInfiniteQuery, useQueryClient, QueryKey, UseQueryOptions, UseInfiniteQueryOptions, QueryFunction, InfiniteQueryFunction } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import type { QueryKey, UseQueryOptions, UseInfiniteQueryOptions, QueryFunction, InfiniteQueryFunction } from "@tanstack/react-query";
 
 // =====================================================
 // Types & Interfaces

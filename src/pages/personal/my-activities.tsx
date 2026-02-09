@@ -18,8 +18,6 @@ import { ActivityExport } from "@/components/inventory/activity/list/activity-ex
 import { ColumnVisibilityManager } from "@/components/inventory/activity/list/column-visibility-manager";
 import { getActivityColumns, getDefaultVisibleColumns } from "@/components/inventory/activity/list/activity-table-columns";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 /**
  * My Activities Page

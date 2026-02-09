@@ -1,8 +1,8 @@
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import type { Task } from "@/types";
-import type { SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "@/constants";
+import type { SERVICE_ORDER_TYPE } from "@/constants";
 import { SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS as SO_STATUS, SERVICE_ORDER_STATUS_LABELS } from "@/constants";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { getServiceOrderStatusColor } from "@/utils/serviceOrder";
 import { IconAlertTriangle } from "@tabler/icons-react";

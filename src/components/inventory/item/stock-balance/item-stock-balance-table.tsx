@@ -35,7 +35,7 @@ interface ItemStockBalanceTableProps {
   onSubmit?: () => void;
 }
 
-export function ItemStockBalanceTable({ items, onCancel, onSubmit }: ItemStockBalanceTableProps) {
+export function ItemStockBalanceTable({ items, onCancel: _onCancel, onSubmit: _onSubmit }: ItemStockBalanceTableProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { batchCreateAsync } = useActivityBatchMutations();

@@ -1,4 +1,3 @@
-import React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +24,6 @@ import {
   REPRESENTATIVE_ROLE_LABELS,
   REPRESENTATIVE_ROLE_COLORS,
 } from "@/types/representative";
-import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -83,7 +81,7 @@ export function createRepresentativeColumns({
               <span className="font-medium text-sm">{representative.name}</span>
               {representative.customer && (
                 <span className="text-xs text-muted-foreground">
-                  {representative.customer.name}
+                  {representative.customer.fantasyName}
                 </span>
               )}
             </div>

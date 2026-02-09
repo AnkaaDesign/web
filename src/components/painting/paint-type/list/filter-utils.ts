@@ -17,8 +17,8 @@ interface FilterUtilsOptions {
 
 export function extractActiveFilters(
   filters: Partial<PaintTypeGetManyFormData>,
-  onRemoveFilter: (key: string, itemId?: string) => void,
-  options: FilterUtilsOptions = {},
+  onRemoveFilter: (key: string, _itemId?: string) => void,
+  _options: FilterUtilsOptions = {},
 ): FilterIndicator[] {
   const activeFilters: FilterIndicator[] = [];
 
@@ -93,7 +93,7 @@ export function extractActiveFilters(
 }
 
 export function createFilterRemover(currentFilters: Partial<PaintTypeGetManyFormData>, onFilterChange: (filters: Partial<PaintTypeGetManyFormData>) => void) {
-  return (key: string, itemId?: string) => {
+  return (key: string, _itemId?: string) => {
     const newFilters = { ...currentFilters };
     const newWhere = { ...newFilters.where };
 

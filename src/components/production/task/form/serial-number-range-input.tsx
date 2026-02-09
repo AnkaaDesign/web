@@ -1,11 +1,11 @@
-import { useFieldArray, useWatch, type FieldValues } from "react-hook-form";
+import { useFieldArray, useWatch } from "react-hook-form";
 import { useState, useRef } from "react";
 import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { IconHash, IconX } from "@tabler/icons-react";
 
-interface SerialNumberRangeInputProps<TFieldValues extends FieldValues = FieldValues> {
+interface SerialNumberRangeInputProps {
   control: any;
   disabled?: boolean;
 }
@@ -88,17 +88,6 @@ export function SerialNumberRangeInput({ control, disabled }: SerialNumberRangeI
     const numberToRemove = serialNumbers[index];
     removedNumbersRef.current.add(numberToRemove);
     remove(index);
-  };
-
-  const handleClearAll = () => {
-    // Add all current numbers to removed set
-    serialNumbers.forEach(num => {
-      removedNumbersRef.current.add(num);
-    });
-    // Remove all
-    for (let i = serialNumbers.length - 1; i >= 0; i--) {
-      remove(i);
-    }
   };
 
   return (

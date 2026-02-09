@@ -32,12 +32,6 @@ export function PaintTasksTable({ paint }: PaintTasksTableProps) {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [isPending, setIsPending] = useState(false);
 
-  // Combine general paintings and logo tasks
-  const allTasks = useMemo(() => [
-    ...(paint.generalPaintings || []),
-    ...(paint.logoTasks || []),
-  ], [paint.generalPaintings, paint.logoTasks]);
-
   // Column visibility state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
     "paint-detail-tasks-visible-columns",
@@ -48,7 +42,7 @@ export function PaintTasksTable({ paint }: PaintTasksTableProps) {
   const allColumns = useMemo(() => createTaskHistoryColumns(), []);
 
   // Table data tracking
-  const [tableData, setTableData] = useState<{ items: Task[]; totalRecords: number }>({
+  const [, setTableData] = useState<{ items: Task[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });

@@ -1,7 +1,6 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useItems } from "../../../hooks";
-import type { Item } from "../../../types";
 import { routes, FAVORITE_PAGES } from "../../../constants";
 import { ItemBatchEditTable } from "@/components/inventory/item/batch-edit/item-batch-edit-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

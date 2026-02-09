@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { MessageService } from "@/api-client/message";
 import type { Message } from "@/types/message";
 import { useAuth } from "@/contexts/auth-context";
@@ -88,7 +88,6 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
   } = options;
 
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const [open, setOpen] = React.useState(false);
   const [dailyDismissed, setDailyDismissed] = React.useState<Record<string, string>>({});
   const hasShownOnMount = React.useRef(false);
@@ -117,7 +116,7 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
     isLoading,
     error,
     refetch,
-    status,
+    status: _status,
   } = useQuery({
     queryKey: ["messages", "unviewed", user?.id],
     queryFn: async () => {

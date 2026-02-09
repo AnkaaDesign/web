@@ -53,7 +53,7 @@ const renderMonthlyConsumptionWithTrend = (item: Item) => {
  */
 export const createItemSelectorColumns = (
   editableConfig?: EditableColumnsConfig,
-  context?: ItemSelectorContext
+  _context?: ItemSelectorContext
 ): ItemSelectorColumn[] => {
   const columns: ItemSelectorColumn[] = [
     // Checkbox column - always fixed

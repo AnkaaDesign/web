@@ -12,7 +12,6 @@ import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { routes } from "../../../../constants";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { getActivityColumns } from "./activity-table-columns";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -53,7 +52,7 @@ export const ActivityTable = ({ filters, visibleColumns, onDataChange, className
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

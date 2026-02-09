@@ -3,11 +3,9 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { IconPaint, IconPlus } from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useMemo } from "react";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export function PaintTypesListPage() {
   const navigate = useNavigate();

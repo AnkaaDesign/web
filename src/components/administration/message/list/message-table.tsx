@@ -93,7 +93,6 @@ export function MessageTable({
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

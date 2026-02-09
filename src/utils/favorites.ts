@@ -7,8 +7,6 @@ export interface FavoritePage {
   addedAt: string;
 }
 
-export type { FavoritePage };
-
 export function getFavoritePages(): FavoritePage[] {
   try {
     const storedData = localStorage.getItem(FAVORITES_KEY);

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { IconFilter } from "@tabler/icons-react";
 
 import type { Position } from "../../../../types";
@@ -7,7 +7,6 @@ import { formatCurrency } from "../../../../utils";
 import { cn } from "@/lib/utils";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
-import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -121,19 +120,9 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
     return result;
   }, [baseQueryFilters]);
 
-  // Handle filter changes
-  const handleFilterChange = useCallback(
-    (newFilters: Partial<PositionGetManyFormData>) => {
-      // Remove orderBy from filters to avoid conflicts with sort management
-      const { orderBy: _, ...filtersWithoutOrderBy } = newFilters;
-      setFilters(filtersWithoutOrderBy);
-    },
-    [setFilters],
-  );
-
   // Handle filter removal for remuneration filters
   const onRemoveFilter = useCallback(
-    (key: string, value?: any) => {
+    (key: string, _value?: any) => {
       if (key === "searchingFor") {
         setSearch("");
       } else if (key === "minRemuneration" || key === "maxRemuneration") {

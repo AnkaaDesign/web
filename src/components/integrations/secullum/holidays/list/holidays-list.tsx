@@ -205,7 +205,7 @@ export function HolidaysList({ className }: HolidaysListProps) {
   };
 
   // Handle edit action (placeholder for now)
-  const handleEdit = (holiday: SecullumHoliday) => {
+  const handleEdit = (_holiday: SecullumHoliday) => {
     toast.info("Edição de feriado ainda não implementada");
   };
 

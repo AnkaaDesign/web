@@ -3,13 +3,11 @@ import { useExternalWithdrawal, useExternalWithdrawalStatusMutations, useExterna
 import { routes, EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { Button } from "@/components/ui/button";
 import type { Icon as TablerIcon } from "@tabler/icons-react";
-import { IconAlertTriangle, IconPackage, IconRefresh, IconEdit, IconCheck, IconLoader2, IconCurrencyReal, IconTruckDelivery } from "@tabler/icons-react";
-import { toast } from "sonner";
+import { IconAlertTriangle, IconRefresh, IconEdit, IconCheck, IconLoader2, IconCurrencyReal, IconTruckDelivery } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ExternalWithdrawalInfoCard, ExternalWithdrawalItemsCard } from "@/components/inventory/external-withdrawal/detail";
 import { ExternalWithdrawalDetailSkeleton } from "@/components/inventory/external-withdrawal/detail/external-withdrawal-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
-import { usePrivileges } from "../../../../hooks";
 import React, { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditExternalWithdrawals } from "@/utils/permissions/entity-permissions";

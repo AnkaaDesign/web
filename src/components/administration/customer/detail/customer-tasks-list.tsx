@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { TASK_STATUS, routes } from "../../../../constants";
+import { routes } from "../../../../constants";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,7 +74,7 @@ export function CustomerTasksList({
   );
 
   // Table data for tracking
-  const [tableData, setTableData] = React.useState<{ items: Task[]; totalRecords: number }>({
+  const [_tableData, setTableData] = React.useState<{ items: Task[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });

@@ -13,7 +13,7 @@ interface RowBlockProps {
  * Responsive: stacks vertically on mobile, horizontal on larger screens
  */
 export const RowBlock = React.memo<RowBlockProps>(({ block, className }) => {
-  const { blocks, columns, gap = 'md', verticalAlign = 'top', id } = block;
+  const { blocks, columns: _columns, gap = 'md', verticalAlign = 'top', id } = block;
 
   const gapClasses = {
     none: 'gap-0',

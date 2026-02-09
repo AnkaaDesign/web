@@ -1,6 +1,5 @@
 import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import type { UserBatchEditFormData } from "../types";
 
 interface PhoneCellProps {
   control: any;
@@ -20,7 +19,7 @@ export function PhoneCell({ control, index, disabled }: PhoneCellProps) {
               ref={field.ref}
               type="phone"
               value={field.value || ""}
-              onChange={(value) => field.onChange(value || null)}
+              onChange={(value: string | number | null) => field.onChange(value || null)}
               onBlur={field.onBlur}
               disabled={disabled}
               placeholder="(00) 00000-0000"

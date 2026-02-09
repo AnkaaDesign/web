@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useFieldArray, useWatch, useController } from "react-hook-form";
-import { FormField, FormLabel } from "@/components/ui/form";
+import { FormField } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import { IconPlus, IconTrash, IconNote } from "@tabler/icons-react";
 import { Combobox } from "@/components/ui/combobox";
 import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { Textarea } from "@/components/ui/textarea";
-import { toTitleCase, getServiceOrderStatusColor } from "../../../../utils";
+import { getServiceOrderStatusColor } from "../../../../utils";
 import { AdminUserSelector } from "@/components/administration/user/form/user-selector";
 import { ServiceDescriptionInput } from "./service-description-input";
 import {
@@ -30,7 +30,7 @@ interface ServiceSelectorProps {
 }
 
 export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege, isTeamLeader = false, onItemDeleted }: ServiceSelectorProps) {
-  const { fields, append, prepend, remove } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control,
     name: "serviceOrders",
   });
@@ -127,7 +127,7 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     };
     const ungrouped: number[] = [];
 
-    fields.forEach((field, index) => {
+    fields.forEach((_field, index) => {
       const service = servicesValues[index];
       // A service is "complete" if it has both type and description (at least 3 chars)
       const isComplete = service?.type && service?.description && service.description.trim().length >= 3;
@@ -341,13 +341,13 @@ interface ServiceRowProps {
 function ServiceRow({
   control,
   index,
-  type,
+  type: _type,
   disabled,
   statusDisabled,
   onRemove,
   isGrouped,
   userPrivilege,
-  currentUserId,
+  currentUserId: _currentUserId,
   isTeamLeader = false,
 }: ServiceRowProps) {
   // Observation modal state
@@ -499,11 +499,6 @@ function ServiceRow({
 
     return true; // Show combobox for team leaders and other sectors
   }, [isGrouped, userPrivilege, isTeamLeader]);
-
-  // Determine if this is a new service order (for observation button visibility)
-  const isNewServiceOrder = useMemo(() => {
-    return !serviceOrderId || (typeof serviceOrderId === 'string' && serviceOrderId.startsWith('temp-'));
-  }, [serviceOrderId]);
 
   // Determine which service order types the user can CREATE based on their privilege
   // Note: This is separate from what they can UPDATE (handled by canEditServiceOrder)

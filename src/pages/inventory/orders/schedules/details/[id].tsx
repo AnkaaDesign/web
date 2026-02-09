@@ -1,14 +1,12 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   IconAlertTriangle,
   IconRefresh,
   IconCalendar,
-  IconClock,
   IconEdit,
   IconTrash,
   IconPackage,
-  IconCalendarTime,
   IconCircleCheck,
   IconCalendarCheck,
   IconCalendarClock,
@@ -16,7 +14,6 @@ import {
   IconRepeat,
   IconPlayerPlay,
   IconPlayerPause,
-  IconCalendarRepeat,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

@@ -385,7 +385,7 @@ export const IconPicker = ({ open, onClose, onSelect, selectedIcon }: IconPicker
           <Input
             placeholder="Buscar ícone... (ex: user, mail, check)"
             value={search}
-            onChange={(value) => setSearch(value as string)}
+            onChange={(value: string | number | null) => setSearch(value as string)}
             autoFocus
           />
 

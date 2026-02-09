@@ -22,7 +22,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useOrders, useOrderMutations, useOrderBatchMutations } from "../../../../hooks";
-import { toast } from "sonner";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { OrderGetManyFormData } from "../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -42,7 +41,7 @@ interface OrderTableProps {
 
 export function OrderTable({ visibleColumns, className, onEdit, filters = {}, onDataChange }: OrderTableProps) {
   const navigate = useNavigate();
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: _isAuthLoading } = useAuth();
   const { delete: deleteOrder, updateAsync: updateOrder } = useOrderMutations();
   const { batchDelete } = useOrderBatchMutations();
 
@@ -82,7 +81,7 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

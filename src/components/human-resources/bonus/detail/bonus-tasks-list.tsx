@@ -72,7 +72,7 @@ export function BonusTasksList({
   );
 
   // Table data for tracking
-  const [tableData, setTableData] = useState<{ items: Task[]; totalRecords: number }>({
+  const [_tableData, setTableData] = useState<{ items: Task[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });

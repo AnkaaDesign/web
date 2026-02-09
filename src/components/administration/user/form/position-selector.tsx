@@ -6,7 +6,7 @@ import { IconBriefcase } from "@tabler/icons-react";
 import { getPositions } from "../../../../api-client";
 import type { Position } from "../../../../types";
 
-interface PositionSelectorProps<T extends FieldValues = FieldValues> {
+interface PositionSelectorProps<_T extends FieldValues = FieldValues> {
   control?: any;
   name?: string;
   label?: string;
@@ -20,7 +20,7 @@ interface PositionSelectorProps<T extends FieldValues = FieldValues> {
   initialPosition?: Position;
 }
 
-export function PositionSelector<T extends FieldValues = FieldValues>({
+export function PositionSelector<_T extends FieldValues = FieldValues>({
   control,
   name = "positionId",
   label = "Cargo",

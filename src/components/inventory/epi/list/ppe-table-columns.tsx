@@ -1,8 +1,6 @@
 import { formatDateTime, formatCurrency } from "../../../../utils";
-import { PPE_SIZE_LABELS, MEASURE_TYPE_LABELS, MEASURE_UNIT_LABELS, MEASURE_TYPE } from "../../../../constants";
+import { MEASURE_TYPE_LABELS, MEASURE_UNIT_LABELS, MEASURE_TYPE } from "../../../../constants";
 import type { Item } from "../../../../types";
-import { Badge } from "../../../ui/badge";
-import { TABLE_LAYOUT } from "../../../ui/table-constants";
 import type { PpeColumn } from "./types";
 
 // Import the stock status indicator

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import type { Cut } from "../../../../types";
 import type { CutGetManyFormData } from "../../../../schemas";
 import { CUT_STATUS } from "../../../../constants";
@@ -28,7 +28,7 @@ export function CutList({ className }: CutListProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // State to hold current page items and total count from the table
-  const [tableData, setTableData] = useState<{ items: Cut[]; totalRecords: number }>({
+  const [, setTableData] = useState<{ items: Cut[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });

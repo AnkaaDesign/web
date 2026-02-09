@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { IconDownload, IconRefresh, IconFilter, IconMaximize } from '@tabler/icons-react';
-import { ChartConfiguration } from '@/lib/charts/chart-config';
+import type { ChartConfiguration } from '@/lib/charts/chart-config';
 
 export interface ChartContainerProps {
   config: ChartConfiguration;

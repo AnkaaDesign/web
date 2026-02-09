@@ -91,7 +91,7 @@ export function useBackupMutations() {
   const restoreBackup = useMutation({
     mutationFn: ({ id, targetPath }: { id: string; targetPath?: string }) =>
       backupApi.restoreBackup(id, targetPath),
-    onSuccess: (result) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: backupQueryKeys.all });
     },
   });
@@ -119,7 +119,7 @@ export function useBackupMutations() {
 
   const verifyBackup = useMutation({
     mutationFn: (id: string) => backupApi.verifyBackup(id),
-    onSuccess: (result, id) => {
+    onSuccess: (_result, id) => {
       queryClient.invalidateQueries({ queryKey: backupQueryKeys.verification(id) });
     },
   });

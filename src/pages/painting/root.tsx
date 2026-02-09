@@ -4,7 +4,6 @@ import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, PAINT
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { usePaintDashboard, usePaintBrands } from "../../hooks";
 import { useNavigate } from "react-router-dom";
-import { formatCurrency, formatNumber } from "../../utils";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import {
@@ -13,23 +12,14 @@ import {
   IconColorSwatch,
   IconFlask2,
   IconDroplet,
-  IconSparkles,
-  IconMicrophone2,
   IconPaint,
   IconActivity,
-  IconTrendingUp,
-  IconTrendingDown,
-  IconClock,
   IconFlask,
   IconBottle,
-  IconTool,
   IconChartBar,
   IconChartPie,
-  IconFileText,
   IconPackage,
-  IconCircleDot,
   IconBrush,
-  IconColorPicker,
   IconTag,
 } from "@tabler/icons-react";
 import {
@@ -47,8 +37,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export function Painting() {
   const navigate = useNavigate();

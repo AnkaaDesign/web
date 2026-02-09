@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useCallback, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { IconInfoCircle, IconPhoto, IconPhone, IconMapPin, IconTag, IconCreditCard } from "@tabler/icons-react";
 import { Form } from "@/components/ui/form";
@@ -252,11 +252,7 @@ export function SupplierForm(props: SupplierFormProps) {
     };
   }, [debouncedUpdateUrl]);
 
-  // Handle CEP lookup (now handled directly in ZipCodeInput component)
-  const handleCepLookup = useCallback(async (_cep: string) => {
-    // This is now handled directly in the ZipCodeInput component
-    // Keeping this function for backwards compatibility
-  }, []);
+  // Handle CEP lookup is now handled directly in the ZipCodeInput component
 
   const onSubmit = async (data: SupplierCreateFormData | SupplierUpdateFormData) => {
     try {

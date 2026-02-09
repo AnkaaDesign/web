@@ -109,7 +109,7 @@ class SocketService {
     });
 
     // Reconnection attempt
-    this.socket.on('reconnect_attempt', (attemptNumber) => {
+    this.socket.on('reconnect_attempt', (_attemptNumber) => {
       this.setConnectionState('reconnecting');
     });
 
@@ -120,7 +120,7 @@ class SocketService {
     });
 
     // Error event
-    this.socket.on('error', (error) => {
+    this.socket.on('error', (_error) => {
       this.setConnectionState('error');
     });
 

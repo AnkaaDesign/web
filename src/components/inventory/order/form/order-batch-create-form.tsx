@@ -10,7 +10,7 @@ import { routes, ORDER_STATUS, MEASURE_UNIT_LABELS } from "../../../../constants
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormMessage } from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
@@ -260,7 +260,6 @@ export const OrderBatchCreateForm = () => {
         }));
         const result = await batchCreateAsync({ orders } as OrderBatchCreateFormData);
         if (result.success) {
-          const successCount = result.data?.success?.length || 0;
           const failedCount = result.data?.failed?.length || 0;
 
           // Success toast is handled automatically by API client
@@ -812,7 +811,7 @@ export const OrderBatchCreateForm = () => {
                           placeholder="Selecione um fornecedor"
                           searchPlaceholder="Buscar fornecedor..."
                           className={`${!form.watch("supplierId") ? "border-red-500" : ""}`}
-                          renderOption={(option, isSelected) => {
+                          renderOption={(option, _isSelected) => {
                             if (option.value === "no-suppliers") {
                               return <span className="text-foreground/60 italic">{option.label}</span>;
                             }

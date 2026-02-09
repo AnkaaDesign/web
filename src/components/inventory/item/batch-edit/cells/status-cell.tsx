@@ -1,5 +1,5 @@
 import { Switch } from "@/components/ui/switch";
-import { FormField, FormItem, FormControl, FormLabel } from "@/components/ui/form";
+import { FormField, FormItem, FormControl } from "@/components/ui/form";
 
 interface StatusCellProps {
   control: any;

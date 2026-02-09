@@ -1,4 +1,3 @@
-import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +10,6 @@ import { routes, FAVORITE_PAGES, BORROW_STATUS } from "../../../../constants";
 import { formatDateTime } from "../../../../utils";
 import type { Borrow } from "../../../../types";
 
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { PageHeader } from "@/components/ui/page-header";

@@ -248,9 +248,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
         setTokenProvider(updatedTokenProvider);
 
-        // Verify token was stored
-        const verifyToken = getLocalStorage("token");
-
         // Return success to let the Login component know login succeeded
         return { success: true } as const;
       } else {

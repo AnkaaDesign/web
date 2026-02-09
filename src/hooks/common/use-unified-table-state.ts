@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUrlStateCoordinator } from "./use-url-state-coordinator";
-import type { UrlUpdateAction } from "./use-url-state-coordinator";
 import {
   extractActiveFilters,
   hasActiveFilters as utilsHasActiveFilters,
   countActiveFilters,
-  convertFiltersToApiFormat,
 } from "../../utils/table-filter-utils";
 import type { FilterIndicator, ExtractFilterOptions } from "../../utils/table-filter-utils";
 
@@ -339,7 +337,7 @@ export function useUnifiedTableState<TFilters extends Record<string, any>, TApiF
     searchParamName = DEFAULT_OPTIONS.searchParamName,
     resetSelectionOnPageChange = DEFAULT_OPTIONS.resetSelectionOnPageChange,
     resetSelectionOnFilterChange = DEFAULT_OPTIONS.resetSelectionOnFilterChange,
-    persistSelection = DEFAULT_OPTIONS.persistSelection,
+    persistSelection: _persistSelection = DEFAULT_OPTIONS.persistSelection,
     enableUrlSync = DEFAULT_OPTIONS.enableUrlSync,
     excludeFromUrl = DEFAULT_OPTIONS.excludeFromUrl,
     filterOptions,

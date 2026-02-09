@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
-import { IconUsers, IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle, IconChecklist } from "@tabler/icons-react";
+import { IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
-import { PAGE_SPACING } from "@/lib/layout-constants";
 import { useCustomer, useCustomerMutations } from "../../../../hooks";
 import { useAuth } from "@/contexts/auth-context";
 import { hasAnyPrivilege } from "@/utils";
@@ -14,9 +13,7 @@ import { BasicInfoCard, ContactDetailsCard, AddressInfoCard, CustomerTasksList, 
 import { CustomerDetailSkeleton } from "@/components/administration/customer/detail/customer-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { toast } from "sonner";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const CustomerDetailsPage = () => {

@@ -4,7 +4,7 @@
  * Defines schema types for message API requests
  */
 
-import type { MessageStatus, MessageTargeting, MessageScheduling } from '../types/message';
+import type { MessageStatus } from '../types/message';
 
 // Query parameters
 export interface MessageGetManyFormData {

@@ -22,7 +22,6 @@ import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormulaFilters } from "@/components/painting/formula/formula-filters";
 import type { FormulaFiltersData } from "@/components/painting/formula/formula-filters";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 export default function FormulasList() {
   const navigate = useNavigate();

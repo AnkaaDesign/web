@@ -5,13 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IconX, IconPlus } from "@tabler/icons-react";
 
-interface TagsCellProps<TFieldValues extends FieldValues = FieldValues> {
+interface TagsCellProps {
   control: any;
   index: number;
   disabled?: boolean;
 }
 
-export function TagsCell<TFieldValues extends FieldValues = FieldValues>({ control, index, disabled }: TagsCellProps<TFieldValues>) {
+export function TagsCell<TFieldValues extends FieldValues = FieldValues>({ control, index, disabled }: TagsCellProps) {
   const [inputValue, setInputValue] = useState("");
 
   return (

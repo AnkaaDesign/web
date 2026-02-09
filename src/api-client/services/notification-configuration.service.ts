@@ -3,7 +3,6 @@
 
 import { apiClient } from "../axiosClient";
 import type {
-  NotificationConfiguration,
   NotificationConfigurationGetManyResponse,
   NotificationConfigurationGetUniqueResponse,
   NotificationConfigurationCreateResponse,

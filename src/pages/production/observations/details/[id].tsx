@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
-import { IconAlertCircle, IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
+import { IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useObservation, useObservationMutations, useAuth } from "../../../../hooks";
@@ -11,7 +11,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ObservationInfoCard, ObservationDetailSkeleton } from "@/components/production/observation/detail";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { toast } from "sonner";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { generateFileUrls } from "@/utils/file-viewer";
 import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";

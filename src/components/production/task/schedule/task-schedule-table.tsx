@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { DeadlineCountdown } from "./deadline-countdown";
 import { getRowColorClass } from "./task-table-utils";
 import { IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
-import { PAINT_FINISH, PAINT_FINISH_LABELS, PAINT_BRAND_LABELS, TRUCK_MANUFACTURER_LABELS, SERVICE_ORDER_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
+import { PAINT_FINISH, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, SERVICE_ORDER_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -371,7 +371,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
   );
 
   const handleSort = useCallback(
-    (column: string, event?: React.MouseEvent) => {
+    (column: string, _event?: React.MouseEvent) => {
       if (!allColumns.find((col) => col.id === column)?.sortable) return;
 
       // Always use cumulative multi-sort mode

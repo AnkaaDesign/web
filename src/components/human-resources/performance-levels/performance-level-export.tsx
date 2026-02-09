@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { BaseExportPopover, type ExportColumn, type ExportFormat } from "@/components/ui/export-popover";
 import { IconDownload } from "@tabler/icons-react";
 import { toast } from "sonner";
-import { formatDate, formatDateTime, formatPhone } from "../../../utils";
+import { formatDate, formatDateTime } from "../../../utils";
 import { userService } from "../../../api-client";
 import { USER_STATUS_LABELS } from "../../../constants";
 import type { User } from "../../../types";
@@ -17,7 +17,7 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
   { id: "position", label: "Cargo", getValue: (user) => user.position?.name || "" },
   { id: "sector", label: "Setor", getValue: (user) => user.sector?.name || "" },
   { id: "performanceLevel", label: "Nível de Desempenho", getValue: (user) => user.performanceLevel?.toString() || "0" },
-  { id: "bonus", label: "Bonificação", getValue: (user) => "" },  // To be implemented
+  { id: "bonus", label: "Bonificação", getValue: (_user) => "" },  // To be implemented
   { id: "status", label: "Status", getValue: (user) => USER_STATUS_LABELS[user.status] || user.status },
   { id: "createdAt", label: "Data de Cadastro", getValue: (user) => new Date(user.createdAt).toLocaleDateString("pt-BR") },
 ];

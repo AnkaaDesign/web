@@ -288,20 +288,4 @@ export const whatsAppService = {
 // Export types for external use
 export type {
   UserNotificationPreference,
-  UserNotificationPreferenceGetManyResponse,
-  UserNotificationPreferenceUpdateResponse,
-  WhatsAppStatus,
-  WhatsAppQRResponse,
-  WhatsAppStatusResponse,
-  WhatsAppDisconnectResponse,
-  // New configuration-driven types
-  NotificationChannel,
-  NotificationImportance,
-  ChannelPreferenceDetail,
-  UserPreferenceConfig,
-  GroupedConfigurationsResponse,
-  AvailableConfigurationsApiResponse,
-  UpdateUserPreferencePayload,
-  UpdateUserPreferenceApiResponse,
-  ResetPreferenceApiResponse,
 };

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import type { File as AnkaaFile } from "../../../types";
-import { formatFileSize, getFileCategory, getFileDisplayName, isImageFile } from "../../../utils/file";
-import { fileViewerService } from "../../../utils/file-viewer";
+import { formatFileSize, getFileDisplayName, isImageFile } from "../../../utils/file";
 import { getPDFThumbnailUrl, isPDFFile } from "../../../utils/pdf-thumbnail";
 import { formatRelativeTime } from "../../../utils";
 import { cn } from "@/lib/utils";
@@ -22,12 +21,6 @@ export interface FileItemProps {
   showRelativeTime?: boolean;
   className?: string;
 }
-
-const isEpsFile = (file: AnkaaFile): boolean => {
-  if (!file || !file.mimetype) return false;
-  const epsMimeTypes = ["application/postscript", "application/x-eps", "application/eps", "image/eps", "image/x-eps"];
-  return epsMimeTypes.includes(file.mimetype.toLowerCase());
-};
 
 // Removed getFileIcon function - now using FileTypeIcon/FileTypeAvatar components
 
@@ -56,16 +49,13 @@ const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" | "large" = "
   return "";
 };
 
-const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, onDelete, showActions = true, showFilename = true, showFileSize = true, showRelativeTime = true, className }) => {
+const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _onDownload, onDelete: _onDelete, showActions: _showActions = true, showFilename = true, showFileSize = true, showRelativeTime: _showRelativeTime = true, className }) => {
   const [thumbnailError, setThumbnailError] = useState(false);
   const [thumbnailLoading, setThumbnailLoading] = useState(true);
   const [showThumbnail, setShowThumbnail] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const category = getFileCategory(file);
   const isImage = isImageFile(file);
   const isPdf = isPDFFile(file);
-  const isEps = isEpsFile(file);
-  const canPreviewFile = fileViewerService.canPreviewFile(file);
   const hasThumbnail = file.thumbnailUrl || isImage || isPdf;
 
   // Get file viewer context - always available since FileViewerProvider wraps the app
@@ -164,15 +154,12 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   );
 };
 
-const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload, onDelete, showActions = true, showFilename = true, showFileSize = true, showRelativeTime = true, className }) => {
+const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _onDownload, onDelete: _onDelete, showActions: _showActions = true, showFilename = true, showFileSize = true, showRelativeTime = true, className }) => {
   const [thumbnailError, setThumbnailError] = useState(false);
   const [thumbnailLoading, setThumbnailLoading] = useState(true);
   const [showThumbnail, setShowThumbnail] = useState(false);
-  const category = getFileCategory(file);
   const isImage = isImageFile(file);
   const isPdf = isPDFFile(file);
-  const isEps = isEpsFile(file);
-  const canPreviewFile = fileViewerService.canPreviewFile(file);
   const hasThumbnail = file.thumbnailUrl || isImage || isPdf;
 
   // Get file viewer context - always available since FileViewerProvider wraps the app

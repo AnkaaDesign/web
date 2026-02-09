@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconUsers, IconChevronRight } from "@tabler/icons-react";
 
@@ -23,7 +23,7 @@ export function SectorUsersTable({ sector }: SectorUsersTableProps) {
   const navigate = useNavigate();
 
   // State to hold current table data
-  const [tableData, setTableData] = useState<{ users: User[]; totalRecords: number }>({ users: [], totalRecords: 0 });
+  const [_tableData, setTableData] = useState<{ users: User[]; totalRecords: number }>({ users: [], totalRecords: 0 });
 
   // Stable callback for table data updates
   const handleTableDataChange = useCallback((data: { users: User[]; totalRecords: number }) => {

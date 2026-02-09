@@ -1,7 +1,5 @@
 import { format } from "date-fns";
 
-import type { SecullumCreateHolidayFormData } from "../../../../../schemas";
-
 import { FormField } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 

@@ -46,7 +46,7 @@ const COLUMN_ID_TO_TYPE: Record<string, SERVICE_ORDER_TYPE> = {
 };
 
 export function CollapsedGroupRow({
-  groupId,
+  groupId: _groupId,
   collapsedTasks,
   firstTask,
   totalCount,

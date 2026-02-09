@@ -6,9 +6,8 @@
 import React, { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { formatNumber } from '../utils/chart-formatters';
-import { Eye, EyeOff } from 'lucide-react';
+import { EyeOff } from 'lucide-react';
 
 export interface LegendItem {
   key: string;

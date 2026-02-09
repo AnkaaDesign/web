@@ -32,45 +32,46 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
 
         columns.forEach((column) => {
           const value = column.accessorFn ? column.accessorFn(task) : (task as any)[column.accessorKey || column.id];
+          const headerKey = typeof column.header === "string" ? column.header : column.id;
 
           // Format values based on column
           switch (column.id) {
             case "status":
-              row[column.header] = getTaskStatusLabel(value);
+              row[headerKey] = getTaskStatusLabel(value);
               break;
             case "price":
-              row[column.header] = value ? formatCurrency(value) : "";
+              row[headerKey] = value ? formatCurrency(value) : "";
               break;
             case "entryDate":
             case "term":
             case "startedAt":
             case "finishedAt":
-              row[column.header] = value ? formatDate(value) : "";
+              row[headerKey] = value ? formatDate(value) : "";
               break;
             case "createdAt":
             case "updatedAt":
-              row[column.header] = value ? formatDateTime(value) : "";
+              row[headerKey] = value ? formatDateTime(value) : "";
               break;
             case "customer.fantasyName":
-              row[column.header] = task.customer?.fantasyName || "";
+              row[headerKey] = task.customer?.fantasyName || "";
               break;
             case "sector.name":
-              row[column.header] = task.sector?.name || "";
+              row[headerKey] = task.sector?.name || "";
               break;
             case "createdBy.name":
-              row[column.header] = task.createdBy?.name || "";
+              row[headerKey] = task.createdBy?.name || "";
               break;
             case "serviceOrders":
-              row[column.header] = task.serviceOrders?.length || 0;
+              row[headerKey] = task.serviceOrders?.length || 0;
               break;
             case "hasArtworks":
-              row[column.header] = (task.artworks?.length || 0) > 0 ? "Sim" : "Não";
+              row[headerKey] = (task.artworks?.length || 0) > 0 ? "Sim" : "Não";
               break;
             case "hasObservation":
-              row[column.header] = task.observation ? "Sim" : "Não";
+              row[headerKey] = task.observation ? "Sim" : "Não";
               break;
             default:
-              row[column.header] = value || "";
+              row[headerKey] = value || "";
           }
         });
 
@@ -144,45 +145,46 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
 
         columns.forEach((column) => {
           const value = column.accessorFn ? column.accessorFn(task) : (task as any)[column.accessorKey || column.id];
+          const headerKey = typeof column.header === "string" ? column.header : column.id;
 
           // Format values based on column
           switch (column.id) {
             case "status":
-              row[column.header] = getTaskStatusLabel(value);
+              row[headerKey] = getTaskStatusLabel(value);
               break;
             case "price":
-              row[column.header] = value ? formatCurrency(value) : "";
+              row[headerKey] = value ? formatCurrency(value) : "";
               break;
             case "entryDate":
             case "term":
             case "startedAt":
             case "finishedAt":
-              row[column.header] = value ? formatDate(value) : "";
+              row[headerKey] = value ? formatDate(value) : "";
               break;
             case "createdAt":
             case "updatedAt":
-              row[column.header] = value ? formatDateTime(value) : "";
+              row[headerKey] = value ? formatDateTime(value) : "";
               break;
             case "customer.fantasyName":
-              row[column.header] = task.customer?.fantasyName || "";
+              row[headerKey] = task.customer?.fantasyName || "";
               break;
             case "sector.name":
-              row[column.header] = task.sector?.name || "";
+              row[headerKey] = task.sector?.name || "";
               break;
             case "createdBy.name":
-              row[column.header] = task.createdBy?.name || "";
+              row[headerKey] = task.createdBy?.name || "";
               break;
             case "serviceOrders":
-              row[column.header] = task.serviceOrders?.length || 0;
+              row[headerKey] = task.serviceOrders?.length || 0;
               break;
             case "hasArtworks":
-              row[column.header] = (task.artworks?.length || 0) > 0 ? "Sim" : "Não";
+              row[headerKey] = (task.artworks?.length || 0) > 0 ? "Sim" : "Não";
               break;
             case "hasObservation":
-              row[column.header] = task.observation ? "Sim" : "Não";
+              row[headerKey] = task.observation ? "Sim" : "Não";
               break;
             default:
-              row[column.header] = value || "";
+              row[headerKey] = value || "";
           }
         });
 

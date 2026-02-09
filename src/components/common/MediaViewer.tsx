@@ -42,7 +42,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [showThumbnails, setShowThumbnails] = useState(true);
+  const [showThumbnails, _setShowThumbnails] = useState(true);
 
   // Image viewer state
   const [zoom, setZoom] = useState(1);

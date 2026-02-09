@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
-import { IconUser, IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
+import { IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
 
-import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "@/constants";
+import { routes, CHANGE_LOG_ENTITY_TYPE } from "@/constants";
 import { useRepresentative, useRepresentativeMutations } from "@/hooks";
 import { useAuth } from "@/contexts/auth-context";
-import { hasAnyPrivilege } from "@/utils";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -21,7 +20,7 @@ export const RepresentativeDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
 
   const {
     data: representative,

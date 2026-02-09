@@ -1,5 +1,5 @@
 import React from "react";
-import { IconLoader2, IconAlertTriangle, IconRefresh, IconWifi, IconWifiOff } from "@tabler/icons-react";
+import { IconLoader2, IconAlertTriangle, IconRefresh, IconWifiOff } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -253,7 +253,7 @@ export function PaginationStateRenderer({
   state,
   data = [],
   error,
-  totalRecords = 0,
+  totalRecords: _totalRecords = 0,
   currentPage = 1,
   totalPages = 1,
   hasFilters = false,

@@ -1,6 +1,5 @@
 import { IconTag } from "@tabler/icons-react";
 
-import type { VacationCreateFormData, VacationUpdateFormData } from "../../../../schemas";
 import { VACATION_TYPE, VACATION_TYPE_LABELS } from "../../../../constants";
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";

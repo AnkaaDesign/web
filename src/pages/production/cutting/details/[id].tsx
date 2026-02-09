@@ -23,7 +23,7 @@ import {
   CHANGE_LOG_ENTITY_TYPE,
   ENTITY_BADGE_CONFIG,
 } from "../../../../constants";
-import { formatDate, formatRelativeTime } from "../../../../utils";
+import { formatRelativeTime } from "../../../../utils";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
   AlertDialog,

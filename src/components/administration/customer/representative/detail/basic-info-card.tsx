@@ -69,7 +69,7 @@ export function BasicInfoCard({ representative, className }: BasicInfoCardProps)
                   Cliente
                 </span>
                 <span className="text-sm font-semibold text-foreground">
-                  {representative.customer.fantasyName || representative.customer.name}
+                  {representative.customer.fantasyName || ""}
                 </span>
               </div>
             </div>

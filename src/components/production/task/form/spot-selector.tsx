@@ -4,8 +4,6 @@ import { Combobox } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
 import {
   getGaragesAvailability,
-  type GarageAvailability,
-  type LaneAvailability,
 } from '../../../../api-client/truck';
 import { TRUCK_SPOT } from '../../../../constants';
 

@@ -20,7 +20,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useItems } from "../../../../hooks";
-import { toast } from "sonner";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -43,7 +42,7 @@ export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeac
   const navigate = useNavigate();
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: _isAuthLoading } = useAuth();
   const canEdit = user ? canEditPpeDeliveries(user) : false;
   const canDelete = user ? canDeletePpeDeliveries(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'ppe') : false;
@@ -60,7 +59,7 @@ export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeac
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

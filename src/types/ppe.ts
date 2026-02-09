@@ -16,7 +16,6 @@ import type {
   MASK_SIZE,
   GLOVES_SIZE,
   RAIN_BOOTS_SIZE,
-  RESCHEDULE_REASON,
   ASSIGNMENT_TYPE,
 } from "../constants";
 import type { User, UserIncludes, UserOrderBy } from "./user";

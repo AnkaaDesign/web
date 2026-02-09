@@ -1,11 +1,9 @@
-import { useMemo, useEffect, useCallback } from "react";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { useMemo, useCallback } from "react";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "../../../../utils";
 import type { Item } from "../../../../types";
-import { toast } from "sonner";
-import { StockStatusIndicator } from "@/components/inventory/item/list/stock-status-indicator";
 import { getItems } from "../../../../api-client";
 
 interface ItemSelectorProps {
@@ -16,7 +14,7 @@ interface ItemSelectorProps {
   initialItem?: Item;
 }
 
-export function BorrowItemSelector({ control, name = "itemId", disabled, selectedItemId, initialItem }: ItemSelectorProps) {
+export function BorrowItemSelector({ control, name = "itemId", disabled, selectedItemId: _selectedItemId, initialItem }: ItemSelectorProps) {
   // Memoize initialOptions with stable dependency
   const initialOptions = useMemo(() => {
     if (!initialItem) return [];
@@ -55,7 +53,7 @@ export function BorrowItemSelector({ control, name = "itemId", disabled, selecte
     });
 
     const items = response.data || [];
-    const total = response.total || 0;
+    const total = response.meta?.totalRecords || 0;
     const hasMore = (page * pageSize) < total;
 
     return {

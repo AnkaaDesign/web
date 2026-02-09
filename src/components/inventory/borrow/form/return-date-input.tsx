@@ -3,7 +3,6 @@ import { FormField } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { isAfter, isBefore, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import type { BorrowUpdateFormData } from "../../../../schemas";
 import { toast } from "sonner";
 
 interface ReturnDateInputProps {

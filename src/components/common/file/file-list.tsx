@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { useFiles, useFileMutations, useFileBatchMutations } from "../../../hooks";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useFiles, useFileBatchMutations } from "../../../hooks";
 import type { File } from "../../../types";
 import type { FileGetManyFormData } from "../../../schemas";
-import { routes } from "../../../constants";
 import { formatFileSize, getFileCategory, getFileDisplayName } from "../../../utils/file";
 import { FileTypeIcon } from "@/components/ui/file-type-icon";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,20 +46,19 @@ function createDebounce<T extends (...args: any[]) => any>(func: T, wait: number
 }
 
 export function FileList({ className }: FileListProps) {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { update } = useFileMutations();
-  const { batchDelete, batchUpdate } = useFileBatchMutations();
+  const { batchDelete } = useFileBatchMutations();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Single source of truth for search input - no dual state!
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") || "");
-  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [_showFilterModal, _setShowFilterModal] = useState(false);
 
   // Delete dialog state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [filesToDelete, setFilesToDelete] = useState<File[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const _filters = filters;
 
   // Get table state for selected items functionality
   const { selectionCount, showSelectedOnly, toggleShowSelectedOnly } = useTableState({
@@ -166,63 +164,6 @@ export function FileList({ className }: FileListProps) {
     };
   }, [filters, searchParams.get("search")]);
 
-  // Handle filter changes
-  const handleFilterChange = useCallback(
-    (newFilters: Partial<FileGetManyFormData>) => {
-      setFilters(newFilters);
-
-      // Update URL immediately when filters change
-      setSearchParams(
-        (prev) => {
-          const params = new URLSearchParams(prev);
-
-          // Clear all filter params first
-          const filterKeys = ["fileType", "showDeleted", "sizeMin", "sizeMax", "createdAfter", "createdBefore"];
-          filterKeys.forEach((key) => params.delete(key));
-
-          // Add new filter params
-          const where = newFilters.where || {};
-          if (where.fileType) params.set("fileType", where.fileType);
-          if (newFilters.showDeleted) params.set("showDeleted", "true");
-
-          // Add range filters
-          if (newFilters.sizeRange?.min !== undefined) params.set("sizeMin", String(newFilters.sizeRange.min));
-          if (newFilters.sizeRange?.max !== undefined) params.set("sizeMax", String(newFilters.sizeRange.max));
-
-          // Add date filters
-          if (newFilters.createdAt?.gte) params.set("createdAfter", newFilters.createdAt.gte.toISOString());
-          if (newFilters.createdAt?.lte) params.set("createdBefore", newFilters.createdAt.lte.toISOString());
-
-          return params;
-        },
-        { replace: true },
-      );
-    },
-    [setSearchParams],
-  );
-
-  // Handle clear all filters
-  const handleClearAllFilters = useCallback(() => {
-    const resetFilters: Partial<FileGetManyFormData> = {
-      limit: DEFAULT_PAGE_SIZE,
-    };
-    setFilters(resetFilters);
-    setSearchInput(""); // Clear search input
-
-    // Clear URL params except sort
-    setSearchParams(
-      (prev) => {
-        const sortParam = prev.get("sort");
-        const newParams = new URLSearchParams();
-        if (sortParam) {
-          newParams.set("sort", sortParam);
-        }
-        return newParams;
-      },
-      { replace: true },
-    );
-  }, [setSearchParams]);
-
   // Fetch files using the query with includes to show associations
   const queryFiltersWithInclude = useMemo(
     () => ({
@@ -245,22 +186,6 @@ export function FileList({ className }: FileListProps) {
   );
 
   const { data: filesData, isLoading, error } = useFiles(queryFiltersWithInclude);
-
-  // Context menu handlers
-  const handleBulkEdit = (files: File[]) => {
-    if (files.length === 1) {
-      // Single file - show alert (files route not yet implemented)
-      alert("Visualização de arquivo em desenvolvimento");
-    } else {
-      // Multiple files - show info (no batch edit available for files)
-      alert(`${files.length} arquivos selecionados`);
-    }
-  };
-
-  const handleBulkDelete = (files: File[]) => {
-    setFilesToDelete(files);
-    setShowDeleteDialog(true);
-  };
 
   const confirmDelete = async () => {
     try {
@@ -296,7 +221,7 @@ export function FileList({ className }: FileListProps) {
           </div>
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)} className="group">
+            <Button variant="outline" size="default" onClick={() => _setShowFilterModal(true)} className="group">
               <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               <span className="text-foreground">Filtros</span>
             </Button>

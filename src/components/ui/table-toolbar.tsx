@@ -10,16 +10,12 @@ import {
   IconLayout,
   IconLayoutGrid,
   IconEye,
-  IconEyeOff,
   IconX,
   IconPlus,
-  IconEdit,
   IconTrash,
   IconAdjustments,
-  IconDots,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useDebouncedValue } from "@/hooks/common/use-debounced-value";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -28,9 +24,9 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { BaseExportPopover, ExportColumn, ExportFormat } from "@/components/ui/export-popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { BaseExportPopover } from "@/components/ui/export-popover";
+import type { ExportColumn, ExportFormat } from "@/components/ui/export-popover";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { getHeaderText } from "@/components/ui/column-visibility-utils";
@@ -181,7 +177,7 @@ export function TableToolbar<T extends { id: string }>({
   onSearchChange,
   searchPlaceholder = "Buscar...",
   enableSearch = true,
-  searchDebounceMs = 300,
+  searchDebounceMs: _searchDebounceMs = 300,
 
   // Selection props
   selectedItems = new Set(),
@@ -199,7 +195,7 @@ export function TableToolbar<T extends { id: string }>({
   columns = [],
   visibleColumns = new Set(),
   onColumnsChange,
-  columnStorageKey,
+  columnStorageKey: _columnStorageKey,
 
   // View props
   density = "normal",
@@ -238,9 +234,6 @@ export function TableToolbar<T extends { id: string }>({
   const [columnSearchQuery, setColumnSearchQuery] = useState("");
 
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Debounced search value
-  const debouncedSearchValue = useDebouncedValue(searchValue, searchDebounceMs);
 
   // Filter columns based on search
   const filteredColumns = useMemo(() => {

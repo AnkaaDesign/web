@@ -3,12 +3,11 @@ import type { FieldValues } from "react-hook-form";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { getUsers } from "../../../../api-client";
-import { toast } from "@/components/ui/sonner";
 import { USER_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useUserMutations } from "../../../../hooks";
 import type { User } from "../../../../types";
 
-interface UserSelectorProps<T extends FieldValues = FieldValues> {
+interface UserSelectorProps<_T extends FieldValues = FieldValues> {
   control: any;
   name?: string;
   label?: string;
@@ -22,7 +21,7 @@ interface UserSelectorProps<T extends FieldValues = FieldValues> {
   includeSectorPrivileges?: SECTOR_PRIVILEGES[];
 }
 
-export function AdminUserSelector<T extends FieldValues = FieldValues>({
+export function AdminUserSelector<_T extends FieldValues = FieldValues>({
   control,
   name = "userId",
   label = "Usuário",

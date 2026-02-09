@@ -7,12 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { IconPlus, IconX, IconTag } from "@tabler/icons-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-interface TagsInputProps<TFieldValues extends FieldValues = FieldValues> {
+interface TagsInputProps<_TFieldValues extends FieldValues = FieldValues> {
   control: any;
   disabled?: boolean;
 }
 
-export function TagsInput<TFieldValues extends FieldValues = FieldValues>({ control, disabled }: TagsInputProps<TFieldValues>) {
+export function TagsInput<_TFieldValues extends FieldValues = FieldValues>({ control, disabled }: TagsInputProps<_TFieldValues>) {
   const [newTag, setNewTag] = useState<string>("");
 
   // Watch the tags array with explicit typing
@@ -57,7 +57,7 @@ export function TagsInput<TFieldValues extends FieldValues = FieldValues>({ cont
                 <Input
                   type="text"
                   value={newTag}
-                  onChange={(value) => {
+                  onChange={(value: string | number | null) => {
                     // Handle both event and direct value from custom Input component
                     if (typeof value === "string") {
                       setNewTag(value);

@@ -1,6 +1,5 @@
 import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import type { UserBatchEditFormData } from "../types";
 
 interface CpfCellProps {
   control: any;

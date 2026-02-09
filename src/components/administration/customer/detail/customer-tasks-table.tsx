@@ -8,7 +8,7 @@ import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { TaskHistoryContextMenu } from "@/components/production/task/history/task-history-context-menu";
 import { createTaskHistoryColumns } from "@/components/production/task/history/task-history-columns";
 import { cn } from "@/lib/utils";
-import { TASK_STATUS, routes } from "../../../../constants";
+import { routes } from "../../../../constants";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
@@ -52,17 +52,11 @@ export function CustomerTasksTable({
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
-    getSortDirection,
-    getSortOrder,
     isSelected,
     isAllSelected,
     isPartiallySelected,
-    selectionCount,
-    resetSelection,
-    removeFromSelection,
     handleRowClick: handleRowClickSelection,
   } = tableState;
 

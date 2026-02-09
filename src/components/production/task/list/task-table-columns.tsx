@@ -5,16 +5,14 @@ import { formatDate, formatDateTime, formatCurrency, getTaskStatusLabel, getTask
 import {
   TASK_STATUS,
   PAINT_FINISH,
-  PAINT_BRAND,
   TRUCK_MANUFACTURER,
   PAINT_FINISH_LABELS,
-  PAINT_BRAND_LABELS,
   TRUCK_MANUFACTURER_LABELS,
   SERVICE_ORDER_TYPE,
   SERVICE_ORDER_TYPE_LABELS,
   SERVICE_ORDER_TYPE_COLUMN_LABELS,
 } from "../../../../constants";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { IconClock, IconCalendar, IconCheck, IconX, IconAlertCircle } from "@tabler/icons-react";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
@@ -67,17 +65,6 @@ const renderDateWithIcon = (date: Date | null) => {
   );
 };
 
-// Helper to render service count
-const renderServiceCount = (task: Task) => {
-  const count = task.serviceOrders?.length || 0;
-  if (count === 0) return <span className="text-muted-foreground">-</span>;
-
-  return (
-    <Badge variant="secondary">
-      {count}
-    </Badge>
-  );
-};
 
 // Define all available columns
 export const createTaskColumns = (): TaskColumn[] => [

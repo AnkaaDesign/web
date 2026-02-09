@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from "@/component
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
-import { formatDate, formatDateTime } from "../../../../utils";
+import { formatDateTime } from "../../../../utils";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { UserCell } from "./cells/user-cell";
@@ -40,7 +40,7 @@ interface BorrowBatchEditTableProps {
   onSubmit?: () => void;
 }
 
-export function BorrowBatchEditTable({ borrows, onCancel, onSubmit }: BorrowBatchEditTableProps) {
+export function BorrowBatchEditTable({ borrows, onCancel: _onCancel, onSubmit: _onSubmit }: BorrowBatchEditTableProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { batchUpdateAsync } = useBorrowBatchMutations();
@@ -83,7 +83,7 @@ export function BorrowBatchEditTable({ borrows, onCancel, onSubmit }: BorrowBatc
     try {
       const result = await batchUpdateAsync(batchPayload);
       if (result?.data) {
-        const { totalSuccess, totalFailed } = result.data;
+        const { totalSuccess: _totalSuccess, totalFailed } = result.data;
 
         if (totalFailed === 0) {
           navigate(routes.inventory.loans.root);

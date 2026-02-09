@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Task, BatchOperationResult } from "../../../../types";
-import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
+import { TASK_STATUS } from "../../../../constants";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -76,7 +76,7 @@ interface TaskBatchEditTableProps {
   onSubmit?: () => void;
 }
 
-export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditTableProps) {
+export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSubmit }: TaskBatchEditTableProps) {
   // Early validation to prevent rendering with invalid data
   if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
     if (process.env.NODE_ENV !== 'production') {

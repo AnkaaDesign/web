@@ -26,7 +26,7 @@ interface AdvancedBulkActionsHandlerProps {
 export const AdvancedBulkActionsHandler = forwardRef<
   { openModal: (type: BulkOperationType, taskIds: string[]) => void },
   AdvancedBulkActionsHandlerProps
->(({ selectedTaskIds, onClearSelection }, ref) => {
+>(({ selectedTaskIds: _selectedTaskIds, onClearSelection }, ref) => {
   const [isOpen, setIsOpen] = useState(false);
   const [operationType, setOperationType] = useState<BulkOperationType | null>(null);
   const [currentTaskIds, setCurrentTaskIds] = useState<string[]>([]);

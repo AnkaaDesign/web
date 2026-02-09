@@ -41,7 +41,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
   const { batchDelete, batchUpdateAsync: batchUpdate } = useUserBatchMutations();
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user } = useAuth();
   const canEdit = user ? canEditUsers(user) : false;
   const canDelete = user ? canDeleteUsers(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'user') : false;
@@ -58,7 +58,6 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

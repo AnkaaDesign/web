@@ -1,4 +1,3 @@
-import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,7 +8,6 @@ import { borrowCreateSchema, type BorrowCreateFormData } from "../../../../schem
 import { useBorrowMutations, useItem } from "../../../../hooks";
 import { routes, FAVORITE_PAGES } from "../../../../constants";
 
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { PageHeader } from "@/components/ui/page-header";
@@ -31,7 +29,7 @@ export function BorrowCreateForm() {
   });
 
   const borrowMutations = useBorrowMutations({
-    onCreateSuccess: (data, variables) => {
+    onCreateSuccess: (_data, _variables) => {
       // Success toast is handled automatically by API client
       navigate(routes.inventory.loans.list);
     },
@@ -107,11 +105,11 @@ export function BorrowCreateForm() {
 
       // Use createAsync if available, otherwise try create
       if (createAsync) {
-        const result = await createAsync(data);
+        await createAsync(data);
       } else if (borrowMutations.create) {
         borrowMutations.create(data);
       } else if (createMutation?.mutateAsync) {
-        const result = await createMutation.mutateAsync(data);
+        await createMutation.mutateAsync(data);
       } else {
         toast.error("Erro interno: método de criação não disponível");
       }

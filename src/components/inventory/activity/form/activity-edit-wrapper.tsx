@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { IconArrowLeft, IconPackage, IconLoader2, IconCheck } from "@tabler/icons-react";
+import { IconPackage, IconLoader2, IconCheck } from "@tabler/icons-react";
 import { useActivity } from "../../../../hooks";
 import { routes } from "../../../../constants";
 import type { Activity } from "../../../../types";
 import { ActivityEditForm } from "./activity-edit-form";
-import { Button } from "@/components/ui/button";
-import { LoadingSpinner } from "@/components/ui/loading";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 

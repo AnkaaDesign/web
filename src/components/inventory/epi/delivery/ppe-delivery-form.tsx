@@ -3,18 +3,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { IconLoader, IconPackage, IconUser } from "@tabler/icons-react";
 import { z } from "zod";
-import { ppeDeliveryCreateSchema, ppeDeliveryUpdateSchema, type PpeDeliveryCreateFormData, type PpeDeliveryUpdateFormData } from "../../../../schemas";
+import { ppeDeliveryUpdateSchema, type PpeDeliveryUpdateFormData } from "../../../../schemas";
 import { useAuth } from "../../../../hooks";
 import { type PpeDelivery } from "../../../../types";
 import { PPE_DELIVERY_STATUS, PPE_DELIVERY_STATUS_LABELS, routes, SECTOR_PRIVILEGES } from "../../../../constants";
-import { ItemSelectorDropdown } from "./item-selector-dropdown";
-import { UserSelectorDropdown } from "./user-selector-dropdown";
 import { MultiDeliveryInput } from "./multi-delivery-input";
 import { hasPrivilege } from "../../../../utils";
 
@@ -55,7 +50,7 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
 
-  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(mode === "update" ? props.ppeDelivery.userId : undefined);
+  const [_selectedUserId, _setSelectedUserId] = useState<string | undefined>(mode === "update" ? props.ppeDelivery.userId : undefined);
 
   const currentStatus = mode === "update" ? props.ppeDelivery.status : PPE_DELIVERY_STATUS.APPROVED;
 

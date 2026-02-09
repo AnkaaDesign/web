@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../constants";
 import { Combobox, type ComboboxOption } from "./combobox";

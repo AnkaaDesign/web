@@ -29,10 +29,10 @@ export function ColorMultiSelect({
   className,
   disabled = false,
   searchable = true,
-  onSearchChange,
+  onSearchChange: _onSearchChange,
   itemLabel = "item",
 }: ColorMultiSelectProps) {
-  const renderOption = React.useCallback((option: ColorMultiSelectOption, isSelected: boolean) => {
+  const renderOption = React.useCallback((option: ColorMultiSelectOption, _isSelected: boolean) => {
     return (
       <div className="flex items-center gap-2">
         {option.color && <div className="w-5 h-5 rounded border border-gray-300 shadow-sm flex-shrink-0" style={{ backgroundColor: option.color }} />}

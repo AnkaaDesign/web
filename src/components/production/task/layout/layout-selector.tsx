@@ -57,7 +57,7 @@ export function LayoutSelector({
   value,
   onChange,
   side,
-  truckId,
+  truckId: _truckId,
   disabled = false,
   className,
   allowCreate = true,

@@ -121,8 +121,6 @@ export class PivotTransformer {
    * Transform data for heatmap
    */
   static toHeatmap(data: any[], config: HeatmapConfig): Array<{ x: string; y: string; value: number }> {
-    const result: Array<{ x: string; y: string; value: number }> = [];
-
     // First pass: collect data
     const heatmapData = data.map((item) => ({
       x: String(item[config.xKey]),

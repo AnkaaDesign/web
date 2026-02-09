@@ -9,10 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconCut, IconFileText, IconClipboardList } from "@tabler/icons-react";
 import { useState, useEffect } from "react";
-import type { Cut, File as FileType, Task } from "../../../../types";
-import type { CutCreateFormData } from "../../../../schemas";
+import type { Cut } from "../../../../types";
 import { cutCreateNestedSchema } from "../../../../schemas";
-import { CUT_TYPE, CUT_ORIGIN, CUT_REQUEST_REASON, CUT_TYPE_LABELS, CUT_ORIGIN_LABELS, CUT_REQUEST_REASON_LABELS } from "../../../../constants";
+import { CUT_TYPE, CUT_ORIGIN, CUT_TYPE_LABELS, CUT_ORIGIN_LABELS, CUT_REQUEST_REASON_LABELS } from "../../../../constants";
 import { useCutMutations } from "../../../../hooks";
 import { useToast } from "@/hooks/common/use-toast";
 

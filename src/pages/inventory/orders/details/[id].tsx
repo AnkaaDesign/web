@@ -3,13 +3,11 @@ import { useOrder, useOrderMutations } from "../../../../hooks";
 import { routes, ORDER_STATUS, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { Button } from "@/components/ui/button";
 import { IconAlertTriangle, IconShoppingCart, IconTrash, IconRefresh, IconEdit, IconLoader2, IconCheck } from "@tabler/icons-react";
-import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/page-header";
 import type { PageAction } from "@/components/ui/page-header";
 import { OrderInfoCard, OrderItemsCard, OrderDocumentsCard } from "@/components/inventory/order/detail";
 import { OrderDetailSkeleton } from "@/components/inventory/order/detail/order-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
-import { usePrivileges } from "../../../../hooks";
 import { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditOrders } from "@/utils/permissions/entity-permissions";
@@ -27,7 +25,6 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES } from "../../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { OrderTotalBadge } from "@/components/inventory/order/common/order-total-calculator";
-import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 const OrderDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -154,9 +151,6 @@ const OrderDetailsPage = () => {
       }
     }
   };
-
-  // Check if all items are fully received
-  const allItemsReceived = order.items?.every((item) => item.receivedQuantity === item.orderedQuantity) ?? false;
 
   // Custom actions for the header
   const customActions = [];

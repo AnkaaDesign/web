@@ -49,7 +49,7 @@ interface PricingData extends TaskPricing {
 }
 
 export function PublicBudgetPage() {
-  const { id, customerId } = useParams<{ id: string; customerId: string }>();
+  const { id, customerId: _customerId } = useParams<{ id: string; customerId: string }>();
   const [pricing, setPricing] = useState<PricingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

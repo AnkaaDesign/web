@@ -1,9 +1,8 @@
-import React from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import { IconFileOff, IconScissors } from "@tabler/icons-react";
 import type { Cut } from "../../../../types";
 import { CUT_STATUS_LABELS, CUT_REQUEST_REASON_LABELS, CUT_ORIGIN_LABELS, CUT_TYPE_LABELS, getBadgeVariant } from "../../../../constants";
-import { CUT_STATUS, CUT_ORIGIN } from "../../../../constants";
+import { CUT_ORIGIN } from "../../../../constants";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import type { CutColumn } from "./types";

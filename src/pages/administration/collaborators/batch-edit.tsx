@@ -4,7 +4,7 @@ import { useUsers } from "../../../hooks";
 import type { User } from "../../../types";
 import { UserBatchEditTable } from "@/components/administration/user/batch-edit";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconAlertTriangle, IconArrowLeft, IconUsers, IconDeviceFloppy } from "@tabler/icons-react";

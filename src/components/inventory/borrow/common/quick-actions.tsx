@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { IconPackageExport, IconCalendarTime, IconSearch, IconPlus, IconQrcode, IconLoader2, IconHistory, IconAlertCircle } from "@tabler/icons-react";
 import { BORROW_STATUS, routes } from "../../../../constants";
 import { toast } from "sonner";

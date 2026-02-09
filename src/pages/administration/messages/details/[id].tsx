@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { routes, FAVORITE_PAGES } from "../../../../constants";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconMessageCircle, IconEdit, IconTrash, IconArrowLeft, IconRefresh } from "@tabler/icons-react";
+import { IconMessageCircle, IconEdit, IconTrash, IconRefresh } from "@tabler/icons-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MessageBlockRenderer } from "@/components/messaging/MessageBlockRenderer";
@@ -57,10 +57,6 @@ export const MessageDetailsPage = () => {
     setShowDeleteDialog(false);
   };
 
-  const handleBack = () => {
-    navigate(routes.administration.messages.root);
-  };
-
   const handleRefresh = () => {
     refetch();
   };
@@ -79,14 +75,6 @@ export const MessageDetailsPage = () => {
     ACTIVE: "active",
     EXPIRED: "expired",
     ARCHIVED: "muted",
-  };
-
-  const TARGET_TYPE_LABELS: Record<string, string> = {
-    ALL_USERS: "Todos os usuários",
-    SPECIFIC_USERS: "Usuários específicos",
-    SPECIFIC_SECTORS: "Setores específicos",
-    SPECIFIC_POSITIONS: "Cargos específicos",
-    SECTOR_PRIVILEGE: "Nível de privilégio",
   };
 
   const actions = [

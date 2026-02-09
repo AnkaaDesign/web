@@ -1,5 +1,4 @@
 import {
-  FilterDefinition,
   createFilterPreset,
   createFilterGroup,
   DateFilterBuilder,
@@ -7,6 +6,7 @@ import {
   SelectFilterBuilder,
   StringFilterBuilder,
 } from "@/utils/table-filter-utils";
+import type { FilterDefinition } from "@/utils/table-filter-utils";
 
 /**
  * Predefined time-based filter presets

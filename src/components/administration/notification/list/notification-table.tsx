@@ -80,12 +80,9 @@ export function NotificationTable({
   const {
     page,
     pageSize,
-    selectedIds,
     sortConfigs,
-    showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

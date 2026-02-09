@@ -3,8 +3,6 @@ import { useEffect } from "react";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { type SupplierCreateFormData, type SupplierUpdateFormData } from "../../../../schemas";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 // Import all form components
 import { FantasyNameInput } from "./fantasy-name-input";
 import { CorporateNameInput } from "./corporate-name-input";
@@ -18,8 +16,6 @@ import { CityInput } from "./city-input";
 import { SupplierStateSelector } from "./state-selector";
 import { LogoInput } from "./logo-input";
 import { FormInput } from "@/components/ui/form-input";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 interface BaseSupplierFormProps {
   isSubmitting?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;

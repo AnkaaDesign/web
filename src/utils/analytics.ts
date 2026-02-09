@@ -19,7 +19,7 @@ export interface AnalyticsEvent {
  * @param eventName - Name of the event to track
  * @param properties - Event properties and metadata
  */
-export const trackEvent = (eventName: string, properties: AnalyticsEvent): void => {
+export const trackEvent = (_eventName: string, _properties: AnalyticsEvent): void => {
   try {
     // TODO: Integrate with analytics service (Google Analytics, Mixpanel, etc.)
     // Example for Google Analytics:

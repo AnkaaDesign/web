@@ -1,8 +1,8 @@
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
 import { toast } from "@/components/ui/sonner";
 import { taskService } from "../../../../api-client";
-import { formatDate, formatDateTime, formatCurrency } from "../../../../utils";
-import { TASK_STATUS, TASK_STATUS_LABELS, PAINT_FINISH_LABELS, PAINT_BRAND_LABELS, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
+import { formatDate, formatDateTime } from "../../../../utils";
+import { TASK_STATUS, TASK_STATUS_LABELS, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 

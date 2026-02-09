@@ -27,7 +27,7 @@ export function CorporateNameInput({ disabled }: CorporateNameInputProps) {
           <FormControl>
             <Input
               value={field.value || ""}
-              onChange={(value) => {
+              onChange={(value: string | number | null) => {
                 const rawValue = typeof value === "string" ? value : (value as any)?.target?.value || "";
                 field.onChange(toTitleCase(rawValue));
               }}

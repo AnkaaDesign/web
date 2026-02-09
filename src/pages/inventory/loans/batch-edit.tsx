@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useBorrows } from "../../../hooks";
 import { routes, FAVORITE_PAGES } from "../../../constants";

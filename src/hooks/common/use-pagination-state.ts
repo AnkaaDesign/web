@@ -87,7 +87,7 @@ export function usePaginationState(meta: Partial<PaginationMeta> = {}, options: 
     namespace,
     urlParams = { page: "page", pageSize: "pageSize" },
     autoCorrectPageOutOfBounds = true,
-    resetToFirstPageOnFiltersChange = true,
+    resetToFirstPageOnFiltersChange: _resetToFirstPageOnFiltersChange = true,
     isLoading = false,
     onPageChange,
     onPageSizeChange,

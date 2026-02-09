@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useCallback } from "react";
+import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { IconUsers } from "@tabler/icons-react";
 import { useAuth } from "../../../../hooks/common/use-auth";
-import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { usePayrolls } from "../../../../hooks";
 import { createPayrollColumns } from "./payroll-table-columns";
 import type { PayrollColumn, PayrollUserRow } from "./payroll-table-columns";
@@ -33,15 +32,12 @@ export function PayrollTable({
   visibleColumns,
   filters,
   onDataChange,
-  refreshInterval = 30000
+  refreshInterval: _refreshInterval = 30000
 }: PayrollTableProps) {
   const navigate = useNavigate();
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
-  const canEdit = user ? canEditHrEntities(user) : false;
-  const canDelete = user ? canDeleteHrEntities(user) : false;
-  const showInteractive = user ? shouldShowInteractiveElements(user, 'hr') : false;
+  const { user: _user } = useAuth();
 
   // Handle row click to navigate to payroll details
   const handleRowClick = (row: PayrollUserRow & { month?: number; year?: number }) => {

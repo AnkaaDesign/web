@@ -1,7 +1,6 @@
 import { FormCombobox } from "@/components/ui/form-combobox";
 import { useSectors } from "../../../../hooks";
 import { createSector } from "../../../../api-client";
-import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
 import { SECTOR_PRIVILEGES } from "../../../../constants";
 import { IconBuilding } from "@tabler/icons-react";
 import { useMemo } from "react";

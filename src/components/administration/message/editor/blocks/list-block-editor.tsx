@@ -48,7 +48,7 @@ export const ListBlockEditor = ({ block, onUpdate }: ListBlockEditorProps) => {
             </span>
             <Input
               value={item}
-              onChange={(value) => handleUpdateItem(index, value as string)}
+              onChange={(value: string | number | null) => handleUpdateItem(index, value as string)}
               placeholder={`Item ${index + 1}...`}
               className="h-9 dark:border-muted"
               transparent

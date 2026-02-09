@@ -9,16 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   IconFilter,
   IconX,
   IconPlus,
   IconSave,
   IconTrash,
-  IconEdit,
-  IconCopy,
-  IconSettings,
   IconSearch,
   IconCalendar,
   IconHash,
@@ -29,13 +26,15 @@ import {
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/common/use-toast";
-import {
+import type {
   FilterDefinition,
-  FilterGroup,
   FilterCondition,
   FilterFieldDefinition,
   FilterDataType,
   FilterOperator,
+  FilterPresetStorage,
+} from "@/utils/table-filter-utils";
+import {
   createFilterGroup,
   createFilterPreset,
   addConditionToGroup,
@@ -45,15 +44,10 @@ import {
   sanitizeFilterValue,
   isFilterDefinitionEmpty,
   getFilterSummary,
-  StringFilterBuilder,
-  NumberFilterBuilder,
-  DateFilterBuilder,
-  BooleanFilterBuilder,
-  SelectFilterBuilder,
   LocalStorageFilterPresets,
-  type FilterPresetStorage,
 } from "@/utils/table-filter-utils";
-import { FilterAutocomplete, type FilterSuggestion, type SuggestionProvider } from "./filter-autocomplete";
+import type { SuggestionProvider } from "./filter-autocomplete";
+import { FilterAutocomplete } from "./filter-autocomplete";
 
 /**
  * Props for the AdvancedFilterDialog component
@@ -221,7 +215,7 @@ export function AdvancedFilterDialog({
   maxConditionsPerGroup = 10,
   showAdvanced = true,
   enableValidation = true,
-  validationMessages = {},
+  validationMessages: _validationMessages = {},
 }: AdvancedFilterDialogProps) {
   // Local state for building filters
   const [filterDefinition, setFilterDefinition] = useState<FilterDefinition>(() => ({
@@ -814,7 +808,6 @@ export function AdvancedFilterDialog({
                             </div>
                           ) : (
                             group.conditions.map((condition, conditionIndex) => {
-                              const field = fields[condition.field];
                               const operators = getOperatorsForField(condition.field);
                               const errorKey = `group_${groupIndex}_condition_${conditionIndex}`;
                               const errors = validationErrors[errorKey] || [];

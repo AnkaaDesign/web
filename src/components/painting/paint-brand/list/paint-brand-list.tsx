@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePaintBrandMutations, usePaintBrandBatchMutations } from "../../../../hooks";
+import { usePaintBrandBatchMutations } from "../../../../hooks";
 import type { PaintBrand } from "../../../../types";
 import type { PaintBrandGetManyFormData } from "../../../../schemas";
 import { routes } from "../../../../constants";
@@ -43,11 +43,10 @@ const EXCLUDE_FROM_URL = ["limit", "orderBy"];
 
 export function PaintBrandList({ className }: PaintBrandListProps) {
   const navigate = useNavigate();
-  const { delete: deletePaintBrand } = usePaintBrandMutations();
-  const { batchDelete, batchUpdate } = usePaintBrandBatchMutations();
+  const { batchDelete } = usePaintBrandBatchMutations();
 
   // State to hold current page paint brands and total count from the table
-  const [tableData, setTableData] = useState<{ paintBrands: PaintBrand[]; totalRecords: number }>({ paintBrands: [], totalRecords: 0 });
+  const [, setTableData] = useState<{ paintBrands: PaintBrand[]; totalRecords: number }>({ paintBrands: [], totalRecords: 0 });
 
   // Delete confirmation dialog state
   const [deleteDialog, setDeleteDialog] = useState<{ items: PaintBrand[]; isBulk: boolean } | null>(null);
@@ -72,7 +71,6 @@ export function PaintBrandList({ className }: PaintBrandListProps) {
     setSearch,
     clearAllFilters,
     queryFilters: baseQueryFilters,
-    hasActiveFilters,
   } = useTableFilters<PaintBrandGetManyFormData>({
     defaultFilters: DEFAULT_FILTERS,
     searchDebounceMs: 500,
@@ -141,8 +139,8 @@ export function PaintBrandList({ className }: PaintBrandListProps) {
       navigate(routes.painting.paintBrands.edit(paintBrands[0].id));
     } else {
       // Multiple paint brands - navigate to batch edit page (when implemented)
-      const ids = paintBrands.map((pb) => pb.id).join(",");
-      // navigate(`${routes.painting.paintBrands.batchEdit}?ids=${ids}`);
+      paintBrands.map((pb) => pb.id).join(",");
+      // navigate(`${routes.painting.paintBrands.batchEdit}?ids=${_ids}`);
       // TODO: Implement batch edit functionality
     }
   };

@@ -1,7 +1,6 @@
 import { useWatch } from "react-hook-form";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card } from "@/components/ui/card";
-import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { AdvancedColorPicker } from "./advanced-color-picker";
 import { CanvasNormalMapRenderer } from "../effects/canvas-normal-map-renderer";
 import { PAINT_FINISH } from "../../../constants";

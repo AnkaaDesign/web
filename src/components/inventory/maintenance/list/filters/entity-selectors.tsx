@@ -1,6 +1,6 @@
-import React, { useRef, useCallback } from "react";
+import { useRef, useCallback } from "react";
 import { Label } from "@/components/ui/label";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Combobox } from "@/components/ui/combobox";
 import { getItems } from "../../../../../api-client";
 
 interface MaintenanceEntitySelectorsProps {

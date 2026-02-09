@@ -1,7 +1,7 @@
 // Patio visualization component for trucks without assigned spots
 // Displays trucks in a grid layout that have entered but not yet assigned to a garage
 
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import type { GarageTruck } from './garage-view';
 

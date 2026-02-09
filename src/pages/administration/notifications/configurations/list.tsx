@@ -264,11 +264,9 @@ export function NotificationConfigurationListPage() {
   const {
     page,
     pageSize,
-    selectedIds,
     sortConfigs,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,
@@ -339,7 +337,7 @@ export function NotificationConfigurationListPage() {
   const { data: response, isLoading, error } = useNotificationConfigurations(queryParams);
 
   const configurations = response?.data || [];
-  const totalRecords = response?.meta?.total || 0;
+  const totalRecords = response?.meta?.totalRecords || 0;
   const totalPages = Math.ceil(totalRecords / pageSize);
 
   // Get all columns

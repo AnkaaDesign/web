@@ -1,11 +1,10 @@
 import { useState, useCallback } from "react";
-import { IconScissors, IconFile, IconUpload } from "@tabler/icons-react";
+import { IconFile, IconUpload } from "@tabler/icons-react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { useController } from "react-hook-form";
-import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
-import { CUT_TYPE_LABELS, CUT_TYPE, CUT_ORIGIN } from "../../../../constants";
+import { CUT_TYPE_LABELS, CUT_TYPE } from "../../../../constants";
 import { FileUploadField } from "@/components/common/file";
 import type { FileWithPreview } from "@/components/common/file";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -112,7 +111,7 @@ export function CutSelector({ control, disabled }: CutSelectorProps) {
       <FormField
         control={control}
         name="cut.fileId"
-        render={({ field }) => (
+        render={({ field: _field }) => (
           <FormItem>
             <FormLabel className="flex items-center gap-2">
               <IconUpload className="h-4 w-4" />

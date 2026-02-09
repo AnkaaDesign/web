@@ -70,7 +70,7 @@ export const SmartSearchInput = forwardRef<HTMLInputElement, SmartSearchInputPro
       clearHistory,
       selectSuggestion,
       navigateSuggestions,
-      selectCurrentSuggestion,
+      selectCurrentSuggestion: _selectCurrentSuggestion,
       addToHistory,
       highlightMatch,
     } = searchHook;

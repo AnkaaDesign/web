@@ -1,14 +1,13 @@
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { IconPaint, IconRefresh } from "@tabler/icons-react";
+import { IconRefresh } from "@tabler/icons-react";
 import { usePaint } from "@/hooks";
-import { routes, SECTOR_PRIVILEGES } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, TEAM_LEADER } from "@/constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { LoadingPage } from "@/components/navigation/loading-page";
 import { ErrorCard } from "@/components/ui/error-card";
 import { PaintSpecificationsCard, PaintFormulasCard, RelatedPaintsCard, GroundPaintsCard } from "@/components/painting/catalogue/detail";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 /**
  * View-only Catalog Details Page for Designers
@@ -74,7 +73,7 @@ export default function CatalogDetailsPage() {
 
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.TEAM_LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, TEAM_LEADER, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="min-h-screen flex items-center justify-center">
           <LoadingPage />
         </div>
@@ -86,7 +85,7 @@ export default function CatalogDetailsPage() {
     const isNetworkError = error?.message?.includes("Network") || error?.message?.includes("timeout");
 
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.TEAM_LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, TEAM_LEADER, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="min-h-screen flex items-center justify-center p-4">
           <ErrorCard
             title={isNetworkError ? "Erro de conexão" : "Tinta não encontrada"}
@@ -105,7 +104,7 @@ export default function CatalogDetailsPage() {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.TEAM_LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, TEAM_LEADER, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col px-4 pt-4">
         <PageHeader
           variant="detail"

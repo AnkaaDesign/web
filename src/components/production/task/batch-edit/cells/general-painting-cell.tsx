@@ -57,7 +57,7 @@ export function GeneralPaintingCell({ control, index, initialPaint }: GeneralPai
   }, []);
 
   // Custom render function for paint items with preview
-  const renderPaintItem = useCallback((paint: Paint, isSelected: boolean) => {
+  const renderPaintItem = useCallback((paint: Paint, _isSelected: boolean) => {
     const color = paint.hex || "#888888";
 
     return (

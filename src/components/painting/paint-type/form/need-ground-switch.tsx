@@ -1,6 +1,5 @@
 import { FormControl, FormField, FormItem, FormLabel, FormDescription } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
-import type { PaintTypeCreateFormData, PaintTypeUpdateFormData } from "../../../../schemas";
 
 interface NeedGroundSwitchProps {
   control: any;

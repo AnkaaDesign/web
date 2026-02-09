@@ -95,14 +95,13 @@ export const PricingSelector = forwardRef<
   const lastRowRef = useRef<HTMLDivElement>(null);
   const { setValue, clearErrors, getValues } = useFormContext();
 
-  const { fields, append, prepend, remove } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control,
     name: "pricing.items",
   });
 
   // Watch pricing values
   const pricingItems = useWatch({ control, name: "pricing.items" });
-  const pricingStatus = useWatch({ control, name: "pricing.status" }) || 'DRAFT';
   const pricingExpiresAt = useWatch({ control, name: "pricing.expiresAt" });
   const discountType = useWatch({ control, name: "pricing.discountType" }) || DISCOUNT_TYPE.NONE;
   const discountValue = useWatch({ control, name: "pricing.discountValue" });
@@ -110,7 +109,6 @@ export const PricingSelector = forwardRef<
   const customPaymentText = useWatch({ control, name: "pricing.customPaymentText" });
   const guaranteeYears = useWatch({ control, name: "pricing.guaranteeYears" });
   const customGuaranteeText = useWatch({ control, name: "pricing.customGuaranteeText" });
-  const layoutFileId = useWatch({ control, name: "pricing.layoutFileId" });
 
   // Current payment condition - directly from stored value or CUSTOM if has custom text
   const currentPaymentCondition = useMemo(() => {
@@ -545,7 +543,7 @@ export const PricingSelector = forwardRef<
           <FormField
             control={control}
             name="pricing.expiresAt"
-            render={({ field }) => (
+            render={({ field: _field }) => (
               <FormItem>
                 <FormLabel className="flex items-center gap-2">
                   <IconCalendar className="h-4 w-4" />
@@ -745,7 +743,7 @@ interface PricingItemRowProps {
 }
 
 const PricingItemRow = forwardRef<HTMLDivElement, PricingItemRowProps>(
-  ({ control, index, disabled, readOnly, onRemove, isFirstRow, isLastRow }, ref) => {
+  ({ control, index, disabled, readOnly, onRemove, isFirstRow, isLastRow: _isLastRow }, ref) => {
     // Observation modal state
     const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
     const [tempObservation, setTempObservation] = useState("");

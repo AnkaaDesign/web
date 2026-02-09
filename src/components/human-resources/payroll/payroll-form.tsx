@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -37,13 +36,13 @@ import {
   IconCalculator,
 } from "@tabler/icons-react";
 import { useUsers, useBonuses } from "../../../hooks";
-import { formatCurrency, parseCurrency } from "../../../utils";
+import { formatCurrency } from "../../../utils";
 import { payrollCreateSchema, payrollUpdateSchema } from "../../../schemas";
 import type {
   PayrollCreateFormData,
   PayrollUpdateFormData
 } from "../../../schemas";
-import type { Payroll, User, Bonus } from "../../../types";
+import type { Payroll } from "../../../types";
 import { UserSelector } from "@/components/ui/user-selector";
 
 interface PayrollFormProps {

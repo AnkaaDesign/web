@@ -1,4 +1,3 @@
-import type { WarningCreateFormData, WarningUpdateFormData } from "../../../../schemas";
 import { WARNING_CATEGORY_LABELS } from "../../../../constants";
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";

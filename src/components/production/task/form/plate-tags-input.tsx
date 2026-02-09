@@ -1,11 +1,11 @@
-import { useFieldArray, useWatch, type FieldValues, type Path, type ArrayPath } from "react-hook-form";
+import { useFieldArray, useWatch } from "react-hook-form";
 import { useState } from "react";
 import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { IconX, IconLicense } from "@tabler/icons-react";
 
-interface PlateTagsInputProps<TFieldValues extends FieldValues = FieldValues> {
+interface PlateTagsInputProps {
   control: any;
   disabled?: boolean;
 }

@@ -227,7 +227,7 @@ export function useNotificationSocket() {
       socketService.requestNotificationCount();
     };
 
-    const handleDisconnect = (reason: string) => {
+    const handleDisconnect = (_reason: string) => {
       // Socket disconnected
     };
 

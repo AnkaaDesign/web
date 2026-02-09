@@ -11,9 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { IconSelector, IconChevronUp, IconChevronDown } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
@@ -59,8 +57,8 @@ interface PerformanceLevelSelectorProps {
 function PerformanceLevelSelector({
   value,
   onChange,
-  onBlur,
-  userId,
+  onBlur: _onBlur,
+  userId: _userId,
   isModified,
   className,
 }: PerformanceLevelSelectorProps) {
@@ -121,12 +119,12 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
   isLoading,
   error,
   visibleColumns,
-  selectedUserIds,
-  onSelectionChange,
-  onDataChange,
+  selectedUserIds: _selectedUserIds,
+  onSelectionChange: _onSelectionChange,
+  onDataChange: _onDataChange,
   onRefresh,
   onPendingChangesUpdate,
-  className,
+  className: _className,
   onSort,
   getSortDirection,
   getSortOrder
@@ -136,7 +134,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
   const [userPerformanceLevels, setUserPerformanceLevels] = useState<Map<string, number>>(new Map());
 
   const queryClient = useQueryClient();
-  const { update, updateAsync, isUpdating, updateMutation, batchUpdate } = useUserMutations();
+  const { updateAsync, isUpdating, batchUpdate } = useUserMutations();
 
   // Get current payroll period (26th-25th cycle)
   // If today is Sept 26th or later, this returns October
@@ -295,7 +293,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
   );
 
   const handlePerformanceLevelBlur = useCallback(
-    async (userId: string) => {
+    async (_userId: string) => {
       // Don't auto-save anymore, just keep the pending changes
       // Changes will be saved when the user clicks the Save button
     },

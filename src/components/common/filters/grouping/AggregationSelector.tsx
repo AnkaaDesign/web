@@ -50,19 +50,6 @@ export function AggregationSelector({
   availableFields,
   className,
 }: AggregationSelectorProps) {
-  const addAggregation = () => {
-    const newAgg: Aggregation = {
-      id: `agg-${Date.now()}`,
-      field: availableFields[0]?.field || "",
-      function: "count",
-      displayFormat: "number",
-    };
-    onChange([...value, newAgg]);
-  };
-
-  const removeAggregation = (id: string) => {
-    onChange(value.filter((agg) => agg.id !== id));
-  };
 
   const updateAggregation = (id: string, updates: Partial<Aggregation>) => {
     onChange(value.map((agg) => (agg.id === id ? { ...agg, ...updates } : agg)));
@@ -80,7 +67,6 @@ export function AggregationSelector({
     <div className={cn("space-y-4", className)}>
       <div className="space-y-2">
         {value.map((aggregation) => {
-          const fieldDef = availableFields.find((f) => f.field === aggregation.field);
           const functions = getAvailableFunctions(aggregation.field);
 
           return (

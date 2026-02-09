@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback, MouseEvent } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import type { MouseEvent } from "react";
 import { IconSearch, IconFilter, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
 import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
 import { Button } from "@/components/ui/button";
@@ -592,7 +593,7 @@ export const OrderItemSelector = ({
             {/* Search Input */}
             <div className="relative flex-1">
               <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Pesquisar por nome, código, marca ou categoria..." value={searchTerm} onChange={(value) => handleSearch(String(value || ""))} className="pl-10 bg-transparent" />
+              <Input placeholder="Pesquisar por nome, código, marca ou categoria..." value={searchTerm} onChange={(value: string | number | null) => handleSearch(String(value || ""))} className="pl-10 bg-transparent" />
             </div>
 
             {/* Action buttons row */}
@@ -947,7 +948,7 @@ export const OrderItemSelector = ({
                               <Input
                                 type="decimal"
                                 value={quantity}
-                                onChange={(value) => onQuantityChange?.(item.id, typeof value === "number" ? value : 0)}
+                                onChange={(value: string | number | null) => onQuantityChange?.(item.id, typeof value === "number" ? value : 0)}
                                 className="w-full h-8 text-sm"
                               />
                             ) : (
@@ -965,7 +966,7 @@ export const OrderItemSelector = ({
                               <Input
                                 type="currency"
                                 value={price}
-                                onChange={(value) => {
+                                onChange={(value: string | number | null) => {
                                   onPriceChange?.(item.id, (value as number) || 0);
                                 }}
                                 className="w-full h-8 text-sm"
@@ -990,7 +991,7 @@ export const OrderItemSelector = ({
                                 min={0}
                                 max={100}
                                 value={icmses[item.id] || 0}
-                                onChange={(value) => onIcmsChange?.(item.id, typeof value === "number" ? value : 0)}
+                                onChange={(value: string | number | null) => onIcmsChange?.(item.id, typeof value === "number" ? value : 0)}
                                 className="w-20 h-8 text-sm"
                               />
                             ) : (
@@ -1010,7 +1011,7 @@ export const OrderItemSelector = ({
                                 min={0}
                                 max={100}
                                 value={ipis[item.id] || 0}
-                                onChange={(value) => onIpiChange?.(item.id, typeof value === "number" ? value : 0)}
+                                onChange={(value: string | number | null) => onIpiChange?.(item.id, typeof value === "number" ? value : 0)}
                                 className="w-20 h-8 text-sm"
                               />
                             ) : (

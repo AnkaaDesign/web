@@ -1,10 +1,10 @@
 import * as React from "react";
-import { IconCalendar, IconClock, IconX } from "@tabler/icons-react";
-import { format, isValid, parse, addDays, startOfDay, endOfDay } from "date-fns";
+import { IconCalendar, IconClock } from "@tabler/icons-react";
+import { format, isValid, parse, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 import type { FieldValues, FieldPath } from "react-hook-form";
-import { FormControl, FormItem, FormLabel, FormMessage, useFormField } from "@/components/ui/form";
+import { FormControl, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -142,40 +142,13 @@ const parseFromHTMLInput = (value: string, mode: DateTimeMode): Date | null => {
   }
 };
 
-// Format date for display
-const formatDateTime = (date: Date | string | null, mode: DateTimeMode): string => {
-  if (!date) return "";
-
-  // Convert string to Date if needed
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-
-  if (!isValid(dateObj)) return "";
-
-  try {
-    switch (mode) {
-      case "date":
-        return format(dateObj, "dd/MM/yyyy", { locale: ptBR });
-      case "time":
-        return format(dateObj, "HH:mm", { locale: ptBR });
-      case "datetime":
-        return format(dateObj, "dd/MM/yyyy HH:mm", { locale: ptBR });
-      case "date-range":
-        return format(dateObj, "dd/MM/yyyy", { locale: ptBR });
-      default:
-        return "";
-    }
-  } catch {
-    return "";
-  }
-};
-
 // Main component
 export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>>({
   field,
   mode = "date",
-  placeholder,
+  placeholder: _placeholder,
   disabled = false,
-  readOnly = false,
+  readOnly: _readOnly = false,
   constraints,
   onChange,
   value,
@@ -183,17 +156,17 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
   label,
   hideLabel = false,
   error,
-  numberOfMonths = 1,
-  onFocus,
-  onBlur,
+  numberOfMonths: _numberOfMonths = 1,
+  onFocus: _onFocus,
+  onBlur: _onBlur,
   onClear,
   format24Hours = true,
   showSeconds = false,
   showClearButton = true,
-  buttonClassName,
+  buttonClassName: _buttonClassName,
   hideIcon = false,
   context,
-  required = false,
+  required: _required = false,
 }: DateTimeInputProps<TFieldValues, TName>) => {
   // State
   const [isOpen, setIsOpen] = React.useState(false);
@@ -225,65 +198,6 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
     }
     return rawValue;
   }, [rawValue]);
-
-  // HTML input type mapping
-  const getHTMLInputType = () => {
-    switch (mode) {
-      case "date":
-        return "date";
-      case "datetime":
-        return "datetime-local";
-      case "time":
-        return "time";
-      default:
-        return "date";
-    }
-  };
-
-  // Get min/max date attributes for HTML input (helps prevent unreasonable dates)
-  const getDateInputConstraints = () => {
-    if (mode === "time") return {};
-
-    const attrs: { min?: string; max?: string } = {};
-
-    if (mergedConstraints?.minDate) {
-      attrs.min = format(mergedConstraints.minDate, "yyyy-MM-dd");
-    }
-    if (mergedConstraints?.maxDate) {
-      attrs.max = format(mergedConstraints.maxDate, "yyyy-MM-dd");
-    }
-
-    return attrs;
-  };
-
-  // Format current value for HTML input
-  const htmlInputValue = formatForHTMLInput(currentValue, mode);
-
-  // Handle HTML input changes with year validation
-  const handleHTMLInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    const parsed = parseFromHTMLInput(inputValue, mode);
-
-    // Validate year is within reasonable bounds
-    if (parsed && !isReasonableYear(parsed, context)) {
-      // Don't update with unreasonable date - the form validation will catch it
-      // but we can prevent obviously wrong values from being set
-      const changeHandler = field?.onChange || onChange;
-      if (changeHandler) {
-        // Set to null to trigger validation error
-        changeHandler(null);
-      }
-      field?.onBlur();
-      return;
-    }
-
-    const changeHandler = field?.onChange || onChange;
-    if (changeHandler) {
-      changeHandler(parsed);
-    }
-    // Mark field as touched/dirty for React Hook Form
-    field?.onBlur();
-  };
 
   // Date constraint validation
   const isDateDisabled = React.useCallback(
@@ -1180,7 +1094,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
 };
 
 // TimeInput wrapper for backward compatibility
-export const TimeInput = React.forwardRef<HTMLInputElement, Omit<DateTimeInputProps, "mode">>((props, ref) => {
+export const TimeInput = React.forwardRef<HTMLInputElement, Omit<DateTimeInputProps, "mode">>((props, _ref) => {
   return <DateTimeInput {...props} mode="time" />;
 });
 

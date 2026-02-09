@@ -1,5 +1,4 @@
 import { apiClient } from './axiosClient';
-import type { TaskPricing } from '@/types/task-pricing';
 
 export const taskPricingService = {
   // Get all pricings

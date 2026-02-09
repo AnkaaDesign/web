@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -16,7 +16,6 @@ import {
   IconCheck,
   IconX,
   IconBuilding,
-  IconUsers,
   IconBriefcase,
   IconUserCheck,
   IconUserMinus,
@@ -44,7 +43,7 @@ export function BonusSimulationFilters({
   onOpenChange,
   filters,
   onApply,
-  onReset,
+  onReset: _onReset,
   sectors
 }: BonusSimulationFiltersProps) {
   const [localFilters, setLocalFilters] = useState(filters);

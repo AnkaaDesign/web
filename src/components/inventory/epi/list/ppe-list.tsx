@@ -17,15 +17,12 @@ import { getDefaultVisibleColumns, createPpeColumns } from "./ppe-table-columns"
 import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/common/use-table-state";
-import { Badge } from "@/components/ui/badge";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { PpeExport } from "./ppe-export";
 
 interface PpeListProps {
   className?: string;
 }
-
-const DEFAULT_PAGE_SIZE = 40;
 
 // Simple debounce utility - moved outside component to avoid initialization issues
 function createDebounce<T extends (...args: any[]) => any>(func: T, wait: number) {

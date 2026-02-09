@@ -1,11 +1,11 @@
 // web/src/pages/inventory/statistics/consumption.tsx
 
-import { useState, useMemo, useCallback, Suspense, lazy } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from '@/constants';
+import { routes, FAVORITE_PAGES } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useConsumptionAnalytics, getComparisonType } from '@/hooks/inventory/use-consumption-analytics';
 import type { ConsumptionAnalyticsFilters, ConsumptionChartType } from '@/types/consumption-analytics';
@@ -24,15 +24,12 @@ import {
   IconBox,
   IconArrowsSort,
   IconChartArea,
-  IconChartDots,
   IconStack2,
-  IconRuler,
 } from '@tabler/icons-react';
 
 // Y-axis display mode type
 type YAxisMode = 'quantity' | 'value';
 import { format, startOfDay, endOfDay, subMonths } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import { toast } from 'sonner';
@@ -178,7 +175,6 @@ const ConsumptionPage = () => {
 
   const items = data?.data?.items || [];
   const summary = data?.data?.summary;
-  const mode = data?.data?.mode || 'items';
 
   // Handle filter apply (ensure operation is always OUTBOUND)
   const handleFilterApply = useCallback((newFilters: ConsumptionAnalyticsFilters) => {

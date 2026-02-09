@@ -1,7 +1,6 @@
 // apps/web/src/components/production/task/batch-edit/task-batch-result-dialog.tsx
 
-import * as React from "react";
-import { IconCheck, IconX, IconAlertCircle, IconClipboardList, IconFileText } from "@tabler/icons-react";
+import { IconCheck, IconX, IconAlertCircle, IconFileText } from "@tabler/icons-react";
 import type { BatchOperationResult, BatchOperationError, Task } from "../../../../types";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import { TASK_STATUS_LABELS } from "../../../../constants";
 
 interface TaskBatchResultDialogProps {

@@ -19,7 +19,6 @@ import type {
   PpeDeliveryGetManyFormData,
 } from "../../schemas";
 import type {
-  UserGetManyResponse,
   BorrowGetManyResponse,
   VacationGetManyResponse,
   WarningGetManyResponse,

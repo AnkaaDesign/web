@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useUsers, useItems, useMarkPpeDeliveryAsDelivered, useBatchMarkPpeDeliveriesAsDelivered, useAuth, useBatchApprovePpeDeliveries, useBatchRejectPpeDeliveries, usePpeDeliveryMutations, useBatchDeletePpeDeliveries } from "../../../../hooks";
+import { useUsers, useItems, useBatchMarkPpeDeliveriesAsDelivered, useAuth, useBatchApprovePpeDeliveries, useBatchRejectPpeDeliveries, usePpeDeliveryMutations, useBatchDeletePpeDeliveries } from "../../../../hooks";
 import type { PpeDelivery } from "../../../../types";
 import type { PpeDeliveryGetManyFormData } from "../../../../schemas";
 import { routes, PPE_DELIVERY_STATUS, ITEM_CATEGORY_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
@@ -20,8 +20,6 @@ import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createPpeDeliveryColumns, getDefaultVisibleColumns } from "./ppe-delivery-table-columns";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { useTableState } from "@/hooks/common/use-table-state";
-import { useBatchResultDialog } from "@/hooks/common/use-batch-result-dialog";
-import { BatchOperationResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 interface PpeDeliveryListProps {
@@ -47,7 +45,6 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const markAsDeliveredMutation = useMarkPpeDeliveryAsDelivered();
   const batchMarkAsDeliveredMutation = useBatchMarkPpeDeliveriesAsDelivered();
   const batchApproveMutation = useBatchApprovePpeDeliveries();
   const batchRejectMutation = useBatchRejectPpeDeliveries();
@@ -57,13 +54,13 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   const [deleteDialog, setDeleteDialog] = useState<{ items: PpeDelivery[]; isBulk: boolean } | null>(null);
 
   // Get table state for selected items functionality - shared with table component via URL
-  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds } = useTableState({
+  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds: _selectedIds } = useTableState({
     defaultPageSize: DEFAULT_PAGE_SIZE,
     resetSelectionOnPageChange: false,
   });
 
   // State to hold current page items from the table component
-  const [tableData, setTableData] = useState<{
+  const [_tableData, setTableData] = useState<{
     items: PpeDelivery[];
     totalRecords: number;
   }>({

@@ -2,9 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
@@ -157,7 +155,7 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
                   min="0"
                   placeholder="Valor mínimo"
                   value={localState.taskCount?.min?.toString() || ""}
-                  onChange={(value) => {
+                  onChange={(value: string | number | null) => {
                     const strValue = value as string;
                     const min = strValue ? parseInt(strValue, 10) : undefined;
                     if (min !== undefined && isNaN(min)) return;
@@ -182,7 +180,7 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
                   min="0"
                   placeholder="Sem limite"
                   value={localState.taskCount?.max?.toString() || ""}
-                  onChange={(value) => {
+                  onChange={(value: string | number | null) => {
                     const strValue = value as string;
                     const max = strValue ? parseInt(strValue, 10) : undefined;
                     if (max !== undefined && isNaN(max)) return;

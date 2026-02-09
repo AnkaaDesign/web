@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 import { getUsers } from "../../../../api-client";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { USER_STATUS } from "../../../../constants";
 import type { User } from "../../../../types";
 
 interface UserSelectorDropdownProps {

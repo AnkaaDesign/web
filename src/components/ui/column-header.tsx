@@ -13,7 +13,6 @@ import {
   IconSortAscending,
   IconSortDescending,
   IconX,
-  IconSettings,
 } from "@tabler/icons-react";
 import { TableHead } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -98,7 +97,7 @@ export function ColumnHeader({
   onFilter,
 
   // Column menu props
-  columnKey,
+  columnKey: _columnKey,
   actions = [],
   onHide,
   onPin,
@@ -508,5 +507,3 @@ export function ColumnHeader({
   );
 }
 
-// Export types for external use
-export type { ColumnAction, FilterConfig };

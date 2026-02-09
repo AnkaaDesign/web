@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { formatCurrency } from "../../../../utils";
@@ -165,7 +164,7 @@ export function BonusDiscountManager({
     {
       key: "customer.name",
       title: "Cliente",
-      render: (task) => task.customer?.name || "N/A",
+      render: (task) => task.customer?.fantasyName || "N/A",
     },
     {
       key: "actions",
@@ -467,7 +466,7 @@ export function BonusDiscountManager({
                   <SelectContent>
                     {availableTasks.map((task) => (
                       <SelectItem key={task.id} value={task.id}>
-                        {task.name} - {task.customer?.name}
+                        {task.name} - {task.customer?.fantasyName}
                       </SelectItem>
                     ))}
                   </SelectContent>

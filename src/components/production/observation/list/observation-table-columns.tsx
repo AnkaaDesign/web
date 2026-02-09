@@ -1,6 +1,6 @@
 import React from "react";
 import type { Observation } from "../../../../types";
-import { formatDate, formatRelativeTime } from "../../../../utils";
+import { formatDate } from "../../../../utils";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { IconPaperclip } from "@tabler/icons-react";

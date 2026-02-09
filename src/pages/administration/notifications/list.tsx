@@ -272,7 +272,7 @@ export const NotificationListPage = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [filters, setFilters] = useState<Partial<NotificationGetManyFormData>>({});
-  const [tableData, setTableData] = useState<{ items: Notification[]; totalRecords: number }>({
+  const [, setTableData] = useState<{ items: Notification[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });

@@ -534,8 +534,6 @@ export interface PpeSizeDistribution {
   totalUsers: number;
 }
 
-export type { PpeOrderSuggestion, PpeSizeRequirement, PpeAvailabilityBySize, PpeSizeDistribution };
-
 /**
  * Get PPE size value based on type
  */

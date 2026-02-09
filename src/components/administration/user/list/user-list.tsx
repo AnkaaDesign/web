@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserBatchMutations, usePositions, useSectors } from "../../../../hooks";
 import type { User } from "../../../../types";
@@ -55,7 +55,7 @@ export function UserList({ className }: UserListProps) {
   const [mergeDialog, setMergeDialog] = useState<{ open: boolean; users: User[] }>({ open: false, users: [] });
 
   // Merge mutation
-  const { mutate: mergeMutation, isPending: isMerging } = useMutation({
+  const { mutate: mergeMutation } = useMutation({
     mutationFn: mergeUsers,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });

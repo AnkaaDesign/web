@@ -53,7 +53,7 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
   const { delete: deleteObservation } = useObservationMutations();
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user } = useAuth();
   const canEdit = user ? canEditObservations(user) : false;
   const canDelete = user ? canDeleteObservations(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'observation') : false;
@@ -70,7 +70,7 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,
@@ -79,7 +79,7 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
     isAllSelected,
     isPartiallySelected,
     selectionCount,
-    resetSelection,
+    resetSelection: _resetSelection,
     removeFromSelection,
     handleRowClick: handleRowClickSelection,
   } = useTableState({

@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from "react";
 import type { User } from "../../../../types";
 import { USER_STATUS } from "../../../../constants";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 import { getUsers } from "../../../../api-client";
 
@@ -19,7 +19,7 @@ interface ActivityUserSelectorProps {
 export const ActivityUserSelector = ({
   value,
   onChange,
-  users,
+  users: _users,
   placeholder = "Selecione um usuário",
   size = "default",
   className,
@@ -79,7 +79,7 @@ export const ActivityUserSelector = ({
     });
 
     const usersData = response.data || [];
-    const total = response.total || 0;
+    const total = response.meta?.totalRecords || 0;
     const hasMore = (page * pageSize) < total;
 
     return {

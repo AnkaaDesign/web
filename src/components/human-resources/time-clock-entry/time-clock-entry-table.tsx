@@ -725,9 +725,6 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       {/* Time inputs */}
                       {["entry1", "exit1", "entry2", "exit2", "entry3", "exit3", "entry4", "exit4", "entry5", "exit5"].map((timeField) => {
                         const isModified = isFieldModified(field.id, timeField);
-                        const currentValue = form.getValues(`entries.${index}.${timeField}` as any);
-                        const originalEntry = originalNormalizedEntries.find((e) => e.id === field.id);
-                        const originalValue = originalEntry?.[timeField as keyof typeof originalEntry];
                         const rawEntry = entries.find((e: any) => String(e.Id) === field.id || String(e.id) === field.id);
                         const isManual = isManualEntry(rawEntry, timeField);
                         return (

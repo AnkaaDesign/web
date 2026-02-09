@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime, formatMaintenanceDuration } from "../../../../utils";
+import { formatDate, formatDateTime } from "../../../../utils";
 import { MAINTENANCE_STATUS } from "../../../../constants";
 import type { Maintenance } from "../../../../types";
 import { MaintenanceStatusBadge } from "../common/maintenance-status-badge";

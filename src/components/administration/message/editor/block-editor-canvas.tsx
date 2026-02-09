@@ -63,11 +63,6 @@ export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasP
     onBlocksChange(blocks.filter((block) => block.id !== id));
   };
 
-  const handleInsertBlock = (index: number) => {
-    setInsertIndex(index);
-    setShowTypeSelector(true);
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -87,7 +82,7 @@ export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasP
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-3">
-              {blocks.map((block, index) => (
+              {blocks.map((block, _index) => (
                 <BlockEditor
                   key={block.id}
                   block={block}

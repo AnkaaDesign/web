@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconShieldCheck, IconShirt, IconShoe, IconBoxSeam, IconMask, IconBulb, IconCalendar, IconPackage, IconUser, IconCertificate, IconRuler } from "@tabler/icons-react";
+import { IconShieldCheck, IconShirt, IconShoe, IconBoxSeam, IconMask, IconBulb, IconPackage, IconUser, IconCertificate, IconRuler } from "@tabler/icons-react";
 import type { Item } from "../../../../types";
 import { PPE_TYPE_LABELS, PPE_SIZE_LABELS, PPE_DELIVERY_MODE_LABELS, PPE_TYPE } from "../../../../constants";
 import { cn } from "@/lib/utils";

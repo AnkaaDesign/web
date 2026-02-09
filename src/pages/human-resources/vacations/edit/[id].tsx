@@ -10,8 +10,6 @@ import { PageHeader } from "@/components/page-header";
 import { VacationForm } from "@/components/human-resources/vacation";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import type { VacationUpdateFormData } from "../../../../schemas";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export const EditVacationPage = () => {
   const navigate = useNavigate();

@@ -4,15 +4,11 @@ import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, TASK_
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useAdministrationDashboard, usePositions } from "../../hooks";
 import { useNavigate } from "react-router-dom";
-import { formatCurrency, formatNumber } from "../../utils";
 import { useState } from "react";
 import {
   IconSettings,
-  IconPlus,
   IconUsers,
   IconBuilding,
-  IconCurrencyDollar,
-  IconUser,
   IconUserCheck,
   IconBell,
   IconFolder,
@@ -20,14 +16,10 @@ import {
   IconUserPlus,
   IconBuildingBank,
   IconActivity,
-  IconTrendingUp,
-  IconTrendingDown,
   IconClock,
   IconUserX,
-  IconFileUpload,
   IconMail,
   IconShield,
-  IconEye,
   IconChartPie,
   IconUsersGroup,
 } from "@tabler/icons-react";
@@ -46,8 +38,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export const AdministrationRootPage = () => {
   const navigate = useNavigate();
@@ -124,44 +114,6 @@ export const AdministrationRootPage = () => {
         color: "red" as const,
       },
     ];
-  };
-
-  // Get file type distribution
-  const getFileTypeDistribution = (): PatternData[] => {
-    if (!dashboard?.data?.fileMetrics?.fileTypeDistribution) return [];
-
-    return dashboard.data.fileMetrics.fileTypeDistribution.map((item) => ({
-      label: item.type,
-      value: item.count,
-    }));
-  };
-
-  // Get users by position
-  const getUsersByPosition = (): PatternData[] => {
-    if (!dashboard?.data?.userActivity?.byPosition) return [];
-
-    const chartData = dashboard.data.userActivity.byPosition;
-    if (!chartData.datasets || !chartData.datasets[0]) return [];
-
-    // Take top 5 positions
-    return chartData.labels.slice(0, 5).map((label, index) => ({
-      label: label.substring(0, 10),
-      value: chartData.datasets[0].data[index] || 0,
-    }));
-  };
-
-  // Get top sectors
-  const getTopSectors = (): PatternData[] => {
-    if (!dashboard?.data?.sectorMetrics?.usersBySector) return [];
-
-    const chartData = dashboard.data.sectorMetrics.usersBySector;
-    if (!chartData.datasets || !chartData.datasets[0]) return [];
-
-    // Take top 5 sectors
-    return chartData.labels.slice(0, 5).map((label, index) => ({
-      label: label.substring(0, 10),
-      value: chartData.datasets[0].data[index] || 0,
-    }));
   };
 
   // Get sector analysis data

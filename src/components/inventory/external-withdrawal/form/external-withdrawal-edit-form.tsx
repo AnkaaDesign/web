@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconUser, IconArrowBack, IconPackage, IconPackageExport, IconDownload, IconFileInvoice, IconReceipt } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconUser, IconPackage, IconPackageExport, IconDownload, IconFileInvoice, IconReceipt } from "@tabler/icons-react";
 import type { ExternalWithdrawalCreateFormData } from "../../../../schemas";
 import type { ExternalWithdrawal, ExternalWithdrawalItem, Item } from "../../../../types";
 import { externalWithdrawalCreateSchema } from "../../../../schemas";

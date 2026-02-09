@@ -23,7 +23,7 @@ interface FilterUtilsOptions {
 export function extractActiveFilters(
   filters: Partial<CustomerGetManyFormData>,
   onRemoveFilter: (key: string, itemId?: string) => void,
-  options: FilterUtilsOptions = {},
+  _options: FilterUtilsOptions = {},
 ): FilterIndicator[] {
   const activeFilters: FilterIndicator[] = [];
 

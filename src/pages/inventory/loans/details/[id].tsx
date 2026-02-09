@@ -2,13 +2,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useBorrow } from "../../../../hooks";
 import { routes, BORROW_STATUS } from "../../../../constants";
 import { Button } from "@/components/ui/button";
-import { IconAlertTriangle, IconPackage, IconTrash, IconAlertTriangleFilled, IconEdit, IconRefresh } from "@tabler/icons-react";
-import { toast } from "sonner";
+import { IconAlertTriangle, IconTrash, IconAlertTriangleFilled, IconEdit, IconRefresh } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { BorrowSpecificationsCard } from "@/components/inventory/borrow/detail/borrow-specifications-card";
 import { BorrowItemCard } from "@/components/inventory/borrow/detail/borrow-item-card";
 import { BorrowHistoryCard } from "@/components/inventory/borrow/detail/borrow-history-card";
-import { usePrivileges } from "../../../../hooks";
 import { useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditBorrows } from "@/utils/permissions/entity-permissions";
@@ -23,7 +21,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useBorrowMutations } from "../../../../hooks";
-import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 export const LoanDetailsPage = () => {
   const { id } = useParams<{ id: string }>();

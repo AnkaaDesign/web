@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { IconPackage, IconUser, IconCalendar, IconCalendarCheck, IconCurrencyReal, IconFileText, IconNotes, IconHash, IconArrowBack, IconFileInvoice, IconReceipt, IconLayoutGrid, IconList } from "@tabler/icons-react";
+import { IconPackage, IconUser, IconCalendar, IconCalendarCheck, IconCurrencyReal, IconNotes, IconHash, IconArrowBack, IconFileInvoice, IconReceipt, IconLayoutGrid, IconList } from "@tabler/icons-react";
 import type { ExternalWithdrawal } from "../../../../types";
 import { EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 import { formatDateTime } from "../../../../utils";

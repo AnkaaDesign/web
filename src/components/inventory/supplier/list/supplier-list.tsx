@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBatchDeleteSuppliers } from "../../../../hooks";
 import type { Supplier } from "../../../../types";
@@ -258,7 +258,7 @@ export function SupplierList({ className }: SupplierListProps) {
 
   // Handle filter removal
   const onRemoveFilter = useCallback(
-    (key: string, value?: any) => {
+    (key: string, _value?: any) => {
       if (key === "searchingFor") {
         setSearch("");
       } else {

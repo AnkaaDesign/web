@@ -13,7 +13,6 @@ import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
-import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { VacationTable } from "./vacation-table";
 import { VacationFilters } from "./vacation-filters";
 import { VacationExport } from "./vacation-export";

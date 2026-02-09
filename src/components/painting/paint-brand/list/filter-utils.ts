@@ -18,7 +18,7 @@ interface FilterUtilsOptions {
 export function extractActiveFilters(
   filters: Partial<PaintBrandGetManyFormData>,
   onRemoveFilter: (key: string, itemId?: string) => void,
-  options: FilterUtilsOptions = {},
+  _options: FilterUtilsOptions = {},
 ): FilterIndicator[] {
   const activeFilters: FilterIndicator[] = [];
 
@@ -35,7 +35,7 @@ export function extractActiveFilters(
 
   // Name filter
   if (filters.names && filters.names.length > 0) {
-    filters.names.forEach((name, index) => {
+    filters.names.forEach((name, _index) => {
       activeFilters.push({
         key: "names",
         label: "Nome",

@@ -42,17 +42,6 @@ export interface DensityCalculationSuccess extends DensityCalculation {
 
 export type DensityCalculationResult = DensityCalculationSuccess | DensityCalculationError;
 
-export type {
-  MeasureValue,
-  MeasureConversionError,
-  MeasureConversionSuccess,
-  MeasureConversionResult,
-  DensityCalculation,
-  DensityCalculationError,
-  DensityCalculationSuccess,
-  DensityCalculationResult
-};
-
 // =====================
 // Unit Categories
 // =====================
@@ -68,8 +57,6 @@ export type VolumeUnit = (typeof VOLUME_UNITS)[number];
 export type LengthUnit = (typeof LENGTH_UNITS)[number];
 export type CountUnit = (typeof COUNT_UNITS)[number];
 export type PackagingUnit = (typeof PACKAGING_UNITS)[number];
-
-export type { WeightUnit, VolumeUnit, LengthUnit, CountUnit, PackagingUnit };
 
 // =====================
 // Unit Conversion Constants
@@ -399,7 +386,7 @@ export function getPrimaryMeasure(measureValue: number | null, measureUnit: MEAS
 /**
  * Format a measure value with Brazilian conventions
  */
-export function formatMeasure(measure: MeasureValue, includeUnit: boolean = true, decimals: number = 2, measureType?: MEASURE_TYPE): string {
+export function formatMeasure(measure: MeasureValue, includeUnit: boolean = true, decimals: number = 2, _measureType?: MEASURE_TYPE): string {
   // For INCHES (any measure type), format as fraction with inch symbol
   if (measure.unit === MEASURE_UNIT.INCHES) {
     const fractionValue = decimalToFraction(measure.value);

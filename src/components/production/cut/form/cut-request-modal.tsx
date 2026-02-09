@@ -10,10 +10,10 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { IconFileText, IconCut, IconAlertCircle, IconInfoCircle } from "@tabler/icons-react";
+import { IconFileText, IconCut, IconInfoCircle } from "@tabler/icons-react";
 import { useState } from "react";
 import type { Cut } from "../../../../types";
-import { CUT_REQUEST_REASON, CUT_ORIGIN, CUT_STATUS } from "../../../../constants";
+import { CUT_REQUEST_REASON, CUT_ORIGIN } from "../../../../constants";
 import { CUT_REQUEST_REASON_LABELS, CUT_TYPE_LABELS, CUT_STATUS_LABELS, getBadgeVariant } from "../../../../constants";
 import { useCutMutations } from "../../../../hooks";
 import { useToast } from "@/hooks/common/use-toast";
@@ -116,7 +116,7 @@ export function CutRequestModal({ open, onOpenChange, cutItem, onSuccess }: CutR
   const cutType = cutItem?.type;
   const fileName = cutItem?.file?.filename || "arquivo";
   const taskName = cutItem?.task?.name;
-  const customerName = cutItem?.task?.customer?.name;
+  const customerName = cutItem?.task?.customer?.fantasyName;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

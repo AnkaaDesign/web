@@ -23,13 +23,10 @@ import {
   IconBriefcase,
   IconMapPin,
   IconClock,
-  IconAlertCircle,
   IconCheck,
   IconHourglass,
 } from "@tabler/icons-react";
 import { QuickAccessCard, StatusCard, RecentActivitiesCard, type Activity } from "@/components/dashboard";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export function Personal() {
   const navigate = useNavigate();

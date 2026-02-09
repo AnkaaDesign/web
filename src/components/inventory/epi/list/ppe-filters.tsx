@@ -5,7 +5,6 @@ import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { IconFilter, IconX, IconShield, IconBrandApple, IconCalendarPlus, IconTriangleInverted } from "@tabler/icons-react";
 import { getItemBrands } from "../../../../api-client";

@@ -68,7 +68,7 @@ export function ComponentForm({
   });
 
   const selectedItem = availableItems.find((item) => item.id === form.watch("itemId"));
-  const weightInGrams = form.watch("weightInGrams");
+  form.watch("weightInGrams");
   const ratio = form.watch("ratio");
 
   // Filter out already selected items (except current component being edited) and sort by unicode

@@ -3,7 +3,6 @@ import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tan
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { canEditItems, canDeleteItems } from "@/utils/permissions/entity-permissions";
 import { useAuth } from "@/hooks/common/use-auth";
 import {
@@ -19,7 +18,6 @@ import {
 import { usePriceList, usePriceMutations } from "../../../../hooks";
 import { IconCurrencyReal, IconLoader, IconEdit, IconTrash, IconPackage } from "@tabler/icons-react";
 import { formatDate, formatCurrency } from "../../../../utils";
-import { toast } from "sonner";
 import type { Price } from "../../../../types";
 import type { PriceGetManyFormData } from "../../../../schemas";
 

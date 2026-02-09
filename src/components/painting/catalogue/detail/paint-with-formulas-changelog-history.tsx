@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { Paint, ChangeLog } from "../../../../types";
-import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ACTION, CHANGE_TRIGGERED_BY } from "../../../../constants";
+import { CHANGE_LOG_ACTION, CHANGE_TRIGGERED_BY } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconHistory, IconFlask, IconPaint, IconEdit, IconPlus, IconTrash, IconRefresh, IconArchive, IconArchiveOff, IconToggleLeft, IconToggleRight, IconCheck, IconX, IconClock, IconCalendar, IconArrowBackUpDouble } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
@@ -296,7 +296,7 @@ export function PaintWithFormulasChangelogHistory({ paint, className }: PaintWit
 // Timeline item component (matching ChangelogHistory exactly)
 const ChangelogTimelineItem = ({
   changelogGroup,
-  isLast,
+  isLast: _isLast,
 }: {
   changelogGroup: Array<ChangeLog & { _entityLabel?: string; _entityName?: string }>;
   isLast: boolean;

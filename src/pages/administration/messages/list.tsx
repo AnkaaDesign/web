@@ -61,7 +61,7 @@ export const MessageListPage = () => {
   const [searchingFor, setSearchingFor] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<Partial<MessageGetManyFormData>>({});
-  const [tableData, setTableData] = useState<{ items: Message[]; totalRecords: number }>({
+  const [, setTableData] = useState<{ items: Message[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });

@@ -1,6 +1,5 @@
 import { IconDots, IconEye, IconPackage, IconTrash } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

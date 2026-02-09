@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -16,11 +16,9 @@ import {
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import {
-  COPYABLE_TASK_FIELDS,
   COPYABLE_FIELD_METADATA,
   type CopyableTaskField,
   getFieldsUserCanCopy,
-  expandAllFieldsForUser,
 } from "@/types/task-copy";
 import { cn } from "@/lib/utils";
 

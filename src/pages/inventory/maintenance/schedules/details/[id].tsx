@@ -3,47 +3,33 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   IconAlertTriangle,
   IconRefresh,
-  IconTools,
   IconCalendar,
-  IconClock,
   IconEdit,
   IconTrash,
-  IconPackage,
   IconHistory,
-  IconCalendarTime,
-  IconAlertCircle,
   IconCircleCheck,
-  IconX,
-  IconArrowRight,
   IconCalendarCheck,
   IconCalendarClock,
   IconInfoCircle,
-  IconFileCheck,
   IconCalendarEvent,
   IconRepeat,
-  IconClipboardList,
   IconAlertTriangleFilled,
   IconBox,
   IconExternalLink,
   IconCurrencyDollar,
   IconBoxMultiple,
-  IconPlayerPause,
-  IconHourglass,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Alert } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ItemsNeededList } from "@/components/inventory/maintenance/common/items-needed-list";
 import { MaintenanceHistoryTable } from "@/components/inventory/maintenance/common/maintenance-history-table";
-import { formatDate, formatDateTime, formatRelativeTime, determineStockLevel, getStockLevelMessage, formatCurrency } from "../../../../../utils";
+import { formatDate, formatDateTime, determineStockLevel, getStockLevelMessage, formatCurrency } from "../../../../../utils";
 import { useMaintenanceSchedule, useItems } from "../../../../../hooks";
-import { MAINTENANCE_STATUS, MAINTENANCE_STATUS_LABELS, routes, getDynamicFrequencyLabel, CHANGE_LOG_ENTITY_TYPE, STOCK_LEVEL_LABELS, MEASURE_UNIT_LABELS, ORDER_STATUS, MEASURE_UNIT, STOCK_LEVEL } from "../../../../../constants";
+import { MAINTENANCE_STATUS, routes, getDynamicFrequencyLabel, CHANGE_LOG_ENTITY_TYPE, STOCK_LEVEL_LABELS, MEASURE_UNIT_LABELS, ORDER_STATUS, MEASURE_UNIT, STOCK_LEVEL } from "../../../../../constants";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { useState } from "react";
 import {
@@ -57,7 +43,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 export function MaintenanceScheduleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -654,22 +639,9 @@ function MaintenanceItemCard({ schedule, className }: { schedule: any; className
 }
 
 // Maintenance History Card Component
-function MaintenanceHistoryCard({ schedule, nextMaintenance, className }: { schedule: any; nextMaintenance: any; className?: string }) {
+function MaintenanceHistoryCard({ schedule, nextMaintenance: _nextMaintenance, className }: { schedule: any; nextMaintenance: any; className?: string }) {
   const navigate = useNavigate();
   const maintenanceHistory = schedule.maintenances || [];
-
-  // Calculate statistics
-  const statistics = React.useMemo(() => {
-    const totalMaintenances = maintenanceHistory.length;
-    const completedMaintenances = maintenanceHistory.filter((m: any) => m.status === MAINTENANCE_STATUS.COMPLETED).length;
-    const pendingMaintenances = maintenanceHistory.filter((m: any) => m.status === MAINTENANCE_STATUS.PENDING).length;
-
-    return {
-      totalMaintenances,
-      completedMaintenances,
-      pendingMaintenances,
-    };
-  }, [maintenanceHistory]);
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>

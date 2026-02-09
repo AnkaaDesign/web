@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "./canvas-normal-map-renderer";
-import { PAINT_FINISH, PAINT_FINISH_LABELS, PAINT_BRAND_LABELS, TRUCK_MANUFACTURER_LABELS } from "../../../constants";
+import { PAINT_FINISH, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS } from "../../../constants";
 import type { Paint } from "../../../types";
 
 interface PaintTablePreviewProps {

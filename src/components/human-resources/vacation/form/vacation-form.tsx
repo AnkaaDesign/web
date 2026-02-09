@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { IconCheck, IconLoader2, IconX } from "@tabler/icons-react";
 import { debounce } from "../../../../utils";
 
 import type { Vacation } from "../../../../types";
@@ -12,9 +11,7 @@ import { routes, VACATION_TYPE, VACATION_STATUS } from "../../../../constants";
 import { useVacationMutations } from "../../../../hooks";
 
 import { Form } from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
 
 import { CollaboratorSelect } from "./collaborator-select";
 import { StartDatePicker } from "./start-date-picker";
@@ -49,7 +46,7 @@ type VacationFormProps = CreateModeProps | UpdateModeProps;
 
 export function VacationForm(props: VacationFormProps) {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { createAsync, updateAsync } = useVacationMutations();
   const { isSubmitting, defaultValues, mode, onDirtyChange, onFormStateChange, onCancel, onFormSubmit } = props;
 
@@ -154,17 +151,18 @@ export function VacationForm(props: VacationFormProps) {
   // URL state persistence for create mode
   const debouncedUpdateUrl = useMemo(
     () =>
-      debounce((formData: Partial<VacationCreateFormData>) => {
+      debounce((_formData: Partial<VacationCreateFormData>) => {
         if (mode === "create") {
-          const params = new URLSearchParams();
-          if (formData.userId) params.set("userId", formData.userId);
-          if (formData.type) params.set("type", formData.type);
-          if (formData.status) params.set("status", formData.status);
-          if (formData.isCollective !== undefined) params.set("collective", formData.isCollective.toString());
-          setSearchParams(params, { replace: true });
+          // URL persistence temporarily disabled
+          // const params = new URLSearchParams();
+          // if (formData.userId) params.set("userId", formData.userId);
+          // if (formData.type) params.set("type", formData.type);
+          // if (formData.status) params.set("status", formData.status);
+          // if (formData.isCollective !== undefined) params.set("collective", formData.isCollective.toString());
+          // setSearchParams(params, { replace: true });
         }
       }, 1000),
-    [mode, setSearchParams],
+    [mode],
   );
 
   // Initialize form from URL params (create mode only)
@@ -227,19 +225,6 @@ export function VacationForm(props: VacationFormProps) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error submitting vacation form:", error);
       }
-    }
-  };
-
-  const handleCancel = () => {
-    if (onCancel) {
-      onCancel();
-      return;
-    }
-
-    if (mode === "create") {
-      navigate(routes.humanResources.vacations.root);
-    } else {
-      navigate(routes.humanResources.vacations.details((props as UpdateModeProps).vacation.id));
     }
   };
 

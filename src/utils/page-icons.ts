@@ -28,7 +28,6 @@ import {
   IconNote,
   IconCalendar,
   IconTools,
-  IconRuler,
   IconStar,
   IconActivity,
   IconMessageCircle,

@@ -17,7 +17,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { ChartConfiguration } from '@/lib/charts/chart-config';
+import type { ChartConfiguration } from '@/lib/charts/chart-config';
 import { ChartTooltip } from './ChartTooltip';
 import { ChartLegend } from './ChartLegend';
 

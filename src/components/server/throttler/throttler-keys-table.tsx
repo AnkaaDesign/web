@@ -1,15 +1,15 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { IconChevronUp, IconChevronDown, IconSelector, IconTrash, IconUser, IconWorld, IconClock, IconAlertTriangle, IconPackage } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconSelector, IconTrash, IconWorld, IconClock } from "@tabler/icons-react";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { ThrottlerKey, BlockedKey } from "@/api-client/throttler";
 import { TtlCountdown } from "./ttl-countdown";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
@@ -186,10 +186,6 @@ export function ThrottlerKeysTable({
   };
 
 
-  // Get current page key IDs for selection
-  const currentPageKeyIds = useMemo(() => {
-    return paginatedKeys.map((key) => key.key);
-  }, [paginatedKeys]);
 
   // Selection handlers
   const allSelected = selectedIds.size === paginatedKeys.length && paginatedKeys.length > 0;

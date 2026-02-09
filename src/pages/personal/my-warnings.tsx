@@ -24,7 +24,7 @@ import { WarningFilters } from "@/components/human-resources/warning/list/warnin
 export const MyWarningsPage = () => {
   const { user } = useAuth();
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [tableData, setTableData] = useState<{ warnings: Warning[]; totalRecords: number }>({
+  const [_tableData, setTableData] = useState<{ warnings: Warning[]; totalRecords: number }>({
     warnings: [],
     totalRecords: 0,
   });
@@ -36,13 +36,13 @@ export const MyWarningsPage = () => {
   });
 
   // Get table state for selected items functionality
-  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds } = useTableState({
+  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds: _selectedIds } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
   });
 
   // Use the unified table filters hook
-  const { filters, setFilters, searchingFor, displaySearchText, setSearch, clearAllFilters, queryFilters: baseQueryFilters, hasActiveFilters } = useTableFilters<WarningGetManyFormData>({
+  const { filters, setFilters, searchingFor, displaySearchText, setSearch, clearAllFilters: _clearAllFilters, queryFilters: baseQueryFilters, hasActiveFilters } = useTableFilters<WarningGetManyFormData>({
     defaultFilters: {
       limit: 40,
     },

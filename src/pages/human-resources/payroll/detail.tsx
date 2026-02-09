@@ -7,14 +7,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { formatCurrency } from "../../../utils";
 import { formatCPF, formatPIS } from "../../../utils/formatters";
 import { cn } from "@/lib/utils";
 import { generatePayrollPDF } from "@/utils/payroll-pdf-generator";
 import {
-  IconReceipt,
   IconAlertCircle,
   IconRefresh,
   IconFileDownload,

@@ -4,8 +4,6 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconCalculator } from "@tabler/icons-react";
 import { BonusSimulationInteractiveTable } from "@/components/human-resources/bonus-simulation/bonus-simulation-interactive-table";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export default function BonusSimulationPage() {
   // Track page access

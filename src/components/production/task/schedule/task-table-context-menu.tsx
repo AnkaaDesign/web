@@ -1,6 +1,6 @@
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconPlayerPlay, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconEditCircle, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconLayout } from "@tabler/icons-react";
+import { IconPlayerPlay, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconLayout } from "@tabler/icons-react";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
 import { useAuth } from "@/contexts/auth-context";

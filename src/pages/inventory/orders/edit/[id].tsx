@@ -4,7 +4,7 @@ import { useOrder } from "../../../../hooks";
 import { routes } from "../../../../constants";
 import type { Order } from "../../../../types";
 import { Button } from "@/components/ui/button";
-import { IconAlertTriangle, IconShoppingCart, IconCheck, IconLoader2 } from "@tabler/icons-react";
+import { IconAlertTriangle, IconShoppingCart } from "@tabler/icons-react";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES } from "../../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -15,7 +15,7 @@ import { OrderEditForm } from "@/components/inventory/order/form/order-edit-form
 export const EditOrderPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [formState, setFormState] = React.useState({ isValid: false, isDirty: false });
+  const [_formState, setFormState] = React.useState({ isValid: false, isDirty: false });
 
   // Track page access
   usePageTracker({
@@ -43,10 +43,6 @@ export const EditOrderPage = () => {
   });
 
   const order = response?.data;
-
-  const handleCancel = () => {
-    navigate(routes.inventory.orders.list);
-  };
 
   if (isLoading) {
     return (
@@ -151,25 +147,6 @@ export const EditOrderPage = () => {
       </PrivilegeRoute>
     );
   }
-
-  const actions = [
-    {
-      key: "cancel",
-      label: "Cancelar",
-      onClick: handleCancel,
-      variant: "outline" as const,
-      disabled: false,
-    },
-    {
-      key: "submit",
-      label: "Salvar Alterações",
-      icon: IconCheck,
-      onClick: () => document.getElementById("order-form-submit")?.click(),
-      variant: "default" as const,
-      disabled: !formState.isValid || !formState.isDirty,
-      loading: false,
-    },
-  ];
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]}>

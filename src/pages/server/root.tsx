@@ -1,14 +1,12 @@
 import { routes } from "../../constants";
 import { IconServer, IconSettings, IconUserCog, IconFolders, IconChartLine, IconFileText, IconRefresh, IconActivity, IconDatabaseImport, IconDatabase } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SkeletonCard, LoadingSpinner } from "@/components/ui/loading";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { PageHeader } from "@/components/ui/page-header";
 import { useServerMetrics, useServerStatus } from "../../hooks";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export function ServerRootPage() {
   const navigate = useNavigate();

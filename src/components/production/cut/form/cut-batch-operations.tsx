@@ -64,11 +64,9 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
 
     setIsSubmitting(true);
     try {
-      let result;
-
       switch (data.operation) {
         case "delete":
-          result = await batchDelete.mutateAsync({
+          await batchDelete.mutateAsync({
             data: {
               cutIds: selectedCuts.map((cut) => cut.id),
             },
@@ -97,7 +95,7 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
             ...(data.status === CUT_STATUS.COMPLETED && { completedAt: new Date() }),
           }));
 
-          result = await batchUpdate.mutateAsync({
+          await batchUpdate.mutateAsync({
             data: { cuts: statusUpdates },
             include: {
               file: true,
@@ -130,7 +128,7 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
             type: data.type!,
           }));
 
-          result = await batchUpdate.mutateAsync({
+          await batchUpdate.mutateAsync({
             data: { cuts: typeUpdates },
             include: {
               file: true,

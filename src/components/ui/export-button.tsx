@@ -9,7 +9,6 @@ import {
   DropdownMenuTrigger,
 } from "./dropdown-menu";
 import { Badge } from "./badge";
-import { Separator } from "./separator";
 import {
   IconDownload,
   IconFileTypeCsv,

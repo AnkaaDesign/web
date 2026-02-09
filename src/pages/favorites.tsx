@@ -10,7 +10,6 @@ import { ThemedBackground } from "@/components/ui";
 import { IconStar, IconStarOff, IconPlus, IconFile } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import * as TablerIcons from "@tabler/icons-react";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 export function FavoritesPage() {
   const navigate = useNavigate();

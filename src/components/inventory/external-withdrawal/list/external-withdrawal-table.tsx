@@ -22,7 +22,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useExternalWithdrawals, useExternalWithdrawalMutations, useExternalWithdrawalStatusMutations } from "../../../../hooks";
-import { toast } from "sonner";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { ExternalWithdrawalGetManyFormData } from "../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -210,7 +209,7 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
   const { markAsFullyReturned, markAsCharged, markAsLiquidated, markAsDelivered } = useExternalWithdrawalStatusMutations();
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: _isAuthLoading } = useAuth();
   const canEdit = user ? canEditExternalWithdrawals(user) : false;
   const canDelete = user ? canDeleteExternalWithdrawals(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'externalWithdrawal') : false;

@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import {
   IconEdit,
   IconTrash,
-  IconDots,
   IconLock,
   IconLockOpen,
   IconChevronUp,
@@ -83,7 +82,6 @@ export function RepresentativeTable({
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

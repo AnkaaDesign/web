@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { type Borrow, type Item, type User } from "../../../../types";
 import { BORROW_STATUS } from "../../../../constants";
-import { formatDate, isBefore, isToday, isTomorrow } from "../../../../utils";
+import { isBefore, isToday, isTomorrow } from "../../../../utils";
 import { differenceInDays } from "date-fns";
 
 /**
@@ -46,7 +46,7 @@ export function notifyOverdueBorrow(data: BorrowNotificationData): void {
  * Note: This function is kept for backward compatibility but is no longer used
  * as the API client now handles CREATE operation toasts automatically
  */
-export function notifyBorrowCreated(data: BorrowNotificationData): void {
+export function notifyBorrowCreated(_data: BorrowNotificationData): void {
   // Removed redundant toast - API client handles this
   // const { borrow } = data;
   // const itemName = borrow.item?.name || "Item";
@@ -215,7 +215,7 @@ export function formatBorrowNotificationMessage(borrow: Borrow & { item?: Item; 
  * Schedule notification for upcoming return
  * Note: This is a placeholder for future implementation with a notification service
  */
-export function scheduleReturnReminder(borrow: BorrowNotificationData, daysBefore: number = 1): void {
+export function scheduleReturnReminder(_borrow: BorrowNotificationData, _daysBefore: number = 1): void {
   // This would integrate with a backend notification service
   // For now, we just log the intention
 }
@@ -224,7 +224,7 @@ export function scheduleReturnReminder(borrow: BorrowNotificationData, daysBefor
  * Cancel scheduled notifications for a borrow
  * Note: This is a placeholder for future implementation with a notification service
  */
-export function cancelBorrowNotifications(borrowId: string): void {
+export function cancelBorrowNotifications(_borrowId: string): void {
   // This would integrate with a backend notification service
   // For now, we just log the intention
 }

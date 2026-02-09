@@ -4,13 +4,10 @@ import { Button } from "@/components/ui/button";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { useTableState } from "@/hooks/common/use-table-state";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   IconFilter,
   IconRefresh,
-  IconReceipt,
-  IconCheck,
-  IconClock,
   IconAlertCircle,
   IconUsers,
 } from "@tabler/icons-react";
@@ -23,16 +20,11 @@ import { PayrollExport } from "@/components/human-resources/payroll/export/payro
 import { PayrollColumnVisibilityManager } from "@/components/human-resources/payroll/list/payroll-column-visibility-manager";
 import { FilterIndicators } from "@/components/human-resources/payroll/list/filter-indicator";
 import { extractActiveFilters, createFilterRemover } from "@/components/human-resources/payroll/list/filter-utils";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePayrolls, useSectors, usePositions, useUsers } from "../../../hooks";
 import { isUserEligibleForBonus, getCurrentPayrollPeriod } from "../../../utils";
 import { StandardizedTable } from "@/components/ui/standardized-table";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
-
 // Extended filters interface with payroll-specific fields
 interface PayrollFiltersData {
   year?: number;
@@ -237,37 +229,6 @@ function isAfterDay26(year: number, month: number): boolean {
   return currentDay > 26;
 }
 
-function getBonusStatus(
-  year: number,
-  month: number,
-): {
-  status: "live" | "saved" | "confirmed";
-  label: string;
-  description: string;
-  icon: React.ReactNode;
-  variant: "default" | "secondary" | "success" | "warning" | "destructive";
-} {
-  const afterDay26 = isAfterDay26(year, month);
-
-  if (afterDay26) {
-    return {
-      status: "confirmed",
-      label: "Bonificações Confirmadas",
-      description: "Bonificações salvas e finalizadas para este período",
-      icon: <IconCheck className="h-4 w-4" />,
-      variant: "success",
-    };
-  } else {
-    return {
-      status: "live",
-      label: "Cálculo Provisório",
-      description: "Cálculo em tempo real - bonificações serão confirmadas após o dia 26",
-      icon: <IconClock className="h-4 w-4" />,
-      variant: "warning",
-    };
-  }
-}
-
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -295,7 +256,7 @@ function PayrollTableComponent({
   onRowClick,
   isLoading,
   error,
-  multiMonth,
+  multiMonth: _multiMonth,
   onSort,
   getSortDirection,
   getSortOrder,
@@ -743,7 +704,7 @@ export default function PayrollListPage() {
     activePayrollData.forEach((query, activeIndex) => {
       if (!query.data) return;
 
-      const { year, month, monthStr } = payrollQueries[activeIndex];
+      const { year, month } = payrollQueries[activeIndex];
       // Get month name in Portuguese and format as title case (first letter uppercase)
       const monthName = new Date(year, month - 1).toLocaleDateString('pt-BR', { month: 'short' });
       // Remove the dot at the end if present (e.g., "jan." -> "jan")
@@ -1060,26 +1021,6 @@ export default function PayrollListPage() {
     }, 300);
   };
 
-  // Reset filters to default
-  const handleResetFilters = async () => {
-    setIsRefreshing(true);
-    const resetFilters = getDefaultFilters();
-    setFilters(resetFilters);
-    setShowFilters(false);
-
-    // Clear filters from URL
-    setSearchParams((prev) => {
-      const newParams = new URLSearchParams(prev);
-      updateFiltersInUrl(newParams, resetFilters, defaultFilters);
-      return newParams;
-    }, { replace: true });
-
-    // Small delay to show loading state
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 300);
-  };
-
   // Handle row click
   const handleRowClick = (row: PayrollRow) => {
     // For live calculations, we need to pass the user/year/month to fetch details
@@ -1094,28 +1035,6 @@ export default function PayrollListPage() {
       navigate(routes.humanResources.payroll.detail(liveId));
     }
   };
-
-  // Calculate period status for display
-  const periodStatus = useMemo(() => {
-    if (!filters.year || !filters.months || filters.months.length === 0) {
-      return null;
-    }
-
-    // For single month, get the status
-    if (filters.months.length === 1) {
-      const month = parseInt(filters.months[0]);
-      return getBonusStatus(filters.year, month);
-    }
-
-    // For multiple months, show general info
-    return {
-      status: "multiple" as const,
-      label: "Múltiplos Períodos",
-      description: `${filters.months.length} meses selecionados`,
-      icon: <IconAlertCircle className="h-4 w-4" />,
-      variant: "default" as const,
-    };
-  }, [filters.year, filters.months]);
 
   // Create filter remover function
   const onRemoveFilter = useCallback(

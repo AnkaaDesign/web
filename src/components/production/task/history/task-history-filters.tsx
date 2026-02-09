@@ -14,11 +14,10 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
 import { useSectors, useCustomers } from "../../../../hooks";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { TASK_STATUS, TASK_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { TASK_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { formatDate } from "../../../../utils";
 import { getBonusPeriodStart, getBonusPeriodEnd } from "../../../../utils/bonus";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
-import type { Customer } from "../../../../types";
 
 interface TaskHistoryFiltersProps {
   open: boolean;
@@ -30,7 +29,7 @@ interface TaskHistoryFiltersProps {
   canViewStatusFilter?: boolean;
 }
 
-export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange, canViewPrice = false, canViewStatusFilter = true }: TaskHistoryFiltersProps) {
+export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange, canViewPrice: _canViewPrice = false, canViewStatusFilter = true }: TaskHistoryFiltersProps) {
   // Load data for selectors
   const { data: sectorsData } = useSectors({
     orderBy: { name: "asc" },
@@ -199,7 +198,7 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
                   logo: customer.logo,
                 })) || []
               }
-              renderOption={(option, isSelected) => (
+              renderOption={(option, _isSelected) => (
                 <div className="flex items-center gap-3 w-full">
                   <CustomerLogoDisplay
                     logo={(option as any).logo}

@@ -24,11 +24,11 @@ import {
   LabelList,
   ReferenceLine,
 } from 'recharts';
-import { ChartWrapper, ExportData } from './base/ChartWrapper';
+import { ChartWrapper } from './base/ChartWrapper';
+import type { ExportData } from './base/ChartWrapper';
 import { ChartTooltip } from './base/ChartTooltip';
 import { COLOR_PALETTES, getColorFromPalette } from './utils/chart-colors';
-import { createFormatter, formatNumber } from './utils/chart-formatters';
-import { groupByCategory } from './utils/chart-data-helpers';
+import { createFormatter } from './utils/chart-formatters';
 
 export interface BarChartDataPoint {
   name: string;
@@ -209,8 +209,8 @@ export const BarChartComponent = React.memo<BarChartComponentProps>(({
           barGap={barGap}
           barCategoryGap={barCategoryGap}
           onClick={(e) => {
-            if (e?.activePayload?.[0]?.payload && onBarClick) {
-              onBarClick(e.activePayload[0].payload);
+            if ((e as any)?.activePayload?.[0]?.payload && onBarClick) {
+              onBarClick((e as any).activePayload[0].payload);
             }
           }}
         >

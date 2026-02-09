@@ -107,7 +107,7 @@ export function ColumnVisibilityManager({ visibleColumns, onVisibilityChange }: 
               type="text"
               placeholder="Buscar coluna..."
               value={searchQuery}
-              onChange={(value) => setSearchQuery(String(value || ""))}
+              onChange={(value: string | number | null) => setSearchQuery(String(value || ""))}
               className="pl-9 h-9 bg-transparent"
             />
           </div>

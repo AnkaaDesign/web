@@ -1,7 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
 export interface AnalysisData {
   label: string;
@@ -20,7 +19,7 @@ interface AnalysisCardProps {
   onDetailsClick?: () => void;
 }
 
-export function AnalysisCard({ title, type, data, icon: Icon, className, onDetailsClick }: AnalysisCardProps) {
+export function AnalysisCard({ title, type, data, icon: Icon, className }: AnalysisCardProps) {
   const totalValue = data.reduce((sum, item) => sum + item.value, 0);
 
   return (

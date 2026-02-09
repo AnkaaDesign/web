@@ -27,10 +27,7 @@ import {
   IconFolders,
   IconFiles,
   IconArrowRight,
-  IconArrowLeft,
   IconChevronRight,
-  IconHome,
-  IconDownload,
   IconFile,
   IconList,
   IconLayoutGrid,
@@ -42,12 +39,11 @@ import {
   IconVideo,
   IconFileCode,
 } from "@tabler/icons-react";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { PageHeader } from "@/components/ui/page-header";
 import { useSharedFolders, useSharedFolderContents } from "../../hooks";
@@ -144,7 +140,7 @@ function FileContentsBrowser({
 }) {
   const fileViewer = useFileViewer();
 
-  const handleFileClick = (file: AnkaaFile, index: number) => {
+  const handleFileClick = (file: AnkaaFile, _index: number) => {
     // For remote files, use direct URL instead of API endpoints
     const remoteUrl = file.path;
 
@@ -359,23 +355,6 @@ export function ServerSharedFoldersPage() {
     navigate(`/servidor/pastas-compartilhadas/${encodedPath}`);
   };
 
-  const handleNavigateUp = () => {
-    if (currentSubPath) {
-      const parentPath = currentSubPath.split("/").slice(0, -1).join("/");
-      if (parentPath) {
-        const encodedPath = `${encodeURIComponent(selectedFolder!)}/${parentPath.split("/").map(seg => encodeURIComponent(seg)).join("/")}`;
-        navigate(`/servidor/pastas-compartilhadas/${encodedPath}`);
-      } else {
-        navigate(`/servidor/pastas-compartilhadas/${encodeURIComponent(selectedFolder!)}`);
-      }
-    } else if (selectedFolder) {
-      navigate("/servidor/pastas-compartilhadas");
-    }
-  };
-
-  const handleBackToFolders = () => {
-    navigate("/servidor/pastas-compartilhadas");
-  };
 
   const formatFileSize = (size: string) => {
     // Size comes as string like "1.2G", "500M", "2.5K"
@@ -405,41 +384,6 @@ export function ServerSharedFoldersPage() {
     return imageExtensions.includes(getFileExtension(filename));
   };
 
-  const getFileIcon = (filename: string) => {
-    const ext = getFileExtension(filename);
-
-    // Document types
-    if (["pdf"].includes(ext)) return IconFileTypePdf;
-    if (["doc", "docx", "odt", "rtf"].includes(ext)) return IconFileTypeDoc;
-    if (["xls", "xlsx", "ods", "csv"].includes(ext)) return IconFileTypeXls;
-    if (["ppt", "pptx", "odp"].includes(ext)) return IconFileTypePpt;
-
-    // Media types
-    if (["jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "ico", "tiff", "tif"].includes(ext)) return IconPhoto;
-    if (["mp3", "wav", "ogg", "flac", "aac", "m4a"].includes(ext)) return IconFileMusic;
-    if (["mp4", "avi", "mov", "wmv", "flv", "mkv", "webm"].includes(ext)) return IconVideo;
-
-    // Code types
-    if (["js", "ts", "jsx", "tsx", "py", "java", "c", "cpp", "cs", "php", "rb", "go", "rs", "swift", "kt", "html", "css", "scss", "json", "xml", "yaml", "yml"].includes(ext))
-      return IconFileCode;
-
-    // Archive types
-    if (["zip", "rar", "7z", "tar", "gz", "bz2", "xz"].includes(ext)) return IconFileZip;
-
-    // Default
-    return IconFile;
-  };
-
-  const getThumbnailUrl = (item: any): string | null => {
-    if (item.type !== "file" || !isImageFile(item.name)) return null;
-
-    // If remoteUrl exists, use it as the thumbnail source
-    if (item.remoteUrl) {
-      return item.remoteUrl;
-    }
-
-    return null;
-  };
 
   const getBreadcrumbs = () => {
     const breadcrumbs = [
@@ -495,7 +439,7 @@ export function ServerSharedFoldersPage() {
         const pathParts = currentSubPath.split("/");
         let accumulatedPath = selectedFolder;
 
-        pathParts.forEach((part, index) => {
+        pathParts.forEach((part, _index) => {
           accumulatedPath += `/${part}`;
           // Encode each segment of the accumulated path for URLs
           const encodedPath = accumulatedPath.split("/").map(seg => encodeURIComponent(seg)).join("/");

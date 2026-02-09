@@ -6,7 +6,6 @@ import { useFormContext } from "react-hook-form";
 import { useItemBrandMutations } from "../../../../hooks";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
 import type { ItemBrand } from "../../../../types";
-import { toast } from "@/components/ui/sonner";
 import { getItemBrands } from "../../../../api-client";
 
 type FormData = ItemCreateFormData | ItemUpdateFormData;

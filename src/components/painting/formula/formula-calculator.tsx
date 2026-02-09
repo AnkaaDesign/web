@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
-import { IconCheck, IconX, IconLoader, IconAlertCircle, IconRefresh } from "@tabler/icons-react";
+import { IconLoader, IconAlertCircle } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -70,7 +70,7 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
 
   // Get item IDs from formula components
   const itemIds = useMemo(() => {
-    return formula.components?.map((c) => c.itemId).filter(Boolean) || [];
+    return formula.components?.map((c: any) => c.itemId).filter(Boolean) || [];
   }, [formula.components]);
 
   // Fetch items with measures and prices
@@ -98,11 +98,11 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
   const errorRatio = useMemo(() => {
     if (!correctionMode || !errorComponentId || !actualAmount) return 1;
 
-    const errorComponent = formula.components?.find((c) => c.id === errorComponentId);
+    const errorComponent = formula.components?.find((c: any) => c.id === errorComponentId);
     if (!errorComponent) return 1;
 
     // Check if ratios need to be normalized (same logic as in calculatedComponents)
-    const ratioSum = formula.components?.reduce((sum, c) => sum + (c.ratio || 0), 0) || 0;
+    const ratioSum = formula.components?.reduce((sum: any, c: any) => sum + (c.ratio || 0), 0) || 0;
     const needsNormalization = ratioSum > 0 && ratioSum < 10;
 
     let componentRatio = errorComponent.ratio || 0;
@@ -139,7 +139,7 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
     const totalWeightInGrams = volumeInMl * formulaDensity;
 
     // Check if ratios need to be normalized (if they sum to ~1 instead of 100)
-    const ratioSum = formula.components.reduce((sum, c) => sum + (c.ratio || 0), 0);
+    const ratioSum = formula.components.reduce((sum: any, c: any) => sum + (c.ratio || 0), 0);
     const needsNormalization = ratioSum > 0 && ratioSum < 10; // If sum is between 0 and 10, assume it needs to be multiplied by 100
 
     // Calculate each component
@@ -494,7 +494,7 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
                       checked={calculatedComponents.length > 0 && calculatedComponents.every((c) => selectedComponents.includes(c.id))}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedComponents(calculatedComponents.map((c) => c.id));
+                          setSelectedComponents(calculatedComponents.map((c: any) => c.id));
                         } else {
                           setSelectedComponents([]);
                         }
@@ -710,7 +710,7 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
             <DialogDescription>
               {selectedComponentForError &&
                 (() => {
-                  const component = calculatedComponents.find((c) => c.id === selectedComponentForError);
+                  const component = calculatedComponents.find((c: any) => c.id === selectedComponentForError);
                   return component ? (
                     <>
                       Você está marcando o componente <strong>{component.name}</strong> como tendo um erro. A quantidade esperada era de{" "}
@@ -739,7 +739,7 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
               />
               {selectedComponentForError &&
                 (() => {
-                  const component = calculatedComponents.find((c) => c.id === selectedComponentForError);
+                  const component = calculatedComponents.find((c: any) => c.id === selectedComponentForError);
                   const expectedWeight = component?.weightInGrams || 0;
                   const typedValue = parseFloat(actualAmount.replace(",", ".")) || 0;
 
@@ -771,7 +771,7 @@ export function FormulaCalculator({ formula, onStartProduction, allowPriceVisibi
               disabled={(() => {
                 if (!actualAmount) return true;
 
-                const component = calculatedComponents.find((c) => c.id === selectedComponentForError);
+                const component = calculatedComponents.find((c: any) => c.id === selectedComponentForError);
                 const expectedWeight = component?.weightInGrams || 0;
                 const typedValue = parseFloat(actualAmount.replace(",", ".")) || 0;
 

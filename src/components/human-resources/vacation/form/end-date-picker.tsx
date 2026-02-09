@@ -1,7 +1,5 @@
 import { IconCalendar } from "@tabler/icons-react";
 import { addDays } from "date-fns";
-import type { VacationCreateFormData, VacationUpdateFormData } from "../../../../schemas";
-
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 
@@ -17,8 +15,7 @@ export function EndDatePicker({ control, disabled, required, startDate }: EndDat
     <FormField
       control={control}
       name="endAt"
-      render={({ field, fieldState }) => {
-        const hasError = fieldState.error;
+      render={({ field }) => {
         const minDate = startDate ? addDays(startDate, 1) : addDays(new Date(), 1);
 
         return (

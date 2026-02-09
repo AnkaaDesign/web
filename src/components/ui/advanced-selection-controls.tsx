@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,16 +12,13 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
-  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
 import {
   IconChevronDown,
-  IconCheck,
   IconX,
   IconFilter,
   IconFilterCheck,
   IconSelectAll,
-  IconSelect,
   IconRefresh,
   IconEye,
   IconEyeOff,
@@ -73,7 +70,7 @@ export function AdvancedSelectionControls({
 
   // Selection state indicators
   const selectionState = useMemo(() => {
-    const { selectedCount, currentPageCount, allCurrentPageSelected, someCurrentPageSelected } = selectionStats;
+    const { selectedCount, currentPageCount: _currentPageCount, allCurrentPageSelected, someCurrentPageSelected } = selectionStats;
 
     if (selectedCount === 0) {
       return {

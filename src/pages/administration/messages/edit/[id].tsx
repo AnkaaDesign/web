@@ -98,10 +98,6 @@ export const EditMessagePage = () => {
     }
   }, [id, updateMessage, navigate]);
 
-  const handleCancel = () => {
-    navigate(routes.administration.messages.details(id!));
-  };
-
   const handlePreview = useCallback((data: MessageFormData) => {
     setCurrentData(data);
     setPreviewOpen(true);

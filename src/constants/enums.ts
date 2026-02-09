@@ -187,12 +187,6 @@ export enum ARTWORK_STATUS {
   REPROVED = "REPROVED",
 }
 
-export const ARTWORK_STATUS_LABELS: Record<ARTWORK_STATUS, string> = {
-  [ARTWORK_STATUS.DRAFT]: "Rascunho",
-  [ARTWORK_STATUS.APPROVED]: "Aprovado",
-  [ARTWORK_STATUS.REPROVED]: "Reprovado",
-};
-
 export enum CUT_TYPE {
   VINYL = "VINYL",
   STENCIL = "STENCIL",

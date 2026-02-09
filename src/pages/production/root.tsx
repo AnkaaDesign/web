@@ -4,11 +4,9 @@ import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD } from
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useProductionDashboard } from "../../hooks";
 import { useNavigate } from "react-router-dom";
-import { formatCurrency, formatNumber } from "../../utils";
+import { formatCurrency } from "../../utils";
 import { useAuth } from "@/contexts/auth-context";
 import { useState, useEffect } from "react";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 import {
   IconTool,
   IconCalendarStats,
@@ -16,32 +14,16 @@ import {
   IconSpray,
   IconBuildingStore,
   IconClipboardList,
-  IconHistory,
   IconActivity,
-  IconTrendingUp,
-  IconTrendingDown,
-  IconClock,
-  IconCheckbox,
   IconX,
   IconCalendar,
-  IconCar,
-  IconSettings,
-  IconChartBar,
   IconChartPie,
   IconProgressCheck,
   IconPlayerPlay,
-  IconPlayerPause,
   IconCheck,
   IconExclamationCircle,
-  IconCalendarTime,
-  IconBrush,
   IconCut,
-  IconNote,
-  IconTruckDelivery,
-  IconFileReport,
-  IconUsers,
   IconGauge,
-  IconGitBranch,
   IconCurrencyDollar,
 } from "@tabler/icons-react";
 import {
@@ -51,10 +33,8 @@ import {
   StatusCard,
   QuickAccessCard,
   AnalysisCard,
-  DashboardSection,
   TimePeriodSelector,
   type Activity,
-  type PatternData,
   type AnalysisData,
 } from "@/components/dashboard";
 import { Skeleton } from "@/components/ui/skeleton";

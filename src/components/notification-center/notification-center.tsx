@@ -120,7 +120,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     unreadCount,
     isLoading,
     isLoadingMore,
-    isConnected,
+    _isConnected,
     markAsRead,
     markAllAsRead,
     dismissNotification,
@@ -255,8 +255,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     }
   };
 
-  const handleDismiss = async (notification: Notification) => {
-    await dismissNotification(notification.id);
+  const handleDismiss = async (_notification: Notification) => {
+    await dismissNotification(_notification.id);
   };
 
   return (

@@ -1,7 +1,6 @@
-import { useState, useMemo, useCallback, useRef, forwardRef, useImperativeHandle, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef, forwardRef, useImperativeHandle } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { GenericColumnVisibilityManager } from "@/components/ui/generic-column-visibility-manager";
@@ -13,11 +12,10 @@ import { useUsers, useSectors } from "../../../hooks";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
-import { IconFilter, IconDownload } from "@tabler/icons-react";
+import { IconFilter } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { USER_STATUS } from "../../../constants";
 import type { UserGetManyFormData } from "../../../schemas";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 const DEFAULT_PAGE_SIZE = 40;
 
@@ -65,7 +63,7 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
   const tableRef = useRef<PerformanceLevelTableRef>(null);
 
   // Load sectors for filter modal
-  const { data: sectorsData } = useSectors({
+  const { data: _sectorsData } = useSectors({
     orderBy: { name: "asc" },
     limit: 100,
   });
@@ -76,7 +74,6 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
     toggleSort,
     getSortDirection,
     getSortOrder,
-    clearSort
   } = useTableState({
     defaultSort: [{ column: "name", direction: "asc" }]
   });
@@ -137,7 +134,7 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
   }, [users, selectedUserIds, showSelectedOnly]);
 
   // Handle table data changes - memoized to prevent re-renders
-  const handleTableDataChange = useCallback((data: any) => {
+  const handleTableDataChange = useCallback((_data: any) => {
     // Handle pagination, sorting, etc.
     // Currently not implemented
   }, []);

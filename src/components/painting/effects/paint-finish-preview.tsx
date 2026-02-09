@@ -3,7 +3,7 @@ import { PAINT_FINISH, PAINT_FINISH_LABELS } from "../../../constants";
 import { PaintFinishEffect } from "./paint-finish-effect";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Combobox } from "@/components/ui/combobox";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { IconPalette, IconSparkles, IconEye } from "@tabler/icons-react";

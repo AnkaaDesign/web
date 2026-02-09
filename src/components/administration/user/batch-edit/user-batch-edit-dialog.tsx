@@ -7,7 +7,7 @@ import { useUserBatchMutations } from "../../../../hooks";
 import { USER_STATUS, USER_STATUS_LABELS } from "../../../../constants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Combobox } from "@/components/ui/combobox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -109,7 +109,7 @@ export function UserBatchEditDialog({ isOpen, onClose, selectedUsers, onSuccess 
         data: updateData,
       }));
 
-      const result = await batchUpdateAsync({ users });
+      await batchUpdateAsync({ users });
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -138,7 +138,7 @@ export function UserBatchEditDialog({ isOpen, onClose, selectedUsers, onSuccess 
 
       const userIds = selectedUsers.map((user) => user.id);
 
-      const result = await batchDeleteAsync({ userIds });
+      await batchDeleteAsync({ userIds });
 
       clearInterval(progressInterval);
       setProgress(100);

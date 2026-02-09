@@ -4,7 +4,7 @@ import { routes, SECTOR_PRIVILEGES } from "../../../../../constants";
 import { usePpeDeliverySchedule, usePpeDeliveryScheduleMutations, useExecutePpeDeliverySchedule, useAuth } from "../../../../../hooks";
 import { PpeScheduleInfoCard, PpeScheduleItemsCard, PpeScheduleDeliveriesCard } from "@/components/inventory/epi/schedule/detail";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconCalendar, IconEdit, IconRefresh, IconTrash, IconPlayerPlay, IconPlayerPause, IconAlertTriangle } from "@tabler/icons-react";
+import { IconEdit, IconRefresh, IconTrash, IconPlayerPlay, IconPlayerPause, IconAlertTriangle } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {

@@ -19,7 +19,8 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { ChartWrapper, ExportData } from './base/ChartWrapper';
+import { ChartWrapper } from './base/ChartWrapper';
+import type { ExportData } from './base/ChartWrapper';
 import { ChartTooltip } from './base/ChartTooltip';
 import { COLOR_PALETTES, getColorFromPalette, withOpacity } from './utils/chart-colors';
 import { formatAxisDate, createFormatter } from './utils/chart-formatters';
@@ -159,9 +160,6 @@ export const AreaChartComponent = React.memo<AreaChartComponentProps>(({
     return seriesConfig.stackId || 'stack1';
   };
 
-  // Determine offset type for stream graph
-  const offsetType = layout === 'stream' ? 'wiggle' : layout === 'percentage' ? 'expand' : undefined;
-
   return (
     <ChartWrapper
       title={title}
@@ -182,7 +180,7 @@ export const AreaChartComponent = React.memo<AreaChartComponentProps>(({
         <AreaChart
           data={processedData}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-          onClick={(e) => {
+          onClick={(e: any) => {
             if (e?.activePayload?.[0]?.payload && onAreaClick) {
               onAreaClick(e.activePayload[0].payload);
             }

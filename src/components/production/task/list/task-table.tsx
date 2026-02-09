@@ -77,7 +77,7 @@ export function TaskTable({
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,
@@ -580,7 +580,7 @@ export function TaskTable({
                       >
                         <div
                           className="px-4 py-2"
-                          onClick={(e) => {
+                          onClick={(_e) => {
                             // Cell click handler
                           }}
                         >

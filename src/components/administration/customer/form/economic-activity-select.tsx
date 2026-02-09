@@ -1,9 +1,8 @@
 import { useFormContext } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getEconomicActivities, createEconomicActivity } from "@/api-client/economic-activity";
-import { toast } from "sonner";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createEconomicActivity } from "@/api-client/economic-activity";
 import type { CustomerCreateFormData, CustomerUpdateFormData } from "@/schemas/customer";
 
 export function EconomicActivitySelect() {

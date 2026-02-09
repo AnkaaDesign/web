@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { OrderStatusBadge } from "../common/order-status-badge";
 import { OrderTotalBadge } from "../common/order-total-calculator";
-import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFile, IconFileInvoice, IconReceipt, IconFileText, IconId, IconCreditCard, IconCopy, IconQrcode } from "@tabler/icons-react";
+import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFileInvoice, IconReceipt, IconFileText, IconId, IconCreditCard, IconCopy, IconQrcode } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime, formatCNPJ } from "../../../../utils";
 import type { Order } from "../../../../types";

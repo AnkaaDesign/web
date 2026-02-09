@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
@@ -274,7 +273,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     notes,
     orderItemMode,
     temporaryItems: temporaryItemsState,
-    setOrderItemMode,
+    setOrderItemMode: _setOrderItemMode,
     setTemporaryItems,
     updateDescription,
     updateSupplierId,
@@ -470,7 +469,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
   // Fetch selected items data for display
   // Always enable query, use empty array when no items selected to get empty result
-  const { data: selectedItemsResponse, isLoading: isLoadingSelectedItems } = useItems({
+  const { data: selectedItemsResponse, isLoading: _isLoadingSelectedItems } = useItems({
     where: selectedItemsArray.length > 0 ? { id: { in: selectedItemsArray } } : { id: { in: [] } },
     include: {
       brand: true,
@@ -1302,7 +1301,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               mode="single"
                               searchable={true}
                               clearable={true}
-                              renderOption={(option, isSelected) => (
+                              renderOption={(option, _isSelected) => (
                                 <div className="flex items-center gap-3 w-full">
                                   <SupplierLogoDisplay
                                     logo={(option as any).logo}

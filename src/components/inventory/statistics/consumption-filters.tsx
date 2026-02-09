@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Combobox } from '@/components/ui/combobox';
@@ -33,7 +32,8 @@ import { getItemBrands } from '@/api-client/item-brand';
 import { getItemCategories } from '@/api-client/item-category';
 import { sectorKeys, userKeys, itemKeys, itemBrandKeys, itemCategoryKeys } from '@/hooks/common/query-keys';
 import { ACTIVITY_OPERATION } from '@/constants';
-import { formatDate } from '@/utils';
+
+
 
 // Page size for async combobox
 const COMBOBOX_PAGE_SIZE = 20;
@@ -93,7 +93,7 @@ export function ConsumptionFilters({
   onOpenChange,
   filters,
   onApply,
-  onReset,
+  onReset: _onReset,
   yAxisMode = 'quantity',
   onYAxisModeChange,
 }: ConsumptionFiltersProps) {

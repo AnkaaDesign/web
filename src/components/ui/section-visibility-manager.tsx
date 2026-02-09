@@ -35,10 +35,6 @@ export function SectionVisibilityManager({
   // Count visible sections and fields (only count sections/fields that exist in current config)
   const visibleSectionsCount = sections.filter(section => visibilityState.sections.has(section.id)).length;
   const totalSectionsCount = sections.length;
-  const allFieldIds = new Set(sections.flatMap(section => section.fields.map(field => field.id)));
-  const visibleFieldsCount = Array.from(visibilityState.fields).filter(fieldId => allFieldIds.has(fieldId)).length;
-  const totalFieldsCount = sections.reduce((sum, section) => sum + section.fields.length, 0);
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>

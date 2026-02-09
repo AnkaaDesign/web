@@ -3,8 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMaintenance, useMaintenanceMutations, useFinishMaintenance } from "../../../../hooks";
 import { routes, MAINTENANCE_STATUS, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { Button } from "@/components/ui/button";
-import { IconAlertTriangle, IconSettings, IconCheck, IconTrash, IconPlayerPlay, IconRefresh, IconEdit } from "@tabler/icons-react";
-import { toast } from "sonner";
+import { IconAlertTriangle, IconCheck, IconTrash, IconPlayerPlay, IconRefresh, IconEdit } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { MaintenanceInfoCard } from "@/components/inventory/maintenance/detail/maintenance-info-card";
 import { TargetItemCard } from "@/components/inventory/maintenance/detail/target-item-card";
@@ -23,7 +22,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 const MaintenanceDetailsPage = () => {
   const { id } = useParams<{ id: string }>();

@@ -5,7 +5,6 @@ import { routes } from "../../../../constants";
 import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditAirbrushings, canDeleteAirbrushings, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   IconChevronUp,
@@ -40,7 +39,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
 import { SetStatusModal } from "./set-status-modal";
 
 interface AirbrushingTableProps {
@@ -55,7 +53,7 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
   const { delete: deleteAirbrushing, update: updateAirbrushing } = useAirbrushingMutations();
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: _isAuthLoading } = useAuth();
   const canEdit = user ? canEditAirbrushings(user) : false;
   const canDelete = user ? canDeleteAirbrushings(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'airbrushing') : false;
@@ -72,7 +70,7 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,
@@ -81,7 +79,7 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
     isAllSelected,
     isPartiallySelected,
     selectionCount,
-    resetSelection,
+    resetSelection: _resetSelection,
     removeFromSelection,
     handleRowClick: handleRowClickSelection,
   } = useTableState({

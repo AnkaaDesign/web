@@ -1,4 +1,4 @@
-import { SECTOR_PRIVILEGES } from "./enums";
+import { SECTOR_PRIVILEGES, TEAM_LEADER } from "./enums";
 
 export interface MenuItem {
   id: string;
@@ -6,7 +6,8 @@ export interface MenuItem {
   icon: string; // Icon name (generic, will be mapped to platform-specific icons)
   path?: string;
   children?: MenuItem[];
-  requiredPrivilege?: SECTOR_PRIVILEGES | SECTOR_PRIVILEGES[]; // Support single privilege or array (use TEAM_LEADER for team leader access)
+  // Support both SECTOR_PRIVILEGES and TEAM_LEADER (virtual privilege for sector managers only)
+  requiredPrivilege?: SECTOR_PRIVILEGES | typeof TEAM_LEADER | (SECTOR_PRIVILEGES | typeof TEAM_LEADER)[];
   isControlPanel?: boolean; // Indicates if this is a control panel/dashboard
   isDynamic?: boolean; // Indicates if this is a dynamic route
   onlyInStaging?: boolean; // Indicates if this menu item should only be shown in staging environment
@@ -1055,7 +1056,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Catálogo",
     icon: "palette",
     path: "/pintura/catalogo-basico",
-    requiredPrivilege: [SECTOR_PRIVILEGES.TEAM_LEADER],
+    requiredPrivilege: [TEAM_LEADER],
     children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo/detalhes/:id", isDynamic: true }],
   },
 
@@ -1066,7 +1067,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Minha Equipe",
     icon: "team",
     path: "/meu-pessoal",
-    requiredPrivilege: [SECTOR_PRIVILEGES.TEAM_LEADER], // Only visible to sector managers
+    requiredPrivilege: [TEAM_LEADER], // Only visible to sector managers
     children: [
       { id: "membros-equipe", title: "Membros", icon: "users", path: "/meu-pessoal/usuarios" },
       { id: "emprestimos-equipe", title: "Empréstimos", icon: "loan", path: "/meu-pessoal/emprestimos" },

@@ -21,7 +21,7 @@ export interface PayrollUserRow extends User {
 export interface PayrollColumn {
   key: string;
   header: string;
-  accessor: (user: PayrollUserRow, monthSpecificTasks?: number) => React.ReactNode;
+  accessor: (user: PayrollUserRow, _monthSpecificTasks?: number) => React.ReactNode;
   sortable?: boolean;
   className?: string;
   align?: "left" | "center" | "right";
@@ -32,7 +32,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
   {
     key: "payrollNumber",
     header: "Nº FOLHA",
-    accessor: (user: PayrollUserRow, monthSpecificTasks?: number) => (
+    accessor: (user: PayrollUserRow, _monthSpecificTasks?: number) => (
       <div className="font-mono text-sm">
         {user.payrollNumber ? user.payrollNumber.toString().padStart(4, "0") : "-"}
       </div>
@@ -45,7 +45,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
   {
     key: "user.name",
     header: "NOME",
-    accessor: (user: PayrollUserRow, monthSpecificTasks?: number) => <div className="font-medium truncate">{user.name}</div>,
+    accessor: (user: PayrollUserRow, _monthSpecificTasks?: number) => <div className="font-medium truncate">{user.name}</div>,
     sortable: true,
     className: "w-64",
     align: "left",
@@ -54,7 +54,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
   {
     key: "user.cpf",
     header: "CPF",
-    accessor: (user: PayrollUserRow, monthSpecificTasks?: number) => (
+    accessor: (user: PayrollUserRow, _monthSpecificTasks?: number) => (
       <div className="text-sm font-mono">
         {user.cpf ? user.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '-'}
       </div>
@@ -67,7 +67,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
   {
     key: "position.name",
     header: "CARGO",
-    accessor: (user: PayrollUserRow, monthSpecificTasks?: number) => <div className="text-sm truncate">{user.position?.name || "-"}</div>,
+    accessor: (user: PayrollUserRow, _monthSpecificTasks?: number) => <div className="text-sm truncate">{user.position?.name || "-"}</div>,
     sortable: true,
     className: "w-48",
     align: "left",
@@ -76,7 +76,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
   {
     key: "sector.name",
     header: "SETOR",
-    accessor: (user: PayrollUserRow, monthSpecificTasks?: number) => <div className="text-sm truncate">{user.sector?.name || "-"}</div>,
+    accessor: (user: PayrollUserRow, _monthSpecificTasks?: number) => <div className="text-sm truncate">{user.sector?.name || "-"}</div>,
     sortable: true,
     className: "w-40",
     align: "left",
@@ -85,7 +85,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
   {
     key: "bonus",
     header: "BÔNUS BRUTO",
-    accessor: (user: PayrollUserRow, monthSpecificTasks?: number) => {
+    accessor: (user: PayrollUserRow, _monthSpecificTasks?: number) => {
       // Check if user is eligible for bonus based on position
       if (!user.position?.bonifiable) {
         return (
@@ -126,7 +126,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
   {
     key: "netBonus",
     header: "BÔNUS LÍQUIDO",
-    accessor: (user: PayrollUserRow, monthSpecificTasks?: number) => {
+    accessor: (user: PayrollUserRow, _monthSpecificTasks?: number) => {
       // Check if user is eligible for bonus based on position
       if (!user.position?.bonifiable) {
         return (
@@ -180,7 +180,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
   {
     key: "remuneration",
     header: "REMUNERAÇÃO",
-    accessor: (user: PayrollUserRow, monthSpecificTasks?: number) => {
+    accessor: (user: PayrollUserRow, _monthSpecificTasks?: number) => {
       // Get base remuneration from the payroll entity's baseRemuneration field
       const remuneration = user.baseRemuneration || 0;
 
@@ -198,7 +198,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
   {
     key: "totalEarnings",
     header: "TOTAL BRUTO",
-    accessor: (user: PayrollUserRow, monthSpecificTasks?: number) => {
+    accessor: (user: PayrollUserRow, _monthSpecificTasks?: number) => {
       // Get base remuneration from payroll
       const remuneration = user.baseRemuneration || 0;
 
@@ -225,7 +225,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
   {
     key: "totalNet",
     header: "TOTAL LÍQUIDO",
-    accessor: (user: PayrollUserRow, monthSpecificTasks?: number) => {
+    accessor: (user: PayrollUserRow, _monthSpecificTasks?: number) => {
       // Get base remuneration from payroll
       const remuneration = user.baseRemuneration || 0;
 

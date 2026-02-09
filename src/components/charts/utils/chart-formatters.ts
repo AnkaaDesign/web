@@ -3,7 +3,7 @@
  * Provides consistent formatting for different data types
  */
 
-import { format, parseISO, formatDistance, formatRelative } from 'date-fns';
+import { format, parseISO, formatDistance } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 /**

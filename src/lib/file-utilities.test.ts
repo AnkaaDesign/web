@@ -4,7 +4,7 @@
  * Comprehensive tests for all file utility functions
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   getFileExtension,
   getFileNameWithoutExtension,

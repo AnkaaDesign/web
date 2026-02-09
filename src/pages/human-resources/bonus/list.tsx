@@ -8,10 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   IconFilter,
   IconRefresh,
-  IconGift,
   IconCalculator,
-  IconCheck,
-  IconClock,
   IconAlertCircle,
   IconUsers,
 } from "@tabler/icons-react";
@@ -29,9 +26,6 @@ import { useBonusList, useSectors, usePositions, useUsers } from "../../../hooks
 import { calculatePonderedTasks } from "../../../utils/bonus";
 import { StandardizedTable } from "@/components/ui/standardized-table";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
-
 // Extended filters interface with bonus-specific fields
 interface BonusFiltersData {
   year?: number;
@@ -203,7 +197,7 @@ function BonusTableComponent({
   onRowClick,
   isLoading,
   error,
-  multiMonth,
+  multiMonth: _multiMonth,
   onSort,
   getSortDirection,
   getSortOrder,

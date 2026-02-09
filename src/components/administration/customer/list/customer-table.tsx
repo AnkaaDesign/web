@@ -36,7 +36,7 @@ interface CustomerTableProps {
 
 export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onMerge, filters = {}, onDataChange }: CustomerTableProps) {
   const navigate = useNavigate();
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user } = useAuth();
   const { delete: deleteCustomer } = useCustomerMutations();
   const { batchDelete } = useCustomerBatchMutations();
 
@@ -57,7 +57,6 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

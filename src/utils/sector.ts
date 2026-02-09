@@ -1,7 +1,7 @@
 // packages/utils/src/sector.ts
 
 import type { Sector } from "../types";
-import { SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS } from "../constants";
+import { SECTOR_PRIVILEGES, TEAM_LEADER, SECTOR_PRIVILEGES_LABELS } from "../constants";
 import { getSectorPrivilegeSortOrder, canAccessSector, canAccessAnyPrivilege, canAccessAllPrivileges } from "./privilege";
 
 // =====================
@@ -40,7 +40,7 @@ export const getSectorPrivilegeDescription = (privilege: SECTOR_PRIVILEGES): str
     [SECTOR_PRIVILEGES.FINANCIAL]: "Acesso financeiro",
     [SECTOR_PRIVILEGES.ADMIN]: "Acesso administrativo completo",
     [SECTOR_PRIVILEGES.EXTERNAL]: "Acesso externo limitado",
-    [SECTOR_PRIVILEGES.TEAM_LEADER]: "Acesso de líder de equipe (gestão do setor)",
+    [TEAM_LEADER]: "Acesso de líder de equipe (gestão do setor)",
   };
   return descriptions[privilege] || "Privilégio não definido";
 };
@@ -57,7 +57,7 @@ export const getSectorPrivilegeColor = (privilege: SECTOR_PRIVILEGES): string =>
     [SECTOR_PRIVILEGES.BASIC]: "gray",
     [SECTOR_PRIVILEGES.EXTERNAL]: "gray",
     [SECTOR_PRIVILEGES.WAREHOUSE]: "green",
-    [SECTOR_PRIVILEGES.TEAM_LEADER]: "teal",
+    [TEAM_LEADER]: "teal",
   };
   return colors[privilege] || "gray";
 };
@@ -72,7 +72,7 @@ export const getSectorPrivilegeBadgeVariant = (privilege: SECTOR_PRIVILEGES): "d
     [SECTOR_PRIVILEGES.FINANCIAL]: "secondary" as const,
     [SECTOR_PRIVILEGES.ADMIN]: "destructive" as const,
     [SECTOR_PRIVILEGES.EXTERNAL]: "outline" as const,
-    [SECTOR_PRIVILEGES.TEAM_LEADER]: "default" as const,
+    [TEAM_LEADER]: "default" as const,
   };
   return variants[privilege] || "outline";
 };

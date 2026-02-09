@@ -1,7 +1,6 @@
 import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { usePositions } from "../../../../../hooks";
-import type { UserBatchEditFormData } from "../types";
 
 interface PositionCellProps {
   control: any;

@@ -46,7 +46,7 @@ export const RepresentativeManager: React.FC<RepresentativeManagerProps> = ({
   error = false,
   helperText,
   allowedRoles,
-  required = false,
+  required: _required = false,
   minRows = 0, // No minimum required by default
   maxRows = 10,
   control,
@@ -62,7 +62,6 @@ export const RepresentativeManager: React.FC<RepresentativeManagerProps> = ({
   const { toast } = useToast();
 
   // State
-  const [loading, setLoading] = useState(false);
   const [availableRepresentatives, setAvailableRepresentatives] = useState<Representative[]>([]);
   const [loadingRepresentatives, setLoadingRepresentatives] = useState(false);
 

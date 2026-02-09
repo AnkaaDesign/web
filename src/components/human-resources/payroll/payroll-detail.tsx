@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -45,7 +45,6 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import {
   usePayrollByUserAndPeriod,
   usePayrollDiscountMutations,
-  usePayrollMutations,
 } from "../../../hooks";
 import { formatCurrency } from "../../../utils";
 import { routes } from "../../../constants";
@@ -94,25 +93,13 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
   } = usePayrollDiscountMutations();
 
   // Payroll mutations for updating discount order
-  const { update: updatePayroll } = usePayrollMutations();
+  // const { update: _updatePayroll } = usePayrollMutations();
 
   // Calculate totals with proper fallbacks
   // Get base remuneration from payroll.baseRemuneration, or user.position.baseRemuneration, or 0
   const baseRemuneration = payroll?.baseRemuneration || payroll?.user?.position?.baseRemuneration || 0;
   const bonusValue = payroll?.bonus?.baseBonus || 0;
   const grossSalary = Number(baseRemuneration) + Number(bonusValue);
-
-  const totalDiscounts = payroll?.discounts?.reduce((sum, discount) => {
-    if (discount.value) {
-      return sum + Number(discount.value);
-    }
-    if (discount.percentage) {
-      return sum + (Number(grossSalary) * Number(discount.percentage) / 100);
-    }
-    return sum;
-  }, 0) || 0;
-
-  const netSalary = Math.max(0, Number(grossSalary) - Number(totalDiscounts));
 
   // Handle discount operations
   const handleAddDiscount = (discountData: any) => {
@@ -191,7 +178,7 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
     items.splice(result.destination.index, 0, reorderedItem);
 
     // Update discount orders
-    const updatedDiscounts = items.map((discount, index) => ({
+    const _updatedDiscounts = items.map((discount, index) => ({
       ...discount,
       calculationOrder: index + 1
     }));

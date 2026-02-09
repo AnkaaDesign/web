@@ -1,7 +1,7 @@
 // packages/schemas/src/task.ts
 
 import { z } from "zod";
-import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, createNameSchema, createDescriptionSchema, nullableDate, moneySchema } from "./common";
+import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, createNameSchema, createDescriptionSchema, nullableDate } from "./common";
 import type { Task } from "../types";
 import { TASK_STATUS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../constants";
 import { cutCreateNestedSchema } from "./cut";

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDate, formatDateTime } from "../../utils";
+import { formatDateTime } from "../../utils";
 import { IconDownload, IconFileTypeCsv, IconFileTypeXls, IconFilter, IconX, IconUser, IconRefresh, IconClock, IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";

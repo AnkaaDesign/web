@@ -1,7 +1,6 @@
 import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { useSectors } from "../../../../../hooks";
-import type { UserBatchEditFormData } from "../types";
 
 interface SectorCellProps {
   control: any;

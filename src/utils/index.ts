@@ -78,5 +78,51 @@ export * from "./vacation";
 export * from "./verification-code";
 export * from "./verification-errors";
 export * from "./work";
-export * from "./file-viewer-utils";
-export * from "./mediaHelpers";
+// file-viewer-utils: exclude duplicates (formatFileSize, getFileExtension, getApiBaseUrl, isImageFile, isVideoFile, isDocumentFile, getFileTypeInfo)
+export {
+  FileTypeEnum,
+  type FileTypeInfo,
+  type ThumbnailOptions,
+  type FileUrlOptions,
+  MIME_TYPE_MAP,
+  EXTENSION_TYPE_MAP,
+  FILE_TYPE_INFO,
+  detectFileType,
+  canPreviewFile,
+  canGenerateThumbnail,
+  generateThumbnailUrl,
+  generateFileUrls,
+  validateFile,
+  getFileIconColor,
+  isPdfFile,
+  fileViewerUtils,
+} from "./file-viewer-utils";
+// mediaHelpers: exclude duplicates (formatFileSize, getFileExtension)
+export {
+  isValidImageUrl,
+  isValidVideoUrl,
+  detectMediaType,
+  formatDuration,
+  createVideoThumbnail,
+  downloadFile,
+  preloadImage,
+  preloadImages,
+  getImageDimensions,
+  getVideoMetadata,
+  fileToMediaItem,
+  filesToMediaItems,
+  calculateFitZoom,
+  clamp,
+  isTouchDevice,
+  supportsFullscreen,
+  requestFullscreen,
+  exitFullscreen,
+  isFullscreen,
+  getOptimalThumbnailSize,
+  generateMediaId,
+  isValidMediaUrl,
+  getMimeType,
+  sortMediaItems,
+  filterMediaByType,
+  searchMediaItems,
+} from "./mediaHelpers";

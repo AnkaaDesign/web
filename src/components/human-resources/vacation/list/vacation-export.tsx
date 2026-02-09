@@ -84,7 +84,7 @@ export function VacationExport({ className, filters, currentVacations = [], tota
     }
   };
 
-  const handleExport = async (format: ExportFormat, items: Vacation[]) => {
+  const handleExport = async (_format: ExportFormat, _items: Vacation[]) => {
     try {
       // The BaseExportPopover component handles the actual export logic
       // including CSV, Excel, and PDF generation// If you need custom export logic, you can implement it here

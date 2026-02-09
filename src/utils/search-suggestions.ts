@@ -56,7 +56,7 @@ export const suggestionBuilders: Record<string, SuggestionBuilder> = {
     categoryLabel: "Produtos",
     icon: IconBox({ className: "h-4 w-4" }),
     getSearchableText: (item: Item) =>
-      [item.name, ...(item.barcodes || []), item.description || "", item.brand?.name || "", item.category?.name || "", item.supplier?.name || ""].filter(Boolean),
+      [item.name, ...(item.barcodes || []), item.category?.description || "", item.brand?.name || "", item.category?.name || "", item.supplier?.fantasyName || ""].filter(Boolean),
     createSuggestion: (item: Item, query: string) => ({
       id: `item-${item.id}`,
       label: item.name,
@@ -105,16 +105,16 @@ export const suggestionBuilders: Record<string, SuggestionBuilder> = {
     categoryLabel: "Clientes",
     icon: IconUsers({ className: "h-4 w-4" }),
     getSearchableText: (customer: Customer) =>
-      [customer.name, customer.fantasyName || "", customer.email || "", customer.cpf || "", customer.cnpj || "", customer.phone || ""].filter(Boolean),
+      [customer.fantasyName || "", customer.email || "", customer.cpf || "", customer.cnpj || "", customer.phones?.[0] || ""].filter(Boolean),
     createSuggestion: (customer: Customer, query: string) => ({
       id: `customer-${customer.id}`,
-      label: customer.fantasyName || customer.name,
-      sublabel: customer.cpf || customer.cnpj || customer.email,
+      label: customer.fantasyName || "",
+      sublabel: customer.cpf || customer.cnpj || customer.email || undefined,
       category: "customers",
       categoryLabel: "Clientes",
       entity: customer,
       icon: IconUsers({ className: "h-4 w-4" }),
-      relevance: calculateDefaultRelevance(customer.name, query),
+      relevance: calculateDefaultRelevance(customer.fantasyName || "", query),
     }),
     calculateRelevance: (customer: Customer, query: string) => {
       const searchableTexts = suggestionBuilders.customers.getSearchableText(customer);
@@ -129,16 +129,16 @@ export const suggestionBuilders: Record<string, SuggestionBuilder> = {
     type: "suppliers",
     categoryLabel: "Fornecedores",
     icon: IconTruck({ className: "h-4 w-4" }),
-    getSearchableText: (supplier: Supplier) => [supplier.name, supplier.fantasyName || "", supplier.email || "", supplier.cnpj || "", supplier.phone || ""].filter(Boolean),
+    getSearchableText: (supplier: Supplier) => [supplier.fantasyName || "", supplier.email || "", supplier.cnpj || "", supplier.phones?.[0] || ""].filter(Boolean),
     createSuggestion: (supplier: Supplier, query: string) => ({
       id: `supplier-${supplier.id}`,
-      label: supplier.fantasyName || supplier.name,
-      sublabel: supplier.cnpj || supplier.email,
+      label: supplier.fantasyName || "",
+      sublabel: supplier.cnpj || supplier.email || undefined,
       category: "suppliers",
       categoryLabel: "Fornecedores",
       entity: supplier,
       icon: IconTruck({ className: "h-4 w-4" }),
-      relevance: calculateDefaultRelevance(supplier.name, query),
+      relevance: calculateDefaultRelevance(supplier.fantasyName || "", query),
     }),
     calculateRelevance: (supplier: Supplier, query: string) => {
       const searchableTexts = suggestionBuilders.suppliers.getSearchableText(supplier);
@@ -156,17 +156,15 @@ export const suggestionBuilders: Record<string, SuggestionBuilder> = {
     getSearchableText: (task: Task) =>
       [
         task.name || "",
-        task.description || "",
-        task.customer?.name || "",
         task.customer?.fantasyName || "",
-        task.user?.name || "",
+        task.createdBy?.name || "",
         task.sector?.name || "",
-        ...(task.serviceOrders?.map((s) => s.name) || []),
+        ...(task.serviceOrders?.map((s) => s.description) || []),
       ].filter(Boolean),
     createSuggestion: (task: Task, query: string) => ({
       id: `task-${task.id}`,
       label: task.name || `Tarefa #${task.id.slice(-6)}`,
-      sublabel: task.customer?.fantasyName || task.customer?.name,
+      sublabel: task.customer?.fantasyName || undefined,
       category: "tasks",
       categoryLabel: "Tarefas",
       entity: task,

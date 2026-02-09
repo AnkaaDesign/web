@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useState, useEffect, useCallback, useMemo, useImperativeHandle, forwardRef, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Form } from "@/components/ui/form";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { FormSteps, type FormStep } from "@/components/ui/form-steps";
 import { paintCreateSchema, paintUpdateSchema, type PaintCreateFormData, type PaintUpdateFormData } from "../../../schemas";
 import type { PaintFormula, Paint } from "../../../types";

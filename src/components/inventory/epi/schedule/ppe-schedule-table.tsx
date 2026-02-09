@@ -65,7 +65,7 @@ export function PpeScheduleTable({ visibleColumns, className, scheduleRoutes, on
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

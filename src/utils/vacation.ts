@@ -2,7 +2,7 @@
 // Validation Helpers
 // =====================
 
-import { VACATION_STATUS, VACATION_TYPE } from "../constants";
+import { VACATION_STATUS } from "../constants";
 import type { Vacation } from "../types";
 
 /**

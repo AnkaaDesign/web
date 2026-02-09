@@ -7,9 +7,6 @@ import { FormulaComponentsEditor } from "./formula-components-editor";
 import { FormulaSampler } from "./formula-sampler";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { IconAlertCircle, IconInfoCircle, IconCircleCheck } from "@tabler/icons-react";
 
 interface FormulaManagerProps {
   formulas: PaintFormula[];
@@ -81,7 +78,7 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
   }, [form.watch, formulas, onFormulasChange]);
 
   // Calculate formula validation status
-  const formulaValidation = React.useMemo(() => {
+  const _validationStatus = React.useMemo(() => {
     const currentFormula = formulas[0];
     if (!currentFormula) return { isValid: false, errors: [], warnings: [] };
 

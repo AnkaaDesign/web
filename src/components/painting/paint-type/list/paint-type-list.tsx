@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePaintTypeMutations, usePaintTypeBatchMutations } from "../../../../hooks";
+import { usePaintTypeBatchMutations } from "../../../../hooks";
 import type { PaintType } from "../../../../types";
 import type { PaintTypeGetManyFormData } from "../../../../schemas";
 import { routes } from "../../../../constants";
@@ -43,11 +43,10 @@ const EXCLUDE_FROM_URL = ["limit", "orderBy"];
 
 export function PaintTypeList({ className }: PaintTypeListProps) {
   const navigate = useNavigate();
-  const { delete: deletePaintType } = usePaintTypeMutations();
-  const { batchDelete, batchUpdate } = usePaintTypeBatchMutations();
+  const { batchDelete } = usePaintTypeBatchMutations();
 
   // State to hold current page paint types and total count from the table
-  const [tableData, setTableData] = useState<{ paintTypes: PaintType[]; totalRecords: number }>({ paintTypes: [], totalRecords: 0 });
+  const [, setTableData] = useState<{ paintTypes: PaintType[]; totalRecords: number }>({ paintTypes: [], totalRecords: 0 });
 
   // Delete confirmation dialog state
   const [deleteDialog, setDeleteDialog] = useState<{ items: PaintType[]; isBulk: boolean } | null>(null);
@@ -72,7 +71,6 @@ export function PaintTypeList({ className }: PaintTypeListProps) {
     setSearch,
     clearAllFilters,
     queryFilters: baseQueryFilters,
-    hasActiveFilters,
   } = useTableFilters<PaintTypeGetManyFormData>({
     defaultFilters: DEFAULT_FILTERS,
     searchDebounceMs: 500,
@@ -141,8 +139,8 @@ export function PaintTypeList({ className }: PaintTypeListProps) {
       navigate(routes.painting.paintTypes.edit(paintTypes[0].id));
     } else {
       // Multiple paint types - navigate to batch edit page (when implemented)
-      const ids = paintTypes.map((pt) => pt.id).join(",");
-      // navigate(`${routes.painting.paintTypes.batchEdit}?ids=${ids}`);
+      paintTypes.map((pt) => pt.id).join(",");
+      // navigate(`${routes.painting.paintTypes.batchEdit}?ids=${_ids}`);
     }
   };
 

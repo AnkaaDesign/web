@@ -4,7 +4,6 @@ import type { Item } from "../../../../types";
 import { Badge } from "../../../ui/badge";
 import { StockStatusIndicator } from "./stock-status-indicator";
 import { MeasureDisplayCompact } from "../common/measure-display";
-import { TABLE_LAYOUT } from "../../../ui/table-constants";
 import type { ItemColumn } from "./types";
 import { IconTrendingUp, IconTrendingDown, IconMinus } from "@tabler/icons-react";
 

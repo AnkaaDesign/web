@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { IconChevronLeft as ChevronLeft, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import type { TimeCellProps, NavigationDirection } from "./cell-types";
 
-export function TimeCell({ entryId, entryIndex, fieldName, label, control, stateManager, onTimeChange, onNavigate, originalValue, disabled = false, className }: TimeCellProps) {
+export function TimeCell({ entryId, entryIndex, fieldName, label: _label, control, stateManager, onTimeChange, onNavigate, originalValue, disabled = false, className }: TimeCellProps) {
   const isModified = stateManager.actions.isFieldModified(entryId, fieldName);
 
   const handleNavigate = useCallback(

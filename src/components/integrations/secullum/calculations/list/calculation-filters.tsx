@@ -1,4 +1,3 @@
-import React from "react";
 import { IconFilter, IconX } from "@tabler/icons-react";
 import {
   Sheet,
@@ -26,7 +25,7 @@ interface CalculationFiltersProps {
 export function CalculationFilters({
   open,
   onOpenChange,
-  filters,
+  filters: _filters,
   onFilterChange,
 }: CalculationFiltersProps) {
   const handleClearAll = () => {

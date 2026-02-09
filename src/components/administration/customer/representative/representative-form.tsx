@@ -20,7 +20,6 @@ import {
   REPRESENTATIVE_ROLE_LABELS,
   RepresentativeRole
 } from '@/types/representative';
-import { cn } from '@/lib/utils';
 import { CustomerLogoDisplay } from '@/components/ui/avatar-display';
 import { formatCNPJ } from '@/utils';
 import { useCnpjAutocomplete } from '@/hooks/common/use-cnpj-autocomplete';
@@ -309,7 +308,7 @@ export function RepresentativeForm({
                           initialOptions={initialCustomerOptions}
                           getOptionLabel={getCustomerOptionLabel}
                           getOptionValue={getCustomerOptionValue}
-                          renderOption={(customer, isSelected) => (
+                          renderOption={(customer, _isSelected) => (
                             <div className="flex items-center gap-3">
                               <CustomerLogoDisplay
                                 logo={customer.logo}

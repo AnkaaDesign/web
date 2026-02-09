@@ -17,8 +17,7 @@ import { useTaskBatchMutations, taskKeys, serviceOrderKeys } from "../../../../h
 import { taskService } from "../../../../api-client/task";
 import { fileService } from "../../../../api-client/file";
 import { IconPhoto, IconFileText, IconPalette, IconCut, IconLoader2, IconPlus, IconFileInvoice, IconLayout } from "@tabler/icons-react";
-import { CUT_TYPE, CUT_ORIGIN, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE_LABELS } from "../../../../constants";
-import { Textarea } from "@/components/ui/textarea";
+import { CUT_TYPE, CUT_ORIGIN, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
 import { serviceOrderService } from "../../../../api-client/serviceOrder";
 import { ServiceSelectorAutoGrouped } from "../form/service-selector-auto-grouped";
 import { useCurrentUser } from "../../../../hooks";
@@ -69,7 +68,7 @@ interface AdvancedBulkActionsHandlerProps {
 export const AdvancedBulkActionsHandler = forwardRef<
   { openModal: (type: BulkOperationType, taskIds: string[]) => void },
   AdvancedBulkActionsHandlerProps
->(({ selectedTaskIds, onClearSelection }, ref) => {
+>(({ selectedTaskIds: _selectedTaskIds, onClearSelection }, ref) => {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [operationType, setOperationType] = useState<BulkOperationType | null>(null);
@@ -93,13 +92,13 @@ export const AdvancedBulkActionsHandler = forwardRef<
   }>({ left: null, right: null, back: null });
 
   // States for service order form (legacy - for creating new ones)
-  const [serviceOrderType, setServiceOrderType] = useState<SERVICE_ORDER_TYPE>(SERVICE_ORDER_TYPE.PRODUCTION);
-  const [serviceOrderDescription, setServiceOrderDescription] = useState<string>("");
+  const [_serviceOrderType, setServiceOrderType] = useState<SERVICE_ORDER_TYPE>(SERVICE_ORDER_TYPE.PRODUCTION);
+  const [_serviceOrderDescription, setServiceOrderDescription] = useState<string>("");
 
   // State for common service orders (for batch editing existing ones)
   const [commonServiceOrders, setCommonServiceOrders] = useState<any[]>([]);
   // Track original service order IDs per task for computing updates
-  const [originalServiceOrdersMap, setOriginalServiceOrdersMap] = useState<Record<string, any[]>>({});
+  const [_originalServiceOrdersMap, setOriginalServiceOrdersMap] = useState<Record<string, any[]>>({});
   // Map of _commonKey -> array of all service order IDs across all tasks (for batch updates)
   const [commonKeyToIdsMap, setCommonKeyToIdsMap] = useState<Record<string, string[]>>({});
 
@@ -143,7 +142,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
     },
   });
 
-  const resetForm = (type: BulkOperationType) => {
+  const resetForm = (_type: BulkOperationType) => {
     // Reset all file states
     setArtworkFiles([]);
     setArtworkStatuses({});
@@ -571,9 +570,6 @@ export const AdvancedBulkActionsHandler = forwardRef<
           const currentFilenames = artworkFiles
             .filter(f => !(f instanceof File))
             .map((f: any) => f.originalName || f.name);
-          const originalCommonFilenames = commonValues.artworkFiles.map(
-            (f: any) => f.originalName || f.name
-          );
           const removedFileIds = commonValues.artworkFiles
             .filter((f: any) => !currentFilenames.includes(f.originalName || f.name))
             .map((f: any) => f.uploadedFileId || f.id);
@@ -890,7 +886,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
           const serviceOrdersToCreate: Array<any> = [];
           const processedCommonKeys: Set<string> = new Set();
 
-          currentFormServiceOrders.forEach((formSO: any, index: number) => {
+          currentFormServiceOrders.forEach((formSO: any, _index: number) => {
             // Try to get commonKey from form field first, then fallback to matching by ID
             let commonKey = formSO._commonKey;
             if (!commonKey && formSO.id) {

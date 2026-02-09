@@ -1,5 +1,4 @@
-import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -30,7 +29,7 @@ export function CalculationListSkeleton() {
               </TableHead>
 
               {/* Data columns */}
-              {skeletonColumns.map((header, index) => (
+              {skeletonColumns.map((_header, index) => (
                 <TableHead key={index} className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-24">
                   <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
                     <Skeleton className="h-4 w-16" />

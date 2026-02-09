@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconUsers, IconChevronRight } from "@tabler/icons-react";
 
@@ -21,7 +21,7 @@ interface RelatedUsersCardProps {
 export function RelatedUsersCard({ position }: RelatedUsersCardProps) {
   const navigate = useNavigate();
   const [searchText, setSearchText] = useState("");
-  const [tableData, setTableData] = useState<{ users: User[]; totalRecords: number }>({ users: [], totalRecords: 0 });
+  const [_tableData, setTableData] = useState<{ users: User[]; totalRecords: number }>({ users: [], totalRecords: 0 });
 
   // Visible columns state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(

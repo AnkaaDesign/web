@@ -30,8 +30,6 @@ import {
 } from "@tabler/icons-react";
 import { useNotification } from "@/hooks";
 import {
-  NOTIFICATION_IMPORTANCE_LABELS,
-  NOTIFICATION_CHANNEL_LABELS,
   NOTIFICATION_TYPE_LABELS,
   routes,
 } from "@/constants";

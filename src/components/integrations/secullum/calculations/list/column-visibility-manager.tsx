@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -86,7 +86,7 @@ export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityC
 
           <div className="relative">
             <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input type="text" placeholder="Buscar coluna..." value={searchQuery} onChange={(value) => setSearchQuery(String(value || ""))} className="pl-9 h-9 bg-transparent" />
+            <Input type="text" placeholder="Buscar coluna..." value={searchQuery} onChange={(value: string | number | null) => setSearchQuery(String(value || ""))} className="pl-9 h-9 bg-transparent" />
           </div>
 
           <div className="flex gap-2 mt-2">

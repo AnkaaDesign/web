@@ -33,7 +33,7 @@ export function BrandList({ className }: BrandListProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // State to hold current page items and total count from the table
-  const [tableData, setTableData] = useState<{ brands: ItemBrand[]; totalRecords: number }>({ brands: [], totalRecords: 0 });
+  const [_tableData, setTableData] = useState<{ brands: ItemBrand[]; totalRecords: number }>({ brands: [], totalRecords: 0 });
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ brands: ItemBrand[]; isBulk: boolean } | null>(null);
 

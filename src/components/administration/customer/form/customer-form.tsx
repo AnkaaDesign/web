@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useCallback, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { IconInfoCircle, IconPhoto, IconPhone, IconMapPin, IconTag } from "@tabler/icons-react";
@@ -10,7 +10,7 @@ import { customerCreateSchema, customerUpdateSchema, type CustomerCreateFormData
 import { serializeCustomerFormToUrlParams, getDefaultCustomerFormValues, debounce } from "@/utils/url-form-state";
 import { createCustomerFormData } from "@/utils/form-data-helper";
 import { useCnpjLookup } from "@/hooks/common/use-cnpj-lookup";
-import { getEconomicActivities, createEconomicActivity } from "@/api-client/economic-activity";
+import { createEconomicActivity } from "@/api-client/economic-activity";
 
 // Import all form components
 import { FantasyNameInput } from "./fantasy-name-input";
@@ -235,12 +235,6 @@ export function CustomerForm(props: CustomerFormProps) {
       debouncedUpdateUrl.cancel();
     };
   }, [debouncedUpdateUrl]);
-
-  // Handle CEP lookup (now handled directly in ZipCodeInput component)
-  const handleCepLookup = useCallback(async (_cep: string) => {
-    // This is now handled directly in the ZipCodeInput component
-    // Keeping this function for backwards compatibility
-  }, []);
 
   const onSubmit = async (data: CustomerCreateFormData | CustomerUpdateFormData) => {
     try {

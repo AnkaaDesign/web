@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { IconFilter, IconPackage, IconUser, IconCategory, IconTag, IconCircleCheck, IconCalendarEvent, IconCalendarCheck, IconX } from "@tabler/icons-react";
 import { getItems, getUsers, getItemBrands, getItemCategories } from "../../../../api-client";
 import type { BorrowGetManyFormData } from "../../../../schemas";

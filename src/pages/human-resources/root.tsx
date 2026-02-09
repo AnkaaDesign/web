@@ -4,7 +4,7 @@ import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, VACAT
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useHRDashboard, useVacations, usePpeDeliveries } from "../../hooks";
 import { useNavigate } from "react-router-dom";
-import { formatCurrency, formatNumber, formatDate, addDays } from "../../utils";
+import { formatDate, addDays } from "../../utils";
 import { useState, useMemo } from "react";
 import {
   IconUsers,
@@ -13,29 +13,16 @@ import {
   IconCalendarEvent,
   IconBellRinging,
   IconShieldCheck,
-  IconUser,
   IconUserCheck,
-  IconUserX,
   IconClock,
   IconActivity,
-  IconTrendingUp,
-  IconTrendingDown,
-  IconSun,
-  IconMoodHappy,
-  IconChartBar,
   IconChartPie,
   IconBriefcase,
   IconUserCog,
-  IconGift,
   IconBeach,
   IconMail,
-  IconCrown,
-  IconBadge,
   IconTrophy,
   IconHome,
-  IconSchool,
-  IconHeart,
-  IconCalendarX,
   IconCheck,
 } from "@tabler/icons-react";
 import {
@@ -55,8 +42,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export const HumanResourcesRootPage = () => {
   const navigate = useNavigate();
@@ -518,7 +503,7 @@ export const HumanResourcesRootPage = () => {
                   data={
                     data?.vacationMetrics?.vacationsByMonth?.map((monthData) => {
                       // Convert YYYY-MM to complete month name
-                      const [year, month] = monthData.month.split("-");
+                      const [_year, month] = monthData.month.split("-");
                       const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
                       const monthName = monthNames[parseInt(month) - 1];
                       return {

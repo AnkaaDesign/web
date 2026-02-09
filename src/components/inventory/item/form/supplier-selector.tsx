@@ -4,13 +4,11 @@ import { Combobox } from "@/components/ui/combobox";
 import { useFormContext } from "react-hook-form";
 import { useCreateSupplier } from "../../../../hooks";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
-import { toast } from "@/components/ui/sonner";
 import { getSuppliers } from "../../../../api-client";
 import { supplierKeys } from "../../../../hooks";
 import type { Supplier } from "../../../../types";
 import { IconTruck } from "@tabler/icons-react";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
-import { formatCNPJ } from "../../../../utils";
 
 type FormData = ItemCreateFormData | ItemUpdateFormData;
 
@@ -49,12 +47,6 @@ export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSele
       cacheRef.current.set(initialSupplier.id, initialSupplier);
     }
   }, [initialSupplier?.id]);
-
-  // Memoize getOptionLabel callback
-  const getOptionLabel = useCallback((supplier: Supplier) => supplier.fantasyName, []);
-
-  // Memoize getOptionValue callback
-  const getOptionValue = useCallback((supplier: Supplier) => supplier.id, []);
 
   const fetchSuppliers = useCallback(async (searchTerm: string, page = 1) => {
     try {
@@ -163,7 +155,7 @@ export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSele
               }}
               isCreating={isCreating}
               queryKeysToInvalidate={[supplierKeys.all]}
-              renderOption={(option, isSelected) => (
+              renderOption={(option, _isSelected) => (
                 <div className="flex items-center gap-3 w-full">
                   <SupplierLogoDisplay
                     logo={(option as any).logo}

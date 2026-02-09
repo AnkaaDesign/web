@@ -3,11 +3,9 @@ import { cn } from "@/lib/utils";
 import {
   formatCPF,
   formatCNPJ,
-  formatPhone,
   formatPIS,
   formatCEP,
   formatCurrency,
-  formatPercentage,
   formatNumberWithDecimals,
   formatChassis,
   cleanCPF,
@@ -15,12 +13,7 @@ import {
   cleanPhone,
   cleanPIS,
   cleanCEP,
-  cleanNumeric,
   cleanChassis,
-  isValidCPF,
-  isValidCNPJ,
-  isValidPhone,
-  isValidPIS,
   parseCurrency,
   formatBrazilianPhone,
 } from "../../utils";
@@ -301,127 +294,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
       return newPos || newVal.length;
     };
-
-    // Advanced cursor position calculation
-    const calculateCursorPosition = React.useCallback(
-      (
-        oldVal: string,
-        newVal: string,
-        oldPos: number,
-        inputType: InputType,
-        isDeleting: boolean = false,
-        key: string = "",
-      ): number => {
-        // For text inputs, maintain position
-        if (["text", "email", "password"].includes(inputType)) {
-          return Math.min(oldPos, newVal.length);
-        }
-
-        // Special handling for currency
-        if (inputType === "currency") {
-          const oldDigits = oldVal.replace(/\D/g, "");
-          const newDigits = newVal.replace(/\D/g, "");
-
-          // If deleting
-          if (isDeleting || key === "Backspace" || key === "Delete") {
-            // Count digits before cursor in old value
-            let digitsBeforeCursor = 0;
-            for (let i = 0; i < oldPos && i < oldVal.length; i++) {
-              if (/\d/.test(oldVal[i])) digitsBeforeCursor++;
-            }
-
-            // Adjust for deletion
-            if (key === "Backspace" && digitsBeforeCursor > 0) {
-              digitsBeforeCursor--;
-            }
-
-            // Find position in new value
-            let newPos = 0;
-            let digitsSeen = 0;
-            for (let i = 0; i < newVal.length; i++) {
-              if (/\d/.test(newVal[i])) {
-                if (digitsSeen === digitsBeforeCursor) {
-                  newPos = i;
-                  break;
-                }
-                digitsSeen++;
-              }
-              newPos = i + 1;
-            }
-
-            // Keep cursor after "R$ " prefix
-            return Math.max(3, newPos);
-          } else {
-            // Adding digits
-            let digitsTyped = 0;
-            for (let i = 0; i < oldPos && i < oldVal.length; i++) {
-              if (/\d/.test(oldVal[i])) digitsTyped++;
-            }
-
-            // If we added a new digit
-            if (newDigits.length > oldDigits.length) {
-              digitsTyped = Math.min(digitsTyped + 1, newDigits.length);
-            }
-
-            // Find position after the correct number of digits
-            let position = 0;
-            let digitCount = 0;
-            for (let i = 0; i < newVal.length; i++) {
-              if (/\d/.test(newVal[i])) {
-                digitCount++;
-                if (digitCount === digitsTyped) {
-                  position = i + 1;
-                  break;
-                }
-              }
-            }
-
-            return Math.max(3, position || newVal.length);
-          }
-        }
-
-        // For other formatted inputs
-        const isFormattedInput = ["cpf", "cnpj", "cpf-cnpj", "phone", "pis", "cep"].includes(inputType);
-        if (!isFormattedInput) {
-          return Math.min(oldPos, newVal.length);
-        }
-
-        const oldDigits = oldVal.replace(/\D/g, "");
-        const newDigits = newVal.replace(/\D/g, "");
-
-        // Count digits before cursor position in old value
-        let digitsBeforeCursor = 0;
-        for (let i = 0; i < oldPos && i < oldVal.length; i++) {
-          if (/\d/.test(oldVal[i])) digitsBeforeCursor++;
-        }
-
-        // Adjust for backspace
-        if (isDeleting && key === "Backspace" && digitsBeforeCursor > 0) {
-          digitsBeforeCursor--;
-        }
-
-        // Adjust if adding digits
-        if (!isDeleting && newDigits.length > oldDigits.length) {
-          digitsBeforeCursor = Math.min(digitsBeforeCursor + (newDigits.length - oldDigits.length), newDigits.length);
-        }
-
-        // Find position in new formatted value
-        let position = 0;
-        let digitCount = 0;
-        for (let i = 0; i < newVal.length; i++) {
-          if (/\d/.test(newVal[i])) {
-            digitCount++;
-            if (digitCount === digitsBeforeCursor) {
-              position = i + 1;
-              break;
-            }
-          }
-        }
-
-        return position || newVal.length;
-      },
-      [],
-    );
 
     // Natural typing speed variation
     const getRandomTypingDelay = React.useCallback(() => {
@@ -838,8 +710,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       const input = e.target;
       let rawValue = input.value;
       const oldCursorPos = input.selectionStart || 0;
-      const isDeleting = lastKeyRef.current === "Backspace" || lastKeyRef.current === "Delete";
-
       // For basic text inputs, handle simply without formatting
       // IMPORTANT: Don't block onChange during IME composition for text inputs
       // because we're not doing any formatting - just passing the value through

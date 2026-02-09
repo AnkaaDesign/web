@@ -66,7 +66,7 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
     return undefined;
   }
 
-  const orderByArray = sortConfigs.map((config, index) => {
+  const orderByArray = sortConfigs.map((config, _index) => {
     // Guard against undefined column
     if (!config.column) {
       return {};

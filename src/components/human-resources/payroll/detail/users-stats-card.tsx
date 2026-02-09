@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
@@ -9,7 +9,7 @@ import { formatCurrency, formatDate } from "../../../../utils";
 import type { User, Bonus } from "../../../../types";
 import { IconUsers, IconDownload } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 
 // Extended User interface for stats display
 export interface UserStatsRow extends User {

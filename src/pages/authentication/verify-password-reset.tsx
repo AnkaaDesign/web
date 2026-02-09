@@ -155,7 +155,7 @@ export function VerifyPasswordResetPage() {
             <VerificationCodeForm contact={contact} isLoading={isLoading} onSubmit={handleVerification} onResendCode={handleResendCode} isResending={isResending} error={error} />
           ) : (
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmitNewPassword, (errors) => {})} aria-label="Formulário de nova senha" noValidate className={styles.form}>
+              <form onSubmit={form.handleSubmit(onSubmitNewPassword, () => {})} aria-label="Formulário de nova senha" noValidate className={styles.form}>
                 <FormField
                   control={form.control}
                   name="password"

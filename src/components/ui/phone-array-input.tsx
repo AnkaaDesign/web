@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { useFieldArray, useWatch } from "react-hook-form";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { IconPhone, IconPlus, IconTrash } from "@tabler/icons-react";
 import { formatBrazilianPhone } from "../../utils";
 
-interface PhoneArrayInputProps<TFieldValues extends FieldValues = FieldValues> {
+interface PhoneArrayInputProps<_TFieldValues extends FieldValues = FieldValues> {
   control: any;
   disabled?: boolean;
   maxPhones?: number;

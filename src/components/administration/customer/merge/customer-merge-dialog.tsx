@@ -4,11 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconArrowRight, IconCheck, IconLoader2, IconUsers, IconInfoCircle } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
 import type { Customer } from "../../../../types";
 
 interface ConflictField {
@@ -36,7 +34,6 @@ interface CustomerMergeDialogProps {
 export function CustomerMergeDialog({ open, onOpenChange, customers, onMerge }: CustomerMergeDialogProps) {
   const [targetCustomerId, setTargetCustomerId] = useState<string>("");
   const [resolutions, setResolutions] = useState<Map<string, MergeResolution>>(new Map());
-  const [customValues, setCustomValues] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
 
   // Detect conflicts between customers
@@ -157,10 +154,6 @@ export function CustomerMergeDialog({ open, onOpenChange, customers, onMerge }: 
 
   const handleResolutionChange = (field: string, resolution: MergeResolution) => {
     setResolutions(new Map(resolutions.set(field, resolution)));
-  };
-
-  const handleCustomValueChange = (field: string, value: string) => {
-    setCustomValues(new Map(customValues.set(field, value)));
   };
 
   const handleMerge = async () => {

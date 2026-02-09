@@ -1,9 +1,8 @@
 import { useMemo, useCallback, useRef } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { getPaints } from "../../../api-client";
-import { PAINT_BRAND_LABELS, PAINT_FINISH_LABELS } from "../../../constants";
+import { PAINT_FINISH_LABELS } from "../../../constants";
 import { IconLayersIntersect } from "@tabler/icons-react";
 import type { Paint } from "../../../types";
 

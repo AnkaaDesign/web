@@ -4,19 +4,16 @@ import { useSecullumTimeEntries, useSecullumConfiguration } from "../../../hooks
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { TimeClockEntryTable } from "@/components/human-resources/time-clock-entry/time-clock-entry-table";
 import type { TimeClockEntryTableRef } from "@/components/human-resources/time-clock-entry/time-clock-entry-table";
-import { IconCalendar, IconClock, IconChevronLeft, IconChevronRight, IconDeviceFloppy, IconRestore } from "@tabler/icons-react";
+import { IconChevronLeft, IconChevronRight, IconDeviceFloppy, IconRestore } from "@tabler/icons-react";
 import { Combobox } from "@/components/ui/combobox";
 import type { ComboboxOption } from "@/components/ui/combobox";
 import { useUsers } from "../../../hooks";
 import { PageHeader } from "@/components/ui/page-header";
 import { routes, FAVORITE_PAGES, USER_STATUS } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export default function TimeClockListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -73,7 +70,7 @@ export default function TimeClockListPage() {
   });
 
   // Local state for date inputs to allow typing
-  const [startDateInput, setStartDateInput] = useState(() => {
+  const [_startDateInput, setStartDateInput] = useState(() => {
     const date = searchParams.get("startDate");
     if (date) {
       const parsed = new Date(date);
@@ -84,7 +81,7 @@ export default function TimeClockListPage() {
     return ""; // Don't set default, wait for config
   });
 
-  const [endDateInput, setEndDateInput] = useState(() => {
+  const [_endDateInput, setEndDateInput] = useState(() => {
     const date = searchParams.get("endDate");
     if (date) {
       const parsed = new Date(date);
@@ -260,59 +257,6 @@ export default function TimeClockListPage() {
     }
   };
 
-  const handleStartDateBlur = (dateString: string) => {
-    if (!dateString) {
-      // Use configuration date or fallback to current month start
-      let fallbackDate;
-      if (configData?.data && Array.isArray(configData.data) && configData.data.length > 0 && configData.data[0]?.dateRange?.start) {
-        // Parse config date in local timezone
-        const parts = configData.data[0].dateRange.start.split("-");
-        fallbackDate = new Date(
-          parseInt(parts[0]),
-          parseInt(parts[1]) - 1, // Month is 0-indexed
-          parseInt(parts[2]),
-        );
-      } else {
-        fallbackDate = startOfMonth(new Date());
-      }
-      setStartDate(fallbackDate);
-      setStartDateInput(format(fallbackDate, "yyyy-MM-dd"));
-      return;
-    }
-
-    // Check if date string is complete (YYYY-MM-DD format)
-    const dateParts = dateString.split("-");
-    if (dateParts.length !== 3) {
-      // Reset to previous valid date
-      setStartDateInput(startDate ? format(startDate, "yyyy-MM-dd") : "");
-      return;
-    }
-
-    const year = parseInt(dateParts[0]);
-    const month = parseInt(dateParts[1]);
-    const day = parseInt(dateParts[2]);
-
-    // Validate year is reasonable (e.g., between 2000 and 2100)
-    if (year < 2000 || year > 2100 || isNaN(year)) {
-      setStartDateInput(startDate ? format(startDate, "yyyy-MM-dd") : "");
-      return;
-    }
-
-    // Parse date in local timezone
-    const newDate = new Date(year, month - 1, day); // month is 0-indexed
-    if (isNaN(newDate.getTime())) {
-      setStartDateInput(startDate ? format(startDate, "yyyy-MM-dd") : "");
-      return;
-    }
-
-    setStartDate(newDate);
-    setStartDateInput(format(newDate, "yyyy-MM-dd"));
-
-    const params = new URLSearchParams(searchParams);
-    params.set("startDate", dateString);
-    setSearchParams(params);
-  };
-
   const handleEndDateChange = (date: Date | null) => {
     if (date && !isNaN(date.getTime())) {
       // Check if end date is before start date
@@ -341,59 +285,6 @@ export default function TimeClockListPage() {
       params.delete("endDate");
       setSearchParams(params);
     }
-  };
-
-  const handleEndDateBlur = (dateString: string) => {
-    if (!dateString) {
-      // Use configuration date or fallback to current month end
-      let fallbackDate;
-      if (configData?.data && Array.isArray(configData.data) && configData.data.length > 0 && configData.data[0]?.dateRange?.end) {
-        // Parse config date in local timezone
-        const parts = configData.data[0].dateRange.end.split("-");
-        fallbackDate = new Date(
-          parseInt(parts[0]),
-          parseInt(parts[1]) - 1, // Month is 0-indexed
-          parseInt(parts[2]),
-        );
-      } else {
-        fallbackDate = endOfMonth(new Date());
-      }
-      setEndDate(fallbackDate);
-      setEndDateInput(format(fallbackDate, "yyyy-MM-dd"));
-      return;
-    }
-
-    // Check if date string is complete (YYYY-MM-DD format)
-    const dateParts = dateString.split("-");
-    if (dateParts.length !== 3) {
-      // Reset to previous valid date
-      setEndDateInput(endDate ? format(endDate, "yyyy-MM-dd") : "");
-      return;
-    }
-
-    const year = parseInt(dateParts[0]);
-    const month = parseInt(dateParts[1]);
-    const day = parseInt(dateParts[2]);
-
-    // Validate year is reasonable (e.g., between 2000 and 2100)
-    if (year < 2000 || year > 2100 || isNaN(year)) {
-      setEndDateInput(endDate ? format(endDate, "yyyy-MM-dd") : "");
-      return;
-    }
-
-    // Parse date in local timezone
-    const newDate = new Date(year, month - 1, day); // month is 0-indexed
-    if (isNaN(newDate.getTime())) {
-      setEndDateInput(endDate ? format(endDate, "yyyy-MM-dd") : "");
-      return;
-    }
-
-    setEndDate(newDate);
-    setEndDateInput(format(newDate, "yyyy-MM-dd"));
-
-    const params = new URLSearchParams(searchParams);
-    params.set("endDate", dateString);
-    setSearchParams(params);
   };
 
   const handleUserChange = (userId: string) => {

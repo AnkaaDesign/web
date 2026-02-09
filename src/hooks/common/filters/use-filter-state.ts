@@ -1,11 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import {
-  FilterDefinition,
-  createFilterGroup,
-  serializeFiltersToUrl,
-  deserializeFiltersFromUrl,
-} from "@/utils/table-filter-utils";
+import type { FilterDefinition } from "@/utils/table-filter-utils";
+import { createFilterGroup } from "@/utils/table-filter-utils";
 
 export interface UseFilterStateOptions {
   /**

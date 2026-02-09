@@ -1,6 +1,5 @@
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { usePaintTypes } from "../../../hooks";
 import { IconPaint } from "@tabler/icons-react";
 

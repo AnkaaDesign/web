@@ -93,7 +93,7 @@ export function SupplierBatchEditDialog({ isOpen, onClose, selectedSuppliers, on
         data: updateData,
       }));
 
-      const result = await batchUpdateAsync({ suppliers });
+      await batchUpdateAsync({ suppliers });
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -122,7 +122,7 @@ export function SupplierBatchEditDialog({ isOpen, onClose, selectedSuppliers, on
 
       const supplierIds = selectedSuppliers.map((supplier) => supplier.id);
 
-      const result = await batchDeleteAsync({ supplierIds });
+      await batchDeleteAsync({ supplierIds });
 
       clearInterval(progressInterval);
       setProgress(100);

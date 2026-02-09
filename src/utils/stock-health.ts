@@ -22,8 +22,6 @@ export interface StockHealthCalculationOptions {
   safetyStockDays?: number; // Default 7 days
 }
 
-export type { StockHealthData, StockHealthCalculationOptions };
-
 /**
  * Calculates the monthly consumption rate based on historical activities
  */
@@ -366,8 +364,6 @@ export interface ReorderPointUpdateResult {
   isVariable: boolean;
   percentageChange: number;
 }
-
-export type { ReorderPointUpdateResult };
 
 /**
  * Batch calculate reorder points for multiple items

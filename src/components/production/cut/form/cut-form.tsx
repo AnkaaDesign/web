@@ -10,14 +10,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { IconFileText, IconCut, IconAlertCircle } from "@tabler/icons-react";
 import { useState, useEffect } from "react";
-import type { Cut, File as FileType, Task } from "../../../../types";
+import type { Cut } from "../../../../types";
 import type { CutCreateFormData, CutUpdateFormData } from "../../../../schemas";
 import { cutCreateSchema, cutUpdateSchema } from "../../../../schemas";
-import { CUT_TYPE, CUT_STATUS, CUT_ORIGIN, CUT_REQUEST_REASON, CUT_TYPE_LABELS, CUT_STATUS_LABELS, CUT_ORIGIN_LABELS, CUT_REQUEST_REASON_LABELS } from "../../../../constants";
+import { CUT_TYPE, CUT_STATUS, CUT_ORIGIN, CUT_TYPE_LABELS, CUT_STATUS_LABELS, CUT_ORIGIN_LABELS, CUT_REQUEST_REASON_LABELS } from "../../../../constants";
 import { useCutMutations, useCut } from "../../../../hooks";
 import { mapCutToFormData } from "../../../../schemas";
 import { useToast } from "@/hooks/common/use-toast";
-import { formatDate } from "../../../../utils";
 
 interface CutFormProps {
   cutId?: string;
@@ -35,7 +34,7 @@ const createFormSchema = cutCreateSchema
     notes: z.string().optional(),
   })
   .refine(
-    (data) => {
+    (data: any) => {
       // Additional validation: if origin is REQUEST, reason is required
       if (data.origin === CUT_ORIGIN.REQUEST) {
         return data.reason !== null && data.reason !== undefined;
@@ -53,7 +52,7 @@ const updateFormSchema = cutUpdateSchema
     notes: z.string().optional(),
   })
   .refine(
-    (data) => {
+    (data: any) => {
       // Additional validation: if origin is REQUEST, reason is required
       if (data.origin === CUT_ORIGIN.REQUEST) {
         return data.reason !== null && data.reason !== undefined;
@@ -364,7 +363,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
                     <FormControl>
                       <Combobox
                         value={field.value || ""}
-                        onChange={(value) => field.onChange(value === "" ? null : value)}
+                        onChange={(value: any) => field.onChange(value === "" ? null : value)}
                         options={Object.entries(CUT_REQUEST_REASON_LABELS).map(([value, label]) => ({
                           value,
                           label,
@@ -391,7 +390,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
                     <FormControl>
                       <Combobox
                         value={field.value || undefined}
-                        onChange={(value) => field.onChange(value || null)}
+                        onChange={(value: any) => field.onChange(value || null)}
                         options={[{ value: "placeholder", label: "Selecionar tarefa..." }]}
                         placeholder="Selecionar tarefa..."
                       />
@@ -413,7 +412,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
                     <FormControl>
                       <Combobox
                         value={field.value || undefined}
-                        onChange={(value) => field.onChange(value || null)}
+                        onChange={(value: any) => field.onChange(value || null)}
                         options={[{ value: "placeholder", label: "Selecionar corte pai..." }]}
                         placeholder="Selecionar corte pai..."
                       />

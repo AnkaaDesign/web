@@ -97,14 +97,6 @@ export function ObservationFilters({ open, onOpenChange, filters, onFilterChange
     });
   };
 
-  const getActiveFilterCount = () => {
-    let count = 0;
-    if (localState.taskIds.length > 0) count++;
-    if (localState.hasFiles !== undefined) count++;
-    if (localState.createdAfter || localState.createdBefore) count++;
-    return count;
-  };
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">

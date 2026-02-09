@@ -10,7 +10,7 @@ import { Button } from "./button";
 import { Badge } from "./badge";
 import { Separator } from "./separator";
 import { Alert, AlertDescription } from "./alert";
-import { IconArrowsExchange, IconCopy, IconRefresh, IconScale, IconRuler2, IconDroplet, IconHash } from "@tabler/icons-react";
+import { IconArrowsExchange, IconCopy, IconRefresh } from "@tabler/icons-react";
 
 interface UnitConverterProps {
   className?: string;
@@ -81,24 +81,6 @@ export function UnitConverter({
     });
 
     return categories;
-  };
-
-  // Get category icon
-  const getCategoryIcon = (category: string) => {
-    const iconProps = { className: "h-4 w-4" };
-    switch (category) {
-      case "Peso":
-        return <IconScale {...iconProps} />;
-      case "Comprimento":
-        return <IconRuler2 {...iconProps} />;
-      case "Volume":
-        return <IconDroplet {...iconProps} />;
-      case "Contagem":
-      case "Embalagem":
-        return <IconHash {...iconProps} />;
-      default:
-        return <IconHash {...iconProps} />;
-    }
   };
 
   // Perform conversion
@@ -283,7 +265,7 @@ export function UnitConverter({
               )}
               placeholder="Selecione a unidade"
               formatDisplay="category"
-              renderOption={(option, isSelected) => (
+              renderOption={(option, _isSelected) => (
                 <div>
                   <div className="truncate">{option.label}</div>
                   <div className="text-xs text-muted-foreground truncate">{option.category}</div>
@@ -315,7 +297,7 @@ export function UnitConverter({
               )}
               placeholder="Selecione a unidade"
               formatDisplay="category"
-              renderOption={(option, isSelected) => (
+              renderOption={(option, _isSelected) => (
                 <div>
                   <div className="truncate">{option.label}</div>
                   <div className="text-xs text-muted-foreground truncate">{option.category}</div>

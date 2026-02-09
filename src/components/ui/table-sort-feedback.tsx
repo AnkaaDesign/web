@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { IconCheck, IconLoader2, IconArrowUp, IconArrowDown, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import type { SortConfig } from "@/utils/table-sort-utils";

@@ -64,7 +64,7 @@ const DoorHeightInput = React.forwardRef<
     disabled?: boolean;
     onBlur?: (value: number) => void;
   }
->(({ doorId, defaultValue, layoutHeight, disabled, onBlur }, ref) => {
+>(({ doorId: _doorId, defaultValue, layoutHeight, disabled, onBlur }, ref) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [localValue, setLocalValue] = useState<string>(() => {
     if (defaultValue === 0) return "";
@@ -148,7 +148,7 @@ const MeasurementInput = React.memo(({
   value,
   onChange,
   placeholder = "0,00",
-  suffix = "cm",
+  suffix: _suffix = "cm",
   className,
   min,
   max,
@@ -298,11 +298,11 @@ export const LayoutForm = ({
   layout,
   onChange,
   onSave,
-  showPhoto,
+  showPhoto: _showPhoto,
   disabled = false,
   taskName,
   previewMode = false,
-  onSideChange,
+  onSideChange: _onSideChange,
   validationError
 }: LayoutFormProps) => {
   // Theme detection for SVG colors (matching mobile version)
@@ -770,7 +770,6 @@ export const LayoutForm = ({
 
   // Get current side's state
   const currentState = sideStates[selectedSide];
-  const shouldShowPhoto = showPhoto ?? selectedSide === 'back';
 
   // Update state for current side
   const updateCurrentSide = useCallback((updates: Partial<SideState>) => {

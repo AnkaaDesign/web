@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -185,7 +184,6 @@ export const CreateNotificationPage = () => {
   };
 
   const selectedChannels = form.watch("channels") || [];
-  const notificationType = form.watch("type");
   const targetType = form.watch("targetType");
   const targetUsers = form.watch("targetUsers") || [];
   const targetSectors = form.watch("targetSectors") || [];

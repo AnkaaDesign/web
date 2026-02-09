@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconClipboardList } from "@tabler/icons-react";
 
@@ -32,7 +32,7 @@ export function SectorTasksTable({ sector }: SectorTasksTableProps) {
   const navigate = useNavigate();
 
   // Table data tracking
-  const [tableData, setTableData] = useState<{ items: Task[]; totalRecords: number }>({
+  const [_tableData, setTableData] = useState<{ items: Task[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });

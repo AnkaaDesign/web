@@ -3,7 +3,6 @@ import { useActivity } from "../../../../hooks";
 import { routes, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { Button } from "@/components/ui/button";
 import { IconAlertTriangle, IconPackage, IconRefresh, IconEdit } from "@tabler/icons-react";
-import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/page-header";
 import { ActivitySpecificationsCard } from "./activity-specifications-card";
 import { ActivityItemCard } from "./activity-item-card";

@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate, formatDateTime } from "../../utils";
 import type { ActivityGetManyFormData } from "../../schemas";
-import { IconDownload, IconFileTypeCsv, IconFileTypeXls, IconFilter, IconX, IconCalendar, IconUser, IconRefresh, IconActivity, IconPackage } from "@tabler/icons-react";
+import { IconDownload, IconFileTypeCsv, IconFileTypeXls, IconFilter, IconX, IconCalendar, IconUser, IconRefresh, IconPackage } from "@tabler/icons-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";

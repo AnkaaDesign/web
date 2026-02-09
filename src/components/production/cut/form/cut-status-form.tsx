@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { IconClock, IconPlay, IconCheck, IconX, IconFileText, IconInfoCircle, IconArrowRight } from "@tabler/icons-react";
+import { IconClock, IconPlay, IconCheck, IconFileText, IconInfoCircle, IconArrowRight } from "@tabler/icons-react";
 import { useState } from "react";
 import type { Cut } from "../../../../types";
 import { CUT_STATUS, CUT_STATUS_LABELS, CUT_TYPE_LABELS } from "../../../../constants";
@@ -152,7 +152,7 @@ export function CutStatusForm({ cut, onSuccess, onCancel, className }: CutStatus
           {cut.task && (
             <div>
               Tarefa: {cut.task.name}
-              {cut.task.customer && ` - ${cut.task.customer.name}`}
+              {cut.task.customer && ` - ${cut.task.customer.fantasyName}`}
             </div>
           )}
 

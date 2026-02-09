@@ -17,7 +17,6 @@ import { getDefaultVisibleColumns, createPpeScheduleColumns } from "./ppe-schedu
 import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/common/use-table-state";
-import { Badge } from "@/components/ui/badge";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import {
   AlertDialog,
@@ -67,7 +66,7 @@ export function PpeScheduleList({ className, scheduleRoutes }: PpeScheduleListPr
   };
 
   // State to hold current page items and total count from the table
-  const [tableData, setTableData] = useState<{ items: PpeDeliverySchedule[]; totalRecords: number }>({ items: [], totalRecords: 0 });
+  const [_tableData, setTableData] = useState<{ items: PpeDeliverySchedule[]; totalRecords: number }>({ items: [], totalRecords: 0 });
 
   // Delete dialog state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -309,15 +308,6 @@ export function PpeScheduleList({ className, scheduleRoutes }: PpeScheduleListPr
     };
   }, [debouncedSearch]);
 
-  // Handle search
-  const handleSearch = useCallback(
-    (value: string) => {
-      setDisplaySearchText(value); // Immediate UI update
-      debouncedSearch(value); // Debounced API call
-    },
-    [debouncedSearch],
-  );
-
   // Context menu handlers
   const handleBulkEdit = (schedules: PpeDeliverySchedule[]) => {
     if (schedules.length === 1) {
@@ -330,11 +320,11 @@ export function PpeScheduleList({ className, scheduleRoutes }: PpeScheduleListPr
     }
   };
 
-  const handleBulkActivate = async (schedules: PpeDeliverySchedule[]) => {
+  const handleBulkActivate = async (_schedules: PpeDeliverySchedule[]) => {
     // TODO: Implement batch activate logic
   };
 
-  const handleBulkDeactivate = async (schedules: PpeDeliverySchedule[]) => {
+  const handleBulkDeactivate = async (_schedules: PpeDeliverySchedule[]) => {
     // TODO: Implement batch deactivate logic
   };
 

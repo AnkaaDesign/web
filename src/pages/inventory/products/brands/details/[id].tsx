@@ -2,15 +2,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useItemBrandDetail } from "../../../../../hooks";
 import { routes, CHANGE_LOG_ENTITY_TYPE } from "../../../../../constants";
 import { Button } from "@/components/ui/button";
-import { IconAlertTriangle, IconTag, IconRefresh, IconEdit } from "@tabler/icons-react";
-import { toast } from "sonner";
+import { IconAlertTriangle, IconRefresh, IconEdit } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { SpecificationsCard } from "@/components/inventory/item/brand/detail/specifications-card";
 import { RelatedItemsCard } from "@/components/inventory/item/brand/detail/related-items-card";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditItems } from "@/utils/permissions/entity-permissions";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 const BrandDetailsPage = () => {
   const { id } = useParams<{ id: string }>();

@@ -6,7 +6,7 @@ import { SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS } from "../../../../constan
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Combobox } from "@/components/ui/combobox";
 
 interface SectorFiltersProps {
   open: boolean;

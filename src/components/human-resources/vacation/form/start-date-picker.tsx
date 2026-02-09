@@ -1,5 +1,4 @@
 import { IconCalendar } from "@tabler/icons-react";
-import type { VacationCreateFormData, VacationUpdateFormData } from "../../../../schemas";
 import { addDays } from "date-fns";
 
 import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";

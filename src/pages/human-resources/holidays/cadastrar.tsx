@@ -7,7 +7,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { HolidayForm } from "@/components/integrations/secullum/holidays/form";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useSecullumCreateHoliday } from "../../../hooks";
-import { toast } from "sonner";
 
 // Type for holiday form data (temporary until build issues are resolved)
 type SecullumCreateHolidayFormData = {

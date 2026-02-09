@@ -53,7 +53,6 @@ export function BonusTasksTable({
     showSelectedOnly: internalShowSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     isSelected,
@@ -77,7 +76,6 @@ export function BonusTasksTable({
         const searchableFields = [
           task.name,
           task.customer?.fantasyName,
-          task.customer?.name,
           task.sector?.name,
           task.serialNumber,
           task.licensePlate,

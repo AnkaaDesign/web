@@ -287,10 +287,6 @@ export function GaragesPage() {
       setPendingChanges((prev) => {
         const newMap = new Map(prev);
 
-        // Get current spots (considering pending changes)
-        const truck1CurrentSpot = prev.get(truck1.id)?.newSpot ?? truck1.spot;
-        const truck2CurrentSpot = prev.get(truck2.id)?.newSpot ?? truck2.spot;
-
         // Add truck1 change (always add for swap, comparing with original DB spot)
         if (truck1.spot !== spot1) {
           newMap.set(truck1.id, {

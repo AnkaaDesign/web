@@ -17,7 +17,7 @@ export async function exportData(
   const {
     filename = "export",
     includeTimestamp = true,
-    includeFilters = false,
+    includeFilters: _includeFilters = false,
   } = config;
 
   const timestamp = includeTimestamp
@@ -78,8 +78,8 @@ async function exportToExcel(
  * Export to PDF
  */
 async function exportToPDF(
-  data: ChartExportData[],
-  filename: string
+  _data: ChartExportData[],
+  _filename: string
 ): Promise<void> {
   // PDF export would require a library like jsPDF
   // For now, throw an error

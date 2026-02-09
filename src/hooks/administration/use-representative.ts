@@ -18,7 +18,7 @@ import { representativeKeys, customerKeys, taskKeys, changeLogKeys } from "../co
 
 const representativeServiceAdapter = {
   getMany: (params?: RepresentativeGetManyFormData) => representativeService.getAll(params),
-  getById: (id: string, include?: any) => representativeService.getById(id),
+  getById: (id: string, _include?: any) => representativeService.getById(id),
   create: (data: RepresentativeCreateFormData) => representativeService.create(data),
   update: (id: string, data: RepresentativeUpdateFormData) => representativeService.update(id, data),
   delete: (id: string) => representativeService.delete(id),

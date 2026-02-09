@@ -1,4 +1,4 @@
-import React, { useState, forwardRef, useImperativeHandle } from "react";
+import { useState, forwardRef, useImperativeHandle } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ interface SimpleBulkActionsTestProps {
 export const SimpleBulkActionsTest = forwardRef<
   { openModal: (type: BulkOperationType, taskIds: string[]) => void },
   SimpleBulkActionsTestProps
->(({ selectedTaskIds, onClearSelection }, ref) => {
+>(({ selectedTaskIds: _selectedTaskIds, onClearSelection }, ref) => {
   const [isOpen, setIsOpen] = useState(false);
   const [operationType, setOperationType] = useState<BulkOperationType | null>(null);
   const [currentTaskIds, setCurrentTaskIds] = useState<string[]>([]);

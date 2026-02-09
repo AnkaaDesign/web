@@ -12,8 +12,6 @@ import { Combobox } from "@/components/ui/combobox";
 import { BRAZILIAN_STATES } from "../../../../constants";
 import { cleanCNPJ, formatCNPJ } from "../../../../utils";
 import { toast } from "sonner";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 interface BaseSupplierFormProps {
   isSubmitting?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
@@ -38,8 +36,6 @@ function SupplierFormContent({ isSubmitting }: { isSubmitting?: boolean }) {
   const loading = isSubmitting || formSubmitting;
 
   // Check if form has errors
-  const hasErrors = Object.keys(errors).length > 0;
-
   // Handle CNPJ formatting
   const handleCNPJChange = (value: string) => {
     const cleaned = cleanCNPJ(value);

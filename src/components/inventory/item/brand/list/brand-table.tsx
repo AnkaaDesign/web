@@ -41,11 +41,11 @@ interface BrandTableProps {
 
 export function BrandTable({ columns: allColumns, visibleColumns, className, onEdit, onDelete, filters = {}, onDataChange }: BrandTableProps) {
   const navigate = useNavigate();
-  const { delete: deleteBrand } = useItemBrandMutations();
-  const { batchDelete } = useItemBrandBatchMutations();
+  const { delete: _deleteBrand } = useItemBrandMutations();
+  const { batchDelete: _batchDelete } = useItemBrandBatchMutations();
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: _isAuthLoading } = useAuth();
   const canEdit = user ? canEditItems(user) : false;
   const canDelete = user ? canDeleteItems(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'item') : false;
@@ -62,7 +62,7 @@ export function BrandTable({ columns: allColumns, visibleColumns, className, onE
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,
@@ -72,7 +72,7 @@ export function BrandTable({ columns: allColumns, visibleColumns, className, onE
     isPartiallySelected,
     selectionCount,
     resetSelection: _resetSelection,
-    removeFromSelection,
+    removeFromSelection: _removeFromSelection,
     handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,

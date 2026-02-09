@@ -1,8 +1,8 @@
 import { useCallback, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconLoader2, IconArrowUp, IconArrowDown, IconCheck, IconPackage } from "@tabler/icons-react";
+import { IconLoader2, IconCheck, IconPackage } from "@tabler/icons-react";
 import type { ActivityCreateFormData, ItemGetManyFormData } from "../../../../schemas";
-import { ACTIVITY_OPERATION, ACTIVITY_REASON, ACTIVITY_REASON_LABELS, USER_STATUS } from "../../../../constants";
+import { ACTIVITY_OPERATION, ACTIVITY_REASON, ACTIVITY_REASON_LABELS } from "../../../../constants";
 import { useActivityBatchMutations, useUsers } from "../../../../hooks";
 import { routes, FAVORITE_PAGES } from "../../../../constants";
 import { toast } from "sonner";
@@ -39,10 +39,10 @@ export const ActivityBatchCreateForm = () => {
     supplierIds,
     page,
     pageSize,
-    totalRecords,
+    totalRecords: _totalRecords,
     setPage,
     setPageSize,
-    setTotalRecords,
+    setTotalRecords: _setTotalRecords,
     setShowSelectedOnly,
     setSearchTerm,
     setShowInactive,
@@ -92,7 +92,7 @@ export const ActivityBatchCreateForm = () => {
 
   // Handle item selection
   const handleSelectItem = useCallback(
-    (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => {
+    (itemId: string, _quantity?: number, _price?: number, _icms?: number, _ipi?: number) => {
       // Activity form only uses quantity, but accept all params for compatibility
       toggleItemSelection(itemId);
     },

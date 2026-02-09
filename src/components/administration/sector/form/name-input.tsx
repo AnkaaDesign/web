@@ -1,5 +1,3 @@
-import type { SectorCreateFormData, SectorUpdateFormData } from "../../../../types";
-
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 

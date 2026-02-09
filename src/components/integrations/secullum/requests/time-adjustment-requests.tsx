@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { IconCircleCheck, IconCircleX, IconRefresh, IconClock, IconUser, IconCalendar, IconClockEdit, IconFileDescription, IconArrowsExchange, IconDeviceMobile, IconFingerprint, IconQrcode, IconId, IconWifi, IconWifiOff } from "@tabler/icons-react";
+import { IconCircleCheck, IconCircleX, IconClock, IconUser, IconCalendar, IconClockEdit, IconFileDescription, IconArrowsExchange, IconWifiOff } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useSecullumRequests, useSecullumApproveRequest, useSecullumRejectRequest } from "../../../../hooks";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -84,22 +83,6 @@ const getOriginInfo = (origin: number | null | undefined) => {
   };
 };
 
-// Helper function to get device icon and label
-const getDeviceInfo = (type?: string) => {
-  switch (type) {
-    case 'mobile':
-      return { icon: IconDeviceMobile, label: 'Aplicativo móvel', color: 'text-blue-600' };
-    case 'biometric':
-      return { icon: IconFingerprint, label: 'Biometria', color: 'text-green-600' };
-    case 'qrcode':
-      return { icon: IconQrcode, label: 'QR Code', color: 'text-purple-600' };
-    case 'card':
-      return { icon: IconId, label: 'Cartão', color: 'text-orange-600' };
-    case 'web':
-    default:
-      return { icon: IconUser, label: 'Portal web', color: 'text-gray-600' };
-  }
-};
 
 const TimeEntryLabel: Record<string, string> = {
   Entrada1: "Entrada 1",

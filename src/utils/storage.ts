@@ -6,8 +6,6 @@ export interface StorageAdapter {
   clear?(): Promise<void> | void;
 }
 
-export type { StorageAdapter };
-
 // Browser localStorage adapter
 export class LocalStorageAdapter implements StorageAdapter {
   private prefix: string;

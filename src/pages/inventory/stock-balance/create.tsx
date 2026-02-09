@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconLoader2, IconCheck, IconClipboardCheck } from "@tabler/icons-react";
 import type { ItemGetManyFormData } from "../../../schemas";
@@ -26,7 +26,7 @@ export const StockBalanceCreatePage = () => {
   const {
     selectedItems,
     countedQuantities,
-    originalQuantities,
+    originalQuantities: _originalQuantities,
     showSelectedOnly,
     searchTerm,
     showInactive,

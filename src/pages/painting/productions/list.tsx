@@ -2,7 +2,6 @@ import { routes, FAVORITE_PAGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { SECTOR_PRIVILEGES } from "../../../constants";
-import { IconFlask } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { PaintProductionList } from "@/components/painting/production/list/paint-production-list";
 

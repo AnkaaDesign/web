@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { IconCut, IconFileText, IconPlus, IconTrash, IconInfoCircle, IconClipboardList } from "@tabler/icons-react";
 import { useState } from "react";
-import type { Cut, File as FileType, Task } from "../../../../types";
+import type { Cut } from "../../../../types";
 import { CUT_TYPE, CUT_ORIGIN, CUT_TYPE_LABELS } from "../../../../constants";
 import { useCutMutations } from "../../../../hooks";
 import { useToast } from "@/hooks/common/use-toast";
@@ -34,7 +34,6 @@ const cutPlanSchema = z.object({
 });
 
 type CutPlanFormData = z.infer<typeof cutPlanSchema>;
-type CutPlanItem = z.infer<typeof cutPlanItemSchema>;
 
 interface CutPlanFormProps {
   fileId?: string;

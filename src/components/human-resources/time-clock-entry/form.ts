@@ -493,7 +493,7 @@ export function useJustificationForm() {
   });
 
   const handleJustificationSubmit = useCallback(
-    async (data: TimeClockJustificationFormData, onSuccess?: () => void) => {
+    async (_data: TimeClockJustificationFormData, onSuccess?: () => void) => {
       try {
         // For now, we just confirm the justification
         // In the future, this could save to a justifications APItoast.success('Justificativa registrada com sucesso');

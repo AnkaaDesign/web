@@ -1,10 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { IconLoader, IconDeviceFloppy, IconX } from "@tabler/icons-react";
 
 // Form components
 import { ItemsSelector } from "./items-selector";
@@ -24,7 +21,7 @@ interface OrderScheduleFormProps {
   onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
 }
 
-export function OrderScheduleForm({ initialData, onSubmit, onCancel, isSubmitting = false, isLoading = false, mode = "create", onFormStateChange }: OrderScheduleFormProps) {
+export function OrderScheduleForm({ initialData, onSubmit, onCancel: _onCancel, isSubmitting = false, isLoading = false, mode = "create", onFormStateChange }: OrderScheduleFormProps) {
   const form = useForm<OrderScheduleCreateFormData | OrderScheduleUpdateFormData>({
     resolver: zodResolver(mode === "create" ? orderScheduleCreateSchema : orderScheduleUpdateSchema),
     defaultValues: {
@@ -64,11 +61,6 @@ export function OrderScheduleForm({ initialData, onSubmit, onCancel, isSubmittin
         console.error("Erro ao salvar cronograma:", error);
       }
     }
-  };
-
-  const handleCancel = () => {
-    form.reset();
-    onCancel?.();
   };
 
   return (

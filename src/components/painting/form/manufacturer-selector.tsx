@@ -1,6 +1,5 @@
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { TRUCK_MANUFACTURER, TRUCK_MANUFACTURER_LABELS } from "../../../constants";
 import { IconTruck } from "@tabler/icons-react";
 

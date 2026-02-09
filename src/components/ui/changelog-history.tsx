@@ -139,7 +139,7 @@ const LogoDisplay = ({
           size,
           imageLoading ? "opacity-0" : "opacity-100",
         )}
-        onError={(e) => {
+        onError={(_e) => {
           setImageError(true);
           setImageLoading(false);
         }}
@@ -2320,7 +2320,7 @@ export function ChangelogHistory({
   });
 
   // Handle rollback action
-  const handleRollback = async (changeLogId: string, fieldName: string) => {
+  const handleRollback = async (changeLogId: string, _fieldName: string) => {
     // Only allow rollback for task entities
     if (entityType !== CHANGE_LOG_ENTITY_TYPE.TASK) {
       return;

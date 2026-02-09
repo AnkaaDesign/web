@@ -14,10 +14,7 @@ import {
   IconTrash,
   IconEdit,
   IconDownload,
-  IconShare,
-  IconCopy,
   IconArchive,
-  IconRestore,
   IconAlertTriangle,
   IconLoader2,
 } from "@tabler/icons-react";

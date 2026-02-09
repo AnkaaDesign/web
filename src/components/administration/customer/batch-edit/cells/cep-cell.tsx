@@ -3,14 +3,14 @@ import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/f
 import { Input } from "@/components/ui";
 import { IconLoader2 } from "@tabler/icons-react";
 
-interface CepCellProps<TFieldValues extends FieldValues = FieldValues> {
+interface CepCellProps<_TFieldValues extends FieldValues = FieldValues> {
   control: any;
   index: number;
   disabled?: boolean;
   onAddressFound?: (data: { address: string; neighborhood: string; city: string; state: string }) => void;
 }
 
-export function CepCell<TFieldValues extends FieldValues = FieldValues>({ control, index, disabled, onAddressFound }: CepCellProps<TFieldValues>) {
+export function CepCell<_TFieldValues extends FieldValues = FieldValues>({ control, index, disabled, onAddressFound }: CepCellProps<_TFieldValues>) {
   const [isLoading, setIsLoading] = useState(false);
   const lastLookupRef = useRef<string>("");
 
@@ -64,7 +64,7 @@ export function CepCell<TFieldValues extends FieldValues = FieldValues>({ contro
               <Input
                 type="cep"
                 value={field.value ?? ""}
-                onChange={(value) => {
+                onChange={(value: string | number | null) => {
                   field.onChange(value ?? null);
                   handleCepLookup(value || "");
                 }}

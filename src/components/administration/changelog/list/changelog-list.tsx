@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { IconSearch, IconFilter, IconRefresh } from "@tabler/icons-react";
 import { useChangeLogs } from "../../../../hooks";
 import { useTableState } from "@/hooks/common/use-table-state";
@@ -228,7 +227,7 @@ export function ChangelogList({ className, onDataChange }: ChangelogListProps) {
               type="text"
               placeholder="Buscar por entidade, ação, campo, motivo ou usuário..."
               value={displaySearchText}
-              onChange={(value) => handleSearch(value as string)}
+              onChange={(value: string | number | null) => handleSearch(value as string)}
               transparent={true}
               className="pl-10"
             />

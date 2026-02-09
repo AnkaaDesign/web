@@ -1,4 +1,3 @@
-import React from "react";
 import { ColorMultiSelect, type ColorMultiSelectOption } from "./color-multi-select";
 
 interface MultiSelectProps {

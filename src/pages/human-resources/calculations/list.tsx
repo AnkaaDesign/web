@@ -1,13 +1,9 @@
-import { IconCalculator } from "@tabler/icons-react";
-
 import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
 import { CalculationList } from "@/components/integrations/secullum/calculations/list";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export default function HumanResourcesCalculationsPage() {
   usePageTracker({ title: "Cálculos de Ponto", icon: "calculator" });

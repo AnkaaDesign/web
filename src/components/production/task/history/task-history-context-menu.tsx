@@ -68,7 +68,6 @@ export function TaskHistoryContextMenu({
   const hasPreparationTasks = tasks.some((t) => t.status === TASK_STATUS.PREPARATION);
   const hasWaitingProductionTasks = tasks.some((t) => t.status === TASK_STATUS.WAITING_PRODUCTION);
   const hasCompletedTasks = tasks.some((t) => t.status === TASK_STATUS.COMPLETED);
-  const hasCancelledTasks = tasks.some((t) => t.status === TASK_STATUS.CANCELLED);
   const hasNonCancelledTasks = tasks.some((t) => t.status !== TASK_STATUS.CANCELLED);
 
   // Permission checks

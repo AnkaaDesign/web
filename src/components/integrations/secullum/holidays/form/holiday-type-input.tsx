@@ -1,6 +1,5 @@
 import { HOLIDAY_TYPE, HOLIDAY_TYPE_LABELS } from "../../../../../constants";
 
-import type { SecullumCreateHolidayFormData } from "../../../../../schemas";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 

@@ -20,7 +20,7 @@ export function AdvancedColorPicker({
   onChange,
   disabled,
   className,
-  popoverSide = "bottom",
+  popoverSide: _popoverSide = "bottom",
   popoverAlign = "start"
 }: AdvancedColorPickerProps) {
   const [isOpen, setIsOpen] = useState(false);

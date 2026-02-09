@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useItemMutations, useItemBatchMutations, useItemBrands, useItemCategories, useSuppliers, useItemMerge } from "../../../../hooks";
 import type { Item } from "../../../../types";
@@ -34,7 +34,7 @@ export function ItemList({ className }: ItemListProps) {
   const navigate = useNavigate();
   const { update } = useItemMutations();
   const { batchDelete, batchUpdate } = useItemBatchMutations();
-  const { mutate: mergeItems, isPending: isMerging } = useItemMerge();
+  const { mutate: mergeItems, isPending: _isMerging } = useItemMerge();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // State to hold current page items and total count from the table

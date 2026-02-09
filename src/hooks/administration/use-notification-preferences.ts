@@ -2,8 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { notificationPreferenceService } from "../../api-client/services/notification.service";
 import type {
   UserNotificationPreference,
-  UserNotificationPreferenceGetManyResponse,
-  UserNotificationPreferenceUpdateResponse,
 } from "../../types";
 
 // =====================================================
@@ -86,7 +84,7 @@ export const useUpdatePreference = () => {
       });
       return response.data;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidate the user's preferences
       queryClient.invalidateQueries({
         queryKey: notificationPreferenceKeys.byUser(variables.userId),
@@ -110,7 +108,7 @@ export const useResetPreferences = () => {
       const response = await notificationPreferenceService.resetPreferences(userId);
       return response.data;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidate the user's preferences
       queryClient.invalidateQueries({
         queryKey: notificationPreferenceKeys.byUser(variables.userId),

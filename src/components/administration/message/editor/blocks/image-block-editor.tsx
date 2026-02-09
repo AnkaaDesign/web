@@ -79,7 +79,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
           <div className="mt-3">
             <Input
               placeholder="Ou cole a URL da imagem..."
-              onChange={(value) => onUpdate({ url: value as string })}
+              onChange={(value: string | number | null) => onUpdate({ url: value as string })}
               transparent
               className="dark:border-muted"
             />
@@ -137,7 +137,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
               <Label className="text-xs">Texto Alternativo</Label>
               <Input
                 value={block.alt || ''}
-                onChange={(value) => onUpdate({ alt: value as string })}
+                onChange={(value: string | number | null) => onUpdate({ alt: value as string })}
                 placeholder="Descrição"
                 className="h-8 text-sm dark:border-muted"
                 transparent
@@ -149,7 +149,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
             <Label className="text-xs">Legenda (opcional)</Label>
             <Input
               value={block.caption || ''}
-              onChange={(value) => onUpdate({ caption: value as string })}
+              onChange={(value: string | number | null) => onUpdate({ caption: value as string })}
               placeholder="Adicione uma legenda..."
               className="h-8 text-sm dark:border-muted"
               transparent

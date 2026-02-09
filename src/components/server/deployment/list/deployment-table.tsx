@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconRocket, IconCheck, IconX, IconClock, IconRotateClockwise, IconEye } from "@tabler/icons-react";
 
@@ -80,8 +80,8 @@ export function DeploymentTable({ filters = {}, className }: DeploymentTableProp
     sortConfigs,
     setPage,
     setPageSize,
-    toggleSort,
-    getSortDirection,
+    toggleSort: _toggleSort,
+    getSortDirection: _getSortDirection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,

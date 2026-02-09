@@ -1,12 +1,11 @@
-import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { IconBold, IconItalic, IconUnderline, IconLink } from "@tabler/icons-react";
+import { useState, useRef } from "react";
+
 import { cn } from "@/lib/utils";
 import type { TextBlock } from "../types";
 import { InlineFormattingToolbar } from "../inline-formatting-toolbar";
 import { Combobox } from "@/components/ui/combobox";
 import { Label } from "@/components/ui/label";
-import { stripMarkdownFormatting, hasMarkdownFormatting, removeMarkdownFormat } from "@/utils/markdown-parser";
+import { stripMarkdownFormatting, removeMarkdownFormat } from "@/utils/markdown-parser";
 
 interface TextBlockEditorProps {
   block: TextBlock;
@@ -94,8 +93,6 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
 
     // Check if text already has the format and toggle it
     let formattedText = selectedText;
-    let newStart = start;
-    let newEnd = end;
 
     if (format === 'bold') {
       // Context-aware detection: check if selection is wrapped by ** markers

@@ -104,6 +104,5 @@ export function useSocketEmit(): (event: string, data?: unknown) => void {
  * @returns Boolean indicating if socket is connected
  */
 export function useSocketConnected(): boolean {
-  const socket = useSocket();
   return socketService.isConnected();
 }

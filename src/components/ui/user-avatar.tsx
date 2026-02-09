@@ -26,7 +26,7 @@ function getInitials(name: string): string {
 
 export function UserAvatar({
   name,
-  email,
+  email: _email,
   size = "md",
   className,
   src

@@ -1,4 +1,5 @@
-import { lazy, ComponentType, LazyExoticComponent } from "react";
+import { lazy } from "react";
+import type { ComponentType, LazyExoticComponent } from "react";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 
 // Get or create a global QueryClient instance
@@ -14,25 +15,6 @@ function getGlobalQueryClient(): QueryClient | null {
         console.warn("[QueryClient] Global client flag set but instance not found");
       }
     }
-  }
-  return null;
-}
-
-// Wait for global QueryClient with timeout
-async function waitForGlobalQueryClient(maxWaitMs = 5000): Promise<QueryClient | null> {
-  const startTime = Date.now();
-
-  while (Date.now() - startTime < maxWaitMs) {
-    const client = getGlobalQueryClient();
-    if (client) {
-      return client;
-    }
-    // Wait 10ms before checking again
-    await new Promise(resolve => setTimeout(resolve, 10));
-  }
-
-  if (process.env.NODE_ENV !== 'production') {
-    console.error("[QueryClient] Timeout waiting for global QueryClient");
   }
   return null;
 }

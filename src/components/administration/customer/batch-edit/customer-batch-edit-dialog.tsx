@@ -93,7 +93,7 @@ export function CustomerBatchEditDialog({ isOpen, onClose, selectedCustomers, on
         data: updateData,
       }));
 
-      const result = await batchUpdateAsync({ customers });
+      await batchUpdateAsync({ customers });
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -122,7 +122,7 @@ export function CustomerBatchEditDialog({ isOpen, onClose, selectedCustomers, on
 
       const customerIds = selectedCustomers.map((customer) => customer.id);
 
-      const result = await batchDeleteAsync({ customerIds });
+      await batchDeleteAsync({ customerIds });
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -222,7 +222,7 @@ export function CustomerBatchEditDialog({ isOpen, onClose, selectedCustomers, on
                             <FormControl>
                               <Input
                                 value={field.value || ""}
-                                onChange={(value) => {
+                                onChange={(value: string | number | null) => {
                                   field.onChange(value);
                                 }}
                                 name={field.name}
@@ -271,7 +271,7 @@ export function CustomerBatchEditDialog({ isOpen, onClose, selectedCustomers, on
                             <FormControl>
                               <Input
                                 value={field.value || ""}
-                                onChange={(value) => {
+                                onChange={(value: string | number | null) => {
                                   field.onChange(value);
                                 }}
                                 name={field.name}
@@ -294,7 +294,7 @@ export function CustomerBatchEditDialog({ isOpen, onClose, selectedCustomers, on
                             <FormControl>
                               <Input
                                 value={field.value || ""}
-                                onChange={(value) => {
+                                onChange={(value: string | number | null) => {
                                   field.onChange(value);
                                 }}
                                 name={field.name}

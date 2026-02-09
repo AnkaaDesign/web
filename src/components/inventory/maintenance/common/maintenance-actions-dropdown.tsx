@@ -10,7 +10,6 @@ import {
   IconCircleX,
   IconRotate,
   IconTrash,
-  IconCalendar,
   IconPower,
   IconPower as IconPowerOff,
 } from "@tabler/icons-react";
@@ -58,11 +57,6 @@ export function MaintenanceActionsDropdown({
   className,
 }: MaintenanceActionsDropdownProps) {
   const { status } = maintenance;
-
-  // Check if maintenance is overdue
-  const now = new Date();
-  const nextRunDate = maintenance.nextRun || maintenance.maintenanceSchedule?.nextRun;
-  const isOverdue = nextRunDate && status === MAINTENANCE_STATUS.PENDING && new Date(nextRunDate) < now;
 
   // Define which actions are available based on status with enhanced logic
   const canStart = status === MAINTENANCE_STATUS.PENDING || status === MAINTENANCE_STATUS.OVERDUE;

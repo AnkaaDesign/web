@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconEye, IconBuildingSkyscraper, IconAlertTriangle, IconPlus } from "@tabler/icons-react";
 
@@ -90,7 +90,7 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user } = useAuth();
   const canEdit = user ? canEditHrEntities(user) : false;
   const canDelete = user ? canDeleteHrEntities(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'hr') : false;
@@ -117,7 +117,6 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

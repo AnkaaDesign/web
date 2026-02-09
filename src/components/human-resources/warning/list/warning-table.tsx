@@ -25,7 +25,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -52,7 +51,7 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
   const [deleteDialog, setDeleteDialog] = useState<{ items: Warning[]; isBulk: boolean } | null>(null);
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user } = useAuth();
   const canEdit = user ? canEditHrEntities(user) : false;
   const canDelete = user ? canDeleteHrEntities(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'hr') : false;
@@ -66,7 +65,6 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

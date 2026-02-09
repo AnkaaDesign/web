@@ -1,11 +1,8 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEditForm } from "../../../../hooks/common/use-edit-form";
 import {
-  IconLoader2,
-  IconArrowLeft,
-  IconCheck,
   IconClipboardList,
   IconCalendar,
   IconPalette,
@@ -13,8 +10,6 @@ import {
   IconRuler,
   IconSparkles,
   IconScissors,
-  IconPlus,
-  IconX,
   IconCurrencyReal,
   IconReceipt,
   IconFileInvoice,
@@ -26,16 +21,13 @@ import {
   IconStatusChange,
   IconMapPin,
   IconUser,
-  IconPhone,
-  IconTrash,
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
-import { useTaskMutations, useCutsByTask, useCutMutations } from "../../../../hooks";
+import { useTaskMutations, useCutsByTask } from "../../../../hooks";
 import { cutService } from "../../../../api-client/cut";
-import { representativeService } from "@/services/representativeService";
-import type { Representative, RepresentativeCreateInlineFormData, RepresentativeRowData } from "@/types/representative";
-import { RepresentativeRole, REPRESENTATIVE_ROLE_LABELS } from "@/types/representative";
+import type { RepresentativeRowData } from "@/types/representative";
+import { RepresentativeRole } from "@/types/representative";
 import { RepresentativeManager } from "@/components/administration/customer/representative";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
@@ -48,11 +40,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { SizeInput } from "@/components/ui/size-input";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
-import { BasePhoneInput } from "@/components/ui/phone-input";
 import { CustomerSelector } from "./customer-selector";
 import { SectorSelector } from "./sector-selector";
 import { ServiceSelectorAutoGrouped } from "./service-selector-auto-grouped";
@@ -67,11 +56,10 @@ import { ArtworkFileUploadField } from "./artwork-file-upload-field";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { formatCNPJ, formatCPF, toTitleCase } from "../../../../utils";
+import { toTitleCase } from "../../../../utils";
 import {
   getPricingItemsToAddFromServiceOrders,
   getServiceOrdersToAddFromPricingItems,
-  combineServiceOrderToPricingDescription,
   normalizeDescription,
   type SyncServiceOrder,
   type SyncPricingItem,
@@ -80,7 +68,6 @@ import { getUniqueDescriptions } from "../../../../api-client/serviceOrder";
 import { LayoutForm } from "@/components/production/layout/layout-form";
 import { SpotSelector } from "./spot-selector";
 import { useLayoutsByTruck, useLayoutMutations } from "../../../../hooks";
-import { FormMoneyInput } from "@/components/ui/form-money-input";
 import { TRUCK_SPOT } from "../../../../constants";
 
 interface TaskEditFormProps {
@@ -125,7 +112,6 @@ const convertToFileWithPreview = (file: any | any[] | undefined | null): FileWit
 export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEditFormProps) => {
   const { user } = useAuth();
   const taskMutations = useTaskMutations();
-  const { createAsync: createCutAsync } = useCutMutations();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Wrap updateAsync for debugging/logging
@@ -196,7 +182,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     })
   );
   // artworkIds should be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
-  const [uploadedFileIds, setUploadedFileIds] = useState<string[]>(
+  const [_uploadedFileIds, setUploadedFileIds] = useState<string[]>(
     task.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || []
   );
 
@@ -311,7 +297,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       thumbnailUrl: file.thumbnailUrl,
     } as FileWithPreview))
   );
-  const [baseFileIds, setBaseFileIds] = useState<string[]>(task.baseFiles?.map((f) => f.id) || []);
+  const [_baseFileIds, setBaseFileIds] = useState<string[]>(task.baseFiles?.map((f) => f.id) || []);
 
   // Track if base files have been modified by the user
   const [hasBaseFileChanges, setHasBaseFileChanges] = useState(false);
@@ -492,7 +478,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   useEffect(() => {
     
   }, [layoutsData, truckId, truckLength]);
-  const { createOrUpdateTruckLayout, delete: deleteLayout } = useLayoutMutations();
+  const { createOrUpdateTruckLayout: _createOrUpdateTruckLayout, delete: deleteLayout } = useLayoutMutations();
   const [shouldDeleteLayouts, setShouldDeleteLayouts] = useState(false);
 
   // CRITICAL FIX: Sync currentLayoutStates with fresh backend data after save
@@ -851,7 +837,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       }
 
       // DEBUG: Log current form values for date fields
-      const currentFormValues = form.getValues();
+      // const _currentFormValues = form.getValues();
       // Current form values for dates: {
       //   forecastDate: currentFormValues.forecastDate,
       //   forecastDateType: typeof currentFormValues.forecastDate,
@@ -1661,12 +1647,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           const submitData = { ...changedData };
 
           // DEBUG: Log submitData immediately after creation
-          console.log('[TaskEditForm] JSON path - changedData received:', JSON.stringify(changedData, (key, value) => {
+          console.log('[TaskEditForm] JSON path - changedData received:', JSON.stringify(changedData, (_key, value) => {
             if (value instanceof Date) return `Date(${value.toISOString()})`;
             return value;
           }, 2));
           console.log('[TaskEditForm] JSON path - changedData.forecastDate:', changedData.forecastDate, 'isNull:', changedData.forecastDate === null);
-          console.log('[TaskEditForm] JSON path - submitData after spread:', JSON.stringify(submitData, (key, value) => {
+          console.log('[TaskEditForm] JSON path - submitData after spread:', JSON.stringify(submitData, (_key, value) => {
             if (value instanceof Date) return `Date(${value.toISOString()})`;
             return value;
           }, 2));
@@ -1895,7 +1881,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           delete submitData._onlyNewRepresentatives;
 
           // DEBUG: Log submitData right before API call
-          console.log('[TaskEditForm] JSON path - submitData before API call:', JSON.stringify(submitData, (key, value) => {
+          console.log('[TaskEditForm] JSON path - submitData before API call:', JSON.stringify(submitData, (_key, value) => {
             if (value instanceof Date) return `Date(${value.toISOString()})`;
             return value;
           }, 2));
@@ -1970,8 +1956,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 // Log FormData contents
                 
-                for (const [key, value] of (formData as any).entries()) {
-                  
+                for (const [_key, _value] of (formData as any).entries()) {
+
                 }
 
                 // Call the cut service directly, bypassing the mutation hooks
@@ -1987,13 +1973,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
               }
             });
 
-            const results = await Promise.all(cutCreationPromises);
-            const totalCreated = results
-              .filter(r => r.success)
-              .reduce((sum, r) => sum + (r.createdCount || 1), 0);
-            const totalFailed = results
-              .filter(r => !r.success && !r.skipped)
-              .reduce((sum, r) => sum + (r.failedCount || 1), 0);
+            await Promise.all(cutCreationPromises);
+            // const _totalCreated = results
+            //   .filter(r => r.success)
+            //   .reduce((sum, r) => sum + (r.createdCount || 1), 0);
+            // const _totalFailed = results
+            //   .filter(r => !r.success && !r.skipped)
+            //   .reduce((sum, r) => sum + (r.failedCount || 1), 0);
 
           }
 
@@ -2064,16 +2050,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   });
 
   // Helper to update file in list
-  const updateFileInList = (files: FileWithPreview[], fileId: string, updates: Partial<FileWithPreview>) => {
-    return files.map((f) => {
-      if (f.id === fileId) {
-        // Use Object.assign to preserve the File object prototype and properties
-        // This keeps all native File properties (size, name, type, lastModified, etc.)
-        return Object.assign(f, updates);
-      }
-      return f;
-    });
-  };
+  // const _updateFileInList = (files: FileWithPreview[], fileId: string, updates: Partial<FileWithPreview>) => {
+  //   return files.map((f) => {
+  //     if (f.id === fileId) {
+  //       // Use Object.assign to preserve the File object prototype and properties
+  //       // This keeps all native File properties (size, name, type, lastModified, etc.)
+  //       return Object.assign(f, updates);
+  //     }
+  //     return f;
+  //   });
+  // };
 
   // Handle budget file change (no longer uploads immediately)
   const handleBudgetFileChange = (files: FileWithPreview[]) => {
@@ -2148,10 +2134,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     // Note: Form validation happens automatically via useWatch, no need to manually trigger
   };
 
-  const handleCancel = useCallback(() => {
-    const redirectUrl = detailsRoute ? detailsRoute(task.id) : `/producao/cronograma/detalhes/${task.id}`;
-    window.location.href = redirectUrl;
-  }, [task.id, detailsRoute]);
+  // const _handleCancel = useCallback(() => {
+  //   const redirectUrl = detailsRoute ? detailsRoute(task.id) : `/producao/cronograma/detalhes/${task.id}`;
+  //   window.location.href = redirectUrl;
+  // }, [task.id, detailsRoute]);
 
   // Handle adding a service order from the Designar dialog in GeneralPaintingSelector
   const handleDesignarServiceOrder = useCallback((serviceOrder: ServiceOrderData) => {
@@ -2668,7 +2654,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   }, [servicesValues, pricingValues, form]);
 
   // Get form state
-  const { formState } = form;
+  const { formState: _formState } = form;
 
   // Refs to track previous state for onFormStateChange callback
   // Declared here but useEffect is below after all validation variables are defined
@@ -2867,43 +2853,43 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   ]);
 
   // Navigation actions - wrapped in useMemo to ensure re-renders when dependencies change
-  const navigationActions = useMemo(() => {
-    const isSubmitDisabled = isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompletePricing || hasIncompleteServices || hasIncompleteObservation || !!layoutWidthError;
+  // const _navigationActions = useMemo(() => {
+  //   const isSubmitDisabled = isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompletePricing || hasIncompleteServices || hasIncompleteObservation || !!layoutWidthError;
 
-    console.log('[TaskEditForm] Submit button disabled state:', {
-      isSubmitDisabled,
-      isSubmitting,
-      hasChanges,
-      hasNewRepresentatives,
-      formFieldChangesCount: Object.keys(formFieldChanges).length,
-      hasCutsWithoutFiles,
-      hasIncompletePricing,
-      hasIncompleteServices,
-      hasIncompleteObservation,
-      hasLayoutError: !!layoutWidthError
-    });
+  //   console.log('[TaskEditForm] Submit button disabled state:', {
+  //     isSubmitDisabled,
+  //     isSubmitting,
+  //     hasChanges,
+  //     hasNewRepresentatives,
+  //     formFieldChangesCount: Object.keys(formFieldChanges).length,
+  //     hasCutsWithoutFiles,
+  //     hasIncompletePricing,
+  //     hasIncompleteServices,
+  //     hasIncompleteObservation,
+  //     hasLayoutError: !!layoutWidthError
+  //   });
 
 
-    return [
-      {
-        key: "cancel",
-        label: "Cancelar",
-        onClick: handleCancel,
-        variant: "outline" as const,
-        icon: IconArrowLeft,
-        disabled: isSubmitting,
-      },
-      {
-        key: "submit",
-        label: "Salvar Alterações",
-        icon: isSubmitting ? IconLoader2 : IconCheck,
-        onClick: handleSubmitChanges(),
-        variant: "default" as const,
-        disabled: isSubmitDisabled,
-        loading: isSubmitting,
-      },
-    ];
-  }, [isSubmitting, hasChanges, hasCutsWithoutFiles, hasIncompletePricing, hasIncompleteServices, hasIncompleteObservation, layoutWidthError, handleCancel, handleSubmitChanges, hasNewRepresentatives]);
+  //   return [
+  //     {
+  //       key: "cancel",
+  //       label: "Cancelar",
+  //       onClick: handleCancel,
+  //       variant: "outline" as const,
+  //       icon: IconArrowLeft,
+  //       disabled: isSubmitting,
+  //     },
+  //     {
+  //       key: "submit",
+  //       label: "Salvar Alterações",
+  //       icon: isSubmitting ? IconLoader2 : IconCheck,
+  //       onClick: handleSubmitChanges(),
+  //       variant: "default" as const,
+  //       disabled: isSubmitDisabled,
+  //       loading: isSubmitting,
+  //     },
+  //   ];
+  // }, [isSubmitting, hasChanges, hasCutsWithoutFiles, hasIncompletePricing, hasIncompleteServices, hasIncompleteObservation, layoutWidthError, handleCancel, handleSubmitChanges, hasNewRepresentatives]);
 
   return (
     <Form {...form}>
@@ -2968,7 +2954,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             <FormControl>
                               <Input
                                 value={field.value || ""}
-                                onChange={(value) => {
+                                onChange={(value: string | number | null) => {
                                   const rawValue = typeof value === "string" ? value : (value as any)?.target?.value || "";
                                   field.onChange(rawValue);
                                 }}
@@ -3082,7 +3068,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                 value={field.value || ""}
                                 placeholder="Ex: ABC-123456"
                                 className="uppercase bg-transparent"
-                                onChange={(value) => field.onChange(typeof value === "string" ? value.toUpperCase() : "")}
+                                onChange={(value: string | number | null) => field.onChange(typeof value === "string" ? value.toUpperCase() : "")}
                                 onBlur={field.onBlur}
                                 disabled={isSubmitting || isWarehouseUser || isDesignerUser || isFinancialUser}
                               />
@@ -3131,7 +3117,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                   placeholder="Ex: ABC-1234 ou ABC-1D23"
                                   className="uppercase bg-transparent"
                                   maxLength={8}
-                                  onChange={(value) => {
+                                  onChange={(value: string | number | null) => {
                                     // Remove all non-alphanumeric characters, convert to uppercase
                                     const cleanValue = (value || "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
                                     // Limit to 7 characters (3 letters + 4 chars)
@@ -3177,7 +3163,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                   placeholder="Ex: 9BW ZZZ37 7V T004251"
                                   className="bg-transparent uppercase"
                                   maxLength={20}
-                                  onChange={(value) => {
+                                  onChange={(value: string | number | null) => {
                                     // Remove all non-alphanumeric characters and spaces, convert to uppercase
                                     const cleanValue = (value || "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
                                     // Limit to exactly 17 characters (VIN standard)

@@ -2,7 +2,7 @@ import type { Item, Price } from "../types";
 import { dateUtils } from "./date";
 import { numberUtils } from "./number";
 import { MEASURE_UNIT_LABELS, STOCK_LEVEL_LABELS, ITEM_ISSUE_TYPE_LABELS } from "../constants";
-import { MEASURE_UNIT, STOCK_LEVEL, ITEM_ISSUE_TYPE, PPE_TYPE, PPE_SIZE, PPE_DELIVERY_MODE } from "../constants";
+import { MEASURE_UNIT, STOCK_LEVEL, ITEM_ISSUE_TYPE, PPE_TYPE, PPE_SIZE } from "../constants";
 
 /**
  * Get stock status based on quantity

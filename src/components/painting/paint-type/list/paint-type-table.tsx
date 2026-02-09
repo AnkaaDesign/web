@@ -46,7 +46,7 @@ export function PaintTypeTable({ visibleColumns, className, onEdit, onDelete, fi
   const { batchDelete } = usePaintTypeBatchMutations();
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user } = useAuth();
   const canEdit = user ? canEditPaints(user) : false;
   const canDelete = user ? canDeletePaints(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'paintType') : false;
@@ -63,7 +63,6 @@ export function PaintTypeTable({ visibleColumns, className, onEdit, onDelete, fi
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { FilterDefinition, LocalStorageFilterPresets, FilterPresetStorage } from "@/utils/table-filter-utils";
+import type { FilterDefinition, FilterPresetStorage } from "@/utils/table-filter-utils";
+import { LocalStorageFilterPresets } from "@/utils/table-filter-utils";
 
 export interface UseFilterPresetsOptions {
   /**

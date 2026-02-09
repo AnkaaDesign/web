@@ -18,8 +18,6 @@ import {
   WEEK_DAY_LABELS,
   MONTH,
   MONTH_LABELS,
-  USER_STATUS,
-  routes,
 } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
@@ -45,7 +43,7 @@ interface UpdatePpeScheduleFormProps extends BasePpeScheduleFormProps {
 type PpeScheduleFormProps = CreatePpeScheduleFormProps | UpdatePpeScheduleFormProps;
 
 export function PpeScheduleForm(props: PpeScheduleFormProps) {
-  const { isSubmitting, mode } = props;
+  const { isSubmitting: _isSubmitting, mode } = props;
   // Note: Form uses props.onSubmit directly instead of mutations
 
   const [selectedAssignmentType, setSelectedAssignmentType] = useState<ASSIGNMENT_TYPE>(mode === "update" ? props.ppeSchedule.assignmentType : ASSIGNMENT_TYPE.SPECIFIC);

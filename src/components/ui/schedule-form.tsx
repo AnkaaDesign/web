@@ -40,7 +40,7 @@ export interface ScheduleFormData {
   dayOfWeek?: WEEK_DAY | null;
   month?: MONTH | null;
 }
-interface ScheduleFormProps<T extends FieldValues & ScheduleFormData> {
+interface ScheduleFormProps<_T extends FieldValues & ScheduleFormData> {
   control: any;
   disabled?: boolean;
   showNextRun?: boolean;

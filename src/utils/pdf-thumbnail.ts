@@ -194,8 +194,8 @@ export const generatePDFThumbnailBlob = async (
  * Note: Requires pdfjs-dist package to be installed
  */
 export const generateClientSidePDFThumbnail = async (
-  pdfUrl: string,
-  options: {
+  _pdfUrl: string,
+  _options: {
     page?: number;
     scale?: number;
     width?: number;

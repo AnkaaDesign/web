@@ -6,16 +6,13 @@ import type { Position, BatchOperationResult } from "../../../../types";
 import { usePositionBatchMutations } from "../../../../hooks";
 import { BatchOperationResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { routes } from "../../../../constants";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { FormInput } from "@/components/ui/form-input";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { IconLoader2, IconDeviceFloppy, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 
@@ -44,7 +41,7 @@ interface PositionBatchEditTableProps {
   onSubmit?: () => void;
 }
 
-export function PositionBatchEditTable({ positions, onCancel, onSubmit }: PositionBatchEditTableProps) {
+export function PositionBatchEditTable({ positions, onCancel: _onCancel, onSubmit: _onSubmit }: PositionBatchEditTableProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState<BatchOperationResult<Position, Position> | null>(null);

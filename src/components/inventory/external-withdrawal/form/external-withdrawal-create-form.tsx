@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconUser, IconArrowBack, IconPackage, IconPackageExport, IconDownload, IconFileInvoice, IconReceipt } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconUser, IconPackage, IconPackageExport, IconDownload, IconFileInvoice, IconReceipt } from "@tabler/icons-react";
 import type { ExternalWithdrawalCreateFormData, ItemGetManyFormData } from "../../../../schemas";
 import { externalWithdrawalCreateSchema } from "../../../../schemas";
 import { useExternalWithdrawalMutations, useItems } from "../../../../hooks";
@@ -87,10 +87,10 @@ export const ExternalWithdrawalCreateForm = () => {
     supplierIds,
     page,
     pageSize,
-    totalRecords,
+    totalRecords: _totalRecords,
     setPage,
     setPageSize,
-    setTotalRecords,
+    setTotalRecords: _setTotalRecords,
     setShowSelectedOnly,
     setSearchTerm,
     setShowInactive,
@@ -317,7 +317,7 @@ export const ExternalWithdrawalCreateForm = () => {
 
   // Handle item selection
   const handleSelectItem = useCallback(
-    (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => {
+    (itemId: string, quantity?: number, price?: number, _icms?: number, _ipi?: number) => {
       // External withdrawal uses quantity and price, accept icms/ipi for compatibility
       toggleItemSelection(itemId, quantity, price);
     },

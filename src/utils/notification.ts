@@ -1,5 +1,5 @@
 import type { Notification, SeenNotification } from "../types";
-import { NOTIFICATION_IMPORTANCE, NOTIFICATION_TYPE, NOTIFICATION_CHANNEL, NOTIFICATION_ACTION_TYPE } from "../constants";
+import { NOTIFICATION_IMPORTANCE, NOTIFICATION_TYPE, NOTIFICATION_CHANNEL } from "../constants";
 import { NOTIFICATION_TYPE_LABELS, NOTIFICATION_IMPORTANCE_LABELS, NOTIFICATION_CHANNEL_LABELS } from "../constants";
 import { dateUtils } from "./date";
 
@@ -82,7 +82,7 @@ export function formatNotificationChannels(channels: NOTIFICATION_CHANNEL[]): st
 
   const labels: Record<NOTIFICATION_CHANNEL, string> = {
     [NOTIFICATION_CHANNEL.EMAIL]: "E-mail",
-    [NOTIFICATION_CHANNEL.SMS]: "SMS",
+    [NOTIFICATION_CHANNEL.WHATSAPP]: "WhatsApp",
     [NOTIFICATION_CHANNEL.PUSH]: "Push",
     [NOTIFICATION_CHANNEL.IN_APP]: "No App",
   };

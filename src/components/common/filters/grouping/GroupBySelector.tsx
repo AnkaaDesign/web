@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IconGripVertical, IconPlus, IconTrash } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
 
 export interface GroupByField {
   id: string;

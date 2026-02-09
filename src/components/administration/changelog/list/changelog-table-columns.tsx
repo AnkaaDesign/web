@@ -4,7 +4,7 @@ import { CHANGE_LOG_ENTITY_TYPE_LABELS, CHANGE_LOG_ACTION_LABELS, CHANGE_LOG_ACT
 import { formatDateTime, formatRelativeTime } from "../../../../utils";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { IconPlus, IconEdit, IconTrash, IconRefresh, IconArrowBackUpDouble, IconArchive, IconCheck, IconX, IconClock, IconEye, IconPackages } from "@tabler/icons-react";
+import { IconPlus, IconEdit, IconTrash, IconRefresh, IconArrowBackUpDouble, IconArchive, IconCheck, IconX, IconEye, IconPackages } from "@tabler/icons-react";
 // Define the column interface directly to avoid import issues
 interface ChangelogColumn {
   key: string;

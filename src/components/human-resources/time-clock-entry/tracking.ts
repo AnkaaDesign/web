@@ -283,19 +283,18 @@ export const debugUtils = {
   /**
    * Log modification state for debugging
    */
-  logModificationState(entryId: string, stateManager: StateManager): void {
+  logModificationState(_entryId: string, _stateManager: StateManager): void {
     if (process.env.NODE_ENV === "development") {
-      const tracker = new VisualTracker(stateManager);
-      const status = tracker.getModificationStatus(entryId);
+      // Debug logging disabled
     }
   },
 
   /**
    * Log all modifications
    */
-  logAllModifications(stateManager: StateManager): void {
+  logAllModifications(_stateManager: StateManager): void {
     if (process.env.NODE_ENV === "development") {
-      const modifications = stateManager.actions.getAllModifications();
+      // Debug logging disabled
     }
   },
 

@@ -16,7 +16,7 @@ interface LogoInputProps {
 export function LogoInput({ disabled, existingLogoId, onFileChange }: LogoInputProps) {
   const form = useFormContext();
   const [previewFiles, setPreviewFiles] = useState<FileWithPreview[]>([]);
-  const [existingLogo, setExistingLogo] = useState<AnkaaFile | null>(null);
+  const [_existingLogo, setExistingLogo] = useState<AnkaaFile | null>(null);
 
   // Load existing logo if logoId is provided
   useEffect(() => {

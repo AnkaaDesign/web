@@ -17,7 +17,7 @@ import { convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { useDebounce } from "@/hooks/common/use-debounce";
-import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
+import { TASK_STATUS_LABELS } from "../../../../constants";
 import { formatDate } from "../../../../utils";
 import type { Task } from "../../../../types";
 

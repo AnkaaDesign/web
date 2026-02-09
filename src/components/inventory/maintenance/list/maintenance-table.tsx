@@ -49,7 +49,7 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
   const batchStartMutation = useBatchStartMaintenances();
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: _isAuthLoading } = useAuth();
   const canEdit = user ? canEditMaintenance(user) : false;
   const canDelete = user ? canDeleteMaintenance(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'maintenance') : false;
@@ -66,7 +66,7 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

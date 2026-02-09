@@ -3,7 +3,7 @@ import { IconFilter, IconX } from "@tabler/icons-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Combobox } from "@/components/ui/combobox";
 
 interface HolidaysFiltersProps {
   open: boolean;

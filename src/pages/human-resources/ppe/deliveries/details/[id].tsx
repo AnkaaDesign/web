@@ -4,9 +4,8 @@ import { routes, PPE_DELIVERY_STATUS, SECTOR_PRIVILEGES } from "../../../../../c
 import { usePpeDelivery, usePpeDeliveryMutations, useMarkPpeDeliveryAsDelivered, useAuth } from "../../../../../hooks";
 import { PpeDeliveryInfoCard, PpeDeliveryScheduleCard, PpeDeliveryChangelogCard, PpeDeliveryItemCard } from "@/components/inventory/epi/delivery/detail";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconShield, IconEdit, IconCheck, IconX, IconTrash, IconTruck, IconAlertTriangle } from "@tabler/icons-react";
+import { IconEdit, IconCheck, IconX, IconTrash, IconTruck, IconAlertTriangle } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,

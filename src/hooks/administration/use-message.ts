@@ -7,7 +7,6 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from "@tanstack/react-query";
 import { messageService } from "@/api-client/message";
 import type {
-  Message,
   MessageGetManyResponse,
   MessageGetUniqueResponse,
 } from "@/types/message";

@@ -6,11 +6,9 @@ import { SECTOR_PRIVILEGES } from "../../../constants/enums";
 import { PerformanceLevelList } from "@/components/human-resources/performance-levels/performance-level-list";
 import { IconTrendingUp, IconDeviceFloppy, IconRestore } from "@tabler/icons-react";
 import type { PerformanceLevelListRef } from "@/components/human-resources/performance-levels/performance-level-list";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export default function PerformanceLevelsListPage() {
-  const [pendingChanges, setPendingChanges] = useState<Map<string, number>>(new Map());
+  const [_pendingChanges, setPendingChanges] = useState<Map<string, number>>(new Map());
   const [modifiedUsers, setModifiedUsers] = useState<Set<string>>(new Set());
   const tableRef = useRef<PerformanceLevelListRef>(null);
 

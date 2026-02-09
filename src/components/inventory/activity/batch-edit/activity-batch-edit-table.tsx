@@ -36,7 +36,7 @@ interface ActivityBatchEditTableProps {
   onCancel: () => void;
 }
 
-export function ActivityBatchEditTable({ activities, onCancel }: ActivityBatchEditTableProps) {
+export function ActivityBatchEditTable({ activities, onCancel: _onCancel }: ActivityBatchEditTableProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { batchUpdateAsync } = useActivityBatchMutations();

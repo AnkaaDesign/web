@@ -19,7 +19,7 @@ interface RepresentativeExportProps {
 const EXPORT_COLUMNS: ExportColumn<Representative>[] = [
   { id: "name", label: "NOME", getValue: (rep: Representative) => rep.name },
   { id: "role", label: "FUNÇÃO", getValue: (rep: Representative) => REPRESENTATIVE_ROLE_LABELS[rep.role] || rep.role },
-  { id: "customer", label: "CLIENTE", getValue: (rep: Representative) => rep.customer?.name || "" },
+  { id: "customer", label: "CLIENTE", getValue: (rep: Representative) => rep.customer?.fantasyName || "" },
   { id: "phone", label: "TELEFONE", getValue: (rep: Representative) => formatBrazilianPhone(rep.phone || "") },
   { id: "email", label: "E-MAIL", getValue: (rep: Representative) => rep.email || "" },
   { id: "access", label: "ACESSO", getValue: (rep: Representative) => (rep.email && rep.password ? "Com acesso" : "Sem acesso") },

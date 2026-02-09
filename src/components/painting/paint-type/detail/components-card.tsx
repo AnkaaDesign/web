@@ -11,7 +11,7 @@ import { routes } from "../../../../constants";
 import type { PaintType, Item } from "../../../../types";
 import { IconComponents, IconWeight, IconDroplet, IconPackage, IconChevronLeft, IconChevronRight, IconSearch } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
-import { ColumnVisibilityManager, getDefaultVisibleColumns } from "../../../inventory/item/list/column-visibility-manager";
+import { ColumnVisibilityManager } from "../../../inventory/item/list/column-visibility-manager";
 
 interface PaintTypeComponentsCardProps {
   paintType: PaintType;

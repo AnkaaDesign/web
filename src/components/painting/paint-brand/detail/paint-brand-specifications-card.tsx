@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { formatDate } from "../../../../utils";
 import type { PaintBrand } from "../../../../types";
 import { IconCalendar, IconSettings } from "@tabler/icons-react";

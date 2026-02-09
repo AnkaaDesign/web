@@ -211,7 +211,7 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
   };
 
   // Handle file preview
-  const handlePreview = (file: any, index: number) => {
+  const handlePreview = (_file: any, index: number) => {
     // Get all file data from filtered artworks
     const allFiles = filteredArtworks.map(artwork => artwork.file || artwork);
     setPreviewFiles(allFiles);

@@ -1,7 +1,7 @@
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
-import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
+
 
 interface MeasureUnitSelectorProps {
   control: any;

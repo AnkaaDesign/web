@@ -3,7 +3,7 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { IconShieldCheck, IconCertificate, IconRuler } from "@tabler/icons-react";
+import { IconCertificate, IconRuler } from "@tabler/icons-react";
 import { PpeTypeSelector } from "./ppe-type-selector";
 import { PpeSizeSelector } from "./ppe-size-selector";
 import { PpeDeliveryModeSelector } from "./ppe-delivery-mode-selector";

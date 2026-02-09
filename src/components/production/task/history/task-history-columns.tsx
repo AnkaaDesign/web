@@ -6,14 +6,12 @@ import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-to
 import {
   PAINT_FINISH,
   PAINT_FINISH_LABELS,
-  PAINT_BRAND_LABELS,
   TRUCK_MANUFACTURER_LABELS,
   TRUCK_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
   COMMISSION_STATUS,
   COMMISSION_STATUS_LABELS,
   TASK_STATUS,
-  TASK_STATUS_LABELS,
   SERVICE_ORDER_STATUS,
   SERVICE_ORDER_TYPE,
   SERVICE_ORDER_TYPE_LABELS,
@@ -22,7 +20,7 @@ import {
   getBadgeVariant
 } from "../../../../constants";
 import { canViewServiceOrderType } from "../../../../utils/permissions/service-order-permissions";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { ServiceOrderCell } from "./service-order-cell";
 import { IconCheck, IconAlertTriangle } from "@tabler/icons-react";
@@ -112,12 +110,6 @@ const getCommercialArtworkOrdersStatus = (task: Task): {
   };
 };
 
-// Helper function to check if task has incomplete commercial or artwork service orders
-// OR if task is missing commercial/artwork service orders entirely
-const hasIncompleteOrMissingCommercialOrArtworkOrders = (task: Task): boolean => {
-  return getCommercialArtworkOrdersStatus(task).hasIssue;
-};
-
 // Helper function to get urgency color based on days until forecast
 const getUrgencyColor = (daysUntil: number): { color: string; colorClass: string; label: string } | null => {
   if (daysUntil <= 3) {
@@ -133,7 +125,7 @@ const getUrgencyColor = (daysUntil: number): { color: string; colorClass: string
 };
 
 // Helper function to render forecast date with indicators (only for preparation route)
-const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: string, currentUserId?: string) => {
+const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: string, _currentUserId?: string) => {
   if (!date) return <span className="text-muted-foreground">-</span>;
 
   const formatted = formatDate(date);
@@ -316,11 +308,6 @@ const renderServices = (task: Task) => {
   );
 };
 
-// Helper to get user who created the task
-const getCreatedByUser = (task: Task) => {
-  return task.createdBy?.name || "-";
-};
-
 // Define columns specific to history view
 export const createTaskHistoryColumns = (options?: {
   canViewPrice?: boolean;
@@ -495,7 +482,7 @@ export const createTaskHistoryColumns = (options?: {
     filterable: true,
     defaultVisible: false,
     width: "160px",
-    formatter: (value: string | null, row: Task) => {
+    formatter: (_value: string | null, row: Task) => {
       if (!row.truck?.category) return <span className="text-muted-foreground">-</span>;
       return (
         <Badge variant="outline" className="truncate">
@@ -512,7 +499,7 @@ export const createTaskHistoryColumns = (options?: {
     filterable: true,
     defaultVisible: false,
     width: "140px",
-    formatter: (value: string | null, row: Task) => {
+    formatter: (_value: string | null, row: Task) => {
       if (!row.truck?.implementType) return <span className="text-muted-foreground">-</span>;
       return (
         <Badge variant="outline" className="truncate">

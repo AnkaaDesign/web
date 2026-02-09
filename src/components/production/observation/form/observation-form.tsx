@@ -11,8 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { TaskSelector } from "./task-selector";
@@ -24,8 +22,6 @@ import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { cn, backendFileToFileWithPreview } from "@/lib/utils";
 import { toast } from "sonner";
 import { createObservationFormData } from "@/utils/form-data-helper";
-import { formatDate } from "../../../../utils";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 // Helper function for file size formatting
 const formatFileSize = (bytes: number): string => {
@@ -78,7 +74,7 @@ interface ObservationFormProps {
   onNavigationReady?: (handlers: { handleNext: () => void; handlePrev: () => void }) => void;
 }
 
-export function ObservationForm({ observationId, mode, initialTaskId, onSuccess, onCancel, className, onStepChange, onNavigationReady }: ObservationFormProps) {
+export function ObservationForm({ observationId, mode, initialTaskId, onSuccess, onCancel: _onCancel, className, onStepChange, onNavigationReady }: ObservationFormProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -332,7 +328,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
         // Get customer info for file organization (if available from selected task or observation.task.customer)
         const customerInfo = selectedTask?.customer || observation?.task?.customer ? {
           id: selectedTask?.customer?.id || observation?.task?.customer?.id,
-          name: selectedTask?.customer?.fantasyName || selectedTask?.customer?.name || observation?.task?.customer?.fantasyName || observation?.task?.customer?.name,
+          name: selectedTask?.customer?.fantasyName || observation?.task?.customer?.fantasyName || "",
         } : undefined;
 
         const formData = createObservationFormData(
@@ -383,9 +379,6 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
   const handlePrev = useCallback(() => {
     prevStep();
   }, [prevStep]);
-
-  const isLastStep = currentStep === steps.length;
-  const isFirstStep = currentStep === 1;
 
   // Expose navigation functions to parent
   useEffect(() => {

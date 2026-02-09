@@ -10,12 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { IconFlask, IconDroplet, IconCalendar, IconPaint, IconComponents, IconWeight, IconRefresh } from "@tabler/icons-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { PAINT_FINISH } from "@/constants";
-import { PAGE_SPACING } from "@/lib/layout-constants";
 
 export function ProductionDetailsPage() {
   const { id } = useParams<{ id: string }>();

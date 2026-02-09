@@ -433,8 +433,6 @@ export function NotificationConfigurationEditPage() {
     form.handleSubmit(onSubmit)();
   };
 
-  const channels = form.watch("channels");
-
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>

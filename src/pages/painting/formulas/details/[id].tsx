@@ -5,14 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { PageHeader } from "@/components/ui/page-header";
 import { LoadingPage } from "@/components/navigation/loading-page";
 import { ErrorCard } from "@/components/ui/error-card";
-import { IconFlask, IconRefresh, IconEdit } from "@tabler/icons-react";
+import { IconRefresh, IconEdit } from "@tabler/icons-react";
 import { routes, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { formatCurrency } from "../../../../utils";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditPaints } from "@/utils/permissions/entity-permissions";
-import { toast } from "sonner";
-import { PAGE_SPACING } from "@/lib/layout-constants";
 
 export default function FormulaDetails() {
   const { id } = useParams<{ id: string }>();

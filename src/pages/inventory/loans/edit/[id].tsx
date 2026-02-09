@@ -1,4 +1,3 @@
-import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { BorrowReturnForm } from "@/components/inventory/borrow/form/borrow-return-form";

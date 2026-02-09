@@ -1,5 +1,3 @@
-import type { WarningCreateFormData, WarningUpdateFormData } from "../../../../schemas";
-
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 

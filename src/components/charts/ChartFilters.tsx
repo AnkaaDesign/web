@@ -6,7 +6,7 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { FilterConfig } from '@/lib/charts/chart-config';
+import type { FilterConfig } from '@/lib/charts/chart-config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

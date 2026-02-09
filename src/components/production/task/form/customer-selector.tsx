@@ -138,7 +138,7 @@ export function CustomerSelector({ control, disabled, required, initialCustomer,
               initialOptions={initialOptions}
               getOptionLabel={getOptionLabel}
               getOptionValue={getOptionValue}
-              renderOption={(customer, isSelected) => (
+              renderOption={(customer, _isSelected) => (
                 <div className="flex items-center gap-3">
                   <CustomerLogoDisplay
                     logo={customer.logo}

@@ -1,4 +1,3 @@
-import type { SectorCreateFormData, SectorUpdateFormData } from "../../../../types";
 import { SECTOR_PRIVILEGES_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";

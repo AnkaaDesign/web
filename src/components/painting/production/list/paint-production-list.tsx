@@ -4,12 +4,11 @@ import { usePaintProductions, usePaintTypes, usePaintProductionMutations, usePai
 import type { PaintProduction } from "../../../../types";
 import type { PaintProductionGetManyFormData } from "../../../../schemas";
 import { routes } from "../../../../constants";
-import { shouldShowInteractiveElements, canEditPaintProductions, canDeletePaintProductions } from "@/utils/permissions/entity-permissions";
+import { canEditPaintProductions, canDeletePaintProductions } from "@/utils/permissions/entity-permissions";
 import { useAuth } from "@/hooks/common/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
-import { Badge } from "@/components/ui/badge";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
@@ -34,7 +33,6 @@ import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { PaintProductionExport } from "./paint-production-export";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -300,12 +298,12 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
       if ("productions" in deleteDialog) {
         // Batch delete
         const productionIds = deleteDialog.productions.map((p) => p.id);
-        const result = await batchDeletePaintProductions({ ids: productionIds });
+        await batchDeletePaintProductions({ ids: productionIds });
         // Clear selection after successful batch delete
         selectedIds.forEach((id) => toggleSelection(id));
       } else {
         // Single delete
-        const result = await deletePaintProduction(deleteDialog.production.id);
+        await deletePaintProduction(deleteDialog.production.id);
       }
       setDeleteDialog(null);
     } catch (error: any) {

@@ -1,5 +1,5 @@
 import type { User } from "../types";
-import { USER_STATUS, SECTOR_PRIVILEGES, VERIFICATION_TYPE } from "../constants";
+import { USER_STATUS, SECTOR_PRIVILEGES, TEAM_LEADER } from "../constants";
 import { dateUtils } from "./date";
 
 /**
@@ -40,11 +40,15 @@ export function isUserBlocked(user: User): boolean {
  * Check if user has specific privilege
  * Uses EXACT privilege matching (not hierarchical) - ADMIN is special case with access to everything
  * FINANCIAL can edit tasks but not inventory, WAREHOUSE can edit inventory but not tasks
- * TEAM_LEADER is a virtual privilege that checks user.managedSector relation
+ * TEAM_LEADER is a virtual privilege that checks user.managedSector relation (only sector managers)
+ *
+ * @param user - The user to check
+ * @param requiredPrivilege - Either a SECTOR_PRIVILEGES enum value or the TEAM_LEADER constant
+ * @returns true if user has the required privilege, false otherwise
  */
-export function hasPrivilege(user: User, requiredPrivilege: SECTOR_PRIVILEGES): boolean {
+export function hasPrivilege(user: User, requiredPrivilege: SECTOR_PRIVILEGES | typeof TEAM_LEADER): boolean {
   // Handle TEAM_LEADER virtual privilege - check if user manages a sector
-  if (requiredPrivilege === SECTOR_PRIVILEGES.TEAM_LEADER) {
+  if (requiredPrivilege === TEAM_LEADER) {
     return isTeamLeader(user);
   }
 
@@ -63,13 +67,17 @@ export function hasPrivilege(user: User, requiredPrivilege: SECTOR_PRIVILEGES): 
  * Check if user has ANY of the specified privileges (OR logic)
  * Matches backend @Roles decorator behavior - checks if user's privilege is IN the array
  * ADMIN can access everything, others need exact match
- * TEAM_LEADER is a virtual privilege that checks user.managedSector relation
+ * TEAM_LEADER is a virtual privilege that checks user.managedSector relation (only sector managers)
+ *
+ * @param user - The user to check
+ * @param requiredPrivileges - Array of SECTOR_PRIVILEGES values and/or TEAM_LEADER constant
+ * @returns true if user has any of the required privileges, false otherwise
  */
-export function hasAnyPrivilege(user: User, requiredPrivileges: SECTOR_PRIVILEGES[]): boolean {
+export function hasAnyPrivilege(user: User, requiredPrivileges: (SECTOR_PRIVILEGES | typeof TEAM_LEADER)[]): boolean {
   if (!requiredPrivileges.length) return false;
 
   // Check for TEAM_LEADER virtual privilege first
-  if (requiredPrivileges.includes(SECTOR_PRIVILEGES.TEAM_LEADER) && isTeamLeader(user)) {
+  if (requiredPrivileges.includes(TEAM_LEADER) && isTeamLeader(user)) {
     return true;
   }
 

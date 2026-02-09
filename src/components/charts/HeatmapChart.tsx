@@ -7,7 +7,7 @@
 import * as React from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
-import { ChartConfiguration } from '@/lib/charts/chart-config';
+import type { ChartConfiguration } from '@/lib/charts/chart-config';
 import { PivotTransformer } from '@/lib/charts/transformers';
 
 export interface HeatmapChartProps {

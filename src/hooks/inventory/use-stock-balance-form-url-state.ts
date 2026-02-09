@@ -86,7 +86,7 @@ const stockBalanceFormFilterConfig = {
 } as const;
 
 export function useStockBalanceFormUrlState(options: UseStockBalanceFormUrlStateOptions = {}) {
-  const { defaultCountedQuantity = 0, preserveQuantitiesOnDeselect = true, defaultPageSize = 40 } = options;
+  const { preserveQuantitiesOnDeselect = true, defaultPageSize = 40 } = options;
 
   // Update config with custom default page size if provided
   const configWithDefaults = useMemo(() => {

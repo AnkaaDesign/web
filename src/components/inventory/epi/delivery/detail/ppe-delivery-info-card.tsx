@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { IconCalendar, IconShield, IconUser, IconPackage, IconTruck, IconCircleCheck, IconFileText, IconPencil, IconExternalLink, IconRefresh } from "@tabler/icons-react";
+import { IconCalendar, IconShield, IconUser, IconPackage, IconTruck, IconCircleCheck, IconFileText, IconPencil, IconExternalLink } from "@tabler/icons-react";
 import type { PpeDelivery } from "../../../../../types";
 import { PPE_DELIVERY_STATUS_LABELS, getBadgeVariant, PPE_DELIVERY_STATUS } from "../../../../../constants";
 import { formatDateTime } from "../../../../../utils";

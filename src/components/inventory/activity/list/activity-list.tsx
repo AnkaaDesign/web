@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import type { Activity } from "../../../../types";
 import type { ActivityGetManyFormData } from "../../../../schemas";
 import { ACTIVITY_REASON, ACTIVITY_OPERATION } from "../../../../constants";
@@ -16,7 +16,6 @@ import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
-import { Badge } from "@/components/ui/badge";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { getActivityColumns, getDefaultVisibleColumns } from "./activity-table-columns";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";

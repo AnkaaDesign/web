@@ -17,7 +17,6 @@ import {
   IconFileCheck,
 } from "@tabler/icons-react";
 import { useFormContext, type Path } from "react-hook-form";
-import { cn } from "@/lib/utils";
 import React from "react";
 
 interface FormInputProps<T extends Record<string, any>> extends Omit<InputProps, "name" | "value" | "onChange"> {
@@ -68,7 +67,7 @@ export function FormInput<T extends Record<string, any>>({
   ...props
 }: FormInputProps<T>) {
   const form = useFormContext<T>();
-  const [cepLoading, setCepLoading] = React.useState(false);
+  const [cepLoading, _setCepLoading] = React.useState(false);
   const IconComponent = icon && type && type in typeIcons ? typeIcons[type as keyof typeof typeIcons] : null;
 
   // For cpf-cnpj type, use the appropriate icon based on documentType

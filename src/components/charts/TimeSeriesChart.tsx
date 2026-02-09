@@ -22,16 +22,15 @@ import {
   ResponsiveContainer,
   Brush,
   ReferenceLine,
-  ReferenceArea,
 } from 'recharts';
-import { ChartWrapper, ExportData } from './base/ChartWrapper';
+import { ChartWrapper } from './base/ChartWrapper';
+import type { ExportData } from './base/ChartWrapper';
 import { ChartTooltip } from './base/ChartTooltip';
 import { COLOR_PALETTES, getColorFromPalette } from './utils/chart-colors';
 import { formatAxisDate, formatDate, createFormatter } from './utils/chart-formatters';
 import {
   calculateMovingAverage,
   calculateLinearRegression,
-  DataPoint,
 } from './utils/chart-data-helpers';
 
 export interface TimeSeriesDataPoint {
@@ -114,7 +113,7 @@ export const TimeSeriesChart = React.memo<TimeSeriesChartProps>(({
   showLegend = true,
   showBrush = false,
   curved = true,
-  stacked = false,
+  stacked: _stacked = false,
   fillArea = false,
   dateKey = 'date',
   dateFormat = 'dd/MM/yyyy',
@@ -123,7 +122,7 @@ export const TimeSeriesChart = React.memo<TimeSeriesChartProps>(({
   movingAverageWindow = 7,
   showTrendLine = false,
   annotations = [],
-  comparisonData,
+  comparisonData: _comparisonData,
   leftAxisLabel,
   rightAxisLabel,
   leftAxisType = 'number',
@@ -232,8 +231,8 @@ export const TimeSeriesChart = React.memo<TimeSeriesChartProps>(({
           data={processedData}
           margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
           onClick={(e) => {
-            if (e?.activePayload?.[0]?.payload && onDataPointClick) {
-              onDataPointClick(e.activePayload[0].payload);
+            if ((e as any)?.activePayload?.[0]?.payload && onDataPointClick) {
+              onDataPointClick((e as any).activePayload[0].payload);
             }
           }}
         >

@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import type { ComboboxOption } from "@/components/ui/combobox";
 import { toast } from "sonner";
-import { Separator } from "@/components/ui/separator";
 import {
   SECTOR_PRIVILEGES,
   routes,
@@ -19,25 +18,20 @@ import {
   SERVICE_ORDER_STATUS,
   SERVICE_ORDER_TYPE_LABELS,
   PAINT_FINISH,
-  CHANGE_LOG_ENTITY_TYPE,
   ENTITY_BADGE_CONFIG,
   PAINT_FINISH_LABELS,
-  PAINT_BRAND_LABELS,
   TRUCK_MANUFACTURER_LABELS,
   SERVICE_ORDER_STATUS_LABELS,
-  CUT_STATUS_LABELS,
-  CUT_TYPE_LABELS,
-  CUT_ORIGIN_LABELS,
   AIRBRUSHING_STATUS_LABELS,
   COMMISSION_STATUS_LABELS,
   TRUCK_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
 } from "../../../../constants";
-import { formatDate, formatDateTime, formatCurrency, formatChassis, formatTruckSpot, formatBrazilianPhone, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
+import { formatDate, formatDateTime, formatCurrency, formatChassis, formatTruckSpot, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
 import { cn } from "@/lib/utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
-import { canViewServiceOrderType, canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
+import { canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { canViewPricing } from "@/utils/permissions/pricing-permissions";
 import { PricingStatusBadge } from "@/components/production/task/pricing/pricing-status-badge";
 import { exportBudgetPdf } from "@/utils/budget-pdf-generator";
@@ -62,7 +56,6 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { TaskWithServiceOrdersChangelog } from "@/components/ui/task-with-service-orders-changelog";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import {
@@ -70,8 +63,6 @@ import {
   IconEdit,
   IconPlayerPlay,
   IconCheck,
-  IconX,
-  IconBan,
   IconClock,
   IconCalendar,
   IconCalendarPlus,
@@ -92,24 +83,18 @@ import {
   IconTruck,
   IconHash,
   IconCar,
-  IconRefresh,
   IconHome,
-  IconSparkles,
   IconBrush,
   IconTruckLoading,
-  IconDroplet,
   IconCut,
   IconSpray,
   IconDownload,
   IconLayoutGrid,
-  IconHistory,
-  IconPlayerPause,
   IconBarcode,
   IconList,
   IconCoin,
   IconMapPin,
   IconLayersIntersect,
-  IconPhone,
   IconCalendarTime,
   IconBrandWhatsapp,
   IconMail,
@@ -135,7 +120,7 @@ import { SectionVisibilityManager } from "@/components/ui/section-visibility-man
 
 // Paint badge style - unified neutral, more subtle (no icons)
 const PAINT_BADGE_STYLE = "bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0";
-import { FileItem, FilePreviewModal, useFileViewer, type FileViewMode } from "@/components/common/file";
+import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
 
 // Component to display truck layout SVG preview
 const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?: string }) => {
@@ -1043,12 +1028,6 @@ export const TaskDetailsPage = () => {
     // Context not available
   }
 
-  const handlePreview = (file: any) => {
-    if (fileViewerContext) {
-      fileViewerContext.actions.viewFile(file);
-    }
-  };
-
   const handleDownload = (file: any) => {
     if (fileViewerContext) {
       fileViewerContext.actions.downloadFile(file);
@@ -1093,7 +1072,6 @@ export const TaskDetailsPage = () => {
     data: response,
     isLoading,
     error,
-    refetch,
   } = useTaskDetail(id!, {
     enabled: !!id,
     include: {

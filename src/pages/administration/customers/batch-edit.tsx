@@ -1,14 +1,12 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useCustomers } from "../../../hooks";
-import type { Customer } from "../../../types";
 import { routes, FAVORITE_PAGES } from "../../../constants";
 import { CustomerBatchEditTable } from "@/components/administration/customer/batch-edit/customer-batch-edit-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { toast } from "sonner";
-import { IconUsers, IconAlertTriangle, IconLoader, IconDeviceFloppy, IconX, IconArrowLeft } from "@tabler/icons-react";
+import { IconUsers, IconAlertTriangle, IconLoader, IconDeviceFloppy, IconArrowLeft } from "@tabler/icons-react";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const CustomerBatchEditPage = () => {

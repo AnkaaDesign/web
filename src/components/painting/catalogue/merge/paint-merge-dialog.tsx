@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconArrowRight, IconCheck, IconLoader2, IconPalette, IconInfoCircle } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
 import type { Paint } from "../../../../types";
 import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
 

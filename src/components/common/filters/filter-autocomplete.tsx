@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { IconChevronDown, IconX, IconSearch, IconCheck, IconLoader2, IconFilter, IconPlus } from "@tabler/icons-react";
+import { IconChevronDown, IconX, IconSearch, IconCheck, IconLoader2, IconPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useCancelableQuery } from "@/hooks/common/use-cancelable-query";
 import { useDebounce } from "@/hooks/common/use-debounce";

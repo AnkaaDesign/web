@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -48,7 +48,7 @@ export function PayrollCalculation({
   className
 }: PayrollCalculationProps) {
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [showDetails, setShowDetails] = useState(true);
+  const [_showDetails, _setShowDetails] = useState(true);
 
   // Fetch payroll data (API transparently returns live calculation for current period)
   const {

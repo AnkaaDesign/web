@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo } from "react";
 import type { Item } from "../../../../types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -20,11 +20,9 @@ interface ItemsNeededListProps {
   className?: string;
 }
 
-const DEFAULT_PAGE_SIZE = 40;
-
 export function ItemsNeededList({ itemsConfig, className }: ItemsNeededListProps) {
   // State to hold current page items and total count from the table
-  const [tableData, setTableData] = useState<{ items: Item[]; totalRecords: number }>({ items: [], totalRecords: 0 });
+  const [_tableData, setTableData] = useState<{ items: Item[]; totalRecords: number }>({ items: [], totalRecords: 0 });
 
   // Stable callback for table data updates
   const handleTableDataChange = useCallback((data: { items: Item[]; totalRecords: number }) => {

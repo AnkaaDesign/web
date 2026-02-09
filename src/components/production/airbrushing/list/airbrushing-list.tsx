@@ -32,7 +32,7 @@ export function AirbrushingList({ className }: AirbrushingListProps) {
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   // State to hold current page items and total count from the table
-  const [tableData, setTableData] = useState<{ items: Airbrushing[]; totalRecords: number }>({ items: [], totalRecords: 0 });
+  const [, setTableData] = useState<{ items: Airbrushing[]; totalRecords: number }>({ items: [], totalRecords: 0 });
 
   // Stable callback for table data updates
   const handleTableDataChange = useCallback((data: { items: Airbrushing[]; totalRecords: number }) => {

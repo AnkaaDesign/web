@@ -19,7 +19,6 @@ import {
   type NotificationChannel,
   type UserPreferenceConfig,
   type GroupedConfigurationsResponse,
-  type NotificationTypeGroup,
 } from "@/api-client";
 
 import { Button } from "@/components/ui/button";
@@ -396,7 +395,7 @@ export function NotificationPreferencesPage() {
   // Handle Reset
   // =====================
 
-  const handleResetPreference = useCallback(
+  const _handleResetPreference = useCallback(
     async (configKey: string) => {
       setSavingKeys((prev) => new Set(prev).add(configKey));
       try {

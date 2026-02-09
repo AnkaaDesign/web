@@ -543,7 +543,7 @@ export const ItemSelector = ({
                       minSearchLength={0}
                       pageSize={50}
                       debounceMs={300}
-                      renderOption={(option, isSelected) => (
+                      renderOption={(option, _isSelected) => (
                         <div className="flex items-center gap-3 w-full">
                           <SupplierLogoDisplay
                             logo={(option as any).logo}

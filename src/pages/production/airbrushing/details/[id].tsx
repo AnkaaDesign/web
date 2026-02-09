@@ -10,7 +10,7 @@ import { AirbrushingInfoCard } from "@/components/production/airbrushing/detail/
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { IconEdit, IconTrash } from "@tabler/icons-react";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +21,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
 
 export const AirbrushingDetails = () => {
   const { id } = useParams<{ id: string }>();

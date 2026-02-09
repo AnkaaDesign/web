@@ -125,20 +125,17 @@ export function PayrollSummary({ users }: PayrollSummaryProps) {
     totalBonus,
     totalRemuneration,
     totalEarnings,
-    averageBonus,
-    averagePerUser,
+    averageBonus: _averageBonus,
+    averagePerUser: _averagePerUser,
     bonusEligibleCount,
     uniqueUsersCount,
     isMultiMonth,
-    monthCount
+    monthCount: _monthCount
   } = useMemo(() => calculateTotals(), [users]);
 
   const bonusPercentage = uniqueUsersCount > 0
     ? Math.round((bonusEligibleCount / uniqueUsersCount) * 100)
     : 0;
-
-  // Get month labels for display
-  const monthLabels = [...new Set(users.map(u => u.monthLabel).filter(Boolean))];
 
   // State for minimize/expand - minimized by default
   const [isMinimized, setIsMinimized] = useState(true);

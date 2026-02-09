@@ -28,7 +28,6 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -322,8 +321,6 @@ export function NotificationConfigurationCreatePage() {
     form.handleSubmit(onSubmit)();
   };
 
-  const channels = form.watch("channels");
-
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
       <FormProvider {...form}>
@@ -485,7 +482,6 @@ export function NotificationConfigurationCreatePage() {
                 <CardContent>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {(["IN_APP", "PUSH", "EMAIL", "WHATSAPP"] as const).map((channel, index) => {
-                      const channelData = channels.find((ch) => ch.channel === channel);
                       return (
                         <Controller
                           key={channel}

@@ -48,7 +48,7 @@ interface UpdateEpiFormProps extends BaseEpiFormProps {
 type EpiFormProps = CreateEpiFormProps | UpdateEpiFormProps;
 
 export function EpiForm(props: EpiFormProps) {
-  const { isSubmitting, defaultValues, mode, initialSupplier, initialBrand, initialCategory } = props;
+  const { isSubmitting, defaultValues, mode, initialSupplier, initialBrand, initialCategory: _initialCategory } = props;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>();

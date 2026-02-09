@@ -14,7 +14,7 @@ import {
   RAIN_BOOTS_SIZE_LABELS,
 } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { IconChevronUp, IconChevronDown, IconSelector, IconShirt, IconShoe, IconHanger, IconMask, IconHandGrab, IconUmbrella, IconAlertTriangle, IconRefresh } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconSelector, IconShirt, IconAlertTriangle, IconRefresh } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";

@@ -26,7 +26,6 @@ import type {
   TaskBatchCreateResponse,
   TaskBatchUpdateResponse,
   TaskBatchDeleteResponse,
-  Representative,
 } from "../types";
 import { representativeService } from "@/services/representativeService";
 

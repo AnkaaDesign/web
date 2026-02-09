@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { IconFlask, IconRefresh } from "@tabler/icons-react";
+import { IconRefresh } from "@tabler/icons-react";
 
 import { usePaintFormula, usePaintProductionMutations } from "../../../../../../../hooks";
 import { routes, SECTOR_PRIVILEGES } from "../../../../../../../constants";
@@ -11,7 +11,6 @@ import { LoadingPage } from "@/components/navigation/loading-page";
 import { ErrorCard } from "@/components/ui/error-card";
 import { FormulaCalculator } from "@/components/painting/formula/formula-calculator";
 import { PageHeader } from "@/components/ui/page-header";
-import { PAGE_SPACING } from "@/lib/layout-constants";
 
 export default function FormulaDetailsPage() {
   const { id: paintId, formulaId } = useParams<{ id: string; formulaId: string }>();

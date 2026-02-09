@@ -1,11 +1,10 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
   IconChartBar,
-  IconAlertCircle,
   IconTool,
 } from "@tabler/icons-react";
 

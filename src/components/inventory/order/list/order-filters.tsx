@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { IconFilter, IconX } from "@tabler/icons-react";
 import { ORDER_STATUS, ORDER_STATUS_LABELS } from "../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -205,7 +204,7 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
               minSearchLength={0}
               pageSize={50}
               debounceMs={300}
-              renderOption={(option, isSelected) => (
+              renderOption={(option, _isSelected) => (
                 <div className="flex items-center gap-3 w-full">
                   <SupplierLogoDisplay
                     logo={(option as any).logo}

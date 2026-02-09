@@ -40,7 +40,7 @@ export const MyLoansPage = () => {
   });
 
   // Get table state for selected items functionality
-  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds } = useTableState({
+  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds: _selectedIds } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
   });
@@ -52,7 +52,7 @@ export const MyLoansPage = () => {
   );
 
   // Use the unified table filters hook
-  const { filters, setFilters, searchingFor, displaySearchText, setSearch, clearAllFilters, queryFilters: baseQueryFilters, hasActiveFilters } = useTableFilters<BorrowGetManyFormData>({
+  const { filters, setFilters, searchingFor, displaySearchText, setSearch, clearAllFilters: _clearAllFilters, queryFilters: baseQueryFilters, hasActiveFilters } = useTableFilters<BorrowGetManyFormData>({
     defaultFilters: {
       limit: 40,
     },

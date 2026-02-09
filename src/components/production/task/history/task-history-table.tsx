@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { useTasks } from "../../../../hooks";
@@ -16,9 +16,7 @@ import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-t
 import { isDateInPast, getHoursBetween } from "../../../../utils";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
-import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { IconChevronUp, IconChevronDown, IconSelector, IconAlertTriangle, IconHistory } from "@tabler/icons-react";
-import { Badge } from "@/components/ui/badge";
+import { IconAlertTriangle, IconHistory } from "@tabler/icons-react";
 import { TaskHistoryTableSkeleton } from "./task-history-table-skeleton";
 import { useNavigate } from "react-router-dom";
 import { ColumnHeader } from "@/components/ui/column-header";
@@ -58,8 +56,8 @@ export function TaskHistoryTable({
   onSourceTaskSelect,
   onShiftClickSelect,
   onSingleClickSelect,
-  externalExpandedGroups,
-  onExpandedGroupsChange,
+  externalExpandedGroups: _externalExpandedGroups,
+  onExpandedGroupsChange: _onExpandedGroupsChange,
   onGroupsDetected,
 }: TaskHistoryTableProps) {
   const navigate = useNavigate();
@@ -107,7 +105,7 @@ export function TaskHistoryTable({
     showSelectedOnly,
     setPage,
     setPageSize,
-    setSelectedIds,
+    setSelectedIds: _setSelectedIds,
     toggleSelection,
     toggleSelectAll,
     toggleSort,
@@ -116,9 +114,9 @@ export function TaskHistoryTable({
     isSelected,
     isAllSelected,
     isPartiallySelected,
-    selectionCount,
-    resetSelection,
-    removeFromSelection,
+    selectionCount: _selectionCount,
+    resetSelection: _resetSelection,
+    removeFromSelection: _removeFromSelection,
     handleRowClick: handleRowClickSelection,
   } = tableState;
 
@@ -298,20 +296,20 @@ export function TaskHistoryTable({
     setContextMenu(null);
   }, []);
 
-  const renderSortIndicator = (columnKey: string) => {
-    const currentSort = sortConfigs.find(s => s.column === columnKey);
+  // const _renderSortIndicator = (columnKey: string) => {
+  //   const currentSort = sortConfigs.find(s => s.column === columnKey);
 
-    return (
-      <div className="inline-flex items-center ml-1">
-        {!currentSort && <IconSelector className="h-4 w-4 text-muted-foreground" />}
-        {currentSort?.direction === "asc" && <IconChevronUp className="h-4 w-4 text-foreground" />}
-        {currentSort?.direction === "desc" && <IconChevronDown className="h-4 w-4 text-foreground" />}
-        {currentSort && sortConfigs.length > 1 && (
-          <span className="text-xs ml-0.5">{sortConfigs.findIndex(s => s.column === columnKey) + 1}</span>
-        )}
-      </div>
-    );
-  };
+  //   return (
+  //     <div className="inline-flex items-center ml-1">
+  //       {!currentSort && <IconSelector className="h-4 w-4 text-muted-foreground" />}
+  //       {currentSort?.direction === "asc" && <IconChevronUp className="h-4 w-4 text-foreground" />}
+  //       {currentSort?.direction === "desc" && <IconChevronDown className="h-4 w-4 text-foreground" />}
+  //       {currentSort && sortConfigs.length > 1 && (
+  //         <span className="text-xs ml-0.5">{sortConfigs.findIndex(s => s.column === columnKey) + 1}</span>
+  //       )}
+  //     </div>
+  //   );
+  // };
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{

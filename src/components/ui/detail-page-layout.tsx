@@ -1,10 +1,11 @@
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import {
   DETAIL_PAGE_SPACING,
   getDetailGridClasses,
 } from "@/lib/layout-constants";
-import { PageHeader, PageHeaderProps } from "@/components/ui/page-header";
+import { PageHeader } from "@/components/ui/page-header";
+import type { PageHeaderProps } from "@/components/ui/page-header";
 import { SectionVisibilityManager } from "@/components/ui/section-visibility-manager";
 import { useSectionVisibility } from "@/hooks/common/use-section-visibility";
 import type { SectionConfig } from "@/hooks/common/use-section-visibility";

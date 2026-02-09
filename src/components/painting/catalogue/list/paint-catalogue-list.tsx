@@ -3,8 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { usePaints, usePaintTypes, usePaintBrands, usePaintMerge } from "../../../../hooks";
 import type { Paint, PaintOrderBy } from "../../../../types";
 import type { PaintGetManyFormData } from "../../../../schemas";
-import { PAINT_FINISH, PAINT_BRAND, TRUCK_MANUFACTURER } from "../../../../constants";
-import { batchUpdatePaintColorOrder } from "../../../../api-client/paint";
+import { PAINT_FINISH, TRUCK_MANUFACTURER } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -90,12 +89,12 @@ function SelectionInfo({ selectedPaints }: SelectionInfoProps) {
   );
 }
 
-function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderRequest, onResetOrderRequest, viewOnly = false }: PaintCatalogueListProps) {
+function PaintCatalogueListContent({ className, onOrderStateChange, onResetOrderRequest, viewOnly = false }: PaintCatalogueListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { selectedPaintIds, clearSelection } = usePaintSelection();
 
   // Merge mutation
-  const { mutateAsync: mergePaints, isPending: isMerging } = usePaintMerge();
+  const { mutateAsync: mergePaints } = usePaintMerge();
 
   // Merge dialog state
   const [showMergeDialog, setShowMergeDialog] = useState(false);
@@ -117,8 +116,8 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
 
 
   // Color order state
-  const [hasOrderChanges, setHasOrderChanges] = useState(false);
-  const [reorderedPaints, setReorderedPaints] = useState<Paint[]>([]);
+  const [, setHasOrderChanges] = useState(false);
+  const [, setReorderedPaints] = useState<Paint[]>([]);
   const [gridResetKey, setGridResetKey] = useState(0);
 
   // Ref for scrolling

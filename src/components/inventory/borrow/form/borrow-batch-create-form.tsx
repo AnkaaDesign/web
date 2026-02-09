@@ -34,7 +34,7 @@ const borrowBatchFormSchema = z
       .min(1, "Pelo menos um item deve ser selecionado")
       .max(50, "Máximo de 50 itens permitido por lote"),
   })
-  .superRefine((data, ctx) => {
+  .superRefine((_data, _ctx) => {
     // Additional business validation will be done in onSubmit
     return true;
   });
@@ -63,10 +63,10 @@ export const BorrowBatchCreateForm = () => {
     supplierIds,
     page,
     pageSize,
-    totalRecords,
+    totalRecords: _totalRecords,
     setPage,
     setPageSize,
-    setTotalRecords,
+    setTotalRecords: _setTotalRecords,
     setShowSelectedOnly,
     setSearchTerm,
     setShowInactive,
@@ -150,7 +150,7 @@ export const BorrowBatchCreateForm = () => {
 
   // Handle item selection
   const handleSelectItem = useCallback(
-    (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => {
+    (itemId: string, _quantity?: number, _price?: number, _icms?: number, _ipi?: number) => {
       // Borrow form only uses quantity, but accept all params for compatibility
       toggleItemSelection(itemId);
     },

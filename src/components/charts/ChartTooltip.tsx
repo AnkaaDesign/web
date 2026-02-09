@@ -7,7 +7,7 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { TooltipConfig } from '@/lib/charts/chart-config';
+import type { TooltipConfig } from '@/lib/charts/chart-config';
 
 export interface ChartTooltipProps {
   active?: boolean;

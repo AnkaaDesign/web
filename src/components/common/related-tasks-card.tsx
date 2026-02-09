@@ -16,17 +16,14 @@ import {
   IconHourglass,
   IconUser,
   IconCalendar,
-  IconCurrencyReal,
   IconSearch,
   IconLayoutGrid,
   IconTable,
   IconBuildingFactory,
 } from "@tabler/icons-react";
 import type { Task } from "../../types";
-import { formatCurrency, formatDate } from "../../utils";
 import { TASK_STATUS, TASK_STATUS_LABELS, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, routes } from "../../constants";
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getBadgeVariantFromStatus } from "@/components/ui/badge";
 import { useTableState } from "@/hooks/common/use-table-state";
 
@@ -41,30 +38,6 @@ interface RelatedTasksCardProps {
   showViewToggle?: boolean;
   displayMode?: "status" | "commission";
 }
-
-// Status icons only - colors come from centralized badge system
-const TASK_STATUS_CONFIG: Record<
-  string,
-  {
-    icon: any;
-  }
-> = {
-  [TASK_STATUS.PREPARATION]: {
-    icon: IconPlayerPause,
-  },
-  [TASK_STATUS.WAITING_PRODUCTION]: {
-    icon: IconClock,
-  },
-  [TASK_STATUS.IN_PRODUCTION]: {
-    icon: IconHourglass,
-  },
-  [TASK_STATUS.COMPLETED]: {
-    icon: IconCircleCheckFilled,
-  },
-  [TASK_STATUS.CANCELLED]: {
-    icon: IconX,
-  },
-};
 
 export function RelatedTasksCard({
   tasks = [],
@@ -404,10 +377,7 @@ export function RelatedTasksCard({
           <ScrollArea className="flex-1 min-h-0 h-full">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-4">
               {sortedTasks.map((task, index) => {
-                const config = TASK_STATUS_CONFIG[task.status];
-                const StatusIcon = config.icon;
                 const taskDescription = getTaskTitle(task);
-                const variant = getBadgeVariantFromStatus(task.status, "TASK");
 
                 return (
                   <div

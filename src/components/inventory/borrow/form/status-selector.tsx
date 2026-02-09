@@ -1,6 +1,5 @@
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import type { BorrowUpdateFormData } from "../../../../schemas";
 import { BORROW_STATUS, BORROW_STATUS_ORDER } from "../../../../constants";
 import { BorrowStatusBadge } from "../common/borrow-status-badge";
 

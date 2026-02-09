@@ -13,7 +13,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { ChartConfiguration } from '@/lib/charts/chart-config';
+import type { ChartConfiguration } from '@/lib/charts/chart-config';
 import { ChartTooltip } from './ChartTooltip';
 import { ChartLegend } from './ChartLegend';
 
@@ -115,7 +115,7 @@ export const PieChart: React.FC<PieChartProps> = ({ config, data, variant = 'pie
             onMouseLeave={onPieLeave}
             animationDuration={300}
           >
-            {dataWithPercentages.map((entry, index) => (
+            {dataWithPercentages.map((_entry, index) => (
               <Cell
                 key={`cell-${index}`}
                 fill={colors[index % colors.length]}

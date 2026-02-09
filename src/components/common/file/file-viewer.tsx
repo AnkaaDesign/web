@@ -146,7 +146,7 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
     const action = fileViewerService.determineFileViewAction(file, viewerConfig);
 
     fileViewerService.executeFileViewAction(action, {
-      onModalOpen: (component, url, _targetFile) => {
+      onModalOpen: (component, _url, _targetFile) => {
         if (component === "image-modal") {
           openImageModal([file], 0);
         } else if (component === "video-player") {
@@ -157,7 +157,7 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
           openImageModal([file], 0);
         }
       },
-      onInlinePlayer: (url, _targetFile) => {
+      onInlinePlayer: (_url, _targetFile) => {
         // For inline players, you might want to emit an event or use a callback
       },
       onDownload: (url, _targetFile) => {

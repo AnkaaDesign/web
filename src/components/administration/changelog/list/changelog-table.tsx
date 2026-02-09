@@ -3,7 +3,7 @@ import type { ChangeLog } from "../../../../types";
 import { useNavigate } from "react-router-dom";
 import { routes } from "../../../../constants";
 import { IconEye, IconHistory, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -38,7 +38,6 @@ export function ChangelogTable({ visibleColumns, className, filters = {}, onData
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,
@@ -90,7 +89,7 @@ export function ChangelogTable({ visibleColumns, className, filters = {}, onData
   );
 
   // Use the changelog hook with memoized parameters
-  const { data: response, error, isLoading } = useChangeLogs(queryParams);
+  const { data: response, isLoading } = useChangeLogs(queryParams);
 
   const changelogs = response?.data || [];
   const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;

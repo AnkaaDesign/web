@@ -8,7 +8,6 @@ import { getItemCategories } from "../../../../api-client";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
 import type { ItemCategory } from "../../../../types";
 import { ITEM_CATEGORY_TYPE } from "../../../../constants";
-import { toast } from "@/components/ui/sonner";
 
 type FormData = ItemCreateFormData | ItemUpdateFormData;
 

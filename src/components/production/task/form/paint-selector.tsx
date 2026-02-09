@@ -87,7 +87,7 @@ export function PaintSelector({ control, disabled, initialPaints }: PaintSelecto
   }, []);
 
   // Custom render for paint option to show color
-  const renderOption = useCallback((paint: Paint, isSelected: boolean) => {
+  const renderOption = useCallback((paint: Paint, _isSelected: boolean) => {
     return (
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2">

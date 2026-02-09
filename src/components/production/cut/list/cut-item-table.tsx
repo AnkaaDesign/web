@@ -1,18 +1,14 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { format, isToday, isYesterday } from "date-fns";
 import { IconFileOff } from "@tabler/icons-react";
 import type { Cut } from "../../../../types";
 import type { CutGetManyFormData } from "../../../../schemas";
 import { useCuts, useCutMutations } from "../../../../hooks";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditCuts } from "@/utils/permissions/entity-permissions";
-import { CUT_STATUS_LABELS, CUT_REQUEST_REASON_LABELS, CUT_ORIGIN_LABELS, CUT_TYPE_LABELS } from "../../../../constants";
 import { CUT_STATUS, CUT_REQUEST_REASON, CUT_ORIGIN, routes } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import { CutRequestModal } from "./cut-request-modal";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { cn } from "@/lib/utils";
@@ -25,7 +21,6 @@ import { CutItemListSkeleton } from "./cut-item-list-skeleton";
 import { CutTableContextMenu, type CutAction } from "./cut-table-context-menu";
 import { useFileViewer } from "@/components/common/file";
 import { createCutColumns } from "./cut-item-table-columns";
-import type { CutColumn } from "./types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -99,7 +94,7 @@ export function CutItemTable({ filters = {}, className, onDataChange, visibleCol
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,
@@ -189,39 +184,6 @@ export function CutItemTable({ filters = {}, className, onDataChange, visibleCol
       }
     }
   }, [items, totalRecords, onDataChange]);
-
-  // Helper functions
-  const formatDateDisplay = (dateString: string | Date | null) => {
-    if (!dateString) return "-";
-
-    const date = new Date(dateString);
-
-    if (isToday(date)) {
-      return format(date, "HH:mm");
-    } else if (isYesterday(date)) {
-      return "Ontem";
-    } else {
-      return format(date, "dd/MM");
-    }
-  };
-
-  const getTaskName = (item: Cut) => {
-    if (item.task?.name) {
-      return item.task.name;
-    }
-    return "-";
-  };
-
-  const getSourceType = (item: Cut) => {
-    return CUT_ORIGIN_LABELS[item.origin];
-  };
-
-  const getReason = (item: Cut) => {
-    if (item.reason) {
-      return CUT_REQUEST_REASON_LABELS[item.reason];
-    }
-    return item.origin === CUT_ORIGIN.PLAN ? "Plano de corte" : "Solicitação";
-  };
 
   // Context menu handlers
   const handleContextMenu = (e: React.MouseEvent, item: Cut) => {

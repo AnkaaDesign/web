@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { routes } from "@/constants";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -117,7 +117,6 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
     setSearch,
     clearAllFilters,
     clearFilter: clearFilters,
-    hasActiveFilters,
   } = useTableFilters<Partial<RepresentativeGetManyFormData>>({
     defaultFilters: customerId ? { customerId } : {},
     searchDebounceMs: 500,
@@ -126,15 +125,6 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
     deserializeFromUrl: deserializeRepresentativeFilters,
     excludeFromUrl: ["customerId"],
   });
-
-  // Calculate active filter count
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (filters.role) count++;
-    if (filters.isActive !== undefined) count++;
-    if (searchingFor) count++;
-    return count;
-  }, [filters.role, filters.isActive, searchingFor]);
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -203,7 +193,7 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
   }, [navigate]);
 
   // Filter removal handler
-  const onRemoveFilter = useCallback((key: string, value?: any) => {
+  const onRemoveFilter = useCallback((key: string, _value?: any) => {
     if (key === "searchingFor") {
       setSearch("");
     } else if (key === "role") {

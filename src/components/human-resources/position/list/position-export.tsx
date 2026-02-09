@@ -81,7 +81,7 @@ export function PositionExport({ className, filters, currentPositions = [], tota
     }
   };
 
-  const handleExport = async (format: ExportFormat, items: Position[], _columns: ExportColumn<Position>[]) => {
+  const handleExport = async (_format: ExportFormat, _items: Position[], _columns: ExportColumn<Position>[]) => {
     try {
       // The BaseExportPopover component handles the actual export logic
       // including CSV, Excel, and PDF generation// If you need custom export logic, you can implement it here

@@ -1,8 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { flushSync } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "./button";
-import { Input } from "./input";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { Badge } from "./badge";
 import { Checkbox } from "./checkbox";
@@ -104,8 +102,8 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   initialOptions = [],
   minSearchLength = 1,
   debounceMs = 300,
-  staleTime = 5 * 60 * 1000,
-  pageSize = 20,
+  staleTime: _staleTime = 5 * 60 * 1000,
+  pageSize: _pageSize = 20,
   allowCreate = false,
   onCreate,
   createLabel = (value) => `Criar "${value}"`,
@@ -125,7 +123,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   clearable = true,
   className,
   triggerClassName,
-  required = false,
+  required: _required = false,
   renderOption,
   renderValue,
   formatDisplay,
@@ -194,7 +192,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   //   }
   // }, [search, debouncedSearch, async, queryKey, queryFn, minSearchLength]);
 
-  const { data: asyncResponse, isLoading: isLoadingOptions, refetch } = useQuery({
+  const { data: asyncResponse, isLoading: isLoadingOptions, refetch: _refetch } = useQuery({
     queryKey: queryKey ? [...queryKey, debouncedSearch, 1] : ["combobox", debouncedSearch, 1],
     queryFn: async () => {
       // console.log('[Combobox] queryFn called with:', { debouncedSearch, page: 1 });
@@ -790,7 +788,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
                       "w-full flex items-center px-2 py-2 text-sm rounded-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
                       isCreating && "opacity-50 cursor-not-allowed",
                     )}
-                    onClick={(e) => {
+                    onClick={(_e) => {
                       if (!isCreating) {
                         handleCreate();
                       }

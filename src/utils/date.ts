@@ -423,8 +423,6 @@ export interface DateRange {
   lte?: Date;
 }
 
-export type { DateRange };
-
 export const createDateRange = (startDate?: Date | string, endDate?: Date | string): DateRange => {
   const range: DateRange = {};
 

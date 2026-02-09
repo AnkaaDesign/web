@@ -46,7 +46,7 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
   const { batchDelete } = usePaintBrandBatchMutations();
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user } = useAuth();
   const canEdit = user ? canEditPaints(user) : false;
   const canDelete = user ? canDeletePaints(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'paintBrand') : false;
@@ -63,7 +63,6 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

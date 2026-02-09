@@ -12,7 +12,7 @@ interface IconBlockProps {
  * Renders an icon block using Tabler icons
  */
 export const IconBlock = React.memo<IconBlockProps>(({ block, className }) => {
-  const { icon, size = 'md', color = 'text-foreground', alignment = 'center', id } = block;
+  const { icon, size = 'md', color = 'text-foreground', id } = block;
 
   // Dynamically import the icon component
   const IconComponent = icon ? (TablerIcons as any)[icon] : null;
@@ -26,12 +26,6 @@ export const IconBlock = React.memo<IconBlockProps>(({ block, className }) => {
     md: 'h-6 w-6',
     lg: 'h-8 w-8',
     xl: 'h-12 w-12',
-  };
-
-  const alignmentClasses = {
-    left: 'justify-start',
-    center: 'justify-center',
-    right: 'justify-end',
   };
 
   return (

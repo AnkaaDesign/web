@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconArrowRight, IconCheck, IconLoader2, IconInfoCircle } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
 import type { Item } from "../../../../types";
 import { formatCurrency } from "../../../../utils";
 

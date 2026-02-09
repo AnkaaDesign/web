@@ -290,45 +290,6 @@ export function TaskPreparationTable({
     };
   }, [groupedTasks, expandedGroups]);
 
-  // Helper function to find all task IDs in a group (first + rest)
-  // Returns single task ID if not in a group OR if group is expanded
-  const getGroupTaskIds = useCallback((taskId: string, respectExpansion: boolean = true): string[] => {
-    // Find the group this task belongs to and return all IDs
-    let foundGroupId: string | undefined;
-
-    // First pass: find if this task belongs to a group (only check group-first)
-    for (const group of groupedTasks) {
-      if (group.type === 'group-first' && group.task?.id === taskId) {
-        foundGroupId = group.groupId;
-        break;
-      }
-    }
-
-    // If not in a group, return just this task
-    if (!foundGroupId) {
-      return [taskId];
-    }
-
-    // If respecting expansion and group is expanded, treat as individual task
-    if (respectExpansion && expandedGroups.has(foundGroupId)) {
-      return [taskId];
-    }
-
-    // Second pass: collect all task IDs in the group (first + collapsed)
-    const result: string[] = [];
-    for (const g of groupedTasks) {
-      if (g.groupId === foundGroupId) {
-        if (g.type === 'group-first' && g.task) {
-          result.push(g.task.id);
-        } else if (g.type === 'group-collapsed' && g.collapsedTasks) {
-          result.push(...g.collapsedTasks.map(t => t.id));
-        }
-      }
-    }
-
-    return result.length > 0 ? result : [taskId];
-  }, [groupedTasks, expandedGroups]);
-
   // Row click handler - now navigates instead of selecting
   const handleRowClick = useCallback((task: Task, event: React.MouseEvent) => {
     // Special mode: selecting source task for copy-from-task
@@ -414,7 +375,7 @@ export function TaskPreparationTable({
               </TableCell>
             </TableRow>
           ) : null}
-          {groupedTasks.map((group, idx) => {
+          {groupedTasks.map((group, _idx) => {
             if (group.type === 'group-collapsed') {
               const groupId = group.groupId!;
               const collapsedTasks = group.collapsedTasks!;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -30,17 +29,12 @@ import {
   Mail,
   MessageCircle,
   Smartphone,
-  Plus,
   Trash2,
   Save,
   Eye,
   AlertCircle,
   CheckCircle,
-  Users,
-  Building2,
-  Filter,
-  Code,
-  Clock
+  Code
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';

@@ -26,13 +26,11 @@ import {
   IconChartArea,
   IconStack2,
   IconBox,
-  IconRuler,
 } from '@tabler/icons-react';
 
 // Y-axis display mode type
 type YAxisMode = 'quantity' | 'value';
 import { format, startOfDay, endOfDay, subMonths } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import { toast } from 'sonner';
@@ -40,8 +38,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OrderFilters } from '@/components/inventory/statistics/order-filters';
-import { DETAIL_PAGE_SPACING } from '@/lib/layout-constants';
-import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -312,9 +308,6 @@ const OrderPage = () => {
       yAxisMode === 'quantity' ? item.totalOrdered : item.totalValue;
 
     const yAxisLabel = yAxisMode === 'quantity' ? 'Quantidade' : 'Preço (R$)';
-    const formatYValue = (value: number) =>
-      yAxisMode === 'quantity' ? Math.round(value).toString() : formatCurrency(value);
-
     // PIE CHART (only available in non-comparison mode)
     if (selectedChartType === 'pie' && !isComparisonMode) {
       const pieData = chartData.map((item) => ({

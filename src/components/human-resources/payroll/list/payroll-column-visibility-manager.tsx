@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -106,7 +106,7 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
               type="text"
               placeholder="Buscar coluna..."
               value={searchQuery}
-              onChange={(value) => setSearchQuery(typeof value === 'string' ? value : "")}
+              onChange={(value: string | number | null) => setSearchQuery(typeof value === 'string' ? value : "")}
               className="pl-9 h-9"
               transparent
             />

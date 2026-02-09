@@ -174,7 +174,7 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
     bonifiableUsersCount,
     uniqueUsersCount,
     isMultiMonth,
-    periodDisplay
+    periodDisplay: _periodDisplay
   } = useMemo(() => calculateTotals(), [bonuses]);
 
   const bonusPercentage = uniqueUsersCount > 0

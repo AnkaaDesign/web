@@ -7,7 +7,7 @@ import { TaskEditForm } from "@/components/production/task/form/task-edit-form";
 import { TaskEditSkeleton } from "@/components/production/task/skeleton/task-edit-skeleton";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconCheck, IconLoader2 } from "@tabler/icons-react";
+import { IconCheck } from "@tabler/icons-react";
 import React from "react";
 
 export const TaskEditPage = () => {

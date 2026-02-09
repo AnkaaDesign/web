@@ -13,7 +13,7 @@ export const CreateVacationPage = () => {
     isValid: false,
     isDirty: false,
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting] = useState(false);
 
   usePageTracker({
     title: "Nova Férias",

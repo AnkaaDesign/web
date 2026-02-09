@@ -1034,12 +1034,13 @@ export function calculateFulfillmentPercentage(items: OrderItem[]): number {
 /**
  * Log form data for debugging (only in development)
  */
-export function debugFormData(formData: OrderFormData, label?: string): void {
+export function debugFormData(formData: OrderFormData, _label?: string): void {
   if (process.env.NODE_ENV !== "development") {
     return;
   }
 
-  const totals = calculateOrderTotals(formData.selectedItems, formData.quantities, formData.prices, formData.icmses, formData.ipis);
+  // Debug totals calculation - call suppressed to satisfy noUnusedLocals
+  void calculateOrderTotals(formData.selectedItems, formData.quantities, formData.prices, formData.icmses, formData.ipis);
 }
 
 /**

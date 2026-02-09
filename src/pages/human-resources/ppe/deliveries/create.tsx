@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import { routes, PPE_DELIVERY_STATUS, FAVORITE_PAGES } from "../../../../constants";
-import { useBatchCreatePpeDeliveries, useAuth } from "../../../../hooks";
+import { routes, FAVORITE_PAGES } from "../../../../constants";
+import { useBatchCreatePpeDeliveries } from "../../../../hooks";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconShield, IconX, IconCheck, IconLoader2 } from "@tabler/icons-react";
 import type { PpeDeliveryBatchCreateFormData } from "../../../../schemas";
@@ -11,7 +11,6 @@ import { PpeDeliveryBatchResultDialog } from "@/components/ui/batch-operation-re
 export const EPIDeliveryCreate = () => {
   const navigate = useNavigate();
   const batchCreateMutation = useBatchCreatePpeDeliveries();
-  const { user: currentUser } = useAuth();
 
   // Batch result dialog
   const { isOpen: isResultDialogOpen, result: batchResult, openDialog: openResultDialog, closeDialog: closeResultDialog } = useBatchResultDialog();

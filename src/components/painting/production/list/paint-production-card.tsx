@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { routes, PAINT_FINISH } from "../../../../constants";
 import { IconFlask, IconCalendar, IconDroplet, IconScale, IconColorSwatch, IconTruckLoading, IconSparkles, IconAlertTriangle } from "@tabler/icons-react";
 import { formatDateTime, formatCurrency } from "../../../../utils";
-import { PAINT_FINISH_LABELS, PAINT_BRAND_LABELS, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
+import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
 import { CanvasNormalMapRenderer } from "../../effects/canvas-normal-map-renderer";
 
 interface PaintProductionCardProps {

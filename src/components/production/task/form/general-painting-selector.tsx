@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
@@ -111,7 +111,7 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint, onDes
   };
 
   // Custom render function for paint items
-  const renderPaintItem = (paint: Paint, isSelected: boolean) => {
+  const renderPaintItem = (paint: Paint, _isSelected: boolean) => {
     const color = paint.hex || "#888888";
 
     return (

@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Task } from "@/types";
 import type { TaskGetManyFormData } from "@/schemas";
-import { useSectors, useCustomers, useUsers, useCurrentUser, useTaskBatchMutations, taskKeys } from "@/hooks";
+import { useSectors, useCustomers, useUsers, useCurrentUser, taskKeys } from "@/hooks";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "@/constants";
 import { taskService } from "@/api-client/task";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
@@ -69,9 +69,6 @@ export function TaskPreparationView({
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
   );
 
-  // Check if user is admin
-  const isAdmin = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN);
-
   // Get table state for selected tasks functionality
   const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds, resetSelection, selectRange } = useTableState({
     defaultPageSize: 40,
@@ -129,9 +126,6 @@ export function TaskPreparationView({
 
   // Copy from task state
   const [copyFromTaskState, setCopyFromTaskState] = useState<CopyFromTaskState>(initialCopyFromTaskState);
-
-  // Batch mutations for copy operation
-  const { batchUpdateAsync } = useTaskBatchMutations();
 
   // Custom deserializer for task filters
   const deserializeTaskFilters = useCallback(

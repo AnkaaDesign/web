@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Task } from "@/types";
 import type { TaskGetManyFormData } from "@/schemas";
-import { useSectors, useCustomers, useUsers, useCurrentUser, useTaskBatchMutations, taskKeys } from "@/hooks";
+import { useSectors, useCustomers, useUsers, useCurrentUser, taskKeys } from "@/hooks";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "@/constants";
 import { taskService } from "@/api-client/task";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
@@ -135,8 +135,6 @@ export function TaskHistoryList({
   const [copyFromTaskState, setCopyFromTaskState] = useState<CopyFromTaskState>(initialCopyFromTaskState);
 
   // Batch mutations for copy operation
-  const { batchUpdateAsync } = useTaskBatchMutations();
-
   // Custom deserializer for task filters
   const deserializeTaskFilters = useCallback(
     (params: URLSearchParams): Partial<TaskGetManyFormData> => {

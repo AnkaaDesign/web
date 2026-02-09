@@ -13,7 +13,7 @@ import {
   citySchema,
 } from "./common";
 import type { Supplier } from "../types";
-import { cleanNumeric, cleanCNPJ } from "../utils";
+import { cleanNumeric } from "../utils";
 import { BRAZILIAN_STATES } from "../constants";
 
 // =====================

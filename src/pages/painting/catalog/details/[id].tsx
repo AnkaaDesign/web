@@ -1,13 +1,12 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { IconPaint, IconTrash, IconRefresh, IconEdit } from "@tabler/icons-react";
+import { IconTrash, IconRefresh, IconEdit } from "@tabler/icons-react";
 
 import { usePaint, usePaintMutations } from "../../../../hooks";
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditPaints } from "@/utils/permissions/entity-permissions";
 import { hasAnyPrivilege, isTeamLeader } from "@/utils";
-import { PAGE_SPACING } from "@/lib/layout-constants";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,11 +55,6 @@ export default function PaintDetailsPage() {
   const canNavigateToFormulas = userPrivilege === SECTOR_PRIVILEGES.WAREHOUSE ||
     userPrivilege === SECTOR_PRIVILEGES.ADMIN ||
     (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader(user));
-
-  // Only COMMERCIAL, ADMIN, FINANCIAL can see prices (WAREHOUSE excluded)
-  const canSeePrices = userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
-    userPrivilege === SECTOR_PRIVILEGES.ADMIN ||
-    userPrivilege === SECTOR_PRIVILEGES.FINANCIAL;
 
   // Only WAREHOUSE and ADMIN can see changelog
   const canSeeChangelog = userPrivilege === SECTOR_PRIVILEGES.WAREHOUSE ||

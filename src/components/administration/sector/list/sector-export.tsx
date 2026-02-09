@@ -64,7 +64,7 @@ export function SectorExport({ className, filters, currentSectors = [], totalRec
     }
   };
 
-  const handleExport = async (format: ExportFormat, items: Sector[]) => {
+  const handleExport = async (_format: ExportFormat, _items: Sector[]) => {
     try {
       // The BaseExportPopover component handles the actual export logic
       // including CSV, Excel, and PDF generation// If you need custom export logic, you can implement it here

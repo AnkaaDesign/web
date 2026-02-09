@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Combobox } from '@/components/ui/combobox';
 import {
@@ -28,7 +27,8 @@ import { getItems } from '@/api-client/item';
 import { getItemBrands } from '@/api-client/item-brand';
 import { getItemCategories } from '@/api-client/item-category';
 import { supplierKeys, itemKeys, itemBrandKeys, itemCategoryKeys } from '@/hooks/common/query-keys';
-import { formatDate } from '@/utils';
+
+
 
 // Page size for async combobox
 const COMBOBOX_PAGE_SIZE = 20;
@@ -88,7 +88,7 @@ export function OrderFilters({
   onOpenChange,
   filters,
   onApply,
-  onReset,
+  onReset: _onReset,
   yAxisMode = 'quantity',
   onYAxisModeChange,
 }: OrderFiltersProps) {

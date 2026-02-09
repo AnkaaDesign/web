@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useBackups, useBackupMutations } from '@/hooks/server/use-backup';
 import { BackupProgressBar } from './BackupProgress';
 import {
@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, formatDistanceToNow, isAfter, isBefore, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import {
   CheckCircle2,
   Clock,
@@ -68,7 +68,7 @@ const RETENTION_LABELS: Record<string, string> = {
 };
 
 export function BackupList({ className, onViewDetails }: BackupListProps) {
-  const { data: backups, isLoading, refetch } = useBackups();
+  const { data: backups, isLoading } = useBackups();
   const mutations = useBackupMutations();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 

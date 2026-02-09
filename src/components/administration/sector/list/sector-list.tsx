@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { IconFilter } from "@tabler/icons-react";
 
 import type { Sector, SectorGetManyFormData } from "../../../../types";
@@ -9,7 +9,6 @@ import { useTableFilters } from "@/hooks/common/use-table-filters";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { FilterIndicators } from "@/components/ui/filter-indicator";

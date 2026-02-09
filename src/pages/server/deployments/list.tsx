@@ -1,5 +1,3 @@
-import { IconRocket } from "@tabler/icons-react";
-
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";

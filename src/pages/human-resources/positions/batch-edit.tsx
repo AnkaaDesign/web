@@ -1,15 +1,13 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { usePositions } from "../../../hooks";
-import type { Position } from "../../../types";
 import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../constants";
 import { PositionBatchEditTable } from "@/components/human-resources/position/batch-edit/position-batch-edit-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { toast } from "sonner";
-import { IconBriefcase, IconAlertTriangle, IconLoader, IconDeviceFloppy, IconX, IconArrowLeft } from "@tabler/icons-react";
+import { IconBriefcase, IconAlertTriangle, IconLoader, IconDeviceFloppy, IconArrowLeft } from "@tabler/icons-react";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const PositionBatchEditPage = () => {

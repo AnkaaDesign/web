@@ -11,7 +11,6 @@ import { type Borrow } from "../../../../types";
 import { formatDate } from "../../../../utils";
 import { useBorrowMutations } from "../../../../hooks";
 import { BORROW_STATUS } from "../../../../constants";
-import { toast } from "sonner";
 
 // Define return condition enum
 enum RETURN_CONDITION {

@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, emailSchema } from "./common";
 import type { Customer } from '@types';
-import { isValidCPF, isValidCNPJ, cleanCNPJ, cleanCPF } from '@utils';
+import { isValidCPF, isValidCNPJ } from '@utils';
 
 // =====================
 // Include Schema Based on Prisma Schema

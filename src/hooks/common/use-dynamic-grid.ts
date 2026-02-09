@@ -433,7 +433,6 @@ export function useDynamicGrid({ itemCount, gap = 8, minSize = 40, maxSize = 200
   const updateDimensions = useCallback(() => {
     if (!containerRef.current) return;
 
-    const rect = containerRef.current.getBoundingClientRect();
     const computedStyle = window.getComputedStyle(containerRef.current);
     const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
     const paddingRight = parseFloat(computedStyle.paddingRight) || 0;

@@ -1,7 +1,7 @@
 import { useCallback, useRef, useEffect, useState, useMemo } from "react";
-import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { z } from "zod";
-import type { UrlStateBase, UrlStateConfiguration, UrlFieldConfig, UrlParamValue, PartialUrlState, SerializedUrlState } from "../../types/url-state-types";
+import type { UrlStateBase, UrlStateConfiguration, UrlFieldConfig } from "../../types/url-state-types";
 
 export type UrlUpdateAction = "pagination" | "sorting" | "selection" | "filter" | "search" | "form" | "navigation" | "batch" | "restore";
 
@@ -111,7 +111,7 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
     maxQueueSize = 50,
     enableValidation = true,
     enableOptimisticUpdates = true,
-    batchUpdateThreshold = 3,
+    batchUpdateThreshold: _batchUpdateThreshold = 3, // eslint-disable-line @typescript-eslint/no-unused-vars
     onValidationError,
     onNavigationConflict,
     onError,
@@ -120,7 +120,6 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
   } = { ...DEFAULT_OPTIONS, ...options };
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const location = useLocation();
 
   // State management
@@ -299,7 +298,7 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
    * Handle browser navigation events
    */
   const handleNavigationEvent = useCallback(
-    (event: PopStateEvent) => {
+    (_event: PopStateEvent) => {
       if (!enableNavigationTracking) return;
 
       setIsNavigating(true);
@@ -795,7 +794,7 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
     ) => {
       const combinedOptimistic: Partial<T> = {};
 
-      updates.forEach(({ updater, action = "batch", optimistic }, index) => {
+      updates.forEach(({ updater, action: _action = "batch", optimistic }, index) => {
         const update: UrlUpdate<T> = {
           id: `${namespace || "global"}_batch_${++updateIdCounter.current}`,
           action: "batch",
@@ -1051,8 +1050,4 @@ function getPriorityForAction(action: UrlUpdateAction): number {
   }
 }
 
-// ====================================
-// Type Exports
-// ====================================
-
-export type { UrlUpdate, StateSnapshot, NavigationEvent, UseUrlStateCoordinatorOptions };
+// Type exports are handled via the export at declaration site

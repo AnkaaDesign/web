@@ -37,9 +37,9 @@ interface ItemTableProps {
 
 export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDeactivate, onDelete, onMerge, onStockBalance, filters = {}, onDataChange }: ItemTableProps) {
   const navigate = useNavigate();
-  const { user, isLoading: isAuthLoading } = useAuth();
-  const { delete: deleteItem } = useItemMutations();
-  const { batchDelete } = useItemBatchMutations();
+  const { user, isLoading: _isAuthLoading } = useAuth();
+  const { delete: _deleteItem } = useItemMutations();
+  const { batchDelete: _batchDelete } = useItemBatchMutations();
 
   // Permission checks
   const canEdit = user ? canEditItems(user) : false;
@@ -58,7 +58,7 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,
@@ -67,8 +67,8 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
     isAllSelected,
     isPartiallySelected,
     selectionCount,
-    resetSelection,
-    removeFromSelection,
+    resetSelection: _resetSelection,
+    removeFromSelection: _removeFromSelection,
     handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,

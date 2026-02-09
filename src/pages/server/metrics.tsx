@@ -45,7 +45,7 @@ export function ServerMetricsPage() {
 
   // Fetch metrics
   const { data: metrics, isLoading, error: metricsError, refetch } = useServerMetrics();
-  const { data: temperatureData, isLoading: isTemperatureLoading, error: temperatureError, refetch: refetchTemperature } = useCpuTemperature();
+  const { data: temperatureData, isLoading: isTemperatureLoading, error: _temperatureError, refetch: refetchTemperature } = useCpuTemperature();
   const { data: ssdHealthData, isLoading: isSsdHealthLoading, error: ssdHealthError, refetch: refetchSsdHealth } = useSsdHealth();
   const { data: raidStatus, isLoading: isRaidLoading, error: raidError, refetch: refetchRaid } = useRaidStatus();
 

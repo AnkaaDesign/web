@@ -6,31 +6,16 @@ import type { Customer, BatchOperationResult } from "../../../../types";
 import { useBatchUpdateCustomers } from "../../../../hooks";
 import { CustomerBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { BRAZILIAN_STATES, routes } from "../../../../constants";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { Combobox } from "@/components/ui/combobox";
 import { FormInput } from "@/components/ui/form-input";
-import { FormDocumentInput } from "@/components/ui/form-document-input";
-import { PhoneArrayInput } from "@/components/ui/phone-array-input";
 import { StateSelector } from "@/components/ui/form-state-selector";
-import { FantasyNameInput } from "../form/fantasy-name-input";
-import { CorporateNameInput } from "../form/corporate-name-input";
-import { WebsiteInput } from "../form/website-input";
-import { AddressInput } from "@/components/ui/form-address-input";
-import { AddressNumberInput } from "@/components/ui/form-address-number-input";
-import { AddressComplementInput } from "@/components/ui/form-address-complement-input";
-import { NeighborhoodInput } from "@/components/ui/form-neighborhood-input";
-import { CityInput } from "@/components/ui/form-city-input";
 import { TagsInput } from "../form/tags-input";
 import { CpfCnpjCell } from "./cells/cpf-cnpj-cell";
-import { CepCell } from "./cells/cep-cell";
-import { TagsCell } from "./cells/tags-cell";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { IconLoader2, IconDeviceFloppy, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 
@@ -80,7 +65,7 @@ interface CustomerBatchEditTableProps {
   onSubmit?: () => void;
 }
 
-export function CustomerBatchEditTable({ customers, onCancel, onSubmit }: CustomerBatchEditTableProps) {
+export function CustomerBatchEditTable({ customers, onCancel: _onCancel, onSubmit: _onSubmit }: CustomerBatchEditTableProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState<BatchOperationResult<Customer, Customer> | null>(null);
@@ -405,7 +390,7 @@ export function CustomerBatchEditTable({ customers, onCancel, onSubmit }: Custom
                                 <FormControl>
                                   <Input
                                     value={field.value || ""}
-                                    onChange={(value) => {
+                                    onChange={(value: string | number | null) => {
                                       field.onChange(value === "" ? null : value);
                                     }}
                                     onBlur={(e) => {

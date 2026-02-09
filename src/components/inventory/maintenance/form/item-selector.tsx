@@ -33,10 +33,6 @@ export function MaintenanceItemSelector<TFieldValues extends FieldValues = Field
     }];
   }, [initialItem?.id]);
 
-  // Memoize getOptionLabel and getOptionValue callbacks with stable dependencies
-  const getOptionLabel = useCallback((item: any) => item.name, []);
-  const getOptionValue = useCallback((item: any) => item.id, []);
-
   // Async query function for Combobox with pagination
   const queryFn = useCallback(async (searchTerm: string, page: number = 1) => {
     try {

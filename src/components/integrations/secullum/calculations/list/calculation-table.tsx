@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { IconChevronUp, IconChevronDown, IconSelector, IconAlertTriangle, IconPackage } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconSelector, IconPackage } from "@tabler/icons-react";
 import { CalculationListSkeleton } from "./calculation-list-skeleton";
 import { cn } from "@/lib/utils";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -9,17 +9,7 @@ import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { createCalculationColumns } from "./calculation-table-columns";
 import type { CalculationColumn } from "./calculation-table-columns";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { useTableState } from "@/hooks/common/use-table-state";
 // Removed pagination import - not needed for Secullum
 
 interface CalculationRow {
@@ -78,7 +68,6 @@ export function CalculationTable({
     selectedIds,
     sortConfigs,
     showSelectedOnly,
-    toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,
@@ -86,7 +75,6 @@ export function CalculationTable({
     isSelected,
     isAllSelected,
     isPartiallySelected,
-    selectionCount,
     handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 999999, // Effectively disable pagination
@@ -146,7 +134,7 @@ export function CalculationTable({
     };
   }, [data, sortConfigs, showSelectedOnly, selectedIds]);
 
-  const { items, totalRecords } = sortedData;
+  const { items } = sortedData;
 
   // Get current page item IDs for selection
   const currentPageItemIds = React.useMemo(() => {

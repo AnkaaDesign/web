@@ -1,5 +1,5 @@
 import React from "react";
-import { parseISO, isValid as isValidDate } from "date-fns";
+import { isValid as isValidDate } from "date-fns";
 import type { User } from "../../../../types";
 import { type UserUpdateFormData } from "../../../../schemas";
 import { UserForm } from "./user-form";

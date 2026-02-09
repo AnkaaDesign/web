@@ -42,7 +42,7 @@ interface ItemBatchEditTableProps {
   onSubmit?: () => void;
 }
 
-export function ItemBatchEditTable({ items, onCancel, onSubmit }: ItemBatchEditTableProps) {
+export function ItemBatchEditTable({ items, onCancel: _onCancel, onSubmit: _onSubmit }: ItemBatchEditTableProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState<BatchOperationResult<Item, Item> | null>(null);

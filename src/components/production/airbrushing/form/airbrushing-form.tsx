@@ -7,7 +7,6 @@ import type { AirbrushingCreateFormData, AirbrushingUpdateFormData } from "../..
 import { airbrushingCreateSchema, airbrushingUpdateSchema } from "../../../../schemas";
 import { routes, AIRBRUSHING_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading";
@@ -15,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { FormSteps, type FormStep } from "@/components/ui/form-steps";
 import { AirbrushingFormFields } from "./airbrushing-form-fields";
 import { TaskSelector } from "./task-selector";
-import { IconSpray, IconCheck, IconFileInvoice, IconClipboardList, IconPhoto, IconUser, IconBuildingFactory, IconHash } from "@tabler/icons-react";
+import { IconSpray, IconFileInvoice, IconClipboardList, IconPhoto, IconUser, IconBuildingFactory, IconHash } from "@tabler/icons-react";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -136,7 +135,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
   });
 
   // Mutations
-  const { createAsync: create, updateAsync: update, isUpdating } = useAirbrushingMutations();
+  const { createAsync: create, updateAsync: update, isUpdating: _isUpdating } = useAirbrushingMutations();
 
   // Set up form with appropriate schema
   const formSchema = mode === "create" ? airbrushingCreateSchema : airbrushingUpdateSchema;
@@ -476,7 +475,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       if (hasNewFiles) {
         const customerInfo = selectedTask?.data?.customer ? {
           id: selectedTask.data.customer.id,
-          name: selectedTask.data.customer.fantasyName || selectedTask.data.customer.name,
+          name: selectedTask.data.customer.fantasyName || "",
         } : undefined;
 
         // Prepare data with existing file IDs and artwork statuses
@@ -650,11 +649,11 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
                               <div className="flex items-center gap-2">
                                 <CustomerLogoDisplay
                                   logo={airbrushing.task.customer.logo}
-                                  customerName={airbrushing.task.customer.fantasyName || airbrushing.task.customer.name || "Cliente"}
+                                  customerName={airbrushing.task.customer.fantasyName || "Cliente"}
                                   size="sm"
                                   shape="rounded"
                                 />
-                                <span className="font-medium text-sm">{airbrushing.task.customer.fantasyName || airbrushing.task.customer.name}</span>
+                                <span className="font-medium text-sm">{airbrushing.task.customer.fantasyName}</span>
                               </div>
                             </div>
                           )}

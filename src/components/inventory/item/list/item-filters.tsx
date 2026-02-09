@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { ItemGetManyFormData } from "../../../../schemas";
-import { IconFilter, IconX, IconTriangleInverted, IconUser, IconPackages, IconCategory, IconBrandAsana, IconTruck, IconNumber, IconCurrencyDollar, IconRuler, IconAlertTriangleFilled } from "@tabler/icons-react";
+import { IconFilter, IconX, IconTriangleInverted, IconUser, IconPackages, IconCategory, IconBrandAsana, IconTruck, IconNumber, IconCurrencyDollar, IconAlertTriangleFilled } from "@tabler/icons-react";
 import {
   Sheet,
   SheetContent,
@@ -16,7 +16,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { STOCK_LEVEL, STOCK_LEVEL_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
 import { getStockLevelTextColor } from "../../../../utils";
 import { getItemCategories, getItemBrands, getSuppliers } from "../../../../api-client";
-import type { ItemCategory, ItemBrand, Supplier } from "../../../../types";
+
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 import { cn } from "@/lib/utils";
 
@@ -398,7 +398,7 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
               placeholder="Selecione status de estoque..."
               emptyText="Nenhum status encontrado"
               searchPlaceholder="Buscar status..."
-              renderOption={(option, isSelected) => {
+              renderOption={(option, _isSelected) => {
                 const Icon = option.icon;
                 return (
                   <div className="flex items-center gap-2">
@@ -506,7 +506,7 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
               minSearchLength={0}
               pageSize={50}
               debounceMs={300}
-              renderOption={(option, isSelected) => (
+              renderOption={(option, _isSelected) => (
                 <div className="flex items-center gap-3 w-full">
                   <SupplierLogoDisplay
                     logo={(option as any).logo}

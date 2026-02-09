@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMaintenanceBatchMutations, useItems, useSectors } from "../../../../hooks";
 import type { Maintenance } from "../../../../types";
@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
-import { Badge } from "@/components/ui/badge";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { getDefaultVisibleColumns, createMaintenanceColumns } from "./maintenance-table-columns";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
@@ -240,7 +239,7 @@ export function MaintenanceList({ className }: MaintenanceListProps) {
     }
   };
 
-  const handleBulkMarkAsFinished = async (maintenances: Maintenance[]) => {
+  const handleBulkMarkAsFinished = async (_maintenances: Maintenance[]) => {
     // TODO: Implement batch finish logic
   };
 

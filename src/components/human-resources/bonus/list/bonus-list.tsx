@@ -8,14 +8,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { formatCurrency, formatDate } from "../../../../utils";
-import { BONUS_STATUS, BONUS_STATUS_LABELS, routes } from "../../../../constants";
+import { BONUS_STATUS_LABELS, routes } from "../../../../constants";
 import { getBadgeVariant } from "../../../../constants";
 import type { Bonus } from "../../../../types";
 import type { BonusGetManyFormData } from "../../../../schemas";
 import { IconPlus, IconEye, IconEdit, IconCalculator } from "@tabler/icons-react";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { BonusSimulationInteractiveTable } from "../../bonus-simulation/bonus-simulation-interactive-table";
-import { cn } from "@/lib/utils";
 
 interface BonusListProps {
   bonuses?: Bonus[];

@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -18,13 +17,10 @@ import {
 import {
   IconUsers,
   IconCalculator,
-  IconCurrencyDollar,
   IconChevronLeft,
   IconChevronRight,
   IconFilter,
-  IconX,
   IconBuilding,
-  IconDownload,
   IconUserMinus,
   IconBriefcase,
   IconUserCheck,
@@ -37,7 +33,7 @@ import { useUsers, useSectors, useTasks } from "../../../hooks";
 import { calculateBonusForPosition } from "../../../utils/bonus";
 import { cn } from "@/lib/utils";
 import { TASK_STATUS, COMMISSION_STATUS, USER_STATUS } from "../../../constants";
-import { FilterIndicators, FilterIndicator } from "@/components/ui/filter-indicator";
+import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
 import { toast } from "sonner";
 import { BonusSimulationFilters } from "./bonus-simulation-filters";
@@ -75,7 +71,7 @@ interface PerformanceLevelSelectorProps {
 function PerformanceLevelSelector({
   value,
   onChange,
-  userId,
+  userId: _userId,
   isModified,
   disabled,
   className,
@@ -152,7 +148,7 @@ interface BonusSimulationInteractiveTableProps {
   embedded?: boolean;
 }
 
-export function BonusSimulationInteractiveTable({ className, embedded = false }: BonusSimulationInteractiveTableProps) {
+export function BonusSimulationInteractiveTable({ className, embedded: _embedded = false }: BonusSimulationInteractiveTableProps) {
   // State
   const [taskQuantity, setTaskQuantity] = useState<number>(0); // Will be set from current period
   const [originalTaskQuantity, setOriginalTaskQuantity] = useState<number>(0); // Store original for restore
@@ -239,13 +235,6 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
         }
         return sum;
       }, 0);
-
-      const fullCommissionCount = currentPeriodTasks.data.filter(
-        t => t.commission === COMMISSION_STATUS.FULL_COMMISSION
-      ).length;
-      const partialCommissionCount = currentPeriodTasks.data.filter(
-        t => t.commission === COMMISSION_STATUS.PARTIAL_COMMISSION
-      ).length;
 
       // Only set if taskQuantity is still 0 (initial state)
       if (taskQuantity === 0) {
@@ -401,11 +390,6 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
     if (eligibleUserCount === 0) return 0;
     return taskQuantity / eligibleUserCount;
   }, [taskQuantity, eligibleUserCount]);
-
-  // Calculate total task quantity when using reverse calculation (for display only)
-  const calculatedTaskQuantity = useMemo(() => {
-    return taskQuantity;
-  }, [taskQuantity]);
 
   const totalBonusAmount = useMemo(() =>
     sortedUsers.reduce((sum, user) => sum + user.bonusAmount, 0),
@@ -787,7 +771,6 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
 
   const exportToPDF = async (users: SimulatedUser[], columns: ExportColumn<SimulatedUser>[]) => {
     // Calculate responsive font sizes
-    const columnCount = columns.length;
     const fontSize = "12px";
     const headerFontSize = "11px";
     const cellPadding = "8px 6px";

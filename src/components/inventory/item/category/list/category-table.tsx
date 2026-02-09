@@ -31,11 +31,11 @@ interface CategoryTableProps {
 
 export function CategoryTable({ visibleColumns, className, onEdit, onDelete, filters = {}, onDataChange }: CategoryTableProps) {
   const navigate = useNavigate();
-  const { delete: deleteCategory } = useItemCategoryMutations();
-  const { batchDelete } = useItemCategoryBatchMutations();
+  const { delete: _deleteCategory } = useItemCategoryMutations();
+  const { batchDelete: _batchDelete } = useItemCategoryBatchMutations();
 
   // Permission checks
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: _isAuthLoading } = useAuth();
   const canEdit = user ? canEditItems(user) : false;
   const canDelete = user ? canDeleteItems(user) : false;
   const showInteractive = user ? shouldShowInteractiveElements(user, 'item') : false;
@@ -52,7 +52,7 @@ export function CategoryTable({ visibleColumns, className, onEdit, onDelete, fil
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,
@@ -62,7 +62,7 @@ export function CategoryTable({ visibleColumns, className, onEdit, onDelete, fil
     isPartiallySelected,
     selectionCount,
     resetSelection: _resetSelection,
-    removeFromSelection,
+    removeFromSelection: _removeFromSelection,
     handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,

@@ -50,11 +50,9 @@ export function findMatches(text: string, query: string, config: Partial<Highlig
 
   if (!text || !query) return [];
 
-  const searchText = caseSensitive ? text : text.toLowerCase();
   const searchQuery = caseSensitive ? query : query.toLowerCase();
 
   const matches: SearchMatch[] = [];
-  let lastIndex = 0;
 
   // Create regex pattern
   let pattern: RegExp;
@@ -265,11 +263,6 @@ export function highlightWithContext(
 
     // Adjust match positions relative to snippet
     const adjustedQuery = query;
-    const adjustedMatch = {
-      ...match,
-      start: match.start - start,
-      end: match.end - start,
-    };
 
     return (
       <React.Fragment key={index}>

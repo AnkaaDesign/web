@@ -1,4 +1,4 @@
-import React, {
+import {
   useRef,
   useEffect,
   useCallback,
@@ -424,7 +424,6 @@ function renderToCanvas(
   textures: LoadedTextures
 ): void {
   const baseRgb = hexToRgb(settings.baseColor);
-  const baseHsl = rgbToHsl(baseRgb.r, baseRgb.g, baseRgb.b);
   const effectIntensity = settings.effectIntensity / 100;
 
   // FIXED light direction for normal map

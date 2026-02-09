@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBorrowMutations, useBorrowBatchMutations, useItems, useUsers } from "../../../../hooks";
 import type { Borrow } from "../../../../types";
@@ -18,7 +18,6 @@ import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
-import { Badge } from "@/components/ui/badge";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -49,7 +48,7 @@ export function BorrowList({ className }: BorrowListProps) {
   const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
 
   // Get table state for selected items functionality
-  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds } = useTableState({
+  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds: _selectedIds } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
   });

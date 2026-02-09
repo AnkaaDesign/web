@@ -2,7 +2,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { IconX, IconGripVertical } from "@tabler/icons-react";
-import { FilterCondition as FilterConditionType, FilterFieldDefinition, FilterOperator } from "@/utils/table-filter-utils";
+import type { FilterCondition as FilterConditionType, FilterFieldDefinition, FilterOperator } from "@/utils/table-filter-utils";
 import { cn } from "@/lib/utils";
 
 export interface FilterConditionProps {

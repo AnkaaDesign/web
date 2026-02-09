@@ -3,7 +3,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { IconTag, IconPlus } from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
 export function PaintBrandsListPage() {

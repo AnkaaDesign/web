@@ -2,7 +2,6 @@ import { useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconTrophy, IconDownload, IconFilter, IconReload, IconMedal, IconCrown, IconStar, IconTrendingUp, IconTrendingDown, IconArrowUp, IconArrowDown } from "@tabler/icons-react";
-import { addDays, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from "date-fns";
+import { subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency } from "../../../utils";
 
@@ -29,9 +28,6 @@ import {
   Cell,
   LineChart,
   Line,
-  ComposedChart,
-  Area,
-  AreaChart
 } from "recharts";
 
 // Types for filters and data

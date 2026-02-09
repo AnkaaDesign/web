@@ -592,7 +592,6 @@ export function getThumbnailUrlOrFallback(
   options: ThumbnailOptions = {},
   baseUrl: string = '/api'
 ): { type: 'url' | 'icon'; value: string } {
-  const category = getFileCategory(filename, mimeType);
   const extension = getFileExtension(filename);
 
   // Check if file type supports thumbnails
@@ -1075,12 +1074,11 @@ export function validateFile(
 /**
  * Check if file can be previewed
  */
-export function canPreview(filename: string, mimeType?: string): boolean {
+export function canPreview(filename: string, _mimeType?: string): boolean {
   const extension = getFileExtension(filename);
-  const category = getFileCategory(filename, mimeType);
 
   // Check if extension is in previewable types
-  for (const [cat, extensions] of Object.entries(PREVIEWABLE_TYPES)) {
+  for (const [_cat, extensions] of Object.entries(PREVIEWABLE_TYPES)) {
     if (extensions.includes(extension)) {
       return true;
     }
@@ -1094,7 +1092,7 @@ export function canPreview(filename: string, mimeType?: string): boolean {
  */
 export function getPreviewType(
   filename: string,
-  mimeType?: string
+  _mimeType?: string
 ): 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'code' | 'none' {
   const extension = getFileExtension(filename);
 

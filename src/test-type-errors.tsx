@@ -1,5 +1,5 @@
 // Test file to demonstrate TS2339 errors with Order entity
-import { Order, OrderItem } from '@/types/order';
+import type { Order, OrderItem } from '@/types/order';
 
 // Example function that might have TS2339 errors
 export function processOrder(order: Order) {

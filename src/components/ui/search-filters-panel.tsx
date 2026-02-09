@@ -12,33 +12,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./car
 import {
   IconFilter,
   IconX,
-  IconPlus,
   IconChevronDown,
-  IconSearch,
   IconSave,
-  IconTrash,
-  IconEdit,
   IconCheck,
   IconClock,
   IconCalendar,
-  IconSortAscending,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import type { UseAdvancedSearchReturn } from "@/hooks/common/use-advanced-search";
 import {
   type FilterIndicator,
   extractActiveFilters,
-  createArrayFilterRemover,
   countActiveFilters,
   type FilterCondition,
   type FilterGroup,
   type FilterDefinition,
   type FilterFieldDefinition,
-  StringFilterBuilder,
-  NumberFilterBuilder,
-  DateFilterBuilder,
-  BooleanFilterBuilder,
-  SelectFilterBuilder,
   createFilterPreset,
   LocalStorageFilterPresets,
 } from "@/utils/table-filter-utils";

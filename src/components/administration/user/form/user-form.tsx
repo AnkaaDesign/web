@@ -1,17 +1,14 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useRef } from "react";
-import { IconUser, IconInfoCircle, IconFileText, IconMapPin, IconBriefcase, IconShieldCheck, IconShirt } from "@tabler/icons-react";
+import { IconUser, IconInfoCircle, IconFileText, IconMapPin, IconBriefcase, IconShieldCheck } from "@tabler/icons-react";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { userCreateSchema, userUpdateSchema, type UserCreateFormData, type UserUpdateFormData } from "../../../../schemas";
 import { USER_STATUS } from "../../../../constants";
-import { formatDateTime } from "../../../../utils/date";
-
 // Import all form components
 import { NameInput } from "./name-input";
 import { FormInput } from "@/components/ui/form-input";
-import { DismissalDateInput } from "./dismissal-date-input";
 import { BirthDateInput } from "./birth-date-input";
 import { PositionSelector } from "./position-selector";
 import { SectorSelector } from "./sector-selector";

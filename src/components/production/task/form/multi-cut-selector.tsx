@@ -10,7 +10,6 @@ import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas
 import { CUT_TYPE, CUT_TYPE_LABELS, CUT_ORIGIN } from "../../../../constants";
 import { FileUploadField } from "@/components/common/file";
 import type { FileWithPreview } from "@/components/common/file";
-import { getApiBaseUrl } from "@/utils/file";
 
 // Helper function to convert database File entity to FileWithPreview
 const convertToFileWithPreview = (file: any | undefined | null): FileWithPreview | undefined => {
@@ -47,10 +46,10 @@ export interface MultiCutSelectorRef {
 }
 
 export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelectorProps>(({ control, disabled, onCutsCountChange }, ref) => {
-  const { setValue, getValues, watch } = useFormContext();
+  const { setValue, watch } = useFormContext();
 
   // Use React Hook Form's useFieldArray - the proper way to manage array fields
-  const { fields, append, prepend, remove } = useFieldArray({
+  const { fields, prepend, remove } = useFieldArray({
     control,
     name: "cuts",
   });
@@ -251,7 +250,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
   }, [localFilesMap]);
 
   // Helper: Check if a cut has a file attached (checking multiple possible properties)
-  const cutHasFile = useCallback((cut: any, index?: number, cutId?: string): boolean => {
+  const cutHasFile = useCallback((cut: any, _index?: number, cutId?: string): boolean => {
     if (!cut) return false;
 
     // CRITICAL: Check localFilesMap first (most up-to-date source)

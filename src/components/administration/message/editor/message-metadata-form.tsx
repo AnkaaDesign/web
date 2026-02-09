@@ -57,7 +57,7 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
             <Input
               id="message-title"
               value={data.title}
-              onChange={(value) => handleChange({ title: value as string || '' })}
+              onChange={(value: string | number | null) => handleChange({ title: value as string || '' })}
               placeholder="Digite o título da mensagem..."
               className="bg-transparent"
               required
@@ -142,7 +142,7 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
                   });
 
                   const usersData = result.data || [];
-                  const total = result.total || 0;
+                  const total = result.meta?.totalRecords || 0;
                   const hasMore = (page * pageSize) < total;
 
                   return {
@@ -203,7 +203,7 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
                   });
 
                   const sectorsData = result.data || [];
-                  const total = result.total || 0;
+                  const total = result.meta?.totalRecords || 0;
                   const hasMore = (page * pageSize) < total;
 
                   return {
@@ -258,7 +258,7 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
                   });
 
                   const positionsData = result.data || [];
-                  const total = result.total || 0;
+                  const total = result.meta?.totalRecords || 0;
                   const hasMore = (page * pageSize) < total;
 
                   return {

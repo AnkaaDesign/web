@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconDownload, IconX, IconAlertTriangle, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconTruck, IconNotes, IconClipboardList, IconCreditCard } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconDownload, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconTruck, IconNotes, IconClipboardList, IconCreditCard } from "@tabler/icons-react";
 import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useSuppliers } from "../../../../hooks";
@@ -27,7 +27,7 @@ import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { TemporaryItemsInput } from "./temporary-items-input";
 import { useOrderFormUrlState } from "@/hooks/inventory/use-order-form-url-state";
-import { formatCurrency, formatDate, formatDateTime, measureUtils, formatPixKey } from "../../../../utils";
+import { formatCurrency, formatDate, measureUtils, formatPixKey } from "../../../../utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
@@ -49,7 +49,7 @@ export const OrderCreateForm = () => {
     icmses,
     ipis,
     orderItemMode,
-    temporaryItems,
+    temporaryItems: _temporaryItems,
     description,
     supplierId,
     forecast,
@@ -58,12 +58,12 @@ export const OrderCreateForm = () => {
     updateSupplierId,
     updateForecast,
     updateNotes,
-    setOrderItemMode,
-    addTemporaryItem,
-    updateTemporaryItem,
-    removeTemporaryItem,
-    clearTemporaryItems,
-    setTemporaryItems,
+    setOrderItemMode: _setOrderItemMode,
+    addTemporaryItem: _addTemporaryItem,
+    updateTemporaryItem: _updateTemporaryItem,
+    removeTemporaryItem: _removeTemporaryItem,
+    clearTemporaryItems: _clearTemporaryItems,
+    setTemporaryItems: _setTemporaryItems,
     showSelectedOnly,
     searchTerm,
     showInactive,
@@ -72,17 +72,17 @@ export const OrderCreateForm = () => {
     supplierIds,
     page,
     pageSize,
-    totalRecords,
+    totalRecords: _totalRecords,
     setPage,
     setPageSize,
-    setTotalRecords,
+    setTotalRecords: _setTotalRecords,
     setShowSelectedOnly,
     setSearchTerm,
     setShowInactive,
     setCategoryIds,
     setBrandIds,
     setSupplierIds,
-    setBatchFilters,
+    setBatchFilters: _setBatchFilters,
     toggleItemSelection,
     batchUpdateSelection,
     setItemQuantity,
@@ -663,7 +663,7 @@ export const OrderCreateForm = () => {
       // Temporary mode: check for valid temporary items
       const hasTemporaryItems = tempItems.length > 0;
 
-      const allTemporaryItemsValid = tempItems.every((item: any, index: number) => {
+      const allTemporaryItemsValid = tempItems.every((item: any, _index: number) => {
         const hasDescription = item.temporaryItemDescription && item.temporaryItemDescription.trim() !== "";
         const hasValidQuantity = item.orderedQuantity && item.orderedQuantity > 0;
         const hasValidPrice = item.price !== undefined && item.price !== null && Number(item.price) > 0;
@@ -1129,7 +1129,7 @@ export const OrderCreateForm = () => {
                                 placeholder="Selecione um fornecedor (opcional)"
                                 emptyText="Nenhum fornecedor encontrado"
                                 className="h-10 w-full"
-                                renderOption={(option, isSelected) => (
+                                renderOption={(option, _isSelected) => (
                                   <div className="flex items-center gap-3 w-full">
                                     <SupplierLogoDisplay
                                       logo={(option as any).logo}

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,8 +31,6 @@ import {
   IconPlus,
   IconDownload,
   IconClock,
-  IconSettings,
-  IconRefresh,
   IconTrash,
   IconAlertTriangle,
   IconCheck,
@@ -42,12 +40,10 @@ import {
   IconCalendar,
   IconShieldCheck,
   IconActivity,
-  IconHeart,
   IconEye,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { formatDate } from "../../utils/date";
 import type { BackupMetadata, ScheduledBackupJob } from "../../api-client/backup";
 import { backupApi } from "../../api-client/backup";
 import {
@@ -326,12 +322,6 @@ const BackupManagementPage = () => {
     }
   };
 
-  const refreshAll = () => {
-    refetchBackups();
-    refetchScheduled();
-    refetchHealth();
-  };
-
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "completed":
@@ -409,7 +399,6 @@ const BackupManagementPage = () => {
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteScheduleDialogOpen, setDeleteScheduleDialogOpen] = useState(false);
-  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
 
   // Context menu state for scheduled backups
   const [scheduleContextMenu, setScheduleContextMenu] = useState<{
@@ -428,7 +417,7 @@ const BackupManagementPage = () => {
 
   // Selection state using table state hook
   const {
-    selectedIds,
+    selectedIds: _selectedIds,
     toggleSelection,
     toggleSelectAll,
     isSelected,
@@ -732,16 +721,6 @@ const BackupManagementPage = () => {
       setSelectedBackup(null);
     }
   }, [selectedBackup, restoreBackup]);
-
-  const handleDeleteBackup = useCallback((backup: BackupMetadata) => {
-    if (backup.status === "in_progress") {
-      toast.error("Não é possível deletar um backup em progresso");
-      return;
-    }
-
-    setBackupToDelete([backup]);
-    setDeleteDialogOpen(true);
-  }, []);
 
   const confirmDeleteBackup = useCallback(async () => {
     if (!backupToDelete || backupToDelete.length === 0) return;

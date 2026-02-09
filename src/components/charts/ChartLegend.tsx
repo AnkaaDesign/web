@@ -6,7 +6,7 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { LegendConfig, SeriesConfig } from '@/lib/charts/chart-config';
+import type { LegendConfig, SeriesConfig } from '@/lib/charts/chart-config';
 
 export interface ChartLegendProps {
   series: SeriesConfig[];

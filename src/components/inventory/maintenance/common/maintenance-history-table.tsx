@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { formatDate, formatRelativeTime } from "../../../../utils";
+import { formatDate } from "../../../../utils";
 import { MAINTENANCE_STATUS, MAINTENANCE_STATUS_LABELS, routes } from "../../../../constants";
 import { ENTITY_BADGE_CONFIG } from "../../../../constants";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { Badge } from "@/components/ui/badge";
@@ -11,17 +11,14 @@ import {
   IconAdjustments,
   IconUser,
   IconCalendar,
-  IconCurrencyReal
 } from "@tabler/icons-react";
 import { formatDate, formatCurrency } from "../../../../utils";
 import {
   COMMISSION_STATUS,
-  COMMISSION_STATUS_LABELS,
-  TASK_STATUS,
-  TASK_STATUS_LABELS
+  COMMISSION_STATUS_LABELS
 } from "../../../../constants";
 import { getBadgeVariant } from "../../../../constants";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
+import { useTableState } from "@/hooks/common/use-table-state";
 import type { Task, Commission } from "../../../../types";
 
 // Extended task interface for display with commission data

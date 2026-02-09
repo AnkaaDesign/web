@@ -54,7 +54,7 @@ export function OrderScheduleTable({
   onDataChange,
   onActivate,
   onDeactivate,
-  onDelete,
+  onDelete: _onDelete,
 }: OrderScheduleTableProps) {
   const navigate = useNavigate();
 
@@ -80,11 +80,11 @@ export function OrderScheduleTable({
   const {
     page,
     pageSize,
-    selectedIds,
+    selectedIds: _selectedIds,
     sortConfigs,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

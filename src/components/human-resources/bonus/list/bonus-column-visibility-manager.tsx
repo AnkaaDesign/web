@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -89,11 +89,6 @@ export function BonusColumnVisibilityManager({ visibleColumns, onVisibilityChang
   const handleClose = () => {
     setLocalVisible(visibleColumns);
     setOpen(false);
-  };
-
-  // Handle search input - Input component passes value directly, not event
-  const handleSearchChange = (value: string | number | null) => {
-    setSearchQuery(typeof value === 'string' ? value : '');
   };
 
   const visibleCount = localVisible.size;

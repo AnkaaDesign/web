@@ -7,12 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { IconPlus, IconX, IconTag } from "@tabler/icons-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-interface TagsInputProps<TFieldValues extends FieldValues = FieldValues> {
+interface TagsInputProps {
   control: any;
   disabled?: boolean;
 }
 
-export function TagsInput<TFieldValues extends FieldValues = FieldValues>({ control, disabled }: TagsInputProps<TFieldValues>) {
+export function TagsInput<TFieldValues extends FieldValues = FieldValues>({ control, disabled }: TagsInputProps) {
   const [newTag, setNewTag] = useState<string>("");
 
   // Watch the tags array with explicit typing

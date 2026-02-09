@@ -16,7 +16,7 @@ interface AvatarInputProps {
 export function AvatarInput({ disabled, existingAvatarId, onFileChange }: AvatarInputProps) {
   const form = useFormContext();
   const [previewFiles, setPreviewFiles] = useState<FileWithPreview[]>([]);
-  const [existingAvatar, setExistingAvatar] = useState<AnkaaFile | null>(null);
+  const [_existingAvatar, setExistingAvatar] = useState<AnkaaFile | null>(null);
 
   // Load existing avatar if avatarId is provided
   useEffect(() => {

@@ -6,11 +6,10 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconAlertCircle, IconEdit, IconPaint } from "@tabler/icons-react";
+import { IconAlertCircle, IconEdit } from "@tabler/icons-react";
 import { PaintTypeSpecificationsCard, PaintTypeComponentsCard, PaintTypeRelatedPaintsCard } from "@/components/painting/paint-type/detail";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditPaintTypes } from "@/utils/permissions/entity-permissions";
-import { PAGE_SPACING } from "@/lib/layout-constants";
 
 export function PaintTypeDetailsPage() {
   const { id } = useParams<{ id: string }>();

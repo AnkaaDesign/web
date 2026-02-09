@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,13 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Form, FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
+import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Combobox } from "@/components/ui/combobox";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { routes, ITEM_CATEGORY_TYPE, ITEM_CATEGORY_TYPE_LABELS } from "../../../../../constants";
-import { IconLoader, IconDeviceFloppy, IconX, IconShield, IconTool, IconHelmet, IconBox } from "@tabler/icons-react";
+import { IconLoader, IconDeviceFloppy, IconX, IconShield } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 

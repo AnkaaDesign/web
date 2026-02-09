@@ -11,7 +11,7 @@ import { getFilteredMenuForUser, getTablerIcon } from "../../utils";
 import { maskPhone, getPageIconName, isPageCadastrar } from "../../utils";
 import { fixNavigationPath } from "@/utils/route-validation";
 import { useAuth } from "@/contexts/auth-context";
-import { IconLogout, IconUser, IconSettings, IconChevronRight, IconMenu2, IconStarFilled, IconServer, IconExternalLink } from "@tabler/icons-react";
+import { IconLogout, IconUser, IconSettings, IconChevronRight, IconStarFilled, IconExternalLink } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationCenter } from "@/components/notification-center";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -94,6 +94,7 @@ import {
   IconArrowsUpDown,
   IconBolt,
   IconStar,
+  IconStarFilled,
   IconFolderShare,
   IconDatabaseImport,
   IconFolders,
@@ -113,7 +114,6 @@ import {
 // Simple icon mapping system
 const iconComponents: Record<string, any> = {
   IconDashboard,
-  IconMenu2,
   IconHome,
   IconBuilding,
   IconTool,
@@ -194,7 +194,6 @@ const iconComponents: Record<string, any> = {
   IconBolt,
   IconStar,
   IconStarFilled,
-  IconServer,
   IconFolderShare,
   IconDatabaseImport,
   IconFolders,
@@ -736,7 +735,6 @@ export const Sidebar = memo(() => {
       let top = rect.top;
 
       // Add viewport boundary checking for popover
-      const estimatedPopoverHeight = 400;
       const minPadding = 8;
       const viewport = {
         width: window.innerWidth,

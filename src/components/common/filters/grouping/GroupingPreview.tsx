@@ -2,8 +2,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { IconChevronRight } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { GroupByField } from "./GroupBySelector";
-import { Aggregation } from "./AggregationSelector";
+import type { GroupByField } from "./GroupBySelector";
+import type { Aggregation } from "./AggregationSelector";
 
 export interface GroupingPreviewProps {
   groups: GroupByField[];
@@ -15,7 +15,7 @@ export interface GroupingPreviewProps {
 export function GroupingPreview({
   groups,
   aggregations,
-  sampleData = [],
+  sampleData: _sampleData = [],
   className,
 }: GroupingPreviewProps) {
   if (groups.length === 0) {

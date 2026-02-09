@@ -18,7 +18,7 @@ interface MaxQuantityInputProps {
 
 export function MaxQuantityInput({
   disabled,
-  currentValue,
+  currentValue: _currentValue,
   isManual: fallbackIsManual = false,
 }: MaxQuantityInputProps) {
   const form = useFormContext();

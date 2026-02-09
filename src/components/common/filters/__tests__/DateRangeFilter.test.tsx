@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { DateRangeFilter, DateRange } from '../DateRangeFilter';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import type { DateRange } from '../DateRangeFilter';
+import { DateRangeFilter } from '../DateRangeFilter';
 
 describe('DateRangeFilter', () => {
   const mockOnChange = vi.fn();
@@ -235,7 +234,6 @@ describe('DateRangeFilter', () => {
     });
 
     it('should call onChange with undefined when clear is clicked', async () => {
-      const user = userEvent.setup();
       const value: DateRange = {
         from: new Date('2024-01-01'),
         to: new Date('2024-01-31'),

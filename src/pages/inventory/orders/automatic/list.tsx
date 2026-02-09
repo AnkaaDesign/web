@@ -27,7 +27,6 @@ import { useToast } from '@/hooks/common/use-toast';
 import { formatCurrency, formatNumberWithDecimals } from '@/utils/number';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { TABLE_LAYOUT } from '@/components/ui/table-constants';
 import { TableSearchInput } from '@/components/ui/table-search-input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';

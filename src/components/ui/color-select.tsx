@@ -26,7 +26,7 @@ export function ColorSelect({
   disabled = false,
   searchable = true,
 }: ColorSelectProps) {
-  const renderOption = React.useCallback((option: ColorSelectOption, isSelected: boolean) => {
+  const renderOption = React.useCallback((option: ColorSelectOption, _isSelected: boolean) => {
     return (
       <div className="flex items-center gap-3">
         <div className="w-6 h-6 rounded border border-gray-300 shadow-sm flex-shrink-0" style={{ backgroundColor: option.color }} />

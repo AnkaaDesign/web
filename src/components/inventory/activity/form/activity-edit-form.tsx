@@ -131,9 +131,6 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
 
   const isSubmitting = updateMutation.isPending;
 
-  // Watch the operation field for conditional rendering
-  const operationValue = form.watch("operation");
-
   // Track form state changes for submit button in parent
   useEffect(() => {
     if (onFormStateChange) {

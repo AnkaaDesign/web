@@ -1,7 +1,7 @@
 import type { Item } from "../../../../types";
 import { determineStockLevel, getStockLevelMessage } from "../../../../utils";
 import { STOCK_LEVEL_LABELS, ORDER_STATUS, STOCK_LEVEL } from "../../../../constants";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { IconAlertTriangleFilled } from "@tabler/icons-react";
 

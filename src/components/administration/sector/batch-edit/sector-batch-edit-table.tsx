@@ -1,7 +1,7 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, useMemo } from "react";
-import { IconCheck, IconLoader2, IconAlertTriangle, IconEdit } from "@tabler/icons-react";
+import { useState } from "react";
+import { IconCheck, IconLoader2 } from "@tabler/icons-react";
 
 import type { Sector } from "../../../../types";
 import { sectorBatchUpdateSchema, type SectorBatchUpdateFormData } from "../../../../schemas";
@@ -13,8 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Combobox } from "@/components/ui/combobox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 
 interface SectorBatchEditTableProps {
   sectors: Sector[];
@@ -23,7 +21,7 @@ interface SectorBatchEditTableProps {
 }
 
 export function SectorBatchEditTable({ sectors, onSubmit, isSubmitting = false }: SectorBatchEditTableProps) {
-  const [validationErrors, setValidationErrors] = useState<Record<number, string[]>>({});
+  const [_validationErrors, setValidationErrors] = useState<Record<number, string[]>>({});
 
   const form = useForm<SectorBatchUpdateFormData>({
     resolver: zodResolver(sectorBatchUpdateSchema),
@@ -42,29 +40,6 @@ export function SectorBatchEditTable({ sectors, onSubmit, isSubmitting = false }
     control: form.control,
     name: "sectors",
   });
-
-  // Calculate changes in real time
-  const changedSectorsInfo = useMemo(() => {
-    const watchedSectors = form.watch("sectors");
-    const changes = watchedSectors
-      .map((sectorData, index) => {
-        const original = sectors[index];
-        const hasChanges = sectorData.data.name !== original.name || sectorData.data.privileges !== original.privileges;
-
-        return {
-          index,
-          hasChanges,
-          original,
-          current: sectorData.data,
-        };
-      })
-      .filter((item) => item.hasChanges);
-
-    return {
-      count: changes.length,
-      changes,
-    };
-  }, [form.watch("sectors"), sectors]);
 
   // Validate individual sector names
   const validateSectorName = (name: string, index: number): string[] => {

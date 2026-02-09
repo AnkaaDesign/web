@@ -16,7 +16,6 @@ function stringSimilarity(str1: string, str2: string): number {
 
   // Use Levenshtein distance for fuzzy matching
   const longer = s1.length > s2.length ? s1 : s2;
-  const shorter = s1.length > s2.length ? s2 : s1;
 
   if (longer.length === 0) return 1;
 

@@ -7,16 +7,13 @@ import { useUserBatchMutations } from "../../../../hooks";
 import { UserBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { USER_STATUS, USER_STATUS_LABELS, routes } from "../../../../constants";
 import type { UserBatchEditFormData } from "./types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { IconLoader2, IconDeviceFloppy, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { CpfCell } from "./cells/cpf-cell";
@@ -56,7 +53,7 @@ interface UserBatchEditTableProps {
   onCancel: () => void;
 }
 
-export function UserBatchEditTable({ users, onCancel }: UserBatchEditTableProps) {
+export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEditTableProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState<BatchOperationResult<User, User> | null>(null);
@@ -265,7 +262,7 @@ export function UserBatchEditTable({ users, onCancel }: UserBatchEditTableProps)
                                 <FormControl>
                                   <Input
                                     value={field.value || ""}
-                                    onChange={(value) => {
+                                    onChange={(value: string | number | null) => {
                                       field.onChange(value);
                                     }}
                                     name={field.name}
@@ -293,7 +290,7 @@ export function UserBatchEditTable({ users, onCancel }: UserBatchEditTableProps)
                                 <FormControl>
                                   <Input
                                     value={field.value || ""}
-                                    onChange={(value) => {
+                                    onChange={(value: string | number | null) => {
                                       field.onChange(value);
                                     }}
                                     name={field.name}

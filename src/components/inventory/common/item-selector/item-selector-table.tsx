@@ -1,8 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import type { MouseEvent } from "react";
 
-// Stable no-op function to prevent ref composition loops in Radix Checkbox
-const NOOP = () => {};
 import { IconFilter, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
 import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
 import { Button } from "@/components/ui/button";
@@ -46,7 +44,6 @@ import { extractActiveFilters, createFilterRemover } from "./item-selector-filte
 export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   selectedItems,
   onSelectItem,
-  onSelectAll,
   onBatchSelectItems,
   className,
   quantities = {},
@@ -62,7 +59,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   storageKey,
   defaultColumns,
   additionalFilters = {},
-  enableAdvancedFilters = true,
+  enableAdvancedFilters: _enableAdvancedFilters = true,
   // State management props
   page: pageProp,
   pageSize: pageSizeProp,
@@ -114,7 +111,6 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
     getSortOrder: localGetSortOrder,
     showSelectedOnly: localShowSelectedOnly,
     toggleShowSelectedOnly: localToggleShowSelectedOnly,
-    selectionCount,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,

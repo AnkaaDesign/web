@@ -4,31 +4,25 @@ import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, ORDER
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useInventoryDashboard, useOrders, useBorrows, usePpeDeliveries, useItems, useSuppliers, useActivities } from "../../hooks";
 import { useNavigate } from "react-router-dom";
-import { formatCurrency, formatNumber } from "../../utils";
-import { useState, useMemo, useEffect } from "react";
+import { formatCurrency } from "../../utils";
+import { useState, useMemo } from "react";
 import {
   IconPackage,
   IconPlus,
   IconArrowUp,
   IconArrowDown,
   IconActivity,
-  IconClock,
   IconAlertTriangle,
   IconTrendingUp,
   IconTrendingDown,
   IconBuildingStore,
-  IconBoxSeam,
   IconBarcode,
   IconTag,
   IconRefresh,
   IconCurrencyDollar,
-  IconExclamationCircle,
   IconShoppingCart,
-  IconUsers,
-  IconExternalLink,
   IconTool,
   IconShieldCheck,
-  IconFileText,
   IconChartBar,
   IconChartPie,
 } from "@tabler/icons-react";
@@ -41,14 +35,11 @@ import {
   AnalysisCard,
   TimePeriodSelector,
   type Activity,
-  type PatternData,
   type AnalysisData,
 } from "@/components/dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export const InventoryRootPage = () => {
   const navigate = useNavigate();

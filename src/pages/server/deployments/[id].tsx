@@ -122,7 +122,6 @@ const InfoRow = ({ icon: Icon, label, value, valueClassName }: InfoRowProps) => 
 
 export const DeploymentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
 
   usePageTracker({
     title: "Detalhes da Implantação",

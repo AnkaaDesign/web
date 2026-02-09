@@ -5,8 +5,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconCalendar, IconPlus } from "@tabler/icons-react";
 import { MaintenanceScheduleList } from "@/components/inventory/maintenance/schedule/maintenance-schedule-list";
-import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
-import { cn } from "@/lib/utils";
 
 export function MaintenanceSchedulePage() {
   const navigate = useNavigate();

@@ -6,12 +6,12 @@
  */
 
 import {
-  ChartConfiguration,
   createChartConfig,
   createSeriesConfig,
   createAxisConfig,
   createDataSourceConfig,
 } from './chart-config';
+import type { ChartConfiguration } from './chart-config';
 
 // ============================================================================
 // Inventory Charts

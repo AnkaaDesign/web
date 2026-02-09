@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { usePaintBrandsForSelection } from "../../../hooks";
 import { IconBrandApple } from "@tabler/icons-react";
 

@@ -88,7 +88,7 @@ export function FilterIndicators({ filters, onClearAll, className }: FilterIndic
 }
 
 // Helper function to determine icon based on filter type
-function getIconForFilter(key: string, value: any): React.ReactNode | undefined {
+function getIconForFilter(key: string, _value: any): React.ReactNode | undefined {
   switch (key) {
     case "searchingFor":
       return renderFilterIcon("search");

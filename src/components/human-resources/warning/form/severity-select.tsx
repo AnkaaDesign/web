@@ -1,6 +1,5 @@
 import { IconAlertTriangle } from "@tabler/icons-react";
 
-import type { WarningCreateFormData, WarningUpdateFormData } from "../../../../schemas";
 import { WARNING_SEVERITY_LABELS } from "../../../../constants";
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";

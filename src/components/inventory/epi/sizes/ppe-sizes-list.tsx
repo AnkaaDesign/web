@@ -1,6 +1,5 @@
 import { useRef, useMemo, useState, useCallback } from "react";
 import { usePositions, useSectors } from "../../../../hooks";
-import type { User } from "../../../../types";
 import type { UserGetManyFormData } from "../../../../schemas";
 import { USER_STATUS } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";

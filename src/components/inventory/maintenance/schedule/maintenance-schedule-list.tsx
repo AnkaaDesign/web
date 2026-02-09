@@ -55,7 +55,7 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
   const { updateMutation, deleteMutation } = useMaintenanceScheduleMutations();
 
   // State to hold current page items and total count from the table
-  const [tableData, setTableData] = useState<{ items: MaintenanceSchedule[]; totalRecords: number }>({
+  const [_tableData, setTableData] = useState<{ items: MaintenanceSchedule[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });
@@ -260,15 +260,6 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
       }
     };
   }, [debouncedSearch]);
-
-  // Handle search
-  const handleSearch = useCallback(
-    (value: string) => {
-      setDisplaySearchText(value); // Immediate UI update
-      debouncedSearch(value); // Debounced API call
-    },
-    [debouncedSearch]
-  );
 
   // Context menu handlers
   const handleBulkEdit = (schedules: MaintenanceSchedule[]) => {

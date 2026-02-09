@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { CPFInput } from "@/components/ui/cpf-input";
 import { CnpjInput } from "@/components/ui/cnpj-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -57,7 +57,6 @@ export function FormCPFCNPJInput<T extends Record<string, any>>({
   // Get error messages from both fields and root-level errors
   const cpfError = form.formState.errors[cpfFieldName];
   const cnpjError = form.formState.errors[cnpjFieldName];
-  const rootError = form.formState.errors.root;
   const hasError = !!(cpfError || cnpjError);
 
   // Get the appropriate error message, prioritizing field-specific errors

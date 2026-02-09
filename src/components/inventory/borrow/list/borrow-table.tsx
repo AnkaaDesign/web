@@ -74,7 +74,7 @@ const formatDateWithRelative = (date: Date | string) => {
 
 export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDelete, filters = {}, onDataChange }: BorrowTableProps) {
   const navigate = useNavigate();
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: _isAuthLoading } = useAuth();
   const { deleteMutation } = useBorrowMutations();
   const { batchDelete, batchUpdateAsync } = useBorrowBatchMutations();
 
@@ -99,7 +99,7 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
     showSelectedOnly,
     setPage,
     setPageSize,
-    toggleSelection,
+    toggleSelection: _toggleSelection,
     toggleSelectAll,
     toggleSort,
     getSortDirection,

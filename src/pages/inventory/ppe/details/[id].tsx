@@ -2,8 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useItem } from "../../../../hooks";
 import { routes, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { Button } from "@/components/ui/button";
-import { IconAlertTriangle, IconShield, IconRefresh, IconEdit } from "@tabler/icons-react";
-import { toast } from "sonner";
+import { IconAlertTriangle, IconRefresh, IconEdit } from "@tabler/icons-react";
 import { SpecificationsCard } from "@/components/inventory/item/detail/specifications-card";
 import { RelatedItemsCard } from "@/components/inventory/item/detail/related-items-card";
 import { ActivityHistoryCard } from "@/components/inventory/item/detail/activity-history-card";
@@ -11,7 +10,6 @@ import { MetricsCard } from "@/components/inventory/item/detail/metrics-card";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { PageHeader } from "@/components/ui/page-header";
 import { PpeInfoCard } from "@/components/inventory/item/detail/ppe-info-card";
-import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 const EpiDetailsPage = () => {
   const { id } = useParams<{ id: string }>();

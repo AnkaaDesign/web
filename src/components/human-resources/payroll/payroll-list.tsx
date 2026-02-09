@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -128,7 +128,7 @@ export function PayrollList({ className }: PayrollListProps) {
   const { mutate: finalizeMonth, isPending: isFinalizing } = useFinalizePayrollMonth();
 
   // Fetch sectors for filtering
-  const { data: sectorsData } = useSectors({
+  const { data: _sectorsData } = useSectors({
     orderBy: { name: "asc" },
     limit: 100
   });

@@ -16,12 +16,13 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  Legend,
   Label,
   Sector,
 } from 'recharts';
-import { ChartWrapper, ExportData } from './base/ChartWrapper';
-import { ChartLegend, LegendItem } from './base/ChartLegend';
+import { ChartWrapper } from './base/ChartWrapper';
+import type { ExportData } from './base/ChartWrapper';
+import { ChartLegend } from './base/ChartLegend';
+import type { LegendItem } from './base/ChartLegend';
 import { COLOR_PALETTES, getColorFromPalette } from './utils/chart-colors';
 import { formatNumber, formatPercentage } from './utils/chart-formatters';
 import { convertToPercentage } from './utils/chart-data-helpers';
@@ -90,9 +91,6 @@ const renderActiveShape = (props: any) => {
     startAngle,
     endAngle,
     fill,
-    payload,
-    percent,
-    value,
   } = props;
 
   return (

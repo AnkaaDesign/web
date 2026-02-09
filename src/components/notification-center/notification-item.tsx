@@ -59,7 +59,6 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   notification,
   onClick,
   onRemindLater,
-  onDismiss,
 }) => {
   const isUnread = !notification.seenBy || notification.seenBy.length === 0;
   const icon = getNotificationIcon(notification.type);

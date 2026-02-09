@@ -3,9 +3,9 @@ import { useWatch, useFormContext } from "react-hook-form";
 import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
-import { IconUser, IconBuilding } from "@tabler/icons-react";
 
-interface CpfCnpjCellProps<TFieldValues extends FieldValues = FieldValues> {
+
+interface CpfCnpjCellProps<_TFieldValues extends FieldValues = FieldValues> {
   control: any;
   index: number;
   disabled?: boolean;
@@ -13,7 +13,7 @@ interface CpfCnpjCellProps<TFieldValues extends FieldValues = FieldValues> {
 
 type DocumentType = "cpf" | "cnpj";
 
-export function CpfCnpjCell<TFieldValues extends FieldValues = FieldValues>({ control, index, disabled }: CpfCnpjCellProps<TFieldValues>) {
+export function CpfCnpjCell<_TFieldValues extends FieldValues = FieldValues>({ control, index, disabled }: CpfCnpjCellProps<_TFieldValues>) {
   const { setValue, getValues } = useFormContext<TFieldValues>();
 
   // Watch the current values to determine initial document type

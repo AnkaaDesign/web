@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { IconFilter } from "@tabler/icons-react";
 
 import type { Warning, WarningGetManyResponse } from "../../../../types";
@@ -13,7 +13,6 @@ import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { useTableState } from "@/hooks/common/use-table-state";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
-import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { WarningTable } from "./warning-table";
 import { WarningFilters } from "./warning-filters";
 
@@ -26,7 +25,7 @@ interface WarningListProps {
 const DEFAULT_PAGE_SIZE = 40;
 
 export function WarningList({ selectedSeverity, onDataUpdate, className }: WarningListProps) {
-  const [tableData, setTableData] = useState<{ warnings: Warning[]; totalRecords: number }>({ warnings: [], totalRecords: 0 });
+  const [_tableData, setTableData] = useState<{ warnings: Warning[]; totalRecords: number }>({ warnings: [], totalRecords: 0 });
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
   // Use the standardized table state hook

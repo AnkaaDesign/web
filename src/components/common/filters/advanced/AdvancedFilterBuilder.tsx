@@ -1,18 +1,18 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IconPlus, IconTrash, IconX, IconCheck } from "@tabler/icons-react";
 import { FilterCondition } from "./FilterCondition";
-import {
+import type {
   FilterDefinition,
-  FilterGroup,
   FilterFieldDefinition,
+  FilterCondition as FilterConditionType,
+} from "@/utils/table-filter-utils";
+import {
   createFilterGroup,
   addConditionToGroup,
   removeConditionFromGroup,
   getValidOperatorsForDataType,
-  FilterCondition as FilterConditionType,
 } from "@/utils/table-filter-utils";
 import { cn } from "@/lib/utils";
 

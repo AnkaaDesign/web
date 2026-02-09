@@ -1,7 +1,6 @@
 import { useMemo, useCallback, useRef } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import type { PaintBrandCreateFormData, PaintBrandUpdateFormData } from "../../../../schemas";
 import { getItems } from "../../../../api-client";
 import type { Item } from "../../../../types";
 

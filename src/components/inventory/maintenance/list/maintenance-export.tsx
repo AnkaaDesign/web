@@ -74,7 +74,7 @@ export function MaintenanceExport({ className, filters, currentMaintenance = [],
     }
   };
 
-  const handleExport = async (format: ExportFormat, items: Maintenance[]) => {
+  const handleExport = async (_format: ExportFormat, _items: Maintenance[]) => {
     try {
       // The BaseExportPopover component handles the actual export logic
       // including CSV, Excel, and PDF generation// If you need custom export logic, you can implement it here

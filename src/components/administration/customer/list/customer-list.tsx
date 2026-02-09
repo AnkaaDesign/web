@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useCustomerBatchMutations } from "../../../../hooks";
 import type { Customer } from "../../../../types";
@@ -57,7 +57,7 @@ export function CustomerList({ className }: CustomerListProps) {
   const [mergeDialog, setMergeDialog] = useState<{ open: boolean; customers: Customer[] }>({ open: false, customers: [] });
 
   // Merge mutation
-  const { mutate: mergeMutation, isPending: isMerging } = useMutation({
+  const { mutate: mergeMutation } = useMutation({
     mutationFn: mergeCustomers,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -187,7 +187,6 @@ export function CustomerList({ className }: CustomerListProps) {
     setSearch,
     clearAllFilters,
     queryFilters: baseQueryFilters,
-    hasActiveFilters,
   } = useTableFilters<CustomerGetManyFormData>({
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
