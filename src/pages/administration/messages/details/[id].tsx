@@ -238,7 +238,7 @@ export const MessageDetailsPage = () => {
                   )}
 
                   {/* Stats Section */}
-                  <div className="pt-3 mt-3 border-t border-border/40">
+                  <div className="pt-3 mt-3 border-t border-border">
                     <div className="text-sm font-medium mb-2">Estatísticas</div>
                     {isLoadingStats ? (
                       <div className="space-y-2">
@@ -279,7 +279,7 @@ export const MessageDetailsPage = () => {
                   <CardTitle>Prévia do Conteúdo</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="border border-border/40 rounded-lg px-4 py-3 bg-card">
+                  <div className="border border-border rounded-lg px-4 py-3 bg-card">
                     {(() => {
                       // Handle content - API returns { blocks: [...], version: "1.0" }
                       let blocks = message.content?.blocks || message.content;

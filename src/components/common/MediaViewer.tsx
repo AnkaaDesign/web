@@ -62,7 +62,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const touchStartRef = useRef({ x: 0, y: 0 });
 
   const currentItem = items[currentIndex];

@@ -15,9 +15,9 @@ import { useState } from "react";
 import type { Cut } from "../../../../types";
 import { CUT_REQUEST_REASON, CUT_ORIGIN } from "../../../../constants";
 import { CUT_REQUEST_REASON_LABELS, CUT_TYPE_LABELS, CUT_STATUS_LABELS, getBadgeVariant } from "../../../../constants";
-import { useCutMutations } from "../../../../hooks";
 import { useToast } from "@/hooks/common/use-toast";
 import { formatDate } from "../../../../utils";
+import { useCutBatchMutations } from "../../../../hooks/production/use-cut";
 
 const requestSchema = z.object({
   quantity: z.coerce.number().int("Quantidade deve ser um número inteiro").min(1, "Quantidade deve ser maior que zero").max(100, "Quantidade não pode exceder 100"),
@@ -40,7 +40,7 @@ export function CutRequestModal({ open, onOpenChange, cutItem, onSuccess }: CutR
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { batchCreate } = useCutMutations();
+  const { batchCreateAsync } = useCutBatchMutations();
 
   const form = useForm<RequestFormData>({
     resolver: zodResolver(requestSchema),
@@ -58,7 +58,7 @@ export function CutRequestModal({ open, onOpenChange, cutItem, onSuccess }: CutR
       toast({
         title: "Erro",
         description: "Nenhum corte selecionado.",
-        variant: "destructive",
+        variant: "error",
       });
       return;
     }
@@ -77,19 +77,18 @@ export function CutRequestModal({ open, onOpenChange, cutItem, onSuccess }: CutR
         ...(cutItem.taskId && { taskId: cutItem.taskId }),
       }));
 
-      const response = await batchCreate.mutateAsync({
-        data: { cuts },
-        include: {
-          file: true,
-          task: {
-            include: {
-              customer: true,
-            },
+      const response = await batchCreateAsync({
+        cuts,
+      }, {
+        file: true,
+        task: {
+          include: {
+            customer: true,
           },
-          parentCut: {
-            include: {
-              file: true,
-            },
+        },
+        parentCut: {
+          include: {
+            file: true,
           },
         },
       });
@@ -99,14 +98,16 @@ export function CutRequestModal({ open, onOpenChange, cutItem, onSuccess }: CutR
         description: `${quantity} novo(s) corte(s) solicitado(s) com sucesso.`,
       });
 
-      onSuccess?.(response.data.success);
+      if (response.data) {
+        onSuccess?.(response.data.success);
+      }
       onOpenChange(false);
       form.reset();
     } catch (error) {
       toast({
         title: "Erro",
         description: "Erro ao solicitar novos cortes.",
-        variant: "destructive",
+        variant: "error",
       });
     } finally {
       setIsSubmitting(false);

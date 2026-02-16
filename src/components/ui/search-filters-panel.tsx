@@ -8,12 +8,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { Badge } from "./badge";
 import { Separator } from "./separator";
 import { Checkbox } from "./checkbox";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./card";
 import {
   IconFilter,
   IconX,
   IconChevronDown,
-  IconSave,
+  IconDeviceFloppy,
   IconCheck,
   IconClock,
   IconCalendar,
@@ -32,7 +31,7 @@ import {
   LocalStorageFilterPresets,
 } from "@/utils/table-filter-utils";
 
-interface SearchFiltersPanelProps<TFilters = Record<string, any>> {
+interface SearchFiltersPanelProps<TFilters extends Record<string, any> = Record<string, any>> {
   /** Search hook return object */
   searchHook: UseAdvancedSearchReturn<TFilters>;
   /** Available filter field definitions */
@@ -70,8 +69,10 @@ export function SearchFiltersPanel<TFilters extends Record<string, any> = Record
   className,
   title = "Busca e Filtros",
 }: SearchFiltersPanelProps<TFilters>) {
-  const { tableState, setFilters, clearAllFilters } = searchHook;
-  const { filters, hasActiveFilters } = tableState;
+  const { tableState } = searchHook;
+  const { filters: filtersObject, hasActiveFilters } = tableState.state;
+  const { setFilters, clearAllFilters } = tableState.filters;
+  const filters = filtersObject;
 
   // Local state
   const [isOpen, setIsOpen] = useState(false);
@@ -87,9 +88,9 @@ export function SearchFiltersPanel<TFilters extends Record<string, any> = Record
     return extractActiveFilters({
       filters,
       onRemoveFilter: (key: string) => {
-        const newFilters = { ...filters };
+        const newFilters = { ...filters } as Record<string, any>;
         delete newFilters[key];
-        setFilters(newFilters);
+        setFilters(newFilters as Partial<TFilters>);
       },
       lookupData,
     });
@@ -262,7 +263,7 @@ export function SearchFiltersPanel<TFilters extends Record<string, any> = Record
                     <div className="flex gap-2">
                       {!showPresetForm ? (
                         <Button variant="outline" size="sm" onClick={() => setShowPresetForm(true)} className="h-7 text-xs flex-1">
-                          <IconSave className="h-3 w-3 mr-1" />
+                          <IconDeviceFloppy className="h-3 w-3 mr-1" />
                           Salvar filtros atuais
                         </Button>
                       ) : (
@@ -312,21 +313,21 @@ export function SearchFiltersPanel<TFilters extends Record<string, any> = Record
                     <div key={field.key}>
                       {renderFilter ? (
                         renderFilter(field, () => {
-                          const newFilters = { ...filters };
+                          const newFilters = { ...filters } as Record<string, any>;
                           delete newFilters[field.key];
-                          setFilters(newFilters);
+                          setFilters(newFilters as Partial<TFilters>);
                         })
                       ) : (
                         <DefaultFilterRenderer
                           field={field}
-                          value={filters[field.key]}
+                          value={(filters as Record<string, any>)[field.key]}
                           onChange={(value) => {
                             if (value === undefined || value === null || value === "") {
-                              const newFilters = { ...filters };
+                              const newFilters = { ...filters } as Record<string, any>;
                               delete newFilters[field.key];
-                              setFilters(newFilters);
+                              setFilters(newFilters as Partial<TFilters>);
                             } else {
-                              setFilters({ ...filters, [field.key]: value });
+                              setFilters({ ...filters, [field.key]: value } as Partial<TFilters>);
                             }
                           }}
                         />
@@ -395,7 +396,7 @@ function DefaultFilterRenderer({ field, value, onChange }: DefaultFilterRenderer
             type="number"
             placeholder={`Filtrar por ${field.label.toLowerCase()}...`}
             value={value || ""}
-            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
+            onChange={(val) => onChange(val ? Number(val) : undefined)}
             className="h-8 text-xs"
           />
         </div>
@@ -459,7 +460,7 @@ function DefaultFilterRenderer({ field, value, onChange }: DefaultFilterRenderer
           <Input
             type="date"
             value={value instanceof Date ? value.toISOString().split("T")[0] : value || ""}
-            onChange={(e) => onChange(e.target.value ? new Date(e.target.value) : undefined)}
+            onChange={(val) => onChange(val ? new Date(val as string) : undefined)}
             className="h-8 text-xs"
           />
         </div>
@@ -472,7 +473,7 @@ function DefaultFilterRenderer({ field, value, onChange }: DefaultFilterRenderer
           <Input
             placeholder={`Filtrar por ${field.label.toLowerCase()}...`}
             value={String(value || "")}
-            onChange={(e) => onChange(e.target.value || undefined)}
+            onChange={(val) => onChange(val || undefined)}
             className="h-8 text-xs"
           />
         </div>

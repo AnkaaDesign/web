@@ -82,7 +82,7 @@ export const RowBlockEditor = ({ block, onUpdate }: RowBlockEditorProps) => {
 
   const handleUpdateBlock = (index: number, updates: Partial<ContentBlock>) => {
     const updatedBlocks = [...block.blocks];
-    updatedBlocks[index] = { ...updatedBlocks[index], ...updates };
+    updatedBlocks[index] = { ...updatedBlocks[index], ...updates } as ContentBlock;
     onUpdate({ blocks: updatedBlocks });
   };
 

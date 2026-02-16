@@ -193,19 +193,19 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
     return (
       <div className={cn("flex flex-col h-full overflow-hidden", className)}>
         <Form {...form}>
-          <div className="flex-1 overflow-auto border border-neutral-400 dark:border-border/40 rounded-md">
+          <div className="flex-1 overflow-auto border border-neutral-400 dark:border-border rounded-md">
             <table className="w-full border-collapse">
               {/* Header */}
               <thead className="sticky top-0 z-20 bg-background">
-                <tr className="border-b border-neutral-400 dark:border-border/40">
+                <tr className="border-b border-neutral-400 dark:border-border">
                   {/* Date column - sticky left */}
-                  <th className="text-left p-2 font-medium text-sm sticky left-0 bg-background z-30 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border/40">
+                  <th className="text-left p-2 font-medium text-sm sticky left-0 bg-background z-30 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border">
                     Data
                   </th>
 
                   {/* Time columns */}
                   {Object.entries(TIME_FIELD_LABELS).map(([field, label]) => (
-                    <th key={field} className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40">
+                    <th key={field} className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">
                       {label}
                     </th>
                   ))}
@@ -216,7 +216,7 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
                       key={field}
                       className={cn(
                         "text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28",
-                        index < array.length - 1 ? "border-r border-neutral-400 dark:border-border/40" : "border-neutral-400 dark:border-border/40",
+                        index < array.length - 1 ? "border-r border-neutral-400 dark:border-border" : "border-neutral-400 dark:border-border",
                       )}
                     >
                       {label}
@@ -238,7 +238,7 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
                     <tr
                       key={field.id}
                       className={cn(
-                        "border-b border-neutral-400 dark:border-border/40 transition-colors",
+                        "border-b border-neutral-400 dark:border-border transition-colors",
                         isChanged && "bg-yellow-50 dark:bg-yellow-900/20",
                         isWeekendDay && "bg-red-50 dark:bg-red-900/10",
                         !isChanged && !isWeekendDay && index % 2 === 0 && "bg-muted/50",
@@ -253,7 +253,7 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
                       {/* Date cell - sticky left */}
                       <td
                         className={cn(
-                          "p-2 sticky left-0 bg-inherit z-10 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border/40",
+                          "p-2 sticky left-0 bg-inherit z-10 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border",
                           isChanged && "bg-yellow-50 dark:bg-yellow-900/20",
                           isWeekendDay && "bg-red-50 dark:bg-red-900/10",
                           !isChanged && !isWeekendDay && index % 2 === 0 && "bg-muted/50",
@@ -274,7 +274,7 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
                         return (
                           <td
                             key={timeField}
-                            className={cn("p-1 w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40", isModified && "bg-yellow-100 dark:bg-yellow-900/30")}
+                            className={cn("p-1 w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border", isModified && "bg-yellow-100 dark:bg-yellow-900/30")}
                             onContextMenu={(e) => {
                               if (onRowContextMenu) {
                                 e.preventDefault();
@@ -286,24 +286,38 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
                             <FormField
                               control={form.control}
                               name={`entries.${index}.${timeField}` as any}
-                              render={({ field: formField }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <div className="flex justify-center">
-                                      <TimeInput
-                                        {...formField}
-                                        value={formField.value as string | null}
-                                        onChange={(value) => {
-                                          formField.onChange(value);
-                                          handleFieldChange(field.id, timeField, value);
-                                        }}
-                                        onBlur={() => handleTimeBlur(field.id, timeField, formField.value as string | null)}
-                                        className="h-8 w-14 text-center px-1"
-                                      />
-                                    </div>
-                                  </FormControl>
-                                </FormItem>
-                              )}
+                              render={({ field: formField }) => {
+                                const timeValue = typeof formField.value === "string" && formField.value ? (() => {
+                                  const [hours, minutes] = formField.value.split(":").map(Number);
+                                  if (!isNaN(hours) && !isNaN(minutes)) {
+                                    const date = new Date();
+                                    date.setHours(hours, minutes, 0, 0);
+                                    return date;
+                                  }
+                                  return null;
+                                })() : null;
+
+                                return (
+                                  <FormItem>
+                                    <FormControl>
+                                      <div className="flex justify-center">
+                                        <TimeInput
+                                          value={timeValue}
+                                          onChange={(value) => {
+                                            const timeString = value instanceof Date
+                                              ? `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`
+                                              : null;
+                                            formField.onChange(timeString);
+                                            handleFieldChange(field.id, timeField, timeString);
+                                          }}
+                                          onBlur={() => handleTimeBlur(field.id, timeField, formField.value as string | null)}
+                                          className="h-8 w-14 text-center px-1"
+                                        />
+                                      </div>
+                                    </FormControl>
+                                  </FormItem>
+                                );
+                              }}
                             />
                           </td>
                         );
@@ -318,7 +332,7 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
                             key={checkboxField}
                             className={cn(
                               "p-1 text-center w-28 min-w-28 max-w-28",
-                              cbIndex < array.length - 1 ? "border-r border-neutral-400 dark:border-border/40" : "border-neutral-400 dark:border-border/40",
+                              cbIndex < array.length - 1 ? "border-r border-neutral-400 dark:border-border" : "border-neutral-400 dark:border-border",
                               isModified && "bg-yellow-100 dark:bg-yellow-900/30",
                             )}
                           >

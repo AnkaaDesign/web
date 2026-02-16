@@ -17,14 +17,18 @@ export function DismissalDateInput({ disabled }: DismissalDateInputProps) {
       name="dismissedAt"
       render={({ field }) => (
         <DateTimeInput
-          field={field}
+          field={{
+            ...field,
+            value: field.value as Date | null,
+            onChange: (value) => field.onChange(value as Date | null),
+          }}
           label={
             <span className="flex items-center gap-1.5">
               <IconUserX className="h-4 w-4" />
               Data de Demissão
             </span>
           }
-          context="termination"
+          context="general"
           disabled={disabled}
           required={false}
           mode="date"

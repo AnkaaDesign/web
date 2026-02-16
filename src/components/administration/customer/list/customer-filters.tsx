@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
 import { IconFilter, IconX, IconBriefcase, IconMapPin, IconCalendarPlus } from "@tabler/icons-react";
+import type { DateRange } from "react-day-picker";
 import { useCustomerFilters } from "@/hooks/administration/use-customer-filters";
 import { BRAZILIAN_STATES, BRAZILIAN_STATE_NAMES } from "../../../../constants";
 
@@ -124,7 +125,10 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
               mode="multiple"
               options={stateOptions}
               value={localState.states || []}
-              onValueChange={(states: string[]) => setLocalState((prev) => ({ ...prev, states: states.length > 0 ? states : undefined }))}
+              onValueChange={(states: string | string[] | null | undefined) => {
+                const statesArray = Array.isArray(states) ? states : states ? [states] : [];
+                setLocalState((prev) => ({ ...prev, states: statesArray.length > 0 ? statesArray : undefined }));
+              }}
               placeholder="Selecione estados..."
               emptyText="Nenhum estado encontrado"
               searchPlaceholder="Buscar estados..."
@@ -152,11 +156,11 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
                 <Input
                   id="taskCountMin"
                   type="number"
-                  min="0"
+                  min={0}
                   placeholder="Valor mínimo"
                   value={localState.taskCount?.min?.toString() || ""}
                   onChange={(value: string | number | null) => {
-                    const strValue = value as string;
+                    const strValue = typeof value === 'number' ? value.toString() : value;
                     const min = strValue ? parseInt(strValue, 10) : undefined;
                     if (min !== undefined && isNaN(min)) return;
                     setLocalState((prev) => ({
@@ -177,11 +181,11 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
                 <Input
                   id="taskCountMax"
                   type="number"
-                  min="0"
+                  min={0}
                   placeholder="Sem limite"
                   value={localState.taskCount?.max?.toString() || ""}
                   onChange={(value: string | number | null) => {
-                    const strValue = value as string;
+                    const strValue = typeof value === 'number' ? value.toString() : value;
                     const max = strValue ? parseInt(strValue, 10) : undefined;
                     if (max !== undefined && isNaN(max)) return;
                     setLocalState((prev) => ({
@@ -219,14 +223,15 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAt?.gte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.createdAt?.lte) {
+                  onChange={(date: Date | DateRange | null) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.createdAt?.lte) {
                       setLocalState((prev) => ({ ...prev, createdAt: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         createdAt: {
-                          ...(date && { gte: date }),
+                          ...(dateValue && { gte: dateValue }),
                           ...(localState.createdAt?.lte && { lte: localState.createdAt.lte }),
                         },
                       }));
@@ -241,15 +246,16 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAt?.lte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.createdAt?.gte) {
+                  onChange={(date: Date | DateRange | null) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.createdAt?.gte) {
                       setLocalState((prev) => ({ ...prev, createdAt: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         createdAt: {
                           ...(localState.createdAt?.gte && { gte: localState.createdAt.gte }),
-                          ...(date && { lte: date }),
+                          ...(dateValue && { lte: dateValue }),
                         },
                       }));
                     }

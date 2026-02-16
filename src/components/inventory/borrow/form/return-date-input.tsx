@@ -1,9 +1,6 @@
-import { useEffect } from "react";
 import { FormField } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { isAfter, isBefore, format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { toast } from "sonner";
+import { isAfter, isBefore } from "date-fns";
 
 interface ReturnDateInputProps {
   control: any;
@@ -20,39 +17,11 @@ export function ReturnDateInput({ control, disabled, borrowCreatedAt }: ReturnDa
     <FormField
       control={control}
       name="returnedAt"
-      render={({ field, fieldState, formState }) => {
-        // Real-time validation
-        useEffect(() => {
-          if (field.value) {
-            const returnDate = new Date(field.value);
-
-            // Validate return date is not in the future
-            if (isAfter(returnDate, today)) {
-              formState.setError("returnedAt", {
-                type: "manual",
-                message: "Data de devolução não pode ser no futuro",
-              });
-              toast.error("Data de devolução não pode ser no futuro");
-            }
-            // Validate return date is not before borrow date
-            else if (borrowDate && isBefore(returnDate, borrowDate)) {
-              formState.setError("returnedAt", {
-                type: "manual",
-                message: "Data de devolução não pode ser anterior à data do empréstimo",
-              });
-              toast.error("Data de devolução não pode ser anterior à data do empréstimo");
-            }
-            // Clear error if validation passes
-            else if (fieldState.error?.type === "manual") {
-              formState.clearErrors("returnedAt");
-            }
-          }
-        }, [field.value, borrowDate, today, formState, fieldState.error]);
-
+      render={({ field }) => {
         return (
           <DateTimeInput
             field={field}
-            context="return"
+            context="general"
             label="Data de Devolução"
             disabled={disabled}
             constraints={{
@@ -68,13 +37,6 @@ export function ReturnDateInput({ control, disabled, borrowCreatedAt }: ReturnDa
                 return false;
               },
             }}
-            description={
-              <div className="space-y-1">
-                <div>A data em que o item foi devolvido</div>
-                {borrowDate && <div className="text-sm text-muted-foreground">Emprestado em: {format(borrowDate, "PPP", { locale: ptBR })}</div>}
-                <div className="text-sm text-muted-foreground">Data máxima: {format(today, "PPP", { locale: ptBR })} (hoje)</div>
-              </div>
-            }
             onClear={() => field.onChange(null)}
           />
         );

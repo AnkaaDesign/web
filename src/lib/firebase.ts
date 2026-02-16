@@ -1,5 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { getMessaging, getToken, onMessage, type Messaging } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -19,8 +19,8 @@ const isConfigValid = () => {
 };
 
 // Initialize Firebase only if config is valid
-let app = null;
-let messaging = null;
+let app: FirebaseApp | null = null;
+let messaging: Messaging | null = null;
 
 try {
   if (isConfigValid()) {

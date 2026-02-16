@@ -17,7 +17,7 @@ interface TaskTableContextMenuProps {
   onAction: (action: TaskAction, tasks: Task[]) => void;
 }
 
-export type TaskAction = "start" | "finish" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkBaseFiles" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask" | "bulkServiceOrder" | "bulkLayout";
+export type TaskAction = "start" | "finish" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkBaseFiles" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask" | "bulkServiceOrder" | "bulkLayout" | "bulkDocuments";
 
 export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTableContextMenuProps) {
   const { user } = useAuth();

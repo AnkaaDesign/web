@@ -66,7 +66,7 @@ export const MessageListPage = () => {
     totalRecords: 0,
   });
 
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Debounced search
   const handleSearchChange = useCallback((value: string) => {
@@ -116,20 +116,6 @@ export const MessageListPage = () => {
         label: "Status",
         value: statusText,
         onRemove: () => setFilters((prev) => ({ ...prev, status: undefined })),
-      });
-    }
-
-    if (filters.priority?.length) {
-      const priorityLabels: Record<string, string> = {
-        low: "Baixa",
-        normal: "Normal",
-        high: "Alta",
-      };
-      const priorityText = filters.priority.map(p => priorityLabels[p] || p).join(", ");
-      indicators.push({
-        label: "Prioridade",
-        value: priorityText,
-        onRemove: () => setFilters((prev) => ({ ...prev, priority: undefined })),
       });
     }
 

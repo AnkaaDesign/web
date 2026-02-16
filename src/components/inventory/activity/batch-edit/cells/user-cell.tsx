@@ -11,7 +11,7 @@ interface UserCellProps {
 }
 
 export function UserCell({ control, index }: UserCellProps) {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
   const debouncedSearch = debounce((value: string) => {
@@ -58,9 +58,8 @@ export function UserCell({ control, index }: UserCellProps) {
               options={options}
               placeholder="Selecione um usuário"
               searchPlaceholder="Buscar usuário..."
-              onSearchChange={setSearchTerm}
-              isLoading={isLoading}
-              emptyMessage="Nenhum usuário encontrado"
+              loading={isLoading}
+              emptyText="Nenhum usuário encontrado"
               className="h-8 text-sm"
             />
           </FormControl>

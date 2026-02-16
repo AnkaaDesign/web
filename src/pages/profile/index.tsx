@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, Camera, Trash2, User as UserIcon, MapPin, Save, RefreshCw, Ruler, Bell } from "lucide-react";
+import { Loader2, Camera, Trash2, User as UserIcon, MapPin, Ruler } from "lucide-react";
+import { IconUser, IconBell, IconRefresh, IconDeviceFloppy } from "@tabler/icons-react";
 import { getProfile, updateProfile, uploadPhoto, deletePhoto } from "@/api-client";
 import type { User } from "@/types";
 import type { UserUpdateFormData } from "@/schemas";
@@ -142,7 +143,7 @@ export function ProfilePage() {
       const response = await updateProfile(data);
 
       if (response.success) {
-        setUser(response.data);
+        setUser(response.data ?? null);
       }
     } catch (error: any) {
       if (process.env.NODE_ENV !== 'production') {
@@ -182,7 +183,7 @@ export function ProfilePage() {
       const response = await uploadPhoto(file, user?.name);
 
       if (response.success) {
-        setUser(response.data);
+        setUser(response.data ?? null);
         toast.success("Foto de perfil atualizada com sucesso!");
       }
     } catch (error: any) {
@@ -201,7 +202,7 @@ export function ProfilePage() {
       const response = await deletePhoto();
 
       if (response.success) {
-        setUser(response.data);
+        setUser(response.data ?? null);
         toast.success("Foto de perfil removida com sucesso!");
       }
     } catch (error: any) {
@@ -236,7 +237,7 @@ export function ProfilePage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Meu Perfil"
-          icon={UserIcon}
+          icon={IconUser}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Meu Perfil" }
@@ -245,14 +246,14 @@ export function ProfilePage() {
             {
               key: "notifications",
               label: "Notificações",
-              icon: Bell,
+              icon: IconBell,
               onClick: () => window.location.href = routes.profileNotifications,
               variant: "outline",
             },
             {
               key: "refresh",
               label: "Atualizar Dados",
-              icon: RefreshCw,
+              icon: IconRefresh,
               onClick: handleRefresh,
               variant: "outline",
               disabled: isRefreshing,
@@ -261,7 +262,7 @@ export function ProfilePage() {
             {
               key: "save",
               label: "Salvar Alterações",
-              icon: Save,
+              icon: IconDeviceFloppy,
               onClick: handleSave,
               variant: "default",
               disabled: isSaving || !form.formState.isDirty,

@@ -73,7 +73,11 @@ export function MaintenanceEntitySelectors({ itemIds, onItemIdsChange }: Mainten
           debounceMs={300}
           mode="multiple"
           value={itemIds}
-          onValueChange={onItemIdsChange}
+          onValueChange={(value) => {
+            if (Array.isArray(value)) {
+              onItemIdsChange(value);
+            }
+          }}
           placeholder="Selecione os itens..."
           searchPlaceholder="Buscar itens..."
           searchable={true}

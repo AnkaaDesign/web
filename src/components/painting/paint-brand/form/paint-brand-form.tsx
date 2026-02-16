@@ -86,7 +86,7 @@ export function PaintBrandForm(props: PaintBrandFormProps) {
           const cleanedData = Object.entries(formData).reduce((acc, [key, value]) => {
             // Keep the value if it's not null, undefined, or empty string
             if (value !== null && value !== undefined && value !== "") {
-              acc[key as keyof PaintBrandCreateFormData] = value;
+              acc[key as keyof PaintBrandCreateFormData] = value as any;
             }
             return acc;
           }, {} as Partial<PaintBrandCreateFormData>);

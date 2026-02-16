@@ -58,8 +58,8 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
 
   // Default values for create mode - use null for optional fields to match schema expectations
   const createDefaults: WarningCreateFormData = {
-    severity: undefined,
-    category: undefined,
+    severity: "" as any,
+    category: "" as any,
     reason: "",
     description: "",
     isActive: true,
@@ -122,9 +122,9 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
   // Handle attachment file changes
   const handleAttachmentFilesChange = (files: FileWithPreview[]) => {
     setAttachmentFiles(files);
-    // Store the files in form state for submission (not the IDs)
+    // Store the files in local state for submission
     // IMPORTANT: Mark form as dirty when files change to enable submit button
-    form.setValue("attachmentFiles", files, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+    // Note: attachmentFiles is not part of the schema, files are handled separately via FormData
     // Clear attachmentIds when new files are selected
     form.setValue("attachmentIds", [], { shouldDirty: true, shouldTouch: true });
   };
@@ -150,13 +150,6 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
   const { isValid, isDirty, errors } = form.formState;
 
   const isSubmitting = props.isSubmitting || form.formState.isSubmitting;
-
-  // Expose form methods via ref
-  useImperativeHandle(ref, () => ({
-    submit: () => form.handleSubmit(handleSubmit)(),
-    isSubmitting,
-    isValid,
-  }), [form, handleSubmit, isSubmitting, isValid]);
 
   // URL state persistence for create mode
   const debouncedUpdateUrl = useMemo(
@@ -307,6 +300,13 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
       }
     }
   };
+
+  // Expose form methods via ref
+  useImperativeHandle(ref, () => ({
+    submit: () => form.handleSubmit(handleSubmit)(),
+    isSubmitting,
+    isValid,
+  }), [form, handleSubmit, isSubmitting, isValid]);
 
   return (
     <FormProvider {...form}>

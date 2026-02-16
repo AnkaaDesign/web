@@ -116,10 +116,10 @@ export function FormulaSampler({ availableItems = [] }: FormulaSamplerProps) {
             type="number"
             placeholder="Ex: 10"
             value={sampleAmount}
-            onChange={(e) => handleSampleAmountChange(e.target.value)}
-            min="0"
+            onChange={(value) => handleSampleAmountChange(value as string)}
+            min={0}
             max={currentTotal}
-            step="0.01"
+            step={0.01}
             className="text-left font-mono bg-transparent"
           />
           <div className="flex gap-1">

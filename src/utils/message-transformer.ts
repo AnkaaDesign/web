@@ -9,6 +9,16 @@ import type { ContentBlock } from '@/components/administration/message/editor/ty
 import type { MessageBlock, InlineFormat } from '@/components/messaging/types';
 import { parseMarkdownToInlineFormat } from './markdown-parser';
 
+// Type guard to check if content is already in InlineFormat array format
+function isInlineFormatArray(content: unknown): content is InlineFormat[] {
+  return Array.isArray(content) &&
+    content.length > 0 &&
+    typeof content[0] === 'object' &&
+    content[0] !== null &&
+    'type' in content[0] &&
+    'content' in content[0];
+}
+
 /**
  * Converts plain text string to InlineFormat array
  * Now supports markdown-style formatting: **bold**, *italic*, __underline__, [link](url)
@@ -43,48 +53,51 @@ export function transformBlocksForDisplay(editorBlocks: ContentBlock[]): Message
     // Renderer format has: heading with level, content as InlineFormat[]
     // Editor format has: heading1/heading2/heading3, content as string
 
-    // Check if content is already an InlineFormat array (renderer format)
-    const hasInlineFormatContent = Array.isArray(block.content) &&
-      block.content.length > 0 &&
-      typeof block.content[0] === 'object' &&
-      'type' in block.content[0];
-
-    // Handle heading blocks (both editor format: heading1/2/3 and renderer format: heading with level)
+    // Handle heading blocks (editor format: heading1/2/3)
     if (block.type === 'heading1' || block.type === 'heading2' || block.type === 'heading3') {
       const level = block.type === 'heading1' ? 1 : block.type === 'heading2' ? 2 : 3;
+      // At this point, TypeScript knows block is a TextBlock with content: string
+      const content = isInlineFormatArray((block as any).content)
+        ? (block as any).content as InlineFormat[]
+        : textToInlineFormat(block.content);
+
       return {
-        ...block,
+        id: block.id,
         type: 'heading',
         level,
-        // Content is already InlineFormat[] or needs conversion from string
-        content: hasInlineFormatContent ? block.content as InlineFormat[] : textToInlineFormat(block.content),
+        content,
+        fontSize: block.fontSize,
+        fontWeight: block.fontWeight,
       };
     }
 
-    // Handle heading with level (pure renderer format)
-    if (block.type === 'heading' && 'level' in block) {
-      return {
-        ...block,
-        type: 'heading',
-        content: hasInlineFormatContent ? block.content as InlineFormat[] : textToInlineFormat(block.content),
-      } as MessageBlock;
-    }
-
-    // Handle paragraph blocks (editor or renderer format)
+    // Handle paragraph blocks
     if (block.type === 'paragraph') {
+      const content = isInlineFormatArray((block as any).content)
+        ? (block as any).content as InlineFormat[]
+        : textToInlineFormat(block.content);
+
       return {
-        ...block,
+        id: block.id,
         type: 'paragraph',
-        content: hasInlineFormatContent ? block.content as InlineFormat[] : textToInlineFormat(block.content),
+        content,
+        fontSize: block.fontSize,
+        fontWeight: block.fontWeight,
       };
     }
 
-    // Handle quote blocks (editor or renderer format)
+    // Handle quote blocks
     if (block.type === 'quote') {
+      const content = isInlineFormatArray((block as any).content)
+        ? (block as any).content as InlineFormat[]
+        : textToInlineFormat(block.content);
+
       return {
-        ...block,
+        id: block.id,
         type: 'quote',
-        content: hasInlineFormatContent ? block.content as InlineFormat[] : textToInlineFormat(block.content),
+        content,
+        fontSize: block.fontSize,
+        fontWeight: block.fontWeight,
       };
     }
 
@@ -162,11 +175,19 @@ export function transformBlocksForDisplay(editorBlocks: ContentBlock[]): Message
     }
 
     // Handle callout blocks (convert to paragraph for now, renderer doesn't support callout yet)
-    if (block.type === 'callout') {
+    // Note: 'callout' is not in ContentBlock type union, but may exist in legacy data
+    if ((block as any).type === 'callout') {
+      const calloutBlock = block as any;
+      const content = isInlineFormatArray(calloutBlock.content)
+        ? calloutBlock.content as InlineFormat[]
+        : textToInlineFormat(calloutBlock.content || '');
+
       return {
-        ...block,
+        id: calloutBlock.id,
         type: 'paragraph',
-        content: hasInlineFormatContent ? block.content as InlineFormat[] : textToInlineFormat(block.content),
+        content,
+        fontSize: calloutBlock.fontSize,
+        fontWeight: calloutBlock.fontWeight,
       };
     }
 

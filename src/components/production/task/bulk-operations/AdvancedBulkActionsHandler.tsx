@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -25,6 +24,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { LayoutForm } from "@/components/production/layout/layout-form";
+import type { Task } from "../../../../types";
 
 // Type definitions for the operations
 type BulkOperationType = "arts" | "baseFiles" | "paints" | "cuttingPlans" | "layout" | "serviceOrder";
@@ -35,10 +35,10 @@ const bulkOperationSchema = z.object({
   paintId: z.string().nullable().optional(),
   paintIds: z.array(z.string()).optional(),
 
-  // For cuts
+  // For cuts - note: quantity is not stored on Cut entity, only used when creating
   cuts: z.array(z.object({
     type: z.nativeEnum(CUT_TYPE),
-    quantity: z.number().min(1).optional(),
+    quantity: z.number().min(1).optional(), // Only for new cuts being created
     origin: z.nativeEnum(CUT_ORIGIN),
     fileId: z.string().optional(),
     file: z.any().optional(),
@@ -73,7 +73,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
   const [isOpen, setIsOpen] = useState(false);
   const [operationType, setOperationType] = useState<BulkOperationType | null>(null);
   const [currentTaskIds, setCurrentTaskIds] = useState<string[]>([]);
-  const [currentTasks, setCurrentTasks] = useState<any[]>([]);
+  const [currentTasks, setCurrentTasks] = useState<Task[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
 
@@ -213,7 +213,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             },
           });
 
-          const tasks = tasksResponse.data;
+          const tasks = tasksResponse.data || [];
           setCurrentTasks(tasks);
 
           // Compute common values across all tasks
@@ -229,21 +229,23 @@ export const AdvancedBulkActionsHandler = forwardRef<
           };
 
           // Check if all tasks have the same general painting
-          const firstPaintId = tasks[0]?.paintId;
+          const firstTask = tasks[0];
+          const firstPaintId = firstTask?.paintId;
           if (firstPaintId && tasks.every(t => t.paintId === firstPaintId)) {
             computed.paintId = firstPaintId;
-            computed.generalPainting = tasks[0].generalPainting;
+            computed.generalPainting = firstTask?.generalPainting;
           }
 
           // Find logo paints that ALL tasks have in common
-          if (tasks.length > 0 && tasks[0].logoPaints) {
-            const firstTaskPaintIds = new Set(tasks[0].logoPaints.map(p => p.id));
+          const firstTaskForPaints = tasks[0];
+          if (tasks.length > 0 && firstTaskForPaints?.logoPaints) {
+            const firstTaskPaintIds = new Set(firstTaskForPaints.logoPaints.map(p => p.id));
             const commonPaintIds = Array.from(firstTaskPaintIds).filter(paintId =>
               tasks.every(task => task.logoPaints?.some(p => p.id === paintId))
             );
             computed.paintIds = commonPaintIds;
             // Also store the full paint objects
-            computed.logoPaints = tasks[0].logoPaints.filter(p => commonPaintIds.includes(p.id));
+            computed.logoPaints = firstTaskForPaints.logoPaints.filter(p => commonPaintIds.includes(p.id));
           }
 
           // Find artworks that ALL tasks have in common (by filename, since each task may have different file IDs)
@@ -272,7 +274,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             // Find the first task that has artworks to use as reference
             const taskWithArtworks = tasks.find(t => t.artworks && t.artworks.length > 0);
 
-            if (taskWithArtworks && commonFilenames.length > 0) {
+            if (taskWithArtworks && taskWithArtworks.artworks && commonFilenames.length > 0) {
               // For each common filename, use the reference task's file data
               const commonArtworks = taskWithArtworks.artworks.filter((artwork: any) => {
                 const file = artwork.file || artwork;
@@ -316,7 +318,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             );
 
             const taskWithBaseFiles = tasks.find(t => t.baseFiles && t.baseFiles.length > 0);
-            if (taskWithBaseFiles && commonBaseFileFilenames.length > 0) {
+            if (taskWithBaseFiles && taskWithBaseFiles.baseFiles && commonBaseFileFilenames.length > 0) {
               const commonBaseFiles = taskWithBaseFiles.baseFiles.filter((f: any) =>
                 commonBaseFileFilenames.includes(f.originalName || f.filename)
               );
@@ -334,17 +336,19 @@ export const AdvancedBulkActionsHandler = forwardRef<
             }
           }
 
-          // Find cuts that ALL tasks have with matching type, quantity, and file
-          if (tasks.length > 0 && tasks[0].cuts && tasks[0].cuts.length > 0) {
+          // Find cuts that ALL tasks have with matching type, origin, and file
+          // Note: Cut entities from API don't have 'quantity' field - it's only used when creating cuts
+          const firstTaskForCuts = tasks[0];
+          if (tasks.length > 0 && firstTaskForCuts?.cuts && firstTaskForCuts.cuts.length > 0) {
             // Check if all tasks have the same number of cuts
-            if (tasks.every(task => task.cuts?.length === tasks[0].cuts?.length)) {
+            const firstTaskCutsLength = firstTaskForCuts.cuts.length;
+            if (tasks.every(task => task.cuts?.length === firstTaskCutsLength)) {
               // Map first task's cuts and check if all tasks have matching cuts
-              const firstTaskCuts = tasks[0].cuts;
+              const firstTaskCuts = firstTaskForCuts.cuts;
               const allCutsMatch = firstTaskCuts.every(firstCut => {
                 return tasks.every(task => {
                   return task.cuts?.some(cut =>
                     cut.type === firstCut.type &&
-                    cut.quantity === firstCut.quantity &&
                     cut.origin === firstCut.origin &&
                     cut.file?.originalName === firstCut.file?.originalName
                   );
@@ -354,7 +358,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
               if (allCutsMatch) {
                 computed.cuts = firstTaskCuts.map(cut => ({
                   type: cut.type,
-                  quantity: cut.quantity,
+                  // Don't include quantity since it's not on Cut entity from API
                   origin: cut.origin,
                   fileId: cut.fileId,
                   file: cut.file ? { id: cut.file.id, originalName: cut.file.originalName, url: cut.file.url } : undefined,
@@ -384,7 +388,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
             setOriginalServiceOrdersMap(serviceOrdersPerTask);
 
             // Find common service orders (matching by type + description across ALL tasks)
-            const firstTaskServiceOrders = tasks[0].serviceOrders || [];
+            const firstTaskForSO = tasks[0];
+            const firstTaskServiceOrders = firstTaskForSO?.serviceOrders || [];
             const commonSOs: any[] = [];
             // Map to track all IDs for each common key
             const keyToIdsMap: Record<string, string[]> = {};
@@ -494,31 +499,34 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 };
               };
 
-              // Check left side
-              const firstLeftId = tasksWithTrucks[0].truck?.leftSideLayoutId;
-              const allShareLeft = firstLeftId && tasksWithTrucks.every(
-                (t: any) => t.truck?.leftSideLayoutId === firstLeftId
-              );
+              const firstTaskWithTruck = tasksWithTrucks[0];
+              if (firstTaskWithTruck?.truck) {
+                // Check left side
+                const firstLeftId = firstTaskWithTruck.truck.leftSideLayoutId;
+                const allShareLeft = firstLeftId && tasksWithTrucks.every(
+                  (t: any) => t.truck?.leftSideLayoutId === firstLeftId
+                );
 
-              // Check right side
-              const firstRightId = tasksWithTrucks[0].truck?.rightSideLayoutId;
-              const allShareRight = firstRightId && tasksWithTrucks.every(
-                (t: any) => t.truck?.rightSideLayoutId === firstRightId
-              );
+                // Check right side
+                const firstRightId = firstTaskWithTruck.truck.rightSideLayoutId;
+                const allShareRight = firstRightId && tasksWithTrucks.every(
+                  (t: any) => t.truck?.rightSideLayoutId === firstRightId
+                );
 
-              // Check back side
-              const firstBackId = tasksWithTrucks[0].truck?.backSideLayoutId;
-              const allShareBack = firstBackId && tasksWithTrucks.every(
-                (t: any) => t.truck?.backSideLayoutId === firstBackId
-              );
+                // Check back side
+                const firstBackId = firstTaskWithTruck.truck.backSideLayoutId;
+                const allShareBack = firstBackId && tasksWithTrucks.every(
+                  (t: any) => t.truck?.backSideLayoutId === firstBackId
+                );
 
-              const preloadedLayouts = {
-                left: allShareLeft ? convertLayoutToFormState(tasksWithTrucks[0].truck?.leftSideLayout) : null,
-                right: allShareRight ? convertLayoutToFormState(tasksWithTrucks[0].truck?.rightSideLayout) : null,
-                back: allShareBack ? convertLayoutToFormState(tasksWithTrucks[0].truck?.backSideLayout) : null,
-              };
+                const preloadedLayouts = {
+                  left: allShareLeft ? convertLayoutToFormState(firstTaskWithTruck.truck.leftSideLayout) : null,
+                  right: allShareRight ? convertLayoutToFormState(firstTaskWithTruck.truck.rightSideLayout) : null,
+                  back: allShareBack ? convertLayoutToFormState(firstTaskWithTruck.truck.backSideLayout) : null,
+                };
 
-              setLayoutStates(preloadedLayouts);
+                setLayoutStates(preloadedLayouts);
+              }
             }
           } else if (type === 'serviceOrder') {
             // Service orders are handled by form.reset above
@@ -739,8 +747,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
                   fileContext: 'cut',
                   entityType: 'task',
                 });
-                if (uploadResponse.success && uploadResponse.data?.successful?.[0]) {
-                  cutData.fileId = uploadResponse.data.successful[0].id;
+                const uploadedFile = uploadResponse.data?.successful?.[0];
+                if (uploadResponse.success && uploadedFile) {
+                  cutData.fileId = uploadedFile.id;
                 }
               } else if (cut.file && (cut.file.id || cut.file.uploadedFileId)) {
                 cutData.fileId = cut.file.id || cut.file.uploadedFileId;
@@ -783,9 +792,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // - Tasks WITH trucks: truck is updated with new layouts
           // - Tasks WITHOUT trucks: truck is created with embedded layouts
           const hasAnyLayoutState =
-            (layoutStates.left?.layoutSections?.length > 0) ||
-            (layoutStates.right?.layoutSections?.length > 0) ||
-            (layoutStates.back?.layoutSections?.length > 0);
+            (layoutStates.left?.layoutSections?.length && layoutStates.left.layoutSections.length > 0) ||
+            (layoutStates.right?.layoutSections?.length && layoutStates.right.layoutSections.length > 0) ||
+            (layoutStates.back?.layoutSections?.length && layoutStates.back.layoutSections.length > 0);
 
           if (hasAnyLayoutState) {
             // Build truck object with embedded layout data (following taskTruckCreateSchema)
@@ -794,56 +803,59 @@ export const AdvancedBulkActionsHandler = forwardRef<
             const layoutPhotoFiles: Array<{ side: string; file: File }> = [];
 
             // Left side layout data
-            if (layoutStates.left?.layoutSections?.length > 0) {
+            const leftLayout = layoutStates.left;
+            if (leftLayout?.layoutSections?.length && leftLayout.layoutSections.length > 0) {
               truckWithLayouts.leftSideLayout = {
-                height: layoutStates.left.height,
-                layoutSections: layoutStates.left.layoutSections.map((s: any, idx: number) => ({
+                height: leftLayout.height,
+                layoutSections: leftLayout.layoutSections.map((s: any, idx: number) => ({
                   width: s.width,
                   isDoor: s.isDoor || false,
                   doorHeight: s.doorHeight,
                   position: idx,
                 })),
-                photoId: layoutStates.left.photoId || null,
+                photoId: leftLayout.photoId || null,
               };
               // Collect photo file if present
-              if (layoutStates.left.photoFile instanceof File) {
-                layoutPhotoFiles.push({ side: 'leftSide', file: layoutStates.left.photoFile });
+              if (leftLayout.photoFile instanceof File) {
+                layoutPhotoFiles.push({ side: 'leftSide', file: leftLayout.photoFile });
               }
             }
 
             // Right side layout data
-            if (layoutStates.right?.layoutSections?.length > 0) {
+            const rightLayout = layoutStates.right;
+            if (rightLayout?.layoutSections?.length && rightLayout.layoutSections.length > 0) {
               truckWithLayouts.rightSideLayout = {
-                height: layoutStates.right.height,
-                layoutSections: layoutStates.right.layoutSections.map((s: any, idx: number) => ({
+                height: rightLayout.height,
+                layoutSections: rightLayout.layoutSections.map((s: any, idx: number) => ({
                   width: s.width,
                   isDoor: s.isDoor || false,
                   doorHeight: s.doorHeight,
                   position: idx,
                 })),
-                photoId: layoutStates.right.photoId || null,
+                photoId: rightLayout.photoId || null,
               };
               // Collect photo file if present
-              if (layoutStates.right.photoFile instanceof File) {
-                layoutPhotoFiles.push({ side: 'rightSide', file: layoutStates.right.photoFile });
+              if (rightLayout.photoFile instanceof File) {
+                layoutPhotoFiles.push({ side: 'rightSide', file: rightLayout.photoFile });
               }
             }
 
             // Back side layout data
-            if (layoutStates.back?.layoutSections?.length > 0) {
+            const backLayout = layoutStates.back;
+            if (backLayout?.layoutSections?.length && backLayout.layoutSections.length > 0) {
               truckWithLayouts.backSideLayout = {
-                height: layoutStates.back.height,
-                layoutSections: layoutStates.back.layoutSections.map((s: any, idx: number) => ({
+                height: backLayout.height,
+                layoutSections: backLayout.layoutSections.map((s: any, idx: number) => ({
                   width: s.width,
                   isDoor: s.isDoor || false,
                   doorHeight: s.doorHeight,
                   position: idx,
                 })),
-                photoId: layoutStates.back.photoId || null,
+                photoId: backLayout.photoId || null,
               };
               // Collect photo file if present
-              if (layoutStates.back.photoFile instanceof File) {
-                layoutPhotoFiles.push({ side: 'backSide', file: layoutStates.back.photoFile });
+              if (backLayout.photoFile instanceof File) {
+                layoutPhotoFiles.push({ side: 'backSide', file: backLayout.photoFile });
               }
             }
 
@@ -853,9 +865,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
               const truckLayoutUpdates: Record<string, any> = {};
 
               currentTasks.forEach(task => {
-                // Pass the same layout data to all tasks
-                // Backend will handle creating/updating trucks and layouts
-                truckLayoutUpdates[task.id] = truckWithLayouts;
+                if (task.id) {
+                  // Pass the same layout data to all tasks
+                  // Backend will handle creating/updating trucks and layouts
+                  truckLayoutUpdates[task.id] = truckWithLayouts;
+                }
               });
 
               updateData._perTaskTruckUpdates = truckLayoutUpdates;
@@ -893,11 +907,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
               commonKey = originalIdToCommonKey[formSO.id];
             }
 
-            const isCommonServiceOrder = commonKey && commonKeyToIdsMap[commonKey];
+            const allIds = commonKey ? commonKeyToIdsMap[commonKey] : undefined;
+            const isCommonServiceOrder = commonKey && allIds;
 
-            if (isCommonServiceOrder) {
+            if (isCommonServiceOrder && commonKey && allIds) {
               // This is a common service order - update ALL matching ones across tasks
-              const allIds = commonKeyToIdsMap[commonKey];
               processedCommonKeys.add(commonKey);
 
               allIds.forEach((soId: string) => {
@@ -932,7 +946,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // Check for removed common service orders (ones that were in commonKeyToIdsMap but not processed)
           const serviceOrdersToDelete: string[] = [];
           Object.entries(commonKeyToIdsMap).forEach(([commonKey, ids]) => {
-            if (!processedCommonKeys.has(commonKey)) {
+            if (!processedCommonKeys.has(commonKey) && ids) {
               // This common key was removed from the form - delete all associated service orders
               serviceOrdersToDelete.push(...ids);
             }
@@ -1017,19 +1031,21 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // Always send artworkIds when perTaskArtworkIds is set (even if empty for some tasks)
           // because we need to tell backend the final state of artworks
           if (perTaskArtworkIds) {
-            const ids = perTaskArtworkIds[id] || [];
+            const ids = perTaskArtworkIds[id];
             // Always include the array - this tells backend what files to keep/set
-            taskData.artworkIds = ids;
+            taskData.artworkIds = ids || [];
           }
 
           // Add per-task baseFileIds if available
           if (perTaskBaseFileIds) {
-            taskData.baseFileIds = perTaskBaseFileIds[id] || [];
+            const baseIds = perTaskBaseFileIds[id];
+            taskData.baseFileIds = baseIds || [];
           }
 
           // Add per-task truck layout updates if available
-          if (perTaskTruckUpdates && perTaskTruckUpdates[id]) {
-            taskData.truck = perTaskTruckUpdates[id];
+          const truckUpdate = perTaskTruckUpdates?.[id];
+          if (perTaskTruckUpdates && truckUpdate) {
+            taskData.truck = truckUpdate;
           }
 
           // Add artwork statuses for status changes
@@ -1079,8 +1095,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
         }
 
         // Get customer name from first task for file organization context
-        const firstTask = currentTasks[0];
-        const customerName = firstTask?.customer?.fantasyName || firstTask?.customer?.corporateName;
+        const firstTaskForContext = currentTasks[0];
+        const customerName = firstTaskForContext?.customer?.fantasyName || firstTaskForContext?.customer?.corporateName;
 
         // Add context for file organization
         if (customerName) {
@@ -1250,7 +1266,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
                   disabled={isSubmitting}
                 >
                   Motorista
-                  {layoutStates.left?.layoutSections?.length > 0 && (
+                  {layoutStates.left?.layoutSections?.length && layoutStates.left.layoutSections.length > 0 && (
                     <Badge variant="success" className="ml-2">
                       Configurado
                     </Badge>

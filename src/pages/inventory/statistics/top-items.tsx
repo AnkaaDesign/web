@@ -157,11 +157,11 @@ export const TopItemsStatisticsPage = () => {
     }
   };
 
-  const handleDateRangeChange = (range: DateRange | undefined) => {
-    if (range) {
+  const handleDateRangeChange = (range: any | undefined) => {
+    if (range && range.from && range.to) {
       setFilters(prev => ({
         ...prev,
-        dateRange: range,
+        dateRange: { from: range.from, to: range.to },
         period: 'custom',
       }));
     }
@@ -226,7 +226,7 @@ export const TopItemsStatisticsPage = () => {
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "Estoque", href: routes.inventory.root },
-              { label: "Estatísticas", href: routes.inventory.statistics.root },
+              { label: "Estatísticas", href: routes.statistics.inventory.root },
               { label: "Top Itens" }
             ]}
             actions={[
@@ -296,7 +296,7 @@ export const TopItemsStatisticsPage = () => {
                 <DateRangePicker
                   from={filters.dateRange.from}
                   to={filters.dateRange.to}
-                  onSelect={handleDateRangeChange}
+                  onDateRangeChange={handleDateRangeChange}
                 />
               </div>
 
@@ -406,7 +406,7 @@ export const TopItemsStatisticsPage = () => {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percentage }) => `${name} (${percentage.toFixed(1)}%)`}
+                            label={({ name, percentage }) => `${name} (${(percentage as number).toFixed(1)}%)`}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="percentage"

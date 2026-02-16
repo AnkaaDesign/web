@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { uploadPhoto, deletePhoto } from "@/api-client";
 import type { User } from "@/types";
+import { getFileUrl } from "@/utils/file";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +25,9 @@ interface AvatarUploadProps {
 
 export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar?.url || null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(
+    user?.avatar ? getFileUrl(user.avatar) : null
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -67,10 +70,12 @@ export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadPro
       // Upload photo via profile API
       const response = await uploadPhoto(file);
 
-      if (response.success && response.data.avatarId) {
-        onAvatarChange?.(response.data.avatarId);
+      if (response.success && response.data) {
+        if (response.data.avatarId) {
+          onAvatarChange?.(response.data.avatarId);
+        }
         if (response.data.avatar) {
-          setAvatarUrl(response.data.avatar.url || null);
+          setAvatarUrl(getFileUrl(response.data.avatar));
         }
       }
     } catch (error: any) {
@@ -78,7 +83,7 @@ export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadPro
         console.error("Error uploading photo:", error);
       }
       // Restore previous avatar on error
-      setAvatarUrl(user?.avatar?.url || null);
+      setAvatarUrl(user?.avatar ? getFileUrl(user.avatar) : null);
     } finally {
       setIsUploading(false);
       // Reset file input

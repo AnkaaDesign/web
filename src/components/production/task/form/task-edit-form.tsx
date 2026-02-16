@@ -12,6 +12,7 @@ import {
   IconScissors,
   IconCurrencyReal,
   IconReceipt,
+  IconFileBarcode,
   IconFileInvoice,
   IconFileText,
   IconHash,
@@ -72,7 +73,7 @@ import { TRUCK_SPOT } from "../../../../constants";
 
 interface TaskEditFormProps {
   task: Task;
-  onFormStateChange?: (state: { isValid: boolean; isDirty: boolean }) => void;
+  onFormStateChange?: (state: { isValid: boolean; isDirty: boolean; isSubmitting: boolean }) => void;
   detailsRoute?: (id: string) => string;
 }
 
@@ -144,9 +145,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
   // Restricted fields (forecastDate, representatives) visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER only
   const canViewRestrictedFields = isAdminUser || isFinancialUser || isCommercialUser || isLogisticUser || isDesignerUser;
-
-  // Invoice To field visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC only (NOT Designer)
-  const canViewInvoiceToField = isAdminUser || isFinancialUser || isCommercialUser || isLogisticUser;
 
   // Commission field visible to ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION
   const canViewCommissionField = isAdminUser || isFinancialUser || isCommercialUser || isProductionUser;
@@ -333,10 +331,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     convertToFileWithPreview((task as any).budgets)
   );
   const [nfeFile, setNfeFile] = useState<FileWithPreview[]>(
-    convertToFileWithPreview((task as any).invoices || task.nfe)
+    convertToFileWithPreview((task as any).invoices)
   );
   const [receiptFile, setReceiptFile] = useState<FileWithPreview[]>(
-    convertToFileWithPreview((task as any).receipts || task.receipt)
+    convertToFileWithPreview((task as any).receipts)
+  );
+  const [bankSlipFile, setBankSlipFile] = useState<FileWithPreview[]>(
+    convertToFileWithPreview((task as any).bankSlips)
   );
 
   const multiCutSelectorRef = useRef<MultiCutSelectorRef>(null);
@@ -423,7 +424,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const initialLayoutStateEmittedRef = useRef<Set<'left' | 'right' | 'back'>>(new Set());
 
   // Get truck ID from task - with safety check
-  const truckId = task.truck?.id || task.truckId;
+  const truckId = task.truck?.id;
 
   // Safety mechanism: If task doesn't have a truck yet, trigger a refetch
   // This shouldn't happen because backend auto-creates it, but it's a safety net
@@ -445,7 +446,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     }
   }, [openAccordion, scrollToAccordion]);
 
-  const { data: layoutsData } = useLayoutsByTruck(truckId || "", !!truckId);
+  const { data: layoutsData } = useLayoutsByTruck(truckId || "", { enabled: !!truckId });
 
   // Calculate truck length from layout sections for spot selector
   // Uses the same two-tier cabin logic as garage view and API:
@@ -617,8 +618,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             type,
             quantity: 1,
             file: convertedFile,
-            // fileName is used for change detection (file objects get stripped during comparison)
-            fileName: convertedFile?.name || cut.file?.filename || cut.file?.name || undefined,
             origin: cut.origin || CUT_ORIGIN.PLAN,
           });
         }
@@ -641,7 +640,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       finishedAt: taskData.finishedAt ? new Date(taskData.finishedAt) : null,
       forecastDate: taskData.forecastDate ? new Date(taskData.forecastDate) : null,
       customerId: taskData.customerId || null,
-      invoiceToId: taskData.invoiceToId || null,
       sectorId: taskData.sectorId || null,
       representativeIds: taskData.representativeIds || [],
       paintId: taskData.paintId || null,
@@ -670,8 +668,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         customForecastDays: taskData.pricing.customForecastDays || null,
         // Layout File
         layoutFileId: taskData.pricing.layoutFileId || null,
+        // Invoice To Customers (extract IDs from full customer objects returned by API)
+        invoicesToCustomerIds: taskData.pricing.invoicesToCustomers?.map((c: any) => c.id) || taskData.pricing.invoicesToCustomerIds || [],
+        // New Fields
+        simultaneousTasks: taskData.pricing.simultaneousTasks || null,
+        discountReference: taskData.pricing.discountReference || null,
         items: (() => {
-          if (taskData.pricing.items?.length > 0) {
+          if (taskData.pricing.items && taskData.pricing.items.length > 0) {
             // Log raw API values for debugging
             console.log('[TaskEditForm] 📥 RAW pricing items from API:');
             taskData.pricing.items.forEach((item: any, index: number) => {
@@ -711,10 +714,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         customForecastDays: null,
         // Layout File (defaults)
         layoutFileId: null,
+        // Invoice To Customers (defaults)
+        invoicesToCustomerIds: [],
+        // New Fields (defaults)
+        simultaneousTasks: null,
+        discountReference: null,
         items: [{ description: "", amount: null, observation: null }], // Default empty row
       },
-      nfeId: taskData.nfeId || null,
-      receiptId: taskData.receiptId || null,
       // Initialize serviceOrders with default row - part of initial state
       // Maintain creation order (sorted by createdAt ASC) to preserve user's intended order
       serviceOrders: (() => {
@@ -761,8 +767,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       truck: {
         plate: taskData.truck?.plate || null,
         chassisNumber: taskData.truck?.chassisNumber || null,
-        model: taskData.truck?.model || "",
-        manufacturer: taskData.truck?.manufacturer,
         category: taskData.truck?.category || null,
         implementType: taskData.truck?.implementType || null,
         spot: taskData.truck?.spot || null,
@@ -777,7 +781,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             origin: CUT_ORIGIN.PLAN,
             fileId: undefined,
             file: undefined,
-            fileName: undefined,
           }],
       paintIds: taskData.logoPaints?.map((lp) => lp.id) || [],
       // Initialize airbrushings with default row - part of initial state
@@ -1199,13 +1202,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         // If only cuts exist (no other changes), we still need to update the task to trigger cut creation
         if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && hasCutsToCreate) {
 
-          changedData._onlyCuts = true; // Marker field to prevent empty body
+          (changedData as any)._onlyCuts = true; // Marker field to prevent empty body
         }
 
         // If only new representatives exist (no other changes), we still need to update the task
         if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate && hasNewRepresentatives) {
           console.log('[TaskEditForm] Only new representatives detected, adding marker field');
-          changedData._onlyNewRepresentatives = true; // Marker field to prevent empty body
+          (changedData as any)._onlyNewRepresentatives = true; // Marker field to prevent empty body
         }
 
         // Check if we have new files that need to be uploaded
@@ -1213,6 +1216,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         const newBudgetFiles = budgetFile.filter(f => !f.uploaded);
         const newNnvoiceFiles = nfeFile.filter(f => !f.uploaded);
         const newReceiptFiles = receiptFile.filter(f => !f.uploaded);
+        const newBankSlipFiles = bankSlipFile.filter(f => !f.uploaded);
         const newArtworkFiles = uploadedFiles.filter(f => !f.uploaded);
         const newBaseFiles = baseFiles.filter(f => !f.uploaded);
         const newObservationFiles = observationFiles.filter(f => !f.uploaded);
@@ -1231,7 +1235,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         );
 
         const hasNewFiles = newBudgetFiles.length > 0 || newNnvoiceFiles.length > 0 ||
-                           newReceiptFiles.length > 0 || newArtworkFiles.length > 0 ||
+                           newReceiptFiles.length > 0 || newBankSlipFiles.length > 0 || newArtworkFiles.length > 0 ||
                            newBaseFiles.length > 0 || hasCutFiles || hasAirbrushingFiles ||
                            newObservationFiles.length > 0 || layoutPhotoFiles.length > 0 ||
                            newPricingLayoutFiles.length > 0;
@@ -1256,6 +1260,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           }
           if (newReceiptFiles.length > 0) {
             files.receipts = newReceiptFiles.filter(f => f instanceof File) as File[];
+          }
+          if (newBankSlipFiles.length > 0) {
+            files.bankSlips = newBankSlipFiles.filter(f => f instanceof File) as File[];
           }
           if (newArtworkFiles.length > 0) {
             files.artworks = newArtworkFiles.filter(f => f instanceof File) as File[];
@@ -1350,7 +1357,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             'startedAt',
             'finishedAt',
             'customerId',
-            'invoiceToId',
             'sectorId',
             'paintId',
             'serialNumber',
@@ -1409,6 +1415,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentInvoiceIds = nfeFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentBankSlipIds = bankSlipFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
           console.log('[Task Update] 📦 FormData - File IDs being sent:', {
             hasArtworkStatusChanges,
@@ -1427,12 +1434,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           dataForFormData.budgetIds = currentBudgetIds;
           dataForFormData.invoiceIds = currentInvoiceIds;
           dataForFormData.receiptIds = currentReceiptIds;
+          dataForFormData.bankSlipIds = currentBankSlipIds;
 
           // Note: artworkStatuses will be added later (around line 1125) after processing
           // This ensures we use the state variable directly, not a rebuilt version
 
           // CRITICAL: Clean up malformed data before creating FormData
-          const fileIdFields = ['artworkIds', 'baseFileIds', 'budgetIds', 'invoiceIds', 'receiptIds'];
+          const fileIdFields = ['artworkIds', 'baseFileIds', 'budgetIds', 'invoiceIds', 'receiptIds', 'bankSlipIds'];
           const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate'];
 
           for (const field of fileIdFields) {
@@ -1637,6 +1645,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 budgets: true,
                 invoices: true,
                 receipts: true,
+                bankSlips: true,
                 artworks: true,
                 baseFiles: true,
               },
@@ -1666,7 +1675,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             'startedAt',
             'finishedAt',
             'customerId',
-            'invoiceToId',
             'sectorId',
             'paintId',
             'serialNumber',
@@ -1677,8 +1685,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
           // Convert undefined to null for nullable fields that are in changedData
           for (const field of nullableFields) {
-            if (field in submitData && submitData[field] === undefined) {
-              submitData[field] = null;
+            if (field in submitData && (submitData as any)[field] === undefined) {
+              (submitData as any)[field] = null;
             }
           }
 
@@ -1697,6 +1705,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentInvoiceIds = nfeFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentBankSlipIds = bankSlipFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
           // Send file IDs arrays when files exist
           // Backend uses these to replace all files via 'set' operation
@@ -1752,7 +1761,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           });
 
           if (Object.keys(existingArtworkStatusesJson).length > 0) {
-            submitData.artworkStatuses = existingArtworkStatusesJson;
+            (submitData as any).artworkStatuses = existingArtworkStatusesJson;
             console.log('[Task Update] ✅ Including artworkStatuses in JSON (UUID-keyed object):', existingArtworkStatusesJson);
           }
           if (currentBaseFileIds.length > 0) {
@@ -1767,25 +1776,28 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           if (currentReceiptIds.length > 0) {
             submitData.receiptIds = [...currentReceiptIds];
           }
+          if (currentBankSlipIds.length > 0) {
+            submitData.bankSlipIds = [...currentBankSlipIds];
+          }
 
           // CRITICAL: Clean up malformed data before sending
           // Remove empty objects that should be arrays or dates
-          const fileIdFields = ['artworkIds', 'baseFileIds', 'budgetIds', 'invoiceIds', 'receiptIds'];
+          const fileIdFields = ['artworkIds', 'baseFileIds', 'budgetIds', 'invoiceIds', 'receiptIds', 'bankSlipIds'];
           const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate'];
 
           for (const field of fileIdFields) {
             if (field in submitData) {
-              const value = submitData[field];
+              const value = (submitData as any)[field];
               // Check if it's an empty object {} (not an array)
               if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
-                delete submitData[field]; // Remove empty objects
+                delete (submitData as any)[field]; // Remove empty objects
               }
               // Convert objects with numeric keys to arrays
               else if (value && typeof value === 'object' && !Array.isArray(value)) {
                 const keys = Object.keys(value);
                 const isNumericKeys = keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
                 if (isNumericKeys) {
-                  submitData[field] = Object.values(value);
+                  (submitData as any)[field] = Object.values(value);
                 }
               }
             }
@@ -1794,9 +1806,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // Remove empty object date fields
           for (const field of dateFields) {
             if (field in submitData) {
-              const value = submitData[field];
+              const value = (submitData as any)[field];
               if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date) && Object.keys(value).length === 0) {
-                delete submitData[field]; // Remove empty date objects
+                delete (submitData as any)[field]; // Remove empty date objects
               }
             }
           }
@@ -1877,8 +1889,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           }
 
           // Remove marker fields before sending to API
-          delete submitData._onlyCuts;
-          delete submitData._onlyNewRepresentatives;
+          delete (submitData as any)._onlyCuts;
+          delete (submitData as any)._onlyNewRepresentatives;
 
           // DEBUG: Log submitData right before API call
           console.log('[TaskEditForm] JSON path - submitData before API call:', JSON.stringify(submitData, (_key, value) => {
@@ -1896,6 +1908,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 budgets: true,
                 invoices: true,
                 receipts: true,
+                bankSlips: true,
                 artworks: true,
                 baseFiles: true,
               },
@@ -2019,7 +2032,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         }, 100);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, budgetFile, nfeFile, receiptFile, uploadedFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, budgetFile, nfeFile, receiptFile, bankSlipFile, uploadedFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -2044,6 +2057,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       "budgetIds",
       "invoiceIds",
       "receiptIds",
+      "bankSlipIds",
       "reimbursementIds",
       "reimbursementInvoiceIds",
     ],
@@ -2080,6 +2094,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     setReceiptFile(files);
     setHasFileChanges(true);
     // Files will be submitted with the form, not uploaded separately
+  };
+
+  // Handle bank slip file change
+  const handleBankSlipFileChange = (files: FileWithPreview[]) => {
+    setBankSlipFile(files);
+    setHasFileChanges(true);
   };
 
   // Handle artwork files change (no longer uploads immediately)
@@ -2122,12 +2142,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     setObservationFiles(files);
     setHasFileChanges(true);
     // Update form value with file IDs
-    const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean);
-    
+    const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean) as string[];
+
     const currentObservation = form.getValues("observation");
-    
+
     form.setValue("observation", {
-      ...currentObservation,
+      description: currentObservation?.description || "",
       fileIds: fileIds,
     }, { shouldDirty: true, shouldTouch: true, shouldValidate: false });
     
@@ -2143,7 +2163,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const handleDesignarServiceOrder = useCallback((serviceOrder: ServiceOrderData) => {
     const currentServiceOrders = form.getValues("serviceOrders") || [];
     // Prepend the new service order to the beginning of the array so it appears at the top
-    form.setValue("serviceOrders", [serviceOrder, ...currentServiceOrders], {
+    form.setValue("serviceOrders", [{ ...serviceOrder, shouldSync: true }, ...currentServiceOrders], {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true,
@@ -2204,11 +2224,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const customerIdValue = useWatch({
     control: form.control,
     name: 'customerId',
-  });
-
-  const invoiceToIdValue = useWatch({
-    control: form.control,
-    name: 'invoiceToId',
   });
 
   // Representatives are now managed by the RepresentativeManager component
@@ -2825,6 +2840,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         onFormStateChange({
           isValid,
           isDirty,
+          isSubmitting,
         });
       }
     }
@@ -2892,7 +2908,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   // }, [isSubmitting, hasChanges, hasCutsWithoutFiles, hasIncompletePricing, hasIncompleteServices, hasIncompleteObservation, layoutWidthError, handleCancel, handleSubmitChanges, hasNewRepresentatives]);
 
   return (
-    <Form {...form}>
+    <Form {...(form as any)}>
       <form
         id="task-form"
         className="container mx-auto max-w-5xl"
@@ -2926,7 +2942,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="basic-information"
             id="accordion-item-basic-information"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
             <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -2980,18 +2996,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                       {/* Customer */}
                       <CustomerSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} initialCustomer={task.customer} />
                     </div>
-
-                    {/* Invoice To - Customer Selector (only visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC - NOT Designer) */}
-                    {canViewInvoiceToField && (
-                      <CustomerSelector
-                        control={form.control}
-                        name="invoiceToId"
-                        label="Faturar Para"
-                        placeholder="Selecione o cliente para faturamento"
-                        disabled={isSubmitting || isFinancialUser || isWarehouseUser || isLogisticUser}
-                        initialCustomer={task.invoiceTo}
-                      />
-                    )}
 
                     {/* Truck Category and Implement Type - Side by Side */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3119,7 +3123,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                   maxLength={8}
                                   onChange={(value: string | number | null) => {
                                     // Remove all non-alphanumeric characters, convert to uppercase
-                                    const cleanValue = (value || "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
+                                    const cleanValue = String(value || "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
                                     // Limit to 7 characters (3 letters + 4 chars)
                                     const limitedValue = cleanValue.slice(0, 7);
                                     field.onChange(limitedValue);
@@ -3165,7 +3169,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                   maxLength={20}
                                   onChange={(value: string | number | null) => {
                                     // Remove all non-alphanumeric characters and spaces, convert to uppercase
-                                    const cleanValue = (value || "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
+                                    const cleanValue = String(value || "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
                                     // Limit to exactly 17 characters (VIN standard)
                                     const limitedValue = cleanValue.slice(0, 17);
                                     field.onChange(limitedValue);
@@ -3224,7 +3228,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                       {canViewCommissionField && (
                       <FormField
                         control={form.control}
-                        name="commission"
+                        name={"commission" as any}
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="flex items-center gap-2">
@@ -3240,7 +3244,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                   { value: "", label: "Não definido" },
                                   ...Object.values(COMMISSION_STATUS).map((status) => ({
                                     value: status,
-                                    label: COMMISSION_STATUS_LABELS[status],
+                                    label: COMMISSION_STATUS_LABELS[status] || status,
                                   })),
                                 ]}
                                 placeholder="Selecione o status de comissão"
@@ -3281,7 +3285,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             <AccordionItem
               value="representatives"
               id="accordion-item-representatives"
-              className="border border-border/40 rounded-lg"
+              className="border border-border rounded-lg"
             >
               <Card className="border-0">
                 <AccordionTrigger className="px-0 hover:no-underline">
@@ -3295,10 +3299,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 <AccordionContent>
                   <CardContent className="pt-0">
                     <RepresentativeManager
-                      customerId={customerIdValue}
-                      customerName={task.customer?.fantasyName || task.customer?.corporateName}
-                      invoiceToId={invoiceToIdValue}
-                      invoiceToName={task.invoiceTo?.fantasyName || task.invoiceTo?.corporateName}
+                      customerId={customerIdValue || undefined}
+                      customerName={task.customer?.fantasyName || task.customer?.corporateName || undefined}
+                      invoiceToCustomers={task.pricing?.invoicesToCustomers}
                       value={representativeRows}
                       onChange={handleRepresentativeRowsChange}
                       disabled={isSubmitting || isFinancialUser || isDesignerUser || isLogisticUser}
@@ -3318,7 +3321,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="dates"
             id="accordion-item-dates"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -3338,12 +3341,19 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                       name="forecastDate"
                       render={({ field }) => (
                         <DateTimeInput
-                          field={field}
-                          mode="date"
-                          context="start"
-                          label="Data de Previsão de Liberação"
-                          disabled={isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser}
-                          allowManualInput={true}
+                          {...{
+                            field: {
+                              onChange: (value: Date | null) => field.onChange(value),
+                              onBlur: () => field.onBlur(),
+                              value: field.value ?? null,
+                              name: field.name,
+                            },
+                            mode: "date",
+                            context: "start",
+                            label: "Data de Previsão de Liberação",
+                            disabled: isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser,
+                            allowManualInput: true,
+                          } as any}
                         />
                       )}
                     />
@@ -3355,7 +3365,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                       <FormField
                         control={form.control}
                         name="entryDate"
-                        render={({ field }) => <DateTimeInput field={field} mode="date" context="start" label="Data de Entrada" disabled={isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser} allowManualInput={true} />}
+                        render={({ field }) => <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "date", context: "start", label: "Data de Entrada", disabled: isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser, allowManualInput: true } as any} />}
                       />
 
                       {/* Deadline - DateTime - DISABLED for Financial and Designer users */}
@@ -3363,7 +3373,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         control={form.control}
                         name="term"
                         render={({ field }) => (
-                          <DateTimeInput field={field} mode="datetime" context="due" label="Prazo de Entrega" disabled={isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser} allowManualInput={true} />
+                          <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "datetime", context: "due", label: "Prazo de Entrega", disabled: isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser, allowManualInput: true } as any} />
                         )}
                       />
                     </div>
@@ -3376,15 +3386,17 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         name="startedAt"
                         render={({ field }) => (
                           <DateTimeInput
-                            field={field}
-                            mode="datetime"
-                            context="start"
-                            label="Data de Início"
-                            disabled={isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser}
-                            constraints={{
-                              maxDate: new Date(), // Cannot start in the future
-                            }}
-                            allowManualInput={true}
+                            {...{
+                              field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name },
+                              mode: "datetime",
+                              context: "start",
+                              label: "Data de Início",
+                              disabled: isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser,
+                              constraints: {
+                                maxDate: new Date(), // Cannot start in the future
+                              },
+                              allowManualInput: true,
+                            } as any}
                           />
                         )}
                       />
@@ -3395,16 +3407,18 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         name="finishedAt"
                         render={({ field }) => (
                           <DateTimeInput
-                            field={field}
-                            mode="datetime"
-                            context="end"
-                            label="Data de Conclusão"
-                            disabled={isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser}
-                            constraints={{
-                              maxDate: new Date(), // Cannot finish in the future
-                              minDate: form.watch("startedAt") || new Date("1900-01-01"), // Cannot finish before started
-                            }}
-                            allowManualInput={true}
+                            {...{
+                              field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name },
+                              mode: "datetime",
+                              context: "end",
+                              label: "Data de Conclusão",
+                              disabled: isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser,
+                              constraints: {
+                                maxDate: new Date(), // Cannot finish in the future
+                                minDate: form.watch("startedAt") || new Date("1900-01-01"), // Cannot finish before started
+                              },
+                              allowManualInput: true,
+                            } as any}
                           />
                         )}
                       />
@@ -3420,7 +3434,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="serviceOrders"
             id="accordion-item-serviceOrders"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -3461,7 +3475,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="paint"
             id="accordion-item-paint"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -3502,7 +3516,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="layout"
             id="accordion-item-layout"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -3661,7 +3675,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="spot"
             id="accordion-item-spot"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                   <Card className="border-0">
                     <AccordionTrigger className="px-0 hover:no-underline">
@@ -3694,7 +3708,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="pricing"
             id="accordion-item-pricing"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -3721,6 +3735,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         layoutFiles={pricingLayoutFiles}
                         onLayoutFilesChange={setPricingLayoutFiles}
                         onItemDeleted={handlePricingItemDeleted}
+                        initialInvoiceToCustomers={task?.pricing?.invoicesToCustomers}
                       />
                     </CardContent>
                   </AccordionContent>
@@ -3733,7 +3748,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="cuts"
             id="accordion-item-cuts"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -3763,7 +3778,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="airbrushing"
             id="accordion-item-airbrushing"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -3793,7 +3808,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="financial"
             id="accordion-item-financial"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -3807,12 +3822,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                   <AccordionContent>
                     <CardContent className="pt-0">
                       <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           {/* Budget File */}
                           <div className="space-y-2">
                             <label className="text-sm font-medium flex items-center gap-2">
                               <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                              Precificação
+                              Orçamento
                             </label>
                             <FileUploadField
                               onFilesChange={handleBudgetFileChange}
@@ -3821,7 +3836,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                               showPreview={true}
                               existingFiles={budgetFile}
                               variant="compact"
-                              placeholder="Adicionar precificaçãos"
+                              placeholder="Adicionar orçamentos"
                               label=""
                             />
                           </div>
@@ -3861,6 +3876,24 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                               label=""
                             />
                           </div>
+
+                          {/* Bank Slip File */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                              <IconFileBarcode className="h-4 w-4 text-muted-foreground" />
+                              Boleto
+                            </label>
+                            <FileUploadField
+                              onFilesChange={handleBankSlipFileChange}
+                              maxFiles={10}
+                              disabled={isSubmitting}
+                              showPreview={true}
+                              existingFiles={bankSlipFile}
+                              variant="compact"
+                              placeholder="Adicionar boletos"
+                              label=""
+                            />
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -3874,7 +3907,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="observation"
             id="accordion-item-observation"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -3954,7 +3987,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="base-files"
             id="accordion-item-base-files"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -3999,7 +4032,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           <AccordionItem
             value="artworks"
             id="accordion-item-artworks"
-            className="border border-border/40 rounded-lg"
+            className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">

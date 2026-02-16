@@ -256,7 +256,10 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
               mode="multiple"
               options={statusOptions}
               value={localState.status || []}
-              onValueChange={(value) => setLocalState((prev) => ({ ...prev, status: value }))}
+              onValueChange={(value) => setLocalState((prev) => ({
+                ...prev,
+                status: Array.isArray(value) ? value : (value ? [value] : undefined)
+              }))}
               placeholder="Selecione status..."
               emptyText="Nenhum status encontrado"
               searchPlaceholder="Buscar status..."
@@ -276,7 +279,10 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
               initialOptions={initialItemOptions}
               mode="multiple"
               value={localState.itemIds || []}
-              onValueChange={(value) => setLocalState((prev) => ({ ...prev, itemIds: value }))}
+              onValueChange={(value) => setLocalState((prev) => ({
+                ...prev,
+                itemIds: Array.isArray(value) ? value : (value ? [value] : undefined)
+              }))}
               placeholder="Selecione itens..."
               emptyText="Nenhum item encontrado"
               searchPlaceholder="Buscar itens..."
@@ -299,7 +305,10 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
               initialOptions={initialUserOptions}
               mode="multiple"
               value={localState.userIds || []}
-              onValueChange={(value) => setLocalState((prev) => ({ ...prev, userIds: value }))}
+              onValueChange={(value) => setLocalState((prev) => ({
+                ...prev,
+                userIds: Array.isArray(value) ? value : (value ? [value] : undefined)
+              }))}
               placeholder="Selecione usuários..."
               emptyText="Nenhum usuário encontrado"
               searchPlaceholder="Buscar usuários..."
@@ -321,14 +330,15 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.scheduledDateRange?.gte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.scheduledDateRange?.lte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.scheduledDateRange?.lte) {
                       setLocalState((prev) => ({ ...prev, scheduledDateRange: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         scheduledDateRange: {
-                          ...(date && { gte: date }),
+                          ...(dateValue && { gte: dateValue }),
                           ...(localState.scheduledDateRange?.lte && { lte: localState.scheduledDateRange.lte }),
                         },
                       }));
@@ -343,15 +353,16 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.scheduledDateRange?.lte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.scheduledDateRange?.gte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.scheduledDateRange?.gte) {
                       setLocalState((prev) => ({ ...prev, scheduledDateRange: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         scheduledDateRange: {
                           ...(localState.scheduledDateRange?.gte && { gte: localState.scheduledDateRange.gte }),
-                          ...(date && { lte: date }),
+                          ...(dateValue && { lte: dateValue }),
                         },
                       }));
                     }
@@ -375,14 +386,15 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.actualDeliveryDateRange?.gte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.actualDeliveryDateRange?.lte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.actualDeliveryDateRange?.lte) {
                       setLocalState((prev) => ({ ...prev, actualDeliveryDateRange: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         actualDeliveryDateRange: {
-                          ...(date && { gte: date }),
+                          ...(dateValue && { gte: dateValue }),
                           ...(localState.actualDeliveryDateRange?.lte && { lte: localState.actualDeliveryDateRange.lte }),
                         },
                       }));
@@ -397,15 +409,16 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.actualDeliveryDateRange?.lte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.actualDeliveryDateRange?.gte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.actualDeliveryDateRange?.gte) {
                       setLocalState((prev) => ({ ...prev, actualDeliveryDateRange: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         actualDeliveryDateRange: {
                           ...(localState.actualDeliveryDateRange?.gte && { gte: localState.actualDeliveryDateRange.gte }),
-                          ...(date && { lte: date }),
+                          ...(dateValue && { lte: dateValue }),
                         },
                       }));
                     }

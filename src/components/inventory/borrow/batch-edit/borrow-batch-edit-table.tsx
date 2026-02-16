@@ -25,8 +25,8 @@ const borrowBatchEditSchema = z.object({
         quantity: z.number().positive().min(0.01),
         userId: z.string().optional(),
         status: z.enum([BORROW_STATUS.ACTIVE, BORROW_STATUS.RETURNED, BORROW_STATUS.LOST]),
-        statusOrder: z.number().int().positive().optional(),
-        returnedAt: z.date().nullable().optional(),
+        statusOrder: z.number().int(),
+        returnedAt: z.date().nullable(),
       }),
     }),
   ),
@@ -54,12 +54,12 @@ export function BorrowBatchEditTable({ borrows, onCancel: _onCancel, onSubmit: _
         id: borrow.id,
         data: {
           quantity: borrow.quantity,
-          userId: borrow.userId,
+          userId: borrow.userId || undefined,
           status: borrow.status,
           statusOrder: borrow.statusOrder || BORROW_STATUS_ORDER[borrow.status] || 1,
           returnedAt: borrow.returnedAt,
         },
-      })),
+      })) as any,
     },
   });
 
@@ -108,7 +108,7 @@ export function BorrowBatchEditTable({ borrows, onCancel: _onCancel, onSubmit: _
   };
 
   // Handle status change with proper date logic and status order
-  const handleStatusChange = (index: number, newStatus: BORROW_STATUS) => {
+  const handleStatusChange = (index: number, newStatus: BORROW_STATUS.ACTIVE | BORROW_STATUS.RETURNED | BORROW_STATUS.LOST) => {
     form.setValue(`borrows.${index}.data.status`, newStatus, { shouldDirty: true, shouldTouch: true });
     form.setValue(`borrows.${index}.data.statusOrder`, BORROW_STATUS_ORDER[newStatus] || 1, { shouldDirty: true });
 
@@ -125,7 +125,15 @@ export function BorrowBatchEditTable({ borrows, onCancel: _onCancel, onSubmit: _
     <Form {...form}>
       <Card className="h-full flex flex-col">
         {/* Hidden submit button for page header to trigger */}
-        <button id="borrow-batch-form-submit" type="button" onClick={form.handleSubmit(handleSubmit)} style={{ display: "none" }} disabled={isSubmitting} />
+        <button
+          id="borrow-batch-form-submit"
+          type="button"
+          onClick={() => {
+            form.handleSubmit(handleSubmit as any)();
+          }}
+          style={{ display: "none" }}
+          disabled={isSubmitting}
+        />
         <CardContent className="p-4 flex-1 overflow-hidden flex flex-col">
           <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-1">
@@ -196,7 +204,7 @@ export function BorrowBatchEditTable({ borrows, onCancel: _onCancel, onSubmit: _
                       <TableCell className="w-32 p-0 !border-r-0">
                         <div className="px-4 py-2">
                           <FormField
-                            control={form.control}
+                            control={form.control as any}
                             name={`borrows.${index}.data.quantity`}
                             render={({ field }) => (
                               <FormItem>
@@ -212,14 +220,17 @@ export function BorrowBatchEditTable({ borrows, onCancel: _onCancel, onSubmit: _
                       <TableCell className="w-40 p-0 !border-r-0">
                         <div className="px-4 py-2">
                           <FormField
-                            control={form.control}
+                            control={form.control as any}
                             name={`borrows.${index}.data.status`}
                             render={({ field }) => (
                               <FormItem>
                                 <FormControl>
                                   <Combobox
                                     value={field.value}
-                                    onValueChange={(value) => handleStatusChange(index, value as BORROW_STATUS)}
+                                    onValueChange={(value) => {
+                                      const normalizedValue = Array.isArray(value) ? value[0] : value;
+                                      handleStatusChange(index, normalizedValue as BORROW_STATUS.ACTIVE | BORROW_STATUS.RETURNED | BORROW_STATUS.LOST);
+                                    }}
                                     options={[
                                       { value: BORROW_STATUS.ACTIVE, label: BORROW_STATUS_LABELS[BORROW_STATUS.ACTIVE] },
                                       { value: BORROW_STATUS.RETURNED, label: BORROW_STATUS_LABELS[BORROW_STATUS.RETURNED] },

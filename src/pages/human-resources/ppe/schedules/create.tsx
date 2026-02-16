@@ -4,7 +4,8 @@ import { routes, FAVORITE_PAGES } from "../../../../constants";
 import { usePpeDeliveryScheduleMutations } from "../../../../hooks";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { IconCalendar, IconX, IconCheck, IconLoader2 } from "@tabler/icons-react";
-import type { PpeDeliveryScheduleCreateFormData, PpeDeliveryScheduleCreateResponse } from "../../../../schemas";
+import type { PpeDeliveryScheduleCreateFormData } from "../../../../schemas";
+import type { PpeDeliveryScheduleCreateResponse } from "../../../../types";
 import { PpeScheduleForm } from "@/components/inventory/epi/schedule/ppe-schedule-form";
 import { toast } from "sonner";
 

@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import type { DateRange } from "react-day-picker";
 import { IconFilter, IconX } from "@tabler/icons-react";
 import type { ItemCategoryGetManyFormData } from "../../../../../schemas";
 
@@ -98,7 +99,8 @@ export function CategoryFilters({ open, onOpenChange, filters, onFilterChange }:
                 <DateTimeInput
                   mode="date"
                   value={localFilters.createdAt?.gte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localFilters.createdAt?.lte) {
                       setLocalFilters({
                         ...localFilters,
@@ -123,7 +125,8 @@ export function CategoryFilters({ open, onOpenChange, filters, onFilterChange }:
                 <DateTimeInput
                   mode="date"
                   value={localFilters.createdAt?.lte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localFilters.createdAt?.gte) {
                       setLocalFilters({
                         ...localFilters,

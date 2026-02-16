@@ -484,7 +484,7 @@ export const ExternalWithdrawalItemSelector = ({
                         label: cat.name,
                       }))}
                       value={tempCategoryIds}
-                      onValueChange={setTempCategoryIds}
+                      onValueChange={(value) => { if (Array.isArray(value)) setTempCategoryIds(value); }}
                       mode="multiple"
                       triggerClassName="h-10"
                     />
@@ -500,7 +500,7 @@ export const ExternalWithdrawalItemSelector = ({
                         label: brand.name,
                       }))}
                       value={tempBrandIds}
-                      onValueChange={setTempBrandIds}
+                      onValueChange={(value) => { if (Array.isArray(value)) setTempBrandIds(value); }}
                       mode="multiple"
                       triggerClassName="h-10"
                     />
@@ -516,7 +516,7 @@ export const ExternalWithdrawalItemSelector = ({
                         label: supplier.fantasyName,
                       }))}
                       value={tempSupplierIds}
-                      onValueChange={setTempSupplierIds}
+                      onValueChange={(value) => { if (Array.isArray(value)) setTempSupplierIds(value); }}
                       mode="multiple"
                       triggerClassName="h-10"
                     />

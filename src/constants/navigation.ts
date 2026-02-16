@@ -541,6 +541,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       {
+        id: "minhas-mensagens-admin",
+        title: "Minhas Mensagens",
+        icon: "message",
+        path: "/pessoal/mensagens",
+        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
+      },
+      {
         id: "setores",
         title: "Setores",
         icon: "building",
@@ -1088,13 +1095,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     path: "/pessoal",
     requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE],
     children: [
-      {
-        id: "assinaturas-pendentes",
-        title: "Assinaturas Pendentes",
-        icon: "signature",
-        path: "/pessoal/assinaturas-pendentes",
-        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE],
-      },
       { id: "meus-feriados", title: "Feriados", icon: "holiday", path: "/pessoal/feriados" },
       {
         id: "meus-emprestimos",

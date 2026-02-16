@@ -140,7 +140,7 @@ export function SectorList({ selectedPrivilege, onDataUpdate, className }: Secto
       filtersArray.push({
         key: "privileges",
         label: "Privilégio",
-        value: SECTOR_PRIVILEGES_LABELS[filters.where.privileges] || filters.where.privileges,
+        value: SECTOR_PRIVILEGES_LABELS[filters.where.privileges as SECTOR_PRIVILEGES] || filters.where.privileges,
         onRemove: () => {
           const { privileges: _, ...restWhere } = filters.where || {};
           setFilters({

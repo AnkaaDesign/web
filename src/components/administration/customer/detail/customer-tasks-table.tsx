@@ -260,12 +260,12 @@ export function CustomerTasksTable({
                       )}
                       disabled={isLoading || tasks.length === 0}
                     >
-                      <TruncatedTextWithTooltip text={column.header} />
+                      <TruncatedTextWithTooltip text={String(column.header)} />
                       {renderSortIndicator(column.id)}
                     </button>
                   ) : (
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                      <TruncatedTextWithTooltip text={column.header} />
+                      <TruncatedTextWithTooltip text={String(column.header)} />
                     </div>
                   )}
                 </TableHead>
@@ -404,7 +404,7 @@ export function CustomerTasksTable({
       {/* Context Menu */}
       {contextMenu && (
         <TaskHistoryContextMenu
-          task={contextMenu.tasks[0]}
+          tasks={contextMenu.tasks}
           position={{ x: contextMenu.x, y: contextMenu.y }}
           onClose={() => setContextMenu(null)}
           selectedIds={contextMenu.isBulk ? selectedIds : [contextMenu.tasks[0]?.id].filter(Boolean)}

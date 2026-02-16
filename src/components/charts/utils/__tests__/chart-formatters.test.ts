@@ -38,8 +38,8 @@ describe('Chart Formatters', () => {
     });
 
     it('should format percentages with custom precision', () => {
-      expect(formatPercentage(0.123456, 1)).toBe('12,3%');
-      expect(formatPercentage(0.123456, 3)).toBe('12,346%');
+      expect(formatPercentage(0.123456, { maximumFractionDigits: 1, minimumFractionDigits: 1 })).toBe('12,3%');
+      expect(formatPercentage(0.123456, { maximumFractionDigits: 3, minimumFractionDigits: 3 })).toBe('12,346%');
     });
 
     it('should handle negative percentages', () => {

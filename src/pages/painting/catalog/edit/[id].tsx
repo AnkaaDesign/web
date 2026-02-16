@@ -6,7 +6,7 @@ import { updatePaint } from "../../../../api-client";
 import { routes } from "../../../../constants";
 import { mapPaintToFormData } from "../../../../schemas";
 import type { PaintUpdateFormData, PaintFormulaCreateFormData } from "../../../../schemas";
-import type { PaintFormula } from "../../../../types";
+import type { PaintFormula, Paint } from "../../../../types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
@@ -72,8 +72,8 @@ export default function CatalogEditPage() {
         for (const formula of newFormulas) {
           const validComponents =
             formula.components?.filter((c) => {
-              const weightInGrams = c.weightInGrams || 0;
-              return c.itemId && weightInGrams > 0;
+              const weight = c.weight || 0;
+              return c.itemId && weight > 0;
             }) ?? [];
 
           if (validComponents.length === 0) {
@@ -87,7 +87,7 @@ export default function CatalogEditPage() {
             description: formula.description || "Fórmula Principal",
             components: validComponents.map((c) => ({
               itemId: c.itemId,
-              weightInGrams: c.weightInGrams || 0,
+              weightInGrams: c.weight || 0,
             })),
           };
 
@@ -193,7 +193,7 @@ export default function CatalogEditPage() {
         <PageHeader
           title="Carregando..."
           icon={IconPalette}
-          favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_EDITAR}
+          favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Pintura", href: routes.painting.root },
@@ -219,7 +219,7 @@ export default function CatalogEditPage() {
         <PageHeader
           title="Erro ao carregar tinta"
           icon={IconPalette}
-          favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_EDITAR}
+          favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Pintura", href: routes.painting.root },
@@ -243,14 +243,14 @@ export default function CatalogEditPage() {
   const defaultValues = mapPaintToFormData(paint);
 
   // Extract ground paints for the GroundSelector's initialPaints
-  const initialGrounds = paint.paintGrounds?.map((pg) => pg.groundPaint).filter(Boolean) || [];
+  const initialGrounds = (paint.paintGrounds?.map((pg) => pg.groundPaint).filter((p): p is Paint => p !== undefined) || []) as Paint[];
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
         title={`Editar ${paint.name}`}
         icon={IconPalette}
-        favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_EDITAR}
+        favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
         breadcrumbs={[
           { label: "Início", href: routes.home },
           { label: "Pintura", href: routes.painting.root },

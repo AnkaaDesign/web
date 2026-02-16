@@ -32,7 +32,7 @@ export function PositionSelector<_T extends FieldValues = FieldValues>({
   excludeIds = [],
   onQuickCreate,
   initialPosition,
-}: PositionSelectorProps<T>) {
+}: PositionSelectorProps<_T>) {
   // Memoize initial options
   const initialOptions = useMemo(() => {
     if (!initialPosition) return [];

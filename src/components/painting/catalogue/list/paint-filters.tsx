@@ -52,7 +52,7 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
     setLocalFilters((prev) => {
       // Remove the key if value is undefined, null, or empty string
       if (value === undefined || value === null || value === "") {
-        const { [key]: _, ...rest } = prev;
+        const { [key as string]: _, ...rest } = prev;
         return rest;
       }
       return {
@@ -75,9 +75,10 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
 
     // Remove any empty string values
     Object.keys(cleanedFilters).forEach((key) => {
-      const value = cleanedFilters[key as keyof PaintGetManyFormData];
+      const typedKey = key as Extract<keyof PaintGetManyFormData, string>;
+      const value = cleanedFilters[typedKey];
       if (value === "" || value === null || value === undefined) {
-        delete cleanedFilters[key as keyof PaintGetManyFormData];
+        delete cleanedFilters[typedKey];
       }
     });
 

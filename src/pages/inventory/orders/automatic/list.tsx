@@ -72,7 +72,7 @@ export const AutomaticOrderListPage = () => {
       toast({
         title: 'Nenhum item para ordenar',
         description: 'Não há recomendações de pedidos automáticos',
-        variant: 'destructive',
+        variant: 'error',
       });
       return;
     }
@@ -99,7 +99,7 @@ export const AutomaticOrderListPage = () => {
       toast({
         title: 'Erro ao criar pedidos',
         description: 'Não foi possível criar os pedidos automáticos',
-        variant: 'destructive',
+        variant: 'error',
       });
     }
   };
@@ -203,17 +203,13 @@ export const AutomaticOrderListPage = () => {
       .filter(group => group.items.length > 0);
   }, [analysisData?.data.supplierGroups, searchValue]);
 
-  const handleClearSearch = () => {
-    setSearchValue('');
-  };
-
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"
           title="Pedidos Automáticos"
-          favoritePage={FAVORITE_PAGES.ESTOQUE_PEDIDOS_AUTOMATICOS}
+          favoritePage={FAVORITE_PAGES.ESTOQUE_PEDIDOS_AUTOMATICOS_LISTAR}
           breadcrumbs={[
             { label: 'Início', href: routes.home },
             { label: 'Estoque', href: routes.inventory.root },
@@ -255,23 +251,23 @@ export const AutomaticOrderListPage = () => {
               <>
                 {analysisData?.data.summary && (
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="p-4 border border-border/40 rounded-lg">
+                    <div className="p-4 border border-border rounded-lg">
                       <div className="text-xs text-muted-foreground mb-1">Total de Itens</div>
                       <div className="text-2xl font-bold">{analysisData.data.summary.totalItems}</div>
                     </div>
-                    <div className="p-4 border border-border/40 rounded-lg">
+                    <div className="p-4 border border-border rounded-lg">
                       <div className="text-xs text-muted-foreground mb-1">Valor Estimado</div>
                       <div className="text-2xl font-bold">
                         {formatCurrency(analysisData.data.summary.totalEstimatedCost || 0)}
                       </div>
                     </div>
-                    <div className="p-4 border border-border/40 rounded-lg">
+                    <div className="p-4 border border-border rounded-lg">
                       <div className="text-xs text-muted-foreground mb-1">Críticos</div>
                       <div className="text-2xl font-bold text-destructive">
                         {analysisData.data.summary.criticalItems}
                       </div>
                     </div>
-                    <div className="p-4 border border-border/40 rounded-lg">
+                    <div className="p-4 border border-border rounded-lg">
                       <div className="text-xs text-muted-foreground mb-1">Overrides Emergenciais</div>
                       <div className="text-2xl font-bold text-orange-500">
                         {analysisData.data.summary.emergencyOverrides}
@@ -285,7 +281,6 @@ export const AutomaticOrderListPage = () => {
                   <TableSearchInput
                     value={searchValue}
                     onChange={setSearchValue}
-                    onClear={handleClearSearch}
                     placeholder="Pesquisar itens ou fornecedores..."
                     className="flex-1"
                   />
@@ -296,7 +291,7 @@ export const AutomaticOrderListPage = () => {
                       value={minStockCriteria}
                       onValueChange={(value) => setMinStockCriteria(value as 'all' | 'low' | 'critical')}
                       placeholder="Criticidade"
-                      emptyMessage="Nenhuma opção encontrada"
+                      emptyText="Nenhuma opção encontrada"
                       searchPlaceholder="Buscar..."
                     />
                   </div>
@@ -320,7 +315,7 @@ export const AutomaticOrderListPage = () => {
                                 value={minStockCriteria}
                                 onValueChange={(value) => setMinStockCriteria(value as 'all' | 'low' | 'critical')}
                                 placeholder="Selecione..."
-                                emptyMessage="Nenhuma opção encontrada"
+                                emptyText="Nenhuma opção encontrada"
                                 searchPlaceholder="Buscar..."
                               />
                             </div>
@@ -349,7 +344,7 @@ export const AutomaticOrderListPage = () => {
                             </div>
 
                             {/* Table */}
-                            <div className="border border-border/40 rounded-lg overflow-hidden">
+                            <div className="border border-border rounded-lg overflow-hidden">
                               <Table>
                                 <TableHeader>
                                   <TableRow>

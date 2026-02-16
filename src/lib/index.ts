@@ -18,9 +18,10 @@ export type {
   DownloadOptions,
   StorageUrlOptions,
   ThumbnailSize,
-  PreviewType,
-  StorageType,
 } from './file-utilities';
+
+// Re-export types from the .d.ts file since they're only in the type definitions
+export type { PreviewType, StorageType } from './file-utilities.d';
 
 // Export push notification utilities
 export * from './push-notifications';

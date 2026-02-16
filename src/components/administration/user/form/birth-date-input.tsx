@@ -18,7 +18,11 @@ export function BirthDateInput({ disabled, required = false }: BirthDateInputPro
       name="birth"
       render={({ field }) => (
         <DateTimeInput
-          field={field}
+          field={{
+            ...field,
+            value: field.value as Date | null,
+            onChange: (value) => field.onChange(value as Date | null),
+          }}
           label={
             <span className="flex items-center gap-1.5">
               <IconCake className="h-4 w-4" />

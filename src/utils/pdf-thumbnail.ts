@@ -1,21 +1,6 @@
 // PDF Thumbnail Generation Utilities
 import type { File as AnkaaFile } from "../types";
-
-/**
- * Get API base URL from environment or fallback
- */
-const getApiBaseUrl = (): string => {
-  if (typeof globalThis !== "undefined" && typeof globalThis.window !== "undefined") {
-    const windowApiUrl = (globalThis.window as any).__ANKAA_API_URL__;
-    if (windowApiUrl) return windowApiUrl;
-  }
-
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-
-  return "http://localhost:3030";
-};
+import { getApiBaseUrl } from "@/config/api";
 
 /**
  * PDF thumbnail options

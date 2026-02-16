@@ -390,10 +390,17 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
               options={stockLevelOptions}
               value={localState.stockLevels || []}
               onValueChange={(value) => {
-                setLocalState((prev) => ({
-                  ...prev,
-                  stockLevels: value.length > 0 ? (value as STOCK_LEVEL[]) : undefined,
-                }));
+                if (!value || (Array.isArray(value) && value.length === 0)) {
+                  setLocalState((prev) => ({
+                    ...prev,
+                    stockLevels: undefined,
+                  }));
+                } else {
+                  setLocalState((prev) => ({
+                    ...prev,
+                    stockLevels: value as STOCK_LEVEL[],
+                  }));
+                }
               }}
               placeholder="Selecione status de estoque..."
               emptyText="Nenhum status encontrado"
@@ -428,10 +435,17 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
               initialOptions={[]}
               value={localState.categoryIds || []}
               onValueChange={(value) => {
-                setLocalState((prev) => ({
-                  ...prev,
-                  categoryIds: value.length > 0 ? value : undefined,
-                }));
+                if (!value || (Array.isArray(value) && value.length === 0)) {
+                  setLocalState((prev) => ({
+                    ...prev,
+                    categoryIds: undefined,
+                  }));
+                } else {
+                  setLocalState((prev) => ({
+                    ...prev,
+                    categoryIds: value as string[],
+                  }));
+                }
               }}
               placeholder="Selecione categorias..."
               emptyText="Nenhuma categoria encontrada"
@@ -461,10 +475,17 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
               initialOptions={[]}
               value={localState.brandIds || []}
               onValueChange={(value) => {
-                setLocalState((prev) => ({
-                  ...prev,
-                  brandIds: value.length > 0 ? value : undefined,
-                }));
+                if (!value || (Array.isArray(value) && value.length === 0)) {
+                  setLocalState((prev) => ({
+                    ...prev,
+                    brandIds: undefined,
+                  }));
+                } else {
+                  setLocalState((prev) => ({
+                    ...prev,
+                    brandIds: value as string[],
+                  }));
+                }
               }}
               placeholder="Selecione marcas..."
               emptyText="Nenhuma marca encontrada"
@@ -494,10 +515,17 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
               initialOptions={[]}
               value={localState.supplierIds || []}
               onValueChange={(value) => {
-                setLocalState((prev) => ({
-                  ...prev,
-                  supplierIds: value.length > 0 ? value : undefined,
-                }));
+                if (!value || (Array.isArray(value) && value.length === 0)) {
+                  setLocalState((prev) => ({
+                    ...prev,
+                    supplierIds: undefined,
+                  }));
+                } else {
+                  setLocalState((prev) => ({
+                    ...prev,
+                    supplierIds: value as string[],
+                  }));
+                }
               }}
               placeholder="Selecione fornecedores..."
               emptyText="Nenhum fornecedor encontrado"
@@ -541,14 +569,13 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
                 </Label>
                 <Input
                   id="quantityMin"
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="decimal"
+                  min={0}
+                  step={0.01}
                   placeholder="0"
-                  value={localState.quantityRange?.min || ""}
+                  value={localState.quantityRange?.min ?? null}
                   onChange={(value) => {
-                    const strValue = value as string;
-                    const min = strValue ? parseFloat(strValue) : undefined;
+                    const min = typeof value === "number" ? value : undefined;
                     setLocalState((prev) => ({
                       ...prev,
                       quantityRange: {
@@ -566,14 +593,13 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
                 </Label>
                 <Input
                   id="quantityMax"
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="decimal"
+                  min={0}
+                  step={0.01}
                   placeholder="∞"
-                  value={localState.quantityRange?.max || ""}
+                  value={localState.quantityRange?.max ?? null}
                   onChange={(value) => {
-                    const strValue = value as string;
-                    const max = strValue ? parseFloat(strValue) : undefined;
+                    const max = typeof value === "number" ? value : undefined;
                     setLocalState((prev) => ({
                       ...prev,
                       quantityRange: {

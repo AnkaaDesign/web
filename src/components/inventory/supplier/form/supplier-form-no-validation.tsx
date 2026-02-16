@@ -40,21 +40,21 @@ export function SupplierFormNoValidation(props: SupplierFormProps) {
 
   // Default values for create mode
   const createDefaults: SupplierCreateFormData = {
-    fantasyName: "",
-    cnpj: null,
-    corporateName: null,
-    email: null,
-    address: null,
-    addressNumber: null,
-    addressComplement: null,
-    neighborhood: null,
-    city: null,
-    state: null,
-    zipCode: null,
-    site: null,
-    phones: [],
-    logoId: null,
-    ...defaultValues,
+    fantasyName: defaultValues?.fantasyName || "",
+    cnpj: defaultValues?.cnpj ?? null,
+    corporateName: defaultValues?.corporateName ?? null,
+    email: defaultValues?.email ?? null,
+    address: defaultValues?.address ?? null,
+    addressNumber: defaultValues?.addressNumber ?? null,
+    addressComplement: defaultValues?.addressComplement ?? null,
+    neighborhood: defaultValues?.neighborhood ?? null,
+    city: defaultValues?.city ?? null,
+    state: defaultValues?.state ?? null,
+    zipCode: defaultValues?.zipCode ?? null,
+    site: defaultValues?.site ?? null,
+    phones: defaultValues?.phones ?? [],
+    logoId: defaultValues?.logoId ?? null,
+    tags: defaultValues?.tags ?? [],
   };
 
   // Create form WITHOUT zodResolver for update mode to avoid validation on unchanged fields

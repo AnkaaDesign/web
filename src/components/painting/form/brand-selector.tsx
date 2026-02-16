@@ -44,7 +44,7 @@ export function PaintBrandSelector({ control, disabled, required }: BrandSelecto
               disabled={disabled || isLoading}
               searchable={true}
               clearable={!required}
-              emptyMessage={isLoading ? "Carregando marcas..." : "Nenhuma marca encontrada"}
+              emptyText={isLoading ? "Carregando marcas..." : "Nenhuma marca encontrada"}
               className="bg-transparent"
             />
           </FormControl>

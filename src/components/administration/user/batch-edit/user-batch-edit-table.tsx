@@ -74,7 +74,7 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
           cpf: user.cpf,
           positionId: user.positionId,
           sectorId: user.sectorId,
-          isSectorLeader: Boolean(user.managedSector?.id),
+          managedSectorId: user.managedSector?.id ?? null,
           status: user.status,
         },
       })),
@@ -99,7 +99,7 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
         user.data.cpf !== originalUser.cpf ||
         user.data.positionId !== originalUser.positionId ||
         user.data.sectorId !== originalUser.sectorId ||
-        user.data.isSectorLeader !== Boolean(originalUser.managedSector?.id) ||
+        user.data.managedSectorId !== (originalUser.managedSector?.id ?? null) ||
         user.data.status !== originalUser.status;
 
       return hasChanges;
@@ -339,7 +339,7 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
                       {/* Setor Gerenciado */}
                       <TableCell className="w-56 p-0 !border-r-0">
                         <div className="px-4 py-2">
-                          <ManagedSectorCell control={form.control} index={index} currentSectorName={user.managedSector?.name} />
+                          <ManagedSectorCell control={form.control} index={index} />
                         </div>
                       </TableCell>
 
@@ -381,7 +381,7 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
       </Card>
 
       {/* Batch Operation Result Dialog */}
-      <UserBatchResultDialog open={showResultDialog} onOpenChange={handleResultDialogClose} result={batchResult} operationType="update" />
+      <UserBatchResultDialog open={showResultDialog} onOpenChange={handleResultDialogClose} result={batchResult as any} operationType="update" />
     </Form>
   );
 }

@@ -56,7 +56,7 @@ export function SectorBatchEditTable({ sectors, onSubmit, isSubmitting = false }
 
     // Check for duplicates
     const watchedSectors = form.watch("sectors");
-    const duplicateIndex = watchedSectors.findIndex((s, i) => i !== index && s.data.name.trim().toLowerCase() === trimmedName.toLowerCase());
+    const duplicateIndex = watchedSectors.findIndex((s, i) => i !== index && s.data.name?.trim().toLowerCase() === trimmedName.toLowerCase());
 
     if (duplicateIndex !== -1) {
       errors.push(`Nome duplicado com setor na linha ${duplicateIndex + 1}`);
@@ -71,7 +71,7 @@ export function SectorBatchEditTable({ sectors, onSubmit, isSubmitting = false }
     let hasErrors = false;
 
     data.sectors.forEach((sectorData, index) => {
-      const errors = validateSectorName(sectorData.data.name, index);
+      const errors = validateSectorName(sectorData.data.name ?? "", index);
       if (errors.length > 0) {
         newValidationErrors[index] = errors;
         hasErrors = true;
@@ -87,6 +87,7 @@ export function SectorBatchEditTable({ sectors, onSubmit, isSubmitting = false }
     // Filter out sectors that haven't changed
     const changedSectors = data.sectors.filter((sectorData, index) => {
       const original = sectors[index];
+      if (!original) return false;
       return sectorData.data.name !== original.name || sectorData.data.privileges !== original.privileges;
     });
 
@@ -113,7 +114,12 @@ export function SectorBatchEditTable({ sectors, onSubmit, isSubmitting = false }
                 return (
                   <TableRow key={field.id}>
                     <TableCell>
-                      <Input {...form.register(`sectors.${index}.data.name`)} placeholder="Nome do setor" disabled={isSubmitting} />
+                      <Input
+                        value={form.watch(`sectors.${index}.data.name`) ?? ''}
+                        onChange={(value) => form.setValue(`sectors.${index}.data.name`, value as string)}
+                        placeholder="Nome do setor"
+                        disabled={isSubmitting}
+                      />
                     </TableCell>
                     <TableCell>
                       <Combobox

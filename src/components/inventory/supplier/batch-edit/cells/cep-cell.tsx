@@ -68,7 +68,7 @@ export function CepCell({ control, index, disabled, onAddressFound }: CepCellPro
                 value={field.value ?? ""}
                 onChange={(value) => {
                   field.onChange(value ?? null);
-                  handleCepLookup(value || "");
+                  handleCepLookup(String(value || ""));
                 }}
                 disabled={disabled || isLoading}
                 onBlur={field.onBlur}

@@ -37,7 +37,7 @@ export function DateInput({ control, disabled, required }: DateInputProps) {
             },
           }}
           mode="date"
-          context="holiday"
+          context="general"
           label="Data"
           disabled={disabled}
           required={required}
@@ -50,7 +50,6 @@ export function DateInput({ control, disabled, required }: DateInputProps) {
             })(),
           }}
           showClearButton={true}
-          allowManualInput={true}
         />
       )}
     />

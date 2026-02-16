@@ -58,7 +58,7 @@ export function NotificationList({ className }: NotificationListProps) {
     isFetchingNextPage,
   });
 
-  const notifications = data?.pages.flatMap((page) => page.data || []) || [];
+  const notifications = data?.pages?.flatMap((page) => page?.data || []) || [];
 
   // Debounced search effect
   useEffect(() => {

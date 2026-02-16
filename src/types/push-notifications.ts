@@ -3,6 +3,14 @@
  */
 
 /**
+ * Service Worker ExtendableEvent interface
+ * Used for service worker events that can be extended with waitUntil()
+ */
+export interface ExtendableEvent extends Event {
+  waitUntil(promise: Promise<any>): void;
+}
+
+/**
  * Firebase Cloud Messaging payload structure
  */
 export interface FCMPayload {

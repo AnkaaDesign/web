@@ -408,8 +408,8 @@ export type BonusDiscountWhere = z.infer<typeof bonusDiscountWhereSchema>;
 // =====================
 
 export const mapToBonusDiscountFormData = createMapToFormDataHelper<BonusDiscount, BonusDiscountUpdateFormData>((bonusDiscount) => ({
-  percentage: bonusDiscount.percentage ?? undefined,
-  value: bonusDiscount.value ?? undefined,
+  percentage: bonusDiscount.percentage ? (typeof bonusDiscount.percentage === 'number' ? bonusDiscount.percentage : bonusDiscount.percentage.toNumber()) : undefined,
+  value: bonusDiscount.value ? (typeof bonusDiscount.value === 'number' ? bonusDiscount.value : bonusDiscount.value.toNumber()) : undefined,
   reference: bonusDiscount.reference,
   calculationOrder: bonusDiscount.calculationOrder,
 }));

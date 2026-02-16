@@ -84,7 +84,7 @@ export function useNotificationSocket() {
             duration: 7000,
           });
           break;
-        case 'MEDIUM':
+        case 'NORMAL':
           toast.info(notification.title, {
             description: notification.body,
             action: toastAction,

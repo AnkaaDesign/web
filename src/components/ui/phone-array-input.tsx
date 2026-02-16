@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useFieldArray, useWatch } from "react-hook-form";
+import { useFieldArray, useWatch, type FieldValues } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,13 +14,13 @@ interface PhoneArrayInputProps<_TFieldValues extends FieldValues = FieldValues> 
   placeholder?: string;
 }
 
-export function PhoneArrayInput<TFieldValues extends FieldValues = FieldValues>({
+export function PhoneArrayInput<_TFieldValues extends FieldValues = FieldValues>({
   control,
   disabled,
   maxPhones = 5,
   label = "Telefones",
   placeholder = "(00) 00000-0000",
-}: PhoneArrayInputProps<TFieldValues>) {
+}: PhoneArrayInputProps<_TFieldValues>) {
   const [newPhone, setNewPhone] = useState("");
 
   // Watch the phones array
@@ -61,8 +61,6 @@ export function PhoneArrayInput<TFieldValues extends FieldValues = FieldValues>(
     <FormField
       control={control}
       name="phones"
-      as
-      any
       render={({ field }) => {
         // Ensure field.value is always an array
         if (!Array.isArray(field.value)) {

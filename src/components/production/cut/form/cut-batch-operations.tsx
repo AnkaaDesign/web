@@ -9,11 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { IconCut, IconTrash, IconEdit, IconCheck, IconPlay, IconClock, IconAlertCircle, IconInfoCircle } from "@tabler/icons-react";
+import { IconCut, IconTrash, IconEdit, IconCheck, IconClock, IconAlertCircle, IconInfoCircle, IconPlayerPlay } from "@tabler/icons-react";
 import { useState } from "react";
 import type { Cut } from "../../../../types";
-import { CUT_STATUS, CUT_STATUS_LABELS, CUT_TYPE_LABELS } from "../../../../constants";
-import { useCutMutations } from "../../../../hooks";
+import { CUT_STATUS, CUT_STATUS_LABELS, CUT_TYPE, CUT_TYPE_LABELS } from "../../../../constants";
+import { useCutBatchMutations } from "../../../../hooks";
 import { useToast } from "@/hooks/common/use-toast";
 
 type BatchOperation = "delete" | "updateStatus" | "updateType";
@@ -21,7 +21,7 @@ type BatchOperation = "delete" | "updateStatus" | "updateType";
 const batchOperationSchema = z.object({
   operation: z.enum(["delete", "updateStatus", "updateType"] as const),
   status: z.nativeEnum(CUT_STATUS).optional(),
-  type: z.enum(["VINYL", "STENCIL"] as const).optional(),
+  type: z.nativeEnum(CUT_TYPE).optional(),
   notes: z.string().optional(),
 });
 
@@ -38,7 +38,7 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { batchUpdate, batchDelete } = useCutMutations();
+  const { batchUpdateAsync, batchDeleteAsync } = useCutBatchMutations();
 
   const form = useForm<BatchOperationFormData>({
     resolver: zodResolver(batchOperationSchema),
@@ -57,7 +57,7 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
       toast({
         title: "Erro",
         description: "Nenhum corte selecionado.",
-        variant: "destructive",
+        variant: "error",
       });
       return;
     }
@@ -66,10 +66,8 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
     try {
       switch (data.operation) {
         case "delete":
-          await batchDelete.mutateAsync({
-            data: {
-              cutIds: selectedCuts.map((cut) => cut.id),
-            },
+          await batchDeleteAsync({
+            cutIds: selectedCuts.map((cut) => cut.id),
           });
           toast({
             title: "Cortes excluídos",
@@ -82,7 +80,7 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
             toast({
               title: "Erro",
               description: "Status é obrigatório para esta operação.",
-              variant: "destructive",
+              variant: "error",
             });
             return;
           }
@@ -95,9 +93,9 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
             ...(data.status === CUT_STATUS.COMPLETED && { completedAt: new Date() }),
           }));
 
-          await batchUpdate.mutateAsync({
-            data: { cuts: statusUpdates },
-            include: {
+          await batchUpdateAsync(
+            { cuts: statusUpdates },
+            {
               file: true,
               task: {
                 include: {
@@ -105,7 +103,7 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
                 },
               },
             },
-          });
+          );
 
           toast({
             title: "Status atualizado",
@@ -118,7 +116,7 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
             toast({
               title: "Erro",
               description: "Tipo é obrigatório para esta operação.",
-              variant: "destructive",
+              variant: "error",
             });
             return;
           }
@@ -128,9 +126,9 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
             type: data.type!,
           }));
 
-          await batchUpdate.mutateAsync({
-            data: { cuts: typeUpdates },
-            include: {
+          await batchUpdateAsync(
+            { cuts: typeUpdates },
+            {
               file: true,
               task: {
                 include: {
@@ -138,7 +136,7 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
                 },
               },
             },
-          });
+          );
 
           toast({
             title: "Tipo atualizado",
@@ -152,7 +150,7 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
       toast({
         title: "Erro",
         description: "Erro ao executar operação em lote.",
-        variant: "destructive",
+        variant: "error",
       });
     } finally {
       setIsSubmitting(false);
@@ -298,7 +296,7 @@ export function CutBatchOperations({ selectedCuts, onSuccess, onCancel, classNam
                             value === CUT_STATUS.PENDING ? (
                               <IconClock className="h-4 w-4 text-yellow-600" />
                             ) : value === CUT_STATUS.CUTTING ? (
-                              <IconPlay className="h-4 w-4 text-blue-600" />
+                              <IconPlayerPlay className="h-4 w-4 text-blue-600" />
                             ) : value === CUT_STATUS.COMPLETED ? (
                               <IconCheck className="h-4 w-4 text-green-600" />
                             ) : undefined,

@@ -7,25 +7,26 @@ import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "../../utils";
 import { useAuth } from "@/contexts/auth-context";
 import { useState, useEffect } from "react";
+import { IconTool } from "@tabler/icons-react";
 import {
-  IconTool,
-  IconCalendarStats,
-  IconScissors,
-  IconSpray,
-  IconBuildingStore,
-  IconClipboardList,
-  IconActivity,
-  IconX,
-  IconCalendar,
-  IconChartPie,
-  IconProgressCheck,
-  IconPlayerPlay,
-  IconCheck,
-  IconExclamationCircle,
-  IconCut,
-  IconGauge,
-  IconCurrencyDollar,
-} from "@tabler/icons-react";
+  CalendarDays,
+  Scissors,
+  SprayCan,
+  Building2,
+  ClipboardList,
+  Activity as ActivityIcon,
+  X,
+  Calendar,
+  PieChart,
+  CheckCircle2,
+  Play,
+  Check,
+  AlertCircle,
+  Scissors as Cut,
+  Gauge,
+  DollarSign,
+  Wrench,
+} from "lucide-react";
 import {
   RecentActivitiesCard,
   TrendCard,
@@ -63,7 +64,13 @@ export const ProductionRootPage = () => {
   });
 
   // Fetch dashboard data with time period
-  const { data: dashboard, isLoading, error } = useProductionDashboard({ timePeriod });
+  const { data: dashboard, isLoading, error } = useProductionDashboard({
+    timePeriod,
+    includeServiceOrders: true,
+    includeCuts: true,
+    includeAirbrush: true,
+    includeTrucks: true,
+  });
 
   // Transform recent activities from real data
   const getRecentActivities = (): Activity[] => {
@@ -76,7 +83,7 @@ export const ProductionRootPage = () => {
     const data = dashboard.data;
 
     // Add completed tasks activity
-    if (data.overview.tasksCompleted?.value) {
+    if (data.overview?.tasksCompleted?.value) {
       activities.push({
         item: "Tarefas Concluídas",
         info: `${data.overview.tasksCompleted.value} concluídas`,
@@ -86,7 +93,7 @@ export const ProductionRootPage = () => {
     }
 
     // Add production activity
-    if (data.overview.tasksInProduction?.value) {
+    if (data.overview?.tasksInProduction?.value) {
       activities.push({
         item: "Produção Ativa",
         info: `${data.overview.tasksInProduction.value} em andamento`,
@@ -125,39 +132,39 @@ export const ProductionRootPage = () => {
     }
 
     const data = dashboard.data.overview;
-    const totalTasks = data.totalTasks?.value || 0;
-    const completedTasks = data.tasksCompleted?.value || 0;
-    const inProgressTasks = data.tasksInProduction?.value || 0;
-    const preparationTasks = data.tasksInPreparation?.value || 0;
-    const cancelledTasks = data.tasksCancelled?.value || 0;
+    const totalTasks = data?.totalTasks?.value ?? 0;
+    const completedTasks = data?.tasksCompleted?.value ?? 0;
+    const inProgressTasks = data?.tasksInProduction?.value ?? 0;
+    const onHoldTasks = data?.tasksOnHold?.value ?? 0;
+    const cancelledTasks = data?.tasksCancelled?.value ?? 0;
 
     return [
       {
         status: "Concluído",
         quantity: completedTasks,
         total: totalTasks,
-        icon: IconCheck,
+        icon: Check,
         color: "green" as const,
       },
       {
         status: "Em Produção",
         quantity: inProgressTasks,
         total: totalTasks,
-        icon: IconPlayerPlay,
+        icon: Play,
         color: "blue" as const,
       },
       {
-        status: "Em Preparação",
-        quantity: preparationTasks,
+        status: "Em Espera",
+        quantity: onHoldTasks,
         total: totalTasks,
-        icon: IconClipboardList,
+        icon: ClipboardList,
         color: "orange" as const,
       },
       {
         status: "Cancelado",
         quantity: cancelledTasks,
         total: totalTasks,
-        icon: IconX,
+        icon: X,
         color: "red" as const,
       },
     ];
@@ -165,14 +172,16 @@ export const ProductionRootPage = () => {
 
   // Get production analysis data from real data
   const getProductionAnalysis = (): AnalysisData[] => {
-    if (!dashboard?.data?.serviceOrders?.byService) {
+    if (!dashboard?.data?.serviceOrders?.serviceOrdersByType?.datasets?.[0]?.data) {
       return [];
     }
 
     // Get service distribution data from the API
-    const serviceData = dashboard.data.serviceOrders.byService;
+    const chartData = dashboard.data.serviceOrders.serviceOrdersByType;
+    const labels = chartData.labels || [];
+    const data = chartData.datasets[0].data || [];
 
-    return serviceData.map((service, index) => {
+    return labels.map((label: string, index: number) => {
       const colors = [
         "bg-blue-500",
         "bg-green-500",
@@ -182,11 +191,15 @@ export const ProductionRootPage = () => {
         "bg-gray-500", // For "Outros"
       ];
 
+      const value = data[index] || 0;
+      const total = data.reduce((sum: number, val: number) => sum + val, 0);
+      const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+
       return {
-        label: service.serviceName || "Serviço sem nome",
-        value: service.count,
-        percentage: service.percentage,
-        info: `${service.count} ordens`,
+        label: label || "Serviço sem nome",
+        value: value,
+        percentage: percentage,
+        info: `${value} ordens`,
         color: colors[index % colors.length],
       };
     });
@@ -213,31 +226,39 @@ export const ProductionRootPage = () => {
       const apiValue = data.productivityMetrics?.tasksByShift?.datasets?.[0]?.data?.[index];
       return {
         label: dayLabel,
-        value: Math.round(apiValue || 0), // Round for display in the chart
+        value: Math.round(apiValue ?? 0), // Round for display in the chart
       };
     });
 
-    // Get garage occupancy data from API spotsByGarage chart data
-    // API returns: labels: ['Pátio', 'Barracão 1', 'Barracão 2', 'Barracão 3']
-    //              datasets[0].data: [patioCount, b1Count, b2Count, b3Count]
-    const garageData = data.garageUtilization;
-    const spotsByGarage = garageData?.spotsByGarage;
-    const garageOccupancy = spotsByGarage?.labels?.map((label: string, index: number) => ({
-      label: label,
-      value: spotsByGarage.datasets?.[0]?.data?.[index] || 0,
-    })) || [
-      { label: "Pátio", value: 0 },
-      { label: "Barracão 1", value: 0 },
-      { label: "Barracão 2", value: 0 },
-      { label: "Barracão 3", value: 0 },
-    ];
+    // Get garage occupancy data - since garageUtilization is not in the API response,
+    // we'll use placeholder data or derive it from truck positions if available
+    // Filter out individual truck entries and only keep garage/position aggregates
+    const truckPositions = data.truckMetrics?.trucksByPosition || [];
+    const isAggregatedData = truckPositions.length <= 10 &&
+      truckPositions.some((item: any) =>
+        item.name?.toLowerCase().includes('barracão') ||
+        item.name?.toLowerCase().includes('pátio') ||
+        item.name?.toLowerCase().includes('patio')
+      );
+
+    const garageOccupancy = isAggregatedData
+      ? truckPositions.map((item: any) => ({
+          label: item.name || "Barracão",
+          value: item.value || 0,
+        }))
+      : [
+          { label: "Pátio", value: 0 },
+          { label: "Barracão 1", value: 0 },
+          { label: "Barracão 2", value: 0 },
+          { label: "Barracão 3", value: 0 },
+        ];
 
     return {
       tasksByType:
         data.productivityMetrics?.tasksBySector?.datasets?.[0]?.data?.map((value, index) => ({
-          label: data.productivityMetrics.tasksBySector.labels[index] || `Setor ${index + 1}`,
-          value: value || 0,
-        })) || [],
+          label: data.productivityMetrics?.tasksBySector?.labels?.[index] ?? `Setor ${index + 1}`,
+          value: value ?? 0,
+        })) ?? [],
       productionWeekly: productionByDay,
       garageOccupancy,
     };
@@ -247,30 +268,30 @@ export const ProductionRootPage = () => {
   const getTrend = (metric?: { trend?: "up" | "down" | "stable"; changePercent?: number }) => {
     if (!metric) return { trend: "stable" as const, percentage: 0 };
     return {
-      trend: metric.trend || ("stable" as const),
-      percentage: Math.abs(metric.changePercent || 0),
+      trend: metric.trend ?? ("stable" as const),
+      percentage: Math.abs(metric.changePercent ?? 0),
     };
   };
 
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-          <PageHeader
-            title="Produção"
-            icon={IconTool}
-            favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Produção" }]}
-            actions={[
-              {
-                key: "time-period",
-                label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                variant: "ghost",
-                className: "p-0 hover:bg-transparent",
-              },
-            ]}
-            className="flex-shrink-0"
-          />
+        <div className="h-full flex flex-col bg-background">
+          {/* Fixed Header */}
+          <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+            <PageHeader
+              title="Produção"
+              icon={IconTool}
+              favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Produção" }]}
+              actions={[
+                {
+                  key: "time-period",
+                  label: <TimePeriodSelector value={timePeriod} onChange={(val) => setTimePeriod(val as DASHBOARD_TIME_PERIOD)} /> as any,
+                },
+              ]}
+            />
+          </div>
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto px-4 pb-6">
@@ -334,29 +355,29 @@ export const ProductionRootPage = () => {
   if (error) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-          <PageHeader
-            title="Produção"
-            icon={IconTool}
-            favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Produção" }]}
-            actions={[
-              {
-                key: "time-period",
-                label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                variant: "ghost",
-                className: "p-0 hover:bg-transparent",
-              },
-            ]}
-            className="flex-shrink-0"
-          />
+        <div className="h-full flex flex-col bg-background">
+          {/* Fixed Header */}
+          <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+            <PageHeader
+              title="Produção"
+              icon={IconTool}
+              favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Produção" }]}
+              actions={[
+                {
+                  key: "time-period",
+                  label: <TimePeriodSelector value={timePeriod} onChange={(val) => setTimePeriod(val as DASHBOARD_TIME_PERIOD)} /> as any,
+                },
+              ]}
+            />
+          </div>
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto px-4 pb-6">
             <Card>
               <CardContent className="p-6">
                 <Alert>
-                  <IconExclamationCircle className="h-4 w-4" />
+                  <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
                     Erro ao carregar o dashboard de produção. Por favor, tente novamente mais tarde.
                     {error && (error as Error).message && <div className="mt-2 text-sm text-muted-foreground">Detalhes: {(error as Error).message}</div>}
@@ -375,22 +396,22 @@ export const ProductionRootPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <PageHeader
-          title="Produção"
-          icon={IconTool}
-          favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Produção" }]}
-          actions={[
-            {
-              key: "time-period",
-              label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-              variant: "ghost",
-              className: "p-0 hover:bg-transparent",
-            },
-          ]}
-          className="flex-shrink-0"
-        />
+      <div className="h-full flex flex-col bg-background">
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+          <PageHeader
+            title="Produção"
+            icon={IconTool}
+            favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
+            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Produção" }]}
+            actions={[
+              {
+                key: "time-period",
+                label: <TimePeriodSelector value={timePeriod} onChange={(val) => setTimePeriod(val as DASHBOARD_TIME_PERIOD)} /> as any,
+              },
+            ]}
+          />
+        </div>
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-4 pb-6">
@@ -402,30 +423,30 @@ export const ProductionRootPage = () => {
               <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <QuickAccessCard
                   title="Cronograma"
-                  icon={IconCalendarStats}
+                  icon={CalendarDays}
                   onClick={() => navigate(routes.production.schedule.root)}
                   count={dashboard?.data?.overview?.totalTasks?.value || 0}
                   color="blue"
                 />
                 <QuickAccessCard
                   title="Recorte"
-                  icon={IconScissors}
+                  icon={Scissors}
                   onClick={() => navigate(routes.production.cutting.root)}
                   count={dashboard?.data?.cuttingOperations?.totalCuts?.value || 0}
                   color="green"
                 />
                 <QuickAccessCard
                   title="Aerografia"
-                  icon={IconSpray}
+                  icon={SprayCan}
                   onClick={() => navigate(routes.production.airbrushings.root)}
                   count={dashboard?.data?.airbrushingMetrics?.totalAirbrushJobs?.value || 0}
                   color="purple"
                 />
                 <QuickAccessCard
                   title="Barracões"
-                  icon={IconBuildingStore}
+                  icon={Building2}
                   onClick={() => navigate(routes.production.garages.root)}
-                  count={dashboard?.data?.garageUtilization?.totalGarages?.value || 0}
+                  count={dashboard?.data?.truckMetrics?.totalTrucks?.value || 0}
                   color="red"
                 />
               </div>
@@ -435,7 +456,7 @@ export const ProductionRootPage = () => {
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4">Atividades Recentes</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <RecentActivitiesCard title="Atividades Recentes" activities={getRecentActivities()} icon={IconActivity} color="blue" />
+                <RecentActivitiesCard title="Atividades Recentes" activities={getRecentActivities()} icon={ActivityIcon} color="blue" />
                 <RecentActivitiesCard
                   title="Tarefas Concluídas"
                   activities={[
@@ -446,7 +467,7 @@ export const ProductionRootPage = () => {
                       time: "Taxa",
                     },
                   ]}
-                  icon={IconProgressCheck}
+                  icon={CheckCircle2}
                   color="green"
                 />
                 <RecentActivitiesCard
@@ -459,20 +480,20 @@ export const ProductionRootPage = () => {
                       time: "Finalizados",
                     },
                   ]}
-                  icon={IconCut}
+                  icon={Cut}
                   color="orange"
                 />
                 <RecentActivitiesCard
                   title="Utilização de Barracões"
                   activities={[
                     {
-                      item: `${dashboard?.data?.garageUtilization?.occupiedSpots?.value || 0}/18`,
+                      item: `${dashboard?.data?.truckMetrics?.totalTrucks?.value || 0}/18`,
                       info: "Vagas ocupadas",
-                      quantity: `${dashboard?.data?.garageUtilization?.totalGarages?.value || 3} barracões`,
+                      quantity: `${dashboard?.data?.truckMetrics?.trucksInProduction?.value || 0} em produção`,
                       time: "Capacidade: 2 por faixa",
                     },
                   ]}
-                  icon={IconGauge}
+                  icon={Gauge}
                   color="purple"
                 />
               </div>
@@ -487,7 +508,7 @@ export const ProductionRootPage = () => {
                   value={dashboard?.data?.overview?.totalTasks?.value || 0}
                   trend={getTrend(dashboard?.data?.overview?.totalTasks).trend}
                   percentage={getTrend(dashboard?.data?.overview?.totalTasks).percentage}
-                  icon={IconCalendarStats}
+                  icon={CalendarDays}
                   subtitle="No sistema"
                 />
                 <TrendCard
@@ -495,7 +516,7 @@ export const ProductionRootPage = () => {
                   value={dashboard?.data?.cuttingOperations?.totalCuts?.value || 0}
                   trend={getTrend(dashboard?.data?.cuttingOperations?.totalCuts).trend}
                   percentage={getTrend(dashboard?.data?.cuttingOperations?.totalCuts).percentage}
-                  icon={IconScissors}
+                  icon={Scissors}
                   subtitle="Total de operações"
                 />
                 <TrendCard
@@ -503,15 +524,17 @@ export const ProductionRootPage = () => {
                   value={dashboard?.data?.airbrushingMetrics?.totalAirbrushJobs?.value || 0}
                   trend={getTrend(dashboard?.data?.airbrushingMetrics?.totalAirbrushJobs).trend}
                   percentage={getTrend(dashboard?.data?.airbrushingMetrics?.totalAirbrushJobs).percentage}
-                  icon={IconSpray}
+                  icon={SprayCan}
                   subtitle="Trabalhos totais"
                 />
                 <TrendCard
                   title="Receita Total"
-                  value={formatCurrency(dashboard?.data?.revenueAnalysis?.totalRevenue?.value || 0)}
-                  trend={getTrend(dashboard?.data?.revenueAnalysis?.totalRevenue).trend}
-                  percentage={getTrend(dashboard?.data?.revenueAnalysis?.totalRevenue).percentage}
-                  icon={IconCurrencyDollar}
+                  value={formatCurrency(
+                    dashboard?.data?.revenueAnalysis?.revenueByMonth?.reduce((sum, point) => sum + point.value, 0) || 0
+                  )}
+                  trend="stable"
+                  percentage={0}
+                  icon={DollarSign}
                   subtitle="Faturamento"
                 />
               </div>
@@ -524,19 +547,19 @@ export const ProductionRootPage = () => {
                 <ActivityPatternCard
                   title="Tarefas por Setor"
                   data={activityPatterns.tasksByType.length > 0 ? activityPatterns.tasksByType : [{ label: "Sem setor", value: 0 }]}
-                  icon={IconTool}
+                  icon={Wrench}
                   color="blue"
                 />
                 <ActivityPatternCard
                   title={timePeriod === DASHBOARD_TIME_PERIOD.THIS_WEEK ? "Produção por Dia (Total)" : "Produção por Dia (Média)"}
                   data={activityPatterns.productionWeekly}
-                  icon={IconCalendar}
+                  icon={Calendar}
                   color="green"
                 />
                 <ActivityPatternCard
                   title="Ocupação por Barracão"
                   data={activityPatterns.garageOccupancy.length > 0 ? activityPatterns.garageOccupancy : [{ label: "Sem dados", value: 0 }]}
-                  icon={IconBuildingStore}
+                  icon={Building2}
                   color="orange"
                 />
               </div>
@@ -560,21 +583,24 @@ export const ProductionRootPage = () => {
                   title="Distribuição por Serviço"
                   type="SERVICE"
                   data={getProductionAnalysis()}
-                  icon={IconChartPie}
+                  icon={PieChart}
                 />
                 <AnalysisCard
                   title="Receita por Setor"
                   type="REVENUE"
                   data={
-                    dashboard?.data?.revenueAnalysis?.revenueBySector?.datasets?.[0]?.data?.map((value, index) => ({
-                      label: dashboard.data.revenueAnalysis.revenueBySector.labels[index] || `Setor ${index + 1}`,
-                      value: value || 0,
-                      percentage: Math.round(((value || 0) / (dashboard.data.revenueAnalysis.totalRevenue?.value || 1)) * 100),
-                      info: formatCurrency(value || 0),
-                      color: `bg-${["blue", "green", "purple", "orange", "red", "yellow"][index % 6]}-500`,
-                    })) || [{ label: "Sem dados", value: 0, percentage: 0, info: formatCurrency(0), color: "bg-gray-500" }]
+                    dashboard?.data?.revenueAnalysis?.revenueBySector?.datasets?.[0]?.data?.map((value, index) => {
+                      const totalRevenue = dashboard?.data?.revenueAnalysis?.revenueByMonth?.reduce((sum, point) => sum + point.value, 0) || 1;
+                      return {
+                        label: dashboard.data?.revenueAnalysis?.revenueBySector?.labels?.[index] ?? `Setor ${index + 1}`,
+                        value: value ?? 0,
+                        percentage: Math.round(((value ?? 0) / totalRevenue) * 100),
+                        info: formatCurrency(value ?? 0),
+                        color: `bg-${["blue", "green", "purple", "orange", "red", "yellow"][index % 6]}-500`,
+                      };
+                    }) ?? [{ label: "Sem dados", value: 0, percentage: 0, info: formatCurrency(0), color: "bg-gray-500" }]
                   }
-                  icon={IconCurrencyDollar}
+                  icon={DollarSign}
                   onDetailsClick={() => navigate(routes.production.schedule.root)}
                 />
               </div>

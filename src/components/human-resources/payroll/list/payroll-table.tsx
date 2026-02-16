@@ -418,7 +418,6 @@ export function PayrollTable({
         isLoading={isLoading}
         error={firstMonthError}
         emptyMessage="Nenhuma folha de pagamento encontrada"
-        emptyDescription="Selecione um período para visualizar a folha de pagamento"
         emptyIcon={IconUsers}
         onSort={toggleSort}
         getSortDirection={getSortDirection}
@@ -429,8 +428,6 @@ export function PayrollTable({
         totalPages={1}
         pageSize={sortedData.length}
         totalRecords={sortedData.length}
-        showPagination={false}
-        showPageInfo={false}
         className={className}
       />
     </div>

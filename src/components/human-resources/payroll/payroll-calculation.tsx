@@ -24,7 +24,8 @@ import {
   useTasks
 } from "../../../hooks";
 import { formatCurrency, formatRelativeTime } from "../../../utils";
-import { TASK_STATUS } from "../../../constants";
+import { TASK_STATUS, COMMISSION_STATUS } from "../../../constants";
+import { toNumber } from "../../../types/common";
 
 interface PayrollCalculationProps {
   userId: string;
@@ -93,13 +94,17 @@ export function PayrollCalculation({
     }
   });
 
-  const user = usersResponse?.data?.[0];
-  const payroll = payrollResponse;
-  const tasks = tasksResponse?.data || [];
+  // Extract data from responses (handle both wrapped and unwrapped responses)
+  const usersData = usersResponse && 'data' in usersResponse ? usersResponse.data : usersResponse;
+  const usersArray = Array.isArray(usersData) ? usersData : [];
+  const user = usersArray[0];
+  const payroll = payrollResponse && 'data' in payrollResponse ? payrollResponse.data : payrollResponse;
+  const tasks = tasksResponse && 'data' in tasksResponse ? tasksResponse.data : tasksResponse;
+  const tasksArray = Array.isArray(tasks) ? tasks : [];
 
   // Calculate current task statistics
   const taskStats: TaskStats = useMemo(() => {
-    const stats = tasks.reduce((acc, task) => {
+    const stats = tasksArray.reduce((acc, task) => {
       acc.total++;
 
       switch (task.status) {
@@ -117,8 +122,9 @@ export function PayrollCalculation({
 
       // Calculate weighted count (this should match bonus calculation logic)
       if (task.status === TASK_STATUS.COMPLETED) {
-        const weight = task.serviceOrders?.reduce((sum, service) =>
-          sum + (service.weight || 1), 0) || 1;
+        // Weight based on commission status: FULL_COMMISSION=1.0, PARTIAL_COMMISSION=0.5, NO_COMMISSION=0
+        const weight = task.commission === COMMISSION_STATUS.FULL_COMMISSION ? 1.0 :
+                       task.commission === COMMISSION_STATUS.PARTIAL_COMMISSION ? 0.5 : 0;
         acc.weightedCount += weight;
       }
 
@@ -132,21 +138,21 @@ export function PayrollCalculation({
     });
 
     return stats;
-  }, [tasks]);
+  }, [tasksArray]);
 
   // Current calculation values (API returns live data for current period)
-  const baseRemuneration = payroll?.baseRemuneration || 0;
-  const bonusValue = payroll?.bonus?.baseBonus || payroll?.bonus?.finalValue || 0;
-  const grossSalary = Number(baseRemuneration) + Number(bonusValue);
+  const baseRemuneration = toNumber(payroll?.baseRemuneration);
+  const bonusValue = toNumber(payroll?.bonus?.baseBonus) || toNumber(payroll?.bonus?.finalValue);
+  const grossSalary = baseRemuneration + bonusValue;
 
   // Calculate discounts
   const discounts = payroll?.discounts || [];
   const totalDiscounts = discounts.reduce((sum: number, discount: any) => {
     if (discount.value) {
-      return sum + Number(discount.value);
+      return sum + toNumber(discount.value);
     }
     if (discount.percentage) {
-      return sum + (grossSalary * Number(discount.percentage) / 100);
+      return sum + (grossSalary * toNumber(discount.percentage) / 100);
     }
     return sum;
   }, 0);
@@ -348,8 +354,8 @@ export function PayrollCalculation({
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Descontos:</p>
                       {discounts.map((discount: any) => {
-                        const discountValue = discount.value ||
-                          (discount.percentage ? (grossSalary * discount.percentage / 100) : 0);
+                        const discountValue = toNumber(discount.value) ||
+                          (discount.percentage ? (grossSalary * toNumber(discount.percentage) / 100) : 0);
 
                         return (
                           <div key={discount.id} className="flex justify-between text-sm">

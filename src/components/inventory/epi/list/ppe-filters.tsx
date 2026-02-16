@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import type { DateRange } from "react-day-picker";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
@@ -225,7 +226,7 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
               initialOptions={initialBrandOptions}
               mode="multiple"
               value={localState.brandIds || []}
-              onValueChange={(value) => setLocalState((prev) => ({ ...prev, brandIds: value }))}
+              onValueChange={(value) => setLocalState((prev) => ({ ...prev, brandIds: Array.isArray(value) ? value : value ? [value] : [] }))}
               placeholder="Selecione marcas..."
               emptyText="Nenhuma marca encontrada"
               searchPlaceholder="Buscar marcas..."
@@ -250,7 +251,7 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
               mode="multiple"
               options={ppeTypeOptions}
               value={localState.ppeType || []}
-              onValueChange={(value) => setLocalState((prev) => ({ ...prev, ppeType: value }))}
+              onValueChange={(value) => setLocalState((prev) => ({ ...prev, ppeType: Array.isArray(value) ? value : value ? [value] : [] }))}
               placeholder="Selecione tipos de EPI..."
               emptyText="Nenhum tipo encontrado"
               searchPlaceholder="Buscar tipos..."
@@ -303,7 +304,8 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAtRange?.gte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return; // Skip DateRange for now
                     if (!date && !localState.createdAtRange?.lte) {
                       setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
                     } else {
@@ -325,7 +327,8 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAtRange?.lte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return; // Skip DateRange for now
                     if (!date && !localState.createdAtRange?.gte) {
                       setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
                     } else {

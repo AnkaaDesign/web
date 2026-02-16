@@ -276,6 +276,7 @@ export function VacationTable({ filters, onDataChange, className, mode = 'hr' }:
         header: "FUNCIONÁRIO",
         sortable: true,
         className: "min-w-[200px]",
+        align: undefined,
         accessor: (vacation: Vacation) => (
           <span className="font-medium truncate block" title={vacation.isCollective ? "Férias Coletivas" : vacation.user?.name}>
             {vacation.isCollective ? "Coletiva" : vacation.user?.name || "—"}
@@ -287,6 +288,7 @@ export function VacationTable({ filters, onDataChange, className, mode = 'hr' }:
         header: "PERÍODO",
         sortable: false,
         className: "min-w-[200px]",
+        align: undefined,
         accessor: (vacation: Vacation) => (
           <span className="text-sm">{vacation.startAt && vacation.endAt ? `${formatDate(vacation.startAt)} - ${formatDate(vacation.endAt)}` : "—"}</span>
         ),
@@ -296,6 +298,7 @@ export function VacationTable({ filters, onDataChange, className, mode = 'hr' }:
         header: "STATUS",
         sortable: true,
         className: "min-w-[150px]",
+        align: undefined,
         accessor: (vacation: Vacation) => (
           <Badge variant="primary" className="font-normal">
             {VACATION_STATUS_LABELS[vacation.status]}
@@ -307,6 +310,7 @@ export function VacationTable({ filters, onDataChange, className, mode = 'hr' }:
         header: "DIAS",
         sortable: true,
         className: "min-w-[80px]",
+        align: undefined,
         accessor: (vacation: Vacation) => {
           // Calculate working days excluding weekends using the utility function
           const workingDays = getWorkdaysBetween(vacation.startAt, vacation.endAt);
@@ -319,6 +323,7 @@ export function VacationTable({ filters, onDataChange, className, mode = 'hr' }:
         header: "SOLICITADO EM",
         sortable: true,
         className: "min-w-[120px]",
+        align: undefined,
         accessor: (vacation: Vacation) => <span className="text-sm text-muted-foreground">{formatDate(vacation.createdAt)}</span>,
       },
     ],

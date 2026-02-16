@@ -1,6 +1,7 @@
 // apps/web/src/utils/file-viewer.ts
 
 import type { File as AnkaaFile } from "../types";
+import { getApiBaseUrl } from "@/config/api";
 
 // File type detection and security utilities
 export interface FileViewerConfig {
@@ -61,21 +62,7 @@ const POTENTIALLY_DANGEROUS_EXTENSIONS = ["exe", "bat", "cmd", "com", "pif", "sc
 
 const XSS_DANGEROUS_TYPES = ["text/html", "application/xhtml+xml", "application/javascript", "text/javascript"];
 
-/**
- * Get API base URL from environment or fallback
- */
-const getApiBaseUrl = (): string => {
-  if (typeof globalThis !== "undefined" && typeof globalThis.window !== "undefined") {
-    const windowApiUrl = (globalThis.window as any).__ANKAA_API_URL__;
-    if (windowApiUrl) return windowApiUrl;
-  }
-
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-
-  return "http://localhost:3030";
-};
+// getApiBaseUrl imported from @/config/api
 
 /**
  * Check if a file is a PDF

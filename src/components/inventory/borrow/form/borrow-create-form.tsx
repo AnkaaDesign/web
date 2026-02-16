@@ -73,7 +73,7 @@ export function BorrowCreateForm() {
       }
 
       // Validate if item is a tool (can be borrowed)
-      if (selectedItem.itemCategory?.type !== "TOOL") {
+      if (selectedItem.category?.type !== "TOOL") {
         toast.error("Apenas ferramentas podem ser emprestadas");
         form.setError("itemId", {
           type: "manual",
@@ -105,11 +105,11 @@ export function BorrowCreateForm() {
 
       // Use createAsync if available, otherwise try create
       if (createAsync) {
-        await createAsync(data);
+        await createAsync(data as any);
       } else if (borrowMutations.create) {
-        borrowMutations.create(data);
+        borrowMutations.create(data as any);
       } else if (createMutation?.mutateAsync) {
-        await createMutation.mutateAsync(data);
+        await createMutation.mutateAsync(data as any);
       } else {
         toast.error("Erro interno: método de criação não disponível");
       }
@@ -205,9 +205,9 @@ export function BorrowCreateForm() {
                     <span className="font-medium">Quantidade disponível:</span> {selectedItem.quantity} {selectedItem.measureUnit || "unidade(s)"}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    <span className="font-medium">Categoria:</span> {selectedItem.itemCategory?.name || "N/A"}
+                    <span className="font-medium">Categoria:</span> {selectedItem.category?.name || "N/A"}
                   </p>
-                  {selectedItem.itemCategory?.type !== "TOOL" && <p className="text-sm text-destructive">⚠️ Apenas ferramentas podem ser emprestadas</p>}
+                  {selectedItem.category?.type !== "TOOL" && <p className="text-sm text-destructive">⚠️ Apenas ferramentas podem ser emprestadas</p>}
                 </div>
               )}
             </form>

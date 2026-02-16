@@ -69,9 +69,9 @@ export function CustomerMergeDialog({ open, onOpenChange, customers, onMerge }: 
           if (value === null || value === undefined) return null;
 
           // Format value for display
-          if (type === "array" && Array.isArray(value)) {
+          if (Array.isArray(value)) {
             formatted = value.length > 0 ? value.join(", ") : "Nenhum";
-          } else if (type === "boolean") {
+          } else if (typeof value === "boolean") {
             formatted = value ? "Sim" : "Não";
           } else {
             formatted = String(value);

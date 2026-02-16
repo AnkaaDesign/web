@@ -19,3 +19,4 @@ export * from "./use-maintenance";
 export * from "./use-stock-balance-form-url-state";
 export * from "./use-stock-metrics";
 export * from "./use-consumption-analytics";
+export * from "./use-price-history";

@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
-import { ARTWORK_STATUS, ARTWORK_STATUS_LABELS } from "@/constants/enums";
+import { ARTWORK_STATUS } from "@/constants/enums";
+import { ARTWORK_STATUS_LABELS } from "@/constants/enum-labels";
 
 interface ArtworkStatusBadgeProps {
   status?: string | null;

@@ -80,7 +80,7 @@ export * from "./work";
 // Re-export dashboard and chart types used by utility components
 export type { ExportFormat, ExportOptions } from "../types/dashboard";
 export type { ExportConfig, ChartExportData } from "./types";
-// file-viewer-utils: exclude duplicates (formatFileSize, getFileExtension, getApiBaseUrl, isImageFile, isVideoFile, isDocumentFile, getFileTypeInfo)
+// file-viewer-utils: exclude duplicates (formatFileSize, getFileExtension, getApiBaseUrl, isImageFile, isVideoFile, isDocumentFile, getFileTypeInfo, validateFile)
 export {
   FileTypeEnum,
   type FileTypeInfo,
@@ -94,7 +94,6 @@ export {
   canGenerateThumbnail,
   generateThumbnailUrl,
   generateFileUrls,
-  validateFile,
   getFileIconColor,
   isPdfFile,
   fileViewerUtils,

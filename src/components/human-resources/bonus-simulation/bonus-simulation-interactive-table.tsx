@@ -276,7 +276,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
           performanceLevel: initialPerformanceLevel,
           bonusAmount: initialBonus
         };
-      });
+      }) as SimulatedUser[];
       setSimulatedUsers(users);
       setIsLoading(false);
     }
@@ -1022,7 +1022,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
                 type="text"
                 inputMode="decimal"
                 value={taskInput}
-                onChange={handleTaskQuantityChange}
+                onChange={(value) => handleTaskQuantityChange(String(value))}
                 className="h-10 text-center font-semibold bg-transparent"
                 placeholder="0,0"
               />
@@ -1052,7 +1052,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
                 type="text"
                 inputMode="decimal"
                 value={averageInput}
-                onChange={handleAveragePerUserChange}
+                onChange={(value) => handleAveragePerUserChange(String(value))}
                 className="h-10 text-center font-semibold bg-transparent"
                 placeholder="0,00"
                 title="Digite a média desejada por usuário para calcular tarefas totais"

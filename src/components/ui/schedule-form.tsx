@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { cn } from "@/lib/utils";
 import { useWatch } from "react-hook-form";
+import type { FieldValues, FieldPath } from "react-hook-form";
 import { SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, MONTH_OCCURRENCE, SCHEDULE_FREQUENCY_LABELS, WEEK_DAY_LABELS, MONTH_LABELS, MONTH_OCCURRENCE_LABELS } from "../../constants";
 export interface ScheduleFormData {
   frequency: SCHEDULE_FREQUENCY;
@@ -201,13 +202,13 @@ export function ScheduleForm<T extends FieldValues & ScheduleFormData>({
                 <FormControl>
                   <Input
                     type="number"
-                    min="1"
-                    max="31"
+                    min={1}
+                    max={31}
                     placeholder="Ex: 15"
-                    value={field.value || ""}
-                    onChange={(e) => {
-                      const value = e.target.value ? parseInt(e.target.value) : null;
-                      field.onChange(value);
+                    value={field.value ?? ""}
+                    onChange={(value) => {
+                      const numValue = typeof value === 'number' ? value : (value ? parseInt(value) : null);
+                      field.onChange(numValue);
                     }}
                     disabled={disabled}
                   />
@@ -282,13 +283,13 @@ export function ScheduleForm<T extends FieldValues & ScheduleFormData>({
                     <FormControl>
                       <Input
                         type="number"
-                        min="1"
-                        max="31"
+                        min={1}
+                        max={31}
                         placeholder="Ex: 15"
-                        value={field.value || ""}
-                        onChange={(e) => {
-                          const value = e.target.value ? parseInt(e.target.value) : null;
-                          field.onChange(value);
+                        value={field.value ?? ""}
+                        onChange={(value) => {
+                          const numValue = typeof value === 'number' ? value : (value ? parseInt(value) : null);
+                          field.onChange(numValue);
                         }}
                         disabled={disabled}
                       />
@@ -347,29 +348,33 @@ export function ScheduleForm<T extends FieldValues & ScheduleFormData>({
       control={control}
       name={name as FieldPath<T>}
       render={({ field }) => (
-        <DateTimeInput
-          field={{
-            ...field,
-            onChange: (date) => {
-              if (date) {
-                // Set hour to 13:00 (1 PM) for schedules
-                const dateWithTime = new Date(date);
-                dateWithTime.setHours(13, 0, 0, 0);
-                field.onChange(dateWithTime);
-              } else {
-                field.onChange(null);
-              }
-            },
-          }}
-          label={label}
-          mode="date"
-          context="scheduled"
-          disabled={disabled}
-          description={description ? `${description} (horário será definido às 13:00)` : "Horário será definido às 13:00"}
-          constraints={{
-            onlyFuture: true,
-          }}
-        />
+        <FormItem>
+          <DateTimeInput
+            field={{
+              ...field,
+              onChange: (date) => {
+                if (date && date instanceof Date) {
+                  // Set hour to 13:00 (1 PM) for schedules
+                  const dateWithTime = new Date(date);
+                  dateWithTime.setHours(13, 0, 0, 0);
+                  field.onChange(dateWithTime);
+                } else {
+                  field.onChange(null);
+                }
+              },
+            }}
+            label={label}
+            mode="date"
+            context="scheduled"
+            disabled={disabled}
+            constraints={{
+              minDate: new Date(),
+            }}
+          />
+          <FormDescription>
+            {description ? `${description} (horário será definido às 13:00)` : "Horário será definido às 13:00"}
+          </FormDescription>
+        </FormItem>
       )}
     />
   );
@@ -440,13 +445,13 @@ export function ScheduleForm<T extends FieldValues & ScheduleFormData>({
                 <FormControl>
                   <Input
                     type="number"
-                    min="1"
-                    max="100"
+                    min={1}
+                    max={100}
                     placeholder="Intervalo"
                     value={showField ? field.value || 1 : ""}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value) || 1;
-                      field.onChange(value);
+                    onChange={(value) => {
+                      const numValue = typeof value === 'number' ? value : (value ? parseInt(value) : 1);
+                      field.onChange(numValue);
                     }}
                     disabled={disabled || !showField}
                   />
@@ -469,14 +474,14 @@ export function ScheduleForm<T extends FieldValues & ScheduleFormData>({
                 <FormControl>
                   <Input
                     type="number"
-                    min="1"
-                    max="31"
+                    min={1}
+                    max={31}
                     placeholder={isMonthly ? "Ex: 15" : "-"}
                     value={isMonthly ? field.value || "" : ""}
-                    onChange={(e) => {
+                    onChange={(value) => {
                       if (isMonthly) {
-                        const value = e.target.value ? parseInt(e.target.value) : null;
-                        field.onChange(value);
+                        const numValue = typeof value === 'number' ? value : (value ? parseInt(value) : null);
+                        field.onChange(numValue);
                       }
                     }}
                     disabled={disabled || !isMonthly}

@@ -219,7 +219,7 @@ export function WarningList({ selectedSeverity, onDataUpdate, className }: Warni
       activeFiltersArray.push({
         key: "severity",
         label: "Severidade",
-        value: WARNING_SEVERITY_LABELS[filters.where.severity] || filters.where.severity,
+        value: WARNING_SEVERITY_LABELS[filters.where.severity as WARNING_SEVERITY] || filters.where.severity,
         onRemove: () => onRemoveFilter("severity"),
       });
     }
@@ -228,7 +228,7 @@ export function WarningList({ selectedSeverity, onDataUpdate, className }: Warni
       activeFiltersArray.push({
         key: "category",
         label: "Categoria",
-        value: WARNING_CATEGORY_LABELS[filters.where.category] || filters.where.category,
+        value: WARNING_CATEGORY_LABELS[filters.where.category as WARNING_CATEGORY] || filters.where.category,
         onRemove: () => onRemoveFilter("category"),
       });
     }

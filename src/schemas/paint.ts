@@ -317,7 +317,7 @@ export const paintIncludeSchema = z
               commissions: z.boolean().optional(),
               services: z.boolean().optional(),
               truck: z.boolean().optional(),
-              airbrushing: z.boolean().optional(),
+              airbrushings: z.boolean().optional(),
             })
             .optional(),
           where: z.any().optional(),
@@ -345,7 +345,7 @@ export const paintIncludeSchema = z
               commissions: z.boolean().optional(),
               services: z.boolean().optional(),
               truck: z.boolean().optional(),
-              airbrushing: z.boolean().optional(),
+              airbrushings: z.boolean().optional(),
             })
             .optional(),
           where: z.any().optional(),

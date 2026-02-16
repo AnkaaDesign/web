@@ -2,8 +2,6 @@
 
 // Form components
 export { OrderScheduleForm } from "./form/order-schedule-form";
-export { OrderScheduleSupplierSelector } from "./form/supplier-selector";
-export { OrderScheduleCategorySelector } from "./form/category-selector";
 export { ItemsSelector } from "./form/items-selector";
 
 // List components

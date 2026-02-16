@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useWatch } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
@@ -9,6 +11,34 @@ import { IconX, IconFlask } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 
+const PAINT_SELECT_FIELDS = {
+  id: true,
+  name: true,
+  code: true,
+  hex: true,
+  finish: true,
+  colorPreview: true,
+  manufacturer: true,
+  paintType: {
+    select: {
+      id: true,
+      name: true,
+      needGround: true,
+    },
+  },
+  paintBrand: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  _count: {
+    select: {
+      formulas: true,
+    },
+  },
+};
+
 interface LogoPaintsSelectorProps {
   control: any;
   disabled?: boolean;
@@ -16,6 +46,9 @@ interface LogoPaintsSelectorProps {
 }
 
 export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPaintsSelectorProps) {
+  // Watch paintIds from form state (persists across accordion unmount/remount)
+  const paintIds = useWatch({ control, name: "paintIds" }) as string[] | undefined;
+
   // Cache of selected paints to display in badges
   const [selectedPaints, setSelectedPaints] = useState<Map<string, Paint>>(
     new Map((initialPaints || []).map(paint => [paint.id, paint]))
@@ -38,6 +71,58 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
     }
   }, [initialPaints]);
 
+  // Stable query key based on sorted paint IDs
+  const selectedPaintsQueryKey = useMemo(
+    () => (paintIds || []).slice().sort().join(","),
+    [paintIds]
+  );
+
+  // Fetch selected paint details by IDs - React Query cache persists across unmount/remount
+  const { data: selectedPaintDetails } = useQuery({
+    queryKey: ["paints", "selected-details", selectedPaintsQueryKey],
+    queryFn: async () => {
+      if (!paintIds || paintIds.length === 0) return [];
+      const response = await getPaints({
+        where: { id: { in: paintIds } },
+        select: PAINT_SELECT_FIELDS,
+        limit: paintIds.length,
+      } as any);
+      return response.data || [];
+    },
+    enabled: (paintIds?.length ?? 0) > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Update selectedPaints map from fetched data + cache + initialPaints
+  useEffect(() => {
+    // Add fetched paint details to cache
+    if (selectedPaintDetails && selectedPaintDetails.length > 0) {
+      selectedPaintDetails.forEach(paint => {
+        paintsCache.current.set(paint.id, paint);
+      });
+    }
+
+    // Build selectedPaints map from all available sources
+    if (paintIds && paintIds.length > 0) {
+      const newSelectedPaints = new Map<string, Paint>();
+      paintIds.forEach((paintId: string) => {
+        const cachedPaint = paintsCache.current.get(paintId);
+        if (cachedPaint) {
+          newSelectedPaints.set(paintId, cachedPaint);
+        } else {
+          const initialPaint = initialPaints?.find(p => p.id === paintId);
+          if (initialPaint) {
+            newSelectedPaints.set(paintId, initialPaint);
+            paintsCache.current.set(paintId, initialPaint);
+          }
+        }
+      });
+      setSelectedPaints(newSelectedPaints);
+    } else {
+      setSelectedPaints(new Map());
+    }
+  }, [selectedPaintDetails, paintIds, initialPaints]);
+
   // Search function for Combobox
   const searchPaints = async (
     search: string,
@@ -50,37 +135,7 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
       orderBy: { name: "asc" },
       page: page,
       take: 15, // Reduced page size for multi-select performance
-      // Use select instead of include to avoid loading full formulas
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        hex: true,
-        finish: true,
-        colorPreview: true,
-        manufacturer: true,
-        // Only get the IDs and names of related entities
-        paintType: {
-          select: {
-            id: true,
-            name: true,
-            needGround: true,
-          },
-        },
-        paintBrand: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        // Only get the count of formulas, not the actual data
-        _count: {
-          select: {
-            formulas: true,
-          },
-        },
-        // DO NOT include formulas data - only count is needed
-      },
+      select: PAINT_SELECT_FIELDS,
     };
 
     // Only add searchingFor if there's actually a search query
@@ -170,31 +225,6 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
       control={control}
       name="paintIds"
       render={({ field }) => {
-        // Update selected paints when field value changes
-        useEffect(() => {
-          if (field.value && Array.isArray(field.value)) {
-            const newSelectedPaints = new Map<string, Paint>();
-            field.value.forEach((paintId: string) => {
-              // First check cache, then fall back to initialPaints
-              const cachedPaint = paintsCache.current.get(paintId);
-              if (cachedPaint) {
-                newSelectedPaints.set(paintId, cachedPaint);
-              } else {
-                // Fallback to initialPaints if not in cache
-                const initialPaint = initialPaints?.find(p => p.id === paintId);
-                if (initialPaint) {
-                  newSelectedPaints.set(paintId, initialPaint);
-                  // Also add to cache for future lookups
-                  paintsCache.current.set(paintId, initialPaint);
-                }
-              }
-            });
-            setSelectedPaints(newSelectedPaints);
-          } else {
-            setSelectedPaints(new Map());
-          }
-        }, [field.value, initialPaints]);
-
         return (
           <FormItem>
             <FormLabel>Tintas da Logomarca</FormLabel>
@@ -222,7 +252,6 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
                   showCount={true}
                   singleMode={false}
                   clearable={true}
-                  loadOnMount={false}  // Enable lazy loading
                   initialOptions={initialOptions}
                   hideDefaultBadges={true}
                 />

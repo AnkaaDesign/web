@@ -38,13 +38,14 @@ export function ColorSelect({
     );
   }, []);
 
-  const renderValue = React.useCallback((option: ColorSelectOption | undefined) => {
-    if (!option) return null;
+  const renderValue = React.useCallback((option: ColorSelectOption | ColorSelectOption[] | undefined) => {
+    const selected = Array.isArray(option) ? option[0] : option;
+    if (!selected) return null;
 
     return (
       <div className="flex items-center gap-2">
-        <div className="w-4 h-4 rounded border border-gray-300" style={{ backgroundColor: option.color }} />
-        <span>{option.label}</span>
+        <div className="w-4 h-4 rounded border border-gray-300" style={{ backgroundColor: selected.color }} />
+        <span>{selected.label}</span>
       </div>
     );
   }, []);

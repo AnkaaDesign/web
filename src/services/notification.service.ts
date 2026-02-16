@@ -47,6 +47,7 @@ export interface NotificationListItem {
   id: string;
   type: string;
   title: string;
+  importance: string;
   sentAt: string | null;
   channel: string[];
   deliveries: DeliveryInfo[];

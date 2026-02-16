@@ -141,6 +141,14 @@ export const taskPricingCreateNestedSchema = z
 
     // Layout File
     layoutFileId: z.string().uuid().optional().nullable(),
+
+    // New fields
+    simultaneousTasks: z.preprocess(
+      (val) => val === '' || val === null || val === undefined ? null : Number(val),
+      z.number().int().min(1).max(100).optional().nullable()
+    ),
+    discountReference: z.string().max(500).optional().nullable(),
+    invoicesToCustomerIds: z.array(z.string().uuid()).optional(),
   })
   .optional()
   .superRefine((data, ctx) => {
@@ -182,26 +190,22 @@ export const taskPricingCreateNestedSchema = z
 
       // Validate discount fields
       if (data.discountType && data.discountType !== 'NONE') {
-        // Check if discount value is missing or not a valid number
-        // The value might come as string from the form, so check more robustly
+        // discountValue is already preprocessed to a number by preprocessMoney
         const discountVal = data.discountValue;
-        const numericValue = typeof discountVal === 'number' ? discountVal :
-                            (typeof discountVal === 'string' && discountVal.trim() !== '') ? Number(discountVal) : null;
-        const hasValidValue = numericValue !== null && !isNaN(numericValue);
 
-        if (!hasValidValue) {
+        if (discountVal === null || discountVal === undefined || isNaN(discountVal)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: "Valor do desconto é obrigatório quando o tipo não é 'Nenhum'",
             path: ['discountValue'],
           });
-        } else if (data.discountType === 'PERCENTAGE' && (numericValue < 0 || numericValue > 100)) {
+        } else if (data.discountType === 'PERCENTAGE' && (discountVal < 0 || discountVal > 100)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: "Porcentagem de desconto deve estar entre 0 e 100",
             path: ['discountValue'],
           });
-        } else if (data.discountType === 'FIXED_VALUE' && numericValue < 0) {
+        } else if (data.discountType === 'FIXED_VALUE' && discountVal < 0) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: "Valor do desconto deve ser maior ou igual a zero",

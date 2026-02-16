@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../constants";
 import { formatNumber, roundToDecimals } from "../../utils";
@@ -140,12 +140,12 @@ export function UnitConverter({
   }, [fromValue, fromUnit, toUnit, onConversionChange, showHistory]);
 
   // Handle value change
-  const handleFromValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleFromValueChange = (value: string | number | null) => {
+    const stringValue = value === null ? "" : String(value);
 
     // Allow empty value and valid number formats
-    if (value === "" || /^\d*[,.]?\d*$/.test(value)) {
-      setFromValue(value);
+    if (stringValue === "" || /^\d*[,.]?\d*$/.test(stringValue)) {
+      setFromValue(stringValue);
     }
   };
 

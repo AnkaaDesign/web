@@ -180,7 +180,7 @@ export function FormulaManager({ formula, availableItems, onStartProduction, onA
                   <ComponentForm
                     component={editingComponent ? components.find((c) => c.id === editingComponent) : undefined}
                     availableItems={availableItems}
-                    onSubmit={editingComponent ? handleUpdateComponent : handleAddComponent}
+                    onSubmit={(editingComponent ? handleUpdateComponent : handleAddComponent) as (data: any) => void}
                     onCancel={handleCancelComponentForm}
                     isEditing={!!editingComponent}
                     selectedComponentIds={components.map((c) => c.itemId).filter(Boolean)}

@@ -62,34 +62,34 @@ export function ItemForm(props: ItemFormProps) {
 
   // Default values for create mode
   const createDefaults: ItemCreateFormData = {
-    name: "",
-    uniCode: null,
-    quantity: 0,
-    reorderPoint: null,  // Auto-calculated by default
-    reorderQuantity: null,  // Optional manual override
-    maxQuantity: null,  // Auto-calculated by default
-    boxQuantity: null,
-    isManualMaxQuantity: false,  // Start in automatic mode
-    isManualReorderPoint: false,  // Start in automatic mode
-    icms: undefined,
-    ipi: undefined,
-    measures: [], // Initialize with empty measures array
-    barcodes: [],
-    shouldAssignToUser: true,
-    abcCategory: null,
-    xyzCategory: null,
-    brandId: undefined,
-    categoryId: undefined,
-    supplierId: null,
-    estimatedLeadTime: 30,
-    isActive: true,
-    price: undefined,
+    name: defaultValues?.name || "",
+    uniCode: defaultValues?.uniCode ?? null,
+    quantity: defaultValues?.quantity ?? 0,
+    reorderPoint: defaultValues?.reorderPoint ?? null,  // Auto-calculated by default
+    reorderQuantity: defaultValues?.reorderQuantity ?? null,  // Optional manual override
+    maxQuantity: defaultValues?.maxQuantity ?? null,  // Auto-calculated by default
+    boxQuantity: defaultValues?.boxQuantity ?? null,
+    isManualMaxQuantity: defaultValues?.isManualMaxQuantity ?? false,  // Start in automatic mode
+    isManualReorderPoint: defaultValues?.isManualReorderPoint ?? false,  // Start in automatic mode
+    icms: defaultValues?.icms ?? undefined,
+    ipi: defaultValues?.ipi ?? undefined,
+    measures: defaultValues?.measures ?? [], // Initialize with empty measures array
+    barcodes: defaultValues?.barcodes ?? [],
+    shouldAssignToUser: defaultValues?.shouldAssignToUser ?? true,
+    abcCategory: defaultValues?.abcCategory ?? null,
+    xyzCategory: defaultValues?.xyzCategory ?? null,
+    brandId: defaultValues?.brandId ?? undefined,
+    categoryId: defaultValues?.categoryId ?? undefined,
+    supplierId: defaultValues?.supplierId ?? null,
+    estimatedLeadTime: defaultValues?.estimatedLeadTime ?? 30,
+    isActive: defaultValues?.isActive ?? true,
+    price: defaultValues?.price ?? undefined,
+    monthlyConsumptionTrendPercent: defaultValues?.monthlyConsumptionTrendPercent ?? null,
     // PPE fields
-    ppeType: null,
-    ppeCA: null,
-    ppeDeliveryMode: null,
-    ppeStandardQuantity: null,
-    ...defaultValues,
+    ppeType: defaultValues?.ppeType ?? null,
+    ppeCA: defaultValues?.ppeCA ?? null,
+    ppeDeliveryMode: defaultValues?.ppeDeliveryMode ?? null,
+    ppeStandardQuantity: defaultValues?.ppeStandardQuantity ?? null,
   };
 
   // Ensure defaultValues has barcodes and measures as arrays for update mode
@@ -127,7 +127,7 @@ export function ItemForm(props: ItemFormProps) {
           const cleanedData = Object.entries(formData).reduce((acc, [key, value]) => {
             // Keep the value if it's not null, undefined, or empty string
             if (value !== null && value !== undefined && value !== "") {
-              acc[key as keyof ItemCreateFormData] = value;
+              acc[key as keyof ItemCreateFormData] = value as any;
             }
             return acc;
           }, {} as Partial<ItemCreateFormData>);

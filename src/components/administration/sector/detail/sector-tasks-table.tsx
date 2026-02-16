@@ -85,7 +85,7 @@ export function SectorTasksTable({ sector }: SectorTasksTableProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate(`${routes.production.history.list}?sectorId=${sector.id}`)}
+            onClick={() => navigate(`${routes.production.history.root}?sectorId=${sector.id}`)}
           >
             Ver todas as tarefas
           </Button>

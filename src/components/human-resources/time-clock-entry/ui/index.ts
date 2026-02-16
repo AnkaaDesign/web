@@ -34,8 +34,6 @@ export {
   timeClockUIUtils,
 } from "./utils";
 
-// Export example component
-export { IntegratedTimeClockTable } from "./table-integration-example";
 
 // Re-export common types
 export interface UIComponentProps {

@@ -1,3 +1,4 @@
+import React from "react";
 import type { SearchField, SearchSuggestion } from "@/hooks/common/use-advanced-search";
 import type { Item, User, Customer, Supplier, Task } from "../types";
 import { IconBox, IconUser, IconUsers, IconTruck, IconClipboardList } from "@tabler/icons-react";

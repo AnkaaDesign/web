@@ -428,10 +428,6 @@ export const routes = {
       request: "/pessoal/meus-epis/solicitar",
       root: "/pessoal/meus-epis",
     },
-    pendingSignatures: {
-      root: "/pessoal/assinaturas-pendentes",
-      sign: (deliveryId: string) => `/pessoal/assinaturas-pendentes/assinar/${deliveryId}`,
-    },
     myLoans: {
       details: (id: string) => `/pessoal/meus-emprestimos/detalhes/${id}`,
       root: "/pessoal/meus-emprestimos",

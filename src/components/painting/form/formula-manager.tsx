@@ -86,6 +86,7 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
             Descrição da Fórmula
             <span className="text-destructive ml-1">*</span>
           </Label>
+          {/* @ts-expect-error - form register onChange type mismatch */}
           <Input
             id="description"
             placeholder="Ex: Fórmula Principal, Variação Clara, etc."

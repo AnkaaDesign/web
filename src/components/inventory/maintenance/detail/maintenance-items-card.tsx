@@ -102,7 +102,7 @@ export function MaintenanceItemsCard({ maintenanceItems, className }: Maintenanc
                 return (
                   <div
                     key={maintenanceItem.id}
-                    className="group relative overflow-hidden rounded-lg border border-border/50 dark:border-border/40 bg-muted/30 min-h-[140px] flex flex-col"
+                    className="group relative overflow-hidden rounded-lg border border-border dark:border-border bg-muted/30 min-h-[140px] flex flex-col"
                   >
                     <div className="p-3 flex-1 flex flex-col justify-center items-center">
                       <IconAlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
@@ -121,7 +121,7 @@ export function MaintenanceItemsCard({ maintenanceItems, className }: Maintenanc
 
               return (
                 <Link key={maintenanceItem.id} to={routes.inventory.products.details(item.id)} className="block">
-                  <div className="group relative overflow-hidden rounded-lg border border-border/50 dark:border-border/40 bg-card hover:bg-muted/50 transition-colors cursor-pointer min-h-[140px] flex flex-col">
+                  <div className="group relative overflow-hidden rounded-lg border border-border dark:border-border bg-card hover:bg-muted/50 transition-colors cursor-pointer min-h-[140px] flex flex-col">
                     <div className="p-3 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="flex items-start justify-between gap-2 mb-1">

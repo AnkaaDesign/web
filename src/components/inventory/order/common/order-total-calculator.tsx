@@ -95,7 +95,7 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
                 {itemCalculations.map(({ orderItem, quantity, unitPrice, icms, ipi, total }) => (
                   <div key={orderItem.id} className="flex items-center justify-between text-sm">
                     <div className="flex-1 min-w-0">
-                      <div className="truncate font-medium">{orderItem.item?.name || `Item ${orderItem.itemId.slice(0, 8)}...`}</div>
+                      <div className="truncate font-medium">{orderItem.item?.name ?? `Item ${orderItem.itemId?.slice(0, 8) ?? 'Unknown'}...`}</div>
                       <div className="text-xs text-muted-foreground">
                         {quantity} × {formatCurrency(unitPrice)}
                         {(icms > 0 || ipi > 0) && ` + ${icms}% ICMS + ${ipi}% IPI`}
@@ -301,7 +301,7 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
                 {itemCalculations.map(({ itemId, item, quantity, unitPrice, icms, ipi, total }) => (
                   <div key={itemId} className="flex items-center justify-between text-sm">
                     <div className="flex-1 min-w-0">
-                      <div className="truncate font-medium">{item?.name || `Item ${itemId.slice(0, 8)}...`}</div>
+                      <div className="truncate font-medium">{item?.name ?? `Item ${itemId.slice(0, 8)}...`}</div>
                       <div className="text-xs text-muted-foreground">
                         {quantity} × {formatCurrency(unitPrice)}
                         {(icms > 0 || ipi > 0) && ` + ${icms}% ICMS + ${ipi}% IPI`}

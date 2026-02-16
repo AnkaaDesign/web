@@ -62,7 +62,7 @@ export function BorrowSpecificationsCard({ borrow, className }: BorrowSpecificat
           )}
 
           {/* Borrow Details Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Detalhes do Empréstimo</h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">

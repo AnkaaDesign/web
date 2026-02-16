@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { ChevronDown, Layout, Plus } from "lucide-react";
+import { ChevronDown, Layout as LayoutIcon, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useLayoutList } from "../../../hooks";
+import type { Layout, LayoutSection } from "@/types";
 
 interface LayoutSelectorProps {
   value?: string | null;
@@ -32,7 +33,7 @@ export function LayoutSelector({
     orderBy: { height: "asc" },
   });
 
-  const selectedLayout = layouts?.data?.find((layout) => layout.id === value);
+  const selectedLayout = layouts?.data?.find((layout: Layout) => layout.id === value);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -45,11 +46,11 @@ export function LayoutSelector({
           disabled={disabled}
         >
           <div className="flex items-center gap-2">
-            <Layout className="h-4 w-4" />
+            <LayoutIcon className="h-4 w-4" />
             {selectedLayout ? (
               <span className="truncate">
                 {selectedLayout.height}m × {selectedLayout.layoutSections?.[0]?.width || 0}m
-                {selectedLayout.layoutSections?.length > 1 && ` (+${selectedLayout.layoutSections.length - 1})`}
+                {selectedLayout.layoutSections?.length && selectedLayout.layoutSections.length > 1 && ` (+${selectedLayout.layoutSections.length - 1})`}
               </span>
             ) : (
               placeholder
@@ -67,7 +68,7 @@ export function LayoutSelector({
             </CommandEmpty>
             {layouts?.data && layouts.data.length > 0 && (
               <CommandGroup>
-                {layouts.data.map((layout) => (
+                {layouts.data.map((layout: Layout) => (
                   <CommandItem
                     key={layout.id}
                     value={layout.id}
@@ -82,8 +83,8 @@ export function LayoutSelector({
                           {layout.height}m × {layout.layoutSections?.[0]?.width || 0}m
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {layout.layoutSections?.length || 0} seção{layout.layoutSections?.length !== 1 ? "ões" : ""}
-                          {layout.layoutSections?.some(section => section.isDoor) && " • Com porta"}
+                          {(layout.layoutSections?.length || 0)} seção{(layout.layoutSections?.length || 0) !== 1 ? "ões" : ""}
+                          {layout.layoutSections?.some((section: LayoutSection) => section.isDoor) && " • Com porta"}
                         </span>
                       </div>
                       {value === layout.id && (

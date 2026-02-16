@@ -57,9 +57,9 @@ export const FunnelChart: React.FC<FunnelChartProps> = ({ config, data }) => {
         },
       },
       legend: config.legend?.show !== false ? {
-        orient: config.legend.layout === 'vertical' ? 'vertical' : 'horizontal',
-        left: config.legend.align === 'start' ? 'left' : config.legend.align === 'end' ? 'right' : 'center',
-        top: config.legend.position === 'top' ? '0%' : config.legend.position === 'bottom' ? 'bottom' : 'middle',
+        orient: config.legend?.layout === 'vertical' ? 'vertical' : 'horizontal',
+        left: config.legend?.align === 'start' ? 'left' : config.legend?.align === 'end' ? 'right' : 'center',
+        top: config.legend?.position === 'top' ? '0%' : config.legend?.position === 'bottom' ? 'bottom' : 'middle',
         textStyle: {
           color: isDark ? '#e2e8f0' : '#1e293b',
         },

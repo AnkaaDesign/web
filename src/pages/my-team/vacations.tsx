@@ -117,7 +117,7 @@ export default function MyTeamVacationsPage() {
                 <Label htmlFor="user-filter">Colaborador</Label>
                 <Combobox
                   value={selectedUserId}
-                  onValueChange={(value) => setSelectedUserId(value || "")}
+                  onValueChange={(value) => setSelectedUserId((Array.isArray(value) ? value[0] : value) || "")}
                   options={[
                     { value: "", label: "Todos os colaboradores" },
                     ...teamUsers.map((user) => ({

@@ -113,7 +113,7 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
 
               {/* Task Information */}
               {observation.task && (
-                <div className="pt-4 border-t border-border/50">
+                <div className="pt-4 border-t border-border">
                   <h4 className="text-sm font-semibold mb-3 text-foreground">Tarefa Relacionada</h4>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -159,7 +159,7 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
 
               {/* Commission Status */}
               {observation.commissions && observation.commissions.length > 0 && (
-                <div className="pt-4 border-t border-border/50">
+                <div className="pt-4 border-t border-border">
                   <h4 className="text-sm font-semibold mb-3 text-foreground">Comissões Afetadas</h4>
                   <div className="space-y-3">
                     {observation.commissions.map((commission) => (
@@ -178,7 +178,7 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
               )}
 
               {/* Date Information */}
-              <div className="pt-4 border-t border-border/50">
+              <div className="pt-4 border-t border-border">
                 <h4 className="text-sm font-semibold mb-3 text-foreground">Datas do Sistema</h4>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -239,7 +239,7 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
 
             {/* Task Information */}
             {observation.task && (
-              <div className="pt-4 border-t border-border/50">
+              <div className="pt-4 border-t border-border">
                 <h4 className="text-sm font-semibold mb-3 text-foreground">Tarefa Relacionada</h4>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -285,7 +285,7 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
 
             {/* Commission Status */}
             {observation.commissions && observation.commissions.length > 0 && (
-              <div className="pt-4 border-t border-border/50">
+              <div className="pt-4 border-t border-border">
                 <h4 className="text-sm font-semibold mb-3 text-foreground">Comissões Afetadas</h4>
                 <div className="space-y-3">
                   {observation.commissions.map((commission) => (
@@ -304,7 +304,7 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
             )}
 
             {/* Date Information */}
-            <div className="pt-4 border-t border-border/50">
+            <div className="pt-4 border-t border-border">
               <h4 className="text-sm font-semibold mb-3 text-foreground">Datas do Sistema</h4>
               <div className="space-y-3">
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">

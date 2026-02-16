@@ -233,7 +233,7 @@ export function VacationList({ selectedStatus, userId, onDataUpdate, className, 
       result.push({
         key: "status",
         label: "Status",
-        value: status ? VACATION_STATUS_LABELS[status] || status : "",
+        value: status ? VACATION_STATUS_LABELS[status as VACATION_STATUS] || status : "",
         onRemove: () => clearFilter("status"),
       });
     }
@@ -242,7 +242,7 @@ export function VacationList({ selectedStatus, userId, onDataUpdate, className, 
       result.push({
         key: "type",
         label: "Tipo",
-        value: VACATION_TYPE_LABELS[filters.where.type] || filters.where.type,
+        value: VACATION_TYPE_LABELS[filters.where.type as VACATION_TYPE] || filters.where.type,
         onRemove: () => clearFilter("type"),
       });
     }

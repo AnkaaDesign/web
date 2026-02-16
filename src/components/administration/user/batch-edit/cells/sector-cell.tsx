@@ -32,7 +32,10 @@ export function SectorCell({ control, index, disabled, currentSectorName }: Sect
           <FormControl>
             <Combobox
               value={field.value || "none"}
-              onValueChange={(value: string | undefined) => field.onChange(value === "none" ? null : value)}
+              onValueChange={(value: string | string[] | null | undefined) => {
+                const stringValue = Array.isArray(value) ? value[0] : value;
+                field.onChange(stringValue === "none" ? null : stringValue);
+              }}
               options={optionsWithNone}
               placeholder={currentSectorName || "Selecione um setor"}
               emptyText="Nenhum setor encontrado"

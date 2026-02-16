@@ -150,7 +150,10 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
                 mode="multiple"
                 options={statusOptions}
                 value={localFilters.status || []}
-                onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, status: value.length > 0 ? value : undefined })}
+                onValueChange={(value) => {
+                  const arr = Array.isArray(value) ? value : (value ? [value] : []);
+                  setLocalFilters({ ...localFilters, status: arr.length > 0 ? arr : undefined });
+                }}
                 placeholder="Selecione os status"
                 searchable={true}
                 minSearchLength={0}
@@ -169,7 +172,10 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
               placeholder="Selecione os setores"
               emptyText="Nenhum setor encontrado"
               value={localFilters.sectorIds || []}
-              onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, sectorIds: value })}
+              onValueChange={(value) => {
+                const arr = Array.isArray(value) ? value : (value ? [value] : []);
+                setLocalFilters({ ...localFilters, sectorIds: arr });
+              }}
               options={
                 sectorsData?.data?.map((sector) => ({
                   value: sector.id,
@@ -190,7 +196,10 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
               placeholder="Selecione os clientes"
               emptyText="Nenhum cliente encontrado"
               value={localFilters.customerIds || []}
-              onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, customerIds: value })}
+              onValueChange={(value) => {
+                const arr = Array.isArray(value) ? value : (value ? [value] : []);
+                setLocalFilters({ ...localFilters, customerIds: arr });
+              }}
               options={
                 customersData?.data?.map((customer) => ({
                   value: customer.id,
@@ -227,7 +236,8 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localFilters.finishedDateRange?.from as Date | undefined}
-                  onChange={(date: Date | null) => {
+                  onChange={(dateOrRange) => {
+                    const date = dateOrRange && typeof dateOrRange === 'object' && 'from' in dateOrRange ? dateOrRange.from : dateOrRange;
                     if (!date && !localFilters.finishedDateRange?.to) {
                       const { finishedDateRange, ...rest } = localFilters;
                       setLocalFilters(rest);
@@ -250,7 +260,8 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localFilters.finishedDateRange?.to as Date | undefined}
-                  onChange={(date: Date | null) => {
+                  onChange={(dateOrRange) => {
+                    const date = dateOrRange && typeof dateOrRange === 'object' && 'from' in dateOrRange ? dateOrRange.to : dateOrRange;
                     if (!date && !localFilters.finishedDateRange?.from) {
                       const { finishedDateRange, ...rest } = localFilters;
                       setLocalFilters(rest);
@@ -282,7 +293,8 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
                 <Combobox
                   value={selectedYear?.toString() || ""}
                   onValueChange={(year) => {
-                    const newYear = year ? parseInt(year) : undefined;
+                    const yearStr = Array.isArray(year) ? year[0] : year;
+                    const newYear = yearStr ? parseInt(yearStr) : undefined;
                     setSelectedYear(newYear);
                     if (!newYear) {
                       setSelectedMonths([]);
@@ -298,7 +310,10 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
                 <Combobox
                   mode="multiple"
                   value={selectedMonths}
-                  onValueChange={(months) => setSelectedMonths(months)}
+                  onValueChange={(months) => {
+                    const arr = Array.isArray(months) ? months : (months ? [months] : []);
+                    setSelectedMonths(arr);
+                  }}
                   options={monthOptions}
                   placeholder={selectedYear ? "Selecione os meses..." : "Selecione um ano primeiro"}
                   searchPlaceholder="Buscar meses..."

@@ -33,6 +33,7 @@ const actionConfig: Record<CHANGE_LOG_ACTION, { icon: React.ElementType; color: 
   [CHANGE_LOG_ACTION.REJECT]: { icon: IconX, color: "text-red-600" },
   [CHANGE_LOG_ACTION.CANCEL]: { icon: IconX, color: "text-red-600" },
   [CHANGE_LOG_ACTION.COMPLETE]: { icon: IconArrowUpRight, color: "text-green-600" },
+  [CHANGE_LOG_ACTION.RESCHEDULE]: { icon: IconCalendar, color: "text-blue-600" },
   [CHANGE_LOG_ACTION.BATCH_CREATE]: { icon: IconArrowDownRight, color: "text-orange-600" },
   [CHANGE_LOG_ACTION.BATCH_UPDATE]: { icon: IconEdit, color: "text-neutral-600" },
   [CHANGE_LOG_ACTION.BATCH_DELETE]: { icon: IconX, color: "text-red-600" },
@@ -416,7 +417,7 @@ export function BorrowHistoryCard({ borrow, className, maxHeight = "500px" }: Bo
                     <div className="pb-1 mb-4 rounded-md">
                       <div className="flex justify-center items-center gap-4">
                         <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60 border border-border/50">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60 border border-border">
                           <IconCalendar className="h-3.5 w-3.5 text-muted-foreground" />
                           <span className="text-sm font-medium text-muted-foreground">{date}</span>
                         </div>

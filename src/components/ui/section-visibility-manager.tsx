@@ -101,7 +101,7 @@ export function SectionVisibilityManager({
 
                   {/* Field Toggles */}
                   {isSectionVisible && section.fields.length > 0 && (
-                    <div className="ml-6 space-y-1 border-l-2 border-border/40 pl-2">
+                    <div className="ml-6 space-y-1 border-l-2 border-border pl-2">
                       {section.fields.map((field) => {
                         const isFieldVisible = visibilityState.fields.has(field.id);
                         const isRequired = field.required;

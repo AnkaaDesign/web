@@ -12,7 +12,7 @@ export function NeedGroundSwitch({ control, disabled }: NeedGroundSwitchProps) {
       control={control}
       name="needGround"
       render={({ field }) => (
-        <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border/50 p-4 bg-muted/30">
+        <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border p-4 bg-muted/30">
           <div className="space-y-0.5">
             <FormLabel className="text-base">Requer Fundo</FormLabel>
             <FormDescription>Ative esta opção se tintas deste tipo precisam de fundos/primers antes da aplicação</FormDescription>

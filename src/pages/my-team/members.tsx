@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo } from "react";
 import { routes } from "../../constants";
 import { useTeamStaffUsers } from "../../hooks";
 import { useAuth } from "@/contexts/auth-context";
-import { isTeamLeader } from "@/utils/user";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,18 +32,15 @@ export const TeamMembersPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  if (!currentUser || !isTeamLeader(currentUser)) {
+  if (!currentUser || !currentUser.managedSector) {
     return <Navigate to={routes.home} replace />;
   }
 
   const userFilters = useMemo(() => {
     const baseFilters: Partial<UserGetManyFormData> = {
       include: {
-        position: {
-          include: {
-            sector: true,
-          },
-        },
+        position: true,
+        sector: true,
       },
       orderBy: {
         name: "asc",
@@ -77,9 +73,9 @@ export const TeamMembersPage = () => {
         user.name || "",
         user.email || "",
         user.position?.name || "",
-        user.position?.sector?.name || "",
-        user.hireDate ? formatDate(user.hireDate) : "",
-        user.active ? "Ativo" : "Inativo",
+        user.sector?.name || "",
+        user.effectedAt ? formatDate(user.effectedAt) : (user.exp1StartAt ? formatDate(user.exp1StartAt) : ""),
+        user.isActive ? "Ativo" : "Inativo",
       ]),
     ]
       .map((row) => row.map((cell) => `"${cell}"`).join(","))
@@ -109,9 +105,9 @@ export const TeamMembersPage = () => {
         user.name || "",
         user.email || "",
         user.position?.name || "",
-        user.position?.sector?.name || "",
-        user.hireDate ? formatDate(user.hireDate) : "",
-        user.active ? "Ativo" : "Inativo",
+        user.sector?.name || "",
+        user.effectedAt ? formatDate(user.effectedAt) : (user.exp1StartAt ? formatDate(user.exp1StartAt) : ""),
+        user.isActive ? "Ativo" : "Inativo",
       ]),
     ]
       .map((row) => row.join("\t"))
@@ -240,7 +236,7 @@ export const TeamMembersPage = () => {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <IconMail className="h-4 w-4 text-muted-foreground" />
-                          <TruncatedTextWithTooltip text={user.email || "-"} maxLength={25} />
+                          <TruncatedTextWithTooltip text={user.email || "-"} />
                         </div>
                       </TableCell>
                       <TableCell>
@@ -249,9 +245,9 @@ export const TeamMembersPage = () => {
                           {user.position?.name || "-"}
                         </div>
                       </TableCell>
-                      <TableCell>{user.hireDate ? formatDate(user.hireDate) : "-"}</TableCell>
+                      <TableCell>{user.effectedAt ? formatDate(user.effectedAt) : (user.exp1StartAt ? formatDate(user.exp1StartAt) : "-")}</TableCell>
                       <TableCell>
-                        <Badge variant={user.active ? "default" : "secondary"}>{user.active ? "Ativo" : "Inativo"}</Badge>
+                        <Badge variant={user.isActive ? "default" : "secondary"}>{user.isActive ? "Ativo" : "Inativo"}</Badge>
                       </TableCell>
                     </TableRow>
                   ))

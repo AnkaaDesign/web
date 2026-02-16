@@ -68,7 +68,7 @@ export const InlineFormattingToolbar = ({ onFormat, position = 'above' }: Inline
           <>
             <Input
               value={linkUrl}
-              onChange={(e) => setLinkUrl(e.target.value)}
+              onChange={(value) => setLinkUrl(value as string)}
               placeholder="https://..."
               className="h-8 w-48 text-sm"
               onKeyDown={(e) => {

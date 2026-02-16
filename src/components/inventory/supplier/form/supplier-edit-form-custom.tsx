@@ -56,7 +56,8 @@ export function SupplierEditForm({ supplier, onDirtyChange, onSubmit, isSubmitti
           const normalizedOld = oldValue === "" ? null : oldValue;
 
           if (normalizedNew !== normalizedOld) {
-            changedFields[typedKey] = Array.isArray(newValue) ? newValue[0] : newValue === null ? undefined : newValue;
+            const value = Array.isArray(newValue) ? newValue[0] : newValue === null ? undefined : newValue;
+            changedFields[typedKey] = value as any;
           }
         }
       }); // If no changes, inform user

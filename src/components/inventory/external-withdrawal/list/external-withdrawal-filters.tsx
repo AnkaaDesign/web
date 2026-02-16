@@ -9,6 +9,7 @@ import { IconFilter, IconX } from "@tabler/icons-react";
 import { EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_STATUS_LABELS, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import type { DateRange } from "react-day-picker";
 
 interface ExternalWithdrawalFiltersProps {
   open: boolean;
@@ -141,7 +142,10 @@ export function ExternalWithdrawalFilters({ open, onOpenChange, filters, onFilte
               mode="multiple"
               options={statusOptions}
               value={localState.statuses || []}
-              onValueChange={(values: string[]) => setLocalState((prev) => ({ ...prev, statuses: values as EXTERNAL_WITHDRAWAL_STATUS[] }))}
+              onValueChange={(value: string | string[] | null | undefined) => {
+                if (!Array.isArray(value)) return;
+                setLocalState((prev) => ({ ...prev, statuses: value as EXTERNAL_WITHDRAWAL_STATUS[] }));
+              }}
               placeholder="Selecione os status"
               emptyText="Nenhum status encontrado"
             />
@@ -154,7 +158,10 @@ export function ExternalWithdrawalFilters({ open, onOpenChange, filters, onFilte
               mode="multiple"
               options={typeOptions}
               value={localState.types || []}
-              onValueChange={(values: string[]) => setLocalState((prev) => ({ ...prev, types: values as EXTERNAL_WITHDRAWAL_TYPE[] }))}
+              onValueChange={(value: string | string[] | null | undefined) => {
+                if (!Array.isArray(value)) return;
+                setLocalState((prev) => ({ ...prev, types: value as EXTERNAL_WITHDRAWAL_TYPE[] }));
+              }}
               placeholder="Selecione os tipos"
               emptyText="Nenhum tipo encontrado"
             />
@@ -211,7 +218,8 @@ export function ExternalWithdrawalFilters({ open, onOpenChange, filters, onFilte
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAtRange?.gte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.createdAtRange?.lte) {
                       setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
                     } else {
@@ -233,7 +241,8 @@ export function ExternalWithdrawalFilters({ open, onOpenChange, filters, onFilte
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAtRange?.lte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.createdAtRange?.gte) {
                       setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
                     } else {

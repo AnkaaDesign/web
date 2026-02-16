@@ -29,6 +29,8 @@ export interface Customer extends BaseEntity {
   logoId: string | null;
   economicActivityId: string | null;
   registrationStatus: string | null;
+  stateRegistration: string | null;
+  streetType: string | null;
 
   // Relations
   logo?: File;
@@ -88,6 +90,8 @@ export interface CustomerOrderBy {
   state?: ORDER_BY_DIRECTION;
   zipCode?: ORDER_BY_DIRECTION;
   site?: ORDER_BY_DIRECTION;
+  registrationStatus?: ORDER_BY_DIRECTION;
+  stateRegistration?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
 }

@@ -662,27 +662,27 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
     <div className={cn("flex flex-col h-full overflow-hidden", className)} ref={tableRef}>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-auto border border-neutral-400 dark:border-border/40 rounded-md">
+          <div className="flex-1 overflow-auto border border-neutral-400 dark:border-border rounded-md">
             <table className="w-full border-collapse">
               <thead className="sticky top-0 z-20 bg-background">
-                <tr className="border-b border-neutral-400 dark:border-border/40">
-                  <th className="text-left p-2 font-medium text-sm sticky left-0 bg-background z-30 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border/40">
+                <tr className="border-b border-neutral-400 dark:border-border">
+                  <th className="text-left p-2 font-medium text-sm sticky left-0 bg-background z-30 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border">
                     Data
                   </th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40">Entrada 1</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40">Saída 1</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40">Entrada 2</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40">Saída 2</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40">Entrada 3</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40">Saída 3</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40">Entrada 4</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40">Saída 4</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40">Entrada 5</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40">Saída 5</th>
-                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border/40">Compensado</th>
-                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border/40">Neutro</th>
-                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border/40">Folga</th>
-                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-neutral-400 dark:border-border/40">Almoço</th>
+                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 1</th>
+                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 1</th>
+                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 2</th>
+                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 2</th>
+                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 3</th>
+                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 3</th>
+                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 4</th>
+                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 4</th>
+                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 5</th>
+                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 5</th>
+                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Compensado</th>
+                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Neutro</th>
+                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Folga</th>
+                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-neutral-400 dark:border-border">Almoço</th>
                 </tr>
               </thead>
               <tbody>
@@ -697,7 +697,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                     <tr
                       key={field.id}
                       className={cn(
-                        "border-b border-neutral-400 dark:border-border/40 transition-colors",
+                        "border-b border-neutral-400 dark:border-border transition-colors",
                         isWeekend && "bg-red-50 dark:bg-red-900/10",
                         !isWeekend && index % 2 === 0 && "bg-muted/50",
                       )}
@@ -707,7 +707,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       }}
                     >
                       <td
-                        className="p-2 sticky left-0 bg-background z-10 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border/40"
+                        className="p-2 sticky left-0 bg-background z-10 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border"
                         onContextMenu={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -730,7 +730,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                         return (
                           <td
                             key={timeField}
-                            className={cn("p-1 w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40", isModified && "bg-yellow-100 dark:bg-yellow-900/30")}
+                            className={cn("p-1 w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border", isModified && "bg-yellow-100 dark:bg-yellow-900/30")}
                             onContextMenu={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -794,7 +794,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       {/* Checkboxes */}
                       <td
                         className={cn(
-                          "p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border/40",
+                          "p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border",
                           isFieldModified(field.id, "compensated") && "bg-yellow-100 dark:bg-yellow-900/30",
                         )}
                       >
@@ -819,7 +819,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
 
                       <td
                         className={cn(
-                          "p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border/40",
+                          "p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border",
                           isFieldModified(field.id, "neutral") && "bg-yellow-100 dark:bg-yellow-900/30",
                         )}
                       >
@@ -844,7 +844,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
 
                       <td
                         className={cn(
-                          "p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border/40",
+                          "p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border",
                           isFieldModified(field.id, "dayOff") && "bg-yellow-100 dark:bg-yellow-900/30",
                         )}
                       >
@@ -869,7 +869,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
 
                       <td
                         className={cn(
-                          "p-1 text-center w-28 min-w-28 max-w-28 border-neutral-400 dark:border-border/40",
+                          "p-1 text-center w-28 min-w-28 max-w-28 border-neutral-400 dark:border-border",
                           isFieldModified(field.id, "freeLunch") && "bg-yellow-100 dark:bg-yellow-900/30",
                         )}
                       >

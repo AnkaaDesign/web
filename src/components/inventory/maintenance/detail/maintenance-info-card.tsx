@@ -158,7 +158,7 @@ function MaintenanceInfoCard({ maintenance, className }: MaintenanceInfoCardProp
 
           {/* For unique maintenances, show simplified info */}
           {isUniqueMaintenance && (
-            <div className={cn(maintenance.description && maintenance.description !== "Manutenção criada automaticamente pelo agendamento." && "pt-4 border-t border-border/50")}>
+            <div className={cn(maintenance.description && maintenance.description !== "Manutenção criada automaticamente pelo agendamento." && "pt-4 border-t border-border")}>
               <h4 className="text-sm font-semibold mb-3 text-foreground">Tipo</h4>
               <div className="space-y-3">
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -181,7 +181,7 @@ function MaintenanceInfoCard({ maintenance, className }: MaintenanceInfoCardProp
 
           {/* Next Run Information */}
           {maintenance.nextRun && (
-            <div className="pt-4 border-t border-border/50">
+            <div className="pt-4 border-t border-border">
               <h4 className="text-sm font-semibold mb-3 text-foreground">Próxima Execução</h4>
               <div className="space-y-3">
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -196,7 +196,7 @@ function MaintenanceInfoCard({ maintenance, className }: MaintenanceInfoCardProp
           )}
 
           {/* Date Information */}
-          <div className="pt-4 border-t border-border/50">
+          <div className="pt-4 border-t border-border">
             <h4 className="text-sm font-semibold mb-3 text-foreground">Datas do Sistema</h4>
             <div className="space-y-3">
               {/* Last Execution - Only for scheduled maintenances */}

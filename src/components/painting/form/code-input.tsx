@@ -22,13 +22,13 @@ export function CodeInput({ control, required = false }: CodeInputProps) {
           <FormControl>
             <Input
               {...field}
-              value={field.value || ""}
+              value={field.value ?? ""}
               placeholder="Ex: PPG123, FAR456"
               maxLength={20}
-              onChange={(e) => {
+              onChange={(value) => {
                 // Convert to uppercase for consistency
-                const value = e.target.value.toUpperCase();
-                field.onChange(value || null);
+                const str = String(value ?? '').toUpperCase();
+                field.onChange(str || null);
               }}
               className="bg-transparent"
             />

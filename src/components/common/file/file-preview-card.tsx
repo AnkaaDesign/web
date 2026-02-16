@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { File as AnkaaFile } from "../../../types";
-import { formatFileSize, getFileCategory, getFileDisplayName, getFileUrl, isImageFile } from "../../../utils/file";
+import { formatFileSize, getFileCategory, getFileDisplayName, getFileDownloadUrl, getFileUrl, isImageFile } from "../../../utils/file";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { IconPhoto, IconFileText, IconVideo, IconMusic, IconFileZip, IconFile, IconVectorBezier, IconEye } from "@tabler/icons-react";
@@ -27,7 +27,6 @@ const getFileIcon = (file: AnkaaFile, size: number = 24) => {
   const category = getFileCategory(file);
   const iconProps = { size, className: "shrink-0" };
 
-  // Special handling for EPS files
   if (isEpsFile(file)) {
     return <IconVectorBezier {...iconProps} className={cn(iconProps.className, "text-indigo-600")} />;
   }
@@ -72,13 +71,12 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
   const isEps = isEpsFile(file);
   const isVideo = category === "video";
   const canPreview = isImage || isPdf || isEps || isVideo;
-  // For PDFs and EPS, always try to show thumbnail
   const hasThumbnail = file.thumbnailUrl || isImage || isPdf || isEps;
 
-  // Debug logging
+  const imgRef = React.useRef<HTMLImageElement>(null);
+
   React.useEffect(() => {}, [file]);
 
-  // Only show thumbnail after initial render to prevent flash
   React.useEffect(() => {
     if (hasThumbnail) {
       const timer = setTimeout(
@@ -86,7 +84,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
           setShowThumbnail(true);
         },
         100 + index * 50,
-      ); // Stagger loading for better UX
+      );
       return () => clearTimeout(timer);
     }
   }, [hasThumbnail, index]);
@@ -97,37 +95,35 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
       return;
     }
 
-    // Handle different file types
     if (file.mimetype === "application/pdf") {
-      // Open PDF in new tab
-      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.123:3030";
+      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.12:3030";
       window.open(`${apiUrl}/files/serve/${file.id}`, "_blank");
     } else if (isImage || category === "video") {
-      // Open image/video in preview modal if available
       if (onPreview) {
         onPreview(file, index);
       }
     } else if (onDownload) {
-      // Download other file types
       onDownload(file);
     } else {
-      // Default: try to open in new tab
-      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.123:3030";
+      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.12:3030";
       window.open(`${apiUrl}/files/${file.id}/download`, "_blank");
     }
   };
 
-  const handleThumbnailLoad = () => {
-    setThumbnailLoading(false);
+  const handleDragStart = (e: React.DragEvent) => {
+    e.stopPropagation();
+    e.dataTransfer.effectAllowed = "copy";
+
+    const url = getFileDownloadUrl(file);
+    const mimeType = file.mimetype || "application/octet-stream";
+    const filename = file.filename || "download";
+    e.dataTransfer.setData("DownloadURL", `${mimeType}:${filename}:${url}`);
+
+    if (imgRef.current) {
+      e.dataTransfer.setDragImage(imgRef.current, 0, 0);
+    }
   };
 
-  const handleThumbnailError = () => {
-    setThumbnailError(true);
-    setThumbnailLoading(false);
-    setShowThumbnail(false);
-  };
-
-  // Size-based dimensions
   const sizeClasses = {
     xs: "w-16 h-16",
     sm: "w-20 h-20",
@@ -144,6 +140,8 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
         className,
       )}
       onClick={handleClick}
+      draggable={true}
+      onDragStart={handleDragStart}
     >
       <CardContent className="p-0 h-full w-full">
         {/* Thumbnail/Icon Area - Full size */}
@@ -156,29 +154,22 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
                 </div>
               )}
               <img
+                ref={imgRef}
                 src={(() => {
-                  // Use the correct API URL - same as the one used for API calls
-                  const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.123:3030";
+                  const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.12:3030";
                   let thumbnailSrc = "";
 
                   if (file.thumbnailUrl) {
-                    // If thumbnailUrl is a full URL, use it as is
                     if (file.thumbnailUrl.startsWith("http")) {
                       thumbnailSrc = file.thumbnailUrl;
-                    }
-                    // If it's a path, prepend the API URL
-                    else if (file.thumbnailUrl.startsWith("/")) {
+                    } else if (file.thumbnailUrl.startsWith("/")) {
                       thumbnailSrc = `${apiUrl}${file.thumbnailUrl}`;
                     } else {
                       thumbnailSrc = file.thumbnailUrl;
                     }
-                  }
-                  // For images without thumbnails, use the direct file URL
-                  else if (isImage) {
+                  } else if (isImage) {
                     thumbnailSrc = `${apiUrl}/files/serve/${file.id}`;
-                  }
-                  // For PDFs and EPS, try the thumbnail endpoint
-                  else if (isPdf || isEps) {
+                  } else if (isPdf || isEps) {
                     thumbnailSrc = `${apiUrl}/files/thumbnail/${file.id}`;
                   } else {
                     thumbnailSrc = getFileUrl(file);
@@ -187,8 +178,13 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
                 })()}
                 alt={file.filename}
                 className={cn("w-full h-full object-contain rounded-md transition-all duration-300", thumbnailLoading ? "opacity-0" : "opacity-100")}
-                onLoad={handleThumbnailLoad}
-                onError={handleThumbnailError}
+                onLoad={() => setThumbnailLoading(false)}
+                onError={() => {
+                  setThumbnailError(true);
+                  setThumbnailLoading(false);
+                  setShowThumbnail(false);
+                }}
+                draggable={false}
               />
             </div>
           ) : (

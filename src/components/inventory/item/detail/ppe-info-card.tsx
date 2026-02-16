@@ -76,7 +76,7 @@ export function PpeInfoCard({ item, className }: PpeInfoCardProps) {
           </div>
 
           {/* Delivery Configuration */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Configuração de Entrega</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>

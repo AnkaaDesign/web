@@ -3,6 +3,7 @@ export * from "./use-customer";
 // convertToApiFilters/convertFromApiFilters name conflicts across domains
 export * from "./use-sector";
 export * from "./use-layout";
+export * from "./use-layout-list";
 export * from "./use-layout-section";
 export * from "./use-changelog";
 export * from "./use-representative";

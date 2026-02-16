@@ -50,7 +50,7 @@ export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWi
           </div>
 
           {/* Withdrawal Details Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Detalhes da Retirada</h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -113,7 +113,7 @@ export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWi
 
           {/* Status Specific Information */}
           {(isFullyReturned || isCharged || isCancelled) && (
-            <div className="pt-6 border-t border-border/50">
+            <div className="pt-6 border-t border-border">
               <h3 className="text-base font-semibold mb-4 text-foreground">Status Atual</h3>
               <div className="space-y-4">
                 {isFullyReturned && (
@@ -151,7 +151,7 @@ export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWi
 
           {/* File Attachments Section */}
           {(withdrawal.nfe || withdrawal.receipt) && (
-            <div className="pt-6 border-t border-border/50">
+            <div className="pt-6 border-t border-border">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold text-foreground">Documentos Anexados</h3>
                 <div className="flex gap-1">

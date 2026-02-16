@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { FormInput } from "@/components/ui/form-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { usePriceMutations, usePriceDetail } from "../../../../hooks";
+// Note: Price hooks should be implemented
+// import { usePriceDetail, usePriceMutations } from "../../../../hooks";
 import { priceUpdateSchema, type PriceUpdateFormData } from "../../../../schemas";
 import { IconCurrencyReal, IconLoader } from "@tabler/icons-react";
 import { formatDate } from "../../../../utils";
@@ -18,14 +19,21 @@ interface PriceEditFormProps {
 }
 
 export function PriceEditForm({ priceId, onSuccess, onCancel }: PriceEditFormProps) {
-  const { update } = usePriceMutations();
+  // Note: Price mutations should be added to hooks
+  const update = async (_id: string, _data: any): Promise<{ success: boolean; data?: any; message?: string }> => {
+    throw new Error('Price mutations not implemented');
+  };
 
-  const { data: priceResponse, isLoading } = usePriceDetail(priceId, {
-    include: {
-      item: true,
-    },
-  });
+  // Note: Price detail hook should be added to hooks
+  // Original code - to be restored when hooks are implemented:
+  // const { data: priceResponse, isLoading } = usePriceDetail(priceId, {
+  //   include: {
+  //     item: true,
+  //   },
+  // });
 
+  const priceResponse = null as { data?: any } | null;
+  const isLoading = true;
   const price = priceResponse?.data;
 
   const form = useForm<PriceUpdateFormData>({

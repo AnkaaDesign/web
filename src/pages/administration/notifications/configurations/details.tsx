@@ -256,7 +256,7 @@ export function NotificationConfigurationDetailsPage() {
   const isValidKey = key && !key.startsWith(":");
 
   const { data: response, isLoading, error } = useNotificationConfiguration(isValidKey ? key : "", {
-    enabled: isValidKey,
+    enabled: !!isValidKey,
   });
   const { delete: deleteMutation } = useNotificationConfigurationMutations();
 

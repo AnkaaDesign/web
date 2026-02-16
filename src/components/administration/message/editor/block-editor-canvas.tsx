@@ -54,7 +54,7 @@ export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasP
   const handleUpdateBlock = (id: string, updates: Partial<ContentBlock>) => {
     onBlocksChange(
       blocks.map((block) =>
-        block.id === id ? { ...block, ...updates } : block
+        block.id === id ? { ...block, ...updates } as ContentBlock : block
       )
     );
   };

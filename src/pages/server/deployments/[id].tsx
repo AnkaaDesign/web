@@ -128,7 +128,7 @@ export const DeploymentDetailPage = () => {
     icon: "rocket",
   });
 
-  const { data: response, isLoading, refetch } = useDeploymentDetail(id!, {
+  const { data: deployment, isLoading, refetch } = useDeploymentDetail(id!, {
     include: {
       app: true,
       gitCommit: {
@@ -143,8 +143,6 @@ export const DeploymentDetailPage = () => {
       },
     },
   });
-
-  const deployment = response?.data;
 
   const handleRefresh = () => {
     refetch();
@@ -213,13 +211,13 @@ export const DeploymentDetailPage = () => {
                       <span className="text-sm text-muted-foreground">Status</span>
                       <Badge variant={deployment.status ? getStatusColor(deployment.status) : "default"} className="gap-1">
                         <StatusIcon className="h-3 w-3" />
-                        <span>{deployment.status ? String(DEPLOYMENT_STATUS_LABELS[deployment.status] || deployment.status) : "N/A"}</span>
+                        <span>{deployment.status ? String(DEPLOYMENT_STATUS_LABELS[deployment.status as keyof typeof DEPLOYMENT_STATUS_LABELS] || deployment.status) : "N/A"}</span>
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Ambiente</span>
                       <Badge variant={deployment.environment ? getEnvironmentColor(deployment.environment) : "default"}>
-                        {deployment.environment ? String(DEPLOYMENT_ENVIRONMENT_LABELS[deployment.environment] || deployment.environment) : "N/A"}
+                        {deployment.environment ? String(DEPLOYMENT_ENVIRONMENT_LABELS[deployment.environment as keyof typeof DEPLOYMENT_ENVIRONMENT_LABELS] || deployment.environment) : "N/A"}
                       </Badge>
                     </div>
                     {deployment.triggeredBy && (

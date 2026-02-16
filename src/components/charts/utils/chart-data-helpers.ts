@@ -392,7 +392,7 @@ export function getTopN<T extends Record<string, any>>(
         name: 'Outros',
         [valueKey]: othersSum,
         isOthers: true,
-      } as T,
+      } as unknown as T,
     ];
   }
 

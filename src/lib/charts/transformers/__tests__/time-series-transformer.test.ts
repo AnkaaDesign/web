@@ -364,9 +364,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should calculate 2-period moving average', () => {
       const data = [
-        { value: 100, _parsedDate: new Date('2024-01-01') },
-        { value: 200, _parsedDate: new Date('2024-01-02') },
-        { value: 300, _parsedDate: new Date('2024-01-03') },
+        { date: new Date('2024-01-01'), value: 100, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-02'), value: 200, _parsedDate: new Date('2024-01-02') },
+        { date: new Date('2024-01-03'), value: 300, _parsedDate: new Date('2024-01-03') },
       ];
 
       const result = TimeSeriesTransformer.calculateMovingAverage(data, 'value', 2);
@@ -377,7 +377,7 @@ describe('TimeSeriesTransformer', () => {
     });
 
     it('should handle single data point', () => {
-      const data = [{ value: 100, _parsedDate: new Date() }];
+      const data = [{ date: new Date(), value: 100, _parsedDate: new Date() }];
 
       const result = TimeSeriesTransformer.calculateMovingAverage(data, 'value', 3);
 
@@ -386,9 +386,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should handle null/undefined values as zero', () => {
       const data = [
-        { value: 100, _parsedDate: new Date() },
-        { value: null, _parsedDate: new Date() },
-        { value: 300, _parsedDate: new Date() },
+        { date: new Date(), value: 100, _parsedDate: new Date() },
+        { date: new Date(), value: null, _parsedDate: new Date() },
+        { date: new Date(), value: 300, _parsedDate: new Date() },
       ];
 
       const result = TimeSeriesTransformer.calculateMovingAverage(data, 'value', 2);
@@ -413,9 +413,9 @@ describe('TimeSeriesTransformer', () => {
   describe('calculateGrowthRate()', () => {
     it('should calculate percentage growth rate', () => {
       const data = [
-        { value: 100, _parsedDate: new Date() },
-        { value: 150, _parsedDate: new Date() },
-        { value: 225, _parsedDate: new Date() },
+        { date: new Date(), value: 100, _parsedDate: new Date() },
+        { date: new Date(), value: 150, _parsedDate: new Date() },
+        { date: new Date(), value: 225, _parsedDate: new Date() },
       ];
 
       const result = TimeSeriesTransformer.calculateGrowthRate(data, 'value');
@@ -427,8 +427,8 @@ describe('TimeSeriesTransformer', () => {
 
     it('should handle negative growth', () => {
       const data = [
-        { value: 200, _parsedDate: new Date() },
-        { value: 100, _parsedDate: new Date() },
+        { date: new Date(), value: 200, _parsedDate: new Date() },
+        { date: new Date(), value: 100, _parsedDate: new Date() },
       ];
 
       const result = TimeSeriesTransformer.calculateGrowthRate(data, 'value');
@@ -438,8 +438,8 @@ describe('TimeSeriesTransformer', () => {
 
     it('should handle zero previous value', () => {
       const data = [
-        { value: 0, _parsedDate: new Date() },
-        { value: 100, _parsedDate: new Date() },
+        { date: new Date(), value: 0, _parsedDate: new Date() },
+        { date: new Date(), value: 100, _parsedDate: new Date() },
       ];
 
       const result = TimeSeriesTransformer.calculateGrowthRate(data, 'value');
@@ -448,7 +448,7 @@ describe('TimeSeriesTransformer', () => {
     });
 
     it('should handle single data point', () => {
-      const data = [{ value: 100, _parsedDate: new Date() }];
+      const data = [{ date: new Date(), value: 100, _parsedDate: new Date() }];
 
       const result = TimeSeriesTransformer.calculateGrowthRate(data, 'value');
 
@@ -457,8 +457,8 @@ describe('TimeSeriesTransformer', () => {
 
     it('should calculate accurate growth rates with decimals', () => {
       const data = [
-        { value: 100.5, _parsedDate: new Date() },
-        { value: 110.55, _parsedDate: new Date() },
+        { date: new Date(), value: 100.5, _parsedDate: new Date() },
+        { date: new Date(), value: 110.55, _parsedDate: new Date() },
       ];
 
       const result = TimeSeriesTransformer.calculateGrowthRate(data, 'value');
@@ -470,9 +470,9 @@ describe('TimeSeriesTransformer', () => {
   describe('resample()', () => {
     it('should resample to day with sum aggregation', () => {
       const data = [
-        { value: 100, _parsedDate: new Date('2024-01-01T10:00:00') },
-        { value: 200, _parsedDate: new Date('2024-01-01T14:00:00') },
-        { value: 300, _parsedDate: new Date('2024-01-02T10:00:00') },
+        { date: new Date('2024-01-01T10:00:00'), value: 100, _parsedDate: new Date('2024-01-01T10:00:00') },
+        { date: new Date('2024-01-01T14:00:00'), value: 200, _parsedDate: new Date('2024-01-01T14:00:00') },
+        { date: new Date('2024-01-02T10:00:00'), value: 300, _parsedDate: new Date('2024-01-02T10:00:00') },
       ];
 
       const result = TimeSeriesTransformer.resample(data, 'day', 'sum', ['value']);
@@ -484,9 +484,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should resample to week with average aggregation', () => {
       const data = [
-        { value: 100, _parsedDate: new Date(2024, 0, 1, 12, 0) },  // Week 1, noon to avoid timezone issues
-        { value: 200, _parsedDate: new Date(2024, 0, 2, 12, 0) },  // Week 1
-        { value: 300, _parsedDate: new Date(2024, 0, 8, 12, 0) },  // Week 2
+        { date: new Date(2024, 0, 1, 12, 0), value: 100, _parsedDate: new Date(2024, 0, 1, 12, 0) },  // Week 1, noon to avoid timezone issues
+        { date: new Date(2024, 0, 2, 12, 0), value: 200, _parsedDate: new Date(2024, 0, 2, 12, 0) },  // Week 1
+        { date: new Date(2024, 0, 8, 12, 0), value: 300, _parsedDate: new Date(2024, 0, 8, 12, 0) },  // Week 2
       ];
 
       const result = TimeSeriesTransformer.resample(data, 'week', 'avg', ['value']);
@@ -498,9 +498,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should resample with min aggregation', () => {
       const data = [
-        { value: 100, _parsedDate: new Date('2024-01-01') },
-        { value: 200, _parsedDate: new Date('2024-01-01') },
-        { value: 50, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 100, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 200, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 50, _parsedDate: new Date('2024-01-01') },
       ];
 
       const result = TimeSeriesTransformer.resample(data, 'day', 'min', ['value']);
@@ -510,9 +510,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should resample with max aggregation', () => {
       const data = [
-        { value: 100, _parsedDate: new Date('2024-01-01') },
-        { value: 200, _parsedDate: new Date('2024-01-01') },
-        { value: 50, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 100, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 200, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 50, _parsedDate: new Date('2024-01-01') },
       ];
 
       const result = TimeSeriesTransformer.resample(data, 'day', 'max', ['value']);
@@ -522,9 +522,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should resample with first aggregation', () => {
       const data = [
-        { value: 100, _parsedDate: new Date('2024-01-01') },
-        { value: 200, _parsedDate: new Date('2024-01-01') },
-        { value: 300, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 100, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 200, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 300, _parsedDate: new Date('2024-01-01') },
       ];
 
       const result = TimeSeriesTransformer.resample(data, 'day', 'first', ['value']);
@@ -534,9 +534,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should resample with last aggregation', () => {
       const data = [
-        { value: 100, _parsedDate: new Date('2024-01-01') },
-        { value: 200, _parsedDate: new Date('2024-01-01') },
-        { value: 300, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 100, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 200, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), value: 300, _parsedDate: new Date('2024-01-01') },
       ];
 
       const result = TimeSeriesTransformer.resample(data, 'day', 'last', ['value']);
@@ -546,8 +546,8 @@ describe('TimeSeriesTransformer', () => {
 
     it('should handle multiple value keys in resampling', () => {
       const data = [
-        { sales: 100, profit: 20, _parsedDate: new Date('2024-01-01') },
-        { sales: 200, profit: 40, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), sales: 100, profit: 20, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-01'), sales: 200, profit: 40, _parsedDate: new Date('2024-01-01') },
       ];
 
       const result = TimeSeriesTransformer.resample(data, 'day', 'sum', ['sales', 'profit']);
@@ -558,9 +558,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should resample to month', () => {
       const data = [
-        { value: 100, _parsedDate: new Date(2024, 0, 1, 12, 0) },   // January, noon to avoid timezone issues
-        { value: 200, _parsedDate: new Date(2024, 0, 15, 12, 0) },  // January
-        { value: 300, _parsedDate: new Date(2024, 1, 1, 12, 0) },   // February
+        { date: new Date(2024, 0, 1, 12, 0), value: 100, _parsedDate: new Date(2024, 0, 1, 12, 0) },   // January, noon to avoid timezone issues
+        { date: new Date(2024, 0, 15, 12, 0), value: 200, _parsedDate: new Date(2024, 0, 15, 12, 0) },  // January
+        { date: new Date(2024, 1, 1, 12, 0), value: 300, _parsedDate: new Date(2024, 1, 1, 12, 0) },   // February
       ];
 
       const result = TimeSeriesTransformer.resample(data, 'month', 'sum', ['value']);
@@ -574,9 +574,9 @@ describe('TimeSeriesTransformer', () => {
   describe('filterByDateRange()', () => {
     it('should filter data within date range', () => {
       const data = [
-        { value: 100, _parsedDate: new Date('2024-01-01') },
-        { value: 200, _parsedDate: new Date('2024-01-15') },
-        { value: 300, _parsedDate: new Date('2024-02-01') },
+        { date: new Date('2024-01-01'), value: 100, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-15'), value: 200, _parsedDate: new Date('2024-01-15') },
+        { date: new Date('2024-02-01'), value: 300, _parsedDate: new Date('2024-02-01') },
       ];
 
       const result = TimeSeriesTransformer.filterByDateRange(
@@ -591,9 +591,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should include boundary dates', () => {
       const data = [
-        { value: 100, _parsedDate: new Date('2024-01-01') },
-        { value: 200, _parsedDate: new Date('2024-01-15') },
-        { value: 300, _parsedDate: new Date('2024-02-01') },
+        { date: new Date('2024-01-01'), value: 100, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-15'), value: 200, _parsedDate: new Date('2024-01-15') },
+        { date: new Date('2024-02-01'), value: 300, _parsedDate: new Date('2024-02-01') },
       ];
 
       const result = TimeSeriesTransformer.filterByDateRange(
@@ -607,8 +607,8 @@ describe('TimeSeriesTransformer', () => {
 
     it('should return empty array when no dates in range', () => {
       const data = [
-        { value: 100, _parsedDate: new Date('2024-01-01') },
-        { value: 200, _parsedDate: new Date('2024-01-02') },
+        { date: new Date('2024-01-01'), value: 100, _parsedDate: new Date('2024-01-01') },
+        { date: new Date('2024-01-02'), value: 200, _parsedDate: new Date('2024-01-02') },
       ];
 
       const result = TimeSeriesTransformer.filterByDateRange(

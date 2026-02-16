@@ -12,18 +12,18 @@ import {
   IconUser,
   IconCalendar,
 } from "@tabler/icons-react";
-import { formatDate, formatCurrency } from "../../../../utils";
+import { formatDate } from "../../../../utils";
 import {
   COMMISSION_STATUS,
   COMMISSION_STATUS_LABELS
 } from "../../../../constants";
 import { getBadgeVariant } from "../../../../constants";
 import { useTableState } from "@/hooks/common/use-table-state";
-import type { Task, Commission } from "../../../../types";
+import type { Task } from "../../../../types";
 
 // Extended task interface for display with commission data
-interface TaskInBonusRow extends Task {
-  commission?: Commission;
+interface TaskInBonusRow extends Omit<Task, 'commission'> {
+  commission?: COMMISSION_STATUS | null;
   commissionStatus?: COMMISSION_STATUS;
   commissionValue?: number;
   weightedValue?: number; // For display purposes (Full=1, Partial=0.5)
@@ -110,9 +110,6 @@ export function TasksInBonusCard({
             break;
           case "weightedValue":
             comparison = (a.weightedValue || 0) - (b.weightedValue || 0);
-            break;
-          case "price":
-            comparison = (a.price || 0) - (b.price || 0);
             break;
         }
 
@@ -272,7 +269,7 @@ export function TasksInBonusCard({
             <Input
               placeholder="Buscar por nome, cliente, S/N ou placa..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(value) => setSearchTerm(value as string)}
               className="pl-10 pr-10"
             />
             {searchTerm && (
@@ -313,7 +310,7 @@ export function TasksInBonusCard({
 
         {/* Summary Stats */}
         {filteredTasks.length > 0 && (
-          <div className="grid grid-cols-5 gap-4 mt-4 p-4 bg-muted/30 rounded-lg">
+          <div className="grid grid-cols-4 gap-4 mt-4 p-4 bg-muted/30 rounded-lg">
             <div className="text-center">
               <div className="text-lg font-semibold text-foreground">{summary.total}</div>
               <div className="text-xs text-muted-foreground">Total</div>
@@ -330,10 +327,6 @@ export function TasksInBonusCard({
               <div className="text-lg font-semibold text-blue-600">{summary.totalWeighted.toFixed(1)}</div>
               <div className="text-xs text-muted-foreground">Ponderado</div>
             </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-primary">{formatCurrency(summary.totalValue)}</div>
-              <div className="text-xs text-muted-foreground">Valor Total</div>
-            </div>
           </div>
         )}
       </CardHeader>
@@ -346,7 +339,6 @@ export function TasksInBonusCard({
             getItemKey={(task) => task.id}
             isLoading={isLoading}
             emptyMessage="Nenhuma tarefa encontrada"
-            emptyDescription="Não há tarefas que correspondam aos filtros selecionados"
             emptyIcon={IconClipboardList}
             onSort={toggleSort}
             getSortDirection={getSortDirection}
@@ -357,7 +349,6 @@ export function TasksInBonusCard({
             totalPages={1}
             pageSize={sortedTasks.length}
             totalRecords={sortedTasks.length}
-            showPagination={false}
             showPageInfo={false}
             className="[&_table]:border-0 [&_tbody_tr]:border-b-0 [&_tbody_tr:hover]:bg-muted/50"
           />

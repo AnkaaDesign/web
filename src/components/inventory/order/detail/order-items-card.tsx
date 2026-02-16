@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate, measureUtils } from "../../../../utils";
 import type { Order, OrderItem } from "../../../../types";
-import { ORDER_STATUS, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER } from "../../../../constants";
+import { ORDER_STATUS, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, MEASURE_TYPE } from "../../../../constants";
 import { useOrderItemBatchMutations, useOrderItemSpecializedBatchMutations } from "../../../../hooks";
 import { toast } from "sonner";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
@@ -279,8 +279,8 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
 
       // Sort measures by type order
       const sortedMeasures = [...measures].sort((a, b) => {
-        const orderA = MEASURE_TYPE_ORDER[a.measureType] ?? 999;
-        const orderB = MEASURE_TYPE_ORDER[b.measureType] ?? 999;
+        const orderA = MEASURE_TYPE_ORDER[a.measureType as keyof typeof MEASURE_TYPE_ORDER] ?? 999;
+        const orderB = MEASURE_TYPE_ORDER[b.measureType as keyof typeof MEASURE_TYPE_ORDER] ?? 999;
         return orderA - orderB;
       });
 
@@ -288,9 +288,9 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
       const measureStrings: string[] = [];
       sortedMeasures.forEach((measure) => {
         if (measure.value !== null && measure.unit !== null) {
-          measureStrings.push(measureUtils.formatMeasure({ value: measure.value, unit: measure.unit }, true, 2, measure.measureType));
+          measureStrings.push(measureUtils.formatMeasure({ value: measure.value, unit: measure.unit }, true, 2, measure.measureType as MEASURE_TYPE));
         } else if (measure.unit !== null) {
-          measureStrings.push(MEASURE_UNIT_LABELS[measure.unit] || measure.unit);
+          measureStrings.push(MEASURE_UNIT_LABELS[measure.unit as keyof typeof MEASURE_UNIT_LABELS] || measure.unit);
         } else if (measure.value !== null) {
           measureStrings.push(measure.value.toString());
         }
@@ -469,7 +469,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
           <div class="header-info">
             <h1 class="title">${orderDescription}</h1>
             <div class="info">
-              <p><strong>Data do Pedido:</strong> ${order.createdAt ? formatDate(new Date(order.createdAt)) : formatDate(new Date())}${order.forecast ? ` | <strong>Data de Entrega:</strong> ${formatDate(new Date(order.forecast))}` : ""} | <strong>Fornecedor:</strong> ${order.supplier ? (order.supplier.fantasyName || order.supplier.name) : "-"} | <strong>Total de itens:</strong> ${order.items?.length || 0}</p>
+              <p><strong>Data do Pedido:</strong> ${order.createdAt ? formatDate(new Date(order.createdAt)) : formatDate(new Date())}${order.forecast ? ` | <strong>Data de Entrega:</strong> ${formatDate(new Date(order.forecast))}` : ""} | <strong>Fornecedor:</strong> ${order.supplier ? (order.supplier.fantasyName || order.supplier.corporateName) : "-"} | <strong>Total de itens:</strong> ${order.items?.length || 0}</p>
             </div>
           </div>
         </div>
@@ -653,7 +653,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
         </div>
 
         {/* Items Table */}
-        <div className="border dark:border-border/40 rounded-lg overflow-hidden">
+        <div className="border dark:border-border rounded-lg overflow-hidden">
           <Table>
             <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
               <TableRow className="bg-muted hover:bg-muted even:bg-muted">
@@ -745,7 +745,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                             max={item.orderedQuantity}
                             step="0.01"
                             className={cn(
-                              "flex h-8 w-20 rounded-md border border-border dark:border-border/40 bg-input px-2 py-2 text-sm text-center",
+                              "flex h-8 w-20 rounded-md border border-border dark:border-border bg-input px-2 py-2 text-sm text-center",
                               "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                               "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
                               "disabled:cursor-not-allowed disabled:opacity-50",

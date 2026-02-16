@@ -91,9 +91,10 @@ export interface MessageFormData {
   title: string;
   blocks: ContentBlock[];
   targeting: {
-    type: 'all' | 'specific' | 'roles';
+    type: 'all' | 'specific' | 'sector' | 'position';
     userIds?: string[];
-    roleIds?: string[];
+    sectorIds?: string[];
+    positionIds?: string[];
   };
   scheduling: {
     startDate?: Date;

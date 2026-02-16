@@ -128,7 +128,6 @@ export const OrderCreateForm = () => {
       forecast: forecast || undefined,
       notes: notes || "",
       items: [],
-      temporaryItems: [],
       paymentMethod: null,
       paymentPix: null,
       paymentDueDays: null,
@@ -194,7 +193,7 @@ export const OrderCreateForm = () => {
       icms: icmses[itemId] || 0,
       ipi: ipis[itemId] || 0,
     }));
-    const isTouched = form.formState.touchedFields.items;
+    const isTouched = !!form.formState.touchedFields.items;
     form.setValue("items", items, {
       shouldValidate: isTouched,
       shouldDirty: true
@@ -205,13 +204,13 @@ export const OrderCreateForm = () => {
   // Auto-add first temporary item when switching to temporary mode
   useEffect(() => {
     if (orderItemMode === "temporary") {
-      const currentTemporaryItems = form.getValues("temporaryItems") || [];
-      // Only add if there are no temporary items yet
-      if (currentTemporaryItems.length === 0) {
-        form.setValue("temporaryItems", [{
+      const currentItems = form.getValues("items") || [];
+      // Only add if there are no items yet
+      if (currentItems.length === 0) {
+        form.setValue("items", [{
           temporaryItemDescription: "",
           orderedQuantity: 1,
-          price: null,
+          price: 0,
           icms: 0,
           ipi: 0,
         }], {
@@ -322,7 +321,7 @@ export const OrderCreateForm = () => {
           }
         } else {
           // Temporary mode - validate temporary items
-          const tempItems = form.getValues("temporaryItems") || [];
+          const tempItems = form.getValues("items") || [];
           if (tempItems.length === 0) {
             toast.error("Pelo menos um item temporário deve ser adicionado");
             return false;
@@ -358,7 +357,7 @@ export const OrderCreateForm = () => {
           }
         } else {
           // Temporary mode - validate temporary items
-          const tempItems = form.getValues("temporaryItems") || [];
+          const tempItems = form.getValues("items") || [];
           if (tempItems.length === 0) {
             toast.error("Pelo menos um item temporário deve ser adicionado");
             return false;
@@ -421,17 +420,17 @@ export const OrderCreateForm = () => {
   const handleBudgetFilesChange = useCallback((files: FileWithPreview[]) => {
     setBudgetFiles(files);
     // Mark form as dirty to enable submit
-    form.setValue("budgetId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
+    form.setValue("budgetIds", files.length > 0 ? ["pending"] : undefined, { shouldDirty: true, shouldTouch: true });
   }, [form]);
 
   const handleReceiptFilesChange = useCallback((files: FileWithPreview[]) => {
     setReceiptFiles(files);
-    form.setValue("receiptId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
+    form.setValue("receiptIds", files.length > 0 ? ["pending"] : undefined, { shouldDirty: true, shouldTouch: true });
   }, [form]);
 
   const handleNfeFilesChange = useCallback((files: FileWithPreview[]) => {
     setNfeFiles(files);
-    form.setValue("nfeId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
+    form.setValue("invoiceIds", files.length > 0 ? ["pending"] : undefined, { shouldDirty: true, shouldTouch: true });
   }, [form]);
 
   // Handle item selection
@@ -517,7 +516,7 @@ export const OrderCreateForm = () => {
         }));
       } else {
         // Temporary items
-        const tempItems = form.getValues("temporaryItems") || [];
+        const tempItems = form.getValues("items") || [];
         itemsData = tempItems.map((item: any) => ({
           temporaryItemDescription: item.temporaryItemDescription,
           orderedQuantity: Number(item.orderedQuantity) || 1,
@@ -650,20 +649,20 @@ export const OrderCreateForm = () => {
 
   // Watch form state to trigger validation when it changes
   const watchedDescription = form.watch("description");
-  const watchedTemporaryItems = form.watch("temporaryItems");
+  const watchedItems = form.watch("items");
 
   // Compute if form is ready to submit (no useMemo - compute on every render)
   const computeFormReadiness = () => {
     // Use watched values (they're live and trigger re-renders)
-    const tempItems = watchedTemporaryItems || [];
+    const items = watchedItems || [];
     const hasDescription = watchedDescription?.trim().length > 0;
 
     // Check based on order mode
     if (orderItemMode === "temporary") {
       // Temporary mode: check for valid temporary items
-      const hasTemporaryItems = tempItems.length > 0;
+      const hasTemporaryItems = items.length > 0;
 
-      const allTemporaryItemsValid = tempItems.every((item: any, _index: number) => {
+      const allTemporaryItemsValid = items.every((item: any, _index: number) => {
         const hasDescription = item.temporaryItemDescription && item.temporaryItemDescription.trim() !== "";
         const hasValidQuantity = item.orderedQuantity && item.orderedQuantity > 0;
         const hasValidPrice = item.price !== undefined && item.price !== null && Number(item.price) > 0;
@@ -702,8 +701,8 @@ export const OrderCreateForm = () => {
 
         // Sort measures by type order
         const sortedMeasures = [...measures].sort((a, b) => {
-          const orderA = MEASURE_TYPE_ORDER[a.measureType] ?? 999;
-          const orderB = MEASURE_TYPE_ORDER[b.measureType] ?? 999;
+          const orderA = (MEASURE_TYPE_ORDER as any)[a.measureType] ?? 999;
+          const orderB = (MEASURE_TYPE_ORDER as any)[b.measureType] ?? 999;
           return orderA - orderB;
         });
 
@@ -713,7 +712,7 @@ export const OrderCreateForm = () => {
           if (measure.value !== null && measure.unit !== null) {
             measureStrings.push(measureUtils.formatMeasure({ value: measure.value, unit: measure.unit }, true, 2, measure.measureType));
           } else if (measure.unit !== null) {
-            measureStrings.push(MEASURE_UNIT_LABELS[measure.unit] || measure.unit);
+            measureStrings.push((MEASURE_UNIT_LABELS as any)[measure.unit] || measure.unit);
           } else if (measure.value !== null) {
             measureStrings.push(measure.value.toString());
           }
@@ -892,7 +891,7 @@ export const OrderCreateForm = () => {
           <div class="header-info">
             <h1 class="title">${orderDescription}</h1>
             <div class="info">
-              <p><strong>Data do Pedido:</strong> ${formatDate(new Date())}${form.watch("forecast") ? ` | <strong>Data de Entrega:</strong> ${formatDate(new Date(form.watch("forecast")))}` : ""} | <strong>Fornecedor:</strong> ${selectedSupplier ? (selectedSupplier.fantasyName || selectedSupplier.name) : "-"} | <strong>Total de itens:</strong> ${orderItemMode === "inventory" ? selectedItemsData.length : (form.watch("temporaryItems") || []).length}</p>
+              <p><strong>Data do Pedido:</strong> ${formatDate(new Date())}${form.watch("forecast") ? ` | <strong>Data de Entrega:</strong> ${formatDate(form.watch("forecast") as Date)}` : ""} | <strong>Fornecedor:</strong> ${selectedSupplier ? selectedSupplier.fantasyName : "-"} | <strong>Total de itens:</strong> ${orderItemMode === "inventory" ? selectedItemsData.length : (form.watch("items") || []).length}</p>
             </div>
           </div>
         </div>
@@ -927,7 +926,7 @@ export const OrderCreateForm = () => {
                       `;
                       })
                       .join("")
-                  : (form.watch("temporaryItems") || [])
+                  : (form.watch("items") || [])
                       .map((item: any) => {
                         const quantity = Number(item.orderedQuantity) || 0;
                         return `
@@ -1113,9 +1112,10 @@ export const OrderCreateForm = () => {
                               <Combobox
                                 value={form.watch("supplierId") || ""}
                                 onValueChange={(value) => {
-                                  form.setValue("supplierId", value || undefined);
+                                  const stringValue = Array.isArray(value) ? value[0] : value;
+                                  form.setValue("supplierId", stringValue || undefined);
                                   // Update URL state
-                                  updateSupplierId(value || undefined);
+                                  updateSupplierId(stringValue || undefined);
                                 }}
                                 options={
                                   suppliers.length === 0
@@ -1171,7 +1171,6 @@ export const OrderCreateForm = () => {
                                 placeholder="Data"
                                 className="w-full"
                                 mode="date"
-                                context="forecast"
                               />
                             </div>
                           </div>
@@ -1186,12 +1185,12 @@ export const OrderCreateForm = () => {
                               </Label>
                               <RadioGroup
                                 value={orderItemMode}
-                                onValueChange={(value) => setOrderItemMode(value as "inventory" | "temporary")}
+                                onValueChange={(value) => _setOrderItemMode(value as "inventory" | "temporary")}
                                 className="flex flex-col gap-2"
                               >
                                 <label
                                   htmlFor="mode-inventory"
-                                  className="flex flex-col space-y-0.5 rounded-md border border-border/40 p-3 hover:bg-accent cursor-pointer transition-colors group"
+                                  className="flex flex-col space-y-0.5 rounded-md border border-border p-3 hover:bg-accent cursor-pointer transition-colors group"
                                 >
                                   <div className="flex items-center gap-2 font-medium group-hover:text-white">
                                     <RadioGroupItem value="inventory" id="mode-inventory" />
@@ -1204,7 +1203,7 @@ export const OrderCreateForm = () => {
                                 </label>
                                 <label
                                   htmlFor="mode-temporary"
-                                  className="flex flex-col space-y-0.5 rounded-md border border-border/40 p-3 hover:bg-accent cursor-pointer transition-colors group"
+                                  className="flex flex-col space-y-0.5 rounded-md border border-border p-3 hover:bg-accent cursor-pointer transition-colors group"
                                 >
                                   <div className="flex items-center gap-2 font-medium group-hover:text-white">
                                     <RadioGroupItem value="temporary" id="mode-temporary" />
@@ -1257,12 +1256,13 @@ export const OrderCreateForm = () => {
                                   <Combobox
                                     value={form.watch("paymentMethod") || ""}
                                     onValueChange={(value) => {
-                                      form.setValue("paymentMethod", value || null);
+                                      const stringValue = Array.isArray(value) ? value[0] : value;
+                                      form.setValue("paymentMethod", stringValue || null);
                                       // Clear conditional fields when payment method changes
-                                      if (value !== "PIX") {
+                                      if (stringValue !== "PIX") {
                                         form.setValue("paymentPix", null);
                                       }
-                                      if (value !== "BANK_SLIP") {
+                                      if (stringValue !== "BANK_SLIP") {
                                         form.setValue("paymentDueDays", null);
                                       }
                                     }}
@@ -1315,7 +1315,10 @@ export const OrderCreateForm = () => {
                                     <Label className="text-sm text-muted-foreground">Prazo de Vencimento</Label>
                                     <Combobox
                                       value={form.watch("paymentDueDays")?.toString() || ""}
-                                      onValueChange={(value) => form.setValue("paymentDueDays", value ? parseInt(value) : null)}
+                                      onValueChange={(value) => {
+                                        const stringValue = Array.isArray(value) ? value[0] : value;
+                                        form.setValue("paymentDueDays", stringValue ? parseInt(stringValue) : null);
+                                      }}
                                       options={[
                                         { value: "30", label: "30 dias" },
                                         { value: "60", label: "60 dias" },
@@ -1508,7 +1511,7 @@ export const OrderCreateForm = () => {
                           {/* Delivery */}
                           <div>
                             <p className="text-xs font-medium text-muted-foreground mb-1">ENTREGA</p>
-                            <p className="text-sm font-medium text-foreground">{form.watch("forecast") ? formatDate(new Date(form.watch("forecast"))) : "-"}</p>
+                            <p className="text-sm font-medium text-foreground">{form.watch("forecast") ? formatDate(form.watch("forecast") as Date) : "-"}</p>
                           </div>
                         </div>
 
@@ -1523,7 +1526,7 @@ export const OrderCreateForm = () => {
                               <p className="text-xs font-medium text-muted-foreground">ITENS</p>
                             </div>
                             <p className="text-2xl font-semibold text-foreground">
-                              {orderItemMode === "inventory" ? selectionCount : (form.watch("temporaryItems") || []).length}
+                              {orderItemMode === "inventory" ? selectionCount : (form.watch("items") || []).filter((item: any) => item.temporaryItemDescription).length}
                             </p>
                           </div>
 
@@ -1535,7 +1538,7 @@ export const OrderCreateForm = () => {
                             <p className="text-2xl font-semibold text-foreground">
                               {orderItemMode === "inventory"
                                 ? Array.from(selectedItems).reduce((total: number, itemId: string) => total + (Number(quantities[itemId]) || 1), 0)
-                                : (form.watch("temporaryItems") || []).reduce((total: number, item: any) => total + (Number(item.orderedQuantity) || 0), 0)}
+                                : (form.watch("items") || []).reduce((total: number, item: any) => total + (Number(item.orderedQuantity) || 0), 0)}
                             </p>
                           </div>
 
@@ -1548,7 +1551,7 @@ export const OrderCreateForm = () => {
                               {formatCurrency(
                                 orderItemMode === "inventory"
                                   ? totalPrice
-                                  : (form.watch("temporaryItems") || []).reduce((total: number, item: any) => {
+                                  : (form.watch("items") || []).reduce((total: number, item: any) => {
                                       const quantity = Number(item.orderedQuantity) || 0;
                                       const price = Number(item.price) || 0;
                                       const icms = Number(item.icms) || 0;
@@ -1587,7 +1590,7 @@ export const OrderCreateForm = () => {
                       </CardHeader>
                       <CardContent>
                         {orderItemMode === "inventory" ? (
-                          <div className="rounded-md border border-border/40 overflow-hidden w-full">
+                          <div className="rounded-md border border-border overflow-hidden w-full">
                             <Table>
                               <TableHeader>
                                 <TableRow className="bg-muted/50">
@@ -1650,7 +1653,7 @@ export const OrderCreateForm = () => {
                           </Table>
                         </div>
                         ) : (
-                          <div className="rounded-md border border-border/40 overflow-hidden w-full">
+                          <div className="rounded-md border border-border overflow-hidden w-full">
                             <Table>
                               <TableHeader>
                                 <TableRow className="bg-muted/50">
@@ -1665,7 +1668,7 @@ export const OrderCreateForm = () => {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {(form.watch("temporaryItems") || []).map((item: any, index: number) => {
+                                {((form.watch("items") || []).filter((item: any) => item.temporaryItemDescription)).map((item: any, index: number) => {
                                   const quantity = Number(item.orderedQuantity) || 0;
                                   const price = Number(item.price) || 0;
                                   const icms = Number(item.icms) || 0;
@@ -1695,7 +1698,7 @@ export const OrderCreateForm = () => {
                                   </TableCell>
                                   <TableCell className="text-right">
                                     {formatCurrency(
-                                      (form.watch("temporaryItems") || []).reduce((total: number, item: any) => {
+                                      ((form.watch("items") || []).filter((item: any) => item.temporaryItemDescription)).reduce((total: number, item: any) => {
                                         const quantity = Number(item.orderedQuantity) || 0;
                                         const price = Number(item.price) || 0;
                                         const icms = Number(item.icms) || 0;

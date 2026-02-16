@@ -270,7 +270,7 @@ export function TaskPreparationView({
     searchParamName: "search",
     serializeToUrl: serializeTaskFilters,
     deserializeFromUrl: deserializeTaskFilters,
-    excludeFromUrl: ["limit", "orderBy"],
+    excludeFromUrl: ["limit", "orderBy", "status"],
   });
 
   // Get user's sector privilege for default columns
@@ -498,10 +498,10 @@ export function TaskPreparationView({
         throw new Error('Failed to fetch source task details');
       }
 
-      setCopyFromTaskState((prev) => ({
+      setCopyFromTaskState((prev): CopyFromTaskState => ({
         ...prev,
         step: "confirming",
-        sourceTask: fullSourceTask.data,
+        sourceTask: fullSourceTask.data ?? null,
       }));
     } catch (error) {
       console.error('Failed to fetch source task:', error);

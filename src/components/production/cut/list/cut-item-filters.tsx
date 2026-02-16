@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { IconFilter, IconX } from "@tabler/icons-react";
+import type { DateRange } from "react-day-picker";
 import { CUT_STATUS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES } from "../../../../constants";
 import { CUT_STATUS_LABELS, CUT_TYPE_LABELS, CUT_ORIGIN_LABELS } from "../../../../constants";
 import type { CutGetManyFormData } from "../../../../schemas";
@@ -188,8 +189,9 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
                 label: label,
               }))}
               value={localState.statuses}
-              onValueChange={(statuses: string[]) => {
-                setLocalState((prev) => ({ ...prev, statuses: statuses as CUT_STATUS[] }));
+              onValueChange={(statuses: string | string[] | null | undefined) => {
+                const statusArray = Array.isArray(statuses) ? statuses : [];
+                setLocalState((prev) => ({ ...prev, statuses: statusArray as CUT_STATUS[] }));
               }}
               placeholder="Selecionar status..."
               searchPlaceholder="Buscar status..."
@@ -215,8 +217,9 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
                 label: label,
               }))}
               value={localState.types}
-              onValueChange={(types: string[]) => {
-                setLocalState((prev) => ({ ...prev, types: types as CUT_TYPE[] }));
+              onValueChange={(types: string | string[] | null | undefined) => {
+                const typeArray = Array.isArray(types) ? types : [];
+                setLocalState((prev) => ({ ...prev, types: typeArray as CUT_TYPE[] }));
               }}
               placeholder="Selecionar tipos..."
               searchPlaceholder="Buscar tipos..."
@@ -230,8 +233,9 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
             <Label className="text-base font-medium">Origem</Label>
             <Combobox
               value={localState.origin}
-              onValueChange={(origin: string) => {
-                setLocalState((prev) => ({ ...prev, origin }));
+              onValueChange={(origin: string | string[] | null | undefined) => {
+                const originValue = typeof origin === 'string' ? origin : 'all';
+                setLocalState((prev) => ({ ...prev, origin: originValue }));
               }}
               options={[
                 { value: "all", label: "Todas" },
@@ -264,8 +268,9 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
                 })),
               ]}
               value={localState.sectorIds}
-              onValueChange={(sectorIds: string[]) => {
-                setLocalState((prev) => ({ ...prev, sectorIds }));
+              onValueChange={(sectorIds: string | string[] | null | undefined) => {
+                const sectorIdArray = Array.isArray(sectorIds) ? sectorIds : [];
+                setLocalState((prev) => ({ ...prev, sectorIds: sectorIdArray }));
               }}
               placeholder="Selecionar setores..."
               searchPlaceholder="Buscar setores..."
@@ -283,10 +288,11 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAfter}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    const dateValue = date instanceof Date ? date : null;
                     setLocalState((prev) => ({
                       ...prev,
-                      createdAfter: date || undefined,
+                      createdAfter: dateValue || undefined,
                     }));
                   }}
                   hideLabel
@@ -298,10 +304,11 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
                 <DateTimeInput
                   mode="date"
                   value={localState.createdBefore}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    const dateValue = date instanceof Date ? date : null;
                     setLocalState((prev) => ({
                       ...prev,
-                      createdBefore: date || undefined,
+                      createdBefore: dateValue || undefined,
                     }));
                   }}
                   hideLabel

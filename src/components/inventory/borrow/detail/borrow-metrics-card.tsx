@@ -103,7 +103,7 @@ export function BorrowMetricsCard({ borrow, className }: BorrowMetricsCardProps)
 
         {/* Additional metrics for returned items */}
         {isReturned && borrow.returnedAt && (
-          <div className="mt-6 pt-6 border-t border-border/50">
+          <div className="mt-6 pt-6 border-t border-border">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Emprestado em</p>

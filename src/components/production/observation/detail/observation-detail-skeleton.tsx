@@ -47,7 +47,7 @@ export function ObservationDetailSkeleton() {
             </div>
 
             {/* Task Information Section */}
-            <div className="pt-4 border-t border-border/50">
+            <div className="pt-4 border-t border-border">
               <Skeleton className="h-5 w-36 mb-3" />
               <div className="space-y-3">
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -70,7 +70,7 @@ export function ObservationDetailSkeleton() {
             </div>
 
             {/* Commissions Section */}
-            <div className="pt-4 border-t border-border/50">
+            <div className="pt-4 border-t border-border">
               <Skeleton className="h-5 w-40 mb-3" />
               <div className="space-y-3">
                 {[1, 2].map((i) => (
@@ -86,7 +86,7 @@ export function ObservationDetailSkeleton() {
             </div>
 
             {/* Date Information Section */}
-            <div className="pt-4 border-t border-border/50">
+            <div className="pt-4 border-t border-border">
               <Skeleton className="h-5 w-32 mb-3" />
               <div className="space-y-3">
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">

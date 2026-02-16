@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useWatch, useFormContext } from "react-hook-form";
+import type { FieldValues, Path } from "react-hook-form";
 import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
@@ -14,22 +15,22 @@ interface CpfCnpjCellProps<_TFieldValues extends FieldValues = FieldValues> {
 type DocumentType = "cpf" | "cnpj";
 
 export function CpfCnpjCell<_TFieldValues extends FieldValues = FieldValues>({ control, index, disabled }: CpfCnpjCellProps<_TFieldValues>) {
-  const { setValue, getValues } = useFormContext<TFieldValues>();
+  const { setValue, getValues } = useFormContext<_TFieldValues>();
 
   // Watch the current values to determine initial document type
   const watchCpf = useWatch({
     control,
-    name: `customers.${index}.data.cpf` as Path<TFieldValues>,
+    name: `customers.${index}.data.cpf` as Path<_TFieldValues>,
   });
   const watchCnpj = useWatch({
     control,
-    name: `customers.${index}.data.cnpj` as Path<TFieldValues>,
+    name: `customers.${index}.data.cnpj` as Path<_TFieldValues>,
   });
 
   // Initialize document type based on existing values
   const initializeDocumentType = (): DocumentType => {
-    const cpfValue = getValues(`customers.${index}.data.cpf` as Path<TFieldValues>);
-    const cnpjValue = getValues(`customers.${index}.data.cnpj` as Path<TFieldValues>);
+    const cpfValue = getValues(`customers.${index}.data.cpf` as Path<_TFieldValues>);
+    const cnpjValue = getValues(`customers.${index}.data.cnpj` as Path<_TFieldValues>);
 
     // If CNPJ has a value and CPF doesn't, show CNPJ
     if (cnpjValue && !cpfValue) {
@@ -55,9 +56,9 @@ export function CpfCnpjCell<_TFieldValues extends FieldValues = FieldValues>({ c
       setDocumentType(value);
       // Clear the other field when switching using proper form methods
       if (value === "cpf") {
-        setValue(`customers.${index}.data.cnpj` as Path<TFieldValues>, null as any);
+        setValue(`customers.${index}.data.cnpj` as Path<_TFieldValues>, null as any);
       } else {
-        setValue(`customers.${index}.data.cpf` as Path<TFieldValues>, null as any);
+        setValue(`customers.${index}.data.cpf` as Path<_TFieldValues>, null as any);
       }
     }
   };
@@ -81,7 +82,7 @@ export function CpfCnpjCell<_TFieldValues extends FieldValues = FieldValues>({ c
         {documentType === "cpf" ? (
           <FormField
             control={control}
-            name={`customers.${index}.data.cpf` as unknown as Path<TFieldValues>}
+            name={`customers.${index}.data.cpf` as unknown as Path<_TFieldValues>}
             render={({ field }) => (
               <FormItem>
                 <FormControl>
@@ -102,7 +103,7 @@ export function CpfCnpjCell<_TFieldValues extends FieldValues = FieldValues>({ c
         ) : (
           <FormField
             control={control}
-            name={`customers.${index}.data.cnpj` as unknown as Path<TFieldValues>}
+            name={`customers.${index}.data.cnpj` as unknown as Path<_TFieldValues>}
             render={({ field }) => (
               <FormItem>
                 <FormControl>

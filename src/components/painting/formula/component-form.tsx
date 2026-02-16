@@ -218,9 +218,10 @@ export function ComponentForm({
                       options={comboboxOptions}
                       value={field.value}
                       onValueChange={(value) => {
-                        field.onChange(value || "");
-                        if (value) {
-                          handleItemSelect(value);
+                        const normalizedValue = Array.isArray(value) ? value[0] : value;
+                        field.onChange(normalizedValue || "");
+                        if (normalizedValue) {
+                          handleItemSelect(normalizedValue);
                         }
                       }}
                       placeholder="Selecione um item..."
@@ -270,7 +271,7 @@ export function ComponentForm({
                         value={field.value}
                         onChange={(value) => {
                           field.onChange(value);
-                          handleRatioChange(value);
+                          handleRatioChange(typeof value === 'number' ? value : Number(value));
                         }}
                         placeholder="Ex: 15,5"
                         className="flex-1"

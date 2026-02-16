@@ -1,7 +1,9 @@
 import { useState, useMemo, useCallback } from "react";
+import { useWatch } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import { getCustomers, quickCreateCustomer } from "../../../../api-client";
+import { getCustomers, getCustomerById, quickCreateCustomer } from "../../../../api-client";
 import type { Customer } from "../../../../types";
 import { formatCNPJ } from "../../../../utils";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
@@ -21,6 +23,23 @@ interface CustomerSelectorProps {
 export function CustomerSelector({ control, disabled, required, initialCustomer, name = "customerId", label = "Cliente", placeholder = "Selecione um cliente" }: CustomerSelectorProps) {
   const [isCreating, setIsCreating] = useState(false);
 
+  // Watch customerId from form state - persists across accordion unmount/remount
+  const selectedCustomerId = useWatch({ control, name }) as string | undefined;
+
+  // Fetch selected customer details by ID - React Query cache persists across unmount/remount
+  const { data: selectedCustomerData } = useQuery({
+    queryKey: ["customers", "selected-detail", selectedCustomerId],
+    queryFn: async () => {
+      if (!selectedCustomerId) return null;
+      const response = await getCustomerById(selectedCustomerId, {
+        include: { logo: true },
+      } as any);
+      return response.data || null;
+    },
+    enabled: !!selectedCustomerId && selectedCustomerId !== initialCustomer?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // CNPJ autocomplete integration - detects CNPJ input and fetches company data from Brasil API
   const {
     isLookingUp,
@@ -30,8 +49,15 @@ export function CustomerSelector({ control, disabled, required, initialCustomer,
     reset: resetCnpjState,
   } = useCnpjAutocomplete();
 
-  // Memoize initialOptions to prevent infinite loop
-  const initialOptions = useMemo(() => initialCustomer ? [initialCustomer] : [], [initialCustomer?.id]);
+  // Memoize initialOptions - include selected customer data for accordion remount scenarios
+  const initialOptions = useMemo(() => {
+    const options: Customer[] = [];
+    if (initialCustomer) options.push(initialCustomer);
+    if (selectedCustomerData && selectedCustomerData.id !== initialCustomer?.id) {
+      options.push(selectedCustomerData);
+    }
+    return options;
+  }, [initialCustomer?.id, selectedCustomerData?.id]);
 
   // Memoize callbacks to prevent infinite loop
   const getOptionLabel = useCallback((customer: Customer) => customer.fantasyName, []);
@@ -131,7 +157,7 @@ export function CustomerSelector({ control, disabled, required, initialCustomer,
               async={true}
               allowCreate={true}
               createLabel={dynamicCreateLabel}
-              onCreate={handleCreateCustomer}
+              onCreate={handleCreateCustomer as any}
               isCreating={isCreating || isLookingUp}
               queryKey={["customers", "search", name]}
               queryFn={searchCustomers}
@@ -153,7 +179,7 @@ export function CustomerSelector({ control, disabled, required, initialCustomer,
                       {customer.corporateName && <span className="truncate">{customer.corporateName}</span>}
                       {customer.cnpj && (
                         <>
-                          {customer.corporateName && <span>•</span>}
+                          {customer.corporateName && <span className="opacity-50">•</span>}
                           <span>{formatCNPJ(customer.cnpj)}</span>
                         </>
                       )}
@@ -161,6 +187,7 @@ export function CustomerSelector({ control, disabled, required, initialCustomer,
                   </div>
                 </div>
               )}
+              // @ts-expect-error - component prop mismatch
               loadMoreText="Carregar mais clientes"
               loadingMoreText="Carregando..."
               minSearchLength={0}

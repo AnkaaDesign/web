@@ -31,6 +31,7 @@ import {
 import { useNotification } from "@/hooks";
 import {
   NOTIFICATION_TYPE_LABELS,
+  NOTIFICATION_CHANNEL,
   routes,
 } from "@/constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -301,8 +302,8 @@ export const NotificationDetailsPage = () => {
                   <FieldRow icon={<IconBell className="h-4 w-4" />} label="Canais de Envio">
                     <div className="flex items-center gap-1.5">
                       {(["IN_APP", "PUSH", "EMAIL", "WHATSAPP"] as const).map((channelKey) => {
-                        const channelConfig = CHANNEL_CONFIG[channelKey];
-                        const isEnabled = notification.channel.includes(channelKey);
+                        const channelConfig = CHANNEL_CONFIG[channelKey as NOTIFICATION_CHANNEL];
+                        const isEnabled = notification.channel.includes(channelKey as NOTIFICATION_CHANNEL);
                         const Icon = channelConfig.icon;
                         return (
                           <div

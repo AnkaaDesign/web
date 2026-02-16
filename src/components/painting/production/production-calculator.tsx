@@ -207,9 +207,9 @@ export function ProductionCalculator({ formula, onStartProduction }: ProductionC
                     id="targetWeight"
                     type="number"
                     value={targetWeight}
-                    onChange={(value) => setTargetWeight(typeof value === "number" ? value : 0)}
-                    min="0"
-                    step="0.1"
+                    onChange={(value) => setTargetWeight(typeof value === "number" ? value : Number(value) || 0)}
+                    min={0}
+                    step={0.1}
                     className="flex-1"
                   />
                   <select value={targetWeightUnit} onChange={(e) => setTargetWeightUnit(e.target.value as MEASURE_UNIT)} className="px-3 py-1 border rounded-md bg-background">
@@ -221,7 +221,7 @@ export function ProductionCalculator({ formula, onStartProduction }: ProductionC
             ) : (
               <div>
                 <Label htmlFor="targetVolume">Volume desejado (L)</Label>
-                <Input id="targetVolume" type="number" value={targetVolume} onChange={(value) => setTargetVolume(typeof value === "number" ? value : 0)} min="0" step="0.1" />
+                <Input id="targetVolume" type="number" value={targetVolume} onChange={(value) => setTargetVolume(typeof value === "number" ? value : Number(value) || 0)} min={0} step={0.1} />
               </div>
             )}
 

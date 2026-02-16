@@ -215,7 +215,7 @@ export const TeamLoansPage = () => {
                 <Label htmlFor="user-filter">Colaborador</Label>
                 <Combobox
                   value={selectedUserId}
-                  onValueChange={(value) => setSelectedUserId(value || "")}
+                  onValueChange={(value) => setSelectedUserId((Array.isArray(value) ? value[0] : value) || "")}
                   options={[
                     { value: "", label: "Todos os colaboradores" },
                     ...teamUsers.map((user) => ({
@@ -232,7 +232,7 @@ export const TeamLoansPage = () => {
                 <Label htmlFor="status-filter">Status</Label>
                 <Combobox
                   value={selectedStatus}
-                  onValueChange={(value) => setSelectedStatus(value || "")}
+                  onValueChange={(value) => setSelectedStatus((Array.isArray(value) ? value[0] : value) || "")}
                   options={[
                     { value: "", label: "Todos os status" },
                     { value: BORROW_STATUS.ACTIVE, label: BORROW_STATUS_LABELS[BORROW_STATUS.ACTIVE] },

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Airbrushing } from "../../../../types";
-import { routes } from "../../../../constants";
+import { routes, AIRBRUSHING_STATUS } from "../../../../constants";
 import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditAirbrushings, canDeleteAirbrushings, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -293,7 +293,7 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
   };
 
   // Confirm status change
-  const confirmStatusChange = async (status: string) => {
+  const confirmStatusChange = async (status: AIRBRUSHING_STATUS) => {
     if (statusModal) {
       try {
         for (const item of statusModal.items) {

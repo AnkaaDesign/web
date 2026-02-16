@@ -175,7 +175,7 @@ export function ActivityHistoryCard({ item, className, maxHeight = "500px" }: Ac
                     <div className="pb-1 mb-4 rounded-md">
                       <div className="flex justify-center items-center gap-4">
                         <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60 border border-border/50">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60 border border-border">
                           <IconCalendar className="h-3.5 w-3.5 text-muted-foreground" />
                           <span className="text-sm font-medium text-muted-foreground">{date}</span>
                         </div>

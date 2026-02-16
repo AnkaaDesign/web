@@ -74,9 +74,9 @@ export function UserMergeDialog({ open, onOpenChange, users, onMerge }: UserMerg
           if (value === null || value === undefined) return null;
 
           // Format value for display
-          if (type === "array" && Array.isArray(value)) {
+          if (Array.isArray(value)) {
             formatted = value.length > 0 ? value.join(", ") : "Nenhum";
-          } else if (type === "boolean") {
+          } else if (typeof value === "boolean") {
             formatted = value ? "Sim" : "Não";
           } else if (field === "birth" && value instanceof Date) {
             formatted = value.toLocaleDateString("pt-BR");
@@ -98,7 +98,7 @@ export function UserMergeDialog({ open, onOpenChange, users, onMerge }: UserMerg
       // Check if there's a conflict (different values)
       if (values.length > 1) {
         const hasConflict =
-          type === "array"
+          Array.isArray(values[0].value)
             ? !values.every((v) => JSON.stringify(v.value) === JSON.stringify(values[0].value))
             : !values.every((v) => {
                 // Special handling for dates

@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { IconPlus, IconTrash, IconCalendar, IconCurrencyReal, IconPhoto, IconNote } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
@@ -31,11 +32,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatCurrency } from "../../../../utils";
+import { formatCurrency, formatCNPJ } from "../../../../utils";
+import { cn } from "@/lib/utils";
 import { DISCOUNT_TYPE, SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { ServiceAutocomplete } from "../form/service-autocomplete";
+import { getCustomers } from "../../../../api-client";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
+import { IconX } from "@tabler/icons-react";
 
 interface PricingSelectorProps {
   control: any;
@@ -46,6 +51,7 @@ interface PricingSelectorProps {
   layoutFiles?: FileWithPreview[];
   onLayoutFilesChange?: (files: FileWithPreview[]) => void;
   onItemDeleted?: (description: string) => void;
+  initialInvoiceToCustomers?: Array<{ id: string; fantasyName?: string; corporateName?: string; cnpj?: string }>;
 }
 
 export interface PricingSelectorRef {
@@ -83,7 +89,7 @@ const VALIDITY_DAYS_OPTIONS = Array.from({ length: 30 }, (_, i) => ({
 export const PricingSelector = forwardRef<
   PricingSelectorRef,
   PricingSelectorProps
->(({ control, disabled, userRole, readOnly, onItemCountChange, layoutFiles: externalLayoutFiles, onLayoutFilesChange, onItemDeleted }, ref) => {
+>(({ control, disabled, userRole, readOnly, onItemCountChange, layoutFiles: externalLayoutFiles, onLayoutFilesChange, onItemDeleted, initialInvoiceToCustomers }, ref) => {
   const [initialized, setInitialized] = useState(false);
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
   const [showCustomPayment, setShowCustomPayment] = useState(false);
@@ -145,8 +151,85 @@ export const PricingSelector = forwardRef<
     } else if (files.length === 0) {
       setValue("pricing.layoutFileId", null);
     }
-  }, [setValue]);
+  }, [setValue, setLayoutFiles]);
 
+  // Customers cache for invoice-to multi-select
+  const customersCache = useRef<Map<string, any>>(new Map());
+  const [selectedCustomers, setSelectedCustomers] = useState<Map<string, any>>(new Map());
+
+  // Initialize cache with initial customers passed from form (no async fetch needed)
+  useEffect(() => {
+    if (initialInvoiceToCustomers && initialInvoiceToCustomers.length > 0) {
+      // Use customer objects passed directly from the API response
+      initialInvoiceToCustomers.forEach(customer => {
+        customersCache.current.set(customer.id, customer);
+      });
+      setSelectedCustomers(new Map(initialInvoiceToCustomers.map(c => [c.id, c])));
+    } else {
+      // Fallback: try to fetch from form values if no initial customers provided
+      const invoicesToCustomerIds = getValues("pricing.invoicesToCustomerIds");
+      if (invoicesToCustomerIds && Array.isArray(invoicesToCustomerIds) && invoicesToCustomerIds.length > 0) {
+        const uncachedIds = invoicesToCustomerIds.filter(id => !customersCache.current.has(id));
+        if (uncachedIds.length > 0) {
+          getCustomers({
+            where: { id: { in: uncachedIds } },
+            include: { logo: true }
+          }).then(response => {
+            if (response.data) {
+              response.data.forEach(customer => {
+                customersCache.current.set(customer.id, customer);
+              });
+              setSelectedCustomers(new Map(response.data.map(c => [c.id, c])));
+            }
+          }).catch((err) => {
+            console.error('[PricingSelector] Failed to fetch initial invoiceTo customers:', err);
+          });
+        }
+      }
+    }
+  }, []); // Run only on mount
+
+  // Search function for customers Combobox
+  const searchCustomers = useCallback(async (
+    search: string,
+    page: number = 1,
+  ): Promise<{
+    data: any[];
+    hasMore: boolean;
+  }> => {
+    const params: any = {
+      orderBy: { fantasyName: "asc" },
+      page: page,
+      take: 50,
+      include: { logo: true },
+    };
+
+    if (search && search.trim()) {
+      params.searchingFor = search.trim();
+    }
+
+    try {
+      const response = await getCustomers(params);
+      const customers = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      // Cache all customers we fetch
+      customers.forEach(customer => {
+        customersCache.current.set(customer.id, customer);
+      });
+
+      return {
+        data: customers,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      return { data: [], hasMore: false };
+    }
+  }, []);
+
+  // Memoize callbacks
+  const getCustomerLabel = useCallback((customer: any) => customer.fantasyName || customer.corporateName || 'Cliente sem nome', []);
+  const getCustomerValue = useCallback((customer: any) => customer.id, []);
 
   // Calculate subtotal from all pricing items
   const subtotal = useMemo(() => {
@@ -392,96 +475,229 @@ export const PricingSelector = forwardRef<
         </Button>
       )}
 
-      {/* Spacing between items and configuration sections */}
+      {/* Discount Section */}
       {hasPricingItems && (
-        <div className="h-4" />
-      )}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField
+              control={control}
+              name="pricing.discountType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo de Desconto</FormLabel>
+                  <FormControl>
+                    <Combobox
+                      value={field.value || DISCOUNT_TYPE.NONE}
+                      onValueChange={(newType) => {
+                        const safeType = newType || DISCOUNT_TYPE.NONE;
+                        const previousType = field.value || DISCOUNT_TYPE.NONE;
+                        field.onChange(safeType);
+                        if (safeType === DISCOUNT_TYPE.NONE) {
+                          setValue("pricing.discountValue", null);
+                          setValue("pricing.discountReference", null);
+                        } else if (previousType !== safeType && previousType !== DISCOUNT_TYPE.NONE) {
+                          setValue("pricing.discountValue", null);
+                        }
+                      }}
+                      disabled={disabled || readOnly}
+                      options={[
+                        DISCOUNT_TYPE.NONE,
+                        DISCOUNT_TYPE.PERCENTAGE,
+                        DISCOUNT_TYPE.FIXED_VALUE,
+                      ].map((type) => ({
+                        value: type,
+                        label: DISCOUNT_TYPE_LABELS[type],
+                      }))}
+                      placeholder="Selecione o tipo"
+                      emptyText="Nenhum tipo encontrado"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-      {/* Discount Section - Right after services */}
-      {hasPricingItems && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField
-            control={control}
-            name="pricing.discountType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo de Desconto</FormLabel>
-                <FormControl>
-                  <Combobox
-                    value={field.value || DISCOUNT_TYPE.NONE}
-                    onValueChange={(newType) => {
-                      const safeType = newType || DISCOUNT_TYPE.NONE;
-                      const previousType = field.value || DISCOUNT_TYPE.NONE;
-                      field.onChange(safeType);
-                      if (safeType === DISCOUNT_TYPE.NONE) {
-                        setValue("pricing.discountValue", null);
-                      } else if (previousType !== safeType && previousType !== DISCOUNT_TYPE.NONE) {
-                        setValue("pricing.discountValue", null);
-                      }
-                    }}
-                    disabled={disabled || readOnly}
-                    options={[
-                      DISCOUNT_TYPE.NONE,
-                      DISCOUNT_TYPE.PERCENTAGE,
-                      DISCOUNT_TYPE.FIXED_VALUE,
-                    ].map((type) => ({
-                      value: type,
-                      label: DISCOUNT_TYPE_LABELS[type],
-                    }))}
-                    placeholder="Selecione o tipo"
-                    emptyMessage="Nenhum tipo encontrado"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+            <FormField
+              control={control}
+              name="pricing.discountValue"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    Valor do Desconto
+                    {discountType === DISCOUNT_TYPE.PERCENTAGE && (
+                      <span className="text-xs text-muted-foreground">(%)</span>
+                    )}
+                    {discountType === DISCOUNT_TYPE.FIXED_VALUE && (
+                      <span className="text-xs text-muted-foreground">(R$)</span>
+                    )}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type={discountType === DISCOUNT_TYPE.FIXED_VALUE ? "currency" : "number"}
+                      {...field}
+                      value={field.value ?? ""}
+                      onChange={(value) => {
+                        if (value === null || value === undefined || value === "") {
+                          field.onChange(null);
+                        } else if (typeof value === "number") {
+                          field.onChange(value);
+                        } else {
+                          const num = Number(value);
+                          field.onChange(isNaN(num) ? null : num);
+                        }
+                      }}
+                      disabled={disabled || readOnly || discountType === DISCOUNT_TYPE.NONE}
+                      placeholder={discountType === DISCOUNT_TYPE.NONE ? "-" : discountType === DISCOUNT_TYPE.FIXED_VALUE ? "R$ 0,00" : "0"}
+                      min={discountType === DISCOUNT_TYPE.PERCENTAGE ? 0 : undefined}
+                      max={discountType === DISCOUNT_TYPE.PERCENTAGE ? 100 : undefined}
+                      step={discountType === DISCOUNT_TYPE.PERCENTAGE ? 0.01 : undefined}
+                      className="bg-transparent"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
-          <FormField
-            control={control}
-            name="pricing.discountValue"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="flex items-center gap-2">
-                  Valor do Desconto
-                  {discountType === DISCOUNT_TYPE.PERCENTAGE && (
-                    <span className="text-xs text-muted-foreground">(%)</span>
-                  )}
-                  {discountType === DISCOUNT_TYPE.FIXED_VALUE && (
-                    <span className="text-xs text-muted-foreground">(R$)</span>
-                  )}
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    type={discountType === DISCOUNT_TYPE.FIXED_VALUE ? "currency" : "number"}
-                    {...field}
-                    value={field.value ?? ""}
-                    onChange={(value) => {
-                      if (value === null || value === undefined || value === "") {
-                        field.onChange(null);
-                      } else if (typeof value === "number") {
-                        field.onChange(value);
-                      } else {
-                        const num = Number(value);
-                        field.onChange(isNaN(num) ? null : num);
-                      }
-                    }}
-                    disabled={disabled || readOnly || discountType === DISCOUNT_TYPE.NONE}
-                    placeholder={discountType === DISCOUNT_TYPE.NONE ? "-" : discountType === DISCOUNT_TYPE.FIXED_VALUE ? "R$ 0,00" : "0"}
-                    min={discountType === DISCOUNT_TYPE.PERCENTAGE ? "0" : undefined}
-                    max={discountType === DISCOUNT_TYPE.PERCENTAGE ? "100" : undefined}
-                    step={discountType === DISCOUNT_TYPE.PERCENTAGE ? "0.01" : undefined}
-                    className="bg-transparent"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {/* Discount Reference - Only show if discount type is not NONE */}
+          {discountType !== DISCOUNT_TYPE.NONE && (
+            <FormField
+              control={control}
+              name="pricing.discountReference"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Referência do Desconto</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      value={field.value || ""}
+                      placeholder="Justificativa ou referência para o desconto aplicado..."
+                      disabled={disabled || readOnly}
+                      maxLength={500}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
         </div>
       )}
 
-      {/* Totals Section - Right after discount */}
+      {/* Invoices to Customers */}
+      {hasPricingItems && (
+        <FormField
+          control={control}
+          name="pricing.invoicesToCustomerIds"
+          render={({ field }) => {
+            // Update selected customers when field value changes
+            useEffect(() => {
+              if (field.value && Array.isArray(field.value)) {
+                const newSelectedCustomers = new Map<string, any>();
+                field.value.forEach((customerId: string) => {
+                  const cachedCustomer = customersCache.current.get(customerId);
+                  if (cachedCustomer) {
+                    newSelectedCustomers.set(customerId, cachedCustomer);
+                  }
+                });
+                setSelectedCustomers(newSelectedCustomers);
+              } else {
+                setSelectedCustomers(new Map());
+              }
+            }, [field.value]);
+
+            return (
+              <FormItem>
+                <FormLabel>Faturar Para (Clientes)</FormLabel>
+                <FormControl>
+                  <div className="space-y-3">
+                    <Combobox
+                      value={field.value || []}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                      }}
+                      mode="multiple"
+                      placeholder="Selecione clientes para faturamento..."
+                      emptyText="Nenhum cliente encontrado"
+                      searchPlaceholder="Pesquisar por nome ou CNPJ..."
+                      disabled={disabled || readOnly}
+                      async={true}
+                      queryKey={["customers", "invoice-selector"]}
+                      queryFn={searchCustomers}
+                      getOptionLabel={getCustomerLabel}
+                      getOptionValue={getCustomerValue}
+                      renderOption={(customer: any, _isSelected: boolean) => (
+                        <div className="flex items-center gap-3">
+                          <CustomerLogoDisplay
+                            logo={customer.logo}
+                            customerName={customer.fantasyName}
+                            size="sm"
+                            shape="rounded"
+                            className="flex-shrink-0"
+                          />
+                          <div className="flex flex-col gap-1 min-w-0 flex-1">
+                            <div className="font-medium truncate">{customer.fantasyName}</div>
+                            <div className="flex items-center gap-2 text-sm truncate group-hover:text-white transition-colors">
+                              {customer.corporateName && <span className="truncate">{customer.corporateName}</span>}
+                              {customer.cnpj && (
+                                <>
+                                  {customer.corporateName && <span className="opacity-50">•</span>}
+                                  <span>{formatCNPJ(customer.cnpj)}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      minSearchLength={0}
+                      pageSize={20}
+                      debounceMs={500}
+                      hideDefaultBadges={true}
+                      clearable={true}
+                    />
+
+                    {/* Selected customers display */}
+                    {selectedCustomers.size > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {Array.from(selectedCustomers.values()).map((customer) => (
+                          <Badge
+                            key={customer.id}
+                            variant="secondary"
+                            className={cn(
+                              "pl-2.5 pr-2.5 py-1.5 flex items-center gap-2 border transition-colors",
+                              !disabled && !readOnly && "cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
+                            )}
+                            onClick={disabled || readOnly ? undefined : (e) => {
+                              e.preventDefault();
+                              const currentValue = field.value || [];
+                              field.onChange(currentValue.filter((id: string) => id !== customer.id));
+                            }}
+                          >
+                            <CustomerLogoDisplay
+                              logo={customer.logo}
+                              customerName={customer.fantasyName}
+                              size="xs"
+                              shape="rounded"
+                              className="flex-shrink-0"
+                            />
+                            <span className="text-xs font-medium">{customer.fantasyName || customer.corporateName}</span>
+                            {customer.cnpj && <span className="text-xs opacity-70">({formatCNPJ(customer.cnpj)})</span>}
+                            {!disabled && !readOnly && <IconX className="h-3 w-3 ml-1" />}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            );
+          }}
+        />
+      )}
+
+      {/* Totals */}
       {hasPricingItems && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormItem>
@@ -514,10 +730,7 @@ export const PricingSelector = forwardRef<
         </div>
       )}
 
-      {/* Spacing between totals and status */}
-      {hasPricingItems && <div className="h-4" />}
-
-      {/* Status and Validity Period */}
+      {/* Status & Validity */}
       {hasPricingItems && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
@@ -532,7 +745,7 @@ export const PricingSelector = forwardRef<
                     value={field.value || 'DRAFT'}
                     onValueChange={field.onChange}
                     placeholder="Selecione o status"
-                    emptyMessage="Nenhum status encontrado"
+                    emptyText="Nenhum status encontrado"
                     disabled={disabled || !canEditStatus || readOnly}
                   />
                 </FormControl>
@@ -553,10 +766,14 @@ export const PricingSelector = forwardRef<
                 <FormControl>
                   <Combobox
                     value={validityPeriod?.toString() || ""}
-                    onValueChange={handleValidityPeriodChange}
+                    onValueChange={(value) => {
+                      if (typeof value === 'string') {
+                        handleValidityPeriodChange(value);
+                      }
+                    }}
                     options={validityPeriodOptions}
                     placeholder="Selecione o período"
-                    emptyMessage="Nenhum período encontrado"
+                    emptyText="Nenhum período encontrado"
                     disabled={disabled || readOnly}
                   />
                 </FormControl>
@@ -567,28 +784,32 @@ export const PricingSelector = forwardRef<
         </div>
       )}
 
-      {/* Payment, Date, Guarantee, and Validity - 6 column grid (2/6, 1/6, 2/6, 1/6) */}
+      {/* Payment Section */}
       {hasPricingItems && (
-        <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
-          {/* Payment Condition - 2/6 */}
-          <FormItem className="sm:col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Payment Condition */}
+          <FormItem>
             <FormLabel>Condição de Pagamento</FormLabel>
             <FormControl>
               <Combobox
                 value={currentPaymentCondition}
-                onValueChange={handlePaymentConditionChange}
+                onValueChange={(value) => {
+                  if (typeof value === 'string') {
+                    handlePaymentConditionChange(value);
+                  }
+                }}
                 disabled={disabled || readOnly}
                 options={PAYMENT_CONDITIONS.map((opt) => ({
                   value: opt.value,
                   label: opt.label,
                 }))}
                 placeholder="Selecione"
-                emptyMessage="Nenhuma opção"
+                emptyText="Nenhuma opção"
               />
             </FormControl>
           </FormItem>
 
-          {/* Down Payment Date - 1/6 */}
+          {/* Down Payment Date */}
           <FormField
             control={control}
             name="pricing.downPaymentDate"
@@ -599,45 +820,6 @@ export const PricingSelector = forwardRef<
                 label="Data da Entrada"
                 disabled={disabled || readOnly}
               />
-            )}
-          />
-
-          {/* Guarantee - 2/6 */}
-          <FormItem className="sm:col-span-2">
-            <FormLabel>Período de Garantia</FormLabel>
-            <FormControl>
-              <Combobox
-                value={currentGuaranteeOption}
-                onValueChange={handleGuaranteeOptionChange}
-                disabled={disabled || readOnly}
-                options={GUARANTEE_OPTIONS.map((opt) => ({
-                  value: opt.value,
-                  label: opt.label,
-                }))}
-                placeholder="Selecione"
-                emptyMessage="Nenhuma opção"
-              />
-            </FormControl>
-          </FormItem>
-
-          {/* Custom Delivery Days - 1/6 */}
-          <FormField
-            control={control}
-            name="pricing.customForecastDays"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Prazo Entrega</FormLabel>
-                <FormControl>
-                  <Combobox
-                    value={field.value ? String(field.value) : ""}
-                    onValueChange={(value) => field.onChange(value ? Number(value) : null)}
-                    disabled={disabled || readOnly}
-                    options={VALIDITY_DAYS_OPTIONS}
-                    placeholder="Auto"
-                    emptyMessage="Nenhuma opção"
-                  />
-                </FormControl>
-              </FormItem>
             )}
           />
         </div>
@@ -658,7 +840,7 @@ export const PricingSelector = forwardRef<
                   placeholder="Descreva as condições de pagamento personalizadas..."
                   disabled={disabled || readOnly}
                   rows={3}
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </FormControl>
               <FormMessage />
@@ -682,7 +864,7 @@ export const PricingSelector = forwardRef<
                   placeholder="Descreva as condições de garantia personalizadas..."
                   disabled={disabled || readOnly}
                   rows={3}
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </FormControl>
               <FormMessage />
@@ -691,8 +873,80 @@ export const PricingSelector = forwardRef<
         />
       )}
 
-      {/* Spacing before layout */}
-      {hasPricingItems && <div className="h-4" />}
+      {/* Guarantee, Simultaneous Tasks & Forecast Days - 2/4, 1/4, 1/4 */}
+      {hasPricingItems && (
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          {/* Guarantee - 2/4 width */}
+          <FormItem className="sm:col-span-2">
+            <FormLabel>Período de Garantia</FormLabel>
+            <FormControl>
+              <Combobox
+                value={currentGuaranteeOption}
+                onValueChange={(value) => {
+                  if (typeof value === 'string') {
+                    handleGuaranteeOptionChange(value);
+                  }
+                }}
+                disabled={disabled || readOnly}
+                options={GUARANTEE_OPTIONS.map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                }))}
+                placeholder="Selecione"
+                emptyText="Nenhuma opção"
+              />
+            </FormControl>
+          </FormItem>
+
+          {/* Simultaneous Tasks - 1/4 width */}
+          <FormField
+            control={control}
+            name="pricing.simultaneousTasks"
+            render={({ field }) => (
+              <FormItem className="sm:col-span-1">
+                <FormLabel>Tarefas Simultâneas</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    {...field}
+                    value={field.value ?? ""}
+                    onChange={(val) => {
+                      const numVal = val ? Number(val) : null;
+                      field.onChange(numVal);
+                    }}
+                    disabled={disabled || readOnly}
+                    placeholder="1-100"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Forecast Days - 1/4 width */}
+          <FormField
+            control={control}
+            name="pricing.customForecastDays"
+            render={({ field }) => (
+              <FormItem className="sm:col-span-1">
+                <FormLabel>Prazo Entrega</FormLabel>
+                <FormControl>
+                  <Combobox
+                    value={field.value ? String(field.value) : ""}
+                    onValueChange={(value) => field.onChange(value ? Number(value) : null)}
+                    disabled={disabled || readOnly}
+                    options={VALIDITY_DAYS_OPTIONS}
+                    placeholder="Auto"
+                    emptyText="Nenhuma opção"
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
+      )}
 
       {/* Layout File Upload */}
       {hasPricingItems && (

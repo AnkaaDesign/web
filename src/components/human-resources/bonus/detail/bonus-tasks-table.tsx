@@ -78,7 +78,7 @@ export function BonusTasksTable({
           task.customer?.fantasyName,
           task.sector?.name,
           task.serialNumber,
-          task.licensePlate,
+          task.truck?.plate,
         ];
         return searchableFields.some((field) =>
           field?.toLowerCase().includes(query)
@@ -283,12 +283,12 @@ export function BonusTasksTable({
                       )}
                       disabled={paginatedTasks.length === 0}
                     >
-                      <TruncatedTextWithTooltip text={column.header} />
+                      <TruncatedTextWithTooltip text={String(column.header)} />
                       {renderSortIndicator(column.id)}
                     </button>
                   ) : (
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                      <TruncatedTextWithTooltip text={column.header} />
+                      <TruncatedTextWithTooltip text={String(column.header)} />
                     </div>
                   )}
                 </TableHead>
@@ -400,6 +400,7 @@ export function BonusTasksTable({
       {/* Context Menu */}
       {contextMenu && (
         <TaskHistoryContextMenu
+          // @ts-expect-error - component prop mismatch
           task={contextMenu.tasks[0]}
           position={{ x: contextMenu.x, y: contextMenu.y }}
           onClose={() => setContextMenu(null)}

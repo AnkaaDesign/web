@@ -95,6 +95,11 @@ export const CreateNotificationPage = () => {
     };
   };
 
+  const fetchUsersForForm = async (searchTerm: string) => {
+    const result = await fetchUsers(searchTerm, 1);
+    return result.data;
+  };
+
   const fetchSectors = async (searchTerm: string, page = 1) => {
     const response = await apiClient.get("/sectors", {
       params: {
@@ -249,7 +254,7 @@ export const CreateNotificationPage = () => {
                   id="title"
                   placeholder="Ex: Atualização Importante do Sistema"
                   transparent
-                  {...form.register("title")}
+                  {...(form.register("title") as any)}
                 />
                 {form.formState.errors.title && (
                   <p className="text-sm text-destructive">{form.formState.errors.title.message}</p>
@@ -308,7 +313,7 @@ export const CreateNotificationPage = () => {
                   id="actionUrl"
                   placeholder="/administracao/configuracoes"
                   transparent
-                  {...form.register("actionUrl")}
+                  {...(form.register("actionUrl") as any)}
                 />
                 <p className="text-xs text-muted-foreground">
                   URL para onde o usuário será direcionado ao clicar na notificação
@@ -329,7 +334,7 @@ export const CreateNotificationPage = () => {
               <div className="grid grid-cols-2 gap-4">
                 <label
                   htmlFor="channel-in-app"
-                  className="flex items-center space-x-3 border border-border/40 rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
                 >
                   <Checkbox
                     id="channel-in-app"
@@ -351,7 +356,7 @@ export const CreateNotificationPage = () => {
 
                 <label
                   htmlFor="channel-email"
-                  className="flex items-center space-x-3 border border-border/40 rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
                 >
                   <Checkbox
                     id="channel-email"
@@ -373,7 +378,7 @@ export const CreateNotificationPage = () => {
 
                 <label
                   htmlFor="channel-push"
-                  className="flex items-center space-x-3 border border-border/40 rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
                 >
                   <Checkbox
                     id="channel-push"
@@ -395,7 +400,7 @@ export const CreateNotificationPage = () => {
 
                 <label
                   htmlFor="channel-whatsapp"
-                  className="flex items-center space-x-3 border border-border/40 rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors"
                 >
                   <Checkbox
                     id="channel-whatsapp"
@@ -452,7 +457,10 @@ export const CreateNotificationPage = () => {
                     placeholder="Selecione os setores"
                     async
                     queryKey={["sectors-async"]}
-                    queryFn={fetchSectors}
+                    queryFn={async (searchTerm: string) => {
+                      const response = await fetchSectors(searchTerm, 1);
+                      return response.data;
+                    }}
                     minSearchLength={0}
                     multiple
                     searchable
@@ -479,7 +487,7 @@ export const CreateNotificationPage = () => {
                     placeholder="Selecione os usuários"
                     async
                     queryKey={["users-async"]}
-                    queryFn={fetchUsers}
+                    queryFn={fetchUsersForForm}
                     minSearchLength={0}
                     multiple
                     searchable
@@ -530,7 +538,12 @@ export const CreateNotificationPage = () => {
                       <FormLabel>Data e Hora</FormLabel>
                       <FormControl>
                         <DateTimeInput
-                          field={field}
+                          field={{
+                            onChange: field.onChange,
+                            onBlur: field.onBlur,
+                            value: (field.value as any) ?? null,
+                            name: field.name,
+                          }}
                           mode="datetime"
                           placeholder="Selecione data e hora"
                         />

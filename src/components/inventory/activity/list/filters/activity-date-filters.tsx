@@ -1,4 +1,5 @@
 import type { ActivityGetManyFormData } from "../../../../../schemas";
+import type { DateRange } from "react-day-picker";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { IconCalendarPlus } from "@tabler/icons-react";
 
@@ -8,7 +9,8 @@ interface ActivityDateFiltersProps {
 }
 
 export const ActivityDateFilters = ({ filters, updateFilter }: ActivityDateFiltersProps) => {
-  const handleCreatedAtFromChange = (date: Date | null) => {
+  const handleCreatedAtFromChange = (date: Date | DateRange | null) => {
+    if (date && !(date instanceof Date)) return; // Skip DateRange for now
     if (!date && !filters.createdAt?.lte) {
       updateFilter("createdAt", undefined);
     } else {
@@ -19,7 +21,8 @@ export const ActivityDateFilters = ({ filters, updateFilter }: ActivityDateFilte
     }
   };
 
-  const handleCreatedAtToChange = (date: Date | null) => {
+  const handleCreatedAtToChange = (date: Date | DateRange | null) => {
+    if (date && !(date instanceof Date)) return; // Skip DateRange for now
     if (!date && !filters.createdAt?.gte) {
       updateFilter("createdAt", undefined);
     } else {

@@ -44,6 +44,7 @@ import {
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { BACKUP_PRESET_PATH_OPTIONS } from "@/config/backup-paths";
 import type { BackupMetadata, ScheduledBackupJob } from "../../api-client/backup";
 import { backupApi } from "../../api-client/backup";
 import {
@@ -94,7 +95,7 @@ interface NewScheduleForm {
   name: string;
   type: "database" | "files" | "system" | "full";
   frequency: "daily" | "weekly" | "monthly";
-  time: string;
+  time: string | Date;
   enabled: boolean;
   priority: "low" | "medium" | "high" | "critical";
   compressionLevel: number;
@@ -124,13 +125,8 @@ const COMPRESSION_OPTIONS = [
   { value: 9, label: "9 - Melhor compressão" },
 ];
 
-// Preset path options for system backups
-const PRESET_PATH_OPTIONS = [
-  { value: "critical", label: "Críticos (Configs principais)", paths: ["/etc/nginx", "/etc/ssl", "/home/kennedy/ankaa/.env", "/home/kennedy/ankaa/apps/api/.env"] },
-  { value: "high", label: "Alta prioridade (Sistema completo)", paths: ["/etc/nginx", "/etc/ssl", "/etc/samba", "/etc/systemd/system", "/var/www"] },
-  { value: "medium", label: "Média prioridade (Logs, www)", paths: ["/var/log/nginx", "/var/www"] },
-  { value: "low", label: "Baixa prioridade (Temporários)", paths: ["/tmp"] },
-];
+// Preset path options for system backups (centralized in config)
+const PRESET_PATH_OPTIONS = BACKUP_PRESET_PATH_OPTIONS;
 
 const BackupManagementPage = () => {
   // Authentication state
@@ -783,12 +779,13 @@ const BackupManagementPage = () => {
 
       // Format time for display (handle Date object from DateTimeInput)
       let timeDisplay: string;
-      if (newSchedule.time instanceof Date) {
-        const hours = newSchedule.time.getHours().toString().padStart(2, '0');
-        const minutes = newSchedule.time.getMinutes().toString().padStart(2, '0');
+      const timeValue = newSchedule.time;
+      if (timeValue instanceof Date) {
+        const hours = timeValue.getHours().toString().padStart(2, '0');
+        const minutes = timeValue.getMinutes().toString().padStart(2, '0');
         timeDisplay = `${hours}:${minutes}`;
       } else {
-        timeDisplay = String(newSchedule.time);
+        timeDisplay = String(timeValue);
       }
 
       const scheduleData = {
@@ -830,7 +827,7 @@ const BackupManagementPage = () => {
       if (process.env.NODE_ENV !== "production") {
         console.error("Error in handleCreateSchedule:", error);
       }
-      toast.error(`Erro ao criar agendamento: ${error.message || "Erro desconhecido"}`);
+      toast.error(`Erro ao criar agendamento: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
     }
   }, [newSchedule, scheduleBackup, getFrequencyLabel, generateCronExpression]);
 
@@ -1166,7 +1163,7 @@ const BackupManagementPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border dark:border-border/40">
+              <div className="rounded-md border dark:border-border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1215,7 +1212,7 @@ const BackupManagementPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border dark:border-border/40">
+              <div className="rounded-md border dark:border-border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1301,7 +1298,7 @@ const BackupManagementPage = () => {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="backup-name">Nome do Backup</Label>
-                <Input transparent id="backup-name" value={newBackup.name} onChange={(value) => setNewBackup({ ...newBackup, name: value as string })} placeholder="Ex: backup_sistema_2024-09-12" />
+                <Input transparent id="backup-name" value={newBackup.name} onChange={(value) => setNewBackup({ ...newBackup, name: Array.isArray(value) ? value.join('') : String(value) })} placeholder="Ex: backup_sistema_2024-09-12" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="backup-type">Tipo de Backup</Label>
@@ -1344,7 +1341,7 @@ const BackupManagementPage = () => {
                   <Label htmlFor="backup-compression">Compressão</Label>
                   <Combobox
                     value={newBackup.compressionLevel.toString()}
-                    onValueChange={(value) => setNewBackup({ ...newBackup, compressionLevel: parseInt(value || "6") })}
+                    onValueChange={(value) => setNewBackup({ ...newBackup, compressionLevel: parseInt(Array.isArray(value) ? value[0] || "6" : value || "6") })}
                     options={COMPRESSION_OPTIONS.map((opt) => ({
                       value: opt.value.toString(),
                       label: opt.label,
@@ -1415,8 +1412,8 @@ const BackupManagementPage = () => {
                             .map((path, idx) => (
                               <li key={idx}>{path}</li>
                             ))}
-                          {PRESET_PATH_OPTIONS.find((opt) => opt.value === newBackup.presetPathType)?.paths.length > 3 && (
-                            <li>... e mais {PRESET_PATH_OPTIONS.find((opt) => opt.value === newBackup.presetPathType)?.paths.length - 3} pastas</li>
+                          {(PRESET_PATH_OPTIONS.find((opt) => opt.value === newBackup.presetPathType)?.paths.length ?? 0) > 3 && (
+                            <li>... e mais {(PRESET_PATH_OPTIONS.find((opt) => opt.value === newBackup.presetPathType)?.paths.length ?? 0) - 3} pastas</li>
                           )}
                         </ul>
                       </div>
@@ -1710,8 +1707,8 @@ const BackupManagementPage = () => {
                             .map((path, idx) => (
                               <li key={idx}>{path}</li>
                             ))}
-                          {PRESET_PATH_OPTIONS.find((opt) => opt.value === newSchedule.presetPathType)?.paths.length > 3 && (
-                            <li>... e mais {PRESET_PATH_OPTIONS.find((opt) => opt.value === newSchedule.presetPathType)?.paths.length - 3} pastas</li>
+                          {(PRESET_PATH_OPTIONS.find((opt) => opt.value === newSchedule.presetPathType)?.paths.length ?? 0) > 3 && (
+                            <li>... e mais {(PRESET_PATH_OPTIONS.find((opt) => opt.value === newSchedule.presetPathType)?.paths.length ?? 0) - 3} pastas</li>
                           )}
                         </ul>
                       </div>
@@ -1760,7 +1757,7 @@ const BackupManagementPage = () => {
                   <Label htmlFor="schedule-compression">Compressão</Label>
                   <Combobox
                     value={newSchedule.compressionLevel.toString()}
-                    onValueChange={(value) => setNewSchedule({ ...newSchedule, compressionLevel: parseInt(value) })}
+                    onValueChange={(value) => setNewSchedule({ ...newSchedule, compressionLevel: parseInt(Array.isArray(value) ? value[0] || "6" : value || "6") })}
                     options={COMPRESSION_OPTIONS.map((opt) => ({
                       label: opt.label,
                       value: opt.value.toString(),
@@ -1780,7 +1777,7 @@ const BackupManagementPage = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="schedule-time">Horário de Execução</Label>
-                <DateTimeInput mode="time" value={newSchedule.time} onChange={(value) => setNewSchedule({ ...newSchedule, time: value })} />
+                <DateTimeInput mode="time" value={newSchedule.time instanceof Date ? newSchedule.time : null} onChange={(value) => setNewSchedule({ ...newSchedule, time: (value instanceof Date ? value : "23:00") })} />
               </div>
 
               {/* Auto-Delete / Retention Section */}

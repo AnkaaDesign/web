@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +17,132 @@ import type { Message } from "@/types/message";
 
 type MessageWithViewStatus = Message & { viewedAt?: Date | null; dismissedAt?: Date | null };
 
+const HOVER_DELAY_MS = 400;
+const GRID_COLUMNS = 4;
+const GRID_ROWS = 2;
+
+const MessagePreviewCard = ({
+  message,
+  onClick,
+}: {
+  message: MessageWithViewStatus;
+  onClick: () => void;
+}) => {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [scrollActive, setScrollActive] = useState(false);
+  const isViewed = !!message.viewedAt;
+
+  const handleMouseEnter = useCallback(() => {
+    hoverTimerRef.current = setTimeout(() => {
+      if (contentRef.current) {
+        const el = contentRef.current;
+        const isScrollable = el.scrollHeight > el.clientHeight;
+        if (isScrollable) {
+          setScrollActive(true);
+        }
+      }
+    }, HOVER_DELAY_MS);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setScrollActive(false);
+  }, []);
+
+  const handleWheel = useCallback(
+    (e: React.WheelEvent<HTMLDivElement>) => {
+      if (!scrollActive || !contentRef.current) return;
+
+      const el = contentRef.current;
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const atTop = scrollTop === 0;
+      const atBottom = Math.abs(scrollTop + clientHeight - scrollHeight) < 1;
+
+      // If scrolling down and at bottom, or scrolling up and at top, let the page scroll
+      if ((e.deltaY > 0 && atBottom) || (e.deltaY < 0 && atTop)) {
+        return;
+      }
+
+      // Otherwise trap the scroll inside the card content
+      e.stopPropagation();
+      el.scrollTop += e.deltaY;
+    },
+    [scrollActive]
+  );
+
+  return (
+    <Card
+      className={cn(
+        "cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:z-10 relative flex flex-col h-full overflow-hidden",
+        !isViewed && "outline outline-2 outline-primary/30 bg-primary/5"
+      )}
+      onClick={onClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onWheel={handleWheel}
+    >
+      {/* Header with gradient like the modal */}
+      <div
+        className={cn(
+          "px-4 py-3 border-b shrink-0",
+          !isViewed
+            ? "bg-gradient-to-r from-primary/15 via-primary/10 to-background"
+            : "bg-gradient-to-r from-muted/50 via-muted/30 to-background"
+        )}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <h3
+              className={cn(
+                "font-semibold text-base truncate",
+                !isViewed && "text-primary"
+              )}
+            >
+              {message.title}
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              {message.publishedAt
+                ? formatDistanceToNow(
+                    typeof message.publishedAt === "string"
+                      ? new Date(message.publishedAt)
+                      : message.publishedAt,
+                    { addSuffix: true, locale: ptBR }
+                  )
+                : ""}
+            </span>
+          </div>
+          {!isViewed && (
+            <Badge variant="default" className="text-xs shrink-0">
+              Novo
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Content preview */}
+      <CardContent className="p-4 flex-1 min-h-0">
+        <div
+          ref={contentRef}
+          className={cn(
+            "prose prose-sm dark:prose-invert max-w-none text-sm text-muted-foreground h-full",
+            scrollActive
+              ? "overflow-y-auto overscroll-contain"
+              : "overflow-hidden"
+          )}
+        >
+          <MessageBlockRenderer
+            blocks={transformMessageContent(message.content)}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export const MyMessagesPage = () => {
   const { user } = useAuth();
   const [selectedMessage, setSelectedMessage] = useState<MessageWithViewStatus | null>(null);
@@ -27,11 +153,14 @@ export const MyMessagesPage = () => {
     enabled: !!user,
   });
 
-  const formatDate = (date: Date | string | null) => {
-    if (!date) return "";
-    const dateObj = typeof date === "string" ? new Date(date) : date;
-    return formatDistanceToNow(dateObj, { addSuffix: true, locale: ptBR });
-  };
+  const rows = useMemo(() => {
+    if (!messages) return [];
+    const result: MessageWithViewStatus[][] = [];
+    for (let i = 0; i < messages.length; i += GRID_COLUMNS) {
+      result.push(messages.slice(i, i + GRID_COLUMNS));
+    }
+    return result;
+  }, [messages]);
 
   const handleCardClick = (message: MessageWithViewStatus) => {
     setSelectedMessage(message);
@@ -61,19 +190,27 @@ export const MyMessagesPage = () => {
         subtitle="Mensagens e comunicados do sistema"
         className="flex-shrink-0"
       />
-      <div className="flex-1 min-h-0 pb-6 overflow-y-auto">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto scroll-smooth snap-y snap-mandatory flex flex-col gap-4 pb-1"
+      >
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="overflow-hidden">
-                <div className="p-4 space-y-3">
-                  <Skeleton className="h-5 w-3/4" />
-                  <Skeleton className="h-3 w-1/4" />
-                  <Skeleton className="h-24 w-full" />
-                </div>
-              </Card>
-            ))}
-          </div>
+          Array.from({ length: GRID_ROWS }).map((_, i) => (
+            <div
+              key={i}
+              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 shrink-0 snap-start px-1"
+              style={{ height: `calc((100% - ${(GRID_ROWS - 1) * 16}px) / ${GRID_ROWS})` }}
+            >
+              {Array.from({ length: GRID_COLUMNS }).map((_, j) => (
+                <Card key={j} className="overflow-hidden">
+                  <div className="p-4 space-y-3">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-3 w-1/4" />
+                    <Skeleton className="h-24 w-full" />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ))
         ) : error ? (
           <Card>
             <CardContent className="py-8">
@@ -97,58 +234,21 @@ export const MyMessagesPage = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {messages.map((message: MessageWithViewStatus) => {
-              const isViewed = !!message.viewedAt;
-
-              return (
-                <Card
+          rows.map((row, rowIndex) => (
+            <div
+              key={rowIndex}
+              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 shrink-0 snap-start px-1"
+              style={{ height: `calc((100% - ${(GRID_ROWS - 1) * 16}px) / ${GRID_ROWS})` }}
+            >
+              {row.map((message) => (
+                <MessagePreviewCard
                   key={message.id}
-                  className={cn(
-                    "overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02]",
-                    !isViewed && "ring-2 ring-primary/30 bg-primary/5"
-                  )}
+                  message={message}
                   onClick={() => handleCardClick(message)}
-                >
-                  {/* Header with gradient like the modal */}
-                  <div className={cn(
-                    "px-4 py-3 border-b",
-                    !isViewed
-                      ? "bg-gradient-to-r from-primary/15 via-primary/10 to-background"
-                      : "bg-gradient-to-r from-muted/50 via-muted/30 to-background"
-                  )}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <h3 className={cn(
-                          "font-semibold text-base truncate",
-                          !isViewed && "text-primary"
-                        )}>
-                          {message.title}
-                        </h3>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(message.publishedAt)}
-                        </span>
-                      </div>
-                      {!isViewed && (
-                        <Badge variant="default" className="text-xs shrink-0">
-                          Novo
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Content preview */}
-                  <CardContent className="p-4">
-                    <div className="prose prose-sm dark:prose-invert max-w-none line-clamp-4 overflow-hidden text-sm text-muted-foreground">
-                      <MessageBlockRenderer
-                        blocks={transformMessageContent(message.content)}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                />
+              ))}
+            </div>
+          ))
         )}
       </div>
 

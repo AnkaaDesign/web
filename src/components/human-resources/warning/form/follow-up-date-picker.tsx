@@ -17,10 +17,9 @@ export function FollowUpDatePicker({ control, disabled, required }: FollowUpDate
           field={field}
           label="Data de Acompanhamento"
           mode="date"
-          context="followUp"
+          context="scheduled"
           disabled={disabled}
           required={required}
-          description="Data para revisão ou acompanhamento da advertência"
         />
       )}
     />

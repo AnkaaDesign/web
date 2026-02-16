@@ -606,7 +606,7 @@ export const OrderBatchCreateForm = () => {
         <div class="info-grid">
           <div class="info-item">
             <span class="info-label">Fornecedor</span>
-            <span class="info-value">${selectedSupplier?.name || "-"}</span>
+            <span class="info-value">${selectedSupplier?.fantasyName || selectedSupplier?.corporateName || "-"}</span>
           </div>
           <div class="info-item">
             <span class="info-label">Data de Entrega</span>
@@ -798,16 +798,12 @@ export const OrderBatchCreateForm = () => {
                         </Label>
                         <Combobox
                           value={form.watch("supplierId") || ""}
-                          onValueChange={(value) => form.setValue("supplierId", value)}
-                          options={
-                            suppliers.length === 0
-                              ? [{ label: "Nenhum fornecedor ativo encontrado", value: "no-suppliers", disabled: true }]
-                              : suppliers.map((supplier) => ({
+                          onValueChange={(value) => form.setValue("supplierId", (Array.isArray(value) ? value[0] : value) ?? undefined)}
+                          options={suppliers.map((supplier) => ({
                                   label: supplier.fantasyName,
                                   value: supplier.id,
                                   logo: supplier.logo,
-                                }))
-                          }
+                                })) || undefined}
                           placeholder="Selecione um fornecedor"
                           searchPlaceholder="Buscar fornecedor..."
                           className={`${!form.watch("supplierId") ? "border-red-500" : ""}`}
@@ -847,7 +843,7 @@ export const OrderBatchCreateForm = () => {
                           return undefined;
                         })()}
                         onChange={(date) => {
-                          if (date) {
+                          if (date && date instanceof Date) {
                             // Set to 13:00 São Paulo time
                             const newDate = new Date(date);
                             newDate.setHours(13, 0, 0, 0);
@@ -856,7 +852,7 @@ export const OrderBatchCreateForm = () => {
                             form.setValue("forecast", undefined);
                           }
                         }}
-                        context="delivery"
+                        context="due"
                         label={
                           <div className="flex items-center gap-2">
                             <IconCalendar className="h-4 w-4" />
@@ -864,10 +860,10 @@ export const OrderBatchCreateForm = () => {
                           </div>
                         }
                         placeholder="Selecione a data de entrega"
-                        description="Data estimada para recebimento dos itens de todos os pedidos"
                         required={true}
                         className={`${!form.watch("forecast") ? "border-red-500" : ""}`}
                       />
+                      <p className="text-sm text-muted-foreground">Data estimada para recebimento dos itens de todos os pedidos</p>
                       {!form.watch("forecast") && <p className="text-sm text-red-500">Data de entrega é obrigatória para pedidos em lote</p>}
 
                       {/* Summary */}

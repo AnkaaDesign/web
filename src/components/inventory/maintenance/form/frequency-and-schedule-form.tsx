@@ -165,7 +165,7 @@ export function FrequencyAndScheduleForm({ control, setValue, watch, disabled = 
                     <CalendarComponent
                       mode="single"
                       selected={field.value ? new Date(field.value) : undefined}
-                      onSelect={(date) => {
+                      onSelect={(date: Date | undefined) => {
                         if (date) {
                           // Set hour to 13:00 (1 PM)
                           const dateWithTime = new Date(date);
@@ -175,8 +175,9 @@ export function FrequencyAndScheduleForm({ control, setValue, watch, disabled = 
                           field.onChange(null);
                         }
                       }}
-                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                      initialFocus
+                      disabled={(date: Date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      autoFocus
+                      {...({} as any)}
                     />
                   </PopoverContent>
                 </Popover>
@@ -306,7 +307,7 @@ export function FrequencyAndScheduleForm({ control, setValue, watch, disabled = 
                       <CalendarComponent
                         mode="single"
                         selected={field.value ? new Date(field.value) : undefined}
-                        onSelect={(date) => {
+                        onSelect={(date: Date | undefined) => {
                           if (date) {
                             // Set hour to 13:00 (1 PM)
                             const dateWithTime = new Date(date);
@@ -316,8 +317,9 @@ export function FrequencyAndScheduleForm({ control, setValue, watch, disabled = 
                             field.onChange(null);
                           }
                         }}
-                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                        initialFocus
+                        disabled={(date: Date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                        autoFocus
+                        {...({} as any)}
                       />
                     </PopoverContent>
                   </Popover>

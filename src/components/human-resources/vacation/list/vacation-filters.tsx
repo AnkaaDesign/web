@@ -107,7 +107,10 @@ export function VacationFilters({ open, onOpenChange, onApply, currentStatus, cu
             <Label htmlFor="year">Ano</Label>
             <Combobox
               value={year}
-              onValueChange={(value) => setYear(value || new Date().getFullYear().toString())}
+              onValueChange={(value) => {
+                const yearValue = Array.isArray(value) ? value[0] : value;
+                setYear(yearValue || new Date().getFullYear().toString());
+              }}
               options={yearOptions.map((yearOption) => ({
                 value: yearOption.toString(),
                 label: yearOption.toString(),

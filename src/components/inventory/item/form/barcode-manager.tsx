@@ -27,12 +27,12 @@ export function BarcodeManager({ disabled }: BarcodeManagerProps) {
 
   const { append, remove } = useFieldArray({
     control: form.control,
-    name: "barcodes",
+    name: "barcodes" as any,
   });
 
   const handleAddBarcode = () => {
     if (newBarcode.trim() && !barcodes.includes(newBarcode.trim())) {
-      append(newBarcode.trim());
+      append(newBarcode.trim() as any);
       setNewBarcode("");
     }
   };

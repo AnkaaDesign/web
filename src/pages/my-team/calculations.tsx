@@ -99,7 +99,7 @@ export const TeamCalculationsPage = () => {
         `${MONTHS.find((m) => m.value === selectedMonth)?.label} ${selectedYear}`,
       ]),
     ]
-      .map((row) => row.map((cell) => `"${cell}"`).join(","))
+      .map((row) => row.map((cell: string | number) => `"${cell}"`).join(","))
       .join("\n");
 
     const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
@@ -191,7 +191,7 @@ export const TeamCalculationsPage = () => {
               <Label htmlFor="user-filter">Colaborador</Label>
               <Combobox
                 value={selectedUserId}
-                onValueChange={(value) => setSelectedUserId(value || "")}
+                onValueChange={(value) => setSelectedUserId((Array.isArray(value) ? value[0] : value) || "")}
                 options={[
                   { value: "", label: "Todos os colaboradores" },
                   ...teamUsers.map((user) => ({
@@ -208,7 +208,7 @@ export const TeamCalculationsPage = () => {
               <Label>Mês</Label>
               <Combobox
                 value={selectedMonth.toString()}
-                onValueChange={(value) => setSelectedMonth(parseInt(value || "1"))}
+                onValueChange={(value) => setSelectedMonth(parseInt((Array.isArray(value) ? value[0] : value) || "1"))}
                 options={MONTHS.map((m) => ({ value: m.value.toString(), label: m.label }))}
                 placeholder="Selecione o mês"
                 searchable={false}
@@ -219,7 +219,7 @@ export const TeamCalculationsPage = () => {
               <Label>Ano</Label>
               <Combobox
                 value={selectedYear.toString()}
-                onValueChange={(value) => setSelectedYear(parseInt(value || currentDate.getFullYear().toString()))}
+                onValueChange={(value) => setSelectedYear(parseInt((Array.isArray(value) ? value[0] : value) || currentDate.getFullYear().toString()))}
                 options={years.map((y) => ({ value: y.toString(), label: y.toString() }))}
                 placeholder="Selecione o ano"
                 searchable={false}

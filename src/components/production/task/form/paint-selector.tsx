@@ -1,9 +1,10 @@
 import { useMemo, useCallback, useRef } from "react";
+import { useWatch } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { getPaints } from "../../../../api-client";
 import type { Paint } from "../../../../types";
-import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
 interface PaintSelectorProps {
   control: any;
   disabled?: boolean;
@@ -14,23 +15,72 @@ export function PaintSelector({ control, disabled, initialPaints }: PaintSelecto
   // Create a stable cache for fetched paints
   const cacheRef = useRef<Map<string, Paint>>(new Map());
 
+  // Watch paintIds from form state - persists across accordion unmount/remount
+  const paintIds = useWatch({ control, name: "paintIds" }) as string[] | undefined;
+
+  // Stable query key based on sorted paint IDs
+  const selectedPaintsQueryKey = useMemo(
+    () => (paintIds || []).slice().sort().join(","),
+    [paintIds]
+  );
+
+  // Fetch selected paint details by IDs - React Query cache persists across unmount/remount
+  const { data: selectedPaintDetails } = useQuery({
+    queryKey: ["paints", "selected-details-selector", selectedPaintsQueryKey],
+    queryFn: async () => {
+      if (!paintIds || paintIds.length === 0) return [];
+      const response = await getPaints({
+        where: { id: { in: paintIds } },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          hex: true,
+          finish: true,
+          colorPreview: true,
+          _count: { select: { formulas: true } },
+        },
+        limit: paintIds.length,
+      } as any);
+      return response.data || [];
+    },
+    enabled: (paintIds?.length ?? 0) > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Create stable dependency for initialPaints array
   const initialPaintIds = useMemo(
     () => (initialPaints || []).map(p => p.id).sort().join(','),
     [initialPaints]
   );
 
-  // Memoize initialOptions with stable dependency
+  // Memoize initialOptions - include selected paint details for accordion remount scenarios
   const initialOptions = useMemo(() => {
-    if (!initialPaints || initialPaints.length === 0) return [];
+    const options: Paint[] = [];
+    const addedIds = new Set<string>();
 
-    // Add initial paints to cache
-    initialPaints.forEach(paint => {
-      cacheRef.current.set(paint.id, paint);
-    });
+    // Add initial paints
+    if (initialPaints && initialPaints.length > 0) {
+      initialPaints.forEach(paint => {
+        options.push(paint);
+        addedIds.add(paint.id);
+        cacheRef.current.set(paint.id, paint);
+      });
+    }
 
-    return initialPaints;
-  }, [initialPaintIds, initialPaints]);
+    // Add fetched selected paints not already in initial
+    if (selectedPaintDetails && selectedPaintDetails.length > 0) {
+      selectedPaintDetails.forEach(paint => {
+        if (!addedIds.has(paint.id)) {
+          options.push(paint);
+          addedIds.add(paint.id);
+        }
+        cacheRef.current.set(paint.id, paint);
+      });
+    }
+
+    return options;
+  }, [initialPaintIds, initialPaints, selectedPaintDetails]);
 
   // Memoize callbacks to prevent infinite loop
   const getOptionLabel = useCallback((paint: Paint) => paint.name, []);
@@ -127,9 +177,8 @@ export function PaintSelector({ control, disabled, initialPaints }: PaintSelecto
               className="w-full"
               renderOption={renderOption}
               minSearchLength={0}
-              pageSize={20}  // Reduced for better performance
-              debounceMs={500}  // Increased debounce
-              loadOnMount={false}  // Enable lazy loading
+              pageSize={20}
+              debounceMs={500}
             />
           </FormControl>
           <FormMessage />

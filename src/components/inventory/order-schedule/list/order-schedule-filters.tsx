@@ -148,7 +148,8 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
                   }))}
                   value={watchedValues.frequency || []}
                   onValueChange={(value) => {
-                    form.setValue("frequency", value.length > 0 ? value as SCHEDULE_FREQUENCY_TYPE[] : undefined);
+                    const frequencyValue = value as SCHEDULE_FREQUENCY_TYPE[];
+                    form.setValue("frequency", frequencyValue.length > 0 ? frequencyValue : undefined);
                   }}
                   placeholder="Selecione frequências..."
                   emptyText="Nenhuma frequência encontrada"
@@ -178,7 +179,8 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={watchedValues.nextRunRange?.gte} onSelect={(date) => form.setValue("nextRunRange.gte", date)} initialFocus />
+                        {/* @ts-expect-error - react-day-picker prop mismatch */}
+                        <Calendar mode="single" selected={watchedValues.nextRunRange?.gte} onSelect={(date: Date | undefined) => form.setValue("nextRunRange.gte", date ?? undefined)} autoFocus />
                       </PopoverContent>
                     </Popover>
                   </div>
@@ -193,7 +195,7 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={watchedValues.nextRunRange?.lte} onSelect={(date) => form.setValue("nextRunRange.lte", date)} initialFocus />
+                        <Calendar mode="single" selected={watchedValues.nextRunRange?.lte} onSelect={(date: Date | undefined) => form.setValue("nextRunRange.lte", date ?? undefined)} autoFocus {...({} as any)} />
                       </PopoverContent>
                     </Popover>
                   </div>

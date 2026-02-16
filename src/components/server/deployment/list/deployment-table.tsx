@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconRocket, IconCheck, IconX, IconClock, IconRotateClockwise, IconEye } from "@tabler/icons-react";
 
-import type { Deployment, DeploymentGetManyFormData, DeploymentOrderBy } from "../../../../types";
+import type { Deployment, DeploymentOrderBy } from "../../../../types";
+import type { DeploymentGetManyFormData } from "../../../../schemas";
 import { routes, DEPLOYMENT_STATUS, DEPLOYMENT_STATUS_LABELS, DEPLOYMENT_ENVIRONMENT_LABELS } from "../../../../constants";
 import { formatDateTime } from "../../../../utils";
 import { useDeployments } from "../../../../hooks";
@@ -111,7 +112,6 @@ export function DeploymentTable({ filters = {}, className }: DeploymentTableProp
 
   const deployments = response?.data || [];
   const totalRecords = response?.meta?.totalRecords || 0;
-  const hasNextPage = response?.meta?.hasNextPage || false;
 
   const handleRowClick = (deployment: Deployment) => {
     navigate(routes.server.deployments.details(deployment.id));
@@ -220,11 +220,11 @@ export function DeploymentTable({ filters = {}, className }: DeploymentTableProp
       {totalRecords > 0 && (
         <div className="mt-4">
           <SimplePaginationAdvanced
-            page={page}
-            pageSize={pageSize}
-            totalRecords={totalRecords}
-            hasNextPage={hasNextPage}
+            currentPage={page}
+            totalPages={Math.ceil(totalRecords / pageSize)}
             onPageChange={setPage}
+            pageSize={pageSize}
+            totalItems={totalRecords}
             onPageSizeChange={setPageSize}
           />
         </div>

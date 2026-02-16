@@ -34,9 +34,9 @@ export function SectorCell({ control, index }: SectorCellProps) {
               onValueChange={(value) => field.onChange(value || null)}
               options={sectorOptions}
               placeholder="Selecionar setor"
-              emptyMessage="Nenhum setor encontrado"
+              emptyText="Nenhum setor encontrado"
               searchPlaceholder="Buscar setor..."
-              allowClear
+              clearable
             />
           </FormControl>
         </FormItem>

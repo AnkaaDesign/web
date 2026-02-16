@@ -160,7 +160,7 @@ export function OrderScheduleDetailsPage() {
 
   const handleToggleActive = async () => {
     try {
-      await updateSchedule({ id: schedule.id, isActive: !schedule.isActive });
+      await updateSchedule({ id: schedule.id, data: { isActive: !schedule.isActive } });
       toast.success(schedule.isActive ? "Agendamento desativado" : "Agendamento ativado");
       refetch();
     } catch (error) {
@@ -172,7 +172,15 @@ export function OrderScheduleDetailsPage() {
 
   const getScheduleDetails = () => {
     if (schedule.weeklyConfig) {
-      const days = schedule.weeklyConfig.daysOfWeek?.map((day: string) => WEEK_DAY_LABELS[day as WEEK_DAY] || day).join(", ") || "";
+      const selectedDays: WEEK_DAY[] = [];
+      if (schedule.weeklyConfig.monday) selectedDays.push("MONDAY" as WEEK_DAY);
+      if (schedule.weeklyConfig.tuesday) selectedDays.push("TUESDAY" as WEEK_DAY);
+      if (schedule.weeklyConfig.wednesday) selectedDays.push("WEDNESDAY" as WEEK_DAY);
+      if (schedule.weeklyConfig.thursday) selectedDays.push("THURSDAY" as WEEK_DAY);
+      if (schedule.weeklyConfig.friday) selectedDays.push("FRIDAY" as WEEK_DAY);
+      if (schedule.weeklyConfig.saturday) selectedDays.push("SATURDAY" as WEEK_DAY);
+      if (schedule.weeklyConfig.sunday) selectedDays.push("SUNDAY" as WEEK_DAY);
+      const days = selectedDays.map(day => WEEK_DAY_LABELS[day] || day).join(", ");
       return `Dias: ${days}`;
     }
     if (schedule.dayOfWeek) {
@@ -261,7 +269,7 @@ export function OrderScheduleDetailsPage() {
                     )}
 
                     {/* Frequency */}
-                    <div className={cn(schedule.description && "pt-4 border-t border-border/50")}>
+                    <div className={cn(schedule.description && "pt-4 border-t border-border")}>
                       <h4 className="text-sm font-semibold mb-3 text-foreground">Periodicidade</h4>
                       <div className="space-y-3">
                         <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -291,7 +299,7 @@ export function OrderScheduleDetailsPage() {
                     </div>
 
                     {/* Dates Section */}
-                    <div className="pt-4 border-t border-border/50">
+                    <div className="pt-4 border-t border-border">
                       <h4 className="text-sm font-semibold mb-3 text-foreground">Datas</h4>
                       <div className="space-y-3">
                         {schedule.nextRun && (
@@ -358,7 +366,7 @@ export function OrderScheduleDetailsPage() {
                 </CardHeader>
                 <CardContent className="pt-0 flex-1">
                   {items.length > 0 ? (
-                    <div className="border rounded-lg overflow-hidden dark:border-border/40">
+                    <div className="border rounded-lg overflow-hidden dark:border-border">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/50">

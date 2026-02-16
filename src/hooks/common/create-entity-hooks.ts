@@ -1,7 +1,7 @@
 // packages/hooks/src/createEntityHooks.ts
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { UseQueryOptions, UseInfiniteQueryOptions } from "@tanstack/react-query";
+import type { UseQueryOptions, UseInfiniteQueryOptions, InfiniteData } from "@tanstack/react-query";
 
 // =====================================================
 // Types
@@ -131,7 +131,9 @@ export function createEntityHooks<
   function useInfiniteList(
     params?: Partial<TGetManyParams>,
     options?: Omit<UseInfiniteQueryOptions<TGetManyResponse>, "queryKey" | "queryFn" | "getNextPageParam" | "initialPageParam">,
-  ) {
+  ): ReturnType<typeof useInfiniteQuery<TGetManyResponse, Error, InfiniteData<TGetManyResponse>, readonly unknown[], number>> & {
+    refresh: () => void;
+  } {
     const queryClient = useQueryClient();
 
     const query = useInfiniteQuery({
@@ -162,6 +164,8 @@ export function createEntityHooks<
     return {
       ...query,
       refresh,
+    } as unknown as ReturnType<typeof useInfiniteQuery<TGetManyResponse, Error, InfiniteData<TGetManyResponse>, readonly unknown[], number>> & {
+      refresh: () => void;
     };
   }
 

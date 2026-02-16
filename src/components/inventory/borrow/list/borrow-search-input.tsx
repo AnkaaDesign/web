@@ -87,8 +87,8 @@ export function BorrowSearchInput({ value, onChange, placeholder = "Buscar por i
   const showSuggestions = debouncedSearch.length > 1 && (suggestions.length > 0 || isLoading);
 
   // Handle input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
+  const handleInputChange = (value: string | number | null) => {
+    const newValue = typeof value === 'string' ? value : String(value ?? '');
 
     // Mark that user is actively typing to prevent external sync
     isUserTypingRef.current = true;

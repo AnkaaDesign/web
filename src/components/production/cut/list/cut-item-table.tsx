@@ -31,6 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { getApiBaseUrl } from "@/config/api";
 
 interface CutItemTableProps {
   filters?: Partial<CutGetManyFormData>;
@@ -70,7 +71,7 @@ export function CutItemTable({ filters = {}, className, onDataChange, visibleCol
   }
 
   const getThumbnailUrl = (file: any) => {
-    const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
+    const apiUrl = getApiBaseUrl();
     return `${apiUrl}/files/thumbnail/${file.id}?size=small`;
   };
 

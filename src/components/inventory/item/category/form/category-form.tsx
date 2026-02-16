@@ -65,7 +65,7 @@ export function CategoryForm(props: CategoryFormProps) {
           const cleanedData = Object.entries(formData).reduce((acc, [key, value]) => {
             // Keep the value if it's not null, undefined, or empty string
             if (value !== null && value !== undefined && value !== "") {
-              acc[key as keyof ItemCategoryCreateFormData] = value;
+              acc[key as keyof ItemCategoryCreateFormData] = value as any;
             }
             return acc;
           }, {} as Partial<ItemCategoryCreateFormData>);

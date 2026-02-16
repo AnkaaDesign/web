@@ -128,14 +128,14 @@ export const BorrowItemCard = ({ borrow, className }: BorrowItemCardProps) => {
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground">Fornecedor</span>
                 <span className="text-sm font-semibold text-foreground">
-                  {item.supplier ? item.supplier.fantasyName || item.supplier.name : <span className="text-muted-foreground italic">Não definido</span>}
+                  {item.supplier ? item.supplier.fantasyName || item.supplier.corporateName : <span className="text-muted-foreground italic">Não definido</span>}
                 </span>
               </div>
             </div>
           </div>
 
           {/* Stock and Price Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Estoque e Preço</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-muted/30 rounded-lg p-4">

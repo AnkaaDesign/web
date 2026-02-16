@@ -395,7 +395,10 @@ export function CalculationList({ className, mode = 'hr' }: CalculationListProps
                   <Combobox
                     options={userOptions}
                     value={selectedUserId || ""}
-                    onValueChange={(value) => handleUserChange(value || "")}
+                    onValueChange={(value) => {
+                      const userId = Array.isArray(value) ? value[0] : value;
+                      handleUserChange(userId || "");
+                    }}
                     placeholder={usersLoading ? "Carregando funcionários..." : "Selecione um funcionário"}
                     emptyText="Nenhum funcionário encontrado"
                     searchable={true}

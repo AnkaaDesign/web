@@ -65,21 +65,26 @@ const CHART_COLORS = [
 
 // Chart type options with context awareness (like consumption analysis)
 const getAvailableChartTypes = (isComparisonMode: boolean) => {
-  const baseTypes = [
+  const baseTypes: Array<{
+    value: OrderChartType;
+    label: string;
+    icon: typeof IconChartBar;
+    description: string;
+  }> = [
     {
-      value: 'bar' as const,
+      value: 'bar' as OrderChartType,
       label: 'Barras',
       icon: IconChartBar,
       description: 'Gráfico de barras vertical',
     },
     {
-      value: 'line' as const,
+      value: 'line' as OrderChartType,
       label: 'Linhas',
       icon: IconChartLine,
       description: 'Gráfico de linhas',
     },
     {
-      value: 'area' as const,
+      value: 'area' as OrderChartType,
       label: 'Área',
       icon: IconChartArea,
       description: 'Gráfico de área',
@@ -88,14 +93,14 @@ const getAvailableChartTypes = (isComparisonMode: boolean) => {
 
   if (isComparisonMode) {
     baseTypes.push({
-      value: 'bar-stacked' as const,
+      value: 'bar-stacked' as OrderChartType,
       label: 'Barras Empilhadas',
       icon: IconStack2,
       description: 'Barras empilhadas para comparação',
     });
   } else {
     baseTypes.push({
-      value: 'pie' as const,
+      value: 'pie' as OrderChartType,
       label: 'Pizza',
       icon: IconChartPie,
       description: 'Gráfico de pizza',
@@ -318,7 +323,7 @@ const OrderPage = () => {
       const option: EChartsOption = {
         tooltip: {
           trigger: 'item',
-          formatter: (params: { name: string; value: number; percent: number }) => {
+          formatter: (params: any) => {
             const formattedValue = yAxisMode === 'quantity'
               ? `${Math.round(params.value)} un`
               : formatCurrency(params.value);
@@ -343,7 +348,7 @@ const OrderPage = () => {
               },
             },
             label: {
-              formatter: (params: { name: string; value: number }) => {
+              formatter: (params: any) => {
                 const formattedValue = yAxisMode === 'quantity'
                   ? Math.round(params.value).toString()
                   : formatCurrency(params.value);
@@ -368,7 +373,7 @@ const OrderPage = () => {
       const option: EChartsOption = {
         tooltip: {
           trigger: 'axis',
-          formatter: (params: Array<{ data: { quantity: number; totalValue: number }; name: string }>) => {
+          formatter: (params: any) => {
             if (!Array.isArray(params) || params.length === 0) return '';
             const p = params[0];
             const qty = Math.round(p.data.quantity);
@@ -403,7 +408,7 @@ const OrderPage = () => {
       const option: EChartsOption = {
         tooltip: {
           trigger: 'axis',
-          formatter: (params: Array<{ data: { quantity: number; totalValue: number }; name: string }>) => {
+          formatter: (params: any) => {
             if (!Array.isArray(params) || params.length === 0) return '';
             const p = params[0];
             const qty = Math.round(p.data.quantity);
@@ -438,7 +443,7 @@ const OrderPage = () => {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
-        formatter: (params: Array<{ data: { quantity: number; totalValue: number }; name: string }>) => {
+        formatter: (params: any) => {
           if (!Array.isArray(params) || params.length === 0) return '';
           const p = params[0];
           const qty = Math.round(p.data.quantity);
@@ -465,7 +470,7 @@ const OrderPage = () => {
           show: true,
           position: 'top',
           fontSize: 9,
-          formatter: (params: { data: { value: number } }) => {
+          formatter: (params: any) => {
             if (params.data.value > 0) {
               return yAxisMode === 'quantity'
                 ? Math.round(params.data.value).toString()
@@ -486,7 +491,7 @@ const OrderPage = () => {
         <PageHeader
           title="Análise de Pedidos"
           icon={IconClipboardList}
-          favoriteKey={FAVORITE_PAGES.STATISTICS_ORDERS}
+          favoritePage={FAVORITE_PAGES.ESTATISTICAS_PEDIDOS}
           breadcrumbs={[
             { label: 'Início', href: routes.home },
             { label: 'Estatísticas', href: routes.statistics.root },

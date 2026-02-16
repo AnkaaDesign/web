@@ -98,8 +98,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       temporaryItemDescription: item.temporaryItemDescription!,
       orderedQuantity: item.orderedQuantity,
       price: item.price,
-      icms: item.icms,
-      ipi: item.ipi,
+      icms: item.icms || 0,
+      ipi: item.ipi || 0,
     })),
     [order.items]
   );
@@ -331,8 +331,13 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     supplierId: supplierId || order.supplierId || undefined,
     forecast: forecast || order.forecast || undefined,
     notes: notes || order.notes || "",
-    // Initialize temporary items from URL state or order data
-    temporaryItems: temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems,
+    // Initialize items from URL state or order data (temporary items go in the items array)
+    // Normalize to ensure icms and ipi are numbers (not optional)
+    items: (temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems).map(item => ({
+      ...item,
+      icms: item.icms ?? 0,
+      ipi: item.ipi ?? 0,
+    })),
     // Payment fields
     paymentMethod: order.paymentMethod || null,
     paymentPix: order.paymentPix || null,
@@ -419,12 +424,16 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   }, [notes]);
 
   useEffect(() => {
-    const currentValue = form.getValues("temporaryItems");
-    const newValue = temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems;
+    const currentValue = form.getValues("items");
+    const newValue = (temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems).map(item => ({
+      ...item,
+      icms: item.icms ?? 0,
+      ipi: item.ipi ?? 0,
+    }));
     // Only update if value has actually changed
     // Deep comparison for array of objects
     if (JSON.stringify(currentValue) !== JSON.stringify(newValue)) {
-      form.setValue("temporaryItems", newValue, {
+      form.setValue("items", newValue, {
         shouldValidate: false,
         shouldDirty: false,
         shouldTouch: false
@@ -433,18 +442,18 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [temporaryItemsState, temporaryItems]);
 
-  // Sync form temporaryItems back to URL state when they change
+  // Sync form items back to URL state when they change (for temporary items mode)
   // This ensures that temporary items are preserved when navigating between steps
   useEffect(() => {
     if (orderItemMode === "temporary") {
       const subscription = form.watch((value, { name }) => {
-        if (name?.startsWith('temporaryItems')) {
-          const currentTemporaryItems = value.temporaryItems || [];
+        if (name?.startsWith('items')) {
+          const currentItems = value.items || [];
           const urlTemporaryItems = temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems;
 
           // Only update URL state if form state has actually changed
-          if (JSON.stringify(currentTemporaryItems) !== JSON.stringify(urlTemporaryItems)) {
-            setTemporaryItems(currentTemporaryItems as any);
+          if (JSON.stringify(currentItems) !== JSON.stringify(urlTemporaryItems)) {
+            setTemporaryItems(currentItems as any);
           }
         }
       });
@@ -508,7 +517,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       }, 0);
     } else {
       // Temporary mode
-      const tempItems = form.getValues("temporaryItems") || temporaryItemsState || [];
+      const tempItems = (form.getValues("items") || temporaryItemsState || []) as any[];
       return tempItems.reduce((total: number, item: any) => {
         const quantity = Number(item.orderedQuantity) || 1;
         const price = Number(item.price) || 0;
@@ -528,7 +537,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     if (orderItemMode === "inventory") {
       return selectionCount;
     } else {
-      const tempItems = form.getValues("temporaryItems") || temporaryItemsState || [];
+      const tempItems = (form.getValues("items") || temporaryItemsState || []) as any[];
       return tempItems.length;
     }
   }, [orderItemMode, selectionCount, form, temporaryItemsState]);
@@ -592,12 +601,14 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
     // Check if quantities have changed for existing items
     const quantitiesChanged = order.items.some(item => {
+      if (!item.itemId) return false;
       const currentQty = quantities[item.itemId];
       return currentQty !== undefined && currentQty !== item.orderedQuantity;
     });
 
     // Check if prices have changed for existing items
     const pricesChanged = order.items.some(item => {
+      if (!item.itemId) return false;
       const currentPrice = prices[item.itemId];
       return currentPrice !== undefined && currentPrice !== item.price;
     });
@@ -647,7 +658,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
           }
         } else {
           // Validate temporary items
-          const tempItems = form.getValues("temporaryItems") || temporaryItemsState || [];
+          const tempItems = (form.getValues("items") || temporaryItemsState || []) as any[];
           if (tempItems.length === 0) {
             toast.error("Pelo menos um item temporário deve ser adicionado");
             return false;
@@ -705,7 +716,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         }));
       } else {
         // Temporary mode - get items from form state
-        const tempItems = form.getValues("temporaryItems") || temporaryItemsState || [];
+        const tempItems = (form.getValues("items") || temporaryItemsState || []) as any[];
         items = tempItems.map((item: any) => ({
           temporaryItemDescription: item.temporaryItemDescription,
           orderedQuantity: Number(item.orderedQuantity) || 1,
@@ -1327,7 +1338,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                             <DateTimeInput
                               value={forecast ? (forecast instanceof Date ? forecast : new Date(forecast)) : undefined}
                               onChange={(date) => {
-                                if (date) {
+                                if (date && date instanceof Date) {
                                   // Set to 13:00 São Paulo time
                                   const newDate = new Date(date);
                                   newDate.setHours(13, 0, 0, 0);
@@ -1342,7 +1353,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   setTimeout(() => form.trigger(), 0);
                                 }
                               }}
-                              context="delivery"
+                              context="due"
                               placeholder="Data"
                               showClearButton={true}
                               className="w-full"
@@ -1363,7 +1374,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               disabled={true}
                               className="flex flex-col gap-2 opacity-60 pointer-events-none"
                             >
-                              <div className="flex items-start space-x-3 space-y-0 rounded-md border border-border/40 p-3 group">
+                              <div className="flex items-start space-x-3 space-y-0 rounded-md border border-border p-3 group">
                                 <RadioGroupItem value="inventory" id="edit-mode-inventory" className="mt-0.5" />
                                 <div className="flex-1 space-y-0.5">
                                   <Label htmlFor="edit-mode-inventory" className="flex items-center gap-2 font-medium group-hover:text-white">
@@ -1375,7 +1386,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-start space-x-3 space-y-0 rounded-md border border-border/40 p-3 group">
+                              <div className="flex items-start space-x-3 space-y-0 rounded-md border border-border p-3 group">
                                 <RadioGroupItem value="temporary" id="edit-mode-temporary" className="mt-0.5" />
                                 <div className="flex-1 space-y-0.5">
                                   <Label htmlFor="edit-mode-temporary" className="flex items-center gap-2 font-medium group-hover:text-white">
@@ -1431,12 +1442,13 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 <Combobox
                                   value={form.watch("paymentMethod") || ""}
                                   onValueChange={(value) => {
-                                    form.setValue("paymentMethod", value || null, { shouldDirty: true });
+                                    const stringValue = Array.isArray(value) ? value[0] : value;
+                                    form.setValue("paymentMethod", stringValue || null, { shouldDirty: true });
                                     // Clear conditional fields when payment method changes
-                                    if (value !== "PIX") {
+                                    if (stringValue !== "PIX") {
                                       form.setValue("paymentPix", null, { shouldDirty: true });
                                     }
-                                    if (value !== "BANK_SLIP") {
+                                    if (stringValue !== "BANK_SLIP") {
                                       form.setValue("paymentDueDays", null, { shouldDirty: true });
                                     }
                                   }}
@@ -1485,7 +1497,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   <Label className="text-sm text-muted-foreground">Prazo de Vencimento</Label>
                                   <Combobox
                                     value={form.watch("paymentDueDays")?.toString() || ""}
-                                    onValueChange={(value) => form.setValue("paymentDueDays", value ? parseInt(value) : null, { shouldDirty: true })}
+                                    onValueChange={(value) => {
+                                      const stringValue = Array.isArray(value) ? value[0] : value;
+                                      form.setValue("paymentDueDays", stringValue ? parseInt(stringValue) : null, { shouldDirty: true });
+                                    }}
                                     options={[
                                       { value: "30", label: "30 dias" },
                                       { value: "60", label: "60 dias" },
@@ -1697,7 +1712,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="rounded-md border border-border/40 overflow-hidden w-full">
+                        <div className="rounded-md border border-border overflow-hidden w-full">
                           {orderItemMode === "inventory" ? (
                             <Table>
                               <TableHeader>
@@ -1770,7 +1785,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {(form.getValues("temporaryItems") || temporaryItemsState || []).map((item: any, index: number) => {
+                                {((form.getValues("items") || temporaryItemsState || []) as any[]).map((item: any, index: number) => {
                                   const quantity = Number(item.orderedQuantity) || 1;
                                   const price = Number(item.price) || 0;
                                   const icms = Number(item.icms) || 0;

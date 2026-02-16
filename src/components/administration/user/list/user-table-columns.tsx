@@ -296,7 +296,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "city",
     header: "CIDADE",
-    accessor: (user: User) => <div className="text-sm truncate" title={user.city}>{user.city || <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate" title={user.city ?? undefined}>{user.city || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",
@@ -348,7 +348,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "neighborhood",
     header: "BAIRRO",
-    accessor: (user: User) => <div className="text-sm truncate" title={user.neighborhood}>{user.neighborhood || <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate" title={user.neighborhood ?? undefined}>{user.neighborhood || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",

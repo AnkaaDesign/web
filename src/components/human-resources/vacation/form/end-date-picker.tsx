@@ -31,12 +31,11 @@ export function EndDatePicker({ control, disabled, required, startDate }: EndDat
                 field={field}
                 hideLabel={true}
                 mode="date"
-                context="vacation"
+                context="end"
                 disabled={disabled}
                 constraints={{
                   minDate,
                   onlyBusinessDays: true,
-                  onlyFuture: true,
                 }}
               />
             </FormControl>

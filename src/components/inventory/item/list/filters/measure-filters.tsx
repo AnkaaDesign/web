@@ -102,7 +102,9 @@ export function MeasureFilters({
           mode="multiple"
           options={measureTypeOptions}
           value={measureTypes}
-          onValueChange={onMeasureTypesChange}
+          onValueChange={(value) => {
+            if (Array.isArray(value)) onMeasureTypesChange(value);
+          }}
           placeholder="Selecione tipos de medida..."
           emptyText="Nenhum tipo encontrado"
           searchPlaceholder="Buscar tipos..."
@@ -124,7 +126,9 @@ export function MeasureFilters({
           mode="multiple"
           options={measureUnitOptions}
           value={measureUnits}
-          onValueChange={onMeasureUnitsChange}
+          onValueChange={(value) => {
+            if (Array.isArray(value)) onMeasureUnitsChange(value);
+          }}
           placeholder="Selecione unidades de medida..."
           emptyText="Nenhuma unidade encontrada"
           searchPlaceholder="Buscar unidades..."

@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { IconLink } from "@tabler/icons-react";
 
 import type { Paint } from "../../../../types";
-import { PAINT_BRAND_LABELS, PAINT_FINISH_LABELS } from "../../../../constants";
+import { PAINT_FINISH_LABELS } from "../../../../constants";
 import { routes } from "../../../../constants";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,9 +59,9 @@ export function RelatedPaintsCard({ paint }: RelatedPaintsCardProps) {
                     <h4 className="font-medium text-sm">{relatedPaint.name}</h4>
                     <code className="text-xs font-mono text-muted-foreground">{relatedPaint.hex}</code>
                     <div className="flex flex-wrap gap-1">
-                      {relatedPaint.brand && (
+                      {relatedPaint.paintBrand && (
                         <Badge variant="secondary" className="text-xs">
-                          {PAINT_BRAND_LABELS[relatedPaint.brand]}
+                          {relatedPaint.paintBrand.name}
                         </Badge>
                       )}
                       {relatedPaint.finish && (

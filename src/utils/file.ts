@@ -2,8 +2,8 @@
 
 import type { File } from "../types";
 import { FILE_ENTITY_TYPE, FILE_FORMAT } from "../constants";
-
 import { FILE_ENTITY_TYPE_LABELS, FILE_FORMAT_LABELS } from "../constants";
+import { getApiBaseUrl } from "@/config/api";
 
 export function getFileEntityTypeLabel(type: FILE_ENTITY_TYPE): string {
   return FILE_ENTITY_TYPE_LABELS[type] || type;
@@ -181,20 +181,8 @@ export const sanitizeFilename = (filename: string | undefined | null): string =>
 // File URLs
 // =====================
 
-export const getApiBaseUrl = (): string => {
-  // Check for browser window object first (web environment)
-  if (typeof globalThis !== "undefined" && typeof globalThis.window !== "undefined" && typeof (globalThis.window as any).__ANKAA_API_URL__ !== "undefined") {
-    return (globalThis.window as any).__ANKAA_API_URL__;
-  }
-
-  // Check for import.meta.env (Vite build-time replacement)
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-
-  // Default fallback
-  return "http://localhost:3030";
-};
+// Re-export centralized API URL resolver
+export { getApiBaseUrl };
 
 /**
  * Normalizes a thumbnail URL to ensure it's a complete URL

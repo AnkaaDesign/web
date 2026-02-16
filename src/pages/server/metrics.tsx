@@ -400,7 +400,7 @@ export function ServerMetricsPage() {
 
     return (
       data.overall.failedArrays > 0 ||
-      data.arrays.some((array) => array.state === "failed" || array.state === "degraded" || array.devices?.some((device) => device.role === "faulty"))
+      data.arrays.some((array: any) => array.state === "failed" || array.state === "degraded" || array.devices?.some((device: any) => device.role === "faulty"))
     );
   };
 
@@ -450,7 +450,7 @@ export function ServerMetricsPage() {
                       if (data.overall.degradedArrays > 0) {
                         issues.push(`${data.overall.degradedArrays} array(s) degradado(s)`);
                       }
-                      const faultyDevices = data.arrays.reduce((count, array) => count + (array.devices?.filter((device) => device.role === "faulty").length || 0), 0);
+                      const faultyDevices = data.arrays.reduce((count: number, array: any) => count + (array.devices?.filter((device: any) => device.role === "faulty").length || 0), 0);
                       if (faultyDevices > 0) {
                         issues.push(`${faultyDevices} dispositivo(s) com falha`);
                       }
@@ -565,7 +565,7 @@ export function ServerMetricsPage() {
                           </div>
                           {(() => {
                             const temp = metrics?.data.cpu?.temperature;
-                            if (temp !== undefined && temp !== null && isFinite(temp) && temp > 0) {
+                            if (temp !== undefined && temp !== null && typeof temp === 'number' && isFinite(temp) && temp > 0) {
                               return (
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">Temperatura:</span>
@@ -881,7 +881,7 @@ export function ServerMetricsPage() {
                           )}
 
                           {/* Error Counts - only show if there are errors */}
-                          {(ssd.errorCounts.reallocatedSectors > 0 || ssd.errorCounts.pendingSectors > 0 || ssd.errorCounts.uncorrectableErrors > 0) && (
+                          {((ssd.errorCounts.reallocatedSectors ?? 0) > 0 || (ssd.errorCounts.pendingSectors ?? 0) > 0 || (ssd.errorCounts.uncorrectableErrors ?? 0) > 0) && (
                             <div className="pt-2 border-t border-muted">
                               <div className="flex items-center gap-1 text-red-600">
                                 <IconAlertTriangle className="h-3 w-3" />
@@ -1043,7 +1043,7 @@ export function ServerMetricsPage() {
 
                       {/* Individual Arrays */}
                       <div className="space-y-4">
-                        {data.arrays.map((array, index) => (
+                        {data.arrays.map((array: any, index: number) => (
                           <div
                             key={index}
                             className={`border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors ${
@@ -1116,7 +1116,7 @@ export function ServerMetricsPage() {
                               <div className="mt-3">
                                 <div className="text-xs text-muted-foreground mb-2">Dispositivos:</div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                                  {array.devices.map((device, deviceIndex) => (
+                                  {array.devices.map((device: any, deviceIndex: number) => (
                                     <div
                                       key={deviceIndex}
                                       className={`flex items-center gap-2 px-2 py-1 rounded text-xs ${

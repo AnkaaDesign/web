@@ -112,7 +112,11 @@ export function PpeSizeSelector({
         <Combobox
           options={controlledOptions}
           value={controlledValue || "_none"}
-          onValueChange={(newValue) => controlledOnChange(newValue === "_none" ? null : newValue)}
+          onValueChange={(newValue) => {
+            // Handle string | string[] | null | undefined -> string | null
+            const normalizedValue = Array.isArray(newValue) ? newValue[0] : newValue;
+            controlledOnChange(normalizedValue === "_none" ? null : (normalizedValue ?? null));
+          }}
           placeholder={ppeType ? "Selecione o tamanho" : "Selecione o tipo de EPI primeiro"}
           disabled={disabled}
           searchable={false}

@@ -862,7 +862,7 @@ export function useUnifiedTableState<TFilters extends Record<string, any>, TApiF
           {
             updater: (params) => {
               // Clear current state
-              params.clear();
+              params.forEach((_, key) => params.delete(key));
 
               // Apply preset
               if (preset.filters) {
@@ -916,7 +916,7 @@ export function useUnifiedTableState<TFilters extends Record<string, any>, TApiF
 
     cancelPendingUpdates();
     queueUpdate((params) => {
-      params.clear();
+      params.forEach((_, key) => params.delete(key));
     }, "batch");
 
     setSearchText("");
@@ -933,7 +933,7 @@ export function useUnifiedTableState<TFilters extends Record<string, any>, TApiF
     batchUpdates([
       {
         updater: (params) => {
-          params.clear();
+          params.forEach((_, key) => params.delete(key));
 
           // Apply defaults
           if (Object.keys(defaultFilters).length > 0) {
@@ -994,7 +994,7 @@ export function useUnifiedTableState<TFilters extends Record<string, any>, TApiF
           batchUpdates([
             {
               updater: (params) => {
-                params.clear();
+                params.forEach((_, key) => params.delete(key));
 
                 // Import state
                 if (importData.filters && Object.keys(importData.filters).length > 0) {

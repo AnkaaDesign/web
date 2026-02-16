@@ -4,8 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { useObservation, useObservationMutations, useTasks } from "../../../../hooks";
-import type { ObservationCreateFormData, ObservationUpdateFormData } from "../../../../schemas";
-import { observationCreateSchema, observationUpdateSchema } from "../../../../schemas";
 import { routes } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -312,7 +310,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
       const newFiles = uploadedFiles
         .filter(f => !f.uploaded && f instanceof File)
-        .filter((f): f is File => f instanceof File);
+        .filter((f): f is FileWithPreview => f instanceof File);
 
       // Prepare submission data
       const submitData = {
@@ -407,7 +405,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
         <div className="space-y-4">
           {/* Task Display for Edit Mode */}
           {observation?.task && (
-            <div className="border border-border/40 rounded-lg p-4 bg-muted/30">
+            <div className="border border-border rounded-lg p-4 bg-muted/30">
               <Label className="text-sm font-medium text-muted-foreground mb-3 block">Tarefa Relacionada</Label>
               <div className="space-y-3">
                 {/* Task Name */}
@@ -427,11 +425,11 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
                       <div className="flex items-center gap-2">
                         <CustomerLogoDisplay
                           logo={observation.task.customer.logo}
-                          customerName={observation.task.customer.fantasyName || observation.task.customer.name || "Cliente"}
+                          customerName={observation.task.customer.fantasyName || observation.task.customer.corporateName || "Cliente"}
                           size="sm"
                           shape="rounded"
                         />
-                        <span className="font-medium text-sm">{observation.task.customer.fantasyName || observation.task.customer.name}</span>
+                        <span className="font-medium text-sm">{observation.task.customer.fantasyName || observation.task.customer.corporateName}</span>
                       </div>
                     </div>
                   )}
@@ -507,7 +505,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
             <div className="space-y-4">
               {/* File Upload Area */}
-              <div className="border-2 border-dashed border-border/40 rounded-lg p-4 bg-muted/10 hover:bg-muted/20 transition-colors">
+              <div className="border-2 border-dashed border-border rounded-lg p-4 bg-muted/10 hover:bg-muted/20 transition-colors">
                 <FormItem>
                   <FormControl>
                     <FileUploadField
@@ -535,7 +533,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
                     {uploadedFiles.map((file, index) => (
                       <div
                         key={file.id || `file-${index}`}
-                        className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border/40 hover:bg-muted/70 transition-colors"
+                        className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border hover:bg-muted/70 transition-colors"
                       >
                         <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
                           <IconFile className="h-5 w-5 text-primary" />
@@ -633,7 +631,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
                   <div className="space-y-4">
                     {/* File Upload Area */}
-                    <div className="border-2 border-dashed border-border/40 rounded-lg p-4 bg-muted/10 hover:bg-muted/20 transition-colors">
+                    <div className="border-2 border-dashed border-border rounded-lg p-4 bg-muted/10 hover:bg-muted/20 transition-colors">
                       <FormItem>
                         <FormControl>
                           <FileUploadField
@@ -661,7 +659,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
                           {uploadedFiles.map((file, index) => (
                             <div
                               key={file.id || `file-${index}`}
-                              className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border/40 hover:bg-muted/70 transition-colors"
+                              className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border hover:bg-muted/70 transition-colors"
                             >
                               <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
                                 <IconFile className="h-5 w-5 text-primary" />
@@ -705,7 +703,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
             {/* Task selection error message */}
             {form.formState.errors.taskId && (
               <div className="bg-destructive/10 border border-destructive/20 rounded-md px-4 py-3 flex-shrink-0">
-                <p className="text-sm text-destructive">{form.formState.errors.taskId.message}</p>
+                <p className="text-sm text-destructive">{String(form.formState.errors.taskId.message ?? "")}</p>
               </div>
             )}
             <TaskSelector
@@ -781,7 +779,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
                     {selectedTask.customer && (
                       <div>
                         <div className="text-sm font-medium text-muted-foreground">Cliente</div>
-                        <div>{selectedTask.customer.fantasyName || selectedTask.customer.name}</div>
+                        <div>{selectedTask.customer.fantasyName || selectedTask.customer.corporateName}</div>
                       </div>
                     )}
                     {selectedTask.sector && (

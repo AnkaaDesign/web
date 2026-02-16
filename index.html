@@ -35,7 +35,20 @@
 
     <!-- Set API URL BEFORE any modules load to prevent QueryClient initialization errors -->
     <script>
-      window.__ANKAA_API_URL__ = "%VITE_API_URL%";
+      (function() {
+        var h = window.location.hostname;
+        var envUrl = "%VITE_API_URL%";
+        // Extract port from the env URL (e.g. "http://192.168.0.11:3030" → "3030")
+        var port = "3030";
+        try { var m = envUrl.match(/:(\d{4,5})(?:\/|$)/); if (m) port = m[1]; } catch(e) {}
+        // LAN access: API runs on the same machine, use the browser's hostname
+        if (h.indexOf("192.168.") === 0 || h.indexOf("10.") === 0 || /^172\.(1[6-9]|2\d|3[01])\./.test(h)) {
+          window.__ANKAA_API_URL__ = "http://" + h + ":" + port;
+        } else {
+          // Localhost or production: use the env var
+          window.__ANKAA_API_URL__ = envUrl;
+        }
+      })();
     </script>
 
     <title>Ankaa Design</title>

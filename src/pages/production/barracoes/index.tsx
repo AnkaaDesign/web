@@ -128,13 +128,15 @@ export function GaragesPage() {
 
   // Update truck spots mutation - uses batch API for single transaction
   const updateTruckMutation = useMutation({
-    mutationFn: async (updates: PendingChange[]) => {
+    mutationFn: async (_updates: PendingChange[]) => {
+      // TODO: Implement truck service API endpoint for batch updates
       // Convert to batch format and update all trucks in single API call
-      const batchUpdates = updates.map((change) => ({
-        truckId: change.truckId,
-        spot: change.newSpot,
-      }));
-      return truckService.batchUpdateSpots(batchUpdates);
+      // const batchUpdates = updates.map((change) => ({
+      //   truckId: change.truckId,
+      //   spot: change.newSpot,
+      // }));
+      // return truckService.batchUpdateSpots(batchUpdates);
+      throw new Error('Truck service API not yet implemented');
     },
     onSuccess: async () => {
       // Toast is already shown by api client

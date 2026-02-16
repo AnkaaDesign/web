@@ -31,8 +31,8 @@ import {
 } from "@tabler/icons-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import type { Notification } from "@/types";
 import type { NotificationGetManyFormData } from "@/schemas";
+import type { NotificationListItem } from "@/services/notification.service";
 import { useNotificationMutations, useSendNotification } from "@/hooks";
 import { useNotifications } from "@/hooks/administration/use-notification-admin";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -51,7 +51,7 @@ import { NotificationTableSkeleton } from "./notification-table-skeleton";
 
 interface NotificationTableProps {
   filters: Partial<NotificationGetManyFormData>;
-  onDataChange?: (data: { items: Notification[]; totalRecords: number }) => void;
+  onDataChange?: (data: { items: NotificationListItem[]; totalRecords: number }) => void;
   className?: string;
 }
 
@@ -61,7 +61,7 @@ interface NotificationColumn {
   sortable: boolean;
   className?: string;
   align?: "left" | "center" | "right";
-  accessor: (notification: Notification) => React.ReactNode;
+  accessor: (notification: NotificationListItem) => React.ReactNode;
 }
 
 export function NotificationTable({
@@ -101,7 +101,7 @@ export function NotificationTable({
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-    items: Notification[];
+    items: NotificationListItem[];
     isBulk: boolean;
   } | null>(null);
 
@@ -164,7 +164,7 @@ export function NotificationTable({
       align: "left",
       accessor: (notification) => (
         <Badge variant="outline" className="whitespace-nowrap">
-          {NOTIFICATION_TYPE_LABELS[notification.type] || notification.type}
+          {NOTIFICATION_TYPE_LABELS[notification.type as keyof typeof NOTIFICATION_TYPE_LABELS] || notification.type}
         </Badge>
       ),
     },
@@ -175,14 +175,14 @@ export function NotificationTable({
       className: "w-36",
       align: "left",
       accessor: (notification) => {
-        const variant = notification.importance === "HIGH"
+        const variant = notification.importance === "HIGH" || notification.importance === "URGENT"
           ? "destructive"
-          : notification.importance === "MEDIUM"
+          : notification.importance === "NORMAL"
           ? "warning"
           : "secondary";
         return (
           <Badge variant={variant as any} className="whitespace-nowrap">
-            {NOTIFICATION_IMPORTANCE_LABELS[notification.importance] || notification.importance}
+            {NOTIFICATION_IMPORTANCE_LABELS[notification.importance as keyof typeof NOTIFICATION_IMPORTANCE_LABELS] || notification.importance}
           </Badge>
         );
       },
@@ -197,7 +197,7 @@ export function NotificationTable({
         <div className="flex flex-nowrap gap-1">
           {notification.channel?.map((ch: string) => (
             <Badge key={ch} variant="secondary" className="text-xs whitespace-nowrap">
-              {NOTIFICATION_CHANNEL_LABELS[ch] || ch}
+              {NOTIFICATION_CHANNEL_LABELS[ch as keyof typeof NOTIFICATION_CHANNEL_LABELS] || ch}
             </Badge>
           ))}
         </div>
@@ -268,7 +268,7 @@ export function NotificationTable({
   };
 
   // Context menu handlers
-  const handleContextMenu = (e: React.MouseEvent, notification: Notification) => {
+  const handleContextMenu = (e: React.MouseEvent, notification: NotificationListItem) => {
     e.preventDefault();
     e.stopPropagation();
 

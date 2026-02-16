@@ -276,7 +276,7 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               onValueChange={(value) =>
                 setLocalFilters({
                   ...localFilters,
-                  reasons: value.length > 0 ? (value as ACTIVITY_REASON[]) : undefined,
+                  reasons: (value && value.length > 0) ? (value as ACTIVITY_REASON[]) : undefined,
                 })
               }
               placeholder="Selecione os motivos..."
@@ -306,7 +306,7 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               onValueChange={(value) =>
                 setLocalFilters({
                   ...localFilters,
-                  userIds: value.length > 0 ? value : undefined,
+                  userIds: (value && value.length > 0) ? value : undefined,
                 })
               }
               placeholder="Selecione usuários..."
@@ -339,7 +339,7 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               onValueChange={(value) =>
                 setLocalFilters({
                   ...localFilters,
-                  itemIds: value.length > 0 ? value : undefined,
+                  itemIds: (value && value.length > 0) ? value : undefined,
                 })
               }
               placeholder="Selecione itens..."
@@ -366,15 +366,15 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Mínimo</Label>
                 <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="decimal"
+                  min={0}
+                  step={0.01}
                   placeholder="Quantidade mínima"
-                  value={localFilters.quantityRange?.min || ""}
-                  onChange={(e) => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                  value={localFilters.quantityRange?.min ?? null}
+                  onChange={(value) => {
+                    const numValue = value ? parseFloat(String(value)) : undefined;
                     const currentRange = localFilters.quantityRange || {};
-                    const newRange = { ...currentRange, min: value };
+                    const newRange = { ...currentRange, min: numValue };
                     setLocalFilters({
                       ...localFilters,
                       quantityRange: newRange.min === undefined && newRange.max === undefined ? undefined : newRange,
@@ -386,15 +386,15 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Máximo</Label>
                 <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="decimal"
+                  min={0}
+                  step={0.01}
                   placeholder="Quantidade máxima"
-                  value={localFilters.quantityRange?.max || ""}
-                  onChange={(e) => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                  value={localFilters.quantityRange?.max ?? null}
+                  onChange={(value) => {
+                    const numValue = value ? parseFloat(String(value)) : undefined;
                     const currentRange = localFilters.quantityRange || {};
-                    const newRange = { ...currentRange, max: value };
+                    const newRange = { ...currentRange, max: numValue };
                     setLocalFilters({
                       ...localFilters,
                       quantityRange: newRange.min === undefined && newRange.max === undefined ? undefined : newRange,
@@ -416,14 +416,14 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Data inicial</Label>
                 <DateTimeInput
-                  type="datetime-local"
+                  mode="datetime"
                   value={localFilters.createdAt?.gte || undefined}
                   onChange={(value) =>
                     setLocalFilters({
                       ...localFilters,
                       createdAt: {
                         ...localFilters.createdAt,
-                        gte: value || undefined,
+                        gte: (value instanceof Date ? value : undefined) || undefined,
                       },
                     })
                   }
@@ -433,14 +433,14 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Data final</Label>
                 <DateTimeInput
-                  type="datetime-local"
+                  mode="datetime"
                   value={localFilters.createdAt?.lte || undefined}
                   onChange={(value) =>
                     setLocalFilters({
                       ...localFilters,
                       createdAt: {
                         ...localFilters.createdAt,
-                        lte: value || undefined,
+                        lte: (value instanceof Date ? value : undefined) || undefined,
                       },
                     })
                   }

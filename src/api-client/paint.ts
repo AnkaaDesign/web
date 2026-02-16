@@ -156,7 +156,7 @@ export class PaintService {
 
   async getPaints(params: PaintGetManyFormData = {}): Promise<PaintGetManyResponse> {
     // Clean up params to remove empty strings, undefined, and null values
-    const cleanedParams = Object.entries(params).reduce((acc, [key, value]: [string, any]) => {
+    const cleanedParams = Object.entries(params).reduce<Partial<PaintGetManyFormData>>((acc, [key, value]) => {
       // Skip empty strings, null, undefined
       if (value === "" || value === null || value === undefined) {
         return acc;
@@ -173,9 +173,9 @@ export class PaintService {
       }
 
       // Only include valid values
-      acc[key as keyof PaintGetManyFormData] = value;
+      acc[key as Extract<keyof PaintGetManyFormData, string>] = value;
       return acc;
-    }, {} as Partial<PaintGetManyFormData>);
+    }, {});
 
 
     const response = await apiClient.get<PaintGetManyResponse>(this.basePath, { params: cleanedParams });

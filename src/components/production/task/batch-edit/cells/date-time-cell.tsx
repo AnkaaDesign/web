@@ -26,6 +26,17 @@ export function DateTimeCell({ control, name, placeholder, defaultTime = "07:30"
     }
   };
 
+  // Handler wrapper for DateTimeInput that supports DateRange
+  const handleDateChange = (field: any) => (value: Date | import("react-day-picker").DateRange | null) => {
+    // DateTimeInput can send DateRange for date-range mode, but this cell only uses datetime mode
+    // Only process Date values, ignore DateRange
+    if (value instanceof Date) {
+      handleChange(field)(value);
+    } else if (value === null) {
+      handleChange(field)(null);
+    }
+  };
+
   return (
     <FormField
       control={control}
@@ -34,8 +45,8 @@ export function DateTimeCell({ control, name, placeholder, defaultTime = "07:30"
         <FormItem>
           <FormControl>
             <DateTimeInput
-              value={field.value}
-              onChange={handleChange(field)}
+              value={field.value ?? null}
+              onChange={handleDateChange(field)}
               placeholder={placeholder}
               mode="datetime"
             />

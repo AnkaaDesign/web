@@ -218,7 +218,7 @@ export function RateLimitingPage() {
     try {
       switch (clearAction.type) {
         case "all":
-          await clearKeys.mutateAsync();
+          await clearKeys.mutateAsync(undefined);
           break;
         case "blocked":
           await clearBlockedKeys.mutateAsync();

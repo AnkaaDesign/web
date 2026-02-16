@@ -31,8 +31,8 @@ export function BorrowListMobile({ onEdit, onDelete, filters, className, onDataC
 
   // Flatten paginated data
   const borrows = React.useMemo(() => {
-    const items = data?.pages.flatMap((page) => page.data || []) || [];
-    const totalRecords = data?.pages[0]?.meta?.totalRecords || 0;
+    const items = data?.pages?.flatMap((page) => page.data || []) || [];
+    const totalRecords = data?.pages?.[0]?.meta?.totalRecords || 0;
 
     // Call onDataChange when data changes
     if (onDataChange && items.length > 0) {

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconFiles } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { getApiBaseUrl } from "@/config/api";
 
 export interface FilePreviewSectionProps {
   files: AnkaaFile[];
@@ -48,7 +49,7 @@ export const FilePreviewSection: React.FC<FilePreviewSectionProps> = ({
       onDownload(file);
     } else {
       // Default download behavior
-      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
+      const apiUrl = getApiBaseUrl();
       const downloadUrl = `${apiUrl}/files/${file.id}/download`;
       window.open(downloadUrl, "_blank");
     }

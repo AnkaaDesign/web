@@ -38,7 +38,7 @@ export function useBackupProgress(
   const [error, setError] = useState<Error | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
   const lastUpdateTime = useRef<number>(Date.now());
   const lastProgress = useRef<number>(0);
 

@@ -44,7 +44,7 @@ export function SpecificationsCard({ item, className }: SpecificationsCardProps)
           </div>
 
           {/* Identification Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Identificação</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {item.uniCode && (
@@ -86,7 +86,7 @@ export function SpecificationsCard({ item, className }: SpecificationsCardProps)
           </div>
 
           {/* Measures Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Medidas e Dimensões</h3>
             <div className="bg-muted/30 rounded-lg p-4">
               <MeasureDisplayFull item={item} />
@@ -95,7 +95,7 @@ export function SpecificationsCard({ item, className }: SpecificationsCardProps)
 
           {/* Packaging Section */}
           {item.boxQuantity !== null && (
-            <div className="pt-6 border-t border-border/50">
+            <div className="pt-6 border-t border-border">
               <h3 className="text-base font-semibold mb-4 text-foreground">Embalagem</h3>
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -109,7 +109,7 @@ export function SpecificationsCard({ item, className }: SpecificationsCardProps)
 
           {/* Logistics Section */}
           {item.estimatedLeadTime !== null && (
-            <div className="pt-6 border-t border-border/50">
+            <div className="pt-6 border-t border-border">
               <h3 className="text-base font-semibold mb-4 text-foreground">Logística</h3>
               <div>
                 <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300 mb-2 flex items-center gap-2">

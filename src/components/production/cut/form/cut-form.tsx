@@ -11,9 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { IconFileText, IconCut, IconAlertCircle } from "@tabler/icons-react";
 import { useState, useEffect } from "react";
 import type { Cut } from "../../../../types";
-import type { CutCreateFormData, CutUpdateFormData } from "../../../../schemas";
-import { cutCreateSchema, cutUpdateSchema } from "../../../../schemas";
-import { CUT_TYPE, CUT_STATUS, CUT_ORIGIN, CUT_TYPE_LABELS, CUT_STATUS_LABELS, CUT_ORIGIN_LABELS, CUT_REQUEST_REASON_LABELS } from "../../../../constants";
+import { CUT_TYPE, CUT_STATUS, CUT_ORIGIN, CUT_REQUEST_REASON, CUT_TYPE_LABELS, CUT_STATUS_LABELS, CUT_ORIGIN_LABELS, CUT_REQUEST_REASON_LABELS } from "../../../../constants";
 import { useCutMutations, useCut } from "../../../../hooks";
 import { mapCutToFormData } from "../../../../schemas";
 import { useToast } from "@/hooks/common/use-toast";
@@ -29,12 +27,37 @@ interface CutFormProps {
   className?: string;
 }
 
-const createFormSchema = cutCreateSchema
+// Extract the base schema before transform is applied
+const createFormSchemaBase = z
+  .object({
+    fileId: z.string().uuid("Arquivo inválido"),
+    type: z.nativeEnum(CUT_TYPE, {
+      errorMap: () => ({ message: "Tipo de corte inválido" }),
+    }),
+    status: z
+      .nativeEnum(CUT_STATUS, {
+        errorMap: () => ({ message: "Status de corte inválido" }),
+      })
+      .optional(),
+    taskId: z.string().uuid("Tarefa inválida").nullable().optional(),
+    origin: z.nativeEnum(CUT_ORIGIN, {
+      errorMap: () => ({ message: "Origem do corte inválida" }),
+    }),
+    reason: z
+      .nativeEnum(CUT_REQUEST_REASON, {
+        errorMap: () => ({ message: "Motivo da solicitação inválido" }),
+      })
+      .nullable()
+      .optional(),
+    parentCutId: z.string().uuid("Corte pai inválido").nullable().optional(),
+    startedAt: z.coerce.date().nullable().optional(),
+    completedAt: z.coerce.date().nullable().optional(),
+  })
   .extend({
     notes: z.string().optional(),
   })
   .refine(
-    (data: any) => {
+    (data) => {
       // Additional validation: if origin is REQUEST, reason is required
       if (data.origin === CUT_ORIGIN.REQUEST) {
         return data.reason !== null && data.reason !== undefined;
@@ -47,12 +70,40 @@ const createFormSchema = cutCreateSchema
     },
   );
 
-const updateFormSchema = cutUpdateSchema
+const updateFormSchemaBase = z
+  .object({
+    fileId: z.string().uuid("Arquivo inválido").optional(),
+    type: z
+      .nativeEnum(CUT_TYPE, {
+        errorMap: () => ({ message: "Tipo de corte inválido" }),
+      })
+      .optional(),
+    status: z
+      .nativeEnum(CUT_STATUS, {
+        errorMap: () => ({ message: "Status de corte inválido" }),
+      })
+      .optional(),
+    taskId: z.string().uuid("Tarefa inválida").nullable().optional(),
+    origin: z
+      .nativeEnum(CUT_ORIGIN, {
+        errorMap: () => ({ message: "Origem do corte inválida" }),
+      })
+      .optional(),
+    reason: z
+      .nativeEnum(CUT_REQUEST_REASON, {
+        errorMap: () => ({ message: "Motivo da solicitação inválido" }),
+      })
+      .nullable()
+      .optional(),
+    parentCutId: z.string().uuid("Corte pai inválido").nullable().optional(),
+    startedAt: z.coerce.date().nullable().optional(),
+    completedAt: z.coerce.date().nullable().optional(),
+  })
   .extend({
     notes: z.string().optional(),
   })
   .refine(
-    (data: any) => {
+    (data) => {
       // Additional validation: if origin is REQUEST, reason is required
       if (data.origin === CUT_ORIGIN.REQUEST) {
         return data.reason !== null && data.reason !== undefined;
@@ -64,6 +115,9 @@ const updateFormSchema = cutUpdateSchema
       path: ["reason"],
     },
   );
+
+const createFormSchema = createFormSchemaBase;
+const updateFormSchema = updateFormSchemaBase;
 
 type CreateFormData = z.infer<typeof createFormSchema>;
 type UpdateFormData = z.infer<typeof updateFormSchema>;
@@ -73,29 +127,24 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch existing cut data for edit mode
-  const { data: existingCut, isLoading: isLoadingCut } = useCut(
-    cutId || "",
-    {
-      include: {
-        file: true,
-        task: {
-          include: {
-            customer: true,
-          },
+  const { data: existingCut, isLoading: isLoadingCut } = useCut(cutId || "", {
+    enabled: mode === "edit" && !!cutId,
+    include: {
+      file: true,
+      task: {
+        include: {
+          customer: true,
         },
-        parentCut: {
-          include: {
-            file: true,
-          },
+      },
+      parentCut: {
+        include: {
+          file: true,
         },
       },
     },
-    {
-      enabled: mode === "edit" && !!cutId,
-    },
-  );
+  });
 
-  const { create, update } = useCutMutations();
+  const mutations = useCutMutations();
 
   // Determine schema and default values based on mode
   const schema = mode === "create" ? createFormSchema : updateFormSchema;
@@ -111,9 +160,9 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
           reason: null,
           notes: "",
         }
-      : existingCut
+      : existingCut?.data
         ? {
-            ...mapCutToFormData(existingCut),
+            ...mapCutToFormData(existingCut.data),
             notes: "",
           }
         : {};
@@ -141,31 +190,26 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
       let result: Cut;
 
       if (mode === "create") {
-        const createData = data as CutCreateFormData;
-        const { notes, ...cutData } = createData as CreateFormData;
+        const { notes, ...cutData } = data as CreateFormData;
 
-        const response = await create.mutateAsync({
-          data: cutData,
-          include: {
-            file: true,
-            task: {
-              include: {
-                customer: true,
-              },
+        const response = await mutations.createAsync(cutData, {
+          file: true,
+          task: {
+            include: {
+              customer: true,
             },
-            parentCut: {
-              include: {
-                file: true,
-              },
+          },
+          parentCut: {
+            include: {
+              file: true,
             },
           },
         });
-        result = response.data;
+        result = response.data!;
       } else {
-        const updateData = data as CutUpdateFormData;
-        const { notes, ...cutData } = updateData as UpdateFormData;
+        const { notes, ...cutData } = data as UpdateFormData;
 
-        const response = await update.mutateAsync({
+        const response = await mutations.updateAsync({
           id: cutId!,
           data: cutData,
           include: {
@@ -182,7 +226,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
             },
           },
         });
-        result = response.data;
+        result = response.data!;
       }
 
       toast({
@@ -195,7 +239,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
       toast({
         title: "Erro",
         description: `Erro ao ${mode === "create" ? "criar" : "atualizar"} corte.`,
-        variant: "destructive",
+        variant: "error",
       });
     } finally {
       setIsSubmitting(false);
@@ -213,7 +257,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
     );
   }
 
-  if (mode === "edit" && !existingCut) {
+  if (mode === "edit" && !existingCut?.data) {
     return (
       <Alert className="m-4">
         <IconAlertCircle className="h-4 w-4" />
@@ -222,30 +266,33 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
     );
   }
 
+  // Extract cut data for easier access
+  const cut = existingCut?.data;
+
   return (
     <div className={className}>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
           {/* Header with cut info */}
-          {mode === "edit" && existingCut && (
+          {mode === "edit" && cut && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <IconCut className="h-5 w-5 text-primary" />
                 <h3 className="text-lg font-medium">Editar Corte</h3>
-                <Badge variant="outline">{CUT_STATUS_LABELS[existingCut.status]}</Badge>
+                <Badge variant="outline">{CUT_STATUS_LABELS[cut.status as CUT_STATUS]}</Badge>
               </div>
 
-              {existingCut.file && (
+              {cut.file && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <IconFileText className="h-4 w-4" />
-                  <span>Arquivo: {existingCut.file.filename}</span>
+                  <span>Arquivo: {cut.file.filename}</span>
                 </div>
               )}
 
-              {existingCut.task && (
+              {cut.task && (
                 <div className="text-sm text-muted-foreground">
-                  Tarefa: {existingCut.task.name}
-                  {existingCut.task.customer && ` - ${existingCut.task.customer.name}`}
+                  Tarefa: {cut.task.name}
+                  {cut.task.customer && ` - ${cut.task.customer.fantasyName}`}
                 </div>
               )}
 
@@ -266,7 +313,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
                     <FormControl>
                       <Combobox
                         value={field.value}
-                        onChange={field.onChange}
+                        onValueChange={field.onChange}
                         options={[{ value: "placeholder", label: "Selecionar arquivo..." }]}
                         placeholder="Selecione um arquivo"
                       />
@@ -287,7 +334,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
                   <FormControl>
                     <Combobox
                       value={field.value}
-                      onChange={field.onChange}
+                      onValueChange={field.onChange}
                       options={Object.entries(CUT_TYPE_LABELS).map(([value, label]) => ({
                         value,
                         label,
@@ -312,7 +359,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
                   <FormControl>
                     <Combobox
                       value={field.value}
-                      onChange={field.onChange}
+                      onValueChange={field.onChange}
                       options={Object.entries(CUT_STATUS_LABELS).map(([value, label]) => ({
                         value,
                         label,
@@ -337,7 +384,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
                   <FormControl>
                     <Combobox
                       value={field.value}
-                      onChange={field.onChange}
+                      onValueChange={field.onChange}
                       options={Object.entries(CUT_ORIGIN_LABELS).map(([value, label]) => ({
                         value,
                         label,
@@ -363,7 +410,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
                     <FormControl>
                       <Combobox
                         value={field.value || ""}
-                        onChange={(value: any) => field.onChange(value === "" ? null : value)}
+                        onValueChange={(value: any) => field.onChange(value === "" ? null : value)}
                         options={Object.entries(CUT_REQUEST_REASON_LABELS).map(([value, label]) => ({
                           value,
                           label,
@@ -390,7 +437,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
                     <FormControl>
                       <Combobox
                         value={field.value || undefined}
-                        onChange={(value: any) => field.onChange(value || null)}
+                        onValueChange={(value: any) => field.onChange(value || null)}
                         options={[{ value: "placeholder", label: "Selecionar tarefa..." }]}
                         placeholder="Selecionar tarefa..."
                       />
@@ -412,7 +459,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
                     <FormControl>
                       <Combobox
                         value={field.value || undefined}
-                        onChange={(value: any) => field.onChange(value || null)}
+                        onValueChange={(value: any) => field.onChange(value || null)}
                         options={[{ value: "placeholder", label: "Selecionar corte pai..." }]}
                         placeholder="Selecionar corte pai..."
                       />
@@ -433,11 +480,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
                 <FormLabel>Observações</FormLabel>
                 <FormControl>
                   <Textarea
-                    value={field.value}
-                    onChange={field.onChange}
-                    onBlur={field.onBlur}
-                    name={field.name}
-                    ref={field.ref}
+                    {...field}
                     placeholder="Adicione observações sobre este corte..."
                     className="min-h-[100px]"
                   />
@@ -453,20 +496,20 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Tipo:</span>
-                <span className="ml-2">{watchedType ? CUT_TYPE_LABELS[watchedType] : "-"}</span>
+                <span className="ml-2">{watchedType ? CUT_TYPE_LABELS[watchedType as CUT_TYPE] : "-"}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Status:</span>
-                <span className="ml-2">{watchedStatus ? CUT_STATUS_LABELS[watchedStatus] : "-"}</span>
+                <span className="ml-2">{watchedStatus ? CUT_STATUS_LABELS[watchedStatus as CUT_STATUS] : "-"}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Origem:</span>
-                <span className="ml-2">{watchedOrigin ? CUT_ORIGIN_LABELS[watchedOrigin] : "-"}</span>
+                <span className="ml-2">{watchedOrigin ? CUT_ORIGIN_LABELS[watchedOrigin as CUT_ORIGIN] : "-"}</span>
               </div>
               {watchedOrigin === CUT_ORIGIN.REQUEST && form.watch("reason") && (
                 <div>
                   <span className="text-muted-foreground">Motivo:</span>
-                  <span className="ml-2">{CUT_REQUEST_REASON_LABELS[form.watch("reason")]}</span>
+                  <span className="ml-2">{CUT_REQUEST_REASON_LABELS[form.watch("reason") as CUT_REQUEST_REASON]}</span>
                 </div>
               )}
             </div>

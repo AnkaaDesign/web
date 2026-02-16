@@ -460,7 +460,7 @@ export function TableToolbar<T extends { id: string }>({
             <DropdownMenuContent align="end">
               {viewOptions.map((option) => (
                 <DropdownMenuItem key={option.key} onClick={option.onClick} className="gap-2">
-                  <option.icon className="h-4 w-4" />
+                  {option.icon}
                   {option.label}
                   {option.active && <IconEye className="h-4 w-4 ml-auto" />}
                 </DropdownMenuItem>
@@ -479,13 +479,16 @@ export function TableToolbar<T extends { id: string }>({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {densityOptions.map((option) => (
-                <DropdownMenuItem key={option.key} onClick={() => onDensityChange(option.key)} className="gap-2">
-                  <option.icon className="h-4 w-4" />
-                  {option.label}
-                  {density === option.key && <IconEye className="h-4 w-4 ml-auto" />}
-                </DropdownMenuItem>
-              ))}
+              {densityOptions.map((option) => {
+                const Icon = option.icon;
+                return (
+                  <DropdownMenuItem key={option.key} onClick={() => onDensityChange(option.key)} className="gap-2">
+                    <Icon className="h-4 w-4" />
+                    {option.label}
+                    {density === option.key && <IconEye className="h-4 w-4 ml-auto" />}
+                  </DropdownMenuItem>
+                );
+              })}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

@@ -66,11 +66,11 @@ export function MeasureDisplay({ item, showConversions = false, compact = false,
   const measureGroups: MeasureGroup[] = Object.values(MEASURE_TYPE)
     .map((type) => {
       const typeMeasures = allMeasures.filter((m) => m.measureType === type);
-      const Icon = MEASURE_TYPE_ICONS[type] || IconHash; // Fallback to IconHash if not found
+      const Icon = MEASURE_TYPE_ICONS[type as keyof typeof MEASURE_TYPE_ICONS] || IconHash; // Fallback to IconHash if not found
 
       return {
         type,
-        label: MEASURE_TYPE_LABELS[type],
+        label: MEASURE_TYPE_LABELS[type as keyof typeof MEASURE_TYPE_LABELS],
         icon: Icon,
         measures: typeMeasures,
         primaryMeasure: null,
@@ -194,7 +194,7 @@ export function MeasureDisplay({ item, showConversions = false, compact = false,
   return (
     <div className={cn("space-y-3", className)}>
       {measureGroups.map((group) => {
-        const Icon = group.icon;
+        const Icon = MEASURE_TYPE_ICONS[group.type as keyof typeof MEASURE_TYPE_ICONS];
         const isExpanded = expandedGroups.has(group.type);
         const hasMultipleMeasures = group.measures.length > 1;
 

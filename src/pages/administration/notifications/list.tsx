@@ -277,7 +277,7 @@ export const NotificationListPage = () => {
     totalRecords: 0,
   });
 
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Debounced search
   const handleSearchChange = useCallback((value: string) => {
@@ -456,7 +456,12 @@ export const NotificationListPage = () => {
               <div className="flex-1 min-h-0 overflow-auto">
                 <NotificationTable
                   filters={queryFilters}
-                  onDataChange={setTableData}
+                  onDataChange={(data) => {
+                    setTableData({
+                      items: data.items as any,
+                      totalRecords: data.totalRecords,
+                    });
+                  }}
                   className="h-full"
                 />
               </div>

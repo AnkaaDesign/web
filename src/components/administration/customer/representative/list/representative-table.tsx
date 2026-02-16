@@ -1,10 +1,9 @@
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { routes } from "@/constants";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { representativeService } from "@/services/representativeService";
-import type { Representative } from "@/types/representative";
-import type { RepresentativeGetManyFormData } from "@/types/representative";
+import type { Representative, RepresentativeGetManyFormData, RepresentativeGetManyResponse } from "@/types/representative";
 import {
   Table,
   TableBody,
@@ -121,7 +120,7 @@ export function RepresentativeTable({
   }, [filters, page, pageSize, searchTerm, sortConfigs, showSelectedOnly, selectedIds]);
 
   // Fetch representatives data
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery<RepresentativeGetManyResponse>({
     queryKey: ["representatives", queryParams],
     queryFn: async () => {
       const response = await representativeService.getAll(queryParams);
@@ -136,7 +135,7 @@ export function RepresentativeTable({
 
       return response;
     },
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   // Toggle active mutation
@@ -153,7 +152,7 @@ export function RepresentativeTable({
       toast({
         title: "Erro",
         description: "Erro ao alterar status do representante",
-        variant: "destructive",
+        variant: "error",
       });
     },
   });
@@ -165,7 +164,7 @@ export function RepresentativeTable({
 
   // Get current page representative IDs for selection
   const currentPageRepresentativeIds = useMemo(
-    () => representatives.map((rep) => rep.id),
+    () => representatives.map((rep: Representative) => rep.id),
     [representatives]
   );
 
@@ -212,7 +211,7 @@ export function RepresentativeTable({
     const hasSelection = selectionCount > 0;
 
     if (hasSelection && isRepresentativeSelected) {
-      const selectedRepresentativesList = representatives.filter((r) => isSelected(r.id));
+      const selectedRepresentativesList = representatives.filter((r: Representative) => isSelected(r.id));
       setContextMenu({
         x: e.clientX,
         y: e.clientY,
@@ -386,7 +385,7 @@ export function RepresentativeTable({
                 </TableCell>
               </TableRow>
             ) : (
-              representatives.map((representative, index) => {
+              representatives.map((representative: Representative, index: number) => {
                 const representativeIsSelected = isSelected(representative.id);
 
                 return (

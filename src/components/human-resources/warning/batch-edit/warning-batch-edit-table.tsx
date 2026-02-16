@@ -111,9 +111,9 @@ export function WarningBatchEditTable({ warnings, onSubmit, isSubmitting = false
                     <TableCell>
                       <DateTimeInput
                         mode="date"
-                        context="followUp"
+                        context="scheduled"
                         value={form.watch(`warnings.${index}.data.followUpDate`)}
-                        onChange={(date: Date | null) => form.setValue(`warnings.${index}.data.followUpDate`, date || new Date())}
+                        onChange={(date) => form.setValue(`warnings.${index}.data.followUpDate`, (date && 'from' in date ? date.from : date) || new Date())}
                         disabled={isSubmitting}
                         className="h-8"
                       />

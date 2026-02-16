@@ -189,11 +189,11 @@ export function ItemStockBalanceTable({ items, onCancel: _onCancel, onSubmit: _o
                               <FormControl>
                                 <Input
                                   type="number"
-                                  min="0"
-                                  step="1"
+                                  min={0}
+                                  step={1}
                                   className="w-28 h-8 font-mono text-sm"
                                   {...field}
-                                  onChange={(e) => field.onChange(Number(e.target.value))}
+                                  onChange={(value) => field.onChange(Number(value as string))}
                                 />
                               </FormControl>
                               <FormMessage className="text-xs" />

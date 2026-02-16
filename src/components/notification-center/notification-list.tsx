@@ -90,7 +90,7 @@ export const NotificationList: React.FC<NotificationListProps> = ({
   onLoadMore,
   isLoadingMore = false,
 }) => {
-  const viewportRef = React.useRef<HTMLDivElement>(null);
+  const viewportRef = React.useRef<HTMLDivElement>(undefined as any);
   const scrollPositionRef = React.useRef<number>(0);
   const prevNotificationsLengthRef = React.useRef<number>(notifications.length);
   const isLoadingMoreRef = React.useRef<boolean>(false);

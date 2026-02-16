@@ -1,4 +1,5 @@
 import { useFieldArray, useWatch } from "react-hook-form";
+import type { FieldValues, Path, ArrayPath } from "react-hook-form";
 import { useState } from "react";
 import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -58,13 +59,13 @@ export function TagsInput<TFieldValues extends FieldValues = FieldValues>({ cont
                   type="text"
                   value={newTag}
                   onChange={(value) => {
-                    // Handle both event and direct value from custom Input component
+                    // Input component's onChange passes the value directly (string | number | null)
                     if (typeof value === "string") {
                       setNewTag(value);
-                    } else if (value && typeof value === "object" && "target" in value && value.target) {
-                      setNewTag((value as any).target.value);
                     } else if (value === null || value === undefined) {
                       setNewTag("");
+                    } else if (typeof value === "number") {
+                      setNewTag(String(value));
                     }
                   }}
                   onKeyDown={(e: React.KeyboardEvent) => {

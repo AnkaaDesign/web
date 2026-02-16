@@ -170,7 +170,7 @@ export function PayrollSummary({ users }: PayrollSummaryProps) {
         <div className="py-3 pt-1 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {/* Total Employees */}
-          <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border/50">
+          <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-1">
               <IconUsers className="h-4 w-4 text-blue-600 flex-shrink-0" />
               <p className="text-sm font-medium text-muted-foreground line-clamp-2 min-h-[2.5rem] flex items-center">
@@ -186,7 +186,7 @@ export function PayrollSummary({ users }: PayrollSummaryProps) {
           </div>
 
           {/* Total Remuneration */}
-          <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border/50">
+          <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-1">
               <IconCurrencyDollar className="h-4 w-4 text-amber-600 flex-shrink-0" />
               <p className="text-sm font-medium text-muted-foreground line-clamp-2 min-h-[2.5rem] flex items-center">
@@ -202,7 +202,7 @@ export function PayrollSummary({ users }: PayrollSummaryProps) {
           </div>
 
           {/* Total Bonus */}
-          <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border/50">
+          <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-1">
               <IconTrendingUp className="h-4 w-4 text-green-600 flex-shrink-0" />
               <p className="text-sm font-medium text-muted-foreground line-clamp-2 min-h-[2.5rem] flex items-center">

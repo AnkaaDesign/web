@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { IconUsers, IconUser, IconMail, IconPhone, IconChevronRight } from "@tabler/icons-react";
 
 import type { Sector } from "../../../../types";
-import { routes, USER_STATUS_LABELS } from "../../../../constants";
+import { routes, USER_STATUS_LABELS, USER_STATUS } from "../../../../constants";
 import { formatCPF, formatBrazilianPhone } from "../../../../utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,7 +67,7 @@ export function RelatedUsersCard({ sector }: RelatedUsersCardProps) {
                     {user.position && <p className="text-sm text-muted-foreground mt-1">{user.position.name}</p>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={user.status === "ACTIVE" ? "success" : "secondary"} className="text-xs">
+                    <Badge variant={user.status === USER_STATUS.EFFECTED ? "success" : "secondary"} className="text-xs">
                       {USER_STATUS_LABELS[user.status]}
                     </Badge>
                     <IconChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />

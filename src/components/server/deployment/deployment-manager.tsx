@@ -10,6 +10,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DeploymentTable } from "./list/deployment-table";
 import { cn } from "@/lib/utils";
+import { DEPLOYMENT_DOMAINS } from "@/config/deployment";
 
 interface DeploymentManagerProps {
   className?: string;
@@ -72,7 +73,7 @@ export function DeploymentManager({ className }: DeploymentManagerProps) {
     return (
       <Badge variant={variants[status as keyof typeof variants] || "outline"} className="gap-1">
         {icons[status as keyof typeof icons]}
-        {DEPLOYMENT_STATUS_LABELS[status] || status}
+        {DEPLOYMENT_STATUS_LABELS[status as keyof typeof DEPLOYMENT_STATUS_LABELS] || status}
       </Badge>
     );
   };
@@ -92,7 +93,7 @@ export function DeploymentManager({ className }: DeploymentManagerProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>Teste (test.ankaadesign.com.br)</span>
+                  <span>Teste ({DEPLOYMENT_DOMAINS.staging})</span>
                   {testDeployment?.data?.status && getStatusBadge(testDeployment.data.status)}
                 </CardTitle>
                 <CardDescription>Ambiente de teste automático</CardDescription>
@@ -136,7 +137,7 @@ export function DeploymentManager({ className }: DeploymentManagerProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>Produção (ankaadesign.com.br)</span>
+                  <span>Produção ({DEPLOYMENT_DOMAINS.production})</span>
                   {prodDeployment?.data?.status && getStatusBadge(prodDeployment.data.status)}
                 </CardTitle>
                 <CardDescription>Ambiente de produção</CardDescription>

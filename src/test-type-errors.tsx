@@ -43,7 +43,7 @@ export function processOrderCorrectly(order: Order) {
   const orderId = order.id; // Use existing property
 
   // Fix 2: Use optional chaining for optional relations
-  const supplierName = order.supplier?.name ?? 'No supplier';
+  const supplierName = order.supplier?.fantasyName ?? 'No supplier';
 
   // Fix 3: Check array existence and length
   const firstItemName = order.items && order.items.length > 0
@@ -107,7 +107,7 @@ export function getSupplierInfo(order: Order) {
   if (isOrderWithSupplier(order)) {
     // Now TypeScript knows supplier is defined
     return {
-      supplierName: order.supplier.name,
+      supplierName: order.supplier.fantasyName,
       supplierId: order.supplier.id,
       // Access other supplier properties safely
     };
@@ -149,7 +149,7 @@ export function generateOrderReport(order: OrderWithFullRelations) {
   // Now we can safely access all relations without optional chaining
   const report = {
     orderId: order.id,
-    supplierName: order.supplier.name,
+    supplierName: order.supplier.fantasyName,
     itemCount: order.items.length,
     totalItems: order.items.reduce((sum, item) => sum + item.orderedQuantity, 0),
     hasBudgets: order.budgets.length > 0,

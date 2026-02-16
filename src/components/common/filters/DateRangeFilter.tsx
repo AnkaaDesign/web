@@ -151,11 +151,13 @@ export function DateRangeFilter({
           )}
           <div className="p-3">
             <Calendar
-              mode="range"
-              selected={value}
-              onSelect={(range) => onChange(range as DateRange)}
-              numberOfMonths={2}
-              locale={ptBR}
+              {...({
+                mode: "range",
+                selected: value,
+                onSelect: (range: any) => onChange(range as DateRange),
+                numberOfMonths: 2,
+                locale: ptBR,
+              } as any)}
             />
           </div>
         </div>

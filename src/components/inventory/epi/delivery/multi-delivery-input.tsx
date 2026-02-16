@@ -116,8 +116,9 @@ export const MultiDeliveryInput = forwardRef<MultiDeliveryInputRef, MultiDeliver
                         <UserSelectorDropdown
                           value={field.value}
                           onChange={(value) => {
-                            field.onChange(value);
-                            handleUserChange(index, value || "");
+                            const stringValue = Array.isArray(value) ? value[0] : value;
+                            field.onChange(stringValue);
+                            handleUserChange(index, stringValue || "");
                           }}
                           placeholder="Selecione o funcionário"
                           disabled={disabled}

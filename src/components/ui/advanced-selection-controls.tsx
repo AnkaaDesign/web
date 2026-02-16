@@ -403,13 +403,13 @@ export function AdvancedTableHeaderCheckbox({
   // Use effect to set indeterminate state instead of inline callback ref
   React.useEffect(() => {
     if (checkboxRef.current) {
-      checkboxRef.current.indeterminate = isIndeterminate;
+      (checkboxRef.current as unknown as HTMLInputElement).indeterminate = isIndeterminate;
     }
   }, [isIndeterminate]);
 
   React.useEffect(() => {
     if (checkboxRef2.current) {
-      checkboxRef2.current.indeterminate = isIndeterminate;
+      (checkboxRef2.current as unknown as HTMLInputElement).indeterminate = isIndeterminate;
     }
   }, [isIndeterminate]);
 

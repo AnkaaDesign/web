@@ -101,9 +101,9 @@ function SupplierFormContent({ isSubmitting }: { isSubmitting?: boolean }) {
                 CNPJ
               </Label>
               <Input
-                value={values.cnpj || ""}
-                onChange={(e) => {
-                  handleCNPJChange(e.target.value);
+                value={values.cnpj ?? ""}
+                onChange={(value) => {
+                  handleCNPJChange(typeof value === 'string' ? value : String(value || ''));
                   setTouched("cnpj");
                 }}
                 onBlur={() => setTouched("cnpj")}
@@ -156,12 +156,13 @@ function SupplierFormContent({ isSubmitting }: { isSubmitting?: boolean }) {
                 CEP
               </Label>
               <Input
-                value={values.zipCode || ""}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, "");
-                  let formatted = value;
-                  if (value.length > 5) {
-                    formatted = `${value.slice(0, 5)}-${value.slice(5, 8)}`;
+                value={values.zipCode ?? ""}
+                onChange={(value) => {
+                  const strValue = typeof value === 'string' ? value : String(value || '');
+                  const digitsOnly = strValue.replace(/\D/g, "");
+                  let formatted = digitsOnly;
+                  if (digitsOnly.length > 5) {
+                    formatted = `${digitsOnly.slice(0, 5)}-${digitsOnly.slice(5, 8)}`;
                   }
                   setValue("zipCode", formatted || null);
                   if (formatted.length === 9) {
@@ -193,8 +194,8 @@ function SupplierFormContent({ isSubmitting }: { isSubmitting?: boolean }) {
                 Estado
               </Label>
               <Combobox
-                value={values.state || ""}
-                onValueChange={(value) => setValue("state", value || null)}
+                value={values.state ?? ""}
+                onValueChange={(value) => setValue("state", typeof value === 'string' ? value : (value ? null : null))}
                 disabled={loading}
                 options={Object.entries(BRAZILIAN_STATES).map(([code, name]) => ({
                   label: name,
@@ -234,6 +235,7 @@ export function SupplierForm(props: SupplierFormProps) {
     zipCode: null,
     site: null,
     phones: [],
+    tags: [],
     logoId: null,
     ...defaultValues,
   };

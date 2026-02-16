@@ -9,19 +9,22 @@ import { useAuth } from "@/contexts/auth-context";
 import {
   IconPalette,
   IconPlus,
-  IconColorSwatch,
-  IconFlask2,
-  IconDroplet,
-  IconPaint,
-  IconActivity,
-  IconFlask,
-  IconBottle,
-  IconChartBar,
-  IconChartPie,
-  IconPackage,
-  IconBrush,
-  IconTag,
 } from "@tabler/icons-react";
+import {
+  Palette,
+  SwatchBook,
+  FlaskConical,
+  Droplet,
+  Paintbrush,
+  Activity as ActivityIcon,
+  TestTube,
+  FlaskRound,
+  BarChart,
+  PieChart,
+  Package,
+  Brush,
+  Tag,
+} from "lucide-react";
 import {
   RecentActivitiesCard,
   TrendCard,
@@ -41,7 +44,7 @@ import { Card, CardContent } from "@/components/ui/card";
 export function Painting() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [timePeriod, setTimePeriod] = useState(DASHBOARD_TIME_PERIOD.THIS_MONTH);
+  const [timePeriod, setTimePeriod] = useState<string>(DASHBOARD_TIME_PERIOD.THIS_MONTH);
 
   // Track page access
   usePageTracker({
@@ -57,7 +60,10 @@ export function Painting() {
   }, [user, navigate]);
 
   // Fetch dashboard data with time period
-  const { data: dashboard, isLoading, error } = usePaintDashboard({ timePeriod });
+  const { data: dashboard, isLoading, error } = usePaintDashboard({
+    timePeriod,
+    includeInactive: false,
+  });
 
   // Fetch paint brands count
   const { data: paintBrandsData } = usePaintBrands({
@@ -114,28 +120,28 @@ export function Painting() {
         status: "Total Produções",
         quantity: totalProductions,
         total: totalProductions,
-        icon: IconActivity,
+        icon: ActivityIcon,
         color: "blue" as const,
       },
       {
         status: "Volume Total",
         quantity: Math.round(volume),
         total: Math.round(volume),
-        icon: IconDroplet,
+        icon: Droplet,
         color: "green" as const,
       },
       {
         status: "Média por Produção",
         quantity: Math.round(dashboard.data.productionOverview.averageVolumePerProduction),
         total: Math.round(volume),
-        icon: IconFlask,
+        icon: TestTube,
         color: "purple" as const,
       },
       {
         status: "Peso Total (kg)",
         quantity: Math.round(dashboard.data.productionOverview.totalWeightKg),
         total: Math.round(dashboard.data.productionOverview.totalWeightKg),
-        icon: IconPackage,
+        icon: Package,
         color: "orange" as const,
       },
     ];
@@ -186,23 +192,19 @@ export function Painting() {
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="h-full flex flex-col bg-background">
           {/* Fixed Header */}
-          <div className="flex-shrink-0 bg-background">
-            <div className="px-4 py-4">
-              <PageHeader
-                title="Pintura"
-                icon={IconPalette}
-                favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
-                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura" }]}
-                actions={[
-                  {
-                    key: "time-period",
-                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                    variant: "ghost",
-                    className: "p-0 hover:bg-transparent",
-                  },
-                ]}
-              />
-            </div>
+          <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+            <PageHeader
+              title="Pintura"
+              icon={IconPalette}
+              favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura" }]}
+              actions={[
+                {
+                  key: "time-period",
+                  label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} /> as any,
+                },
+              ]}
+            />
           </div>
 
           {/* Scrollable Content */}
@@ -225,23 +227,19 @@ export function Painting() {
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="h-full flex flex-col bg-background">
           {/* Fixed Header */}
-          <div className="flex-shrink-0 bg-background">
-            <div className="px-4 py-4">
-              <PageHeader
-                title="Pintura"
-                icon={IconPalette}
-                favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
-                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura" }]}
-                actions={[
-                  {
-                    key: "time-period",
-                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                    variant: "ghost",
-                    className: "p-0 hover:bg-transparent",
-                  },
-                ]}
-              />
-            </div>
+          <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+            <PageHeader
+              title="Pintura"
+              icon={IconPalette}
+              favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura" }]}
+              actions={[
+                {
+                  key: "time-period",
+                  label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} /> as any,
+                },
+              ]}
+            />
           </div>
 
           {/* Scrollable Content */}
@@ -265,30 +263,26 @@ export function Painting() {
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col bg-background">
         {/* Fixed Header */}
-        <div className="flex-shrink-0 bg-background">
-          <div className="px-4 py-4">
-            <PageHeader
-              title="Pintura"
-              icon={IconPalette}
-              favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
-              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura" }]}
-              actions={[
-                {
-                  key: "time-period",
-                  label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                  variant: "ghost",
-                  className: "p-0 hover:bg-transparent",
-                },
-                {
-                  key: "create-paint",
-                  label: "Nova Tinta",
-                  icon: IconPlus,
-                  onClick: () => navigate(routes.painting.catalog.create),
-                  variant: "default",
-                },
-              ]}
-            />
-          </div>
+        <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+          <PageHeader
+            title="Pintura"
+            icon={IconPalette}
+            favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
+            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura" }]}
+            actions={[
+              {
+                key: "create-paint",
+                label: "Nova Tinta",
+                icon: IconPlus,
+                onClick: () => navigate(routes.painting.catalog.create),
+                variant: "default",
+              },
+              {
+                key: "time-period",
+                label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} /> as any,
+              },
+            ]}
+          />
         </div>
 
         {/* Scrollable Content */}
@@ -301,28 +295,28 @@ export function Painting() {
               <div className="grid grid-cols-4 gap-4">
                 <QuickAccessCard
                   title="Catálogo"
-                  icon={IconColorSwatch}
+                  icon={SwatchBook}
                   onClick={() => navigate(routes.painting.catalog.root)}
                   count={data?.colorAnalysis?.totalColors}
                   color="blue"
                 />
                 <QuickAccessCard
                   title="Produções"
-                  icon={IconPaint}
+                  icon={Paintbrush}
                   onClick={() => navigate(routes.painting.productions.root)}
                   count={data?.productionOverview?.totalProductions}
                   color="green"
                 />
                 <QuickAccessCard
                   title="Tipos de Tinta"
-                  icon={IconBrush}
+                  icon={Brush}
                   onClick={() => navigate(routes.painting.paintTypes.root)}
                   count={data?.componentInventory?.componentUsageByType?.length}
                   color="red"
                 />
                 <QuickAccessCard
                   title="Marcas de Tinta"
-                  icon={IconTag}
+                  icon={Tag}
                   onClick={() => navigate(routes.painting.paintBrands.root)}
                   count={paintBrandsData?.meta?.totalRecords}
                   color="purple"
@@ -334,8 +328,8 @@ export function Painting() {
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4">Atividades Recentes</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <RecentActivitiesCard title="Tintas Usadas em Tarefas" activities={getRecentPaintsUsedInTasks()} icon={IconActivity} color="blue" />
-                <RecentActivitiesCard title="Produções Recentes" activities={getRecentProductions()} icon={IconPaint} color="orange" />
+                <RecentActivitiesCard title="Tintas Usadas em Tarefas" activities={getRecentPaintsUsedInTasks()} icon={ActivityIcon} color="blue" />
+                <RecentActivitiesCard title="Produções Recentes" activities={getRecentProductions()} icon={Paintbrush} color="orange" />
                 <RecentActivitiesCard
                   title="Top Produções por Volume"
                   activities={
@@ -349,7 +343,7 @@ export function Painting() {
                         time: `${formula.productionCount} prod.`,
                       })) || []
                   }
-                  icon={IconBottle}
+                  icon={FlaskRound}
                   color="purple"
                 />
               </div>
@@ -364,18 +358,18 @@ export function Painting() {
                   value={data?.colorAnalysis?.totalColors || 0}
                   trend="stable"
                   percentage={0}
-                  icon={IconColorSwatch}
+                  icon={SwatchBook}
                   subtitle="Cores disponíveis"
                 />
-                <TrendCard title="Produções" value={data?.productionOverview?.totalProductions || 0} trend="up" percentage={10} icon={IconPaint} subtitle="Total" />
-                <TrendCard title="Fórmulas" value={data?.formulaMetrics?.totalFormulas || 0} trend="up" percentage={5} icon={IconFlask2} subtitle="Receitas ativas" />
-                <TrendCard title="Componentes" value={data?.componentInventory?.totalComponents || 0} trend="stable" percentage={0} icon={IconDroplet} subtitle="Ingredientes" />
+                <TrendCard title="Produções" value={data?.productionOverview?.totalProductions || 0} trend="up" percentage={10} icon={Paintbrush} subtitle="Total" />
+                <TrendCard title="Fórmulas" value={data?.formulaMetrics?.totalFormulas || 0} trend="up" percentage={5} icon={FlaskConical} subtitle="Receitas ativas" />
+                <TrendCard title="Componentes" value={data?.componentInventory?.totalComponents || 0} trend="stable" percentage={0} icon={Droplet} subtitle="Ingredientes" />
                 <TrendCard
                   title="Volume Produzido"
                   value={`${Math.round(data?.productionOverview?.totalVolumeLiters || 0)}L`}
                   trend="up"
                   percentage={15}
-                  icon={IconPackage}
+                  icon={Package}
                   subtitle="Total"
                 />
               </div>
@@ -385,7 +379,7 @@ export function Painting() {
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4">Padrões de Atividade</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <ActivityPatternCard title="Tintas Mais Usadas" data={getColorPatterns()} icon={IconPalette} color="blue" labelWidth="w-32" />
+                <ActivityPatternCard title="Tintas Mais Usadas" data={getColorPatterns()} icon={Palette} color="blue" labelWidth="w-32" />
                 <ActivityPatternCard
                   title="Tintas por Tipo"
                   data={
@@ -394,7 +388,7 @@ export function Painting() {
                       value: type.componentCount,
                     })) || []
                   }
-                  icon={IconBrush}
+                  icon={Brush}
                   color="green"
                   labelWidth="w-32"
                 />
@@ -406,7 +400,7 @@ export function Painting() {
                       value: Math.round(component.currentQuantity * 100) / 100,
                     })) || []
                   }
-                  icon={IconDroplet}
+                  icon={Droplet}
                   color="purple"
                   labelWidth="w-32"
                 />
@@ -431,7 +425,7 @@ export function Painting() {
                   title="Complexidade das Fórmulas"
                   type="COMPLEXITY"
                   data={getFormulaComplexityAnalysis()}
-                  icon={IconChartBar}
+                  icon={BarChart}
                   onDetailsClick={() => navigate(routes.painting.formulas.root)}
                 />
                 <AnalysisCard
@@ -456,7 +450,7 @@ export function Painting() {
                       };
                     }) || []
                   }
-                  icon={IconChartPie}
+                  icon={PieChart}
                   onDetailsClick={() => navigate(routes.painting.catalog.root)}
                 />
               </div>

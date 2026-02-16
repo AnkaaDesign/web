@@ -82,14 +82,16 @@ export function RepresentativeForm({
 
   // Search function for Customer Combobox
   const searchCustomers = useCallback(async (
-    search: string,
+    search?: string,
     page: number = 1,
   ): Promise<{
     data: Customer[];
     hasMore: boolean;
   }> => {
     // Process input for CNPJ detection
-    processInput(search);
+    if (search) {
+      processInput(search);
+    }
 
     const params: any = {
       orderBy: { fantasyName: "asc" },
@@ -118,7 +120,7 @@ export function RepresentativeForm({
   }, [processInput]);
 
   // Handle customer creation with CNPJ data support
-  const handleCreateCustomer = useCallback(async (searchText: string): Promise<Customer | undefined> => {
+  const handleCreateCustomer = useCallback(async (searchText: string): Promise<Customer> => {
     setIsCreatingCustomer(true);
     try {
       const customerData = buildCustomerData(searchText);
@@ -128,6 +130,7 @@ export function RepresentativeForm({
         resetCnpjState();
         return result.data;
       }
+      throw new Error("Failed to create customer");
     } catch (error) {
       throw error;
     } finally {
@@ -331,12 +334,9 @@ export function RepresentativeForm({
                               </div>
                             </div>
                           )}
-                          loadMoreText="Carregar mais clientes"
-                          loadingMoreText="Carregando..."
                           minSearchLength={0}
                           pageSize={20}
                           debounceMs={500}
-                          loadOnMount={false}
                           className="w-full"
                         />
                       </FormControl>
@@ -372,7 +372,7 @@ export function RepresentativeForm({
           </Card>
 
           {/* System Access */}
-          <Card className="border-border/40">
+          <Card className="border-border">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconLock className="h-5 w-5 text-muted-foreground" />
@@ -456,7 +456,7 @@ export function RepresentativeForm({
           </Card>
 
           {/* Status */}
-          <Card className="border-border/40">
+          <Card className="border-border">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconBuilding className="h-5 w-5 text-muted-foreground" />

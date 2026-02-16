@@ -20,7 +20,19 @@ const STEPS = [
 export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStepChange }: MessageEditorProps) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [blocks, setBlocks] = useState<ContentBlock[]>(initialData?.blocks || []);
-  const [metadata, setMetadata] = useState({
+  const [metadata, setMetadata] = useState<{
+    title: string;
+    targeting: {
+      type: 'all' | 'specific' | 'sector' | 'position';
+      userIds?: string[];
+      sectorIds?: string[];
+      positionIds?: string[];
+    };
+    scheduling: {
+      startDate?: Date;
+      endDate?: Date;
+    };
+  }>({
     title: initialData?.title || '',
     targeting: initialData?.targeting || { type: 'specific' as const, userIds: [], sectorIds: [], positionIds: [] },
     scheduling: initialData?.scheduling || {},
@@ -52,7 +64,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
   }, [initialData]);
 
   // Helper function to validate targeting
-  const isTargetingValid = () => {
+  const isTargetingValid = (): boolean => {
     const { type, userIds, sectorIds, positionIds } = metadata.targeting as {
       type: 'all' | 'specific' | 'sector' | 'position';
       userIds?: string[];
@@ -64,15 +76,15 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
       case 'all':
         return true;
       case 'specific':
-        const isValid = userIds && userIds.length > 0;
+        const isValid = !!(userIds && userIds.length > 0);
         if (process.env.NODE_ENV !== 'production') {
           console.log('[MessageEditor] Validating specific targeting:', { userIds, isValid });
         }
         return isValid;
       case 'sector':
-        return sectorIds && sectorIds.length > 0;
+        return !!(sectorIds && sectorIds.length > 0);
       case 'position':
-        return positionIds && positionIds.length > 0;
+        return !!(positionIds && positionIds.length > 0);
       default:
         return true;
     }

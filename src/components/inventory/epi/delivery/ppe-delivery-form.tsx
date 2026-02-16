@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,8 +49,6 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
   const { isSubmitting, mode } = props;
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
-
-  const [_selectedUserId, _setSelectedUserId] = useState<string | undefined>(mode === "update" ? props.ppeDelivery.userId : undefined);
 
   const currentStatus = mode === "update" ? props.ppeDelivery.status : PPE_DELIVERY_STATUS.APPROVED;
 
@@ -153,14 +151,14 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
                           min={1}
                           max={999}
                           value={field.value}
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value);
-                            if (isNaN(value) || value < 1) {
+                          onChange={(value: string | number | null) => {
+                            const numValue = typeof value === 'number' ? value : parseInt(String(value ?? '1'));
+                            if (isNaN(numValue) || numValue < 1) {
                               field.onChange(1);
-                            } else if (value > 999) {
+                            } else if (numValue > 999) {
                               field.onChange(999);
                             } else {
-                              field.onChange(value);
+                              field.onChange(numValue);
                             }
                           }}
                           placeholder="Quantidade"
@@ -188,10 +186,9 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
                             onChange={field.onChange}
                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            <option value={PPE_DELIVERY_STATUS.PENDING}>{PPE_DELIVERY_STATUS_LABELS[PPE_DELIVERY_STATUS.PENDING]}</option>
-                            <option value={PPE_DELIVERY_STATUS.APPROVED}>{PPE_DELIVERY_STATUS_LABELS[PPE_DELIVERY_STATUS.APPROVED]}</option>
-                            <option value={PPE_DELIVERY_STATUS.DELIVERED}>{PPE_DELIVERY_STATUS_LABELS[PPE_DELIVERY_STATUS.DELIVERED]}</option>
-                            <option value={PPE_DELIVERY_STATUS.REPROVED}>{PPE_DELIVERY_STATUS_LABELS[PPE_DELIVERY_STATUS.REPROVED]}</option>
+                            {Object.values(PPE_DELIVERY_STATUS).map((status) => (
+                              <option key={status} value={status}>{PPE_DELIVERY_STATUS_LABELS[status]}</option>
+                            ))}
                           </select>
                         </FormControl>
                         <FormMessage />

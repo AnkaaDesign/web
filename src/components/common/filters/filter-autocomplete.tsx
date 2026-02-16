@@ -194,7 +194,7 @@ export function FilterAutocomplete({
   const debouncedInputValue = useDebounce(inputValue, debounceMs);
 
   // Cancelable query hook
-  const { signal, cancel } = useCancelableQuery({
+  const { getSignal, cancel } = useCancelableQuery({
     queryKey: ["filter-suggestions", debouncedInputValue],
     enabled: open && debouncedInputValue.length >= minSearchLength,
   });
@@ -209,7 +209,7 @@ export function FilterAutocomplete({
 
     setIsLoading(true);
 
-    getSuggestions(debouncedInputValue, signal)
+    getSuggestions(debouncedInputValue, getSignal())
       .then((newSuggestions) => {
         // Combine static suggestions with fetched ones
         const combined = [...staticSuggestions, ...newSuggestions];
@@ -234,7 +234,7 @@ export function FilterAutocomplete({
     return () => {
       cancel();
     };
-  }, [debouncedInputValue, minSearchLength, open, getSuggestions, signal, cancel, staticSuggestions]);
+  }, [debouncedInputValue, minSearchLength, open, getSuggestions, cancel, staticSuggestions]);
 
   // Group suggestions by category
   const groupedSuggestions = useMemo(() => {

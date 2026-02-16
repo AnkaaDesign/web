@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export type SortOption = "finish" | "color" | "paintBrand" | "manufacturer" | "name" | "type";
+export type SortOption = "finish" | "color" | "paintBrand" | "manufacturer" | "name" | "type" | "brand";
 
 interface SortSelectorProps {
   currentSort: SortOption;
@@ -26,6 +26,7 @@ const SORT_OPTIONS: Record<SortOption, string> = {
   manufacturer: "Montadora",
   name: "Nome",
   type: "Tipo",
+  brand: "Marca",
 };
 
 export function SortSelector({ currentSort, onSortChange, disabled, disabledLabel }: SortSelectorProps) {

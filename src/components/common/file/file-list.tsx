@@ -214,7 +214,7 @@ export function FileList({ className }: FileListProps) {
               type="text"
               placeholder="Buscar arquivos por nome, tipo..."
               value={searchInput}
-              onChange={(e) => handleSearchChange(e.target.value)}
+              onChange={(value) => handleSearchChange(value as string)}
               className="pl-10"
             />
           </div>

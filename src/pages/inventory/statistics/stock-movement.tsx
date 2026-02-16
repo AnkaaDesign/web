@@ -26,7 +26,7 @@ export const StockMovementStatisticsPage = () => {
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "Estoque", href: routes.inventory.root },
-              { label: "Estatísticas", href: routes.inventory.statistics.root },
+              { label: "Estatísticas", href: routes.statistics.inventory.root },
               { label: "Movimentação" }
             ]}
           />

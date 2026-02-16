@@ -32,34 +32,30 @@ export const TaskBatchEditPage = () => {
     data: tasksResponse,
     isLoading,
     error,
-  } = useTasks(
-    {
-      where: {
-        id: {
-          in: taskIds,
+  } = useTasks({
+    where: {
+      id: {
+        in: taskIds,
+      },
+    },
+    include: {
+      customer: {
+        include: {
+          logo: true,
         },
       },
-      include: {
-        customer: {
-          include: {
-            logo: true,
-          },
+      sector: true,
+      generalPainting: {
+        include: {
+          paintType: true,
+          paintBrand: true,
         },
-        sector: true,
-        generalPainting: {
-          include: {
-            paintType: true,
-            paintBrand: true,
-          },
-        },
-        truck: true,
       },
-      take: taskIds.length,
+      truck: true,
     },
-    {
-      enabled: taskIds.length > 0,
-    },
-  );
+    take: taskIds.length,
+    enabled: taskIds.length > 0,
+  });
 
   const tasks = tasksResponse?.data || [];
 

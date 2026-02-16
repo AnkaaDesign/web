@@ -37,13 +37,6 @@ export const HolidayForm = forwardRef<{ submit: () => void; isSubmitting: boolea
 
   const isSubmitting = props.isSubmitting || form.formState.isSubmitting;
 
-  // Expose form methods via ref
-  useImperativeHandle(ref, () => ({
-    submit: () => form.handleSubmit(handleSubmit)(),
-    isSubmitting,
-    isValid: form.formState.isValid,
-  }), [form, handleSubmit, isSubmitting]);
-
   // URL state persistence for create mode
   const debouncedUpdateUrl = useMemo(
     () =>
@@ -95,6 +88,13 @@ export const HolidayForm = forwardRef<{ submit: () => void; isSubmitting: boolea
       }
     }
   };
+
+  // Expose form methods via ref
+  useImperativeHandle(ref, () => ({
+    submit: () => form.handleSubmit(handleSubmit)(),
+    isSubmitting,
+    isValid: form.formState.isValid,
+  }), [form, handleSubmit, isSubmitting]);
 
   return (
     <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">

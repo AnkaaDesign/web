@@ -862,7 +862,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                             <Input
                               placeholder="Digite o nome da pessoa que está retirando"
                               value={withdrawerName}
-                              onChange={(value: string) => updateWithdrawerName(value)}
+                              onChange={(value: string | number | null) => updateWithdrawerName(typeof value === 'string' ? value : String(value ?? ''))}
                               className="h-10 bg-transparent"
                               maxLength={200}
                             />
@@ -1070,7 +1070,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="rounded-md border overflow-hidden dark:border-border/40">
+                        <div className="rounded-md border overflow-hidden dark:border-border">
                           <Table>
                             <TableHeader>
                               <TableRow>

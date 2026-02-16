@@ -430,7 +430,7 @@ export function NotificationPreferencesPage() {
         <div className="flex-shrink-0">
           <PageHeader
             title="Preferências de Notificação"
-            icon={Bell}
+            icon={Bell as any}
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "Meu Perfil", href: routes.profile },
@@ -455,7 +455,7 @@ export function NotificationPreferencesPage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Preferências de Notificação"
-          icon={Bell}
+          icon={Bell as any}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Meu Perfil", href: routes.profile },
@@ -465,7 +465,7 @@ export function NotificationPreferencesPage() {
             {
               key: "refresh",
               label: "Atualizar",
-              icon: RotateCcw,
+              icon: RotateCcw as any,
               onClick: loadConfigurations,
               variant: "outline",
               disabled: savingKeys.size > 0,
@@ -518,7 +518,7 @@ export function NotificationPreferencesPage() {
                 <AccordionItem
                   key={section.type}
                   value={section.type}
-                  className="border border-border/40 rounded-lg px-4 bg-card"
+                  className="border border-border rounded-lg px-4 bg-card"
                 >
                   <AccordionTrigger className="hover:no-underline py-4">
                     <div className="flex items-center gap-3">

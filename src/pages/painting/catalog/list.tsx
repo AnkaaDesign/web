@@ -26,7 +26,7 @@ export function CatalogListPage() {
   });
 
   // Check if user can create paints (WAREHOUSE or ADMIN only)
-  const canCreatePaint = hasAnyPrivilege(user, [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]);
+  const canCreatePaint = hasAnyPrivilege(user as any, [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]);
 
   const handleOrderStateChange = (hasChanges: boolean, orderedPaints: Paint[]) => {
     setHasOrderChanges(hasChanges);

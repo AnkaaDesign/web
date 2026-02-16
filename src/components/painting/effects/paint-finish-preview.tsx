@@ -137,7 +137,7 @@ export const PaintFinishPreview: React.FC<PaintFinishPreviewProps> = ({
                     label: PAINT_FINISH_LABELS[finishType],
                   }))}
                   value={selectedFinish}
-                  onValueChange={handleFinishChange}
+                  onValueChange={(value) => handleFinishChange(value as PAINT_FINISH)}
                   placeholder="Selecione o acabamento"
                   searchable={false}
                   renderOption={(option) => (

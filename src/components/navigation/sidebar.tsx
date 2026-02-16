@@ -11,7 +11,7 @@ import { getFilteredMenuForUser, getTablerIcon } from "../../utils";
 import { maskPhone, getPageIconName, isPageCadastrar } from "../../utils";
 import { fixNavigationPath } from "@/utils/route-validation";
 import { useAuth } from "@/contexts/auth-context";
-import { IconLogout, IconUser, IconSettings, IconChevronRight, IconStarFilled, IconExternalLink } from "@tabler/icons-react";
+import { IconLogout, IconUser, IconSettings, IconChevronRight, IconExternalLink } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { NotificationCenter } from "@/components/notification-center";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -456,7 +456,7 @@ export const Sidebar = memo(() => {
         };
 
         // Use filteredMenu instead of menuWithContextualItems to avoid circular dependency
-        const currentFilteredMenu = getFilteredMenuForUser(MENU_ITEMS, user || undefined, "web");
+        const currentFilteredMenu = getFilteredMenuForUser(MENU_ITEMS, user as any || undefined, "web");
         findAndCloseSiblings(currentFilteredMenu);
       }
 
@@ -469,7 +469,7 @@ export const Sidebar = memo(() => {
 
   // Get filtered menu for current user
   const filteredMenu = useMemo(() => {
-    return getFilteredMenuForUser(MENU_ITEMS, user || undefined, "web");
+    return getFilteredMenuForUser(MENU_ITEMS, user as any || undefined, "web");
   }, [user]);
 
   // Filter menu items based on current route (hide cadastrar/editar/detalhes unless on relevant pages)
@@ -1224,7 +1224,7 @@ export const Sidebar = memo(() => {
             )}
 
             {/* Divider if there are favorites */}
-            {favorites.length > 0 && <div className="border-t border-border/50 my-2" />}
+            {favorites.length > 0 && <div className="border-t border-border my-2" />}
 
             {/* Regular Menu Items */}
             <div className="space-y-1">

@@ -139,12 +139,12 @@ function updateFiltersInUrl(
 // Bonus row interface for table display
 interface BonusRow {
   id: string;
-  oderId: string;
+  userId: string;
   userName: string;
   userEmail?: string;
   userCpf?: string;
   payrollNumber?: string;
-  position?: { id?: string; name: string; remuneration?: number; bonifiable?: boolean };
+  position?: { id: string; name: string; remuneration?: number; bonifiable?: boolean };
   sector?: { id: string; name: string };
   performanceLevel: number;
   status: string;
@@ -158,16 +158,22 @@ interface BonusRow {
   totalWeightedTasks: number;
 
   // Period statistics (same for all rows in the period)
-  totalCollaborators: number;
+  totalCollaborators?: number;
 
   // Discount data
   totalDiscounts: number;
   netBonus: number;
 
+  // Bonus status
+  bonusStatus: 'live' | 'saved';
+
   // Month info for multi-month display
   monthLabel?: string;
   month: number;
   year: number;
+
+  // Additional fields for internal use
+  oderId?: string;
 }
 
 function formatCurrency(value: number): string {
@@ -339,10 +345,8 @@ function BonusTableComponent({
       onRowClick={onRowClick}
       isLoading={isLoading}
       error={error}
-      emptyMessage="Nenhum bônus encontrado"
-      emptyDescription="Selecione um período para visualizar os bônus"
+      emptyMessage="Nenhum bônus encontrado. Selecione um período para visualizar os bônus"
       emptyIcon={IconUsers}
-      showPagination={false}
       showPageInfo={false}
       currentPage={0}
       totalPages={1}
@@ -352,7 +356,7 @@ function BonusTableComponent({
       onSort={onSort}
       getSortDirection={getSortDirection}
       getSortOrder={getSortOrder}
-      sortConfigs={sortConfigs}
+      sortConfigs={sortConfigs.map(config => ({ field: config.column, direction: config.direction }))}
     />
   );
 }
@@ -429,8 +433,8 @@ export default function BonusListPage() {
     // Note: LEADER privilege was removed - filter only PRODUCTION and WAREHOUSE
     return sectorsData.data
       .filter(sector =>
-        sector.privilege === 'PRODUCTION' ||
-        sector.privilege === 'WAREHOUSE'
+        sector.privileges === 'PRODUCTION' ||
+        sector.privileges === 'WAREHOUSE'
       )
       .map(sector => sector.id);
   }, [sectorsData?.data]);
@@ -611,6 +615,7 @@ export default function BonusListPage() {
       const row: BonusRow = {
         id: bonus.id,
         oderId: user.id,
+        userId: user.id,
         userName: user.name || 'Sem nome',
         userEmail: user.email,
         userCpf: user.cpf,
@@ -626,6 +631,7 @@ export default function BonusListPage() {
           name: user.sector.name,
         } : undefined,
         performanceLevel: bonus.performanceLevel || user.performanceLevel || 0,
+        status: bonus.status || 'active',
 
         bonusId: bonus.id,
         bonusAmount: netBonusAmount,              // Net bonus (after discounts) for summary calculations
@@ -638,6 +644,8 @@ export default function BonusListPage() {
 
         totalDiscounts: totalDiscounts,
         netBonus: netBonusAmount,
+
+        bonusStatus: bonus.isSaved ? 'saved' : 'live',
 
         monthLabel,
         month: bonus.month,
@@ -772,7 +780,7 @@ export default function BonusListPage() {
           title="Bônus"
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_BONUS_LISTAR}
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }, { label: "Bônus" }]}
-          description={(() => {
+          subtitle={(() => {
             if (filters.year && filters.months && filters.months.length > 0) {
               if (filters.months.length === 1) {
                 const monthName = new Date(filters.year, parseInt(filters.months[0]) - 1).toLocaleDateString("pt-BR", { month: "long" });

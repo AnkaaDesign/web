@@ -22,8 +22,8 @@ export function AddressInput({
   errorMessage,
   required = false,
 }: AddressInputProps) {
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange?.(e.target.value);
+  const handleChange = (value: string | number | null) => {
+    onChange?.(value as string);
   };
 
   return (

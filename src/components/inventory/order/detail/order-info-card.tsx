@@ -81,7 +81,7 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
           </div>
         </div>
 
-        <Separator className="bg-border/50" />
+        <Separator className="bg-border" />
 
         {/* Order Details */}
         <div className="space-y-4">
@@ -157,7 +157,7 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
         {/* Payment Information */}
         {order.paymentMethod && (
           <>
-            <Separator className="bg-border/50" />
+            <Separator className="bg-border" />
             <div className="space-y-4">
               <h3 className="text-base font-semibold mb-4 text-foreground">Pagamento</h3>
               <div className="space-y-4">
@@ -205,44 +205,50 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
         )}
 
         {/* File Attachments */}
-        {(order.budget || order.nfe || order.receipt) && (
+        {((order.budgets && order.budgets.length > 0) || (order.invoices && order.invoices.length > 0) || (order.receipts && order.receipts.length > 0)) && (
           <>
-            <Separator className="bg-border/50" />
+            <Separator className="bg-border" />
             <div className="space-y-6">
               <h3 className="text-base font-semibold text-foreground">Documentos Anexados</h3>
 
-              {order.budget && (
+              {order.budgets && order.budgets.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
                     <h4 className="text-sm font-semibold">Orçamento</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <FilePreviewCard file={order.budget} size="md" showMetadata={true} />
+                    {order.budgets.map((budget, index) => (
+                      <FilePreviewCard key={budget.id} file={budget} index={index} size="md" showMetadata={true} />
+                    ))}
                   </div>
                 </div>
               )}
 
-              {order.nfe && (
+              {order.invoices && order.invoices.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
                     <h4 className="text-sm font-semibold">Nota Fiscal</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <FilePreviewCard file={order.nfe} size="md" showMetadata={true} />
+                    {order.invoices.map((invoice, index) => (
+                      <FilePreviewCard key={invoice.id} file={invoice} index={index} size="md" showMetadata={true} />
+                    ))}
                   </div>
                 </div>
               )}
 
-              {order.receipt && (
+              {order.receipts && order.receipts.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <IconReceipt className="h-4 w-4 text-muted-foreground" />
                     <h4 className="text-sm font-semibold">Recibo</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <FilePreviewCard file={order.receipt} size="md" showMetadata={true} />
+                    {order.receipts.map((receipt, index) => (
+                      <FilePreviewCard key={receipt.id} file={receipt} index={index} size="md" showMetadata={true} />
+                    ))}
                   </div>
                 </div>
               )}

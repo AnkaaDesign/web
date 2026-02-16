@@ -8,9 +8,16 @@ import {
 import { formatCurrency } from "../../../utils";
 import { getDiscountTypeInfo } from "../../../utils/payroll-discount-utils";
 import type { Payroll } from "../../../types/payroll";
+import type { DecimalValue } from "../../../types/common";
 
 interface PayrollSummaryCardProps {
   payroll: Payroll;
+}
+
+// Helper function to convert DecimalValue to number
+function toNumber(value: DecimalValue | null | undefined): number {
+  if (value == null) return 0;
+  return typeof value === 'number' ? value : value.toNumber();
 }
 
 export function PayrollSummaryCard({ payroll }: PayrollSummaryCardProps) {
@@ -57,10 +64,10 @@ export function PayrollSummaryCard({ payroll }: PayrollSummaryCardProps) {
           </div>
 
           {/* Overtime 50% */}
-          {(payroll.overtime50Hours && payroll.overtime50Hours > 0) && (
+          {(payroll.overtime50Hours && toNumber(payroll.overtime50Hours) > 0) && (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
-                + HE 50% ({payroll.overtime50Hours?.toFixed(2)}h × R$ {hourlyRate.toFixed(2)} × 1,5)
+                + HE 50% ({toNumber(payroll.overtime50Hours).toFixed(2)}h × R$ {hourlyRate.toFixed(2)} × 1,5)
               </span>
               <span className="text-green-600">
                 {formatCurrency(Number(payroll.overtime50Amount) || 0)}
@@ -69,10 +76,10 @@ export function PayrollSummaryCard({ payroll }: PayrollSummaryCardProps) {
           )}
 
           {/* Overtime 100% */}
-          {(payroll.overtime100Hours && payroll.overtime100Hours > 0) && (
+          {(payroll.overtime100Hours && toNumber(payroll.overtime100Hours) > 0) && (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
-                + HE 100% ({payroll.overtime100Hours?.toFixed(2)}h × R$ {hourlyRate.toFixed(2)} × 2,0)
+                + HE 100% ({toNumber(payroll.overtime100Hours).toFixed(2)}h × R$ {hourlyRate.toFixed(2)} × 2,0)
               </span>
               <span className="text-green-600">
                 {formatCurrency(Number(payroll.overtime100Amount) || 0)}
@@ -81,10 +88,10 @@ export function PayrollSummaryCard({ payroll }: PayrollSummaryCardProps) {
           )}
 
           {/* Night Differential */}
-          {(payroll.nightHours && payroll.nightHours > 0) && (
+          {(payroll.nightHours && toNumber(payroll.nightHours) > 0) && (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
-                + Adicional Noturno ({payroll.nightHours?.toFixed(2)}h × 20%)
+                + Adicional Noturno ({toNumber(payroll.nightHours).toFixed(2)}h × 20%)
               </span>
               <span className="text-green-600">
                 {formatCurrency(Number(payroll.nightDifferentialAmount) || 0)}
@@ -93,7 +100,7 @@ export function PayrollSummaryCard({ payroll }: PayrollSummaryCardProps) {
           )}
 
           {/* DSR */}
-          {(payroll.dsrAmount && payroll.dsrAmount > 0) && (
+          {(payroll.dsrAmount && toNumber(payroll.dsrAmount) > 0) && (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">+ DSR sobre Horas Extras</span>
               <span className="text-green-600">
@@ -103,7 +110,7 @@ export function PayrollSummaryCard({ payroll }: PayrollSummaryCardProps) {
           )}
 
           {/* Bonus */}
-          {(payroll.bonus?.baseBonus && payroll.bonus.baseBonus > 0) && (
+          {(payroll.bonus?.baseBonus && toNumber(payroll.bonus.baseBonus) > 0) && (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">+ Bonificação</span>
               <span className="text-green-600">
@@ -260,7 +267,7 @@ export function PayrollSummaryCard({ payroll }: PayrollSummaryCardProps) {
           </div>
 
           {/* FGTS Info */}
-          {(payroll.fgtsAmount && payroll.fgtsAmount > 0) && (
+          {(payroll.fgtsAmount && toNumber(payroll.fgtsAmount) > 0) && (
             <div className="mt-4 p-3 bg-muted/50 rounded-lg">
               <div className="flex items-start gap-2">
                 <IconBuildingBank className="h-4 w-4 text-muted-foreground mt-0.5" />

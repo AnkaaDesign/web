@@ -188,7 +188,13 @@ const MaintenanceDetailsPage = () => {
   const canDelete = maintenance.status === MAINTENANCE_STATUS.CANCELLED || maintenance.status === MAINTENANCE_STATUS.COMPLETED;
 
   // Build actions array dynamically
-  const actions = [
+  const actions: Array<{
+    key: string;
+    label: string;
+    icon?: any;
+    onClick?: () => void;
+    disabled?: boolean;
+  }> = [
     {
       key: "refresh",
       label: "Atualizar",
@@ -233,7 +239,7 @@ const MaintenanceDetailsPage = () => {
       label: "Excluir",
       icon: IconTrash,
       onClick: () => setShowDeleteDialog(true),
-      loading: isDeleting,
+      disabled: isDeleting,
     });
   }
 

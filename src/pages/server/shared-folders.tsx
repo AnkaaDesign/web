@@ -150,7 +150,7 @@ function FileContentsBrowser({
         })
         .map((item: any) => convertRemoteItemToAnkaaFile(item, `${selectedFolder}/${currentSubPath || ""}`)) || [];
 
-      const imageIndex = allImageFiles.findIndex(f => f.id === file.id);
+      const imageIndex = allImageFiles.findIndex((f: AnkaaFile) => f.id === file.id);
       if (imageIndex !== -1) {
         fileViewer?.actions.viewFiles(allImageFiles, imageIndex);
       }
@@ -324,7 +324,7 @@ export function ServerSharedFoldersPage() {
     data: folderContents,
     isLoading: isLoadingContents,
     refetch: refetchContents,
-  } = useSharedFolderContents(selectedFolder, currentSubPath, { enabled: viewMode === "browse" && !!selectedFolder });
+  } = useSharedFolderContents(selectedFolder ?? undefined, currentSubPath ?? undefined, { enabled: viewMode === "browse" && !!selectedFolder });
 
   // Redirect if not admin
   useEffect(() => {
@@ -366,7 +366,7 @@ export function ServerSharedFoldersPage() {
 
   // Helper functions for file type detection
   const getBreadcrumbs = () => {
-    const breadcrumbs = [
+    const breadcrumbs: Array<{ label: string; href: string; onClick: (e: React.MouseEvent) => void }> = [
       {
         label: "Início",
         href: routes.home,
@@ -402,7 +402,7 @@ export function ServerSharedFoldersPage() {
           href: routes.server.sharedFolders,
           onClick: (e: React.MouseEvent) => {
             e.preventDefault();
-            navigate("/servidor/pastas-compartilhadas");
+            navigate(routes.server.sharedFolders);
           },
         },
         {

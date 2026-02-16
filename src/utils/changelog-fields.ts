@@ -10,6 +10,12 @@ import {
   MASK_SIZE_LABELS,
   GLOVES_SIZE_LABELS,
   RAIN_BOOTS_SIZE_LABELS,
+  TASK_PRICING_STATUS_LABELS,
+  DISCOUNT_TYPE_LABELS,
+  PAYMENT_CONDITION_LABELS,
+  TASK_PRICING_STATUS,
+  DISCOUNT_TYPE,
+  PAYMENT_CONDITION,
 } from '@constants';
 import { formatDateTime, formatDate } from "./date";
 import { formatCurrency } from "./number";
@@ -208,9 +214,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     status: "Status",
     statusOrder: "Ordem do Status",
     isActive: "Ativo",
-    admissional: "Data de Admissão",
     effectedAt: "Data de Contratação",
-    exp1StartAt: "Início da Experiência 1",
+    exp1StartAt: "Data de Admissão / Início Exp. 1",
     exp1EndAt: "Fim da Experiência 1",
     exp2StartAt: "Início da Experiência 2",
     exp2EndAt: "Fim da Experiência 2",
@@ -261,7 +266,6 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     commission: "Comissão",
     bonusDiscountId: "Desconto Bônus",
     customerId: "Cliente",
-    invoiceToId: "Faturar Para",
     sectorId: "Setor",
     createdById: "Criado por",
     budgetIds: "Orçamentos",
@@ -275,7 +279,6 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     // Relationship fields
     sector: "Setor",
     customer: "Cliente",
-    invoiceTo: "Faturar Para",
     budget: "Orçamento",
     nfe: "Nota Fiscal",
     receipt: "Recibo",
@@ -311,9 +314,6 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "customer.fantasyName": "Nome Fantasia do Cliente",
     "customer.corporateName": "Razão Social do Cliente",
     "customer.cnpj": "CNPJ do Cliente",
-    "invoiceTo.fantasyName": "Nome Fantasia (Faturar Para)",
-    "invoiceTo.corporateName": "Razão Social (Faturar Para)",
-    "invoiceTo.cnpj": "CNPJ (Faturar Para)",
     "negotiatingWith.name": "Responsável pela Negociação",
     "negotiatingWith.phone": "Telefone do Responsável",
     "sector.name": "Nome do Setor",
@@ -643,6 +643,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     logoId: "Logo",
     economicActivityId: "Atividade Econômica",
     registrationStatus: "Situação Cadastral",
+    stateRegistration: "Inscrição Estadual",
 
     // Nested relationship fields
     "logo.filename": "Nome do Logo",
@@ -735,6 +736,29 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     chassisNumber: "Número do Chassi",
     // Related garage fields
     "garage.name": "Nome da Garagem",
+  },
+  [CHANGE_LOG_ENTITY_TYPE.TASK_PRICING]: {
+    subtotal: "Subtotal",
+    discountType: "Tipo de Desconto",
+    discountValue: "Valor do Desconto",
+    total: "Total",
+    expiresAt: "Data de Expiração",
+    status: "Status",
+    paymentCondition: "Condição de Pagamento",
+    downPaymentDate: "Data de Entrada",
+    customPaymentText: "Texto Personalizado de Pagamento",
+    guaranteeYears: "Anos de Garantia",
+    customGuaranteeText: "Texto Personalizado de Garantia",
+    layoutFileId: "Arquivo de Layout",
+    budgetNumber: "Número do Orçamento",
+    simultaneousTasks: "Tarefas Simultâneas",
+    discountReference: "Referência do Desconto",
+    invoicesToCustomerIds: "Faturar Para (Clientes)",
+    customerSignatureId: "Assinatura do Cliente",
+    customForecastDays: "Dias de Previsão Personalizados",
+    items: "Itens do Orçamento",
+    // Nested relationship fields
+    "items.length": "Quantidade de Itens",
   },
   [CHANGE_LOG_ENTITY_TYPE.LAYOUT]: {
     height: "Altura",
@@ -915,9 +939,9 @@ interface FieldMetadata {
  * @param field - The field name (optional)
  * @param entityType - The entity type for context-specific formatting (optional)
  * @param metadata - Optional metadata for additional context
- * @returns The formatted value as a string
+ * @returns The formatted value as a string or array (for special cases like paints)
  */
-export function formatFieldValue(value: ComplexFieldValue, field?: string | null, entityType?: CHANGE_LOG_ENTITY_TYPE, metadata?: FieldMetadata): string {
+export function formatFieldValue(value: ComplexFieldValue, field?: string | null, entityType?: CHANGE_LOG_ENTITY_TYPE, metadata?: FieldMetadata): string | any[] {
   // Handle null/undefined commission field specifically
   if ((value === null || value === undefined) && field === "commission" && entityType === CHANGE_LOG_ENTITY_TYPE.TASK) {
     return "Não Definida";
@@ -945,7 +969,8 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       "icms", "ipi", "margin", "minimumMargin", "monthlyConsumptionTrendPercent", "ratio",
       "quantity", "maxQuantity", "boxQuantity", "reorderPoint", "reorderQuantity",
       "orderedQuantity", "receivedQuantity", "withdrawedQuantity", "returnedQuantity",
-      "viscosity", "weight", "volume", "volumeLiters", "timeTaken"
+      "viscosity", "weight", "volume", "volumeLiters", "timeTaken",
+      "subtotal", "total", "discountValue", "guaranteeYears", "customForecastDays", "simultaneousTasks"
     ];
 
     if (numericFields.includes(field)) {
@@ -1041,13 +1066,24 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
         return `${value.length} ${value.length === 1 ? "tarefa relacionada" : "tarefas relacionadas"}`;
       }
       if (field === "representatives" || field === "representativeIds") {
-        // Format representatives with name and phone
+        // Format representatives with name, role, and phone
         if (value.length > 0 && typeof value[0] === "object" && value[0].name) {
+          const ROLE_LABELS: Record<string, string> = {
+            COMMERCIAL: "Comercial",
+            MARKETING: "Marketing",
+            COORDINATOR: "Coordenador",
+            FINANCIAL: "Financeiro",
+            FLEET_MANAGER: "Gestor de Frota",
+          };
           return value.map((rep: { name?: string; phone?: string; role?: string }) => {
             const name = rep.name || "Representante";
+            const role = rep.role ? ROLE_LABELS[rep.role] || rep.role : "";
             const phone = rep.phone ? formatBrazilianPhone(rep.phone) : "";
-            return phone ? `${name} - ${phone}` : name;
-          }).join("\n");
+            const parts = [name];
+            if (role) parts.push(`(${role})`);
+            if (phone) parts.push(`- ${phone}`);
+            return parts.join(" ");
+          });
         }
         // Fallback to count for IDs only
         return `${value.length} ${value.length === 1 ? "representante" : "representantes"}`;
@@ -1224,6 +1260,31 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return vacationTypeLabels[value] || value;
   }
 
+  // Handle task pricing fields
+  if (entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING) {
+    if ((field === "status" || field === "status_transition") && typeof value === "string") {
+      return TASK_PRICING_STATUS_LABELS[value as TASK_PRICING_STATUS] || value;
+    }
+    if (field === "discountType" && typeof value === "string") {
+      return DISCOUNT_TYPE_LABELS[value as DISCOUNT_TYPE] || value;
+    }
+    if (field === "paymentCondition" && typeof value === "string") {
+      return PAYMENT_CONDITION_LABELS[value as PAYMENT_CONDITION] || value;
+    }
+    if ((field === "subtotal" || field === "total" || field === "discountValue") && typeof value === "number") {
+      return formatCurrency(value);
+    }
+    if (field === "guaranteeYears" && typeof value === "number") {
+      return `${value} ${value === 1 ? "ano" : "anos"}`;
+    }
+    if (field === "customForecastDays" && typeof value === "number") {
+      return `${value} ${value === 1 ? "dia" : "dias"}`;
+    }
+    if (field === "simultaneousTasks" && typeof value === "number") {
+      return `${value} ${value === 1 ? "tarefa" : "tarefas"}`;
+    }
+  }
+
   // Handle cut status
   if ((field === "status" || field === "status_transition") && entityType === CHANGE_LOG_ENTITY_TYPE.CUT && typeof value === "string") {
     const cutStatusLabels: Record<string, string> = {
@@ -1386,6 +1447,33 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   // Handle street type for Supplier and Customer
   if (field === "streetType" && typeof value === "string") {
     const streetTypeLabels: Record<string, string> = {
+      // New English enum values
+      STREET: "Rua",
+      AVENUE: "Avenida",
+      ALLEY: "Alameda",
+      CROSSING: "Travessa",
+      SQUARE: "Praça",
+      HIGHWAY: "Rodovia",
+      ROAD: "Estrada",
+      WAY: "Via",
+      PLAZA: "Largo",
+      LANE: "Viela",
+      DEADEND: "Beco",
+      SMALL_STREET: "Ruela",
+      PATH: "Caminho",
+      PASSAGE: "Passagem",
+      GARDEN: "Jardim",
+      BLOCK: "Quadra",
+      LOT: "Lote",
+      SITE: "Sítio",
+      PARK: "Parque",
+      FARM: "Fazenda",
+      RANCH: "Chácara",
+      CONDOMINIUM: "Condomínio",
+      COMPLEX: "Conjunto",
+      RESIDENTIAL: "Residencial",
+      OTHER: "Outro",
+      // Legacy Portuguese values (for old changelog entries)
       RUA: "Rua",
       AVENIDA: "Avenida",
       ALAMEDA: "Alameda",
@@ -1406,6 +1494,11 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       SITIO: "Sítio",
       PARQUE: "Parque",
       FAZENDA: "Fazenda",
+      CHACARA: "Chácara",
+      CONDOMINIO: "Condomínio",
+      CONJUNTO: "Conjunto",
+      RESIDENCIAL: "Residencial",
+      OUTRO: "Outro",
     };
     return streetTypeLabels[value] || value;
   }
@@ -1932,7 +2025,6 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     field === "lastRun" ||
     field === "birth" ||
     field === "productionDate" ||
-    field === "admissional" ||
     field === "exp1StartAt" ||
     field === "exp1EndAt" ||
     field === "exp2StartAt" ||
@@ -2091,6 +2183,7 @@ export const actionConfig: Record<CHANGE_LOG_ACTION, { label: string }> = {
   [CHANGE_LOG_ACTION.REJECT]: { label: "Rejeitado" },
   [CHANGE_LOG_ACTION.CANCEL]: { label: "Cancelado" },
   [CHANGE_LOG_ACTION.COMPLETE]: { label: "Concluído" },
+  [CHANGE_LOG_ACTION.RESCHEDULE]: { label: "Reagendado" },
   [CHANGE_LOG_ACTION.BATCH_CREATE]: { label: "Criação em Lote" },
   [CHANGE_LOG_ACTION.BATCH_UPDATE]: { label: "Atualização em Lote" },
   [CHANGE_LOG_ACTION.BATCH_DELETE]: { label: "Exclusão em Lote" },

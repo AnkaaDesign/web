@@ -85,7 +85,7 @@ export function BasicInfoCard({ customer, className }: BasicInfoCardProps) {
 
           {/* Tags Section */}
           {customer.tags && customer.tags.length > 0 && (
-            <div className="pt-6 border-t border-border/50">
+            <div className="pt-6 border-t border-border">
               <h3 className="text-base font-semibold mb-4 text-foreground">Tags</h3>
               <div className="flex flex-wrap gap-2">
                 {customer.tags.map((tag: string, index: number) => (

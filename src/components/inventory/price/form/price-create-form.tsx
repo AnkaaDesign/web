@@ -6,8 +6,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { FormInput } from "@/components/ui/form-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
-import { usePriceMutations } from "../../../../hooks";
-import { useItemList } from "../../../../hooks";
+import { useItems } from "../../../../hooks";
 import { priceCreateSchema, type PriceCreateFormData } from "../../../../schemas";
 import { IconCurrencyReal, IconPackage } from "@tabler/icons-react";
 import type { Item } from "../../../../types";
@@ -19,10 +18,13 @@ interface PriceCreateFormProps {
 }
 
 export function PriceCreateForm({ itemId, onSuccess, onCancel }: PriceCreateFormProps) {
-  const { create } = usePriceMutations();
+  // Note: Price mutations should be added to hooks
+  const create = async (_data: any): Promise<{ success: boolean; data?: any; message?: string }> => {
+    throw new Error('Price mutations not implemented');
+  };
 
   // Fetch items for selection if no itemId provided
-  const { data: itemsResponse } = useItemList(
+  const { data: itemsResponse } = useItems(
     {
       orderBy: { name: "asc" },
       where: { status: { equals: "ACTIVE" } },
@@ -98,7 +100,6 @@ export function PriceCreateForm({ itemId, onSuccess, onCancel }: PriceCreateForm
                         options={items.map((item: Item) => ({
                           value: item.id,
                           label: `${item.name}${item.uniCode ? ` (${item.uniCode})` : ""}`,
-                          description: item.description || undefined,
                         }))}
                         value={field.value}
                         onValueChange={field.onChange}

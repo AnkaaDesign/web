@@ -240,12 +240,12 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
       ...(showSelectedOnly &&
         selectedIds.length > 0 && {
           where: {
-            ...queryFilters.where,
+            ...(baseQueryFilters.where || {}),
             id: { in: selectedIds },
           },
         }),
     }),
-    [queryFilters, currentPage, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds],
+    [queryFilters, currentPage, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds, baseQueryFilters],
   );
 
   // Fetch productions with pagination
@@ -298,7 +298,7 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
       if ("productions" in deleteDialog) {
         // Batch delete
         const productionIds = deleteDialog.productions.map((p) => p.id);
-        await batchDeletePaintProductions({ ids: productionIds });
+        await batchDeletePaintProductions({ paintProductionIds: productionIds });
         // Clear selection after successful batch delete
         selectedIds.forEach((id) => toggleSelection(id));
       } else {

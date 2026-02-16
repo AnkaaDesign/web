@@ -50,8 +50,8 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
     // Note: LEADER privilege was removed - filter only PRODUCTION and WAREHOUSE
     return sectorsData.data
       .filter(sector =>
-        sector.privilege === 'PRODUCTION' ||
-        sector.privilege === 'WAREHOUSE'
+        sector.privileges === 'PRODUCTION' ||
+        sector.privileges === 'WAREHOUSE'
       )
       .map(sector => sector.id);
   }, [sectorsData?.data]);
@@ -212,7 +212,8 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
               <div className="col-span-1">
                 <Combobox
                   value={localFilters.year?.toString() || ""}
-                  onValueChange={(year) => {
+                  onValueChange={(value) => {
+                    const year = Array.isArray(value) ? value[0] : value;
                     const newYear = year ? parseInt(year) : undefined;
                     setLocalFilters({
                       ...localFilters,
@@ -242,7 +243,10 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
                 <Combobox
                   mode="multiple"
                   value={localFilters.months || []}
-                  onValueChange={(months) => setLocalFilters({ ...localFilters, months })}
+                  onValueChange={(value) => {
+                    const months = Array.isArray(value) ? value : (value ? [value] : undefined);
+                    setLocalFilters({ ...localFilters, months });
+                  }}
                   options={[
                     { value: "01", label: "Janeiro" },
                     { value: "02", label: "Fevereiro" },
@@ -285,7 +289,10 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
                 label: sector.name,
               })) || []}
               value={localFilters.sectorIds || []}
-              onValueChange={handleSectorsChange}
+              onValueChange={(value) => {
+                const selectedIds = Array.isArray(value) ? value : (value ? [value] : []);
+                handleSectorsChange(selectedIds);
+              }}
               className="w-full"
               searchable={true}
               clearable={true}
@@ -311,7 +318,10 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
                 label: position.name,
               })) || []}
               value={localFilters.positionIds || []}
-              onValueChange={handlePositionsChange}
+              onValueChange={(value) => {
+                const selectedIds = Array.isArray(value) ? value : (value ? [value] : []);
+                handlePositionsChange(selectedIds);
+              }}
               className="w-full"
               searchable={true}
               clearable={true}
@@ -337,7 +347,10 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
                 label: `${user.name}${user.sector?.name ? ` (${user.sector.name})` : ''}`,
               }))}
               value={localFilters.userIds || []}
-              onValueChange={handleUsersChange}
+              onValueChange={(value) => {
+                const selectedIds = Array.isArray(value) ? value : (value ? [value] : []);
+                handleUsersChange(selectedIds);
+              }}
               className="w-full"
               searchable={true}
               clearable={true}

@@ -148,8 +148,8 @@ export function DataTableWithSelection<T extends Record<string, any>>({
           <Input
             placeholder={searchPlaceholder}
             value={filtering}
-            onChange={(event) => {
-              setFiltering(event.target.value);
+            onChange={(value) => {
+              setFiltering(value as string);
               setPage(1);
             }}
             className="max-w-sm"

@@ -96,31 +96,8 @@ export const useDeploymentsInfinite = baseHooks.useInfiniteList;
 export const useDeployments = baseHooks.useList;
 export const useDeploymentDetail = baseHooks.useDetail;
 
-// Extended mutations with deployment workflow operations
-export const useDeploymentMutations = () => {
-  const baseMutations = baseHooks.useMutations();
-  const queryClient = useQueryClient();
-
-  const deploy = useMutation({
-    mutationFn: deploymentService.deploy,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: deploymentKeys.all });
-    },
-  });
-
-  const rollback = useMutation({
-    mutationFn: deploymentService.rollback,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: deploymentKeys.all });
-    },
-  });
-
-  return {
-    ...baseMutations,
-    deploy,
-    rollback,
-  };
-};
+// Export base mutations (create, update, delete)
+export const useDeploymentMutations = baseHooks.useMutations;
 
 export const useDeploymentBatchMutations = baseHooks.useBatchMutations;
 

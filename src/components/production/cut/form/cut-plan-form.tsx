@@ -14,7 +14,7 @@ import { IconCut, IconFileText, IconPlus, IconTrash, IconInfoCircle, IconClipboa
 import { useState } from "react";
 import type { Cut } from "../../../../types";
 import { CUT_TYPE, CUT_ORIGIN, CUT_TYPE_LABELS } from "../../../../constants";
-import { useCutMutations } from "../../../../hooks";
+import { useCutBatchMutations } from "../../../../hooks";
 import { useToast } from "@/hooks/common/use-toast";
 
 // Schema for individual cut plan item
@@ -49,7 +49,7 @@ export function CutPlanForm({ fileId, fileName, taskId, taskName, onSuccess, onC
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { batchCreate } = useCutMutations();
+  const { batchCreateAsync } = useCutBatchMutations();
 
   const form = useForm<CutPlanFormData>({
     resolver: zodResolver(cutPlanSchema),
@@ -80,7 +80,7 @@ export function CutPlanForm({ fileId, fileName, taskId, taskName, onSuccess, onC
       toast({
         title: "Erro",
         description: "É necessário selecionar um arquivo.",
-        variant: "destructive",
+        variant: "error",
       });
       return;
     }
@@ -97,9 +97,9 @@ export function CutPlanForm({ fileId, fileName, taskId, taskName, onSuccess, onC
         })),
       );
 
-      const response = await batchCreate.mutateAsync({
-        data: { cuts },
-        include: {
+      const response = await batchCreateAsync(
+        { cuts },
+        {
           file: true,
           task: {
             include: {
@@ -107,7 +107,7 @@ export function CutPlanForm({ fileId, fileName, taskId, taskName, onSuccess, onC
             },
           },
         },
-      });
+      );
 
       const totalCuts = cuts.length;
       toast({
@@ -115,12 +115,12 @@ export function CutPlanForm({ fileId, fileName, taskId, taskName, onSuccess, onC
         description: `${totalCuts} corte(s) criado(s) conforme o plano "${data.planName}".`,
       });
 
-      onSuccess?.(response.data.success);
+      onSuccess?.(response.data?.success ?? []);
     } catch (error) {
       toast({
         title: "Erro",
         description: "Erro ao criar plano de corte.",
-        variant: "destructive",
+        variant: "error",
       });
     } finally {
       setIsSubmitting(false);

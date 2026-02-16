@@ -16,6 +16,7 @@ import { IconFilter } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { USER_STATUS } from "../../../constants";
 import type { UserGetManyFormData } from "../../../schemas";
+import type { User } from "../../../types";
 
 const DEFAULT_PAGE_SIZE = 40;
 
@@ -107,7 +108,7 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
   const orderBy = useMemo(() => {
     const converted = convertSortConfigsToOrderBy(sortConfigs);
     // If no sort is set, default to name ascending
-    return converted && converted.length > 0 ? converted : [{ name: "asc" }];
+    return converted !== undefined ? converted : [{ name: "asc" }];
   }, [sortConfigs]);
 
   // Memoize query params to prevent unnecessary refetches
@@ -295,7 +296,7 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
               currentUsers={displayUsers}
               totalRecords={totalRecords}
               visibleColumns={visibleColumns}
-              selectedUsers={Array.from(selectedUserIds).map(id => users.find(u => u.id === id)).filter(Boolean)}
+              selectedUsers={Array.from(selectedUserIds).map(id => users.find(u => u.id === id)).filter((user): user is User => user !== undefined)}
             />
           </div>
         </div>

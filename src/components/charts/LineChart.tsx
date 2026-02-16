@@ -90,7 +90,7 @@ export const LineChart: React.FC<LineChartProps> = ({ config, data }) => {
 
           <XAxis
             dataKey={config.xAxis?.dataKey}
-            type={config.xAxis?.type}
+            type={config.xAxis?.type === 'time' ? 'number' : config.xAxis?.type}
             tickFormatter={formatXAxisTick}
             stroke="hsl(var(--muted-foreground))"
             fontSize={12}
@@ -110,7 +110,7 @@ export const LineChart: React.FC<LineChartProps> = ({ config, data }) => {
           />
 
           <YAxis
-            type={config.yAxis?.type}
+            type={config.yAxis?.type === 'time' ? 'number' : config.yAxis?.type}
             tickFormatter={formatYAxisTick}
             stroke="hsl(var(--muted-foreground))"
             fontSize={12}

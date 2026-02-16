@@ -74,9 +74,9 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    count += localFilters.entityTypes?.length || 0;
-    count += localFilters.actions?.length || 0;
-    count += localFilters.userIds?.length || 0;
+    count += (localFilters.entityTypes?.length ?? 0);
+    count += (localFilters.actions?.length ?? 0);
+    count += (localFilters.userIds?.length ?? 0);
     count += localFilters.createdAt ? 1 : 0;
     return count;
   }, [localFilters]);
@@ -105,7 +105,11 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
                 mode="multiple"
                 options={entityOptions}
                 value={localFilters.entityTypes || []}
-                onValueChange={(value) => setLocalFilters({ ...localFilters, entityTypes: value.length > 0 ? value : undefined })}
+                onValueChange={(value) => {
+                  if (value) {
+                    setLocalFilters({ ...localFilters, entityTypes: value.length > 0 ? value : undefined });
+                  }
+                }}
                 placeholder="Selecione os tipos de entidade"
                 searchPlaceholder="Buscar tipo..."
                 emptyText="Nenhum tipo encontrado"
@@ -119,7 +123,11 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
                 mode="multiple"
                 options={actionOptions}
                 value={localFilters.actions || []}
-                onValueChange={(value) => setLocalFilters({ ...localFilters, actions: value.length > 0 ? value : undefined })}
+                onValueChange={(value) => {
+                  if (value) {
+                    setLocalFilters({ ...localFilters, actions: value.length > 0 ? value : undefined });
+                  }
+                }}
                 placeholder="Selecione as ações"
                 searchPlaceholder="Buscar ação..."
                 emptyText="Nenhuma ação encontrada"
@@ -133,7 +141,11 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
                 mode="multiple"
                 options={userOptions}
                 value={localFilters.userIds || []}
-                onValueChange={(value) => setLocalFilters({ ...localFilters, userIds: value.length > 0 ? value : undefined })}
+                onValueChange={(value) => {
+                  if (value) {
+                    setLocalFilters({ ...localFilters, userIds: value.length > 0 ? value : undefined });
+                  }
+                }}
                 placeholder="Selecione os usuários"
                 searchPlaceholder="Buscar usuário..."
                 emptyText="Nenhum usuário encontrado"
@@ -149,15 +161,16 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
                   <DateTimeInput
                     mode="date"
                     value={localFilters.createdAt?.gte}
-                    onChange={(date: Date | null) => {
-                      if (!date && !localFilters.createdAt?.lte) {
+                    onChange={(date) => {
+                      const dateValue = date instanceof Date ? date : null;
+                      if (!dateValue && !localFilters.createdAt?.lte) {
                         const { createdAt, ...rest } = localFilters;
                         setLocalFilters(rest);
                       } else {
                         setLocalFilters({
                           ...localFilters,
                           createdAt: {
-                            ...(date && { gte: date }),
+                            ...(dateValue && { gte: dateValue }),
                             ...(localFilters.createdAt?.lte && { lte: localFilters.createdAt.lte }),
                           },
                         });
@@ -172,8 +185,9 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
                   <DateTimeInput
                     mode="date"
                     value={localFilters.createdAt?.lte}
-                    onChange={(date: Date | null) => {
-                      if (!date && !localFilters.createdAt?.gte) {
+                    onChange={(date) => {
+                      const dateValue = date instanceof Date ? date : null;
+                      if (!dateValue && !localFilters.createdAt?.gte) {
                         const { createdAt, ...rest } = localFilters;
                         setLocalFilters(rest);
                       } else {
@@ -181,7 +195,7 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
                           ...localFilters,
                           createdAt: {
                             ...(localFilters.createdAt?.gte && { gte: localFilters.createdAt.gte }),
-                            ...(date && { lte: date }),
+                            ...(dateValue && { lte: dateValue }),
                           },
                         });
                       }

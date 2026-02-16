@@ -69,6 +69,14 @@ export enum USER_STATUS {
   DISMISSED = "DISMISSED",
 }
 
+export enum REGISTRATION_STATUS {
+  ACTIVE = "ACTIVE",
+  SUSPENDED = "SUSPENDED",
+  UNFIT = "UNFIT",
+  ACTIVE_NOT_REGULAR = "ACTIVE_NOT_REGULAR",
+  DEREGISTERED = "DEREGISTERED",
+}
+
 export const REGISTRATION_STATUS_OPTIONS = [
   { value: "ACTIVE", label: "Ativa" },
   { value: "SUSPENDED", label: "Suspensa" },
@@ -155,6 +163,8 @@ export enum TASK_STATUS {
   WAITING_PRODUCTION = "WAITING_PRODUCTION",
   IN_PRODUCTION = "IN_PRODUCTION",
   COMPLETED = "COMPLETED",
+  INVOICED = "INVOICED",
+  SETTLED = "SETTLED",
   CANCELLED = "CANCELLED",
 }
 
@@ -173,6 +183,15 @@ export enum SERVICE_ORDER_TYPE {
   LOGISTIC = "LOGISTIC",
   ARTWORK = "ARTWORK",
 }
+
+/** Fixed display order for service order type groups */
+export const SERVICE_ORDER_TYPE_DISPLAY_ORDER: SERVICE_ORDER_TYPE[] = [
+  SERVICE_ORDER_TYPE.COMMERCIAL,
+  SERVICE_ORDER_TYPE.ARTWORK,
+  SERVICE_ORDER_TYPE.PRODUCTION,
+  SERVICE_ORDER_TYPE.FINANCIAL,
+  SERVICE_ORDER_TYPE.LOGISTIC,
+];
 
 export enum AIRBRUSHING_STATUS {
   PENDING = "PENDING",
@@ -1568,11 +1587,13 @@ export enum CHANGE_LOG_ENTITY_TYPE {
   SERVICE_ORDER = "SERVICE_ORDER",
   SUPPLIER = "SUPPLIER",
   TASK = "TASK",
+  TASK_PRICING = "TASK_PRICING",
   TIME_CLOCK_ENTRY = "TIME_CLOCK_ENTRY",
   TRUCK = "TRUCK",
   USER = "USER",
   VACATION = "VACATION",
   VERIFICATION = "VERIFICATION",
+  WARNING = "WARNING",
 }
 
 // Alias for Prisma compatibility
@@ -1876,6 +1897,7 @@ export enum FAVORITE_PAGES {
 
   // Production - Create Pages
   PRODUCAO_AGENDA_CADASTRAR = "/producao/agenda/cadastrar",
+  PRODUCAO_CRONOGRAMA_CADASTRAR = "/producao/cronograma/cadastrar",
   PRODUCAO_RECORTE_CADASTRAR = "/producao/recorte/cadastrar",
   PRODUCAO_SERVICOS_CADASTRAR = "/producao/servicos/cadastrar",
   PRODUCAO_OBSERVACOES_CADASTRAR = "/producao/observacoes/cadastrar",
@@ -1904,6 +1926,11 @@ export enum FAVORITE_PAGES {
   ESTATISTICAS = "/estatisticas",
   // Entity-Specific Statistics
   ESTATISTICAS_ESTOQUE = "/estatisticas/estoque",
+  ESTOQUE_ESTATISTICAS = "/estatisticas/estoque",
+  ESTOQUE_ESTATISTICAS_MOVIMENTACAO = "/estatisticas/estoque/movimentacao",
+  ESTOQUE_ESTATISTICAS_TENDENCIAS = "/estatisticas/estoque/tendencias",
+  ESTOQUE_TOP_ITENS = "/estatisticas/estoque/principais-itens",
+  STATISTICS_CONSUMPTION = "/estatisticas/estoque/consumo",
   ESTATISTICAS_PRODUCAO = "/estatisticas/producao",
   ESTATISTICAS_PEDIDOS = "/estatisticas/pedidos",
   ESTATISTICAS_RECURSOS_HUMANOS = "/estatisticas/recursos-humanos",
@@ -1937,6 +1964,9 @@ export enum FAVORITE_PAGES {
   ESTOQUE_EPI_AGENDAMENTOS_CADASTRAR = "/estoque/epi/agendamentos/cadastrar",
   ESTOQUE_EMPRESTIMOS_CADASTRAR = "/estoque/emprestimos/cadastrar",
 
+  // Inventory - Edit Pages
+  ESTOQUE_MANUTENCAO_AGENDAMENTOS_EDITAR = "/estoque/manutencao/agendamentos/editar/:id",
+
   // Painting - List Pages
   PINTURA_CATALOGO_LISTAR = "/pintura/catalogo",
   PINTURA_PRODUCOES_LISTAR = "/pintura/producoes",
@@ -1944,6 +1974,7 @@ export enum FAVORITE_PAGES {
   PINTURA_FORMULAS_LISTAR = "/pintura/formulas/listar",
   PINTURA_FORMULACOES_LISTAR = "/pintura/formulacoes/listar",
   PINTURA_COMPONENTES_LISTAR = "/pintura/componentes/listar",
+  PINTURA_MARCAS_TINTA_LISTAR = "/pintura/marcas-de-tinta/listar",
 
   // Painting - Create Pages
   PINTURA_CATALOGO_CADASTRAR = "/pintura/catalogo/cadastrar",
@@ -1952,6 +1983,11 @@ export enum FAVORITE_PAGES {
   PINTURA_FORMULAS_CADASTRAR = "/pintura/formulas/cadastrar",
   PINTURA_FORMULACOES_CADASTRAR = "/pintura/formulacoes/cadastrar",
   PINTURA_COMPONENTES_CADASTRAR = "/pintura/componentes/cadastrar",
+  PINTURA_MARCAS_TINTA_CADASTRAR = "/pintura/marcas-de-tinta/cadastrar",
+
+  // Painting - Edit Pages
+  PINTURA_TIPOS_TINTA_EDITAR = "/pintura/tipos-de-tinta/editar/:id",
+  PINTURA_MARCAS_TINTA_EDITAR = "/pintura/marcas-de-tinta/editar/:id",
 
   // Administration - List Pages
   ADMINISTRACAO_COMISSOES_LISTAR = "/administracao/comissoes",
@@ -1975,6 +2011,7 @@ export enum FAVORITE_PAGES {
   ADMINISTRACAO_NOTIFICACOES_CADASTRAR = "/administracao/notificacoes/cadastrar/enviar",
   ADMINISTRACAO_NOTIFICACOES_EDITAR = "/administracao/notificacoes/editar",
   ADMINISTRACAO_MENSAGENS_CRIAR = "/administracao/mensagens/criar",
+  ADMINISTRACAO_MENSAGENS_EDITAR = "/administracao/mensagens/editar/:id",
 
   // Financeiro - List Pages
   FINANCEIRO_CLIENTES_LISTAR = "/financeiro/clientes",
@@ -2001,6 +2038,7 @@ export enum FAVORITE_PAGES {
   RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR = "/recursos-humanos/epi/agendamentos/cadastrar",
   RECURSOS_HUMANOS_SETORES_CADASTRAR = "/recursos-humanos/setores/cadastrar",
   RECURSOS_HUMANOS_BONUS_LISTAR = "/recursos-humanos/bonus",
+  RECURSOS_HUMANOS_NIVEIS_DESEMPENHO_LISTAR = "/recursos-humanos/niveis-de-desempenho",
 
   // Personal - List Pages
   PESSOAL_FERIADOS_LISTAR = "/pessoal/feriados",
@@ -2008,6 +2046,8 @@ export enum FAVORITE_PAGES {
   PESSOAL_MEUS_EPIS_LISTAR = "/pessoal/meus-epis",
   PESSOAL_MEUS_EMPRESTIMOS_LISTAR = "/pessoal/meus-emprestimos",
   PESSOAL_MINHAS_ATIVIDADES_LISTAR = "/pessoal/minhas-atividades",
+  PESSOAL_MINHAS_ADVERTENCIAS_LISTAR = "/pessoal/minhas-advertencias",
+  PESSOAL_MEUS_PONTOS = "/pessoal/meus-pontos",
 
   // Catalog Basic - List Pages
   CATALOGO_BASICO_LISTAR = "/pintura/catalogo-basico",
@@ -2086,6 +2126,29 @@ export enum DISCOUNT_TYPE {
   PERCENTAGE = "PERCENTAGE",
   FIXED_VALUE = "FIXED_VALUE",
 }
+
+export enum REPRESENTATIVE_ROLE {
+  COMMERCIAL = "COMMERCIAL",
+  MARKETING = "MARKETING",
+  COORDINATOR = "COORDINATOR",
+  FINANCIAL = "FINANCIAL",
+  FLEET_MANAGER = "FLEET_MANAGER",
+}
+
+// Payment condition enum - controls payment structure
+export enum PAYMENT_CONDITION {
+  CASH = "CASH",
+  INSTALLMENTS_2 = "INSTALLMENTS_2",
+  INSTALLMENTS_3 = "INSTALLMENTS_3",
+  INSTALLMENTS_4 = "INSTALLMENTS_4",
+  INSTALLMENTS_5 = "INSTALLMENTS_5",
+  INSTALLMENTS_6 = "INSTALLMENTS_6",
+  INSTALLMENTS_7 = "INSTALLMENTS_7",
+  CUSTOM = "CUSTOM",
+}
+
+// Guarantee years options
+export const GUARANTEE_YEARS_OPTIONS = [5, 10, 15] as const;
 
 export enum PAYROLL_STATUS {
   DRAFT = "DRAFT",

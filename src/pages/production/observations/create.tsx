@@ -6,13 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import type { Observation } from "../../../types";
-import { IconCheck, IconNotebook, IconArrowRight, IconArrowLeft } from "@tabler/icons-react";
+import { IconNotebook } from "@tabler/icons-react";
 
 export const ObservationCreate = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
-  const navigationHandlersRef = useRef<{ handleNext: () => void; handlePrev: () => void }>();
+  const navigationHandlersRef = useRef<{ handleNext: () => void; handlePrev: () => void } | undefined>(undefined);
 
   // Get task ID from URL params if provided
   const taskId = searchParams.get("taskId");
@@ -56,9 +56,8 @@ export const ObservationCreate = () => {
       actions.push({
         key: "next",
         label: "Próximo",
-        icon: IconArrowRight,
         onClick: handleNextStep,
-        variant: "default" as const,
+        variant: "outline" as const,
       });
     }
     // Step 2: Show Previous and Next buttons
@@ -67,16 +66,14 @@ export const ObservationCreate = () => {
         {
           key: "previous",
           label: "Anterior",
-          icon: IconArrowLeft,
           onClick: handlePrevStep,
           variant: "outline" as const,
         },
         {
           key: "next",
           label: "Próximo",
-          icon: IconArrowRight,
           onClick: handleNextStep,
-          variant: "default" as const,
+          variant: "outline" as const,
         }
       );
     }
@@ -86,16 +83,14 @@ export const ObservationCreate = () => {
         {
           key: "previous",
           label: "Anterior",
-          icon: IconArrowLeft,
           onClick: handlePrevStep,
           variant: "outline" as const,
         },
         {
           key: "submit",
           label: "Cadastrar",
-          icon: IconCheck,
           onClick: () => document.getElementById("observation-form-submit")?.click(),
-          variant: "default" as const,
+          variant: "outline" as const,
         }
       );
     }

@@ -1,8 +1,12 @@
-import { SECTOR_PRIVILEGES } from "../constants";
+import { SECTOR_PRIVILEGES, TEAM_LEADER } from "../constants";
 import { routes } from "../constants";
 
+// Type for route privileges that includes both enum values and the virtual TEAM_LEADER
+type RoutePrivilege = keyof typeof SECTOR_PRIVILEGES | typeof TEAM_LEADER;
+type RoutePrivilegeValue = RoutePrivilege | RoutePrivilege[];
+
 // Enhanced route privilege mappings with support for arrays and granular permissions
-export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[]> = {
+export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // Home - All authenticated users can access (all privileges)
   "/": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
 
@@ -14,18 +18,12 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   [routes.administration.customers.edit(":id")]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can edit customers
   "/administracao/clientes/editar/:id": ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can edit customers - explicit pattern
   [routes.administration.customers.create]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can create customers
-  "/administracao/clientes/cadastrar": ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can create customers - explicit pattern
   // Representatives - Admin and Commercial can manage representatives
   [routes.representatives.root]: ["ADMIN", "COMMERCIAL"],
   [routes.representatives.create]: ["ADMIN", "COMMERCIAL"],
   [routes.representatives.details(":id")]: ["ADMIN", "COMMERCIAL"],
   [routes.representatives.edit(":id")]: ["ADMIN", "COMMERCIAL"],
   [routes.representatives.password(":id")]: ["ADMIN", "COMMERCIAL"],
-  "/administracao/clientes/representantes": ["ADMIN", "COMMERCIAL"],
-  "/administracao/clientes/representantes/cadastrar": ["ADMIN", "COMMERCIAL"],
-  "/administracao/clientes/representantes/detalhes/:id": ["ADMIN", "COMMERCIAL"],
-  "/administracao/clientes/representantes/editar/:id": ["ADMIN", "COMMERCIAL"],
-  "/administracao/clientes/representantes/senha/:id": ["ADMIN", "COMMERCIAL"],
 
   "/administracao/registros-de-alteracoes": "ADMIN",
   "/administracao/arquivos": "ADMIN",
@@ -78,8 +76,6 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   [routes.inventory.orders.automatic.root]: "ADMIN", // Automatic orders require admin
   [routes.inventory.maintenance.root]: ["WAREHOUSE", "MAINTENANCE", "ADMIN"], // Maintenance operations
   [routes.inventory.maintenance.list]: ["WAREHOUSE", "MAINTENANCE", "ADMIN"], // Maintenance list
-  "/estoque/manutencao": ["WAREHOUSE", "MAINTENANCE", "ADMIN"], // Maintenance root - explicit
-  "/estoque/manutencao/listar": ["WAREHOUSE", "MAINTENANCE", "ADMIN"], // Maintenance list - explicit
   "/estoque/manutencao/detalhes/:id": ["WAREHOUSE", "MAINTENANCE", "ADMIN"], // Maintenance detail
   "/estoque/manutencao/editar/:id": ["WAREHOUSE", "MAINTENANCE", "ADMIN"], // Maintenance edit
   "/estoque/manutencao/cadastrar": ["WAREHOUSE", "MAINTENANCE", "ADMIN"], // Maintenance create
@@ -146,13 +142,9 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   [routes.production.schedule.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL"], // Team leaders check at component level
   // [routes.production.schedule.create]: ["PRODUCTION", "WAREHOUSE"], // Removed - tasks are now created in the "in preparation" page
   [routes.production.schedule.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // Task detail page
-  "/producao/cronograma/detalhes/:id": ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // Explicit cronograma details route
   [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // DESIGNER, FINANCIAL, LOGISTIC, PLOTTING can edit with restrictions
-  "/producao/cronograma/editar/:id": ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // Explicit cronograma edit route
   [routes.production.preparation.root]: ["DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // PRODUCTION and WAREHOUSE excluded from preparation
-  "/producao/agenda": ["DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Agenda root (preparation) - PRODUCTION excluded
   [routes.production.preparation.create]: ["PRODUCTION", "DESIGNER", "LOGISTIC", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Preparation task create - WAREHOUSE excluded
-  "/producao/agenda/cadastrar": ["PRODUCTION", "DESIGNER", "LOGISTIC", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Agenda create
   [routes.production.preparation.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Preparation task detail - WAREHOUSE excluded
   "/producao/agenda/detalhes/:id": ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Agenda details
   [routes.production.preparation.edit(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Preparation task edit - WAREHOUSE excluded
@@ -160,7 +152,6 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   [routes.production.history.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL"], // Team leaders check at component level
   [routes.production.history.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // History detail page
   [routes.production.garages.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Garages/Barracões - LOGISTIC can edit layouts
-  "/producao/barracoes": ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Explicit barracoes route
   [routes.production.airbrushings.root]: ["WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"], // PRODUCTION and DESIGNER excluded from airbrushings
   [routes.production.airbrushings.list]: ["WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"],
   [routes.production.airbrushings.create]: ["WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // PRODUCTION and DESIGNER excluded
@@ -238,7 +229,7 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
 
 // Helper function to get required privilege(s) for a route
 // Returns single privilege or array of privileges
-export function getRequiredPrivilegeForRoute(pathname: string): keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[] | undefined {
+export function getRequiredPrivilegeForRoute(pathname: string): RoutePrivilegeValue | undefined {
   // Debug logging for problematic routes
   if (process.env.NODE_ENV !== 'production' && (pathname.includes('/clientes/') || pathname.includes('/cronograma/') || pathname.includes('/agenda/') || pathname.includes('/barracoes') || pathname.includes('/catalogo-basico'))) {
     console.log('[route-privileges] Checking privileges for:', pathname);
@@ -327,7 +318,7 @@ export function routeRequiresAdmin(pathname: string): boolean {
 }
 
 // Helper function to get privilege display text for UI
-export function getPrivilegeDisplayText(privilege: keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[]): string {
+export function getPrivilegeDisplayText(privilege: RoutePrivilegeValue): string {
   if (Array.isArray(privilege)) {
     return privilege.join(" ou "); // "WAREHOUSE ou ADMIN"
   }

@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { Controller } from "react-hook-form";
 import { Checkbox } from "../../../ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { CheckboxCellProps } from "./cell-types";

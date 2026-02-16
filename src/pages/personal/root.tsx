@@ -11,21 +11,21 @@ import { useNavigate } from "react-router-dom";
 import { routes, PPE_DELIVERY_STATUS, BORROW_STATUS, USER_STATUS_LABELS } from "../../constants";
 import { formatDate, getFileUrl } from "../../utils";
 import {
-  IconUserCircle,
-  IconCalendarEvent,
-  IconShieldCheck,
-  IconTool,
-  IconActivity,
-  IconCalendarWeek,
-  IconMail,
-  IconPhone,
-  IconBuilding,
-  IconBriefcase,
-  IconMapPin,
-  IconClock,
-  IconCheck,
-  IconHourglass,
-} from "@tabler/icons-react";
+  CalendarDays,
+  Shield,
+  Wrench,
+  Activity as ActivityIcon,
+  Calendar,
+  Mail,
+  Phone,
+  Building,
+  Briefcase,
+  MapPin,
+  Clock,
+  Check,
+  Hourglass,
+} from "lucide-react";
+import { IconUser, IconShield } from "@tabler/icons-react";
 import { QuickAccessCard, StatusCard, RecentActivitiesCard, type Activity } from "@/components/dashboard";
 
 export function Personal() {
@@ -45,7 +45,7 @@ export function Personal() {
     where: {
       userId: user?.id,
       status: {
-        in: [BORROW_STATUS.BORROWED, BORROW_STATUS.PARTIALLY_RETURNED],
+        in: [BORROW_STATUS.ACTIVE],
       },
     },
     take: 10,
@@ -228,7 +228,7 @@ export function Personal() {
           <div className="px-4 py-4">
             <PageHeader
               title="Área Pessoal"
-              icon={IconUserCircle}
+              icon={IconUser}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
             />
           </div>
@@ -256,7 +256,7 @@ export function Personal() {
           <div className="px-4 py-4">
             <PageHeader
               title="Área Pessoal"
-              icon={IconUserCircle}
+              icon={IconUser}
               breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
             />
           </div>
@@ -283,13 +283,13 @@ export function Personal() {
         <div className="px-4 py-4">
           <PageHeader
             title="Área Pessoal"
-            icon={IconUserCircle}
+            icon={IconUser}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
             actions={[
               {
                 key: "request-ppe",
                 label: "Solicitar EPI",
-                icon: IconShieldCheck,
+                icon: IconShield,
                 onClick: () => navigate(routes.personal.myPpes.request),
                 variant: "default",
               },
@@ -333,31 +333,31 @@ export function Personal() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {user?.email && (
                       <div className="flex items-center gap-2 text-sm">
-                        <IconMail className="h-4 w-4 text-muted-foreground" />
+                        <Mail className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">{user.email}</span>
                       </div>
                     )}
                     {user?.phone && (
                       <div className="flex items-center gap-2 text-sm">
-                        <IconPhone className="h-4 w-4 text-muted-foreground" />
+                        <Phone className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">{user.phone}</span>
                       </div>
                     )}
                     {user?.sector && (
                       <div className="flex items-center gap-2 text-sm">
-                        <IconBuilding className="h-4 w-4 text-muted-foreground" />
+                        <Building className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">{user.sector.name}</span>
                       </div>
                     )}
                     {user?.position && (
                       <div className="flex items-center gap-2 text-sm">
-                        <IconBriefcase className="h-4 w-4 text-muted-foreground" />
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">{user.position.name}</span>
                       </div>
                     )}
                     {(user?.city || user?.state) && (
                       <div className="flex items-center gap-2 text-sm">
-                        <IconMapPin className="h-4 w-4 text-muted-foreground" />
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">
                           {[user.city, user.state].filter(Boolean).join(", ")}
                         </span>
@@ -365,7 +365,7 @@ export function Personal() {
                     )}
                     {user?.lastLoginAt && (
                       <div className="flex items-center gap-2 text-sm">
-                        <IconClock className="h-4 w-4 text-muted-foreground" />
+                        <Clock className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">
                           Último acesso: {formatDate(user.lastLoginAt)}
                         </span>
@@ -383,34 +383,34 @@ export function Personal() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <QuickAccessCard
                 title="Feriados"
-                icon={IconCalendarEvent}
+                icon={CalendarDays}
                 onClick={() => navigate(routes.personal.myHolidays.root)}
                 color="purple"
               />
               <QuickAccessCard
                 title="Férias"
-                icon={IconCalendarWeek}
+                icon={Calendar}
                 onClick={() => navigate(routes.personal.myVacations.root)}
                 count={vacationsCount}
                 color="blue"
               />
               <QuickAccessCard
                 title="Meus EPIs"
-                icon={IconShieldCheck}
+                icon={Shield}
                 onClick={() => navigate(routes.personal.myPpes.root)}
                 count={ppeTotalCount}
                 color="teal"
               />
               <QuickAccessCard
                 title="Empréstimos"
-                icon={IconTool}
+                icon={Wrench}
                 onClick={() => navigate(routes.personal.myLoans.root)}
                 count={activeBorrowsCount}
                 color="orange"
               />
               <QuickAccessCard
                 title="Atividades"
-                icon={IconActivity}
+                icon={ActivityIcon}
                 onClick={() => navigate(routes.personal.myActivities.root)}
                 count={activitiesCount}
                 color="green"
@@ -426,7 +426,7 @@ export function Personal() {
                 status="EPIs Pendentes"
                 quantity={ppePendingCount}
                 total={ppeTotalCount || 1}
-                icon={IconHourglass}
+                icon={Hourglass}
                 color="yellow"
                 unit="solicitações"
                 onClick={() => navigate(routes.personal.myPpes.root)}
@@ -435,7 +435,7 @@ export function Personal() {
                 status="EPIs Aprovados"
                 quantity={ppeApprovedCount}
                 total={ppeTotalCount || 1}
-                icon={IconCheck}
+                icon={Check}
                 color="blue"
                 unit="solicitações"
                 onClick={() => navigate(routes.personal.myPpes.root)}
@@ -444,7 +444,7 @@ export function Personal() {
                 status="EPIs Entregues"
                 quantity={ppeDeliveredCount}
                 total={ppeTotalCount || 1}
-                icon={IconShieldCheck}
+                icon={Shield}
                 color="green"
                 unit="entregas"
                 onClick={() => navigate(routes.personal.myPpes.root)}
@@ -453,7 +453,7 @@ export function Personal() {
                 status="Empréstimos Ativos"
                 quantity={activeBorrowsCount}
                 total={activeBorrowsCount || 1}
-                icon={IconTool}
+                icon={Wrench}
                 color="orange"
                 unit="itens"
                 onClick={() => navigate(routes.personal.myLoans.root)}
@@ -468,19 +468,19 @@ export function Personal() {
               <RecentActivitiesCard
                 title="Movimentações"
                 activities={getRecentActivities()}
-                icon={IconActivity}
+                icon={ActivityIcon}
                 color="green"
               />
               <RecentActivitiesCard
                 title="Solicitações de EPI"
                 activities={getRecentPpeRequests()}
-                icon={IconShieldCheck}
-                color="teal"
+                icon={Shield}
+                color="blue"
               />
               <RecentActivitiesCard
                 title="Empréstimos"
                 activities={getRecentBorrows()}
-                icon={IconTool}
+                icon={Wrench}
                 color="orange"
               />
             </div>
@@ -500,7 +500,7 @@ export function Personal() {
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-blue-500/10 dark:bg-blue-400/20 rounded-lg">
-                          <IconCalendarWeek className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div className="flex-1">
                           <p className="text-sm font-medium text-foreground">

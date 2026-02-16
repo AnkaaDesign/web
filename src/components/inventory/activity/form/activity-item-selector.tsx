@@ -543,7 +543,7 @@ export const ActivityItemSelector = ({
                         label: cat.name,
                       }))}
                       value={tempCategoryIds}
-                      onValueChange={setTempCategoryIds}
+                      onValueChange={(value) => setTempCategoryIds(Array.isArray(value) ? value : value ? [value] : [])}
                       mode="multiple"
                       triggerClassName="h-10"
                     />
@@ -559,7 +559,7 @@ export const ActivityItemSelector = ({
                         label: brand.name,
                       }))}
                       value={tempBrandIds}
-                      onValueChange={setTempBrandIds}
+                      onValueChange={(value) => setTempBrandIds(Array.isArray(value) ? value : value ? [value] : [])}
                       mode="multiple"
                       triggerClassName="h-10"
                     />
@@ -575,7 +575,7 @@ export const ActivityItemSelector = ({
                         label: supplier.fantasyName || supplier.corporateName || "Sem nome",
                       }))}
                       value={tempSupplierIds}
-                      onValueChange={setTempSupplierIds}
+                      onValueChange={(value) => setTempSupplierIds(Array.isArray(value) ? value : value ? [value] : [])}
                       mode="multiple"
                       triggerClassName="h-10"
                     />
@@ -795,7 +795,10 @@ export const ActivityItemSelector = ({
                               <Input
                                 type="decimal"
                                 value={quantity}
-                                onChange={(value) => onQuantityChange?.(item.id, typeof value === "number" ? value : null)}
+                                onChange={(value) => {
+                                  const numValue = typeof value === "number" ? value : (typeof value === "string" ? parseFloat(value) : 0);
+                                  onQuantityChange?.(item.id, numValue);
+                                }}
                                 min={0.01}
                                 max={999999}
                                 step={0.01}

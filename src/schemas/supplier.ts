@@ -558,6 +558,13 @@ const supplierTransform = (data: any): any => {
     delete data.phoneContains;
   }
 
+  // Handle cnpj filter
+  if (data.cnpj && typeof data.cnpj === "string" && data.cnpj.trim()) {
+    const cleanedCnpj = data.cnpj.trim().replace(/\D/g, "");
+    andConditions.push({ cnpj: { contains: cleanedCnpj } });
+    delete data.cnpj;
+  }
+
   // Handle tags filter
   if (data.tags && Array.isArray(data.tags) && data.tags.length > 0) {
     andConditions.push({
@@ -628,6 +635,7 @@ export const supplierGetManySchema = z
     cities: z.array(z.string()).optional(),
     states: z.array(z.string()).optional(),
     phoneContains: z.string().optional(),
+    cnpj: z.string().optional(),
     tags: z.array(z.string()).optional(),
     itemCount: z
       .object({
@@ -933,6 +941,7 @@ export const supplierGetByIdSchema = z.object({
 // =====================
 
 export type SupplierGetManyFormData = z.infer<typeof supplierGetManySchema>;
+export type SupplierGetManyInput = z.input<typeof supplierGetManySchema>;
 export type SupplierGetByIdFormData = z.infer<typeof supplierGetByIdSchema>;
 export type SupplierQueryFormData = z.infer<typeof supplierQuerySchema>;
 
@@ -956,6 +965,7 @@ export const mapSupplierToFormData = createMapToFormDataHelper<Supplier, Supplie
   cnpj: supplier.cnpj,
   corporateName: supplier.corporateName,
   email: supplier.email,
+  streetType: supplier.streetType as any,
   address: supplier.address,
   addressNumber: supplier.addressNumber,
   addressComplement: supplier.addressComplement,

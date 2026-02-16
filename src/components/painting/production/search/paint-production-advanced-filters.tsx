@@ -196,11 +196,11 @@ export function PaintProductionAdvancedFilters({ filters, onFilterChange, classN
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Mínimo</Label>
-            <Input type="number" placeholder="Volume mínimo" value={volumeMin} onChange={(value) => handleVolumeChange("min", String(value ?? ""))} min="0.001" max="100" step="0.001" />
+            <Input type="number" placeholder="Volume mínimo" value={volumeMin} onChange={(value) => handleVolumeChange("min", String(value ?? ""))} min={0.001} max={100} step={0.001} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Máximo</Label>
-            <Input type="number" placeholder="Volume máximo" value={volumeMax} onChange={(value) => handleVolumeChange("max", String(value ?? ""))} min="0.001" max="100" step="0.001" />
+            <Input type="number" placeholder="Volume máximo" value={volumeMax} onChange={(value) => handleVolumeChange("max", String(value ?? ""))} min={0.001} max={100} step={0.001} />
           </div>
         </div>
       </div>
@@ -216,15 +216,16 @@ export function PaintProductionAdvancedFilters({ filters, onFilterChange, classN
             <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
             <DateTimeInput
               mode="date"
-              context="generic"
+              context="general"
               value={filters.createdAt?.gte}
-              onChange={(date: Date | null) => {
+              onChange={(date) => {
                 const newFilters = { ...filters };
-                if (!date && !filters.createdAt?.lte) {
+                const singleDate = date instanceof Date ? date : null;
+                if (!singleDate && !filters.createdAt?.lte) {
                   delete newFilters.createdAt;
                 } else {
                   newFilters.createdAt = {
-                    ...(date && { gte: date }),
+                    ...(singleDate && { gte: singleDate }),
                     ...(filters.createdAt?.lte && { lte: filters.createdAt.lte }),
                   };
                 }
@@ -238,16 +239,17 @@ export function PaintProductionAdvancedFilters({ filters, onFilterChange, classN
             <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
             <DateTimeInput
               mode="date"
-              context="generic"
+              context="general"
               value={filters.createdAt?.lte}
-              onChange={(date: Date | null) => {
+              onChange={(date) => {
                 const newFilters = { ...filters };
-                if (!date && !filters.createdAt?.gte) {
+                const singleDate = date instanceof Date ? date : null;
+                if (!singleDate && !filters.createdAt?.gte) {
                   delete newFilters.createdAt;
                 } else {
                   newFilters.createdAt = {
                     ...(filters.createdAt?.gte && { gte: filters.createdAt.gte }),
-                    ...(date && { lte: date }),
+                    ...(singleDate && { lte: singleDate }),
                   };
                 }
                 onFilterChange(newFilters);
@@ -270,15 +272,16 @@ export function PaintProductionAdvancedFilters({ filters, onFilterChange, classN
             <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
             <DateTimeInput
               mode="date"
-              context="generic"
+              context="general"
               value={filters.updatedAt?.gte}
-              onChange={(date: Date | null) => {
+              onChange={(date) => {
                 const newFilters = { ...filters };
-                if (!date && !filters.updatedAt?.lte) {
+                const singleDate = date instanceof Date ? date : null;
+                if (!singleDate && !filters.updatedAt?.lte) {
                   delete newFilters.updatedAt;
                 } else {
                   newFilters.updatedAt = {
-                    ...(date && { gte: date }),
+                    ...(singleDate && { gte: singleDate }),
                     ...(filters.updatedAt?.lte && { lte: filters.updatedAt.lte }),
                   };
                 }
@@ -292,16 +295,17 @@ export function PaintProductionAdvancedFilters({ filters, onFilterChange, classN
             <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
             <DateTimeInput
               mode="date"
-              context="generic"
+              context="general"
               value={filters.updatedAt?.lte}
-              onChange={(date: Date | null) => {
+              onChange={(date) => {
                 const newFilters = { ...filters };
-                if (!date && !filters.updatedAt?.gte) {
+                const singleDate = date instanceof Date ? date : null;
+                if (!singleDate && !filters.updatedAt?.gte) {
                   delete newFilters.updatedAt;
                 } else {
                   newFilters.updatedAt = {
                     ...(filters.updatedAt?.gte && { gte: filters.updatedAt.gte }),
-                    ...(date && { lte: date }),
+                    ...(singleDate && { lte: singleDate }),
                   };
                 }
                 onFilterChange(newFilters);

@@ -8,6 +8,7 @@
  */
 
 import type { File as AnkaaFile } from "../types";
+import { getApiBaseUrl as getApiBaseUrlFromConfig } from "@/config/api";
 
 // =====================
 // Type Definitions
@@ -426,23 +427,8 @@ export const canGenerateThumbnail = (file: AnkaaFile): boolean => {
   return FILE_TYPE_INFO[fileType].canThumbnail;
 };
 
-/**
- * Gets the API base URL
- */
-export const getApiBaseUrl = (): string => {
-  // Check window global
-  if (typeof window !== "undefined" && (window as any).__ANKAA_API_URL__) {
-    return (window as any).__ANKAA_API_URL__;
-  }
-
-  // Check environment variable (Vite build-time replacement)
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-
-  // Fallback
-  return "http://localhost:3030";
-};
+// Re-export centralized API URL resolver
+export const getApiBaseUrl = getApiBaseUrlFromConfig;
 
 /**
  * Generates thumbnail URL for a file

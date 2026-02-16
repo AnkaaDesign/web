@@ -66,9 +66,10 @@ export function DataTable<T extends Record<string, any>>({
   const sortedData = React.useMemo(() => {
     if (!sorting.column) return filteredData;
 
+    const sortColumn = sorting.column;
     return [...filteredData].sort((a, b) => {
-      const aValue = a[sorting.column!];
-      const bValue = b[sorting.column!];
+      const aValue = a[sortColumn];
+      const bValue = b[sortColumn];
 
       if (aValue === null || aValue === undefined) return 1;
       if (bValue === null || bValue === undefined) return -1;
@@ -111,8 +112,8 @@ export function DataTable<T extends Record<string, any>>({
           <Input
             placeholder={searchPlaceholder}
             value={filtering}
-            onChange={(event) => {
-              setFiltering(event.target.value);
+            onChange={(value) => {
+              setFiltering(String(value ?? ''));
               setCurrentPage(1);
             }}
             className="max-w-sm"

@@ -102,8 +102,6 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
       if (hasBoldBefore && hasBoldAfter) {
         // Remove bold markers (markers are OUTSIDE the selection)
         formattedText = selectedText;
-        newStart = start - 2;
-        newEnd = end;
         const newContent =
           block.content.substring(0, start - 2) +
           formattedText +
@@ -200,7 +198,8 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
   };
 
   // Handler for font weight changes - strip bold markers when switching to normal
-  const handleFontWeightChange = (weight: string) => {
+  const handleFontWeightChange = (weight: string | string[] | null | undefined) => {
+    if (!weight || typeof weight !== 'string') return;
     let newContent = block.content;
 
     // If switching to normal or medium, remove bold markers
@@ -269,7 +268,7 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
       )}
 
       {/* Formatting Controls */}
-      <div className="flex gap-2 pt-2 border-t border-border/50">
+      <div className="flex gap-2 pt-2 border-t border-border">
         <div className="flex-1">
           <Label className="text-xs text-muted-foreground mb-1">Tamanho</Label>
           <Combobox

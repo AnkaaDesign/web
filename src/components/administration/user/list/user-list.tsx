@@ -56,7 +56,8 @@ export function UserList({ className }: UserListProps) {
 
   // Merge mutation
   const { mutate: mergeMutation } = useMutation({
-    mutationFn: mergeUsers,
+    mutationFn: (params: { targetUserId: string; sourceUserIds: string[]; conflictResolutions?: Record<string, any> }) =>
+      mergeUsers(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
     },

@@ -76,3 +76,4 @@ export * from "./toggle";
 export * from "./toggle-group";
 export * from "./tooltip";
 export * from "./unit-converter";
+export * from "./user-selector";

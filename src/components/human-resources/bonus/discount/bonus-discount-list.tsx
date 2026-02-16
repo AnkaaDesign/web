@@ -3,8 +3,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { formatCurrency } from "../../../../utils";
-import type { BonusDiscount, Bonus } from "../../../../types";
+import type { BonusDiscount, Bonus, DecimalValue } from "../../../../types";
 import { IconTrash, IconEdit, IconCalculator } from "@tabler/icons-react";
+
+/**
+ * Helper function to safely extract number from DecimalValue type
+ */
+const toNumber = (value: DecimalValue | number | null | undefined): number => {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'object' && 'toNumber' in value) return value.toNumber();
+  return 0;
+};
 
 interface BonusDiscountListProps {
   bonus: Bonus;
@@ -24,14 +34,14 @@ export function BonusDiscountList({
   className
 }: BonusDiscountListProps) {
   // Calculate extras total
-  const baseBonus = Number(bonus.baseBonus);
+  const baseBonus = toNumber(bonus.baseBonus);
   const extras = bonus.bonusExtras || [];
   let totalExtras = 0;
   for (const extra of extras) {
     if (extra.value !== null && extra.value !== undefined) {
-      totalExtras += Number(extra.value);
+      totalExtras += toNumber(extra.value);
     } else if (extra.percentage !== null && extra.percentage !== undefined) {
-      totalExtras += baseBonus * (Number(extra.percentage) / 100);
+      totalExtras += baseBonus * (toNumber(extra.percentage) / 100);
     }
   }
 
@@ -43,9 +53,9 @@ export function BonusDiscountList({
   const discountsWithCalculations = sortedDiscounts.map((discount) => {
     let calculatedAmount = 0;
     if (discount.percentage) {
-      calculatedAmount = currentValue * (Number(discount.percentage) / 100);
+      calculatedAmount = currentValue * (toNumber(discount.percentage) / 100);
     } else if (discount.value) {
-      calculatedAmount = Math.min(Number(discount.value), currentValue);
+      calculatedAmount = Math.min(toNumber(discount.value), currentValue);
     }
     currentValue = Math.max(0, currentValue - calculatedAmount);
     return {
@@ -60,7 +70,7 @@ export function BonusDiscountList({
   const columns: StandardizedColumn<typeof discountsWithCalculations[0]>[] = [
     {
       key: "calculationOrder",
-      title: "Ordem",
+      header: "Ordem",
       sortable: true,
       render: (discount) => (
         <Badge variant="outline" className="w-12 justify-center">
@@ -70,7 +80,7 @@ export function BonusDiscountList({
     },
     {
       key: "reference",
-      title: "Referência",
+      header: "Referência",
       sortable: true,
       render: (discount) => (
         <div className="font-medium">
@@ -80,7 +90,7 @@ export function BonusDiscountList({
     },
     {
       key: "type",
-      title: "Tipo",
+      header: "Tipo",
       render: (discount) => (
         <Badge variant={discount.percentage ? "secondary" : "outline"}>
           {discount.percentage ? `${discount.percentage}%` : "Valor Fixo"}
@@ -89,25 +99,25 @@ export function BonusDiscountList({
     },
     {
       key: "value",
-      title: "Valor Original",
+      header: "Valor Original",
       render: (discount) => {
         if (discount.percentage) {
           return (
             <span className="text-sm text-muted-foreground">
-              {discount.percentage}% de {formatCurrency(bonus.baseBonus)}
+              {toNumber(discount.percentage)}% de {formatCurrency(baseBonus)}
             </span>
           );
         }
         return (
           <span className="font-medium">
-            {formatCurrency(discount.value || 0)}
+            {formatCurrency(toNumber(discount.value))}
           </span>
         );
       },
     },
     {
       key: "calculatedAmount",
-      title: "Desconto Aplicado",
+      header: "Desconto Aplicado",
       sortable: true,
       render: (discount) => (
         <span className="font-medium text-red-600">
@@ -117,7 +127,7 @@ export function BonusDiscountList({
     },
     {
       key: "actions",
-      title: "Ações",
+      header: "Ações",
       render: (discount) => (
         <div className="flex items-center gap-1">
           {onEdit && (
@@ -151,7 +161,7 @@ export function BonusDiscountList({
           <CardContent className="flex flex-col items-center justify-center p-4">
             <p className="text-sm font-medium text-muted-foreground">Valor Base</p>
             <p className="text-2xl font-bold text-green-600">
-              {formatCurrency(bonus.baseBonus)}
+              {formatCurrency(baseBonus)}
             </p>
           </CardContent>
         </Card>
@@ -193,6 +203,7 @@ export function BonusDiscountList({
           <StandardizedTable
             data={discountsWithCalculations}
             columns={columns}
+            getItemKey={(discount) => discount.id}
             emptyMessage="Nenhum desconto aplicado"
             isLoading={isLoading}
           />

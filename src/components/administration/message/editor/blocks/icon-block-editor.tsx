@@ -75,8 +75,8 @@ export const IconBlockEditor = ({ block, onUpdate }: IconBlockEditorProps) => {
       <div>
         <Label className="text-xs">Cor</Label>
         <Combobox
-          value={block.color || 'text-foreground'}
-          onValueChange={(value) => onUpdate({ color: value })}
+          value={Array.isArray(block.color) ? (block.color[0] || 'text-foreground') : (block.color || 'text-foreground')}
+          onValueChange={(value) => onUpdate({ color: (Array.isArray(value) ? value[0] : value) ?? undefined })}
           options={[
             { value: 'text-foreground', label: 'Padrão' },
             { value: 'text-primary', label: 'Primária' },

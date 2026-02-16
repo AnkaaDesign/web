@@ -76,7 +76,7 @@ export function MaintenanceMetricsCard({ maintenance, className }: MaintenanceMe
 
           {/* Items Required Summary */}
           {maintenance.itemsNeeded && maintenance.itemsNeeded.length > 0 && (
-            <div className="pt-4 border-t border-border/50">
+            <div className="pt-4 border-t border-border">
               <h4 className="text-sm font-semibold mb-3 text-foreground">Recursos Necessários</h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-muted/30 rounded-lg p-3">

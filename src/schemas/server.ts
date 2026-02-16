@@ -66,6 +66,7 @@ export const cpuInfoSchema = z.object({
   usage: z.number(),
   loadAverage: z.array(z.number()),
   cores: z.number(),
+  temperature: z.number().optional(),
 });
 
 export const memoryInfoSchema = z.object({

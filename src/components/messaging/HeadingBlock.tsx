@@ -68,16 +68,24 @@ export const HeadingBlock = React.memo<HeadingBlockProps>(({ block, className })
   // Get effective weight
   const customFontWeight = fontWeight ? fontWeightMap[fontWeight] : '';
 
-  const HeadingTag = `h${level}` as keyof JSX.IntrinsicElements;
+  const headingClassName = cn(baseStyles, levelStyles[level], effectiveFontSize, customFontWeight, className);
 
-  return (
-    <HeadingTag
-      id={id}
-      className={cn(baseStyles, levelStyles[level], effectiveFontSize, customFontWeight, className)}
-    >
-      <InlineContent content={content} />
-    </HeadingTag>
-  );
+  switch (level) {
+    case 1:
+      return <h1 id={id} className={headingClassName}><InlineContent content={content} /></h1>;
+    case 2:
+      return <h2 id={id} className={headingClassName}><InlineContent content={content} /></h2>;
+    case 3:
+      return <h3 id={id} className={headingClassName}><InlineContent content={content} /></h3>;
+    case 4:
+      return <h4 id={id} className={headingClassName}><InlineContent content={content} /></h4>;
+    case 5:
+      return <h5 id={id} className={headingClassName}><InlineContent content={content} /></h5>;
+    case 6:
+      return <h6 id={id} className={headingClassName}><InlineContent content={content} /></h6>;
+    default:
+      return null;
+  }
 });
 
 HeadingBlock.displayName = "HeadingBlock";

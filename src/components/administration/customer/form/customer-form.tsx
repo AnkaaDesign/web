@@ -18,12 +18,12 @@ import { CorporateNameInput } from "./corporate-name-input";
 import { FormDocumentInput } from "@/components/ui/form-document-input";
 import { WebsiteInput } from "./website-input";
 import { PhoneArrayInput } from "@/components/ui/phone-array-input";
-import { AddressInput } from "@/components/ui/form-address-input";
-import { AddressNumberInput } from "@/components/ui/form-address-number-input";
-import { AddressComplementInput } from "@/components/ui/form-address-complement-input";
-import { NeighborhoodInput } from "@/components/ui/form-neighborhood-input";
-import { CityInput } from "@/components/ui/form-city-input";
-import { StateSelector } from "@/components/ui/form-state-selector";
+import { FormAddressInput } from "@/components/ui/form-address-input";
+import { FormAddressNumberInput } from "@/components/ui/form-address-number-input";
+import { FormAddressComplementInput } from "@/components/ui/form-address-complement-input";
+import { FormNeighborhoodInput } from "@/components/ui/form-neighborhood-input";
+import { FormCityInput } from "@/components/ui/form-city-input";
+import { FormStateSelector } from "@/components/ui/form-state-selector";
 import { FormInput } from "@/components/ui/form-input";
 import { LogoInput } from "./logo-input";
 import { TagsInput } from "./tags-input";
@@ -77,6 +77,7 @@ export function CustomerForm(props: CustomerFormProps) {
       cpf: null,
       corporateName: null,
       email: null,
+      streetType: null,
       address: null,
       addressNumber: null,
       addressComplement: null,
@@ -89,6 +90,7 @@ export function CustomerForm(props: CustomerFormProps) {
       tags: [],
       logoId: null,
       registrationStatus: null,
+      stateRegistration: null,
       ...defaultValues,
     };
   }, [mode, searchParams, defaultValues]);
@@ -150,7 +152,9 @@ export function CustomerForm(props: CustomerFormProps) {
             code: data.economicActivityCode,
             description: data.economicActivityDescription,
           });
-          form.setValue("economicActivityId", response.data.id, { shouldDirty: true, shouldValidate: true });
+          if (response.data?.id) {
+            form.setValue("economicActivityId", response.data.id, { shouldDirty: true, shouldValidate: true });
+          }
           // Invalidate the query cache so the combobox refetches and includes the new activity
           queryClient.invalidateQueries({ queryKey: ["economic-activities"] });
         } catch (error) {
@@ -206,8 +210,9 @@ export function CustomerForm(props: CustomerFormProps) {
           // Clean up empty/null/undefined values before serializing
           const cleanedData = Object.entries(formData).reduce((acc, [key, value]) => {
             // Keep the value if it's not null, undefined, or empty string
-            if (value !== null && value !== undefined && value !== "") {
-              acc[key as keyof CustomerCreateFormData] = value;
+            // Handle arrays separately - don't filter them out if they're empty arrays
+            if (value !== null && value !== undefined && value !== "" && !(Array.isArray(value) && value.length === 0)) {
+              acc[key as keyof CustomerCreateFormData] = value as any;
             }
             return acc;
           }, {} as Partial<CustomerCreateFormData>);
@@ -264,7 +269,7 @@ export function CustomerForm(props: CustomerFormProps) {
           dataWithoutFile,
           logoFile,
           {
-            id: mode === "update" ? defaultValues?.id : undefined,
+            id: mode === "update" ? (defaultValues as any)?.id : undefined,
             name: transformedData.corporateName || transformedData.fantasyName,
             fantasyName: transformedData.fantasyName,
           }
@@ -324,8 +329,8 @@ export function CustomerForm(props: CustomerFormProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <SituacaoCadastralSelect />
                 <FormInput<CustomerCreateFormData | CustomerUpdateFormData>
-                  name="inscricaoEstadual"
-                  type="inscricao-estadual"
+                  name="stateRegistration"
+                  type="text"
                   label="Inscrição Estadual"
                   placeholder="Ex: 123.456.789.012"
                   disabled={isSubmitting}
@@ -346,7 +351,7 @@ export function CustomerForm(props: CustomerFormProps) {
               <CardDescription>Imagem do logo do cliente</CardDescription>
             </CardHeader>
             <CardContent>
-              <LogoInput disabled={isSubmitting} existingLogoId={defaultValues?.logoId} />
+              <LogoInput disabled={isSubmitting} existingLogoId={defaultValues?.logoId ?? undefined} />
             </CardContent>
           </Card>
 
@@ -385,10 +390,9 @@ export function CustomerForm(props: CustomerFormProps) {
                   neighborhoodFieldName="neighborhood"
                   cityFieldName="city"
                   stateFieldName="state"
-                  logradouroFieldName="streetType"
                 />
-                <CityInput disabled={isSubmitting} required={false} />
-                <StateSelector disabled={isSubmitting} />
+                <FormCityInput<CustomerCreateFormData | CustomerUpdateFormData> name="city" disabled={isSubmitting} required={false} />
+                <FormStateSelector<CustomerCreateFormData | CustomerUpdateFormData> name="state" disabled={isSubmitting} />
               </div>
 
               {/* Second row: street type (2/6), address (3/6), number (1/6) */}
@@ -397,17 +401,17 @@ export function CustomerForm(props: CustomerFormProps) {
                   <StreetTypeSelect />
                 </div>
                 <div className="md:col-span-3">
-                  <AddressInput disabled={isSubmitting} required={false} />
+                  <FormAddressInput<CustomerCreateFormData | CustomerUpdateFormData> name="address" disabled={isSubmitting} required={false} />
                 </div>
                 <div className="md:col-span-1">
-                  <AddressNumberInput disabled={isSubmitting} />
+                  <FormAddressNumberInput<CustomerCreateFormData | CustomerUpdateFormData> name="addressNumber" disabled={isSubmitting} />
                 </div>
               </div>
 
               {/* Third row: bairro, complemento */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <NeighborhoodInput disabled={isSubmitting} />
-                <AddressComplementInput disabled={isSubmitting} />
+                <FormNeighborhoodInput<CustomerCreateFormData | CustomerUpdateFormData> name="neighborhood" disabled={isSubmitting} />
+                <FormAddressComplementInput<CustomerCreateFormData | CustomerUpdateFormData> name="addressComplement" disabled={isSubmitting} />
               </div>
             </CardContent>
           </Card>

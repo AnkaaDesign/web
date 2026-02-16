@@ -153,8 +153,9 @@ export function PpeConfigSection({ disabled, required }: PpeConfigSectionProps) 
                 {required && ppeType && ppeType !== "OTHERS" && <span className="text-destructive ml-1">*</span>}
               </FormLabel>
               <PpeSizeSelector
+                control={form.control}
                 name="__ppeSize" // Virtual field name
-                ppeType={ppeType}
+                ppeType={ppeType ?? undefined}
                 disabled={disabled || !ppeType}
                 required={required && ppeType !== "OTHERS"}
                 value={getCurrentPpeSize()}

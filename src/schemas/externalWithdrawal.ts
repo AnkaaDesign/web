@@ -1001,7 +1001,7 @@ export const combineFormStages = (
 export const convertCompleteFormToCreateData = (completeData: ExternalWithdrawalCompleteFormData): ExternalWithdrawalCreateFormData => {
   return {
     withdrawerName: completeData.withdrawerName,
-    willReturn: completeData.willReturn,
+    type: completeData.type,
     notes: completeData.notes,
     items: completeData.items.map((item) => ({
       itemId: item.itemId,

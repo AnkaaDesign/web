@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema } from "./common";
 import { COLOR_SCHEMA, FAVORITE_PAGES } from "../constants";
-import type { Preferences } from "../../types/src/preferences";
+import type { Preferences } from "@/types/preferences";
 
 // =====================
 // Include Schema Based on Prisma Schema

@@ -9,7 +9,7 @@ export function SituacaoCadastralSelect() {
       label="Situação Cadastral"
       icon={<IconCertificate className="h-4 w-4" />}
       placeholder="Selecione a situação cadastral"
-      options={REGISTRATION_STATUS_OPTIONS}
+      options={[...REGISTRATION_STATUS_OPTIONS]}
       searchable
     />
   );

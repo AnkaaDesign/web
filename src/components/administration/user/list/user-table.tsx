@@ -71,7 +71,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
-    defaultSort: [{ key: 'name', direction: 'asc' }],
+    defaultSort: [{ column: 'name', direction: 'asc' }],
   });
 
   // Memoize include configuration to prevent re-renders

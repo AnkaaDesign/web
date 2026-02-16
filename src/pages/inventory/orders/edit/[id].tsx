@@ -1,4 +1,3 @@
-import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useOrder } from "../../../../hooks";
 import { routes } from "../../../../constants";
@@ -15,7 +14,6 @@ import { OrderEditForm } from "@/components/inventory/order/form/order-edit-form
 export const EditOrderPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [_formState, setFormState] = React.useState({ isValid: false, isDirty: false });
 
   // Track page access
   usePageTracker({
@@ -153,7 +151,6 @@ export const EditOrderPage = () => {
       <div className="h-full flex flex-col">
         <OrderEditForm
           order={order as Order & { items: NonNullable<Order["items"]> }}
-          onFormStateChange={setFormState}
         />
       </div>
     </PrivilegeRoute>

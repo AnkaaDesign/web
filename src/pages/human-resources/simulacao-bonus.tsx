@@ -24,7 +24,6 @@ export default function BonusSimulationPage() {
             { label: "Administração" },
             { label: "Simulação de Bônus" }
           ]}
-          description="Simulação interativa de bonificações - ajuste quantidade de tarefas, selecione usuários e modifique cargos e níveis em tempo real"
           actions={[]}
         />
         <BonusSimulationInteractiveTable className="flex-1 min-h-0" />

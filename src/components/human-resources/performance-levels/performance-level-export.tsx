@@ -1,14 +1,12 @@
-import { Button } from "@/components/ui/button";
 import { BaseExportPopover, type ExportColumn, type ExportFormat } from "@/components/ui/export-popover";
-import { IconDownload } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { formatDate, formatDateTime } from "../../../utils";
 import { userService } from "../../../api-client";
-import { USER_STATUS_LABELS } from "../../../constants";
+import { USER_STATUS_LABELS, USER_STATUS } from "../../../constants";
 import type { User } from "../../../types";
 
 const EXPORT_COLUMNS: ExportColumn<User>[] = [
-  { id: "payrollNumber", label: "Nº Folha", getValue: (user) => user.payrollNumber || "" },
+  { id: "payrollNumber", label: "Nº Folha", getValue: (user) => String(user.payrollNumber || "") },
   { id: "name", label: "Nome", getValue: (user) => user.name },
   { id: "email", label: "Email", getValue: (user) => user.email || "" },
   { id: "phone", label: "Telefone", getValue: (user) => user.phone || "" },
@@ -16,7 +14,7 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
   { id: "pis", label: "PIS", getValue: (user) => user.pis || "" },
   { id: "position", label: "Cargo", getValue: (user) => user.position?.name || "" },
   { id: "sector", label: "Setor", getValue: (user) => user.sector?.name || "" },
-  { id: "performanceLevel", label: "Nível de Desempenho", getValue: (user) => user.performanceLevel?.toString() || "0" },
+  { id: "performanceLevel", label: "Nível de Desempenho", getValue: (user) => String(user.performanceLevel || "0") },
   { id: "bonus", label: "Bonificação", getValue: (_user) => "" },  // To be implemented
   { id: "status", label: "Status", getValue: (user) => USER_STATUS_LABELS[user.status] || user.status },
   { id: "createdAt", label: "Data de Cadastro", getValue: (user) => new Date(user.createdAt).toLocaleDateString("pt-BR") },
@@ -243,7 +241,7 @@ export function PerformanceLevelExport({
                       // Apply formatting based on column
                       switch (col.id) {
                         case "status":
-                          const statusClass = item.status === "ACTIVE" ? "badge-active" : "badge-inactive";
+                          const statusClass = item.status === USER_STATUS.EFFECTED ? "badge-active" : "badge-inactive";
                           value = `<span class="badge ${statusClass}">${value}</span>`;
                           break;
                         case "performanceLevel":
@@ -303,11 +301,6 @@ export function PerformanceLevelExport({
       onFetchAllItems={fetchAllUsers}
       entityName="colaborador"
       entityNamePlural="colaboradores"
-    >
-      <Button variant="outline" size="default" className="group">
-        <IconDownload className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-        <span className="text-foreground">Exportar</span>
-      </Button>
-    </BaseExportPopover>
+    />
   );
 }

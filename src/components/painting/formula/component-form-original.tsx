@@ -134,9 +134,10 @@ export function ComponentForm({ component, availableItems = [], onSubmit, onCanc
                       options={comboboxOptions}
                       value={field.value}
                       onValueChange={(value) => {
-                        field.onChange(value || "");
-                        if (value) {
-                          handleItemSelect(value);
+                        const normalizedValue = Array.isArray(value) ? value[0] : value;
+                        field.onChange(normalizedValue || "");
+                        if (normalizedValue) {
+                          handleItemSelect(normalizedValue);
                         }
                       }}
                       placeholder="Selecione um item..."
@@ -183,17 +184,17 @@ export function ComponentForm({ component, availableItems = [], onSubmit, onCanc
                     <div className="flex gap-2">
                       <Input
                         type="number"
-                        step="0.1"
-                        min="0.1"
-                        max="10000"
+                        step={0.1}
+                        min={0.1}
+                        max={10000}
                         {...field}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          const value = e.target.value;
-                          if (value === "") {
+                        onChange={(value) => {
+                          const str = String(value ?? '');
+                          if (str === "") {
                             field.onChange("");
                             return;
                           }
-                          const numValue = Number(value);
+                          const numValue = Number(str);
                           if (!isNaN(numValue)) {
                             field.onChange(numValue);
                           }

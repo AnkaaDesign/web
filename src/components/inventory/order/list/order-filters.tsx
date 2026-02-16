@@ -230,14 +230,15 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAtRange?.gte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.createdAtRange?.lte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.createdAtRange?.lte) {
                       setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         createdAtRange: {
-                          ...(date && { gte: date }),
+                          ...(dateValue && { gte: dateValue }),
                           ...(localState.createdAtRange?.lte && { lte: localState.createdAtRange.lte }),
                         },
                       }));
@@ -252,15 +253,16 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAtRange?.lte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.createdAtRange?.gte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.createdAtRange?.gte) {
                       setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         createdAtRange: {
                           ...(localState.createdAtRange?.gte && { gte: localState.createdAtRange.gte }),
-                          ...(date && { lte: date }),
+                          ...(dateValue && { lte: dateValue }),
                         },
                       }));
                     }
@@ -280,14 +282,15 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
                 <DateTimeInput
                   mode="date"
                   value={localState.forecastRange?.gte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.forecastRange?.lte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.forecastRange?.lte) {
                       setLocalState((prev) => ({ ...prev, forecastRange: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         forecastRange: {
-                          ...(date && { gte: date }),
+                          ...(dateValue && { gte: dateValue }),
                           ...(localState.forecastRange?.lte && { lte: localState.forecastRange.lte }),
                         },
                       }));
@@ -295,7 +298,7 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
                   }}
                   hideLabel
                   placeholder="Selecionar data inicial..."
-                  context="delivery"
+                  context="scheduled"
                 />
               </div>
               <div>
@@ -303,22 +306,23 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
                 <DateTimeInput
                   mode="date"
                   value={localState.forecastRange?.lte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.forecastRange?.gte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.forecastRange?.gte) {
                       setLocalState((prev) => ({ ...prev, forecastRange: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         forecastRange: {
                           ...(localState.forecastRange?.gte && { gte: localState.forecastRange.gte }),
-                          ...(date && { lte: date }),
+                          ...(dateValue && { lte: dateValue }),
                         },
                       }));
                     }
                   }}
                   hideLabel
                   placeholder="Selecionar data final..."
-                  context="delivery"
+                  context="scheduled"
                 />
               </div>
             </div>
@@ -332,14 +336,15 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
                 <DateTimeInput
                   mode="date"
                   value={localState.updatedAtRange?.gte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.updatedAtRange?.lte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.updatedAtRange?.lte) {
                       setLocalState((prev) => ({ ...prev, updatedAtRange: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         updatedAtRange: {
-                          ...(date && { gte: date }),
+                          ...(dateValue && { gte: dateValue }),
                           ...(localState.updatedAtRange?.lte && { lte: localState.updatedAtRange.lte }),
                         },
                       }));
@@ -354,15 +359,16 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
                 <DateTimeInput
                   mode="date"
                   value={localState.updatedAtRange?.lte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localState.updatedAtRange?.gte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localState.updatedAtRange?.gte) {
                       setLocalState((prev) => ({ ...prev, updatedAtRange: undefined }));
                     } else {
                       setLocalState((prev) => ({
                         ...prev,
                         updatedAtRange: {
                           ...(localState.updatedAtRange?.gte && { gte: localState.updatedAtRange.gte }),
-                          ...(date && { lte: date }),
+                          ...(dateValue && { lte: dateValue }),
                         },
                       }));
                     }

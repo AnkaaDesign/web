@@ -26,13 +26,15 @@ export const PaintEffectsShowcase: React.FC = () => {
   const samplePaint: Paint = {
     id: "sample-paint",
     name: "Cor Personalizada",
+    code: null,
     hex: selectedColor,
     finish: selectedFinish,
-    brand: "SUVINIL" as any,
     manufacturer: null,
     tags: ["personalizada", "showcase"],
     colorOrder: 1,
     paintTypeId: "sample-type",
+    paintBrandId: null,
+    colorPreview: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     paintType: {
@@ -91,7 +93,7 @@ export const PaintEffectsShowcase: React.FC = () => {
             <div className="space-y-3">
               <Label>Cor Base</Label>
               <div className="flex gap-2">
-                <Input type="color" value={selectedColor} onChange={(value) => setSelectedColor(String(value || ""))} className="w-16 h-10 p-1 rounded border" />
+                <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.currentTarget.value)} className="w-16 h-10 p-1 rounded border" />
                 <Input type="text" value={selectedColor} onChange={(value) => setSelectedColor(String(value || ""))} placeholder="#FF6B35" className="flex-1" />
               </div>
 
@@ -214,6 +216,7 @@ export const PaintEffectsShowcase: React.FC = () => {
                     <IconCards className="h-5 w-5" />
                     Card com Efeitos
                   </h3>
+                  {/* @ts-expect-error - component prop mismatch */}
                   <PaintCard paint={samplePaint} showEffects={useAdvancedEffects} />
                 </div>
 

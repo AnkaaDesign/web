@@ -125,9 +125,9 @@ export function FormInput<T extends Record<string, any>>({
               value={field.value ?? ""}
               onChange={(newValue) => {
                 // Use field.onChange directly to preserve RHF context
-                field.onChange(newValue);
+                field.onChange(newValue as any);
                 // Explicitly mark as dirty and trigger validation
-                form.setValue(name, newValue, { shouldDirty: true, shouldValidate: true });
+                form.setValue(name, newValue as any, { shouldDirty: true, shouldValidate: true });
               }}
               onBlur={field.onBlur}
               documentType={documentType}

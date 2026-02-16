@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBatchDeleteSuppliers } from "../../../../hooks";
 import type { Supplier } from "../../../../types";
-import type { SupplierGetManyFormData } from "../../../../schemas";
+import type { SupplierGetManyInput } from "../../../../schemas";
 import { routes, BRAZILIAN_STATES } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,8 +49,8 @@ export function SupplierList({ className }: SupplierListProps) {
   });
 
   // Custom deserializer for supplier filters
-  const deserializeSupplierFilters = useCallback((params: URLSearchParams): Partial<SupplierGetManyFormData> => {
-    const filters: Partial<SupplierGetManyFormData> = {};
+  const deserializeSupplierFilters = useCallback((params: URLSearchParams): Partial<SupplierGetManyInput> => {
+    const filters: Partial<SupplierGetManyInput> = {};
 
     // Parse boolean filters
     const hasActiveOrders = params.get("hasActiveOrders");
@@ -169,7 +169,7 @@ export function SupplierList({ className }: SupplierListProps) {
   }, []);
 
   // Custom serializer for supplier filters
-  const serializeSupplierFilters = useCallback((filters: Partial<SupplierGetManyFormData>): Record<string, string> => {
+  const serializeSupplierFilters = useCallback((filters: Partial<SupplierGetManyInput>): Record<string, string> => {
     const params: Record<string, string> = {};
 
     // Boolean filters
@@ -214,7 +214,7 @@ export function SupplierList({ className }: SupplierListProps) {
     clearAllFilters,
     queryFilters: baseQueryFilters,
     hasActiveFilters,
-  } = useTableFilters<SupplierGetManyFormData>({
+  } = useTableFilters<SupplierGetManyInput>({
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
     },
@@ -239,7 +239,7 @@ export function SupplierList({ className }: SupplierListProps) {
 
   // Handle filter changes
   const handleFilterChange = useCallback(
-    (newFilters: Partial<SupplierGetManyFormData>) => {
+    (newFilters: Partial<SupplierGetManyInput>) => {
       // Remove orderBy from filters to avoid conflicts with sort management
       const { orderBy: _, ...filtersWithoutOrderBy } = newFilters;
       setFilters(filtersWithoutOrderBy);
@@ -264,7 +264,7 @@ export function SupplierList({ className }: SupplierListProps) {
       } else {
         setFilters((prev) => {
           const updated = { ...prev };
-          delete updated[key as keyof SupplierGetManyFormData];
+          delete updated[key as keyof SupplierGetManyInput];
           return updated;
         });
       }

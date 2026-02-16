@@ -392,9 +392,7 @@ export function ThrottlerKeysTable({
                       onClick={() => toggleSort(column.id)}
                       className={cn(
                         "flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer border-0 bg-transparent",
-                        column.align === "center" && "justify-center",
-                        column.align === "right" && "justify-end",
-                        !column.align && "justify-start",
+                        column.align === "center" ? "justify-center" : "justify-start",
                       )}
                       disabled={isLoading || paginatedKeys.length === 0}
                     >
@@ -404,9 +402,7 @@ export function ThrottlerKeysTable({
                   ) : (
                     <div className={cn(
                       "flex items-center h-full min-h-[2.5rem] px-4 py-2",
-                      column.align === "center" && "justify-center text-center",
-                      column.align === "right" && "justify-end text-right",
-                      !column.align && "justify-start text-left",
+                      column.align === "center" ? "justify-center text-center" : "justify-start text-left",
                     )}>
                       <TruncatedTextWithTooltip text={column.header} />
                     </div>
@@ -483,10 +479,7 @@ export function ThrottlerKeysTable({
                       >
                         <div className={cn(
                           "flex items-center px-4 py-2",
-                          column.align === "center" && "justify-center",
-                          column.align === "right" && "justify-end",
-                          column.align === "left" && "justify-start",
-                          !column.align && "justify-start",
+                          column.align === "center" ? "justify-center" : column.align === "left" ? "justify-start" : "justify-start",
                         )}>
                           {column.cell(key)}
                         </div>

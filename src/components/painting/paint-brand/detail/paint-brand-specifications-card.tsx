@@ -28,11 +28,6 @@ export function PaintBrandSpecificationsCard({ paintBrand }: PaintBrandSpecifica
               </div>
 
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground">Código</span>
-                <span className="text-sm font-semibold text-foreground">{paintBrand.code || "-"}</span>
-              </div>
-
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground">Componentes Disponíveis</span>
                 <span className="text-sm font-semibold text-foreground">{paintBrand._count?.componentItems || 0} componente(s)</span>
               </div>

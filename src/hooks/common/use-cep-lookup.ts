@@ -9,7 +9,7 @@ interface BrasilApiCepData {
   service: string;
 }
 
-interface CepData {
+export interface CepData {
   street: string;
   streetType?: string;
   bairro: string;

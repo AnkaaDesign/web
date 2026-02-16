@@ -14,15 +14,13 @@ export function NextRunInput({ control, disabled = false, required = false }: Ne
       name="nextRun"
       render={({ field }) => (
         <DateTimeInput
-          field={field}
+          field={field as any}
           mode="datetime"
-          context="maintenance"
+          context="scheduled"
           label="Próxima Manutenção"
           disabled={disabled}
           required={required}
-          description="Data e hora agendada para a próxima execução da manutenção"
           showClearButton={true}
-          showTodayButton={true}
         />
       )}
     />

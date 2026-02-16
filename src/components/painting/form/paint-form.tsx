@@ -137,7 +137,7 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
           const cleanedData = Object.entries(formData).reduce((acc, [key, value]) => {
             // Keep the value if it's not null, undefined, or empty string
             if (value !== null && value !== undefined && value !== "") {
-              acc[key as keyof PaintCreateFormData] = value;
+              acc[key as keyof PaintCreateFormData] = value as any;
             }
             return acc;
           }, {} as Partial<PaintCreateFormData>);
@@ -274,12 +274,12 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
 
     if (mode === "create") {
       // Filter valid formulas to pass to the parent
-      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.weightInGrams && c.weightInGrams > 0));
+      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.weight && c.weight > 0));
 
       await (props as CreateFormProps).onSubmit(data as PaintCreateFormData, validFormulas, colorPreviewFile);
     } else {
       // In update mode, also handle new formulas if any
-      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.weightInGrams && c.weightInGrams > 0));
+      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.weight && c.weight > 0));
 
       await (props as UpdateFormProps).onSubmit(data as PaintUpdateFormData, validFormulas, colorPreviewFile);
     }
@@ -520,7 +520,7 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
                 {props.mode === "update" && props.existingFormulas && props.existingFormulas.length > 0 && (
                   <div className="flex flex-col max-h-[400px] overflow-y-auto space-y-3">
                     {props.existingFormulas.map((formula, index) => (
-                      <div key={formula.id} className="p-4 bg-muted/30 rounded-lg border border-border/50">
+                      <div key={formula.id} className="p-4 bg-muted/30 rounded-lg border border-border">
                         <h4 className="font-medium mb-2 text-sm">{formula.description || `Fórmula ${index + 1}`}</h4>
                         {formula.components && formula.components.length > 0 && (
                           <ul className="space-y-1 text-sm text-muted-foreground">

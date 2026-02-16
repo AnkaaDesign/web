@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { DateRange } from "react-day-picker";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -239,7 +240,8 @@ export function MaintenanceFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.nextRunRange?.gte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.nextRunRange?.lte) {
                       setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
                     } else {
@@ -261,7 +263,8 @@ export function MaintenanceFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.nextRunRange?.lte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.nextRunRange?.gte) {
                       setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
                     } else {
@@ -293,7 +296,8 @@ export function MaintenanceFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAtRange?.gte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.createdAtRange?.lte) {
                       setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
                     } else {
@@ -315,7 +319,8 @@ export function MaintenanceFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAtRange?.lte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.createdAtRange?.gte) {
                       setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
                     } else {

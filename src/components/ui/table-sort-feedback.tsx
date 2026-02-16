@@ -132,7 +132,7 @@ export function TableSortFeedback({ config, sortConfigs, columnLabels = {}, onDi
           {getIcon()}
           <div className="flex-1">
             <p className="text-sm font-medium">{getDefaultMessage()}</p>
-            {variant === "detailed" && sortConfigs.length > 0 && (
+            {sortConfigs.length > 0 && (
               <div className="mt-1 text-xs opacity-80">
                 {sortConfigs.map((config, index) => (
                   <div key={config.column} className="flex items-center gap-1">

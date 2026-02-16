@@ -210,7 +210,6 @@ const PersonalMyHolidays = lazy(() => import("@/pages/personal/my-holidays").the
 const PersonalMyVacations = lazy(() => import("@/pages/personal/my-vacations").then((module) => ({ default: module.MyVacationsPage })));
 const PersonalMyPpes = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.MyPpesPage })));
 const PersonalMyPpesRequest = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.PersonalMyPpesRequest })));
-const PersonalPendingSignatures = lazy(() => import("@/pages/personal/pending-signatures").then((module) => ({ default: module.PendingSignaturesPage })));
 const PersonalMyLoans = lazy(() => import("@/pages/personal/my-loans").then((module) => ({ default: module.MyLoansPage })));
 const PersonalMyActivities = lazy(() => import("@/pages/personal/my-activities").then((module) => ({ default: module.MyActivitiesPage })));
 const PersonalMyWarnings = lazy(() => import("@/pages/personal/my-warnings").then((module) => ({ default: module.MyWarningsPage })));
@@ -1641,14 +1640,6 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PersonalMyPpesRequest />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personal.pendingSignatures.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonalPendingSignatures />
                     </Suspense>
                   }
                 />

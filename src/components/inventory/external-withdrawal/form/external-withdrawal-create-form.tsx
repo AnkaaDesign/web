@@ -1260,7 +1260,7 @@ export const ExternalWithdrawalCreateForm = () => {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="rounded-md border overflow-hidden dark:border-border/40">
+                        <div className="rounded-md border overflow-hidden dark:border-border">
                           <Table>
                             <TableHeader>
                               <TableRow className="bg-muted/50">

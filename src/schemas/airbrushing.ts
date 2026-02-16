@@ -29,7 +29,7 @@ export const airbrushingIncludeSchema = z
               commissions: z.boolean().optional(),
               services: z.boolean().optional(),
               truck: z.boolean().optional(),
-              airbrushing: z.boolean().optional(),
+              airbrushings: z.boolean().optional(),
             })
             .optional(),
         }),

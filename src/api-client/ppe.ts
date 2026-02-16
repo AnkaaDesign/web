@@ -64,7 +64,6 @@ import type {
   PpeDeliveryScheduleBatchUpdateResponse,
   PpeDeliveryScheduleBatchDeleteResponse,
 } from "../types";
-import { PPE_TYPE } from "../constants";
 
 // =====================
 // PpeSize Service Class
@@ -267,26 +266,6 @@ export class PpeDeliveryService {
     return response.data;
   }
 
-  async getAvailablePpeForUser(userId: string, ppeType?: PPE_TYPE, query?: PpeDeliveryQueryFormData): Promise<PpeDeliveryGetManyResponse> {
-    const response = await apiClient.get<PpeDeliveryGetManyResponse>(`${this.basePath}/available-for-user/${userId}`, {
-      params: {
-        ...query,
-        ppeType,
-      },
-    });
-    return response.data;
-  }
-
-  async getMyAvailablePpe(ppeType?: PPE_TYPE, query?: PpeDeliveryQueryFormData): Promise<PpeDeliveryGetManyResponse> {
-    const response = await apiClient.get<PpeDeliveryGetManyResponse>(`${this.basePath}/my-available`, {
-      params: {
-        ...query,
-        ppeType,
-      },
-    });
-    return response.data;
-  }
-
   async batchApprove(
     deliveryIds: string[],
     approvedBy?: string,
@@ -469,21 +448,8 @@ export const batchMarkPpeDeliveriesAsDelivered = (deliveryIds: string[], deliver
 export const requestPpeDelivery = (data: Omit<PpeDeliveryCreateFormData, "userId" | "status" | "statusOrder">, query?: PpeDeliveryQueryFormData) =>
   ppeDeliveryService.requestPpeDelivery(data, query);
 export const getMyPpeDeliveries = (params?: PpeDeliveryGetManyFormData) => ppeDeliveryService.getMyPpeDeliveries(params);
-export const getAvailablePpeForUser = (userId: string, ppeType?: PPE_TYPE, query?: PpeDeliveryQueryFormData) => ppeDeliveryService.getAvailablePpeForUser(userId, ppeType, query);
-export const getMyAvailablePpe = (ppeType?: PPE_TYPE, query?: PpeDeliveryQueryFormData) => ppeDeliveryService.getMyAvailablePpe(ppeType, query);
 export const batchApprovePpeDeliveries = (deliveryIds: string[], approvedBy?: string) => ppeDeliveryService.batchApprove(deliveryIds, approvedBy);
 export const batchRejectPpeDeliveries = (deliveryIds: string[], reviewedBy?: string, reason?: string) => ppeDeliveryService.batchReject(deliveryIds, reviewedBy, reason);
-export const getMyPendingSignatures = () => ppeDeliveryService.getMyPendingSignatures();
-export const initiateInAppSignature = (deliveryId: string) => ppeDeliveryService.initiateInAppSignature(deliveryId);
-export const initiateBatchInAppSignature = (deliveryIds: string[]) => ppeDeliveryService.initiateBatchInAppSignature(deliveryIds);
-export const submitInAppSignature = (
-  deliveryId: string,
-  data: { termsAccepted: boolean; deviceInfo?: { platform?: string; appVersion?: string } },
-) => ppeDeliveryService.submitInAppSignature(deliveryId, data);
-export const getInAppSignatureStatus = (deliveryId: string) => ppeDeliveryService.getInAppSignatureStatus(deliveryId);
-export const getSignatureTerms = () => ppeDeliveryService.getSignatureTerms();
-export const verifySignatureOtp = (deliveryId: string, otpCode: string) => ppeDeliveryService.verifySignatureOtp(deliveryId, otpCode);
-export const resendSignatureOtp = (deliveryId: string) => ppeDeliveryService.resendSignatureOtp(deliveryId);
 
 // PpeDeliverySchedule exports
 export const getPpeDeliverySchedules = (params?: PpeDeliveryScheduleGetManyFormData) => ppeDeliveryScheduleService.getPpeDeliverySchedules(params);
@@ -500,3 +466,4 @@ export const batchUpdatePpeDeliverySchedules = (data: PpeDeliveryScheduleBatchUp
   ppeDeliveryScheduleService.batchUpdatePpeDeliverySchedules(data, query);
 export const batchDeletePpeDeliverySchedules = (data: PpeDeliveryScheduleBatchDeleteFormData, query?: PpeDeliveryScheduleQueryFormData) =>
   ppeDeliveryScheduleService.batchDeletePpeDeliverySchedules(data, query);
+export const executePpeDeliveryScheduleNow = (id: string) => ppeDeliveryScheduleService.executeScheduleNow(id);

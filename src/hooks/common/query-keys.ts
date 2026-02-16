@@ -11,7 +11,6 @@ import type {
   ExternalWithdrawalGetManyFormData,
   ExternalWithdrawalItemGetManyFormData,
   FileGetManyFormData,
-  GarageGetManyFormData,
   ItemGetManyFormData,
   ItemBrandGetManyFormData,
   ItemCategoryGetManyFormData,
@@ -37,7 +36,6 @@ import type {
   ServiceOrderGetManyFormData,
   SupplierGetManyFormData,
   TaskGetManyFormData,
-  TruckGetManyFormData,
   UserGetManyFormData,
   VacationGetManyFormData,
   NotificationGetManyFormData,
@@ -45,7 +43,7 @@ import type {
   AirbrushingGetManyFormData,
   CutGetManyFormData,
 } from "../../schemas";
-import type { SectorGetManyFormData } from "../../types";
+import type { SectorGetManyFormData, TruckGetManyFormData as TruckGetManyFormDataType } from "../../types";
 
 // =====================================================
 // Query Key Factory Pattern
@@ -359,7 +357,9 @@ export const artworkKeys = fileKeys;
 // Garage Query Keys
 // =====================================================
 
-export const garageKeys = createQueryKeyStore<GarageGetManyFormData>("garages");
+// Note: Garage is not a real entity - it's a visualization of truck spots
+// Using a simple Record<string, any> placeholder for query key typing
+export const garageKeys = createQueryKeyStore<Record<string, any>>("garages");
 
 // =====================================================
 // Item Query Keys
@@ -550,6 +550,8 @@ export const orderScheduleKeys = {
   byIds: (ids: string[]) => ["orderSchedules", "byIds", ids] as const,
 
   // Specialized queries
+  bySupplier: (supplierId: string, filters?: Partial<OrderScheduleGetManyFormData>) =>
+    filters ? (["orderSchedules", "bySupplier", supplierId, filters] as const) : (["orderSchedules", "bySupplier", supplierId] as const),
   active: (filters?: Partial<OrderScheduleGetManyFormData>) => (filters ? (["orderSchedules", "active", filters] as const) : (["orderSchedules", "active"] as const)),
 };
 
@@ -715,7 +717,7 @@ export const taskKeys = {
 // Truck Query Keys
 // =====================================================
 
-export const truckKeys = createQueryKeyStore<TruckGetManyFormData>("trucks");
+export const truckKeys = createQueryKeyStore<TruckGetManyFormDataType>("trucks");
 
 // =====================================================
 // User Query Keys

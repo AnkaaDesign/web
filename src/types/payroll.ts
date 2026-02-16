@@ -26,8 +26,8 @@ export type PayrollDiscountType =
   | 'CUSTOM';
 
 export interface Discount extends BaseEntity {
-  percentage: DecimalValue | null;
-  value: DecimalValue | null;
+  percentage: DecimalValue | number | null;
+  value: DecimalValue | number | null;
   calculationOrder: number;
   reference: string;
   payrollId: string;
@@ -42,7 +42,7 @@ export interface Discount extends BaseEntity {
 
 export interface Payroll extends BaseEntity {
   // Base information
-  baseRemuneration: DecimalValue;
+  baseRemuneration: DecimalValue | number;
   year: number;
   month: number;
   userId: string;
@@ -51,32 +51,32 @@ export interface Payroll extends BaseEntity {
   // Working days
   workingDaysInMonth?: number;
   workedDaysInMonth?: number;
-  absenceHours?: DecimalValue;
+  absenceHours?: DecimalValue | number;
 
   // Overtime earnings
-  overtime50Hours?: DecimalValue;
-  overtime50Amount?: DecimalValue;
-  overtime100Hours?: DecimalValue;
-  overtime100Amount?: DecimalValue;
-  nightHours?: DecimalValue;
-  nightDifferentialAmount?: DecimalValue;
+  overtime50Hours?: DecimalValue | number;
+  overtime50Amount?: DecimalValue | number;
+  overtime100Hours?: DecimalValue | number;
+  overtime100Amount?: DecimalValue | number;
+  nightHours?: DecimalValue | number;
+  nightDifferentialAmount?: DecimalValue | number;
 
   // DSR
-  dsrAmount?: DecimalValue;
+  dsrAmount?: DecimalValue | number;
 
   // Calculated totals
-  grossSalary?: DecimalValue;
-  totalDiscounts?: DecimalValue;
-  netSalary?: DecimalValue;
+  grossSalary?: DecimalValue | number;
+  totalDiscounts?: DecimalValue | number;
+  netSalary?: DecimalValue | number;
 
   // Tax details
-  inssBase?: DecimalValue;
-  inssAmount?: DecimalValue;
-  irrfBase?: DecimalValue;
-  irrfAmount?: DecimalValue;
+  inssBase?: DecimalValue | number;
+  inssAmount?: DecimalValue | number;
+  irrfBase?: DecimalValue | number;
+  irrfAmount?: DecimalValue | number;
 
   // FGTS (employer contribution, tracked but not deducted)
-  fgtsAmount?: DecimalValue;
+  fgtsAmount?: DecimalValue | number;
 
   // Legacy/deprecated fields (for compatibility)
   performanceLevel?: number;
@@ -96,6 +96,27 @@ export interface Payroll extends BaseEntity {
   _count?: {
     discounts?: number;
   };
+
+  // Denormalized user info (for when user relation not loaded)
+  userName?: string;
+  userEmail?: string;
+
+  // Absence tracking
+  absenceDays?: number;
+
+  // Task statistics (computed from bonus/task data)
+  taskStats?: {
+    totalTasks: number;
+    fullCommissionTasks: number;
+    partialCommissionTasks: number;
+    totalPonderado: number;
+  };
+
+  // Live calculation indicator
+  isLive?: boolean;
+
+  // Revenue tracking
+  totalRevenue?: DecimalValue | number;
 }
 
 // =====================

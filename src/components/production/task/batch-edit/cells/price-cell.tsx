@@ -42,8 +42,8 @@ export function PriceCell({ control, index }: PriceCellProps) {
             <Input
               {...field}
               value={formatCurrency(field.value || 0)}
-              onChange={(e) => {
-                const parsedValue = parseCurrency(e.target.value);
+              onChange={(value) => {
+                const parsedValue = parseCurrency(typeof value === 'string' ? value : String(value ?? '0'));
                 field.onChange(parsedValue);
               }}
               placeholder="R$ 0,00"

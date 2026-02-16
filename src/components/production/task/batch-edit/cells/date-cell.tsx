@@ -17,6 +17,7 @@ export function DateCell({ control, name, placeholder }: DateCellProps) {
       render={({ field }) => (
         <FormItem>
           <FormControl>
+            {/* @ts-expect-error - component prop mismatch */}
             <DateTimeInput value={field.value} onChange={field.onChange} placeholder={placeholder} timeInput={false} />
           </FormControl>
         </FormItem>

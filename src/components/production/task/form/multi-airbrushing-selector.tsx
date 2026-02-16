@@ -49,17 +49,21 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
     // Helper to convert File objects to FileWithPreview
     const convertFilesToFileWithPreview = (files: any[]): FileWithPreview[] => {
-      return (files || []).map(file => ({
-        id: file.id,
-        name: file.filename,
-        size: file.size,
-        type: file.mimetype,
-        file: null,
-        preview: file.url || '',
-        uploaded: true,
-        uploadedFileId: file.id,
-        thumbnailUrl: file.thumbnailUrl || undefined,
-      }));
+      return (files || []).map(file => {
+        // Create a minimal File-like object that satisfies the FileWithPreview interface
+        const mockFile = new File([], file.filename || '', { type: file.mimetype || '' });
+
+        return Object.assign(mockFile, {
+          id: file.id,
+          name: file.filename,
+          size: file.size,
+          type: file.mimetype,
+          preview: file.url || '',
+          uploaded: true,
+          uploadedFileId: file.id,
+          thumbnailUrl: file.thumbnailUrl || undefined,
+        }) as FileWithPreview;
+      });
     };
 
     // Initialize airbrushings from form field value
@@ -280,7 +284,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         {/* Airbrushings List */}
         <div className="space-y-3">
           {airbrushings.map((airbrushing) => (
-              <div key={airbrushing.id} className="border border-border/40 rounded-lg p-4 space-y-4">
+              <div key={airbrushing.id} className="border border-border rounded-lg p-4 space-y-4">
                 {/* Status row (only in edit mode) */}
                 {isEditMode && (
                   <div className="flex gap-4 items-end">
@@ -288,7 +292,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       <FormLabel>Status</FormLabel>
                       <Combobox
                         value={airbrushing.status}
-                        onValueChange={(value) => updateAirbrushing(airbrushing.id, { status: value })}
+                        onValueChange={(value) => updateAirbrushing(airbrushing.id, { status: (value as string) || '' })}
                         disabled={disabled}
                         options={Object.values(AIRBRUSHING_STATUS).map((status) => ({
                           value: status,
@@ -321,7 +325,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       value={airbrushing.price || undefined}
                       onChange={(value) => {
                         updateAirbrushing(airbrushing.id, {
-                          price: value,
+                          price: typeof value === 'number' ? value : null,
                         });
                       }}
                       disabled={disabled}
@@ -336,7 +340,9 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                     <DateTimeInput
                       field={{
                         value: airbrushing.startDate,
-                        onChange: (date) => updateAirbrushing(airbrushing.id, { startDate: date }),
+                        onChange: (date) => updateAirbrushing(airbrushing.id, { startDate: date as Date | null }),
+                        onBlur: () => {},
+                        name: `airbrushings.${airbrushing.id}.startDate`,
                       }}
                       mode="date"
                       context="start"
@@ -351,7 +357,9 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       <DateTimeInput
                         field={{
                           value: airbrushing.finishDate,
-                          onChange: (date) => updateAirbrushing(airbrushing.id, { finishDate: date }),
+                          onChange: (date) => updateAirbrushing(airbrushing.id, { finishDate: date as Date | null }),
+                          onBlur: () => {},
+                          name: `airbrushings.${airbrushing.id}.finishDate`,
                         }}
                         mode="date"
                         context="end"
@@ -422,7 +430,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       showPreview={true}
                       variant="compact"
                       placeholder="Adicione artes"
-                      accept="image/*"
+                      acceptedFileTypes={{ 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'] }}
                       disabled={disabled || airbrushing.uploading}
                     />
                   </div>

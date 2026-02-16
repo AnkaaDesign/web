@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import type { SupplierGetManyFormData } from "../../../../schemas";
+import type { DateRange } from "react-day-picker";
 import {
   Sheet,
   SheetContent,
@@ -163,7 +164,10 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
               mode="multiple"
               options={stateOptions}
               value={localState.states || []}
-              onValueChange={(states) => setLocalState((prev) => ({ ...prev, states: states.length > 0 ? states : undefined }))}
+              onValueChange={(states) => {
+                const statesArray = Array.isArray(states) ? states : states ? [states] : [];
+                setLocalState((prev) => ({ ...prev, states: statesArray.length > 0 ? statesArray : undefined }));
+              }}
               placeholder="Selecione estados..."
               emptyText="Nenhum estado encontrado"
               searchPlaceholder="Buscar estados..."
@@ -189,11 +193,11 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
                 <Input
                   id="itemCountMin"
                   type="number"
-                  min="0"
+                  min={0}
                   placeholder="Valor mínimo"
-                  value={localState.itemCount?.min?.toString() || ""}
-                  onChange={(e) => {
-                    const min = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                  value={localState.itemCount?.min ?? ""}
+                  onChange={(value) => {
+                    const min = value ? parseInt(String(value), 10) : undefined;
                     if (min !== undefined && isNaN(min)) return;
                     setLocalState((prev) => ({
                       ...prev,
@@ -213,11 +217,11 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
                 <Input
                   id="itemCountMax"
                   type="number"
-                  min="0"
+                  min={0}
                   placeholder="Sem limite"
-                  value={localState.itemCount?.max?.toString() || ""}
-                  onChange={(e) => {
-                    const max = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                  value={localState.itemCount?.max ?? ""}
+                  onChange={(value) => {
+                    const max = value ? parseInt(String(value), 10) : undefined;
                     if (max !== undefined && isNaN(max)) return;
                     setLocalState((prev) => ({
                       ...prev,
@@ -254,7 +258,8 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAt?.gte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.createdAt?.lte) {
                       setLocalState((prev) => ({ ...prev, createdAt: undefined }));
                     } else {
@@ -276,7 +281,8 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAt?.lte}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.createdAt?.gte) {
                       setLocalState((prev) => ({ ...prev, createdAt: undefined }));
                     } else {

@@ -74,7 +74,7 @@ export const CuttingDetailsPage = () => {
   const [pendingStatus, setPendingStatus] = useState<CUT_STATUS | null>(null);
 
   // Permission checks
-  const canEdit = canEditCuts(user);
+  const canEdit = canEditCuts(user as any);
 
   // Fetch cut details with all relations
   const {

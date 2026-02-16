@@ -67,7 +67,10 @@ export function HolidaysFilters({ open, onOpenChange, onApply, currentYear, sele
             <Label htmlFor="year">Ano</Label>
             <Combobox
               value={year?.toString() || currentYear.toString()}
-              onValueChange={(value) => setYear(value ? parseInt(value) : currentYear)}
+              onValueChange={(value) => {
+                const yearValue = Array.isArray(value) ? value[0] : value;
+                setYear(yearValue ? parseInt(yearValue) : currentYear);
+              }}
               options={yearOptions.map((y) => ({
                 value: y.toString(),
                 label: y.toString(),
@@ -83,7 +86,10 @@ export function HolidaysFilters({ open, onOpenChange, onApply, currentYear, sele
             <Label htmlFor="month">Mês</Label>
             <Combobox
               value={month?.toString() || "all"}
-              onValueChange={(value) => setMonth(value === "all" ? undefined : value ? parseInt(value) : undefined)}
+              onValueChange={(value) => {
+                const monthValue = Array.isArray(value) ? value[0] : value;
+                setMonth(monthValue === "all" ? undefined : monthValue ? parseInt(monthValue) : undefined);
+              }}
               options={[
                 { value: "all", label: "Todos os meses" },
                 ...monthNames.map((name, index) => ({

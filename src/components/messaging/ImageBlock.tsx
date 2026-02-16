@@ -65,7 +65,7 @@ export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => 
         )}
 
         {hasError ? (
-          <div className="flex min-h-[200px] items-center justify-center bg-muted/50 border border-border/50 rounded-lg p-8">
+          <div className="flex min-h-[200px] items-center justify-center bg-muted/50 border border-border rounded-lg p-8">
             <div className="text-center">
               <svg
                 className="mx-auto h-12 w-12 text-muted-foreground"

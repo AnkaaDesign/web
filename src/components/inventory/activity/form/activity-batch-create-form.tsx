@@ -245,7 +245,7 @@ export const ActivityBatchCreateForm = () => {
                       label: `${user.name}${user.sector ? ` - ${user.sector.name}` : ""}`,
                     }))}
                     value={globalUserId}
-                    onValueChange={handleGlobalUserChange}
+                    onValueChange={(value) => handleGlobalUserChange(Array.isArray(value) ? value[0] : value || undefined)}
                     placeholder="Selecionar usuário (opcional)"
                     className="h-10"
                     searchable

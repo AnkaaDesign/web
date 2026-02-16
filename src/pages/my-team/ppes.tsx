@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate, formatDateTime } from "../../utils";
@@ -31,7 +30,7 @@ export const TeamPpesPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  if (!currentUser || !isTeamLeader(currentUser)) {
+  if (!currentUser || !isTeamLeader(currentUser as any)) {
     return <Navigate to={routes.home} replace />;
   }
 
@@ -63,10 +62,10 @@ export const TeamPpesPage = () => {
             },
           },
         },
-        ppe: true,
+        item: true,
       },
       orderBy: {
-        deliveredAt: "desc",
+        actualDeliveryDate: "desc",
       },
       page: currentPage,
       limit: pageSize,
@@ -99,10 +98,10 @@ export const TeamPpesPage = () => {
         delivery.user?.name || "",
         delivery.user?.email || "",
         delivery.user?.position?.name || "",
-        delivery.ppe?.name || "",
+        delivery.item?.name || "",
         delivery.quantity?.toString() || "1",
-        formatDateTime(delivery.deliveredAt),
-        delivery.expiresAt ? formatDate(delivery.expiresAt) : "",
+        delivery.actualDeliveryDate ? formatDateTime(delivery.actualDeliveryDate) : "",
+        "",
       ]),
     ]
       .map((row) => row.map((cell) => `"${cell}"`).join(","))
@@ -132,10 +131,10 @@ export const TeamPpesPage = () => {
         delivery.user?.name || "",
         delivery.user?.email || "",
         delivery.user?.position?.name || "",
-        delivery.ppe?.name || "",
+        delivery.item?.name || "",
         delivery.quantity?.toString() || "1",
-        formatDateTime(delivery.deliveredAt),
-        delivery.expiresAt ? formatDate(delivery.expiresAt) : "",
+        delivery.actualDeliveryDate ? formatDateTime(delivery.actualDeliveryDate) : "",
+        "",
       ]),
     ]
       .map((row) => row.join("\t"))
@@ -155,20 +154,6 @@ export const TeamPpesPage = () => {
   };
 
   const hasActiveFilters = selectedUserId;
-
-  const getExpirationStatus = (expiresAt: string | Date | null | undefined) => {
-    if (!expiresAt) return null;
-    const expDate = new Date(expiresAt);
-    const today = new Date();
-    const daysUntilExpiration = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (daysUntilExpiration < 0) {
-      return <Badge variant="destructive">Vencido</Badge>;
-    } else if (daysUntilExpiration <= 30) {
-      return <Badge className="bg-yellow-100 text-yellow-800">Vence em {daysUntilExpiration} dias</Badge>;
-    }
-    return <Badge variant="outline">Válido</Badge>;
-  };
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -190,7 +175,7 @@ export const TeamPpesPage = () => {
               <Label htmlFor="user-filter">Colaborador</Label>
               <Combobox
                 value={selectedUserId}
-                onValueChange={(value) => setSelectedUserId(value || "")}
+                onValueChange={(value) => setSelectedUserId(Array.isArray(value) ? value[0] || "" : value || "")}
                 options={[
                   { value: "", label: "Todos os colaboradores" },
                   ...teamUsers.map((user) => ({
@@ -291,18 +276,18 @@ export const TeamPpesPage = () => {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <IconHelmet className="h-4 w-4 text-muted-foreground" />
-                          <TruncatedTextWithTooltip text={delivery.ppe?.name || "-"} />
+                          <TruncatedTextWithTooltip text={delivery.item?.name || "-"} />
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-medium">{delivery.quantity || 1}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <IconCalendar className="h-4 w-4 text-muted-foreground" />
-                          {formatDate(delivery.deliveredAt)}
+                          {delivery.actualDeliveryDate ? formatDate(delivery.actualDeliveryDate) : "-"}
                         </div>
                       </TableCell>
-                      <TableCell>{delivery.expiresAt ? formatDate(delivery.expiresAt) : "-"}</TableCell>
-                      <TableCell>{getExpirationStatus(delivery.expiresAt)}</TableCell>
+                      <TableCell>-</TableCell>
+                      <TableCell>-</TableCell>
                     </TableRow>
                   ))
                 )}

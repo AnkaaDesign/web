@@ -381,7 +381,7 @@ export function PerformanceLevelFilters({
               searchPlaceholder="Buscar setores..."
               options={sectorOptions}
               value={localState.sectorIds}
-              onValueChange={handleSectorsChange}
+              onValueChange={(value) => handleSectorsChange(Array.isArray(value) ? value : value ? [value] : [])}
               className="w-full"
               searchable={true}
               clearable={true}
@@ -404,7 +404,7 @@ export function PerformanceLevelFilters({
               searchPlaceholder="Buscar cargos..."
               options={positionOptions}
               value={localState.positionIds}
-              onValueChange={handlePositionsChange}
+              onValueChange={(value) => handlePositionsChange(Array.isArray(value) ? value : value ? [value] : [])}
               className="w-full"
               searchable={true}
               clearable={true}
@@ -427,7 +427,7 @@ export function PerformanceLevelFilters({
               searchPlaceholder="Buscar usuários..."
               options={userOptions}
               value={localState.includeUserIds}
-              onValueChange={handleIncludeUsersChange}
+              onValueChange={(value) => handleIncludeUsersChange(Array.isArray(value) ? value : value ? [value] : [])}
               className="w-full"
               searchable={true}
               clearable={true}
@@ -454,7 +454,7 @@ export function PerformanceLevelFilters({
               searchPlaceholder="Buscar usuários..."
               options={userOptions}
               value={localState.excludeUserIds}
-              onValueChange={handleExcludeUsersChange}
+              onValueChange={(value) => handleExcludeUsersChange(Array.isArray(value) ? value : value ? [value] : [])}
               className="w-full"
               searchable={true}
               clearable={true}

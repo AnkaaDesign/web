@@ -140,7 +140,10 @@ export const MyPpesPage = () => {
       [PPE_DELIVERY_STATUS.PENDING]: "outline",
       [PPE_DELIVERY_STATUS.APPROVED]: "default",
       [PPE_DELIVERY_STATUS.DELIVERED]: "secondary",
+      [PPE_DELIVERY_STATUS.WAITING_SIGNATURE]: "outline",
+      [PPE_DELIVERY_STATUS.COMPLETED]: "secondary",
       [PPE_DELIVERY_STATUS.REPROVED]: "destructive",
+      [PPE_DELIVERY_STATUS.SIGNATURE_REJECTED]: "destructive",
       [PPE_DELIVERY_STATUS.CANCELLED]: "destructive",
     };
 
@@ -387,10 +390,10 @@ export const MyPpesPage = () => {
           {totalPages > 1 && (
             <div className="flex-shrink-0 pt-2">
               <SimplePaginationAdvanced
-                currentPage={page}
+                currentPage={page - 1}
                 totalPages={totalPages}
-                onPageChange={setPage}
-                totalRecords={totalRecords}
+                onPageChange={(p) => setPage(p + 1)}
+                totalItems={totalRecords}
                 pageSize={pageSize}
                 onPageSizeChange={(size) => {
                   setPageSize(size);
@@ -446,7 +449,7 @@ export const MyPpesPage = () => {
                 options={statusOptions}
                 value={localFilterState.status || []}
                 onValueChange={(value) =>
-                  setLocalFilterState((prev) => ({ ...prev, status: value }))
+                  setLocalFilterState((prev): FilterState => ({ ...prev, status: Array.isArray(value) ? value : undefined }))
                 }
                 placeholder="Selecione status..."
                 emptyText="Nenhum status encontrado"

@@ -56,7 +56,6 @@ export interface PpeDelivery extends BaseEntity {
   // ClickSign integration fields
   clicksignEnvelopeId?: string | null;
   clicksignDocumentKey?: string | null;
-  clicksignRequestKey?: string | null;
   clicksignSignerKey?: string | null;
   clicksignSignedAt?: Date | null;
   deliveryDocumentId?: string | null;

@@ -1,4 +1,5 @@
 import { FormField } from "@/components/ui/form";
+import type { DateRange } from "react-day-picker";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 
 interface DateRangeSelectorProps {
@@ -17,7 +18,8 @@ export function DateRangeSelector({ control, name, label, description, disabled 
       name={name}
       render={({ field }) => {
         // Handle date changes for the "from" field
-        const handleFromChange = (date: Date | null) => {
+        const handleFromChange = (date: Date | DateRange | null) => {
+          if (date && !(date instanceof Date)) return; // Skip DateRange for now
           const currentValue = field.value || {};
 
           if (!date && !currentValue.lte) {
@@ -31,7 +33,8 @@ export function DateRangeSelector({ control, name, label, description, disabled 
         };
 
         // Handle date changes for the "to" field
-        const handleToChange = (date: Date | null) => {
+        const handleToChange = (date: Date | DateRange | null) => {
+          if (date && !(date instanceof Date)) return; // Skip DateRange for now
           const currentValue = field.value || {};
 
           if (!date && !currentValue.gte) {
@@ -86,7 +89,8 @@ interface StandaloneDateRangeSelectorProps {
 
 export function StandaloneDateRangeSelector({ value, onChange, label, description, disabled, className }: StandaloneDateRangeSelectorProps) {
   // Handle date changes for the "from" field
-  const handleFromChange = (date: Date | null) => {
+  const handleFromChange = (date: Date | DateRange | null) => {
+    if (date && !(date instanceof Date)) return; // Skip DateRange for now
     if (!date && !value?.lte) {
       onChange(undefined);
     } else {
@@ -98,7 +102,8 @@ export function StandaloneDateRangeSelector({ value, onChange, label, descriptio
   };
 
   // Handle date changes for the "to" field
-  const handleToChange = (date: Date | null) => {
+  const handleToChange = (date: Date | DateRange | null) => {
+    if (date && !(date instanceof Date)) return; // Skip DateRange for now
     if (!date && !value?.gte) {
       onChange(undefined);
     } else {

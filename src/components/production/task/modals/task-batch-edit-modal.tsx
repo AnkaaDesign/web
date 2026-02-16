@@ -21,7 +21,7 @@ const batchEditSchema = z.object({
   status: z.enum(Object.values(TASK_STATUS) as [string, ...string[]]).optional(),
   sectorId: z.string().uuid().optional().nullable(),
   paintId: z.string().uuid().optional().nullable(),
-  term: z.date().optional().nullable(),
+  term: z.date().nullable().optional(),
   // Flags for which fields to update
   updateStatus: z.boolean().default(false),
   updateSector: z.boolean().default(false),
@@ -57,7 +57,6 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
       updateSector: false,
       updatePaint: false,
       updateTerm: false,
-      updateCommission: false,
     },
   });
 
@@ -109,7 +108,6 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
   const watchUpdateSector = form.watch("updateSector");
   const watchUpdatePaint = form.watch("updatePaint");
   const watchUpdateTerm = form.watch("updateTerm");
-  const watchUpdateCommission = form.watch("updateCommission");
 
   // Check if tasks can be batch edited based on their status
   const canEdit = tasks.every((task) => task.status !== TASK_STATUS.COMPLETED && task.status !== TASK_STATUS.CANCELLED);
@@ -299,7 +297,10 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
                     name="term"
                     render={({ field }) => (
                       <DateTimeInput
-                        field={field}
+                        field={{
+                          ...field,
+                          value: field.value ?? null,
+                        }}
                         mode="datetime"
                         context="due"
                         placeholder="Selecione o prazo de entrega"
@@ -307,7 +308,6 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
                         constraints={{
                           minDate: new Date(), // Term should be in the future
                         }}
-                        allowManualInput={true}
                       />
                     )}
                   />
@@ -323,7 +323,7 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
               <Button
                 type="submit"
                 disabled={
-                  !canEdit || isSubmitting || (!watchUpdateStatus && !watchUpdateSector && !watchUpdatePaint && !watchUpdateTerm && !watchUpdateCommission)
+                  !canEdit || isSubmitting || (!watchUpdateStatus && !watchUpdateSector && !watchUpdatePaint && !watchUpdateTerm)
                 }
               >
                 {isSubmitting && <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />}

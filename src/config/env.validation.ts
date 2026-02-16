@@ -14,6 +14,12 @@ export const envSchema = z.object({
     .transform((val) => val === "true")
     .optional(),
 
+  // Application Configuration (Optional - have sensible defaults)
+  VITE_APP_ROOT: z.string().optional(),
+  VITE_STAGING_DOMAIN: z.string().optional(),
+  VITE_PRODUCTION_DOMAIN: z.string().optional(),
+  VITE_APP_SCHEME: z.string().optional(),
+
   // Analytics (Optional)
   VITE_ANALYTICS_ID: z.string().optional(),
   VITE_SENTRY_DSN: z.string().url().optional(),

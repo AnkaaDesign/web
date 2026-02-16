@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { trackPageAccess } from "../../utils";
 
 interface UsePageTrackerOptions {
+  page?: string;
   title: string;
   icon?: string;
   trackingEnabled?: boolean;

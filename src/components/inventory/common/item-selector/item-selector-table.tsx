@@ -21,7 +21,6 @@ import type { ItemGetManyFormData } from "../../../../schemas";
 import type {
   ItemSelectorTableProps,
   ItemSelectorContext,
-  ItemSelectorColumn,
 } from "./item-selector-types";
 import { createItemSelectorColumns, getDefaultVisibleColumns } from "./item-selector-columns";
 import { ItemSelectorFilters } from "./item-selector-filters";

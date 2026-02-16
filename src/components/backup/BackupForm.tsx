@@ -68,8 +68,8 @@ export function BackupForm({ open, onClose, onSuccess }: BackupFormProps) {
         autoDelete: formData.autoDelete.enabled ? formData.autoDelete : undefined,
       });
 
-      if (result.data?.id) {
-        onSuccess?.(result.data.id);
+      if (result.id) {
+        onSuccess?.(result.id);
       }
 
       onClose();
@@ -122,7 +122,7 @@ export function BackupForm({ open, onClose, onSuccess }: BackupFormProps) {
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, name: String(value) })}
                 placeholder="e.g., Daily Database Backup"
                 required
               />
@@ -164,7 +164,7 @@ export function BackupForm({ open, onClose, onSuccess }: BackupFormProps) {
               <div className="flex gap-2">
                 <Input
                   value={pathInput}
-                  onChange={(e) => setPathInput(e.target.value)}
+                  onChange={(value) => setPathInput(String(value))}
                   placeholder="/path/to/backup"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -221,11 +221,11 @@ export function BackupForm({ open, onClose, onSuccess }: BackupFormProps) {
               <Input
                 id="compression"
                 type="number"
-                min="1"
-                max="9"
+                min={1}
+                max={9}
                 value={formData.compressionLevel}
-                onChange={(e) =>
-                  setFormData({ ...formData, compressionLevel: parseInt(e.target.value) })
+                onChange={(value) =>
+                  setFormData({ ...formData, compressionLevel: Number(value) })
                 }
               />
             </div>
@@ -242,7 +242,7 @@ export function BackupForm({ open, onClose, onSuccess }: BackupFormProps) {
             />
           </div>
 
-          <div className="border dark:border-border/40 rounded-lg p-4 space-y-4 bg-muted/50">
+          <div className="border dark:border-border rounded-lg p-4 space-y-4 bg-muted/50">
             <div className="flex items-center justify-between">
               <Label htmlFor="autoDelete" className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />

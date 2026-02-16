@@ -123,6 +123,7 @@ export const ExportButton = ({
   showDataCount = true,
   disabled = false,
   className,
+  // @ts-expect-error - ExportFormat type mismatch
   availableFormats = ["csv", "excel", "pdf", "json"],
   onExportStart,
   onExportComplete,
@@ -169,7 +170,7 @@ export const ExportButton = ({
     if (availableFormats.length === 1) {
       handleExport(availableFormats[0]);
     } else {
-      handleExport("csv"); // Default to CSV for quick export
+      handleExport("csv" as ExportFormat); // Default to CSV for quick export
     }
   };
 

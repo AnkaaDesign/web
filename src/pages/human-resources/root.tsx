@@ -6,25 +6,27 @@ import { useHRDashboard, useVacations, usePpeDeliveries } from "../../hooks";
 import { useNavigate } from "react-router-dom";
 import { formatDate, addDays } from "../../utils";
 import { useState, useMemo } from "react";
+// Tabler icons for PageHeader component
+import { IconUsers as TablerIconUsers, IconPlus as TablerIconPlus } from "@tabler/icons-react";
+
+// Lucide icons for dashboard components
 import {
-  IconUsers,
-  IconPlus,
-  IconCalendar,
-  IconCalendarEvent,
-  IconBellRinging,
-  IconShieldCheck,
-  IconUserCheck,
-  IconClock,
-  IconActivity,
-  IconChartPie,
-  IconBriefcase,
-  IconUserCog,
-  IconBeach,
-  IconMail,
-  IconTrophy,
-  IconHome,
-  IconCheck,
-} from "@tabler/icons-react";
+  Users as IconUsers,
+  Calendar as IconCalendar,
+  CalendarDays as IconCalendarEvent,
+  Bell as IconBellRinging,
+  ShieldCheck as IconShieldCheck,
+  UserCheck as IconUserCheck,
+  Clock as IconClock,
+  Activity as IconActivity,
+  PieChart as IconChartPie,
+  Briefcase as IconBriefcase,
+  UserCog as IconUserCog,
+  Palmtree as IconBeach,
+  Mail as IconMail,
+  Trophy as IconTrophy,
+  Home as IconHome,
+} from "lucide-react";
 import {
   RecentActivitiesCard,
   TrendCard,
@@ -54,7 +56,10 @@ export const HumanResourcesRootPage = () => {
   });
 
   // Fetch dashboard data with time period
-  const { data: dashboard, isLoading, error } = useHRDashboard({ timePeriod });
+  const { data: dashboard, isLoading, error } = useHRDashboard({
+    timePeriod,
+    includeInactive: false
+  });
 
   // Memoize date ranges to prevent recreating them on every render
   const vacationDateRange = useMemo(() => {
@@ -90,7 +95,7 @@ export const HumanResourcesRootPage = () => {
       retry: false,
       retryOnMount: false,
       staleTime: Infinity, // Never consider stale
-      cacheTime: 60 * 60 * 1000, // 1 hour cache
+      gcTime: 60 * 60 * 1000, // 1 hour cache
       refetchInterval: false,
     },
   );
@@ -112,7 +117,7 @@ export const HumanResourcesRootPage = () => {
       retry: false,
       retryOnMount: false,
       staleTime: Infinity, // Never consider stale
-      cacheTime: 60 * 60 * 1000, // 1 hour cache
+      gcTime: 60 * 60 * 1000, // 1 hour cache
       refetchInterval: false,
     },
   );
@@ -175,15 +180,20 @@ export const HumanResourcesRootPage = () => {
   const getVacationStatus = () => {
     if (!dashboard?.data?.vacationMetrics) return [];
 
-    const { totalVacations, pending, approved, inProgress, completed } = dashboard.data.vacationMetrics;
+    const metrics = dashboard.data.vacationMetrics;
+    // Calculate totals from the metrics we have
+    const onVacation = metrics.onVacationNow?.value || 0;
+    const upcoming = metrics.upcomingVacations?.value || 0;
+    const approved = metrics.approvedVacations?.value || 0;
+    const totalVacations = onVacation + upcoming + approved;
 
     return [
       {
-        status: "Pendente",
-        quantity: pending,
+        status: "Em Andamento",
+        quantity: onVacation,
         total: totalVacations,
-        icon: IconClock,
-        color: "orange" as const,
+        icon: IconBeach,
+        color: "blue" as const,
       },
       {
         status: "Aprovado",
@@ -193,17 +203,17 @@ export const HumanResourcesRootPage = () => {
         color: "green" as const,
       },
       {
-        status: "Em Andamento",
-        quantity: inProgress,
+        status: "Próximas",
+        quantity: upcoming,
         total: totalVacations,
-        icon: IconBeach,
-        color: "blue" as const,
+        icon: IconClock,
+        color: "orange" as const,
       },
       {
-        status: "Concluído",
-        quantity: completed,
+        status: "Agendadas",
+        quantity: metrics.vacationSchedule?.length || 0,
         total: totalVacations,
-        icon: IconCheck,
+        icon: IconCalendar,
         color: "purple" as const,
       },
     ];
@@ -235,16 +245,16 @@ export const HumanResourcesRootPage = () => {
     });
   };
 
-  // Get seniority data from position levels
+  // Get seniority data from performance levels
   const getSeniorityAnalysis = (): AnalysisData[] => {
-    if (!dashboard?.data?.overview?.employeesByPositionLevel) return [];
+    if (!dashboard?.data?.overview?.employeesByPerformanceLevel) return [];
 
-    const levelData = dashboard.data.overview.employeesByPositionLevel;
+    const levelData = dashboard.data.overview.employeesByPerformanceLevel;
     if (!levelData.datasets || !levelData.datasets[0]) return [];
 
     // Get data for each performance level (1-5)
     const levels = [];
-    const total = levelData.datasets[0].data.reduce((sum, val) => sum + val, 0);
+    const total = levelData.datasets[0].data.reduce((sum: number, val: number) => sum + val, 0);
 
     for (let i = 0; i < 5; i++) {
       const value = levelData.datasets[0].data[i] || 0;
@@ -267,23 +277,19 @@ export const HumanResourcesRootPage = () => {
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="h-full flex flex-col bg-background">
           {/* Fixed Header */}
-          <div className="flex-shrink-0 bg-background">
-            <div className="px-4 py-4">
-              <PageHeader
-                title="Recursos Humanos"
-                icon={IconUsers}
-                favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
-                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }]}
-                actions={[
-                  {
-                    key: "time-period",
-                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                    variant: "ghost",
-                    className: "p-0 hover:bg-transparent",
-                  },
-                ]}
-              />
-            </div>
+          <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+            <PageHeader
+              title="Recursos Humanos"
+              icon={TablerIconUsers}
+              favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }]}
+              actions={[
+                {
+                  key: "time-period",
+                  label: <TimePeriodSelector value={timePeriod} onChange={(value) => setTimePeriod(value as DASHBOARD_TIME_PERIOD)} /> as any,
+                },
+              ]}
+            />
           </div>
 
           {/* Scrollable Content */}
@@ -306,23 +312,19 @@ export const HumanResourcesRootPage = () => {
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="h-full flex flex-col bg-background">
           {/* Fixed Header */}
-          <div className="flex-shrink-0 bg-background">
-            <div className="px-4 py-4">
-              <PageHeader
-                title="Recursos Humanos"
-                icon={IconUsers}
-                favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
-                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }]}
-                actions={[
-                  {
-                    key: "time-period",
-                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                    variant: "ghost",
-                    className: "p-0 hover:bg-transparent",
-                  },
-                ]}
-              />
-            </div>
+          <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+            <PageHeader
+              title="Recursos Humanos"
+              icon={TablerIconUsers}
+              favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }]}
+              actions={[
+                {
+                  key: "time-period",
+                  label: <TimePeriodSelector value={timePeriod} onChange={(value) => setTimePeriod(value as DASHBOARD_TIME_PERIOD)} /> as any,
+                },
+              ]}
+            />
           </div>
 
           {/* Scrollable Content */}
@@ -346,36 +348,33 @@ export const HumanResourcesRootPage = () => {
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col bg-background">
         {/* Fixed Header */}
-        <div className="flex-shrink-0 bg-background">
-          <div className="px-4 py-4">
-            <PageHeader
-              title="Recursos Humanos"
-              icon={IconUsers}
-              favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
-              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }]}
-              actions={[
-                {
-                  key: "time-period",
-                  label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                  variant: "ghost",
-                  className: "p-0 hover:bg-transparent",
-                },
-                {
-                  key: "create-position",
-                  label: "Novo Cargo",
-                  icon: IconPlus,
-                  onClick: () => navigate(routes.humanResources.positions.create),
-                  variant: "default",
-                },
-              ]}
-            />
-          </div>
+        <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+          <PageHeader
+            title="Recursos Humanos"
+            icon={TablerIconUsers}
+            favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
+            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }]}
+            actions={[
+              {
+                key: "create-position",
+                label: "Novo Cargo",
+                icon: TablerIconPlus,
+                onClick: () => navigate(routes.humanResources.positions.create),
+                variant: "default",
+              },
+              {
+                key: "time-period",
+                label: <TimePeriodSelector value={timePeriod} onChange={(value) => setTimePeriod(value as DASHBOARD_TIME_PERIOD)} /> as any,
+              },
+            ]}
+          />
         </div>
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-4 pb-6">
           <Card>
             <CardContent className="p-6 space-y-6">
+
             {/* Quick Access Section */}
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4">Acesso Rápido</h3>
@@ -391,7 +390,7 @@ export const HumanResourcesRootPage = () => {
                   title="Férias"
                   icon={IconBeach}
                   onClick={() => navigate(routes.humanResources.vacations.root)}
-                  count={data?.vacationMetrics?.totalVacations}
+                  count={data?.vacationMetrics?.vacationSchedule?.length}
                   color="green"
                 />
                 <QuickAccessCard
@@ -404,7 +403,7 @@ export const HumanResourcesRootPage = () => {
                 <QuickAccessCard
                   title="Avisos"
                   icon={IconBellRinging}
-                  onClick={() => navigate(routes.humanResources.notices.root)}
+                  onClick={() => navigate(routes.humanResources.warnings.root)}
                   count={data?.noticeMetrics?.totalNotices}
                   color="orange"
                 />
@@ -464,11 +463,11 @@ export const HumanResourcesRootPage = () => {
                 />
                 <TrendCard
                   title="Férias Aprovadas"
-                  value={data?.vacationMetrics?.approvedThisMonth || 0}
-                  trend={data?.vacationMetrics?.vacationTrend}
-                  percentage={data?.vacationMetrics?.vacationPercent}
+                  value={data?.vacationMetrics?.approvedVacations?.value || 0}
+                  trend="stable"
+                  percentage={0}
                   icon={IconBeach}
-                  subtitle="Este mês"
+                  subtitle="Aprovadas"
                 />
                 <TrendCard
                   title="EPIs Entregues"
@@ -478,7 +477,7 @@ export const HumanResourcesRootPage = () => {
                   icon={IconShieldCheck}
                   subtitle="Este mês"
                 />
-                <TrendCard title="Avisos Enviados" value={data?.noticeMetrics?.sentThisMonth || 0} trend="up" percentage={8} icon={IconBellRinging} subtitle="Este mês" />
+                <TrendCard title="Avisos Ativos" value={data?.noticeMetrics?.activeNotices || 0} trend="stable" percentage={0} icon={IconBellRinging} subtitle="Avisos ativos" />
               </div>
             </div>
 
@@ -499,19 +498,21 @@ export const HumanResourcesRootPage = () => {
                   color="green"
                 />
                 <ActivityPatternCard
-                  title="Férias por Mês"
-                  data={
-                    data?.vacationMetrics?.vacationsByMonth?.map((monthData) => {
-                      // Convert YYYY-MM to complete month name
-                      const [_year, month] = monthData.month.split("-");
-                      const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-                      const monthName = monthNames[parseInt(month) - 1];
-                      return {
-                        label: monthName,
-                        value: monthData.count,
-                      };
-                    }) || []
-                  }
+                  title="Status das Férias"
+                  data={[
+                    {
+                      label: "Aprovadas",
+                      value: data?.vacationMetrics?.approvedVacations?.value || 0,
+                    },
+                    {
+                      label: "Em Andamento",
+                      value: data?.vacationMetrics?.onVacationNow?.value || 0,
+                    },
+                    {
+                      label: "Próximas",
+                      value: data?.vacationMetrics?.upcomingVacations?.value || 0,
+                    },
+                  ]}
                   icon={IconCalendar}
                   color="purple"
                 />
@@ -534,10 +535,10 @@ export const HumanResourcesRootPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <AnalysisCard
                   title="Distribuição por Departamento"
-                  type="DEPARTMENT"
+                  type="custom"
                   data={getEmployeeAnalysis()}
                   icon={IconChartPie}
-                  onDetailsClick={() => navigate(routes.humanResources.sectors.root)}
+                  onDetailsClick={() => navigate(routes.administration.sectors.root)}
                 />
                 <AnalysisCard
                   title="Análise de Desempenho"

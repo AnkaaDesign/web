@@ -45,7 +45,8 @@ export function ColorMultiSelect({
   }, []);
 
   const renderValue = React.useCallback(
-    (selectedOptions: ColorMultiSelectOption[]) => {
+    (option: ColorMultiSelectOption | ColorMultiSelectOption[] | undefined) => {
+      const selectedOptions = Array.isArray(option) ? option : option ? [option] : [];
       if (!selectedOptions || selectedOptions.length === 0) {
         return <span className="text-muted-foreground group-hover:text-inherit group-data-[state=open]:text-inherit">{placeholder}</span>;
       }

@@ -26,9 +26,9 @@ export function PISInput({ disabled }: PISInputProps) {
             <Input
               ref={field.ref}
               value={field.value ? formatPIS(field.value) : ""}
-              onChange={(value: string) => {
+              onChange={(value: string | number | null) => {
                 // Remove non-numeric characters and apply formatting
-                const cleanedValue = value.replace(/\D/g, "");
+                const cleanedValue = typeof value === 'string' ? value.replace(/\D/g, "") : null;
                 field.onChange(cleanedValue || null);
               }}
               onBlur={field.onBlur}

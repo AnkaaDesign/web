@@ -4,24 +4,24 @@ import { cn } from "@/lib/utils";
 export const tableStyles = {
   // Container styles
   container: "flex flex-col h-full overflow-hidden",
-  scrollContainer: "flex-1 overflow-auto border border-neutral-400 dark:border-border/40 rounded-md",
+  scrollContainer: "flex-1 overflow-auto border border-neutral-400 dark:border-border rounded-md",
 
   // Table structure
   table: "w-full border-collapse",
 
   // Header styles
   thead: "sticky top-0 z-20 bg-background",
-  theadRow: "border-b border-neutral-400 dark:border-border/40",
-  th: "text-left p-2 font-medium text-sm border-r border-neutral-400 dark:border-border/40",
+  theadRow: "border-b border-neutral-400 dark:border-border",
+  th: "text-left p-2 font-medium text-sm border-r border-neutral-400 dark:border-border",
   thSticky: "sticky left-0 bg-background z-30",
-  thCenter: "text-center p-2 font-medium text-sm border-r border-neutral-400 dark:border-border/40",
+  thCenter: "text-center p-2 font-medium text-sm border-r border-neutral-400 dark:border-border",
 
   // Body styles
   tbody: "",
-  tr: "border-b border-neutral-400 dark:border-border/40 transition-colors",
-  td: "p-1 border-r border-neutral-400 dark:border-border/40",
+  tr: "border-b border-neutral-400 dark:border-border transition-colors",
+  td: "p-1 border-r border-neutral-400 dark:border-border",
   tdSticky: "sticky left-0 bg-background z-10",
-  tdCenter: "text-center p-1 border-r border-neutral-400 dark:border-border/40",
+  tdCenter: "text-center p-1 border-r border-neutral-400 dark:border-border",
 
   // Column widths
   dateColumn: "w-[150px] min-w-[150px] max-w-[150px]",

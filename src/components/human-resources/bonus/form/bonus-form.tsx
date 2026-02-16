@@ -40,7 +40,7 @@ export function BonusForm({
           month: bonus.month,
           userId: bonus.userId,
           performanceLevel: bonus.performanceLevel,
-          baseBonus: bonus.baseBonus,
+          baseBonus: typeof bonus.baseBonus === 'number' ? bonus.baseBonus : bonus.baseBonus.toNumber(),
         }
       : {
           year: new Date().getFullYear(),
@@ -118,7 +118,7 @@ export function BonusForm({
                       <FormLabel>Ano</FormLabel>
                       <Select
                         onValueChange={(value) => field.onChange(Number(value))}
-                        value={field.value?.toString()}
+                        value={field.value !== undefined ? field.value.toString() : undefined}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -146,7 +146,7 @@ export function BonusForm({
                       <FormLabel>Mês</FormLabel>
                       <Select
                         onValueChange={(value) => field.onChange(Number(value))}
-                        value={field.value?.toString()}
+                        value={field.value !== undefined ? field.value.toString() : undefined}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -221,7 +221,7 @@ export function BonusForm({
                       <FormLabel>Nível de Performance</FormLabel>
                       <Select
                         onValueChange={(value) => field.onChange(Number(value))}
-                        value={field.value?.toString()}
+                        value={field.value !== undefined ? field.value.toString() : undefined}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -250,16 +250,16 @@ export function BonusForm({
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.01"
-                          min="0"
+                          step={0.01}
+                          min={0}
                           placeholder="0,00"
                           ref={field.ref}
-                          onChange={(value: string) => field.onChange(Number(value))}
+                          onChange={(value: string | number | null) => field.onChange(typeof value === 'number' ? value : (typeof value === 'string' ? Number(value) || 0 : 0))}
                           onBlur={field.onBlur}
-                          value={field.value || ""}
+                          value={field.value}
                         />
                       </FormControl>
-                      {watchedValues.baseBonus > 0 && (
+                      {watchedValues.baseBonus !== undefined && watchedValues.baseBonus > 0 && (
                         <p className="text-sm text-muted-foreground">
                           Valor formatado: {formatCurrency(watchedValues.baseBonus)}
                         </p>

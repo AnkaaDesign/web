@@ -72,7 +72,7 @@ export function ContactFilters({ hasCnpj, onHasCnpjChange, hasEmail, onHasEmailC
               type="text"
               placeholder="Digite parte do telefone..."
               value={phoneContains || ""}
-              onChange={(e) => onPhoneContainsChange(e.target.value || undefined)}
+              onChange={(value) => onPhoneContainsChange((value as string) || undefined)}
             />
             {phoneContains && <div className="text-xs text-muted-foreground">Buscando por: "{phoneContains}"</div>}
           </div>

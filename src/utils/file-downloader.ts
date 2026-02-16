@@ -1,6 +1,7 @@
 // apps/web/src/utils/file-downloader.ts
 
 import type { File as AnkaaFile } from "../types";
+import { getApiBaseUrl } from "@/config/api";
 
 export interface DownloadConfig {
   baseUrl?: string;
@@ -20,21 +21,7 @@ export interface DownloadResult {
   fileName?: string;
 }
 
-/**
- * Get API base URL from environment or fallback
- */
-const getApiBaseUrl = (): string => {
-  if (typeof globalThis !== "undefined" && typeof globalThis.window !== "undefined") {
-    const windowApiUrl = (globalThis.window as any).__ANKAA_API_URL__;
-    if (windowApiUrl) return windowApiUrl;
-  }
-
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-
-  return "http://localhost:3030";
-};
+// getApiBaseUrl imported from @/config/api
 
 /**
  * Validate file before download

@@ -51,7 +51,7 @@ export function RelatedItemsCard({ items, supplierId, className }: RelatedItemsC
       return (
         item.name?.toLowerCase().includes(searchLower) ||
         item.uniCode?.toLowerCase().includes(searchLower) ||
-        item.barCode?.toLowerCase().includes(searchLower) ||
+        item.barcodes?.some(barcode => barcode.toLowerCase().includes(searchLower)) ||
         item.brand?.name?.toLowerCase().includes(searchLower) ||
         item.category?.name?.toLowerCase().includes(searchLower)
       );

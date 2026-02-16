@@ -137,7 +137,7 @@ export function BorrowCardSkeleton() {
           </div>
 
           {/* User Information Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <Skeleton className="h-5 w-40 mb-4" />
             <div className="bg-muted/30 rounded-lg p-4">
               <Skeleton className="h-5 w-36 mb-3" />
@@ -157,7 +157,7 @@ export function BorrowCardSkeleton() {
           </div>
 
           {/* Borrow Details Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <Skeleton className="h-5 w-36 mb-4" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>

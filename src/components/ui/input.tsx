@@ -17,7 +17,7 @@ import {
   parseCurrency,
   formatBrazilianPhone,
 } from "../../utils";
-import { useCepLookup } from "@/hooks/common/use-cep-lookup";
+import { useCepLookup, type CepData } from "@/hooks/common/use-cep-lookup";
 import { IconLoader2 } from "@tabler/icons-react";
 
 type InputType =
@@ -42,19 +42,10 @@ type InputType =
   | "integer"
   | "natural";
 
-interface CepData {
-  logradouro: string;
-  bairro: string;
-  localidade: string;
-  uf: string;
-  erro?: boolean;
-}
-
-export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange" | "maxLength" | "onBlur" | "name"> {
+export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange" | "maxLength"> {
   type?: InputType;
   value?: string | number | null;
-  // Support both custom onChange (value) and react-hook-form onChange (event)
-  onChange?: ((value: string | number | null) => void) | React.ChangeEventHandler<HTMLInputElement>;
+  onChange?: (value: string | number | null) => void;
   decimals?: number;
   documentType?: "cpf" | "cnpj";
   onCepLookup?: (data: CepData) => void;
@@ -71,6 +62,9 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   min?: number;
   max?: number;
   step?: number;
+  // Props needed for react-hook-form compatibility
+  onBlur?: React.FocusEventHandler<HTMLInputElement>;
+  name?: string;
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -719,16 +713,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         setInternalValue(rawValue);
         setDisplayValue(naturalTyping ? displayValue : rawValue);
         setCursorPosition(null);
-
-        if (onChange) {
-          // If name prop is provided (e.g., from react-hook-form's register()),
-          // pass the event for compatibility. Otherwise pass value directly.
-          if (nameProp !== undefined) {
-            (onChange as React.ChangeEventHandler<HTMLInputElement>)(e);
-          } else {
-            (onChange as (value: string | number | null) => void)(rawValue);
-          }
-        }
+        onChange?.(rawValue);
         return;
       }
 
@@ -1270,7 +1255,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       }
 
       // Call original onBlur if provided
-      props.onBlur?.(e);
+      onBlurProp?.(e);
     };
 
     const getInputMode = (): React.InputHTMLAttributes<HTMLInputElement>["inputMode"] => {
@@ -1313,7 +1298,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
     const getPlaceholder = (): string => {
       if (typewriterPlaceholder) return placeholderText;
-      if (props.placeholder) return props.placeholder;
+      if (placeholder) return placeholder;
 
       switch (type) {
         case "cpf":
@@ -1412,8 +1397,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           type={getHtmlType()}
           name={nameProp}
           className={cn(
-            "flex h-10 w-full rounded-md border border-border px-2 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 ease-in-out",
-            transparent ? "!bg-transparent" : "bg-input",
+            "flex h-10 w-full rounded-md border border-border bg-transparent px-2 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 ease-in-out",
             withIcon && "pr-10",
             className,
           )}

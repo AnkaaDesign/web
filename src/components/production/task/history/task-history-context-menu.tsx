@@ -72,11 +72,11 @@ export function TaskHistoryContextMenu({
 
   // Permission checks
   const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
-  const isTeamLeaderUser = user ? isTeamLeader(user) : false;
-  const canDelete = canDeleteTasks(user);
+  const isTeamLeaderUser = user ? isTeamLeader(user as any) : false;
+  const canDelete = canDeleteTasks(user as any);
 
   // Team leaders can only manage tasks in their managed sector or tasks without sector
-  const canLeaderManageTheseTasks = isTeamLeaderUser && tasks.every((t) => canLeaderManageTask(user, t.sectorId));
+  const canLeaderManageTheseTasks = isTeamLeaderUser && tasks.every((t) => canLeaderManageTask(user as any, t.sectorId));
   const canManageStatus = isAdmin || canLeaderManageTheseTasks;
 
   // FINANCIAL users should only see View and Edit options
@@ -213,7 +213,7 @@ export function TaskHistoryContextMenu({
           id,
           data: { sectorId }
         }));
-        await batchUpdate({ items: updates });
+        await batchUpdate({ tasks: updates });
       }
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
@@ -246,7 +246,7 @@ export function TaskHistoryContextMenu({
       } else {
         // Note: startedAt and finishedAt are auto-filled by the backend when status changes
         const updates = taskIds.map(id => ({ id, data: { status } }));
-        await batchUpdate({ items: updates });
+        await batchUpdate({ tasks: updates });
       }
     } catch (error) {
       console.error("Error updating task status:", error);
@@ -316,7 +316,7 @@ export function TaskHistoryContextMenu({
       // First, validate ALL tasks before making any updates
       for (const t of tasks) {
         if (t.status === TASK_STATUS.IN_PRODUCTION) {
-          const taskName = t.name || t.serialNumber || t.plate || 'Tarefa';
+          const taskName = t.name || t.serialNumber || t.truck?.plate || 'Tarefa';
 
           // Get all PRODUCTION service orders for this task
           const productionServiceOrders = t.serviceOrders?.filter(
@@ -522,7 +522,7 @@ export function TaskHistoryContextMenu({
         observation: task.observation
           ? {
               description: task.observation.description,
-              artworkIds: task.observation.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
+              artworkIds: task.observation.files?.map((file: any) => file.id) || [],
             }
           : null,
       });
@@ -608,7 +608,7 @@ export function TaskHistoryContextMenu({
         <PositionedDropdownMenuContent
           position={position}
           isOpen={dropdownOpen}
-          className="w-56"
+          className="w-72"
           onCloseAutoFocus={(e) => e.preventDefault()}
           onPointerDownOutside={(e) => {
             // Prevent menu from closing on the initial pointer event that opened it
@@ -639,7 +639,7 @@ export function TaskHistoryContextMenu({
           {(hasPreparationTasks || hasWaitingProductionTasks) && canLiberar && (
             <DropdownMenuItem onClick={handleLiberar} className="text-blue-600 hover:text-white">
               <IconCalendarCheck className="mr-2 h-4 w-4" />
-              Liberar
+              <span className="truncate">Liberar</span>
             </DropdownMenuItem>
           )}
 
@@ -647,22 +647,22 @@ export function TaskHistoryContextMenu({
           {(hasPreparationTasks || hasWaitingProductionTasks) && canDarEntrada && (
             <DropdownMenuItem onClick={handleDarEntrada} className="text-emerald-600 hover:text-white">
               <IconDoorEnter className="mr-2 h-4 w-4" />
-              Dar Entrada
+              <span className="truncate">Dar Entrada</span>
             </DropdownMenuItem>
           )}
 
           {/* Status actions - Team leaders (sector match) and ADMIN only */}
-          {canManageStatus && (hasPreparationTasks || hasWaitingProductionTasks) && (
+          {canManageStatus && (isPreparationRoute ? hasPreparationTasks : (hasPreparationTasks || hasWaitingProductionTasks)) && (
             <DropdownMenuItem onClick={handleStart} className="text-green-700 hover:text-white">
               <IconPlayerPlay className="mr-2 h-4 w-4" />
-              {isPreparationRoute ? "Disponibilizar para produção" : "Iniciar"}
+              <span className="truncate">{isPreparationRoute ? "Disponibilizar para produção" : "Iniciar"}</span>
             </DropdownMenuItem>
           )}
 
           {canManageStatus && hasInProgressTasks && (
             <DropdownMenuItem onClick={handleFinish} className="text-green-700 hover:text-white">
               <IconCheck className="mr-2 h-4 w-4" />
-              Finalizar
+              <span className="truncate">Finalizar</span>
             </DropdownMenuItem>
           )}
 
@@ -673,21 +673,21 @@ export function TaskHistoryContextMenu({
           {!isBulk && task && (
             <DropdownMenuItem onClick={handleView}>
               <IconEye className="mr-2 h-4 w-4" />
-              Visualizar
+              <span className="truncate">Visualizar</span>
             </DropdownMenuItem>
           )}
 
           {/* Edit action */}
           <DropdownMenuItem onClick={handleEdit}>
             <IconEdit className="mr-2 h-4 w-4" />
-            {isBulk ? "Editar em lote" : "Editar"}
+            <span className="truncate">{isBulk ? "Editar em lote" : "Editar"}</span>
           </DropdownMenuItem>
 
           {/* Admin-only actions: duplicate, setSector (conditionally), setStatus */}
           {isAdmin && !isBulk && (
             <DropdownMenuItem onClick={handleDuplicate}>
               <IconCopy className="mr-2 h-4 w-4" />
-              Criar Cópias
+              <span className="truncate">Criar Cópias</span>
             </DropdownMenuItem>
           )}
 
@@ -698,7 +698,7 @@ export function TaskHistoryContextMenu({
               onSelect={(e) => e.preventDefault()}
             >
               <IconBuildingFactory2 className="mr-2 h-4 w-4" />
-              {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
+              <span className="truncate">{tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}</span>
             </DropdownMenuItem>
           )}
 
@@ -709,7 +709,7 @@ export function TaskHistoryContextMenu({
               onSelect={(e) => e.preventDefault()}
             >
               <IconFileInvoice className="mr-2 h-4 w-4" />
-              Alterar Status
+              <span className="truncate">Alterar Status</span>
             </DropdownMenuItem>
           )}
 
@@ -720,43 +720,43 @@ export function TaskHistoryContextMenu({
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="data-[state=open]:bg-accent data-[state=open]:text-accent-foreground">
                 <IconSettings2 className="mr-2 h-4 w-4" />
-                <span className="data-[state=open]:text-accent-foreground">Avançados</span>
+                <span className="truncate data-[state=open]:text-accent-foreground">Avançados</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 {canAccessArtworks && (
                   <DropdownMenuItem onClick={handleBulkArts}>
                     <IconPhoto className="mr-2 h-4 w-4" />
-                    Adicionar Artes
+                    <span className="truncate">Adicionar Artes</span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={handleBulkBaseFiles}>
                   <IconFileText className="mr-2 h-4 w-4" />
-                  Arquivos Base
+                  <span className="truncate">Arquivos Base</span>
                 </DropdownMenuItem>
                 {canAccessPaints && (
                   <DropdownMenuItem onClick={handleBulkPaints}>
                     <IconPalette className="mr-2 h-4 w-4" />
-                    Adicionar Tintas
+                    <span className="truncate">Adicionar Tintas</span>
                   </DropdownMenuItem>
                 )}
                 {canAccessCutPlan && (
                   <DropdownMenuItem onClick={handleBulkCuttingPlans}>
                     <IconCut className="mr-2 h-4 w-4" />
-                    Adicionar Plano de Corte
+                    <span className="truncate">Adicionar Plano de Corte</span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={handleBulkServiceOrder}>
                   <IconFileInvoice className="mr-2 h-4 w-4" />
-                  Ordem de Servico
+                  <span className="truncate">Ordem de Servico</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleBulkLayout}>
                   <IconLayout className="mr-2 h-4 w-4" />
-                  Layout
+                  <span className="truncate">Layout</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleCopyFromTask}>
                   <IconClipboardCopy className="mr-2 h-4 w-4" />
-                  Copiar de Outra Tarefa
+                  <span className="truncate">Copiar de Outra Tarefa</span>
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
@@ -768,7 +768,7 @@ export function TaskHistoryContextMenu({
           {canCancel && hasNonCancelledTasks && (
             <DropdownMenuItem onClick={handleCancel} className="text-orange-600 hover:text-white">
               <IconX className="mr-2 h-4 w-4" />
-              {isBulk ? "Cancelar selecionadas" : "Cancelar"}
+              <span className="truncate">{isBulk ? "Cancelar selecionadas" : "Cancelar"}</span>
             </DropdownMenuItem>
           )}
 
@@ -778,7 +778,7 @@ export function TaskHistoryContextMenu({
           {canDelete && (
             <DropdownMenuItem onClick={handleDelete} className="text-destructive">
               <IconTrash className="mr-2 h-4 w-4" />
-              {isBulk ? "Excluir selecionadas" : "Excluir"}
+              <span className="truncate">{isBulk ? "Excluir selecionadas" : "Excluir"}</span>
             </DropdownMenuItem>
           )}
         </PositionedDropdownMenuContent>

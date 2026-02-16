@@ -261,7 +261,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                         <FormLabel>Nome do Agendamento {isRequired && <span className="text-destructive">*</span>}</FormLabel>
                         <FormControl>
                           <Input
-                            value={field.value}
+                            value={field.value ?? ""}
                             onChange={field.onChange}
                             onBlur={field.onBlur}
                             name={field.name}
@@ -286,7 +286,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                       <FormLabel>Descrição</FormLabel>
                       <FormControl>
                         <Textarea
-                          value={field.value}
+                          value={field.value ?? ""}
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           name={field.name}
@@ -334,7 +334,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                   />
 
                   {/* Show interval field only for frequencies that support it */}
-                  {watchFrequency && frequencyGroups.withInterval.includes(watchFrequency) && (
+                  {watchFrequency && frequencyGroups.withInterval.includes(watchFrequency as SCHEDULE_FREQUENCY) && (
                     <FormField
                       control={form.control}
                       name="frequencyCount"
@@ -363,7 +363,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                                 disabled={isSubmitting}
                                 className="bg-transparent"
                                 ref={field.ref}
-                                value={field.value}
+                                value={field.value ?? 1}
                                 onChange={(value) => field.onChange(typeof value === "number" ? value : parseInt(String(value)) || 1)}
                                 onBlur={field.onBlur}
                               />
@@ -376,7 +376,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                   )}
 
                   {/* Specific date field (for ONCE and CUSTOM frequencies) */}
-                  {watchFrequency && frequencyGroups.needsSpecificDate.includes(watchFrequency) && (
+                  {watchFrequency && frequencyGroups.needsSpecificDate.includes(watchFrequency as SCHEDULE_FREQUENCY) && (
                     <FormField
                       control={form.control}
                       name="specificDate"
@@ -387,7 +387,12 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                             {isRequired && <span className="text-destructive">*</span>}
                           </FormLabel>
                           <DateTimeInput
-                            field={field}
+                            field={{
+                              onChange: field.onChange,
+                              onBlur: field.onBlur,
+                              value: field.value ?? null,
+                              name: field.name,
+                            }}
                             hideLabel
                             placeholder="Selecione a data"
                             mode="date"
@@ -403,7 +408,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                   )}
 
                   {/* Day of week field (for WEEKLY and BIWEEKLY) */}
-                  {watchFrequency && frequencyGroups.needsDayOfWeek.includes(watchFrequency) && (
+                  {watchFrequency && frequencyGroups.needsDayOfWeek.includes(watchFrequency as SCHEDULE_FREQUENCY) && (
                     <FormField
                       control={form.control}
                       name="dayOfWeek"
@@ -427,7 +432,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                   )}
 
                   {/* Month field (for ANNUAL only) */}
-                  {watchFrequency && frequencyGroups.needsMonth.includes(watchFrequency) && (
+                  {watchFrequency && frequencyGroups.needsMonth.includes(watchFrequency as SCHEDULE_FREQUENCY) && (
                     <FormField
                       control={form.control}
                       name="month"
@@ -451,7 +456,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                   )}
 
                   {/* Day of month field (for monthly/quarterly/annual frequencies) */}
-                  {watchFrequency && frequencyGroups.needsDayOfMonth.includes(watchFrequency) && (
+                  {watchFrequency && frequencyGroups.needsDayOfMonth.includes(watchFrequency as SCHEDULE_FREQUENCY) && (
                     <FormField
                       control={form.control}
                       name="dayOfMonth"
@@ -479,7 +484,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                   )}
 
                   {/* Next run date field (for all except ONCE and CUSTOM) */}
-                  {watchFrequency && frequencyGroups.needsNextRun.includes(watchFrequency) && (
+                  {watchFrequency && frequencyGroups.needsNextRun.includes(watchFrequency as SCHEDULE_FREQUENCY) && (
                     <FormField
                       control={form.control}
                       name="nextRun"
@@ -487,7 +492,12 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                         <FormItem className="flex flex-col flex-1 min-w-[200px]">
                           <FormLabel>Primeira Execução</FormLabel>
                           <DateTimeInput
-                            field={field}
+                            field={{
+                              onChange: field.onChange,
+                              onBlur: field.onBlur,
+                              value: field.value ?? null,
+                              name: field.name,
+                            }}
                             hideLabel
                             placeholder="Data de início"
                             mode="date"
@@ -538,9 +548,9 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                               className="bg-transparent"
                               {...field}
                               value={field.value || 1}
-                              onChange={(e) => {
-                                const value = parseInt(e.target.value);
-                                field.onChange(isNaN(value) || value < 1 ? 1 : value);
+                              onChange={(value) => {
+                                const numValue = typeof value === "number" ? value : parseInt(String(value));
+                                field.onChange(isNaN(numValue) || numValue < 1 ? 1 : numValue);
                               }}
                             />
                           </FormControl>

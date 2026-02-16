@@ -503,11 +503,13 @@ const bonusTransform = (data: any) => {
 
   if (data.searchingFor && typeof data.searchingFor === "string") {
     const searchTerm = data.searchingFor;
+    const parsedYear = parseInt(searchTerm);
+    const parsedMonth = parseInt(searchTerm);
     data.where = {
       ...data.where,
       OR: [
-        { year: { equals: parseInt(searchTerm) || undefined } },
-        { month: { equals: parseInt(searchTerm) || undefined } },
+        { year: { equals: !isNaN(parsedYear) ? parsedYear : undefined } },
+        { month: { equals: !isNaN(parsedMonth) ? parsedMonth : undefined } },
         { user: { name: { contains: searchTerm, mode: "insensitive" } } },
       ],
     };
@@ -604,8 +606,8 @@ export const mapToBonusFormData = createMapToFormDataHelper<Bonus, BonusUpdateFo
   year: bonus.year,
   month: bonus.month,
   performanceLevel: bonus.performanceLevel,
-  ponderedTaskCount: typeof bonus.ponderedTaskCount === 'number' ? bonus.ponderedTaskCount : bonus.ponderedTaskCount.toNumber(),
-  averageTasksPerUser: typeof bonus.averageTasksPerUser === 'number' ? bonus.averageTasksPerUser : bonus.averageTasksPerUser.toNumber(),
+  ponderedTaskCount: bonus.ponderedTaskCount ? (typeof bonus.ponderedTaskCount === 'number' ? bonus.ponderedTaskCount : bonus.ponderedTaskCount.toNumber()) : 0,
+  averageTasksPerUser: bonus.averageTasksPerUser ? (typeof bonus.averageTasksPerUser === 'number' ? bonus.averageTasksPerUser : bonus.averageTasksPerUser.toNumber()) : 0,
   calculationPeriodStart: bonus.calculationPeriodStart,
   calculationPeriodEnd: bonus.calculationPeriodEnd,
 }));

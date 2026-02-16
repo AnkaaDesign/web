@@ -98,7 +98,7 @@ export function BonusDiscountManager({
   const discountColumns: StandardizedColumn<BonusDiscount>[] = [
     {
       key: "reference",
-      title: "Referência",
+      header: "Referência",
       render: (discount) => (
         <div className="font-medium">
           {discount.reference}
@@ -107,7 +107,7 @@ export function BonusDiscountManager({
     },
     {
       key: "percentage",
-      title: "Tipo",
+      header: "Tipo",
       render: (discount) => (
         <Badge variant={discount.percentage ? "secondary" : "outline"}>
           {discount.percentage ? `${discount.percentage}%` : "Valor Fixo"}
@@ -116,9 +116,12 @@ export function BonusDiscountManager({
     },
     {
       key: "value",
-      title: "Desconto",
+      header: "Desconto",
       render: (discount) => {
-        const discountAmount = discount.value || (bonus.baseBonus * (discount.percentage || 0) / 100);
+        const baseValue = typeof bonus.baseBonus === 'number' ? bonus.baseBonus : bonus.baseBonus.toNumber();
+        const percentageValue = typeof discount.percentage === 'number' ? discount.percentage : discount.percentage?.toNumber() || 0;
+        const valueAmount = discount.value ? (typeof discount.value === 'number' ? discount.value : discount.value.toNumber()) : 0;
+        const discountAmount = valueAmount || (baseValue * percentageValue / 100);
         return (
           <span className="font-medium text-red-600">
             -{formatCurrency(discountAmount)}
@@ -128,7 +131,7 @@ export function BonusDiscountManager({
     },
     {
       key: "calculationOrder",
-      title: "Ordem",
+      header: "Ordem",
       render: (discount) => (
         <Badge variant="outline">
           {discount.calculationOrder}
@@ -137,7 +140,7 @@ export function BonusDiscountManager({
     },
     {
       key: "actions",
-      title: "Ações",
+      header: "Ações",
       render: (discount) => (
         <Button
           variant="ghost"
@@ -154,7 +157,7 @@ export function BonusDiscountManager({
   const suspendedTaskColumns: StandardizedColumn<Task>[] = [
     {
       key: "name",
-      title: "Tarefa",
+      header: "Tarefa",
       render: (task) => (
         <div className="font-medium">
           {task.name}
@@ -163,12 +166,12 @@ export function BonusDiscountManager({
     },
     {
       key: "customer.name",
-      title: "Cliente",
+      header: "Cliente",
       render: (task) => task.customer?.fantasyName || "N/A",
     },
     {
       key: "actions",
-      title: "Ações",
+      header: "Ações",
       render: (task) => (
         <Button
           variant="ghost"
@@ -296,19 +299,18 @@ export function BonusDiscountManager({
                           <FormControl>
                             <Input
                               type="number"
-                              step="0.01"
-                              min="0"
-                              max="100"
+                              step={0.01}
+                              min={0}
+                              max={100}
                               placeholder="0.00"
-                              {...field}
-                              onChange={(e) => {
-                                const value = e.target.value ? Number(e.target.value) : undefined;
-                                field.onChange(value);
-                                if (value !== undefined) {
+                              onChange={(value) => {
+                                const numValue = value ? Number(value) : undefined;
+                                field.onChange(numValue);
+                                if (numValue !== undefined) {
                                   form.setValue("value", undefined);
                                 }
                               }}
-                              value={field.value || ""}
+                              value={field.value ?? ""}
                             />
                           </FormControl>
                           <FormMessage />
@@ -325,18 +327,17 @@ export function BonusDiscountManager({
                           <FormControl>
                             <Input
                               type="number"
-                              step="0.01"
-                              min="0"
+                              step={0.01}
+                              min={0}
                               placeholder="0.00"
-                              {...field}
-                              onChange={(e) => {
-                                const value = e.target.value ? Number(e.target.value) : undefined;
-                                field.onChange(value);
-                                if (value !== undefined) {
+                              onChange={(value) => {
+                                const numValue = value ? Number(value) : undefined;
+                                field.onChange(numValue);
+                                if (numValue !== undefined) {
                                   form.setValue("percentage", undefined);
                                 }
                               }}
-                              value={field.value || ""}
+                              value={field.value ?? ""}
                             />
                           </FormControl>
                           <FormMessage />
@@ -359,7 +360,7 @@ export function BonusDiscountManager({
                         <span className="text-red-600">
                           -{formatCurrency(
                             watchedValues.value ||
-                            (bonus.baseBonus * (watchedValues.percentage || 0) / 100)
+                            (Number(typeof bonus.baseBonus === 'number' ? bonus.baseBonus : bonus.baseBonus.toNumber()) * (watchedValues.percentage || 0) / 100)
                           )}
                         </span>
                       </p>
@@ -379,6 +380,7 @@ export function BonusDiscountManager({
               <StandardizedTable
                 data={discounts}
                 columns={discountColumns}
+                getItemKey={(discount) => discount.id}
                 emptyMessage="Nenhum desconto aplicado"
               />
             </CardContent>
@@ -405,14 +407,14 @@ export function BonusDiscountManager({
                   columns={[
                     {
                       key: "reference",
-                      title: "Referência",
+                      header: "Referência",
                       render: (extra) => (
                         <div className="font-medium">{extra.reference}</div>
                       ),
                     },
                     {
                       key: "percentage",
-                      title: "Tipo",
+                      header: "Tipo",
                       render: (extra) => (
                         <Badge variant={extra.percentage ? "secondary" : "outline"}>
                           {extra.percentage ? `${extra.percentage}%` : "Valor Fixo"}
@@ -421,11 +423,12 @@ export function BonusDiscountManager({
                     },
                     {
                       key: "value",
-                      title: "Valor",
+                      header: "Valor",
                       render: (extra) => {
-                        const extraAmount = extra.value
-                          ? Number(extra.value)
-                          : Number(bonus.baseBonus) * (Number(extra.percentage) || 0) / 100;
+                        const baseValue = typeof bonus.baseBonus === 'number' ? bonus.baseBonus : bonus.baseBonus.toNumber();
+                        const percentageValue = extra.percentage ? (typeof extra.percentage === 'number' ? extra.percentage : extra.percentage.toNumber()) : 0;
+                        const valueAmount = extra.value ? (typeof extra.value === 'number' ? extra.value : extra.value.toNumber()) : 0;
+                        const extraAmount = valueAmount || (baseValue * percentageValue / 100);
                         return (
                           <span className="font-medium text-emerald-600">
                             +{formatCurrency(extraAmount)}
@@ -435,12 +438,13 @@ export function BonusDiscountManager({
                     },
                     {
                       key: "calculationOrder",
-                      title: "Ordem",
+                      header: "Ordem",
                       render: (extra) => (
                         <Badge variant="outline">{extra.calculationOrder}</Badge>
                       ),
                     },
                   ]}
+                  getItemKey={(extra) => extra.id}
                   emptyMessage="Nenhum extra aplicado"
                 />
               )}
@@ -487,6 +491,7 @@ export function BonusDiscountManager({
               <StandardizedTable
                 data={suspendedTasks}
                 columns={suspendedTaskColumns}
+                getItemKey={(task) => task.id}
                 emptyMessage="Nenhuma tarefa suspensa"
               />
             </CardContent>

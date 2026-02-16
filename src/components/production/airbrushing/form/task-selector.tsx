@@ -284,7 +284,11 @@ export const TaskSelector = ({
                     }))}
                     mode="multiple"
                     value={tempStatusIds}
-                    onValueChange={setTempStatusIds}
+                    onValueChange={(value) => {
+                      if (Array.isArray(value)) {
+                        setTempStatusIds(value);
+                      }
+                    }}
                     placeholder="Selecionar status..."
                     searchPlaceholder="Buscar status..."
                   />
@@ -298,7 +302,11 @@ export const TaskSelector = ({
                     }))}
                     mode="multiple"
                     value={tempCustomerIds}
-                    onValueChange={setTempCustomerIds}
+                    onValueChange={(value) => {
+                      if (Array.isArray(value)) {
+                        setTempCustomerIds(value);
+                      }
+                    }}
                     placeholder="Selecionar clientes..."
                     searchPlaceholder="Buscar clientes..."
                   />
@@ -312,7 +320,11 @@ export const TaskSelector = ({
                     }))}
                     mode="multiple"
                     value={tempUserIds}
-                    onValueChange={setTempUserIds}
+                    onValueChange={(value) => {
+                      if (Array.isArray(value)) {
+                        setTempUserIds(value);
+                      }
+                    }}
                     placeholder="Selecionar usuários..."
                     searchPlaceholder="Buscar usuários..."
                   />
@@ -326,7 +338,11 @@ export const TaskSelector = ({
                     }))}
                     mode="multiple"
                     value={tempSectorIds}
-                    onValueChange={setTempSectorIds}
+                    onValueChange={(value) => {
+                      if (Array.isArray(value)) {
+                        setTempSectorIds(value);
+                      }
+                    }}
                     placeholder="Selecionar setores..."
                     searchPlaceholder="Buscar setores..."
                   />

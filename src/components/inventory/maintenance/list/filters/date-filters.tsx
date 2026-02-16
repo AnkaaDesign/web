@@ -1,6 +1,7 @@
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import type { DateRange } from "react-day-picker";
 
 interface MaintenanceDateFiltersProps {
   nextRunRange?: { gte?: Date; lte?: Date };
@@ -19,69 +20,87 @@ export function MaintenanceDateFilters({
   updatedAtRange,
   onUpdatedAtRangeChange,
 }: MaintenanceDateFiltersProps) {
-  const handleNextRunFromChange = (date: Date | null) => {
-    if (!date && !nextRunRange?.lte) {
-      onNextRunRangeChange(undefined);
-    } else {
-      onNextRunRangeChange({
-        ...(date && { gte: date }),
-        ...(nextRunRange?.lte && { lte: nextRunRange.lte }),
-      });
+  const handleNextRunFromChange = (date: Date | DateRange | null) => {
+    // Only handle Date instances (mode is "date", not "date-range")
+    if (date instanceof Date || date === null) {
+      if (!date && !nextRunRange?.lte) {
+        onNextRunRangeChange(undefined);
+      } else {
+        onNextRunRangeChange({
+          ...(date && { gte: date }),
+          ...(nextRunRange?.lte && { lte: nextRunRange.lte }),
+        });
+      }
     }
   };
 
-  const handleNextRunToChange = (date: Date | null) => {
-    if (!date && !nextRunRange?.gte) {
-      onNextRunRangeChange(undefined);
-    } else {
-      onNextRunRangeChange({
-        ...(nextRunRange?.gte && { gte: nextRunRange.gte }),
-        ...(date && { lte: date }),
-      });
+  const handleNextRunToChange = (date: Date | DateRange | null) => {
+    // Only handle Date instances (mode is "date", not "date-range")
+    if (date instanceof Date || date === null) {
+      if (!date && !nextRunRange?.gte) {
+        onNextRunRangeChange(undefined);
+      } else {
+        onNextRunRangeChange({
+          ...(nextRunRange?.gte && { gte: nextRunRange.gte }),
+          ...(date && { lte: date }),
+        });
+      }
     }
   };
 
-  const handleCreatedAtFromChange = (date: Date | null) => {
-    if (!date && !createdAtRange?.lte) {
-      onCreatedAtRangeChange(undefined);
-    } else {
-      onCreatedAtRangeChange({
-        ...(date && { gte: date }),
-        ...(createdAtRange?.lte && { lte: createdAtRange.lte }),
-      });
+  const handleCreatedAtFromChange = (date: Date | DateRange | null) => {
+    // Only handle Date instances (mode is "date", not "date-range")
+    if (date instanceof Date || date === null) {
+      if (!date && !createdAtRange?.lte) {
+        onCreatedAtRangeChange(undefined);
+      } else {
+        onCreatedAtRangeChange({
+          ...(date && { gte: date }),
+          ...(createdAtRange?.lte && { lte: createdAtRange.lte }),
+        });
+      }
     }
   };
 
-  const handleCreatedAtToChange = (date: Date | null) => {
-    if (!date && !createdAtRange?.gte) {
-      onCreatedAtRangeChange(undefined);
-    } else {
-      onCreatedAtRangeChange({
-        ...(createdAtRange?.gte && { gte: createdAtRange.gte }),
-        ...(date && { lte: date }),
-      });
+  const handleCreatedAtToChange = (date: Date | DateRange | null) => {
+    // Only handle Date instances (mode is "date", not "date-range")
+    if (date instanceof Date || date === null) {
+      if (!date && !createdAtRange?.gte) {
+        onCreatedAtRangeChange(undefined);
+      } else {
+        onCreatedAtRangeChange({
+          ...(createdAtRange?.gte && { gte: createdAtRange.gte }),
+          ...(date && { lte: date }),
+        });
+      }
     }
   };
 
-  const handleUpdatedAtFromChange = (date: Date | null) => {
-    if (!date && !updatedAtRange?.lte) {
-      onUpdatedAtRangeChange(undefined);
-    } else {
-      onUpdatedAtRangeChange({
-        ...(date && { gte: date }),
-        ...(updatedAtRange?.lte && { lte: updatedAtRange.lte }),
-      });
+  const handleUpdatedAtFromChange = (date: Date | DateRange | null) => {
+    // Only handle Date instances (mode is "date", not "date-range")
+    if (date instanceof Date || date === null) {
+      if (!date && !updatedAtRange?.lte) {
+        onUpdatedAtRangeChange(undefined);
+      } else {
+        onUpdatedAtRangeChange({
+          ...(date && { gte: date }),
+          ...(updatedAtRange?.lte && { lte: updatedAtRange.lte }),
+        });
+      }
     }
   };
 
-  const handleUpdatedAtToChange = (date: Date | null) => {
-    if (!date && !updatedAtRange?.gte) {
-      onUpdatedAtRangeChange(undefined);
-    } else {
-      onUpdatedAtRangeChange({
-        ...(updatedAtRange?.gte && { gte: updatedAtRange.gte }),
-        ...(date && { lte: date }),
-      });
+  const handleUpdatedAtToChange = (date: Date | DateRange | null) => {
+    // Only handle Date instances (mode is "date", not "date-range")
+    if (date instanceof Date || date === null) {
+      if (!date && !updatedAtRange?.gte) {
+        onUpdatedAtRangeChange(undefined);
+      } else {
+        onUpdatedAtRangeChange({
+          ...(updatedAtRange?.gte && { gte: updatedAtRange.gte }),
+          ...(date && { lte: date }),
+        });
+      }
     }
   };
 

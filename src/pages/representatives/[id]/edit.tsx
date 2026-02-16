@@ -42,7 +42,7 @@ export default function EditRepresentativePage() {
       toast({
         title: 'Erro',
         description: error.message || 'Erro ao atualizar representante',
-        variant: 'destructive',
+        variant: 'error',
       });
     },
   });
@@ -115,7 +115,7 @@ export default function EditRepresentativePage() {
         <RepresentativeForm
           mode="edit"
           initialData={representative}
-          initialCustomer={representative?.customer}
+          initialCustomer={representative?.customer || undefined}
           onSubmit={handleSubmit}
           isSubmitting={updateMutation.isPending}
           onFormStateChange={setFormState}

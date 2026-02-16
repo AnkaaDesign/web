@@ -144,7 +144,7 @@ export function MultiCombobox({
               <Input
                 placeholder={searchPlaceholder}
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(value) => setSearch(value as string)}
                 className="border-0 p-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-2"
               />
             </div>

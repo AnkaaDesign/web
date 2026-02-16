@@ -34,7 +34,7 @@ export const buildTableRowClasses = (params: { isModified?: boolean; isWeekend?:
   const { isModified, isWeekend, isEven, isSelected, className } = params;
 
   return cn(
-    "border-b border-neutral-400 dark:border-border/40 transition-colors",
+    "border-b border-neutral-400 dark:border-border transition-colors",
     isModified && "bg-yellow-50 dark:bg-yellow-900/20",
     isWeekend && "bg-red-50 dark:bg-red-900/10",
     !isModified && !isWeekend && isEven && "bg-muted/50",
@@ -48,7 +48,7 @@ export const buildTableCellClasses = (params: { isModified?: boolean; isSticky?:
   const { isModified, isSticky, isCenter, width, className } = params;
 
   return cn(
-    "p-1 border-r border-neutral-400 dark:border-border/40",
+    "p-1 border-r border-neutral-400 dark:border-border",
     isCenter && "text-center",
     isSticky && "sticky left-0 bg-background z-10",
     isModified && "bg-yellow-100 dark:bg-yellow-900/30",

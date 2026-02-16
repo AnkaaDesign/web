@@ -305,7 +305,7 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
                     {conflict.type === "number" && (
                       <div className="space-y-2">
                         <RadioGroup
-                          value={resolutions.get(conflict.field)?.action}
+                          value={resolutions.get(conflict.field)?.action ?? undefined}
                           onValueChange={(action) => {
                             if (action === "sum" || action === "max") {
                               handleResolutionChange(conflict.field, { field: conflict.field, action: action as any });
@@ -355,14 +355,15 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
                           <Input
                             type="number"
                             placeholder="Digite o valor personalizado"
-                            value={customValues.get(conflict.field) || ""}
-                            onChange={(e) => {
-                              const value = parseFloat(e.target.value);
-                              handleCustomValueChange(conflict.field, e.target.value);
+                            value={customValues.get(conflict.field) ?? ""}
+                            onChange={(value: string | number | null) => {
+                              const stringValue = String(value ?? '');
+                              const numValue = parseFloat(stringValue || '0');
+                              handleCustomValueChange(conflict.field, stringValue);
                               handleResolutionChange(conflict.field, {
                                 field: conflict.field,
                                 action: "custom",
-                                customValue: isNaN(value) ? null : value,
+                                customValue: isNaN(numValue) ? null : numValue,
                               });
                             }}
                           />
@@ -372,7 +373,7 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
 
                     {conflict.type === "single" && (
                       <RadioGroup
-                        value={resolutions.get(conflict.field)?.selectedItemId}
+                        value={resolutions.get(conflict.field)?.selectedItemId ?? undefined}
                         onValueChange={(itemId) =>
                           handleResolutionChange(conflict.field, {
                             field: conflict.field,
@@ -395,7 +396,7 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
 
                     {conflict.type === "boolean" && (
                       <RadioGroup
-                        value={resolutions.get(conflict.field)?.selectedItemId}
+                        value={resolutions.get(conflict.field)?.selectedItemId ?? undefined}
                         onValueChange={(itemId) =>
                           handleResolutionChange(conflict.field, {
                             field: conflict.field,
@@ -423,9 +424,9 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
                           <div key={value.itemId} className="flex items-start space-x-2">
                             <Checkbox
                               id={`${conflict.field}-${value.itemId}`}
-                              checked={resolutions.get(conflict.field)?.selectedIds?.includes(value.itemId)}
+                              checked={resolutions.get(conflict.field)?.selectedIds?.includes(value.itemId) ?? false}
                               onCheckedChange={(checked) => {
-                                const currentIds = resolutions.get(conflict.field)?.selectedIds || [];
+                                const currentIds = resolutions.get(conflict.field)?.selectedIds ?? [];
                                 const newIds = checked
                                   ? [...currentIds, value.itemId]
                                   : currentIds.filter((id) => id !== value.itemId);
@@ -466,7 +467,7 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Código</Label>
-                    <p className="font-medium">{mergedPreview.uniCode || "N/A"}</p>
+                    <p className="font-medium">{mergedPreview.uniCode ?? "N/A"}</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Quantidade</Label>
@@ -474,7 +475,7 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Preço Total</Label>
-                    <p className="font-medium">{mergedPreview.totalPrice ? formatCurrency(mergedPreview.totalPrice) : "N/A"}</p>
+                    <p className="font-medium">{mergedPreview.totalPrice !== null && mergedPreview.totalPrice !== undefined ? formatCurrency(mergedPreview.totalPrice) : "N/A"}</p>
                   </div>
                 </div>
               </div>

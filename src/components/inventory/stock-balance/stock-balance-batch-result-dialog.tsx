@@ -1,5 +1,5 @@
 import { IconCheck, IconX, IconAlertCircle, IconPackage, IconFileText, IconArrowUp, IconArrowDown } from "@tabler/icons-react";
-import type { BatchOperationResult, BatchOperationError } from "../../../types";
+import type { BatchOperationResult } from "../../../types";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

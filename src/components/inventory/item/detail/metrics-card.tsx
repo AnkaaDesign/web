@@ -137,7 +137,7 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
         </div>
 
         {/* Relation Counts */}
-        <div className="mt-8 pt-8 border-t border-border/50">
+        <div className="mt-8 pt-8 border-t border-border">
           <h4 className="text-base font-semibold mb-4 text-foreground flex items-center gap-2">
             <IconActivity className="h-4 w-4 text-primary" />
             Contadores de Relações
@@ -164,7 +164,7 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
 
         {/* ABC/XYZ Categorization */}
         {(item.abcCategory || item.xyzCategory) && (
-          <div className="mt-8 pt-8 border-t border-border/50">
+          <div className="mt-8 pt-8 border-t border-border">
             <h4 className="text-base font-semibold mb-4 text-foreground flex items-center gap-2">
               <IconTags className="h-4 w-4 text-primary" />
               Categorização ABC/XYZ
@@ -193,7 +193,7 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
         )}
 
         {/* Stock Levels */}
-        <div className="mt-8 pt-8 border-t border-border/50">
+        <div className="mt-8 pt-8 border-t border-border">
           <h4 className="text-base font-semibold mb-4 text-foreground">Níveis de Estoque</h4>
           <div className="space-y-4">
             <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">

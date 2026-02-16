@@ -63,7 +63,7 @@ export function SearchFilter({
         type="text"
         placeholder={placeholder}
         value={displayValue}
-        onChange={(e) => handleChange(e.target.value)}
+        onChange={(value) => handleChange(value as string)}
         className="pl-9 pr-9"
       />
       {displayValue && (

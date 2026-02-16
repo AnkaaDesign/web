@@ -63,7 +63,7 @@ export function ItemBatchEditTable({ items, onCancel: _onCancel, onSubmit: _onSu
           categoryId: item.categoryId || undefined,
           supplierId: item.supplierId || undefined,
           isActive: item.isActive,
-          totalPrice: item.totalPrice || 0,
+          price: item.price || undefined,
           quantity: item.quantity,
           barcodes: item.barcodes || [],
         },
@@ -89,7 +89,7 @@ export function ItemBatchEditTable({ items, onCancel: _onCancel, onSubmit: _onSu
         item.data.categoryId !== originalItem.categoryId ||
         item.data.supplierId !== originalItem.supplierId ||
         item.data.isActive !== originalItem.isActive ||
-        item.data.totalPrice !== originalItem.totalPrice ||
+        item.data.price !== originalItem.price ||
         item.data.quantity !== originalItem.quantity ||
         JSON.stringify(item.data.barcodes) !== JSON.stringify(originalItem.barcodes || []);
 
@@ -115,7 +115,7 @@ export function ItemBatchEditTable({ items, onCancel: _onCancel, onSubmit: _onSu
       const result = await batchUpdateAsync(batchPayload);
       if (result?.data) {
         // Show the detailed result dialog
-        setBatchResult(result.data);
+        setBatchResult(result.data as any);
         setShowResultDialog(true);
       } else {
         // Even if we don't have detailed results, navigate back on apparent success

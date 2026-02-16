@@ -239,7 +239,7 @@ export function BonusSimulationFilters({
               searchPlaceholder="Buscar setores..."
               options={sectorOptions}
               value={localFilters.sectorIds}
-              onValueChange={handleSectorsChange}
+              onValueChange={(value) => handleSectorsChange(Array.isArray(value) ? value : value ? [value] : [])}
               className="w-full"
               searchable={true}
               clearable={true}
@@ -262,7 +262,7 @@ export function BonusSimulationFilters({
               searchPlaceholder="Buscar cargos..."
               options={positionOptions}
               value={localFilters.positionIds}
-              onValueChange={handlePositionsChange}
+              onValueChange={(value) => handlePositionsChange(Array.isArray(value) ? value : value ? [value] : [])}
               className="w-full"
               searchable={true}
               clearable={true}
@@ -285,7 +285,7 @@ export function BonusSimulationFilters({
               searchPlaceholder="Buscar usuários..."
               options={userOptions}
               value={localFilters.includeUserIds}
-              onValueChange={handleIncludeUsersChange}
+              onValueChange={(value) => handleIncludeUsersChange(Array.isArray(value) ? value : value ? [value] : [])}
               className="w-full"
               searchable={true}
               clearable={true}
@@ -312,7 +312,7 @@ export function BonusSimulationFilters({
               searchPlaceholder="Buscar usuários..."
               options={userOptions}
               value={localFilters.excludeUserIds}
-              onValueChange={handleExcludeUsersChange}
+              onValueChange={(value) => handleExcludeUsersChange(Array.isArray(value) ? value : value ? [value] : [])}
               className="w-full"
               searchable={true}
               clearable={true}

@@ -17,12 +17,12 @@ import { UserStatusSelector } from "./status-selector";
 import { VerifiedSwitch } from "./verified-switch";
 import { ActiveSwitch } from "./active-switch";
 import { StatusDatesSection } from "./status-dates-section";
-import { AddressInput } from "@/components/ui/form-address-input";
-import { AddressNumberInput } from "@/components/ui/form-address-number-input";
-import { AddressComplementInput } from "@/components/ui/form-address-complement-input";
-import { NeighborhoodInput } from "@/components/ui/form-neighborhood-input";
-import { CityInput } from "@/components/ui/form-city-input";
-import { StateSelector } from "@/components/ui/form-state-selector";
+import { FormAddressInput } from "@/components/ui/form-address-input";
+import { FormAddressNumberInput } from "@/components/ui/form-address-number-input";
+import { FormAddressComplementInput } from "@/components/ui/form-address-complement-input";
+import { FormNeighborhoodInput } from "@/components/ui/form-neighborhood-input";
+import { FormCityInput } from "@/components/ui/form-city-input";
+import { FormStateSelector } from "@/components/ui/form-state-selector";
 import { PayrollNumberInput } from "./payroll-number-input";
 import { PpeSizesSection } from "./ppe-sizes-section";
 import { AvatarInput } from "./avatar-input";
@@ -85,7 +85,7 @@ export function UserForm(props: UserFormProps) {
     site: null,
 
     // Additional dates
-    birth: null,
+    birth: null as any, // Will be validated by schema when submitted
 
     // Status tracking dates
     exp1StartAt: null,
@@ -118,47 +118,7 @@ export function UserForm(props: UserFormProps) {
   // Create a unified form that works for both modes
   const form = useForm({
     resolver: customResolver,
-    defaultValues: mode === "create" ? createDefaults : (defaultValues || {
-      name: "",
-      email: null,
-      status: USER_STATUS.EXPERIENCE_PERIOD_1,
-      currentStatus: USER_STATUS.EXPERIENCE_PERIOD_1, // Required for validation
-      phone: null,
-      cpf: null,
-      pis: null,
-      verified: false,
-      isActive: true,
-      positionId: null,
-      performanceLevel: 0,
-      sectorId: null,
-      isSectorLeader: false,
-      address: null,
-      addressNumber: null,
-      addressComplement: null,
-      neighborhood: null,
-      city: null,
-      state: null,
-      zipCode: null,
-      site: null,
-      birth: null,
-      exp1StartAt: null,
-      exp1EndAt: null,
-      exp2StartAt: null,
-      exp2EndAt: null,
-      effectedAt: null,
-      dismissedAt: null,
-      payrollNumber: null,
-      avatarId: null,
-      ppeSize: {
-        shirts: null,
-        boots: null,
-        pants: null,
-        sleeves: null,
-        mask: null,
-        gloves: null,
-        rainBoots: null,
-      },
-    }),
+    defaultValues: mode === "create" ? createDefaults : (defaultValues || {} as any),
     mode: "onTouched", // Validate only after field is touched to avoid premature validation
     reValidateMode: "onChange", // After first validation, check on every change
     shouldFocusError: true, // Focus on first error field when validation fails
@@ -195,8 +155,8 @@ export function UserForm(props: UserFormProps) {
         }
         // If dismissal date is cleared and status is DISMISSED, clear status
         if (name === "dismissedAt" && !value.dismissedAt && value.status === USER_STATUS.DISMISSED) {
-          // Revert to currentStatus
-          const currentStatus = form.getValues("currentStatus");
+          // Revert to currentStatus (from defaultValues, not form state)
+          const currentStatus = (defaultValues as any)?.currentStatus;
           if (currentStatus && currentStatus !== USER_STATUS.DISMISSED) {
             form.setValue("status", currentStatus, { shouldDirty: true, shouldValidate: true });
           }
@@ -205,7 +165,7 @@ export function UserForm(props: UserFormProps) {
       });
       return () => subscription.unsubscribe();
     }
-  }, [form, mode]);
+  }, [form, mode, defaultValues]);
 
   // Debug validation errors in development - only log on user interaction
   useEffect(() => {
@@ -270,7 +230,7 @@ export function UserForm(props: UserFormProps) {
           dataWithoutFile,
           avatarFile,
           {
-            id: mode === "update" ? defaultValues?.id : undefined,
+            id: mode === "update" ? (defaultValues as any)?.id : undefined,
             name: data.name,
           }
         );
@@ -397,16 +357,16 @@ export function UserForm(props: UserFormProps) {
                   cityFieldName="city"
                   stateFieldName="state"
                 />
-                <AddressInput disabled={isSubmitting} required={false} />
-                <AddressNumberInput disabled={isSubmitting} />
+                <FormAddressInput<UserCreateFormData | UserUpdateFormData> name="address" disabled={isSubmitting} required={false} />
+                <FormAddressNumberInput<UserCreateFormData | UserUpdateFormData> name="addressNumber" disabled={isSubmitting} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <AddressComplementInput disabled={isSubmitting} />
-                <NeighborhoodInput disabled={isSubmitting} />
+                <FormAddressComplementInput<UserCreateFormData | UserUpdateFormData> name="addressComplement" disabled={isSubmitting} />
+                <FormNeighborhoodInput<UserCreateFormData | UserUpdateFormData> name="neighborhood" disabled={isSubmitting} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <CityInput disabled={isSubmitting} required={false} />
-                <StateSelector disabled={isSubmitting} />
+                <FormCityInput<UserCreateFormData | UserUpdateFormData> name="city" disabled={isSubmitting} required={false} />
+                <FormStateSelector<UserCreateFormData | UserUpdateFormData> name="state" disabled={isSubmitting} />
               </div>
             </CardContent>
           </Card>

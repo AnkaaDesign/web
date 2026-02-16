@@ -105,11 +105,11 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       paintIds: task.logoPaints?.map((paint) => paint.id),
 
       // Complex relations - copy nested data
-      // observation.artworkIds must also be File IDs
+      // observation.artworkIds are actually file IDs (Observation has files, not artworks)
       observation: task.observation
         ? {
             description: task.observation.description,
-            artworkIds: task.observation.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
+            artworkIds: task.observation.files?.map((file: any) => file.id) || [],
           }
         : null,
 
@@ -214,7 +214,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                               value={field.value || ""}
                               placeholder="Ex: ABC-12345"
                               className="uppercase"
-                              onChange={(value: string) => field.onChange(value.toUpperCase())}
+                              onChange={(value: string | number | null) => field.onChange(typeof value === 'string' ? value.toUpperCase() : String(value ?? '').toUpperCase())}
                               onBlur={field.onBlur}
                               disabled={isSubmitting}
                               autoFocus={index === 0}
@@ -238,7 +238,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                               value={field.value || ""}
                               placeholder="Ex: ABC1D23"
                               className="uppercase"
-                              onChange={(value: string) => field.onChange(value.toUpperCase())}
+                              onChange={(value: string | number | null) => field.onChange(typeof value === 'string' ? value.toUpperCase() : String(value ?? '').toUpperCase())}
                               onBlur={field.onBlur}
                               disabled={isSubmitting}
                             />
@@ -261,7 +261,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                               value={field.value || ""}
                               placeholder="Ex: 9BWZZZ377VT004251"
                               className="uppercase"
-                              onChange={(value: string) => field.onChange(value.toUpperCase())}
+                              onChange={(value: string | number | null) => field.onChange(typeof value === 'string' ? value.toUpperCase() : String(value ?? '').toUpperCase())}
                               onBlur={field.onBlur}
                               disabled={isSubmitting}
                             />

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Item, User } from "../../../../types";
-import { EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";
+import { EXTERNAL_WITHDRAWAL_TYPE, USER_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 
 // =====================
 // VALIDATION ERROR TYPES
@@ -116,7 +116,7 @@ export function validateStage1(
   // Business rule validations
   if (context.selectedUser) {
     // Check if user is active
-    if (context.selectedUser.status !== "ACTIVE") {
+    if (context.selectedUser.status !== USER_STATUS.EFFECTED) {
       errors.push({
         field: "withdrawerId",
         message: "Usuário selecionado está inativo",
@@ -125,7 +125,7 @@ export function validateStage1(
     }
 
     // Check user permissions (if needed for external withdrawals)
-    if (context.selectedUser.sector?.privileges === "EXTERNAL") {
+    if (context.selectedUser.sector?.privileges === SECTOR_PRIVILEGES.EXTERNAL) {
       errors.push({
         field: "withdrawerId",
         message: "Usuários externos não podem fazer retiradas diretas",

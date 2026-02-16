@@ -55,17 +55,6 @@ export function MessageFilters({
     });
   };
 
-  const togglePriority = (priority: string) => {
-    const currentPriorities = localFilters.priority || [];
-    const newPriorities = currentPriorities.includes(priority as any)
-      ? currentPriorities.filter((p) => p !== priority)
-      : [...currentPriorities, priority as any];
-
-    setLocalFilters({
-      ...localFilters,
-      priority: newPriorities.length > 0 ? newPriorities : undefined,
-    });
-  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -107,7 +96,7 @@ export function MessageFilters({
             </div>
           </div>
 
-          {/* Priority Filter */}
+          {/* Priority Filter - Commented out as not supported by MessageGetManyFormData schema
           <div className="space-y-3">
             <Label className="text-sm font-medium">Prioridade</Label>
             <div className="space-y-2">
@@ -119,7 +108,7 @@ export function MessageFilters({
                 <div key={option.value} className="flex items-center space-x-2">
                   <Checkbox
                     id={`priority-${option.value}`}
-                    checked={localFilters.priority?.includes(option.value as any) || false}
+                    checked={false}
                     onCheckedChange={() => togglePriority(option.value)}
                   />
                   <label
@@ -132,6 +121,7 @@ export function MessageFilters({
               ))}
             </div>
           </div>
+          */}
 
           {/* Date Range Filter */}
           <div className="space-y-3">
@@ -139,7 +129,7 @@ export function MessageFilters({
             <DateRangePicker
               from={localFilters.createdAt?.gte ? new Date(localFilters.createdAt.gte) : undefined}
               to={localFilters.createdAt?.lte ? new Date(localFilters.createdAt.lte) : undefined}
-              onSelect={(range) => {
+              onDateRangeChange={(range) => {
                 if (range?.from || range?.to) {
                   setLocalFilters({
                     ...localFilters,

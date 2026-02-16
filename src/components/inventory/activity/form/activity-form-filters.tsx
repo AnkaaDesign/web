@@ -287,7 +287,7 @@ export function ActivityFormFilters({ open, onOpenChange, filters, onFilterChang
                       mode="multiple"
                       options={categoryOptions}
                       value={localState.categoryIds || []}
-                      onValueChange={(ids) => setLocalState((prev) => ({ ...prev, categoryIds: ids }))}
+                      onValueChange={(ids) => setLocalState((prev) => ({ ...prev, categoryIds: Array.isArray(ids) ? ids : ids ? [ids] : [] }))}
                       placeholder="Selecione categorias..."
                       emptyText="Nenhuma categoria encontrada"
                       searchPlaceholder="Buscar categorias..."
@@ -308,7 +308,7 @@ export function ActivityFormFilters({ open, onOpenChange, filters, onFilterChang
                       mode="multiple"
                       options={brandOptions}
                       value={localState.brandIds || []}
-                      onValueChange={(ids) => setLocalState((prev) => ({ ...prev, brandIds: ids }))}
+                      onValueChange={(ids) => setLocalState((prev) => ({ ...prev, brandIds: Array.isArray(ids) ? ids : ids ? [ids] : [] }))}
                       placeholder="Selecione marcas..."
                       emptyText="Nenhuma marca encontrada"
                       searchPlaceholder="Buscar marcas..."
@@ -328,7 +328,7 @@ export function ActivityFormFilters({ open, onOpenChange, filters, onFilterChang
                       mode="multiple"
                       options={supplierOptions}
                       value={localState.supplierIds || []}
-                      onValueChange={(ids) => setLocalState((prev) => ({ ...prev, supplierIds: ids }))}
+                      onValueChange={(ids) => setLocalState((prev) => ({ ...prev, supplierIds: Array.isArray(ids) ? ids : ids ? [ids] : [] }))}
                       placeholder="Selecione fornecedores..."
                       emptyText="Nenhum fornecedor encontrado"
                       searchPlaceholder="Buscar fornecedores..."

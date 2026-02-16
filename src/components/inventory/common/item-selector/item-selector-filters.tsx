@@ -335,7 +335,11 @@ export function ItemSelectorFilters({ open, onOpenChange, filters, onFilterChang
                 { value: "ativo", label: "Ativo" },
                 { value: "inativo", label: "Inativo" },
               ]}
-              value={localState.showInactive ? "inativo" : "ativo"}
+              value={
+                localState.showInactive === true ? "inativo" :
+                localState.showInactive === false ? "ativo" :
+                "ambos"
+              }
               onValueChange={(value) => {
                 setLocalState((prev) => ({
                   ...prev,
@@ -385,9 +389,11 @@ export function ItemSelectorFilters({ open, onOpenChange, filters, onFilterChang
               options={stockLevelOptions}
               value={localState.stockLevels || []}
               onValueChange={(value) => {
+                // Ensure value is always an array or undefined
+                const arrayValue = value ? (Array.isArray(value) ? value : [value]) : [];
                 setLocalState((prev) => ({
                   ...prev,
-                  stockLevels: value.length > 0 ? (value as STOCK_LEVEL[]) : undefined,
+                  stockLevels: arrayValue.length > 0 ? (arrayValue as STOCK_LEVEL[]) : undefined,
                 }));
               }}
               placeholder="Selecione status de estoque..."
@@ -423,9 +429,11 @@ export function ItemSelectorFilters({ open, onOpenChange, filters, onFilterChang
               initialOptions={[]}
               value={localState.categoryIds || []}
               onValueChange={(value) => {
+                // Ensure value is always a string array or undefined
+                const arrayValue = value ? (Array.isArray(value) ? value : [value]) : [];
                 setLocalState((prev) => ({
                   ...prev,
-                  categoryIds: value.length > 0 ? value : undefined,
+                  categoryIds: arrayValue.length > 0 ? arrayValue : undefined,
                 }));
               }}
               placeholder="Selecione categorias..."
@@ -456,9 +464,11 @@ export function ItemSelectorFilters({ open, onOpenChange, filters, onFilterChang
               initialOptions={[]}
               value={localState.brandIds || []}
               onValueChange={(value) => {
+                // Ensure value is always a string array or undefined
+                const arrayValue = value ? (Array.isArray(value) ? value : [value]) : [];
                 setLocalState((prev) => ({
                   ...prev,
-                  brandIds: value.length > 0 ? value : undefined,
+                  brandIds: arrayValue.length > 0 ? arrayValue : undefined,
                 }));
               }}
               placeholder="Selecione marcas..."
@@ -489,9 +499,11 @@ export function ItemSelectorFilters({ open, onOpenChange, filters, onFilterChang
               initialOptions={[]}
               value={localState.supplierIds || []}
               onValueChange={(value) => {
+                // Ensure value is always a string array or undefined
+                const arrayValue = value ? (Array.isArray(value) ? value : [value]) : [];
                 setLocalState((prev) => ({
                   ...prev,
-                  supplierIds: value.length > 0 ? value : undefined,
+                  supplierIds: arrayValue.length > 0 ? arrayValue : undefined,
                 }));
               }}
               placeholder="Selecione fornecedores..."
@@ -537,13 +549,12 @@ export function ItemSelectorFilters({ open, onOpenChange, filters, onFilterChang
                 <Input
                   id="quantityMin"
                   type="number"
-                  min="0"
-                  step="0.01"
+                  min={0}
+                  step={0.01}
                   placeholder="0"
-                  value={localState.quantityRange?.min || ""}
+                  value={localState.quantityRange?.min ?? null}
                   onChange={(value) => {
-                    const strValue = value as string;
-                    const min = strValue ? parseFloat(strValue) : undefined;
+                    const min = typeof value === "number" ? value : undefined;
                     setLocalState((prev) => ({
                       ...prev,
                       quantityRange: {
@@ -562,13 +573,12 @@ export function ItemSelectorFilters({ open, onOpenChange, filters, onFilterChang
                 <Input
                   id="quantityMax"
                   type="number"
-                  min="0"
-                  step="0.01"
+                  min={0}
+                  step={0.01}
                   placeholder="∞"
-                  value={localState.quantityRange?.max || ""}
+                  value={localState.quantityRange?.max ?? null}
                   onChange={(value) => {
-                    const strValue = value as string;
-                    const max = strValue ? parseFloat(strValue) : undefined;
+                    const max = typeof value === "number" ? value : undefined;
                     setLocalState((prev) => ({
                       ...prev,
                       quantityRange: {
@@ -598,7 +608,7 @@ export function ItemSelectorFilters({ open, onOpenChange, filters, onFilterChang
                   id="priceMin"
                   type="currency"
                   placeholder="R$ 0,00"
-                  value={localState.totalPriceRange?.min ?? undefined}
+                  value={localState.totalPriceRange?.min ?? null}
                   onChange={(value) => {
                     const min = typeof value === "number" ? value : undefined;
                     setLocalState((prev) => ({
@@ -620,7 +630,7 @@ export function ItemSelectorFilters({ open, onOpenChange, filters, onFilterChang
                   id="priceMax"
                   type="currency"
                   placeholder="R$ ∞"
-                  value={localState.totalPriceRange?.max ?? undefined}
+                  value={localState.totalPriceRange?.max ?? null}
                   onChange={(value) => {
                     const max = typeof value === "number" ? value : undefined;
                     setLocalState((prev) => ({

@@ -41,14 +41,24 @@ import {
   IconGripVertical,
   IconRefresh,
 } from "@tabler/icons-react";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+} from "@hello-pangea/dnd";
+import type {
+  DropResult,
+  DraggableProvided,
+  DraggableStateSnapshot,
+  DroppableProvided,
+} from "@hello-pangea/dnd";
 import {
   usePayrollByUserAndPeriod,
   usePayrollDiscountMutations,
 } from "../../../hooks";
 import { formatCurrency } from "../../../utils";
 import { routes } from "../../../constants";
-import type { Discount } from "../../../types";
+import type { Discount, Payroll } from "../../../types";
 import { DiscountForm } from "./discount-form";
 import { PayrollCalculation } from "./payroll-calculation";
 import { PayrollSummaryCard } from "./payroll-summary-card";
@@ -82,7 +92,7 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
     refetch
   } = usePayrollByUserAndPeriod(userId!, yearNum, monthNum);
 
-  const payroll = payrollResponse;
+  const payroll = payrollResponse as Payroll | undefined;
 
   // Discount mutations
   const {
@@ -96,8 +106,8 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
   // const { update: _updatePayroll } = usePayrollMutations();
 
   // Calculate totals with proper fallbacks
-  // Get base remuneration from payroll.baseRemuneration, or user.position.baseRemuneration, or 0
-  const baseRemuneration = payroll?.baseRemuneration || payroll?.user?.position?.baseRemuneration || 0;
+  // Get base remuneration from payroll.baseRemuneration, or user.position.remuneration, or 0
+  const baseRemuneration = payroll?.baseRemuneration || payroll?.user?.position?.remuneration || 0;
   const bonusValue = payroll?.bonus?.baseBonus || 0;
   const grossSalary = Number(baseRemuneration) + Number(bonusValue);
 
@@ -276,18 +286,18 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
             </div>
             <div>
               <label className="text-sm font-medium text-muted-foreground">Setor</label>
-              <p className="text-sm">{payroll.user?.sector?.name || payroll.user?.position?.sector?.name || "N/A"}</p>
+              <p className="text-sm">{payroll.user?.sector?.name || "N/A"}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-muted-foreground">Cargo</label>
-              <p className="text-sm">{payroll.user?.position?.name || payroll.user?.position?.title || "N/A"}</p>
+              <p className="text-sm">{payroll.user?.position?.name || "N/A"}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Comprehensive Payroll Summary */}
-      <PayrollSummaryCard payroll={payroll} />
+      <PayrollSummaryCard payroll={payroll as Payroll} />
 
       {/* Additional Info Cards */}
       <div className="grid gap-6 md:grid-cols-2">
@@ -426,13 +436,13 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
           {payroll.discounts && payroll.discounts.length > 0 ? (
             <DragDropContext onDragEnd={handleDiscountReorder}>
               <Droppable droppableId="discounts">
-                {(provided) => (
+                {(provided: DroppableProvided) => (
                   <div
                     {...provided.droppableProps}
                     ref={provided.innerRef}
                     className="space-y-3"
                   >
-                    {payroll.discounts.map((discount, index) => {
+                    {payroll.discounts?.map((discount, index) => {
                       const discountValue = discount.value
                         ? Number(discount.value)
                         : discount.percentage
@@ -445,7 +455,7 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
                           draggableId={discount.id}
                           index={index}
                         >
-                          {(provided, snapshot) => (
+                          {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
                             <div
                               ref={provided.innerRef}
                               {...provided.draggableProps}

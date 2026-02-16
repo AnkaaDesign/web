@@ -1,7 +1,7 @@
 import React from "react";
 import { IconUser, IconFileText, IconPackage, IconHash, IconBoxMultiple, IconCurrencyReal, IconArrowBack, IconTag, IconCategory } from "@tabler/icons-react";
 import type { Item } from "../../../../types";
-import { MEASURE_UNIT_LABELS } from "../../../../constants";
+import { MEASURE_UNIT_LABELS, EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";
 import { formatCurrency } from "../../../../utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,10 +32,10 @@ export const ExternalWithdrawalSummaryCards: React.FC<ExternalWithdrawalSummaryC
   return (
     <div className={cn("space-y-6", className)}>
       {/* Basic Info Summary Card */}
-      <BasicInfoSummaryCard withdrawerName={withdrawerName} willReturn={willReturn} notes={notes} />
+      <BasicInfoSummaryCard withdrawerName={withdrawerName} type={type} notes={notes} />
 
       {/* Items Summary Card */}
-      <ItemsSummaryCard selectedItems={selectedItems} willReturn={willReturn} totalItems={totalItems} totalQuantity={totalQuantity} />
+      <ItemsSummaryCard selectedItems={selectedItems} type={type} totalItems={totalItems} totalQuantity={totalQuantity} />
 
       {/* Total Calculation Card (only for non-returnable items) */}
       {type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && <TotalCalculationCard selectedItems={selectedItems} totalValue={totalValue} totalItems={totalItems} totalQuantity={totalQuantity} />}
@@ -171,7 +171,7 @@ export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItem
           </div>
 
           {/* Items Table Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Lista de Itens</h3>
             <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-950">
               <Table>

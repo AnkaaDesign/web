@@ -90,9 +90,6 @@ export function AirbrushingFormFields({
               label="Data de Início"
               mode="date"
               context="start"
-              constraints={{
-                onlyPast: true,
-              }}
             />
           )}
         />
@@ -107,9 +104,6 @@ export function AirbrushingFormFields({
               label="Data de Finalização"
               mode="date"
               context="end"
-              constraints={{
-                onlyPast: true,
-              }}
             />
           )}
         />

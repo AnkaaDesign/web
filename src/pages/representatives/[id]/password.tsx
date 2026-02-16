@@ -74,7 +74,7 @@ export default function UpdatePasswordPage() {
       toast({
         title: 'Erro',
         description: error.message || 'Erro ao atualizar senha',
-        variant: 'destructive',
+        variant: 'error',
       });
     },
   });

@@ -342,7 +342,7 @@ export function FileUploader({
 
     const getThumbnailSrc = () => {
       // Get base URL for API requests
-      const apiBaseUrl = "http://localhost:3030"; // This should match your API server
+      const apiBaseUrl = getApiBaseUrl();
 
       const src = (() => {
         if (file.thumbnailUrl) {

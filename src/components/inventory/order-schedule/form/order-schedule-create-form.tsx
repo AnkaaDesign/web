@@ -17,7 +17,7 @@ import {
 import type { OrderScheduleCreateFormData } from "../../../../schemas";
 import { orderScheduleCreateSchema } from "../../../../schemas";
 import { useOrderScheduleMutations } from "../../../../hooks";
-import { routes, FAVORITE_PAGES, SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, WEEK_DAY_LABELS, MONTH_LABELS } from "../../../../constants";
+import { routes, FAVORITE_PAGES, SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, WEEK_DAY_LABELS, MONTH_LABELS, WEEK_DAY, MONTH } from "../../../../constants";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -403,7 +403,7 @@ export const OrderScheduleCreateForm = () => {
                                 />
 
                                 {/* Show interval field only for frequencies that support it */}
-                                {watchedFrequency && frequencyGroups.withInterval.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.withInterval.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="frequencyCount"
@@ -445,7 +445,7 @@ export const OrderScheduleCreateForm = () => {
                                 )}
 
                                 {/* Specific date field (for ONCE and CUSTOM frequencies) */}
-                                {watchedFrequency && frequencyGroups.needsSpecificDate.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.needsSpecificDate.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="specificDate"
@@ -456,7 +456,12 @@ export const OrderScheduleCreateForm = () => {
                                           <span className="text-destructive">*</span>
                                         </FormLabel>
                                         <DateTimeInput
-                                          field={field}
+                                          field={{
+                                            onChange: (value) => field.onChange(value),
+                                            onBlur: field.onBlur,
+                                            value: field.value ? new Date(field.value) : null,
+                                            name: field.name,
+                                          }}
                                           hideLabel
                                           placeholder="Selecione a data"
                                           mode="date"
@@ -472,7 +477,7 @@ export const OrderScheduleCreateForm = () => {
                                 )}
 
                                 {/* Day of week field (for WEEKLY and BIWEEKLY) */}
-                                {watchedFrequency && frequencyGroups.needsDayOfWeek.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.needsDayOfWeek.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="dayOfWeek"
@@ -496,7 +501,7 @@ export const OrderScheduleCreateForm = () => {
                                 )}
 
                                 {/* Month field (for ANNUAL only) */}
-                                {watchedFrequency && frequencyGroups.needsMonth.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.needsMonth.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="month"
@@ -520,7 +525,7 @@ export const OrderScheduleCreateForm = () => {
                                 )}
 
                                 {/* Day of month field (for monthly/quarterly/annual frequencies) */}
-                                {watchedFrequency && frequencyGroups.needsDayOfMonth.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.needsDayOfMonth.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="dayOfMonth"
@@ -548,7 +553,7 @@ export const OrderScheduleCreateForm = () => {
                                 )}
 
                                 {/* Next run date field (for all except ONCE and CUSTOM) */}
-                                {watchedFrequency && frequencyGroups.needsNextRun.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.needsNextRun.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="nextRun"
@@ -556,7 +561,12 @@ export const OrderScheduleCreateForm = () => {
                                       <FormItem className="flex flex-col flex-1 min-w-[200px]">
                                         <FormLabel>Primeira Execução</FormLabel>
                                         <DateTimeInput
-                                          field={field}
+                                          field={{
+                                            onChange: (value) => field.onChange(value),
+                                            onBlur: field.onBlur,
+                                            value: field.value ? new Date(field.value) : null,
+                                            name: field.name,
+                                          }}
                                           hideLabel
                                           placeholder="Data de início"
                                           mode="date"
@@ -632,7 +642,7 @@ export const OrderScheduleCreateForm = () => {
                         <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                           <span className="text-sm font-medium text-muted-foreground">Frequência</span>
                           <span className="text-sm font-semibold text-foreground">
-                            {SCHEDULE_FREQUENCY_LABELS[watchedFrequency] || watchedFrequency}
+                            {SCHEDULE_FREQUENCY_LABELS[watchedFrequency as SCHEDULE_FREQUENCY] || watchedFrequency}
                             {watchedFrequencyCount && watchedFrequencyCount > 1 && ` - A cada ${watchedFrequencyCount}`}
                           </span>
                         </div>
@@ -640,7 +650,7 @@ export const OrderScheduleCreateForm = () => {
                         {watchedDayOfWeek && (
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                             <span className="text-sm font-medium text-muted-foreground">Dia da Semana</span>
-                            <span className="text-sm font-semibold text-foreground">{WEEK_DAY_LABELS[watchedDayOfWeek]}</span>
+                            <span className="text-sm font-semibold text-foreground">{WEEK_DAY_LABELS[watchedDayOfWeek as WEEK_DAY]}</span>
                           </div>
                         )}
 
@@ -654,7 +664,7 @@ export const OrderScheduleCreateForm = () => {
                         {watchedMonth && (
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                             <span className="text-sm font-medium text-muted-foreground">Mês</span>
-                            <span className="text-sm font-semibold text-foreground">{MONTH_LABELS[watchedMonth]}</span>
+                            <span className="text-sm font-semibold text-foreground">{MONTH_LABELS[watchedMonth as MONTH]}</span>
                           </div>
                         )}
 

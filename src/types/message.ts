@@ -41,6 +41,8 @@ export interface Message {
   publishedAt?: string | Date | null;
   startDate?: string | Date | null;
   endDate?: string | Date | null;
+  actionUrl?: string;
+  actionType?: string;
   createdBy?: {
     id: string;
     name: string;

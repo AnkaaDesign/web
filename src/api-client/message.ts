@@ -268,8 +268,8 @@ export const batchUpdateMessages = (data: MessageBatchUpdateFormData, params?: M
 export const batchDeleteMessages = (data: MessageBatchDeleteFormData) => messageService.batchDeleteMessages(data);
 export const getMessagesByRecipient = (recipientId: string, params?: MessageGetManyFormData) => messageService.getMessagesByRecipient(recipientId, params || {});
 export const getMessagesBySender = (senderId: string, params?: MessageGetManyFormData) => messageService.getMessagesBySender(senderId, params || {});
-export const getUnviewedMessages = (recipientId: string, params?: MessageGetManyFormData) => messageService.getUnviewedMessages(recipientId, params || {});
-export const markAsViewed = (messageId: string, userId: string) => messageService.markAsViewed(messageId, userId);
+export const getUnviewedMessages = () => messageService.getUnviewedMessages();
+export const markAsViewed = (messageId: string) => messageService.markAsViewed(messageId);
 export const markAllAsViewed = (userId: string) => messageService.markAllAsViewed(userId);
 
 // ViewedMessage exports

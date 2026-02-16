@@ -227,8 +227,8 @@ export default function TimeClockListPage() {
   // Fetch time clock entries from Secullum
   const { data, isLoading } = useSecullumTimeEntries(queryParams);
 
-  const handleStartDateChange = (date: Date | null) => {
-    if (date && !isNaN(date.getTime())) {
+  const handleStartDateChange = (date: Date | null | any) => {
+    if (date && typeof date === 'object' && 'getTime' in date && !isNaN(date.getTime())) {
       // Check if start date is after end date
       if (endDate && date > endDate) {
         // Auto-adjust end date to be the same as start date
@@ -257,8 +257,8 @@ export default function TimeClockListPage() {
     }
   };
 
-  const handleEndDateChange = (date: Date | null) => {
-    if (date && !isNaN(date.getTime())) {
+  const handleEndDateChange = (date: Date | null | any) => {
+    if (date && typeof date === 'object' && 'getTime' in date && !isNaN(date.getTime())) {
       // Check if end date is before start date
       if (startDate && date < startDate) {
         // Auto-adjust start date to be the same as end date
@@ -381,7 +381,7 @@ export default function TimeClockListPage() {
               <Combobox
                 options={userOptions}
                 value={selectedUserId}
-                onValueChange={(value) => handleUserChange(value || "")}
+                onValueChange={(value) => handleUserChange((Array.isArray(value) ? value[0] : value) || "")}
                 placeholder={usersLoading ? "Carregando funcionários..." : "Selecione um funcionário"}
                 emptyText="Nenhum funcionário encontrado"
                 searchable={true}

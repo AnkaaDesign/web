@@ -179,11 +179,11 @@ export function ExternalWithdrawalList({ className }: ExternalWithdrawalListProp
 
   // Wrap to also handle searchingFor
   const onRemoveFilter = useCallback(
-    (key: string, value?: any) => {
+    (key: string) => {
       if (key === "searchingFor") {
         setSearch("");
       } else {
-        baseOnRemoveFilter(key, value);
+        baseOnRemoveFilter(key);
       }
     },
     [baseOnRemoveFilter, setSearch],

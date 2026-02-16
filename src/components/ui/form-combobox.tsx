@@ -103,7 +103,7 @@ export function FormCombobox<TData = ComboboxOption>({
               mode={multiple ? "multiple" : "single"}
               async={async}
               queryKey={queryKey}
-              queryFn={queryFn}
+              queryFn={queryFn ? async (searchTerm: string) => ({ data: await queryFn(searchTerm), hasMore: false }) : undefined}
               initialOptions={initialOptions}
               minSearchLength={minSearchLength}
               allowCreate={allowCreate}

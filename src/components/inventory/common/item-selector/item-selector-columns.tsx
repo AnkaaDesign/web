@@ -363,7 +363,7 @@ export const createItemSelectorColumns = (
             value={quantity || ""}
             onChange={(value) => {
               const numValue = typeof value === "string" ? parseFloat(value) : value;
-              if (!isNaN(numValue) && numValue > 0) {
+              if (numValue !== null && !isNaN(numValue) && numValue > 0) {
                 ctx?.onQuantityChange?.(item.id, numValue);
               }
             }}
@@ -428,7 +428,7 @@ export const createItemSelectorColumns = (
             value={icms || ""}
             onChange={(value) => {
               const numValue = typeof value === "string" ? parseFloat(value) : value;
-              if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+              if (numValue !== null && !isNaN(numValue) && numValue >= 0 && numValue <= 100) {
                 ctx?.onIcmsChange?.(item.id, numValue);
               }
             }}
@@ -461,7 +461,7 @@ export const createItemSelectorColumns = (
             value={ipi || ""}
             onChange={(value) => {
               const numValue = typeof value === "string" ? parseFloat(value) : value;
-              if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+              if (numValue !== null && !isNaN(numValue) && numValue >= 0 && numValue <= 100) {
                 ctx?.onIpiChange?.(item.id, numValue);
               }
             }}

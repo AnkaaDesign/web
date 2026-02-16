@@ -78,11 +78,11 @@ const ActivityBatchTableRow = ({
         <div className="px-4 py-2">
           <Input
             type="number"
-            min="0.01"
-            max="999999"
-            step="0.01"
-            value={(field.quantity || 0).toString()}
-            onChange={(value: string) => handleQuantityChange(value)}
+            min={0.01}
+            max={999999}
+            step={0.01}
+            value={field.quantity || 0}
+            onChange={(value: string | number | null) => handleQuantityChange(typeof value === 'string' ? value : String(value ?? ''))}
             className="w-full h-8"
           />
         </div>

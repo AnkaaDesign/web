@@ -193,7 +193,7 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
         <div className="py-3 pt-1 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border/50">
+              <div key={i} className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border">
                 <div className="h-4 w-24 bg-muted animate-pulse rounded mb-2" />
                 <div className="h-6 w-16 bg-muted animate-pulse rounded mb-1" />
                 <div className="h-3 w-20 bg-muted animate-pulse rounded" />
@@ -235,7 +235,7 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
         <div className="py-3 pt-1 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
             {/* Total Bonus Amount */}
-            <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border/50">
+            <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <IconTrendingUp className="h-4 w-4 text-green-600 flex-shrink-0" />
                 <p className="text-sm font-medium text-muted-foreground line-clamp-2 min-h-[2.5rem] flex items-center">
@@ -251,7 +251,7 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
             </div>
 
             {/* Users with Bonus */}
-            <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border/50">
+            <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <IconUsers className="h-4 w-4 text-blue-600 flex-shrink-0" />
                 <p className="text-sm font-medium text-muted-foreground line-clamp-2 min-h-[2.5rem] flex items-center">
@@ -283,7 +283,7 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
             </div>
 
             {/* Total Tasks Completed */}
-            <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border/50">
+            <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <IconCheckbox className="h-4 w-4 text-amber-600 flex-shrink-0" />
                 <p className="text-sm font-medium text-muted-foreground line-clamp-2 min-h-[2.5rem] flex items-center">
@@ -299,7 +299,7 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
             </div>
 
             {/* Average Tasks per User */}
-            <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border/50">
+            <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <IconCheckbox className="h-4 w-4 text-purple-600 flex-shrink-0" />
                 <p className="text-sm font-medium text-muted-foreground line-clamp-2 min-h-[2.5rem] flex items-center">

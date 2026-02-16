@@ -3,7 +3,6 @@ import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight 
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 
 // Export a simple pagination component for basic use cases
@@ -155,12 +154,12 @@ export function SimplePaginationAdvanced({
         {showGoToPage && totalPages > 5 && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground whitespace-nowrap">Ir para:</span>
-            <Input
+            <input
               type="number"
               min="1"
               max={totalPages}
               value={pageInput}
-              onChange={(value) => setPageInput(String(value || ""))}
+              onChange={(e) => setPageInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();

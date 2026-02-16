@@ -208,7 +208,7 @@ export function ProductionDetailsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="rounded-md border border-border/50">
+                <div className="rounded-md border border-border">
                   <Table className="w-full [&>div]:border-0 [&>div]:rounded-none">
                     <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
                       <TableRow className="bg-muted hover:bg-muted even:bg-muted">

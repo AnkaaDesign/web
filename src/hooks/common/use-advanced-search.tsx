@@ -51,7 +51,7 @@ export interface SearchEmptyState {
   };
 }
 
-export interface UseAdvancedSearchOptions<TFilters = Record<string, any>> {
+export interface UseAdvancedSearchOptions<TFilters extends Record<string, any> = Record<string, any>> {
   /** Search fields configuration */
   searchFields?: SearchField[];
   /** Debounce delay for search input */
@@ -77,10 +77,10 @@ export interface UseAdvancedSearchOptions<TFilters = Record<string, any>> {
   /** Custom suggestion fetcher */
   fetchSuggestions?: (query: string, fields: SearchField[]) => Promise<SearchSuggestion[]>;
   /** Table state options */
-  tableStateOptions?: Parameters<typeof useUnifiedTableState<TFilters>>[0];
+  tableStateOptions?: Parameters<typeof useUnifiedTableState<TFilters, unknown>>[0];
 }
 
-export interface UseAdvancedSearchReturn<TFilters = Record<string, any>> {
+export interface UseAdvancedSearchReturn<TFilters extends Record<string, any> = Record<string, any>> {
   // Search state
   searchQuery: string;
   debouncedSearchQuery: string;
@@ -111,7 +111,7 @@ export interface UseAdvancedSearchReturn<TFilters = Record<string, any>> {
   highlightMatch: (text: string, query?: string) => React.ReactNode;
 
   // Table state integration
-  tableState: ReturnType<typeof useUnifiedTableState<TFilters>>;
+  tableState: ReturnType<typeof useUnifiedTableState<TFilters, unknown>>;
 
   // Empty states
   currentEmptyState: SearchEmptyState | null;
@@ -138,12 +138,15 @@ export function useAdvancedSearch<TFilters extends Record<string, any> = Record<
   } = options;
 
   // Initialize table state with search integration
-  const tableState = useUnifiedTableState<TFilters>({
-    searchDebounceMs,
+  const tableState = useUnifiedTableState<TFilters, unknown>({
+    debounceMs: {
+      search: searchDebounceMs,
+    },
     ...tableStateOptions,
   });
 
-  const { searchingFor: urlSearchQuery, setSearch: setUrlSearch } = tableState;
+  const urlSearchQuery = tableState.search.searchText;
+  const setUrlSearch = tableState.search.setSearch;
 
   // Local search state
   const [localSearchQuery, setLocalSearchQuery] = useState(urlSearchQuery);

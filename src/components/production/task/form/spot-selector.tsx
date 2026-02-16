@@ -12,6 +12,39 @@ type GarageId = 'B1' | 'B2' | 'B3';
 type LaneId = 'F1' | 'F2' | 'F3';
 type SpotNumber = 1 | 2 | 3;
 
+// Types for garage availability API response
+interface LaneAvailability {
+  laneId: LaneId;
+  canFit: boolean;
+  availableSpace: number;
+  occupiedSpots: SpotNumber[];
+  spotOccupants?: Array<{
+    spotNumber: SpotNumber;
+    taskName?: string;
+  }>;
+}
+
+interface GarageAvailability {
+  garageId: GarageId;
+  canFit: boolean;
+  lanes: LaneAvailability[];
+}
+
+interface GaragesAvailabilityResponse {
+  data: GarageAvailability[];
+}
+
+// Mock API function until the actual API is implemented
+const getGaragesAvailability = async (
+  _truckLength: number,
+  _truckId?: string
+): Promise<GaragesAvailabilityResponse> => {
+  // TODO: Replace with actual API call when available
+  return {
+    data: [],
+  };
+};
+
 interface SpotSelectorProps {
   truckLength: number | null;
   currentSpot: TRUCK_SPOT | null;
@@ -95,13 +128,13 @@ export function SpotSelector({
   // Find selected garage data
   const selectedGarageData = useMemo(() => {
     if (!selectedGarage || selectedGarage === 'PATIO') return null;
-    return garages.find((g) => g.garageId === selectedGarage);
+    return garages.find((g: GarageAvailability) => g.garageId === selectedGarage);
   }, [garages, selectedGarage]);
 
   // Find selected lane data
   const selectedLaneData = useMemo(() => {
     if (!selectedGarageData || !selectedLane) return null;
-    return selectedGarageData.lanes.find((l) => l.laneId === selectedLane);
+    return selectedGarageData.lanes.find((l: LaneAvailability) => l.laneId === selectedLane);
   }, [selectedGarageData, selectedLane]);
 
   // Garage options (including Pátio)
@@ -116,11 +149,11 @@ export function SpotSelector({
 
     const garageIds: GarageId[] = ['B1', 'B2', 'B3'];
     for (const garageId of garageIds) {
-      const garageData = garages.find((g) => g.garageId === garageId);
+      const garageData = garages.find((g: GarageAvailability) => g.garageId === garageId);
       const canFit = garageData?.canFit ?? true;
 
       // Count lanes that can fit this truck
-      const availableLanes = garageData?.lanes.filter((l) => l.canFit).length ?? 0;
+      const availableLanes = garageData?.lanes.filter((l: LaneAvailability) => l.canFit).length ?? 0;
 
       // Build descriptive label
       let description: string;
@@ -148,7 +181,7 @@ export function SpotSelector({
   const laneOptions = useMemo(() => {
     if (!selectedGarageData) return [];
 
-    return selectedGarageData.lanes.map((lane) => ({
+    return selectedGarageData.lanes.map((lane: LaneAvailability) => ({
       value: lane.laneId,
       label: `${LANE_LABELS[lane.laneId]} (${lane.availableSpace.toFixed(1)}m livre)`,
       disabled: !lane.canFit && lane.laneId !== parsedSpot.lane,
@@ -170,7 +203,7 @@ export function SpotSelector({
       const isCurrentSpot = parsedSpot.spotNumber === spotNum && parsedSpot.lane === selectedLane && parsedSpot.garage === selectedGarage;
 
       // Find who occupies this spot
-      const occupant = selectedLaneData.spotOccupants?.find((o) => o.spotNumber === spotNum);
+      const occupant = selectedLaneData.spotOccupants?.find((o: { spotNumber: SpotNumber; taskName?: string }) => o.spotNumber === spotNum);
 
       // Build label with occupant info if occupied
       let label = SPOT_LABELS[spotNum];
@@ -204,7 +237,7 @@ export function SpotSelector({
       });
     } else if (v1Occupied && v2Occupied && hasEnoughSpace) {
       // V3 available when V1/V2 are full and there's 6m+ space
-      const v3Occupant = selectedLaneData.spotOccupants?.find((o) => o.spotNumber === 3);
+      const v3Occupant = selectedLaneData.spotOccupants?.find((o: { spotNumber: SpotNumber; taskName?: string }) => o.spotNumber === 3);
       let v3Label = SPOT_LABELS[3];
       if (v3IsOccupied && v3Occupant) {
         const taskName = v3Occupant.taskName || 'Sem tarefa';
@@ -288,8 +321,8 @@ export function SpotSelector({
         <div className="grid grid-cols-3 gap-3">
           {/* Garage selector */}
           <Combobox
-            value={selectedGarage}
-            onValueChange={handleGarageChange}
+            value={selectedGarage ?? undefined}
+            onValueChange={(value) => handleGarageChange((Array.isArray(value) ? value[0] : value) ?? null)}
             options={garageOptions}
             placeholder="Barracão"
             disabled={isDisabled}
@@ -299,8 +332,8 @@ export function SpotSelector({
 
           {/* Lane selector */}
           <Combobox
-            value={selectedLane}
-            onValueChange={handleLaneChange}
+            value={selectedLane ?? undefined}
+            onValueChange={(value) => handleLaneChange((Array.isArray(value) ? value[0] : value) ?? null)}
             options={laneOptions}
             placeholder="Faixa"
             disabled={isDisabled || !selectedGarage || selectedGarage === 'PATIO'}
@@ -309,8 +342,8 @@ export function SpotSelector({
 
           {/* Spot selector */}
           <Combobox
-            value={selectedSpotNumber ? String(selectedSpotNumber) : null}
-            onValueChange={handleSpotChange}
+            value={selectedSpotNumber ? String(selectedSpotNumber) : undefined}
+            onValueChange={(value) => handleSpotChange((Array.isArray(value) ? value[0] : value) ?? null)}
             options={spotOptions}
             placeholder="Vaga"
             disabled={isDisabled || !selectedLane}

@@ -25,9 +25,9 @@ export function RegistrationNumberInput({ disabled }: RegistrationNumberInputPro
             <Input
               ref={field.ref}
               value={field.value || ""}
-              onChange={(value: string) => {
+              onChange={(value: string | number | null) => {
                 // Clean input to only alphanumeric characters and convert to uppercase
-                const cleanedValue = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                const cleanedValue = typeof value === 'string' ? value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase() : null;
                 field.onChange(cleanedValue || null);
               }}
               onBlur={field.onBlur}

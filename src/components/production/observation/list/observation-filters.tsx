@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { IconFilter, IconX } from "@tabler/icons-react";
+import type { DateRange } from "react-day-picker";
 import {
   Sheet,
   SheetContent,
@@ -168,8 +169,10 @@ export function ObservationFilters({ open, onOpenChange, filters, onFilterChange
                       label: task.name,
                     }))}
                     value={localState.taskIds}
-                    onValueChange={(taskIds: string[]) => {
-                      setLocalState((prev) => ({ ...prev, taskIds }));
+                    onValueChange={(value) => {
+                      if (Array.isArray(value)) {
+                        setLocalState((prev) => ({ ...prev, taskIds: value }));
+                      }
                     }}
                     placeholder="Selecionar tarefas..."
                     searchPlaceholder="Buscar tarefas..."
@@ -191,7 +194,8 @@ export function ObservationFilters({ open, onOpenChange, filters, onFilterChange
                       <DateTimeInput
                         mode="date"
                         value={localState.createdAfter}
-                        onChange={(date: Date | null) => {
+                        onChange={(date: Date | DateRange | null) => {
+                          if (date && !(date instanceof Date)) return;
                           setLocalState((prev) => ({
                             ...prev,
                             createdAfter: date || undefined,
@@ -206,7 +210,8 @@ export function ObservationFilters({ open, onOpenChange, filters, onFilterChange
                       <DateTimeInput
                         mode="date"
                         value={localState.createdBefore}
-                        onChange={(date: Date | null) => {
+                        onChange={(date: Date | DateRange | null) => {
+                          if (date && !(date instanceof Date)) return;
                           setLocalState((prev) => ({
                             ...prev,
                             createdBefore: date || undefined,

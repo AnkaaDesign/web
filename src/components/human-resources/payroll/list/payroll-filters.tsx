@@ -184,7 +184,8 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 <Combobox
                   value={localFilters.year?.toString() || ""}
                   onValueChange={(year) => {
-                    const newYear = year ? parseInt(year) : undefined;
+                    const yearValue = Array.isArray(year) ? year[0] : year;
+                    const newYear = yearValue ? parseInt(yearValue) : undefined;
                     setLocalFilters({
                       ...localFilters,
                       year: newYear,
@@ -213,7 +214,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 <Combobox
                   mode="multiple"
                   value={localFilters.months || []}
-                  onValueChange={(months) => setLocalFilters({ ...localFilters, months })}
+                  onValueChange={(months) => setLocalFilters({ ...localFilters, months: Array.isArray(months) ? months : months ? [months] : undefined })}
                   options={[
                     { value: "01", label: "Janeiro" },
                     { value: "02", label: "Fevereiro" },
@@ -256,7 +257,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 label: sector.name,
               })) || []}
               value={localFilters.sectorIds || []}
-              onValueChange={handleSectorsChange}
+              onValueChange={(value) => handleSectorsChange(Array.isArray(value) ? value : value ? [value] : [])}
               className="w-full"
               searchable={true}
               clearable={true}
@@ -282,7 +283,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 label: position.name,
               })) || []}
               value={localFilters.positionIds || []}
-              onValueChange={handlePositionsChange}
+              onValueChange={(value) => handlePositionsChange(Array.isArray(value) ? value : value ? [value] : [])}
               className="w-full"
               searchable={true}
               clearable={true}
@@ -308,7 +309,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 label: `${user.name}${user.sector?.name ? ` (${user.sector.name})` : ''}`,
               }))}
               value={localFilters.userIds || []}
-              onValueChange={handleUsersChange}
+              onValueChange={(value) => handleUsersChange(Array.isArray(value) ? value : value ? [value] : [])}
               className="w-full"
               searchable={true}
               clearable={true}

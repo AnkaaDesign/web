@@ -39,29 +39,11 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-
-// Enums (would come from your types file)
-enum NOTIFICATION_TYPE {
-  SYSTEM = 'SYSTEM',
-  PRODUCTION = 'PRODUCTION',
-  STOCK = 'STOCK',
-  USER = 'USER',
-  GENERAL = 'GENERAL'
-}
-
-enum NOTIFICATION_CHANNEL {
-  IN_APP = 'IN_APP',
-  EMAIL = 'EMAIL',
-  PUSH = 'PUSH',
-  WHATSAPP = 'WHATSAPP'
-}
-
-enum NOTIFICATION_IMPORTANCE {
-  LOW = 'LOW',
-  NORMAL = 'NORMAL',
-  HIGH = 'HIGH',
-  URGENT = 'URGENT'
-}
+import {
+  NOTIFICATION_TYPE,
+  NOTIFICATION_CHANNEL,
+  NOTIFICATION_IMPORTANCE,
+} from '@/constants';
 
 enum SECTOR_PRIVILEGES {
   ADMIN = 'ADMIN',
@@ -330,10 +312,8 @@ export default function CreateNotificationConfiguration() {
                       id="eventType"
                       placeholder="e.g., created, completed, assigned"
                       value={config.eventType}
-                      onChange={(e) => {
-                        if (e && e.target) {
-                          setConfig({...config, eventType: e.target.value});
-                        }
+                      onChange={(value) => {
+                        setConfig({...config, eventType: String(value || '')});
                       }}
                     />
                   </div>
@@ -356,9 +336,7 @@ export default function CreateNotificationConfiguration() {
                     placeholder="Describe when this notification is sent and why"
                     value={config.description}
                     onChange={(e) => {
-                      if (e && e.target) {
-                        setConfig({...config, description: e.target.value});
-                      }
+                      setConfig({...config, description: e.target.value});
                     }}
                     rows={3}
                   />
@@ -448,9 +426,7 @@ export default function CreateNotificationConfiguration() {
 }"
                     value={config.customFilterCode || ''}
                     onChange={(e) => {
-                      if (e && e.target) {
-                        setConfig({...config, customFilterCode: e.target.value});
-                      }
+                      setConfig({...config, customFilterCode: e.target.value});
                     }}
                     rows={6}
                     className="font-mono text-sm"
@@ -564,14 +540,12 @@ export default function CreateNotificationConfiguration() {
                                     </div>
                                     <div className="flex items-center gap-3">
                                       <Switch
-                                        size="sm"
                                         checked={channelConfig.enabled}
                                         onCheckedChange={(checked) =>
                                           updateSectorChannel(override.sector, channelConfig.channel, 'enabled', checked)
                                         }
                                       />
                                       <Switch
-                                        size="sm"
                                         checked={channelConfig.mandatory}
                                         disabled={!channelConfig.enabled}
                                         onCheckedChange={(checked) =>
@@ -617,13 +591,11 @@ export default function CreateNotificationConfiguration() {
                         type="number"
                         placeholder="Unlimited"
                         value={config.maxFrequencyPerDay || ''}
-                        onChange={(e) => {
-                          if (e && e.target) {
-                            setConfig({
-                              ...config,
-                              maxFrequencyPerDay: e.target.value ? parseInt(e.target.value) : undefined
-                            });
-                          }
+                        onChange={(value) => {
+                          setConfig({
+                            ...config,
+                            maxFrequencyPerDay: value ? Number(value) : undefined
+                          });
                         }}
                       />
                     </div>
@@ -635,13 +607,11 @@ export default function CreateNotificationConfiguration() {
                         type="number"
                         placeholder="No deduplication"
                         value={config.deduplicationWindow || ''}
-                        onChange={(e) => {
-                          if (e && e.target) {
-                            setConfig({
-                              ...config,
-                              deduplicationWindow: e.target.value ? parseInt(e.target.value) : undefined
-                            });
-                          }
+                        onChange={(value) => {
+                          setConfig({
+                            ...config,
+                            deduplicationWindow: value ? Number(value) : undefined
+                          });
                         }}
                       />
                     </div>
@@ -671,13 +641,11 @@ export default function CreateNotificationConfiguration() {
                         type="number"
                         placeholder="300"
                         value={config.batchDelay || ''}
-                        onChange={(e) => {
-                          if (e && e.target) {
-                            setConfig({
-                              ...config,
-                              batchDelay: e.target.value ? parseInt(e.target.value) : undefined
-                            });
-                          }
+                        onChange={(value) => {
+                          setConfig({
+                            ...config,
+                            batchDelay: value ? Number(value) : undefined
+                          });
                         }}
                       />
                     </div>
@@ -703,13 +671,11 @@ export default function CreateNotificationConfiguration() {
                       id="template-inapp"
                       placeholder="Task {{taskTitle}} has been assigned to you"
                       value={config.templates.inApp}
-                      onChange={(e) => {
-                        if (e && e.target) {
-                          setConfig({
-                            ...config,
-                            templates: { ...config.templates, inApp: e.target.value }
-                          });
-                        }
+                      onChange={(value) => {
+                        setConfig({
+                          ...config,
+                          templates: { ...config.templates, inApp: String(value || '') }
+                        });
                       }}
                     />
                   </div>
@@ -723,13 +689,11 @@ export default function CreateNotificationConfiguration() {
                       id="template-push"
                       placeholder="New task: {{taskTitle}}"
                       value={config.templates.push}
-                      onChange={(e) => {
-                        if (e && e.target) {
-                          setConfig({
-                            ...config,
-                            templates: { ...config.templates, push: e.target.value }
-                          });
-                        }
+                      onChange={(value) => {
+                        setConfig({
+                          ...config,
+                          templates: { ...config.templates, push: String(value || '') }
+                        });
                       }}
                     />
                   </div>
@@ -743,16 +707,14 @@ export default function CreateNotificationConfiguration() {
                       id="template-email-subject"
                       placeholder="Task Assignment: {{taskTitle}}"
                       value={config.templates.email.subject}
-                      onChange={(e) => {
-                        if (e && e.target) {
-                          setConfig({
-                            ...config,
-                            templates: {
-                              ...config.templates,
-                              email: { ...config.templates.email, subject: e.target.value }
-                            }
-                          });
-                        }
+                      onChange={(value) => {
+                        setConfig({
+                          ...config,
+                          templates: {
+                            ...config.templates,
+                            email: { ...config.templates.email, subject: String(value || '') }
+                          }
+                        });
                       }}
                     />
                   </div>
@@ -773,15 +735,13 @@ The Team"
                       rows={8}
                       value={config.templates.email.body}
                       onChange={(e) => {
-                        if (e && e.target) {
-                          setConfig({
-                            ...config,
-                            templates: {
-                              ...config.templates,
-                              email: { ...config.templates.email, body: e.target.value }
-                            }
-                          });
-                        }
+                        setConfig({
+                          ...config,
+                          templates: {
+                            ...config.templates,
+                            email: { ...config.templates.email, body: e.target.value }
+                          }
+                        });
                       }}
                     />
                   </div>
@@ -803,12 +763,10 @@ View details: {{link}}"
                       rows={5}
                       value={config.templates.whatsapp}
                       onChange={(e) => {
-                        if (e && e.target) {
-                          setConfig({
-                            ...config,
-                            templates: { ...config.templates, whatsapp: e.target.value }
-                          });
-                        }
+                        setConfig({
+                          ...config,
+                          templates: { ...config.templates, whatsapp: e.target.value }
+                        });
                       }}
                     />
                   </div>

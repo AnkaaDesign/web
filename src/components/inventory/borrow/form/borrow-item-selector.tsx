@@ -561,9 +561,9 @@ export const BorrowItemSelector = ({
             <Input
               placeholder="Pesquisar por nome, código, marca ou categoria..."
               value={searchTerm}
-              onChange={(e) => {
-                const value = e?.target?.value ?? e ?? '';
-                handleSearch(value);
+              onChange={(value) => {
+                const stringValue = value !== null ? String(value) : '';
+                handleSearch(stringValue);
               }}
               className="pl-10 bg-transparent"
             />
@@ -616,7 +616,7 @@ export const BorrowItemSelector = ({
                         label: cat.name,
                       }))}
                       value={tempCategoryIds}
-                      onValueChange={setTempCategoryIds}
+                      onValueChange={(value) => setTempCategoryIds(Array.isArray(value) ? value : value ? [value] : [])}
                       mode="multiple"
                       triggerClassName="h-10"
                     />
@@ -632,7 +632,7 @@ export const BorrowItemSelector = ({
                         label: brand.name,
                       }))}
                       value={tempBrandIds}
-                      onValueChange={setTempBrandIds}
+                      onValueChange={(value) => setTempBrandIds(Array.isArray(value) ? value : value ? [value] : [])}
                       mode="multiple"
                       triggerClassName="h-10"
                     />
@@ -648,7 +648,7 @@ export const BorrowItemSelector = ({
                         label: supplier.fantasyName || supplier.corporateName || "Sem nome",
                       }))}
                       value={tempSupplierIds}
-                      onValueChange={setTempSupplierIds}
+                      onValueChange={(value) => setTempSupplierIds(Array.isArray(value) ? value : value ? [value] : [])}
                       mode="multiple"
                       triggerClassName="h-10"
                     />
@@ -859,19 +859,17 @@ export const BorrowItemSelector = ({
                               {itemIsSelected ? (
                                 <Input
                                   type="number"
-                                  min="1"
+                                  min={1}
                                   max={item.availableStock}
-                                  step="1"
+                                  step={1}
                                   value={quantity}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                    const inputValue = e.target.value;
-
-                                    // If empty, don't update (will be handled on blur)
-                                    if (inputValue === "") {
+                                  onChange={(value) => {
+                                    // If empty or null, don't update (will be handled on blur)
+                                    if (value === null || value === "") {
                                       return;
                                     }
 
-                                    const numericValue = parseInt(inputValue, 10);
+                                    const numericValue = typeof value === 'number' ? value : parseInt(String(value), 10);
 
                                     // If invalid, don't update
                                     if (isNaN(numericValue) || numericValue < 1) {

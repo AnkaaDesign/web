@@ -95,10 +95,10 @@ export function CalculationTable({
     if (sortConfigs.length > 0) {
       processedData.sort((a, b) => {
         for (const sortConfig of sortConfigs) {
-          const { key, direction } = sortConfig;
+          const { column, direction } = sortConfig;
 
-          let aValue = (a as any)[key] || "";
-          let bValue = (b as any)[key] || "";
+          let aValue = (a as any)[column] || "";
+          let bValue = (b as any)[column] || "";
 
           // Handle empty/null values
           if (!aValue && !bValue) continue;

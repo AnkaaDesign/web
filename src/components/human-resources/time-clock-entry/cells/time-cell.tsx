@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { Controller } from "react-hook-form";
 import { DateTimeInput } from "../../../ui/date-time-input";
 import { Button } from "../../../ui/button";
 import { cn } from "@/lib/utils";
@@ -35,24 +36,38 @@ export function TimeCell({ entryId, entryIndex, fieldName, label: _label, contro
       <Controller
         name={`entries.${entryIndex}.${fieldName}`}
         control={control}
-        render={({ field }) => (
-          <DateTimeInput
-            value={typeof field.value === "string" ? field.value : ""}
-            onChange={(value) => {
-              field.onChange(value);
-              handleTimeChange(typeof value === "string" ? value : null);
-            }}
-            placeholder="--:--"
-            className={cn(
-              "w-16 h-8 text-center text-sm border-0 bg-transparent focus:bg-white focus:border focus:border-blue-300",
-              isModified && "font-medium text-blue-700",
-              disabled && "opacity-50 cursor-not-allowed",
-            )}
-            disabled={disabled}
-            mode="time"
-            allowManualInput={true}
-          />
-        )}
+        render={({ field }) => {
+          const timeValue = typeof field.value === "string" && field.value ? (() => {
+            const [hours, minutes] = field.value.split(":").map(Number);
+            if (!isNaN(hours) && !isNaN(minutes)) {
+              const date = new Date();
+              date.setHours(hours, minutes, 0, 0);
+              return date;
+            }
+            return null;
+          })() : null;
+
+          return (
+            <DateTimeInput
+              value={timeValue}
+              onChange={(value) => {
+                const timeString = value instanceof Date
+                  ? `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`
+                  : null;
+                field.onChange(timeString);
+                handleTimeChange(timeString);
+              }}
+              placeholder="--:--"
+              className={cn(
+                "w-16 h-8 text-center text-sm border-0 bg-transparent focus:bg-white focus:border focus:border-blue-300",
+                isModified && "font-medium text-blue-700",
+                disabled && "opacity-50 cursor-not-allowed",
+              )}
+              disabled={disabled}
+              mode="time"
+            />
+          );
+        }}
       />
 
       {/* Right navigation button */}

@@ -215,10 +215,10 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
       );
 
       // Move to confirming step with fully loaded source task
-      setCopyFromTaskState((prev) => ({
+      setCopyFromTaskState((prev): CopyFromTaskState => ({
         ...prev,
         step: "confirming",
-        sourceTask: fullSourceTask.data,  // Use refetched task
+        sourceTask: fullSourceTask.data ?? null,  // Use refetched task
       }));
     } catch (error) {
       console.error('[CopyFromTask] Failed to fetch source task:', error);
@@ -470,7 +470,11 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
               type="text"
               placeholder="Buscar por nome, cliente, número de série, placa, setor..."
               value={searchText}
-              onChange={setSearchText}
+              onChange={(value) => {
+                if (typeof value === "string") {
+                  setSearchText(value);
+                }
+              }}
               transparent={true}
               className="pl-9"
             />

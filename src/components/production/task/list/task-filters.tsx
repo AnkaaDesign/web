@@ -16,6 +16,7 @@ import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { IconChevronDown, IconChevronRight, IconFilter, IconX } from "@tabler/icons-react";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
+import type { DateRange } from "react-day-picker";
 
 interface TaskFiltersProps {
   open: boolean;
@@ -363,15 +364,16 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.entryDateRange?.from as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.entryDateRange?.to) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.entryDateRange?.to) {
                             const { entryDateRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
                             setLocalFilters({
                               ...localFilters,
                               entryDateRange: {
-                                ...(date && { from: date }),
+                                ...(dateValue && { from: dateValue }),
                                 ...(localFilters.entryDateRange?.to && { to: localFilters.entryDateRange.to }),
                               },
                             });
@@ -386,8 +388,9 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.entryDateRange?.to as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.entryDateRange?.from) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.entryDateRange?.from) {
                             const { entryDateRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
@@ -395,7 +398,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                               ...localFilters,
                               entryDateRange: {
                                 ...(localFilters.entryDateRange?.from && { from: localFilters.entryDateRange.from }),
-                                ...(date && { to: date }),
+                                ...(dateValue && { to: dateValue }),
                               },
                             });
                           }
@@ -416,15 +419,16 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.termRange?.from as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.termRange?.to) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.termRange?.to) {
                             const { termRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
                             setLocalFilters({
                               ...localFilters,
                               termRange: {
-                                ...(date && { from: date }),
+                                ...(dateValue && { from: dateValue }),
                                 ...(localFilters.termRange?.to && { to: localFilters.termRange.to }),
                               },
                             });
@@ -440,8 +444,9 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.termRange?.to as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.termRange?.from) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.termRange?.from) {
                             const { termRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
@@ -449,7 +454,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                               ...localFilters,
                               termRange: {
                                 ...(localFilters.termRange?.from && { from: localFilters.termRange.from }),
-                                ...(date && { to: date }),
+                                ...(dateValue && { to: dateValue }),
                               },
                             });
                           }
@@ -471,15 +476,16 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.startedDateRange?.from as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.startedDateRange?.to) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.startedDateRange?.to) {
                             const { startedDateRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
                             setLocalFilters({
                               ...localFilters,
                               startedDateRange: {
-                                ...(date && { from: date }),
+                                ...(dateValue && { from: dateValue }),
                                 ...(localFilters.startedDateRange?.to && { to: localFilters.startedDateRange.to }),
                               },
                             });
@@ -495,8 +501,9 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.startedDateRange?.to as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.startedDateRange?.from) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.startedDateRange?.from) {
                             const { startedDateRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
@@ -504,7 +511,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                               ...localFilters,
                               startedDateRange: {
                                 ...(localFilters.startedDateRange?.from && { from: localFilters.startedDateRange.from }),
-                                ...(date && { to: date }),
+                                ...(dateValue && { to: dateValue }),
                               },
                             });
                           }
@@ -526,15 +533,16 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.finishedDateRange?.from as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.finishedDateRange?.to) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.finishedDateRange?.to) {
                             const { finishedDateRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
                             setLocalFilters({
                               ...localFilters,
                               finishedDateRange: {
-                                ...(date && { from: date }),
+                                ...(dateValue && { from: dateValue }),
                                 ...(localFilters.finishedDateRange?.to && { to: localFilters.finishedDateRange.to }),
                               },
                             });
@@ -550,8 +558,9 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.finishedDateRange?.to as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.finishedDateRange?.from) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.finishedDateRange?.from) {
                             const { finishedDateRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
@@ -559,7 +568,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                               ...localFilters,
                               finishedDateRange: {
                                 ...(localFilters.finishedDateRange?.from && { from: localFilters.finishedDateRange.from }),
-                                ...(date && { to: date }),
+                                ...(dateValue && { to: dateValue }),
                               },
                             });
                           }
@@ -581,15 +590,16 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.createdAtRange?.from as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.createdAtRange?.to) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.createdAtRange?.to) {
                             const { createdAtRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
                             setLocalFilters({
                               ...localFilters,
                               createdAtRange: {
-                                ...(date && { from: date }),
+                                ...(dateValue && { from: dateValue }),
                                 ...(localFilters.createdAtRange?.to && { to: localFilters.createdAtRange.to }),
                               },
                             });
@@ -604,8 +614,9 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.createdAtRange?.to as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.createdAtRange?.from) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.createdAtRange?.from) {
                             const { createdAtRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
@@ -613,7 +624,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                               ...localFilters,
                               createdAtRange: {
                                 ...(localFilters.createdAtRange?.from && { from: localFilters.createdAtRange.from }),
-                                ...(date && { to: date }),
+                                ...(dateValue && { to: dateValue }),
                               },
                             });
                           }
@@ -634,15 +645,16 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.updatedAtRange?.from as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.updatedAtRange?.to) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.updatedAtRange?.to) {
                             const { updatedAtRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
                             setLocalFilters({
                               ...localFilters,
                               updatedAtRange: {
-                                ...(date && { from: date }),
+                                ...(dateValue && { from: dateValue }),
                                 ...(localFilters.updatedAtRange?.to && { to: localFilters.updatedAtRange.to }),
                               },
                             });
@@ -657,8 +669,9 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       <DateTimeInput
                         mode="date"
                         value={localFilters.updatedAtRange?.to as Date | undefined}
-                        onChange={(date: Date | null) => {
-                          if (!date && !localFilters.updatedAtRange?.from) {
+                        onChange={(date: Date | DateRange | null) => {
+                          const dateValue = date instanceof Date ? date : null;
+                          if (!dateValue && !localFilters.updatedAtRange?.from) {
                             const { updatedAtRange, ...rest } = localFilters;
                             setLocalFilters(rest);
                           } else {
@@ -666,7 +679,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                               ...localFilters,
                               updatedAtRange: {
                                 ...(localFilters.updatedAtRange?.from && { from: localFilters.updatedAtRange.from }),
-                                ...(date && { to: date }),
+                                ...(dateValue && { to: dateValue }),
                               },
                             });
                           }
@@ -801,11 +814,11 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Mínimo</Label>
-                      <Input type="number" placeholder="0,00" value={priceMin} onChange={(value) => setPriceMin(value as string)} onBlur={handlePriceRangeChange} step="0.01" min="0" />
+                      <Input type="number" placeholder="0,00" value={priceMin} onChange={(value) => setPriceMin(value?.toString() || "")} onBlur={handlePriceRangeChange} step={0.01} min={0} />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Máximo</Label>
-                      <Input type="number" placeholder="0,00" value={priceMax} onChange={(value) => setPriceMax(value as string)} onBlur={handlePriceRangeChange} step="0.01" min="0" />
+                      <Input type="number" placeholder="0,00" value={priceMax} onChange={(value) => setPriceMax(value?.toString() || "")} onBlur={handlePriceRangeChange} step={0.01} min={0} />
                     </div>
                   </div>
                 </div>

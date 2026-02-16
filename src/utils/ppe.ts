@@ -3,7 +3,6 @@ import { dateUtils } from "./date";
 import {
   SCHEDULE_FREQUENCY,
   PPE_DELIVERY_MODE,
-  PPE_REQUEST_STATUS,
   PANTS_SIZE,
   SHIRT_SIZE,
   BOOT_SIZE,
@@ -12,7 +11,6 @@ import {
   PPE_DELIVERY_STATUS,
 } from "../constants";
 import {
-  PPE_REQUEST_STATUS_LABELS,
   DELIVERY_MODE_LABELS,
   PANTS_SIZE_LABELS,
   SHIRT_SIZE_LABELS,
@@ -108,14 +106,6 @@ export function getValidSizesForPpeType(ppeType: PPE_TYPE): PPE_SIZE[] {
     default:
       return [];
   }
-}
-
-/**
- * Get PPE request status label
- * @deprecated Use getPpeDeliveryStatusLabel instead
- */
-export function getPpeRequestStatusLabel(status: PPE_REQUEST_STATUS): string {
-  return PPE_REQUEST_STATUS_LABELS[status] || status;
 }
 
 /**
@@ -231,46 +221,7 @@ export function isDeliveryDelivered(delivery: PpeDelivery): boolean {
  * Check if PPE delivery is cancelled
  */
 export function isDeliveryCancelled(delivery: PpeDelivery): boolean {
-  return delivery.status === PPE_DELIVERY_STATUS.REPROVED;
-}
-
-/**
- * Get delivery status
- * @deprecated Use delivery.status directly with PPE_DELIVERY_STATUS enum
- */
-export function getDeliveryStatus(delivery: PpeDelivery): "scheduled" | "overdue" | "completed" | "unscheduled" {
-  if (isDeliveryCompleted(delivery)) return "completed";
-  if (isDeliveryOverdue(delivery)) return "overdue";
-  if (isDeliveryScheduled(delivery)) return "scheduled";
-  return "unscheduled";
-}
-
-/**
- * Get delivery status label
- * @deprecated Use getPpeDeliveryStatusLabel instead
- */
-export function getDeliveryStatusLabel(status: "scheduled" | "overdue" | "completed" | "unscheduled"): string {
-  const labels = {
-    scheduled: "Agendado",
-    overdue: "Atrasado",
-    completed: "Entregue",
-    unscheduled: "Não agendado",
-  };
-  return labels[status];
-}
-
-/**
- * Get delivery status color
- * @deprecated Use getPpeDeliveryStatusColor instead
- */
-export function getDeliveryStatusColor(status: "scheduled" | "overdue" | "completed" | "unscheduled"): string {
-  const colors = {
-    scheduled: "blue",
-    overdue: "red",
-    completed: "green",
-    unscheduled: "gray",
-  };
-  return colors[status];
+  return delivery.status === PPE_DELIVERY_STATUS.CANCELLED;
 }
 
 /**
@@ -281,7 +232,10 @@ export function getPpeDeliveryStatusColor(status: PPE_DELIVERY_STATUS): string {
     [PPE_DELIVERY_STATUS.PENDING]: "yellow",
     [PPE_DELIVERY_STATUS.APPROVED]: "blue",
     [PPE_DELIVERY_STATUS.DELIVERED]: "green",
+    [PPE_DELIVERY_STATUS.WAITING_SIGNATURE]: "blue",
+    [PPE_DELIVERY_STATUS.COMPLETED]: "green",
     [PPE_DELIVERY_STATUS.REPROVED]: "red",
+    [PPE_DELIVERY_STATUS.SIGNATURE_REJECTED]: "red",
     [PPE_DELIVERY_STATUS.CANCELLED]: "gray",
   };
   return colors[status] || "gray";
@@ -310,19 +264,6 @@ export function getDaysUntilDelivery(delivery: PpeDelivery): number | null {
   if (delivery.actualDeliveryDate) return null;
 
   return dateUtils.getDaysBetween(new Date(), delivery.scheduledDate);
-}
-
-/**
- * Get delivery mode label (legacy - using hardcoded labels)
- * @deprecated Use getPpeDeliveryModeLabel instead
- */
-export function getDeliveryModeLabel(mode: PPE_DELIVERY_MODE): string {
-  const labels: Record<PPE_DELIVERY_MODE, string> = {
-    [PPE_DELIVERY_MODE.SCHEDULED]: "Programada",
-    [PPE_DELIVERY_MODE.ON_DEMAND]: "Sob Demanda",
-    [PPE_DELIVERY_MODE.BOTH]: "Ambos",
-  };
-  return labels[mode] || mode;
 }
 
 /**
@@ -390,7 +331,10 @@ export function groupDeliveriesByStatus(deliveries: PpeDelivery[]): Record<PPE_D
     [PPE_DELIVERY_STATUS.PENDING]: [],
     [PPE_DELIVERY_STATUS.APPROVED]: [],
     [PPE_DELIVERY_STATUS.DELIVERED]: [],
+    [PPE_DELIVERY_STATUS.WAITING_SIGNATURE]: [],
+    [PPE_DELIVERY_STATUS.COMPLETED]: [],
     [PPE_DELIVERY_STATUS.REPROVED]: [],
+    [PPE_DELIVERY_STATUS.SIGNATURE_REJECTED]: [],
     [PPE_DELIVERY_STATUS.CANCELLED]: [],
   };
 
@@ -455,32 +399,6 @@ export function sortDeliveriesByScheduledDate(deliveries: PpeDelivery[], order: 
     return order === "asc" ? dateA - dateB : dateB - dateA;
   });
 }
-
-// COMMENTED OUT: PPE config now in Item model
-/*
-export function calculatePpeConfigStats(configs: PpeConfig[]) {
-  const total = configs.length;
-
-  const byDeliveryMode = configs.reduce(
-    (acc, config) => {
-      acc[config.deliveryMode] = (acc[config.deliveryMode] || 0) + 1;
-      return acc;
-    },
-    {} as Record<PPE_DELIVERY_MODE, number>,
-  );
-
-  const averageStandardQuantity = configs.reduce((sum, config) => sum + config.standardQuantity, 0) / (total || 1);
-
-  const averageAutoOrderMonths = configs.reduce((sum, config) => sum + config.autoOrderMonths, 0) / (total || 1);
-
-  return {
-    total,
-    byDeliveryMode,
-    averageStandardQuantity: Math.round(averageStandardQuantity),
-    averageAutoOrderMonths: Math.round(averageAutoOrderMonths),
-  };
-}
-*/
 
 /**
  * Interface for PPE order suggestion
@@ -630,18 +548,3 @@ export function allowsOnDemandDelivery(item: Item): boolean {
   return mode === PPE_DELIVERY_MODE.ON_DEMAND || mode === PPE_DELIVERY_MODE.BOTH;
 }
 
-// COMMENTED OUT: Functions that use PpeConfig - PPE config now in Item model
-// The following functions have been removed because they depend on PpeConfig:
-// - calculateRequiredQuantitiesBySize
-// - generateOrderSuggestionsBySize
-// - validatePpeAvailabilityBySize
-// - createSizeDistributionReport
-// - getPpeSizeLabel
-// - formatPpeOrderSuggestion
-// - groupOrderSuggestionsByType
-// - calculateTotalOrderValue
-// - analyzePpeConsumption
-// - optimizePpeOrder
-// - getPpeReorderRecommendations
-// - generatePpeDeliverySchedule
-// - createPpeOrderReport

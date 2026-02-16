@@ -9,8 +9,8 @@ import type { Bonus, BonusIncludes } from "./bonus";
 
 export interface BonusExtra extends BaseEntity {
   bonusId: string;
-  percentage: DecimalValue | null;
-  value: DecimalValue | null;
+  percentage: DecimalValue | number | null;
+  value: DecimalValue | number | null;
   reference: string;
   calculationOrder: number;
 

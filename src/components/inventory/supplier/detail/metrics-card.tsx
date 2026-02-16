@@ -61,7 +61,7 @@ export function MetricsCard({ supplier, className }: MetricsCardProps) {
 
           {/* Financial Information */}
           {totalOrderValue > 0 && (
-            <div className="pt-6 border-t border-border/50">
+            <div className="pt-6 border-t border-border">
               <h3 className="text-base font-semibold mb-4 text-foreground">Informações Financeiras</h3>
               <div className="bg-muted/50 rounded-lg px-4 py-3">
                 <div className="flex justify-between items-center">
@@ -74,7 +74,7 @@ export function MetricsCard({ supplier, className }: MetricsCardProps) {
 
           {/* Recent Activity */}
           {mostRecentOrder && (
-            <div className="pt-6 border-t border-border/50">
+            <div className="pt-6 border-t border-border">
               <h3 className="text-base font-semibold mb-4 text-foreground">Atividade Recente</h3>
               <div className="bg-muted/50 rounded-lg px-4 py-3">
                 <div className="flex justify-between items-center">

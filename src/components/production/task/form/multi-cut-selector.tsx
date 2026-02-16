@@ -6,7 +6,6 @@ import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
 import { CUT_TYPE, CUT_TYPE_LABELS, CUT_ORIGIN } from "../../../../constants";
 import { FileUploadField } from "@/components/common/file";
 import type { FileWithPreview } from "@/components/common/file";
@@ -347,7 +346,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
             const fileForDisplay = getFileForCut(currentCut, cutId);
 
             return (
-            <div key={cutId} className="border border-border/40 rounded-lg p-4">
+            <div key={cutId} className="border border-border rounded-lg p-4">
               {/* Two column layout: File on left, Type+Quantity on right */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Left Column - File Upload (takes full height) */}
@@ -404,8 +403,8 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                       <FormLabel>Quantidade</FormLabel>
                       <Input
                         type="number"
-                        min="1"
-                        max="100"
+                        min={1}
+                        max={100}
                         value={currentCut.quantity}
                         onChange={(value) => {
                           const num = typeof value === 'string' ? parseInt(value, 10) : value as number;

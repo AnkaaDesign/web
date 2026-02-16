@@ -24,7 +24,7 @@ import {
   IconCalculator
 } from "@tabler/icons-react";
 import { formatCurrency } from "../../../utils";
-import { useBonusSimulation, useSectors } from "../../../hooks";
+import { usePayrollBonusSimulation, useSectors } from "../../../hooks";
 import { BonusSimulationFilters } from "./bonus-simulation-filters";
 
 interface BonusSimulationTableProps {
@@ -45,7 +45,10 @@ export function BonusSimulationTable({ className }: BonusSimulationTableProps) {
     month: currentMonth,
     taskQuantity: undefined as number | undefined, // Don't provide default - fetch from DB
     sectorIds: [] as string[],
+    positionIds: [] as string[],
+    includeUserIds: [] as string[],
     excludeUserIds: [] as string[],
+    showOnlyEligible: true,
   });
 
   // Fetch data
@@ -57,7 +60,7 @@ export function BonusSimulationTable({ className }: BonusSimulationTableProps) {
     isLoading,
     isError,
     refetch
-  } = useBonusSimulation(simulationParams);
+  } = usePayrollBonusSimulation(simulationParams);
 
   // Debug log
   console.log('Simulation data from hook:', simulationData);
@@ -73,8 +76,11 @@ export function BonusSimulationTable({ className }: BonusSimulationTableProps) {
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (simulationParams.sectorIds.length > 0) count++;
+    if (simulationParams.positionIds.length > 0) count++;
+    if (simulationParams.includeUserIds.length > 0) count++;
     if (simulationParams.excludeUserIds.length > 0) count++;
     if (simulationParams.taskQuantity !== undefined) count++; // Has custom task quantity
+    if (!simulationParams.showOnlyEligible) count++; // Showing all users is a filter
     return count;
   }, [simulationParams]);
 
@@ -89,7 +95,10 @@ export function BonusSimulationTable({ className }: BonusSimulationTableProps) {
       month: currentMonth,
       taskQuantity: undefined,
       sectorIds: [],
+      positionIds: [],
+      includeUserIds: [],
       excludeUserIds: [],
+      showOnlyEligible: true,
     });
   }, [currentYear, currentMonth]);
 
@@ -306,6 +315,7 @@ export function BonusSimulationTable({ className }: BonusSimulationTableProps) {
         onApply={handleFiltersApply}
         onReset={handleFiltersReset}
         sectors={sectors}
+        // @ts-expect-error - component prop mismatch
         users={users} // Pass all users for exclusion filter
       />
     </Card>

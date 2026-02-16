@@ -28,7 +28,6 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -200,7 +199,7 @@ function ChannelConfigCard({ channel, value, onChange }: ChannelConfigCardProps)
       </div>
 
       {value.enabled && (
-        <div className="space-y-3 pt-2 border-t border-border/50">
+        <div className="space-y-3 pt-2 border-t border-border">
           <label className="flex items-center justify-between cursor-pointer">
             <div className="flex items-center gap-2">
               <IconLock className="w-4 h-4 text-muted-foreground" />
@@ -375,11 +374,11 @@ export function NotificationConfigurationCreatePage() {
                       <Label htmlFor="key">
                         Chave <span className="text-destructive">*</span>
                       </Label>
-                      <Input
+                      <input
                         id="key"
                         placeholder="Ex: service_order.completed"
-                        transparent
-                        {...form.register("key")}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm bg-transparent"
+                        {...(form.register("key") as any)}
                       />
                       {form.formState.errors.key && (
                         <p className="text-sm text-destructive">{form.formState.errors.key.message}</p>
@@ -393,11 +392,11 @@ export function NotificationConfigurationCreatePage() {
                       <Label htmlFor="name">
                         Nome <span className="text-destructive">*</span>
                       </Label>
-                      <Input
+                      <input
                         id="name"
                         placeholder="Ex: Ordem de Serviço Concluída"
-                        transparent
-                        {...form.register("name")}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm bg-transparent"
+                        {...(form.register("name") as any)}
                       />
                       {form.formState.errors.name && (
                         <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
@@ -412,11 +411,11 @@ export function NotificationConfigurationCreatePage() {
                     <Label htmlFor="eventType">
                       Tipo de Evento <span className="text-destructive">*</span>
                     </Label>
-                    <Input
+                    <input
                       id="eventType"
                       placeholder="Ex: task.created"
-                      transparent
-                      {...form.register("eventType")}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm bg-transparent"
+                      {...(form.register("eventType") as any)}
                     />
                     {form.formState.errors.eventType && (
                       <p className="text-sm text-destructive">{form.formState.errors.eventType.message}</p>
@@ -623,15 +622,15 @@ export function NotificationConfigurationCreatePage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="maxFrequencyPerDay">Frequência máxima por dia</Label>
-                      <Input
+                      <input
                         id="maxFrequencyPerDay"
                         type="number"
                         min={0}
                         placeholder="Sem limite"
-                        transparent
-                        {...form.register("maxFrequencyPerDay", {
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm bg-transparent"
+                        {...(form.register("maxFrequencyPerDay", {
                           setValueAs: (v) => (v === "" || v == null ? null : parseInt(v, 10)),
-                        })}
+                        }) as any)}
                       />
                       {form.formState.errors.maxFrequencyPerDay && (
                         <p className="text-sm text-destructive">{form.formState.errors.maxFrequencyPerDay.message}</p>
@@ -643,15 +642,15 @@ export function NotificationConfigurationCreatePage() {
 
                     <div className="space-y-2">
                       <Label htmlFor="deduplicationWindow">Janela de deduplicação (min)</Label>
-                      <Input
+                      <input
                         id="deduplicationWindow"
                         type="number"
                         min={0}
                         placeholder="Desabilitada"
-                        transparent
-                        {...form.register("deduplicationWindow", {
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm bg-transparent"
+                        {...(form.register("deduplicationWindow", {
                           setValueAs: (v) => (v === "" || v == null ? null : parseInt(v, 10)),
-                        })}
+                        }) as any)}
                       />
                       {form.formState.errors.deduplicationWindow && (
                         <p className="text-sm text-destructive">{form.formState.errors.deduplicationWindow.message}</p>

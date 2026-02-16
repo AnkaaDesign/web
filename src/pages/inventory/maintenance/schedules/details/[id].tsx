@@ -379,7 +379,7 @@ function ScheduleConfigurationCard({ schedule, isOverdue, totalCost, className }
           )}
 
           {/* Frequency */}
-          <div className={cn(schedule.description && "pt-4 border-t border-border/50")}>
+          <div className={cn(schedule.description && "pt-4 border-t border-border")}>
             <h4 className="text-sm font-semibold mb-3 text-foreground">Periodicidade</h4>
             <div className="space-y-3">
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -416,7 +416,7 @@ function ScheduleConfigurationCard({ schedule, isOverdue, totalCost, className }
           </div>
 
           {/* Dates Section */}
-          <div className="pt-4 border-t border-border/50">
+          <div className="pt-4 border-t border-border">
             <h4 className="text-sm font-semibold mb-3 text-foreground">Datas do Sistema</h4>
             <div className="space-y-3">
               {schedule.nextRun && (
@@ -589,7 +589,7 @@ function MaintenanceItemCard({ schedule, className }: { schedule: any; className
           </div>
 
           {/* Stock and Price Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Estoque e Preço</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-muted/30 rounded-lg p-4">

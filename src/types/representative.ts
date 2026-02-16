@@ -27,29 +27,29 @@ export interface Representative {
 }
 
 export interface RepresentativeCreateFormData {
-  email?: string;
+  email?: string | null;
   phone: string;
   name: string;
-  password?: string;
+  password?: string | null;
   customerId?: string | null;
   role: RepresentativeRole;
   isActive?: boolean;
 }
 
 export interface RepresentativeUpdateFormData {
-  email?: string;
+  email?: string | null;
   phone?: string;
   name?: string;
-  password?: string;
+  password?: string | null;
   role?: RepresentativeRole;
   isActive?: boolean;
 }
 
 export interface RepresentativeCreateInline {
-  email?: string;
+  email?: string | null;
   phone: string;
   name: string;
-  password?: string;
+  password?: string | null;
   role: RepresentativeRole;
   isActive?: boolean;
 }

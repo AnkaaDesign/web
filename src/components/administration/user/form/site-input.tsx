@@ -25,14 +25,13 @@ export function SiteInput({ disabled }: SiteInputProps) {
             <Input
               ref={field.ref}
               value={field.value || ""}
-              onChange={(value: string) => {
-                const trimmedValue = value.trim();
+              onChange={(value: string | number | null) => {
+                const trimmedValue = typeof value === 'string' ? value.trim() : null;
                 field.onChange(trimmedValue || null);
               }}
               onBlur={field.onBlur}
               placeholder="https://exemplo.com"
               disabled={disabled}
-              type="url"
               className="transition-all duration-200 "
             />
           </FormControl>

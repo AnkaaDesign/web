@@ -2,7 +2,6 @@ import React, { useCallback, useRef, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS, MEASURE_TYPE, MEASURE_TYPE_LABELS } from "../../constants";
 import { Combobox } from "./combobox";
-import { Input } from "./input";
 import { Label } from "./label";
 import { formatNumber, roundToDecimals } from "../../utils";
 import { getMeasureUnitCategory, canConvertUnits, convertValue } from "../../types";
@@ -249,7 +248,7 @@ export function MeasureInput({
       <div className="flex gap-2">
         {/* Value Input */}
         <div className="flex-1">
-          <Input
+          <input
             ref={inputRef}
             type="text"
             inputMode="decimal"
@@ -258,10 +257,7 @@ export function MeasureInput({
             placeholder={placeholder}
             disabled={disabled}
             required={required}
-            min={min}
-            max={max}
-            step={step}
-            className={cn(error && "border-destructive focus-visible:ring-destructive", valueClassName)}
+            className={cn("flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm", error && "border-destructive focus-visible:ring-destructive", valueClassName)}
             {...props}
           />
         </div>
@@ -270,7 +266,10 @@ export function MeasureInput({
         <div className="min-w-[100px]">
           <Combobox
             value={unit || ""}
-            onValueChange={handleUnitChange}
+            onValueChange={(newValue) => {
+              const strValue = Array.isArray(newValue) ? newValue[0] : newValue;
+              handleUnitChange(strValue || "");
+            }}
             disabled={disabled}
             placeholder="Selecione unidade"
             triggerClassName={cn(error && "border-destructive focus-visible:ring-destructive", unitClassName)}

@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useObservations, useTasks } from "../../../../hooks";
-import type { Observation } from "../../../../types";
 import type { ObservationGetManyFormData } from "../../../../schemas";
-import { routes } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +38,6 @@ function debounce<T extends (...args: any[]) => any>(func: T, wait: number) {
 }
 
 export function ObservationList({ className }: ObservationListProps) {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -61,13 +58,7 @@ export function ObservationList({ className }: ObservationListProps) {
 
   // Create columns for visibility manager (without handlers since they're not needed for column visibility)
   const columnsForVisibility = useMemo(() => {
-    return createObservationColumns({
-      selection: {},
-      onRowSelection: () => {},
-      onEdit: () => {},
-      onDelete: () => {},
-      onView: () => {},
-    });
+    return createObservationColumns();
   }, []);
 
   // State from URL params
@@ -145,12 +136,6 @@ export function ObservationList({ className }: ObservationListProps) {
     [],
   );
 
-  // Handle search input change
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setDisplaySearchText(value);
-    debouncedSetSearchingFor(value);
-  };
 
   // Update URL when search or filters change
   useEffect(() => {
@@ -245,10 +230,6 @@ export function ObservationList({ className }: ObservationListProps) {
     [filterRemovers],
   );
 
-  // Handle row click to navigate to details
-  const handleRowClick = (observation: Observation) => {
-    navigate(routes.production.observations.details(observation.id));
-  };
 
   return (
     <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
@@ -257,7 +238,11 @@ export function ObservationList({ className }: ObservationListProps) {
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex-1 relative">
             <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input ref={searchInputRef} placeholder="Buscar observações..." value={displaySearchText} onChange={handleSearchChange} transparent={true} className="pl-9" />
+            <Input ref={searchInputRef} placeholder="Buscar observações..." value={displaySearchText} onChange={(value) => {
+              const str = String(value ?? '');
+              setDisplaySearchText(str);
+              debouncedSetSearchingFor(str);
+            }} transparent={true} className="pl-9" />
           </div>
           <div className="flex gap-2">
             {selectionCount > 0 && <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />}
@@ -281,7 +266,7 @@ export function ObservationList({ className }: ObservationListProps) {
           ) : error ? (
             <div className="flex items-center justify-center h-full text-destructive">Erro ao carregar observações</div>
           ) : (
-            <ObservationTable className="h-full" onRowClick={handleRowClick} showSelectedOnly={showSelectedOnly} visibleColumns={visibleColumns} query={observationQuery} />
+            <ObservationTable className="h-full" visibleColumns={visibleColumns} filters={filters} />
           )}
         </div>
 

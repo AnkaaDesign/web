@@ -82,17 +82,6 @@ export function PpeScheduleInfoCard({ schedule, className }: PpeScheduleInfoCard
             </div>
           </div>
 
-          {/* Description */}
-          {schedule.description && (
-            <div className="flex flex-col gap-2 bg-muted/50 rounded-lg px-4 py-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <IconFileText className="h-4 w-4" />
-                Descrição
-              </div>
-              <p className="text-sm text-foreground">{schedule.description}</p>
-            </div>
-          )}
-
           {/* Frequency */}
           <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">

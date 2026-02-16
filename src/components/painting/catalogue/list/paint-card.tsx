@@ -143,10 +143,11 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
   const handlePaintBrandFilter = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onFilterChange && paint.paintBrand?.id) {
+      const paintBrandId = paint.paintBrand.id;
       const currentPaintBrandIds = currentFilters?.paintBrandIds || [];
-      const newPaintBrandIds = currentPaintBrandIds.includes(paint.paintBrand.id)
-        ? currentPaintBrandIds.filter((id: string) => id !== paint.paintBrand.id)
-        : [...currentPaintBrandIds, paint.paintBrand.id];
+      const newPaintBrandIds = currentPaintBrandIds.includes(paintBrandId)
+        ? currentPaintBrandIds.filter((id: string) => id !== paintBrandId)
+        : [...currentPaintBrandIds, paintBrandId];
 
       onFilterChange({
         ...currentFilters,
@@ -159,10 +160,11 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
   const handleManufacturerFilter = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onFilterChange && paint.manufacturer) {
+      const manufacturer = paint.manufacturer;
       const currentManufacturers = currentFilters?.manufacturers || [];
-      const newManufacturers = currentManufacturers.includes(paint.manufacturer)
-        ? currentManufacturers.filter((m: TRUCK_MANUFACTURER) => m !== paint.manufacturer)
-        : [...currentManufacturers, paint.manufacturer];
+      const newManufacturers = currentManufacturers.includes(manufacturer)
+        ? currentManufacturers.filter((m: TRUCK_MANUFACTURER) => m !== manufacturer)
+        : [...currentManufacturers, manufacturer];
 
       onFilterChange({
         ...currentFilters,

@@ -34,7 +34,7 @@ export default function PaintDetailsPage() {
   // Determine which catalogue link to use based on user privileges
   // Full catalogue is only for WAREHOUSE and ADMIN
   // Basic catalogue is for everyone else (DESIGNER, COMMERCIAL, LOGISTIC, FINANCIAL, PRODUCTION team leader)
-  const shouldUseFullCatalogue = hasAnyPrivilege(user, [
+  const shouldUseFullCatalogue = hasAnyPrivilege(user as any, [
     SECTOR_PRIVILEGES.WAREHOUSE,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
@@ -54,7 +54,7 @@ export default function PaintDetailsPage() {
   // Only WAREHOUSE, ADMIN, and PRODUCTION team leaders can navigate to formula details
   const canNavigateToFormulas = userPrivilege === SECTOR_PRIVILEGES.WAREHOUSE ||
     userPrivilege === SECTOR_PRIVILEGES.ADMIN ||
-    (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader(user));
+    (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader(user as any));
 
   // Only WAREHOUSE and ADMIN can see changelog
   const canSeeChangelog = userPrivilege === SECTOR_PRIVILEGES.WAREHOUSE ||

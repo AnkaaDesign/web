@@ -51,6 +51,16 @@ export interface TaskPricing extends BaseEntity {
   customerSignatureId: string | null;
   customerSignature?: File;
 
+  // New fields from migration
+  simultaneousTasks: number | null; // Number of simultaneous tasks (1-100)
+  discountReference: string | null; // Reference/justification for discount
+  invoicesToCustomerIds?: string[]; // IDs of customers to invoice
+  invoicesToCustomers?: Array<{ // Full customer objects for display
+    id: string;
+    corporateName?: string;
+    fantasyName?: string;
+  }>;
+
   tasks?: any[];  // Tasks that share this pricing (one-to-many)
   items?: TaskPricingItem[];
 }

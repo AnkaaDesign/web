@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { IconSelector, IconChevronUp, IconChevronDown } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useUserMutations } from "../../../hooks/human-resources/use-user";
+import { useUserMutations, useUserBatchMutations } from "../../../hooks/human-resources/use-user";
 import { useTasks } from "../../../hooks";
 import { formatCurrency, getCurrentPayrollPeriod, getBonusPeriod } from "../../../utils";
 import { calculateBonusForPosition } from "../../../utils/bonus";
@@ -134,7 +134,8 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
   const [userPerformanceLevels, setUserPerformanceLevels] = useState<Map<string, number>>(new Map());
 
   const queryClient = useQueryClient();
-  const { updateAsync, isUpdating, batchUpdate } = useUserMutations();
+  const { updateAsync, isUpdating } = useUserMutations();
+  const { batchUpdateAsync } = useUserBatchMutations();
 
   // Get current payroll period (26th-25th cycle)
   // If today is Sept 26th or later, this returns October
@@ -311,8 +312,8 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
 
     try {
       // Use batch update if available, otherwise update one by one
-      if (batchUpdate) {
-        await batchUpdate.mutateAsync({ updates });
+      if (batchUpdateAsync) {
+        await batchUpdateAsync({ users: updates }, undefined);
       } else {
         // Fallback to individual updates
         await Promise.all(
@@ -342,7 +343,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
         console.error("Failed to update performance levels:", error);
       }
     }
-  }, [pendingChanges, batchUpdate, updateAsync, queryClient, onRefresh]);
+  }, [pendingChanges, batchUpdateAsync, updateAsync, queryClient, onRefresh]);
 
   // Revert all pending changes
   const revertAllChanges = useCallback(() => {

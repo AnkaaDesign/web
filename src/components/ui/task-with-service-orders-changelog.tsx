@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { FilePreviewCard } from "@/components/common/file";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
+import { Button } from "@/components/ui/button";
 import {
   IconHistory,
   IconEdit,
@@ -14,7 +15,12 @@ import {
   IconCalendar,
   IconClock,
   IconUser,
+  IconArrowBackUpDouble,
 } from "@tabler/icons-react";
+import { rollbackFieldChange } from "@/api-client/task";
+import { useQueryClient } from "@tanstack/react-query";
+import { taskKeys, serviceOrderKeys, truckKeys, changeLogKeys } from "../../hooks/common/query-keys";
+import { taskPricingKeys } from "../../hooks/production/use-task-pricing";
 import type { ChangeLog } from "../../types";
 import {
   CHANGE_LOG_ENTITY_TYPE,
@@ -22,6 +28,11 @@ import {
   CHANGE_TRIGGERED_BY,
   SERVICE_ORDER_TYPE,
   SECTOR_PRIVILEGES,
+  CUT_STATUS,
+  CUT_TYPE,
+  CUT_ORIGIN,
+  AIRBRUSHING_STATUS,
+  TRUCK_MANUFACTURER,
 } from "../../constants";
 import { useCurrentUser } from "../../hooks";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
@@ -42,7 +53,9 @@ import {
   getFieldLabel,
   formatFieldValue,
   getActionLabel,
+  formatCurrency,
 } from "../../utils";
+import { generateLayoutSVG } from "@/utils/generate-layout-svg";
 import { useChangeLogs } from "../../hooks";
 import { useEntityDetails } from "@/hooks/common/use-entity-details";
 import { cn } from "@/lib/utils";
@@ -160,10 +173,10 @@ const renderCutsCards = (cuts: any[]) => {
                 </h4>
                 {cut.status && (
                   <Badge
-                    variant={ENTITY_BADGE_CONFIG.CUT?.[cut.status] || "default"}
+                    variant={ENTITY_BADGE_CONFIG.CUT?.[cut.status as CUT_STATUS] || "default"}
                     className="text-[10px] h-4 px-1.5 flex-shrink-0"
                   >
-                    {CUT_STATUS_LABELS[cut.status] || cut.status}
+                    {CUT_STATUS_LABELS[cut.status as CUT_STATUS] || cut.status}
                   </Badge>
                 )}
               </div>
@@ -171,7 +184,7 @@ const renderCutsCards = (cuts: any[]) => {
                 {cut.type && (
                   <div className="flex items-center gap-1">
                     <span className="font-medium">Tipo:</span>
-                    <span>{CUT_TYPE_LABELS[cut.type] || cut.type}</span>
+                    <span>{CUT_TYPE_LABELS[cut.type as CUT_TYPE] || cut.type}</span>
                   </div>
                 )}
                 {cut.quantity && (
@@ -183,7 +196,7 @@ const renderCutsCards = (cuts: any[]) => {
                 {cut.origin && (
                   <div className="flex items-center gap-1">
                     <span className="font-medium">Origem:</span>
-                    <span>{CUT_ORIGIN_LABELS[cut.origin] || cut.origin}</span>
+                    <span>{CUT_ORIGIN_LABELS[cut.origin as CUT_ORIGIN] || cut.origin}</span>
                   </div>
                 )}
               </div>
@@ -281,7 +294,7 @@ const renderAirbrushingsCards = (airbrushings: any[]) => {
                 variant="secondary"
                 className="text-[10px] h-4 px-1.5 flex-shrink-0"
               >
-                {AIRBRUSHING_STATUS_LABELS[airbrushing.status] ||
+                {AIRBRUSHING_STATUS_LABELS[airbrushing.status as AIRBRUSHING_STATUS] ||
                   airbrushing.status}
               </Badge>
             )}
@@ -293,7 +306,7 @@ const renderAirbrushingsCards = (airbrushings: any[]) => {
 };
 
 // Render paints as cards
-const renderPaintsCards = (paints: any[]) => {
+const renderPaintsCards = (paints: any[] | null) => {
   if (!Array.isArray(paints) || paints.length === 0) {
     return (
       <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>
@@ -305,7 +318,7 @@ const renderPaintsCards = (paints: any[]) => {
       {paints.map((paint: any, index: number) => (
         <div
           key={paint.id || index}
-          className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-card"
+          className="border dark:border-border rounded-lg px-2.5 py-1.5 bg-card"
         >
           <div className="flex items-start gap-3">
             <div className="relative flex-shrink-0">
@@ -348,7 +361,7 @@ const renderPaintsCards = (paints: any[]) => {
                 )}
                 {paint.finish && (
                   <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
-                    {PAINT_FINISH_LABELS[paint.finish]}
+                    {PAINT_FINISH_LABELS[paint.finish as PAINT_FINISH]}
                   </Badge>
                 )}
                 {paint.paintBrand?.name && (
@@ -358,7 +371,7 @@ const renderPaintsCards = (paints: any[]) => {
                 )}
                 {paint.manufacturer && (
                   <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
-                    {TRUCK_MANUFACTURER_LABELS[paint.manufacturer]}
+                    {TRUCK_MANUFACTURER_LABELS[paint.manufacturer as TRUCK_MANUFACTURER]}
                   </Badge>
                 )}
               </div>
@@ -377,6 +390,7 @@ interface TaskWithServiceOrdersChangelogProps {
   serviceOrderIds: string[];
   truckId?: string;
   layoutIds?: string[];
+  pricingId?: string;
   className?: string;
   maxHeight?: string;
   limit?: number;
@@ -391,7 +405,7 @@ const actionConfig: Record<
   [CHANGE_LOG_ACTION.UPDATE]: { icon: IconEdit, color: "text-neutral-600" },
   [CHANGE_LOG_ACTION.DELETE]: { icon: IconTrash, color: "text-red-600" },
   [CHANGE_LOG_ACTION.RESTORE]: { icon: IconRefresh, color: "text-purple-600" },
-  [CHANGE_LOG_ACTION.ROLLBACK]: { icon: IconRefresh, color: "text-blue-600" },
+  [CHANGE_LOG_ACTION.ROLLBACK]: { icon: IconArrowBackUpDouble, color: "text-blue-600" },
   [CHANGE_LOG_ACTION.ARCHIVE]: { icon: IconTrash, color: "text-gray-600" },
   [CHANGE_LOG_ACTION.UNARCHIVE]: { icon: IconPlus, color: "text-gray-600" },
   [CHANGE_LOG_ACTION.ACTIVATE]: { icon: IconPlus, color: "text-green-600" },
@@ -400,6 +414,7 @@ const actionConfig: Record<
   [CHANGE_LOG_ACTION.REJECT]: { icon: IconTrash, color: "text-red-600" },
   [CHANGE_LOG_ACTION.CANCEL]: { icon: IconTrash, color: "text-red-600" },
   [CHANGE_LOG_ACTION.COMPLETE]: { icon: IconPlus, color: "text-green-600" },
+  [CHANGE_LOG_ACTION.RESCHEDULE]: { icon: IconCalendar, color: "text-blue-600" },
   [CHANGE_LOG_ACTION.BATCH_CREATE]: { icon: IconPlus, color: "text-green-600" },
   [CHANGE_LOG_ACTION.BATCH_UPDATE]: {
     icon: IconEdit,
@@ -461,6 +476,27 @@ const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
         groups.push(currentGroup);
       }
       // CREATE action gets its own group
+      groups.push([changelog]);
+      currentGroup = [];
+      currentTime = null;
+      currentEntityId = null;
+      currentAction = null;
+      currentEntityType = null;
+      return;
+    }
+
+    // TASK/SERVICE_ORDER/TRUCK UPDATE/ROLLBACK/BATCH_UPDATE actions should never be grouped —
+    // each gets its own card so that every field change can have its own rollback button
+    const isRollbackableUpdate =
+      (changelog.action === CHANGE_LOG_ACTION.UPDATE ||
+        changelog.action === CHANGE_LOG_ACTION.ROLLBACK ||
+        changelog.action === CHANGE_LOG_ACTION.BATCH_UPDATE) &&
+      (changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
+        changelog.entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ||
+        changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK);
+
+    if (isRollbackableUpdate) {
+      if (currentGroup.length > 0) groups.push(currentGroup);
       groups.push([changelog]);
       currentGroup = [];
       currentTime = null;
@@ -585,9 +621,6 @@ const formatValueWithEntity = (
       if (field === "invoiceToId" && entityDetails.customers.has(parsedValue)) {
         return entityDetails.customers.get(parsedValue) || "Cliente";
       }
-      if (field === "truckId" && entityDetails.trucks.has(parsedValue)) {
-        return entityDetails.trucks.get(parsedValue) || "Caminhão";
-      }
     }
 
     // If entity details not available, show a placeholder
@@ -600,6 +633,14 @@ const formatValueWithEntity = (
 
   // Use parsedValue to ensure arrays/objects are properly formatted
   const result = formatFieldValue(parsedValue, field, entityType, metadata);
+
+  // Render arrays as stacked lines (e.g., representatives)
+  if (Array.isArray(result)) {
+    return result.map((item, i) => (
+      <div key={i}>{String(item)}</div>
+    ));
+  }
+
   return result;
 };
 
@@ -609,12 +650,16 @@ const ChangelogTimelineItem = ({
   entityType,
   entityDetails,
   userSectorPrivilege,
+  onRollback,
+  rollbackLoading,
 }: {
   changelogGroup: ChangeLog[];
   isLast: boolean;
   entityType: CHANGE_LOG_ENTITY_TYPE;
   entityDetails: any;
   userSectorPrivilege?: SECTOR_PRIVILEGES;
+  onRollback?: (changeLogId: string, fieldName: string) => void;
+  rollbackLoading?: string | null;
 }) => {
   const firstChange = changelogGroup[0];
   const config = actionConfig[firstChange.action] || {
@@ -634,7 +679,9 @@ const ChangelogTimelineItem = ({
           ? "Caminhão"
           : entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT
             ? "Layout"
-            : "";
+            : entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING
+              ? "Precificação"
+              : "";
 
   // Determine the action label
   const actionLabel = getActionLabel(
@@ -861,7 +908,7 @@ const ChangelogTimelineItem = ({
                         }: any) => (
                           <div
                             key={layoutChange.id}
-                            className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-muted/30 inline-flex items-center gap-2"
+                            className="border dark:border-border rounded-lg px-2.5 py-1.5 bg-muted/30 inline-flex items-center gap-2"
                           >
                             <span className="text-xs font-medium">
                               {sideName}
@@ -878,7 +925,7 @@ const ChangelogTimelineItem = ({
             )}
 
             {/* Footer */}
-            <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
+            <div className="mt-3 pt-3 border-t border-border/40 text-sm text-muted-foreground">
               <span className="text-muted-foreground">Por: </span>
               <span className="text-foreground font-medium">
                 {firstChange.user?.name || "Sistema"}
@@ -1076,37 +1123,234 @@ const ChangelogTimelineItem = ({
               <div className="mb-3 space-y-2">
                 {(descriptionChange?.newValue ||
                   serviceOrderDetails?.description) && (
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Descrição: </span>
-                    <span className="text-foreground font-medium">
-                      {descriptionChange?.newValue ||
-                        serviceOrderDetails?.description}
-                    </span>
+                  <div className="flex items-center justify-between text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Descrição: </span>
+                      <span className="text-foreground font-medium">
+                        {descriptionChange?.newValue ||
+                          serviceOrderDetails?.description}
+                      </span>
+                    </div>
+                    {descriptionChange &&
+                      descriptionChange.oldValue !== null &&
+                      onRollback && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            onRollback(
+                              descriptionChange.id,
+                              getFieldLabel(descriptionChange.field!, entityType),
+                            )
+                          }
+                          disabled={rollbackLoading === descriptionChange.id}
+                          className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          {rollbackLoading === descriptionChange.id ? (
+                            <>
+                              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                              Revertendo...
+                            </>
+                          ) : (
+                            <>
+                              <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                              Reverter
+                            </>
+                          )}
+                        </Button>
+                      )}
                   </div>
                 )}
                 {(typeChange?.newValue || serviceOrderDetails?.type) && (
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Tipo: </span>
-                    <span className="text-foreground font-medium">
-                      {SERVICE_ORDER_TYPE_LABELS[
-                        (typeChange?.newValue ||
-                          serviceOrderDetails?.type) as keyof typeof SERVICE_ORDER_TYPE_LABELS
-                      ] ||
-                        typeChange?.newValue ||
-                        serviceOrderDetails?.type}
-                    </span>
+                  <div className="flex items-center justify-between text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Tipo: </span>
+                      <span className="text-foreground font-medium">
+                        {SERVICE_ORDER_TYPE_LABELS[
+                          (typeChange?.newValue ||
+                            serviceOrderDetails?.type) as keyof typeof SERVICE_ORDER_TYPE_LABELS
+                        ] ||
+                          typeChange?.newValue ||
+                          serviceOrderDetails?.type}
+                      </span>
+                    </div>
+                    {typeChange &&
+                      typeChange.oldValue !== null &&
+                      onRollback && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            onRollback(
+                              typeChange.id,
+                              getFieldLabel(typeChange.field!, entityType),
+                            )
+                          }
+                          disabled={rollbackLoading === typeChange.id}
+                          className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          {rollbackLoading === typeChange.id ? (
+                            <>
+                              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                              Revertendo...
+                            </>
+                          ) : (
+                            <>
+                              <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                              Reverter
+                            </>
+                          )}
+                        </Button>
+                      )}
                   </div>
                 )}
               </div>
             )}
 
             {/* Status change summary - matching CREATE style */}
-            {statusSummary && (
-              <div className="text-sm">
-                <span className="text-muted-foreground">Status: </span>
-                <span className="text-foreground font-medium">
-                  {statusSummary.title.replace("Status: ", "")}
-                </span>
+            {statusSummary && statusChange && (
+              <div className="flex items-center justify-between text-sm">
+                <div>
+                  <span className="text-muted-foreground">Status: </span>
+                  <span className="text-foreground font-medium">
+                    {statusSummary.title.replace("Status: ", "")}
+                  </span>
+                </div>
+                {statusChange.oldValue !== null && onRollback && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      onRollback(
+                        statusChange.id,
+                        getFieldLabel(statusChange.field!, entityType),
+                      )
+                    }
+                    disabled={rollbackLoading === statusChange.id}
+                    className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  >
+                    {rollbackLoading === statusChange.id ? (
+                      <>
+                        <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                        Revertendo...
+                      </>
+                    ) : (
+                      <>
+                        <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                        Reverter
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Timestamp changes (when shown without a status change) */}
+            {!statusChange && timestampChanges.length > 0 && (
+              <div className="space-y-2 mt-2">
+                {timestampChanges.map((changelog) => (
+                  <div key={changelog.id} className="text-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-muted-foreground">
+                          {getFieldLabel(changelog.field, entityType)}:{" "}
+                        </span>
+                        <span className="text-foreground font-medium">
+                          {formatValueWithEntity(
+                            changelog.newValue,
+                            changelog.field,
+                            entityType,
+                            entityDetails,
+                          ) || "Nenhum"}
+                        </span>
+                      </div>
+                      {changelog.field &&
+                        changelog.oldValue !== null &&
+                        onRollback && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              onRollback(
+                                changelog.id,
+                                getFieldLabel(changelog.field!, entityType),
+                              )
+                            }
+                            disabled={rollbackLoading === changelog.id}
+                            className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            {rollbackLoading === changelog.id ? (
+                              <>
+                                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                                Revertendo...
+                              </>
+                            ) : (
+                              <>
+                                <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                                Reverter
+                              </>
+                            )}
+                          </Button>
+                        )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* User changes (when shown without a status change) */}
+            {!statusChange && userChanges.length > 0 && (
+              <div className="space-y-2 mt-2">
+                {userChanges.map((changelog) => {
+                  const newUserId = changelog.newValue;
+                  const newUserName =
+                    newUserId && entityDetails?.users
+                      ? entityDetails.users.get(newUserId)?.name
+                      : null;
+
+                  return (
+                    <div key={changelog.id} className="text-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-muted-foreground">
+                            {getFieldLabel(changelog.field, entityType)}:{" "}
+                          </span>
+                          <span className="text-foreground font-medium">
+                            {newUserName || (newUserId ? "Usuário" : "Nenhum")}
+                          </span>
+                        </div>
+                        {changelog.field &&
+                          changelog.oldValue !== null &&
+                          onRollback && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                onRollback(
+                                  changelog.id,
+                                  getFieldLabel(changelog.field!, entityType),
+                                )
+                              }
+                              disabled={rollbackLoading === changelog.id}
+                              className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              {rollbackLoading === changelog.id ? (
+                                <>
+                                  <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                                  Revertendo...
+                                </>
+                              ) : (
+                                <>
+                                  <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                                  Reverter
+                                </>
+                              )}
+                            </Button>
+                          )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1124,12 +1368,42 @@ const ChangelogTimelineItem = ({
 
                     return (
                       <div key={changelog.id} className="text-sm">
-                        <span className="text-muted-foreground">
-                          Atribuído a:{" "}
-                        </span>
-                        <span className="text-foreground font-medium">
-                          {newUserName || (newUserId ? "Usuário" : "Nenhum")}
-                        </span>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-muted-foreground">
+                              Atribuído a:{" "}
+                            </span>
+                            <span className="text-foreground font-medium">
+                              {newUserName || (newUserId ? "Usuário" : "Nenhum")}
+                            </span>
+                          </div>
+                          {changelog.oldValue !== null && onRollback && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                onRollback(
+                                  changelog.id,
+                                  getFieldLabel(changelog.field!, entityType),
+                                )
+                              }
+                              disabled={rollbackLoading === changelog.id}
+                              className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              {rollbackLoading === changelog.id ? (
+                                <>
+                                  <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                                  Revertendo...
+                                </>
+                              ) : (
+                                <>
+                                  <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                                  Reverter
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     );
                   }
@@ -1137,25 +1411,57 @@ const ChangelogTimelineItem = ({
                   // Default rendering for other fields (with before/after)
                   return (
                     <div key={changelog.id} className="text-sm">
-                      <span className="text-muted-foreground">
-                        {getFieldLabel(changelog.field, entityType)}:{" "}
-                      </span>
-                      <span className="text-red-600 dark:text-red-400 line-through mr-2">
-                        {formatValueWithEntity(
-                          changelog.oldValue,
-                          changelog.field,
-                          entityType,
-                          entityDetails,
-                        ) || "Nenhum"}
-                      </span>
-                      <span className="text-green-600 dark:text-green-400">
-                        {formatValueWithEntity(
-                          changelog.newValue,
-                          changelog.field,
-                          entityType,
-                          entityDetails,
-                        ) || "Nenhum"}
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-muted-foreground">
+                            {getFieldLabel(changelog.field, entityType)}:{" "}
+                          </span>
+                          <span className="text-red-600 dark:text-red-400 line-through mr-2">
+                            {formatValueWithEntity(
+                              changelog.oldValue,
+                              changelog.field,
+                              entityType,
+                              entityDetails,
+                            ) || "Nenhum"}
+                          </span>
+                          <span className="text-green-600 dark:text-green-400">
+                            {formatValueWithEntity(
+                              changelog.newValue,
+                              changelog.field,
+                              entityType,
+                              entityDetails,
+                            ) || "Nenhum"}
+                          </span>
+                        </div>
+                        {changelog.field &&
+                          changelog.oldValue !== null &&
+                          onRollback && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                onRollback(
+                                  changelog.id,
+                                  getFieldLabel(changelog.field!, entityType),
+                                )
+                              }
+                              disabled={rollbackLoading === changelog.id}
+                              className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              {rollbackLoading === changelog.id ? (
+                                <>
+                                  <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                                  Revertendo...
+                                </>
+                              ) : (
+                                <>
+                                  <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                                  Reverter
+                                </>
+                              )}
+                            </Button>
+                          )}
+                      </div>
                     </div>
                   );
                 })}
@@ -1163,7 +1469,7 @@ const ChangelogTimelineItem = ({
             )}
 
             {/* Footer */}
-            <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
+            <div className="mt-3 pt-3 border-t border-border/40 text-sm text-muted-foreground">
               <span className="text-muted-foreground">Por: </span>
               <span className="text-foreground font-medium">
                 {firstChange.user?.name || "Sistema"}
@@ -1278,36 +1584,14 @@ const ChangelogTimelineItem = ({
                   return false;
                 }
 
-                // For services field, only show if there's a meaningful change (count changed)
-                if (changelog.field === "services") {
-                  const parseValue = (val: any) => {
-                    if (!val) return null;
-                    if (
-                      typeof val === "string" &&
-                      (val.trim().startsWith("[") || val.trim().startsWith("{"))
-                    ) {
-                      try {
-                        return JSON.parse(val);
-                      } catch (e) {
-                        return null;
-                      }
-                    }
-                    return val;
-                  };
-
-                  const oldParsed = parseValue(changelog.oldValue);
-                  const newParsed = parseValue(changelog.newValue);
-                  const oldCount = Array.isArray(oldParsed)
-                    ? oldParsed.length
-                    : 0;
-                  const newCount = Array.isArray(newParsed)
-                    ? newParsed.length
-                    : 0;
-
-                  // Only show if count actually changed (services added or removed)
-                  if (oldCount === newCount) {
-                    return false;
-                  }
+                // Always hide services/serviceOrders fields — individual SERVICE_ORDER
+                // CREATE/UPDATE/DELETE changelogs already cover all changes
+                if (
+                  changelog.field === "services" ||
+                  changelog.field === "serviceOrders" ||
+                  changelog.field === "serviceOrderIds"
+                ) {
+                  return false;
                 }
 
                 return true;
@@ -1319,10 +1603,12 @@ const ChangelogTimelineItem = ({
 
                 return (
                   <div key={changelog.id}>
-                    {index > 0 && <div className="my-3 border-t" />}
+                    {index > 0 && <div className="my-3 border-t border-border/40" />}
 
                     {/* Field name - Hide for services field as it renders as cards */}
-                    {changelog.field !== "services" && (
+                    {changelog.field !== "services" &&
+                      changelog.field !== "serviceOrders" &&
+                      changelog.field !== "serviceOrderIds" && (
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-sm text-muted-foreground">
                           <span className="text-muted-foreground">Campo: </span>
@@ -1330,6 +1616,42 @@ const ChangelogTimelineItem = ({
                             {getFieldLabel(changelog.field, entityType)}
                           </span>
                         </div>
+
+                        {/* Rollback button */}
+                        {(firstChange.action === CHANGE_LOG_ACTION.UPDATE ||
+                          firstChange.action === CHANGE_LOG_ACTION.ROLLBACK ||
+                          firstChange.action === CHANGE_LOG_ACTION.BATCH_UPDATE) &&
+                          changelog.field &&
+                          changelog.oldValue !== null &&
+                          onRollback &&
+                          (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
+                            entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ||
+                            entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                onRollback(
+                                  changelog.id,
+                                  getFieldLabel(changelog.field!, entityType),
+                                )
+                              }
+                              disabled={rollbackLoading === changelog.id}
+                              className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              {rollbackLoading === changelog.id ? (
+                                <>
+                                  <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                                  Revertendo...
+                                </>
+                              ) : (
+                                <>
+                                  <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                                  Reverter
+                                </>
+                              )}
+                            </Button>
+                          )}
                       </div>
                     )}
 
@@ -1362,6 +1684,42 @@ const ChangelogTimelineItem = ({
                               const newParsed = parseValue(changelog.newValue);
                               return (
                                 <>
+                                  {/* Rollback button for cuts */}
+                                  {(firstChange.action === CHANGE_LOG_ACTION.UPDATE ||
+                                    firstChange.action === CHANGE_LOG_ACTION.ROLLBACK ||
+                                    firstChange.action === CHANGE_LOG_ACTION.BATCH_UPDATE) &&
+                                    changelog.oldValue !== null &&
+                                    onRollback &&
+                                    (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
+                                      entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ||
+                                      entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK) && (
+                                      <div className="flex justify-end mb-2">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            onRollback(
+                                              changelog.id,
+                                              getFieldLabel(changelog.field!, entityType),
+                                            )
+                                          }
+                                          disabled={rollbackLoading === changelog.id}
+                                          className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                        >
+                                          {rollbackLoading === changelog.id ? (
+                                            <>
+                                              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                                              Revertendo...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                                              Reverter
+                                            </>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    )}
                                   <div>
                                     <span className="text-sm text-muted-foreground">
                                       Antes:
@@ -1377,7 +1735,9 @@ const ChangelogTimelineItem = ({
                                 </>
                               );
                             })()
-                          ) : changelog.field === "services" ? (
+                          ) : changelog.field === "services" ||
+                            changelog.field === "serviceOrders" ||
+                            changelog.field === "serviceOrderIds" ? (
                             (() => {
                               const parseValue = (val: any) => {
                                 if (!val) return val;
@@ -1466,6 +1826,42 @@ const ChangelogTimelineItem = ({
                               const newParsed = parseValue(changelog.newValue);
                               return (
                                 <>
+                                  {/* Rollback button for airbrushings */}
+                                  {(firstChange.action === CHANGE_LOG_ACTION.UPDATE ||
+                                    firstChange.action === CHANGE_LOG_ACTION.ROLLBACK ||
+                                    firstChange.action === CHANGE_LOG_ACTION.BATCH_UPDATE) &&
+                                    changelog.oldValue !== null &&
+                                    onRollback &&
+                                    (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
+                                      entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ||
+                                      entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK) && (
+                                      <div className="flex justify-end mb-2">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            onRollback(
+                                              changelog.id,
+                                              getFieldLabel(changelog.field!, entityType),
+                                            )
+                                          }
+                                          disabled={rollbackLoading === changelog.id}
+                                          className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                        >
+                                          {rollbackLoading === changelog.id ? (
+                                            <>
+                                              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                                              Revertendo...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                                              Reverter
+                                            </>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    )}
                                   <div>
                                     <span className="text-sm text-muted-foreground">
                                       Antes:
@@ -1501,6 +1897,42 @@ const ChangelogTimelineItem = ({
                               const newPaint = getFullPaint(changelog.newValue);
                               return (
                                 <>
+                                  {/* Rollback button for paintId */}
+                                  {(firstChange.action === CHANGE_LOG_ACTION.UPDATE ||
+                                    firstChange.action === CHANGE_LOG_ACTION.ROLLBACK ||
+                                    firstChange.action === CHANGE_LOG_ACTION.BATCH_UPDATE) &&
+                                    changelog.oldValue !== null &&
+                                    onRollback &&
+                                    (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
+                                      entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ||
+                                      entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK) && (
+                                      <div className="flex justify-end mb-2">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            onRollback(
+                                              changelog.id,
+                                              getFieldLabel(changelog.field!, entityType),
+                                            )
+                                          }
+                                          disabled={rollbackLoading === changelog.id}
+                                          className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                        >
+                                          {rollbackLoading === changelog.id ? (
+                                            <>
+                                              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                                              Revertendo...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                                              Reverter
+                                            </>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    )}
                                   <div>
                                     <span className="text-sm text-muted-foreground">
                                       Antes:
@@ -1575,6 +2007,42 @@ const ChangelogTimelineItem = ({
                               const newPaints = getPaintObjects(newParsed);
                               return (
                                 <>
+                                  {/* Rollback button for paint fields */}
+                                  {(firstChange.action === CHANGE_LOG_ACTION.UPDATE ||
+                                    firstChange.action === CHANGE_LOG_ACTION.ROLLBACK ||
+                                    firstChange.action === CHANGE_LOG_ACTION.BATCH_UPDATE) &&
+                                    changelog.oldValue !== null &&
+                                    onRollback &&
+                                    (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
+                                      entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ||
+                                      entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK) && (
+                                      <div className="flex justify-end mb-2">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            onRollback(
+                                              changelog.id,
+                                              getFieldLabel(changelog.field!, entityType),
+                                            )
+                                          }
+                                          disabled={rollbackLoading === changelog.id}
+                                          className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                        >
+                                          {rollbackLoading === changelog.id ? (
+                                            <>
+                                              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                                              Revertendo...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                                              Reverter
+                                            </>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    )}
                                   <div>
                                     <span className="text-sm text-muted-foreground">
                                       Antes:
@@ -1597,6 +2065,42 @@ const ChangelogTimelineItem = ({
                             changelog.field === "invoices" ||
                             changelog.field === "receipts" ? (
                             <>
+                              {/* Rollback button for file fields */}
+                              {(firstChange.action === CHANGE_LOG_ACTION.UPDATE ||
+                                firstChange.action === CHANGE_LOG_ACTION.ROLLBACK ||
+                                firstChange.action === CHANGE_LOG_ACTION.BATCH_UPDATE) &&
+                                changelog.oldValue !== null &&
+                                onRollback &&
+                                (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
+                                  entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ||
+                                  entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK) && (
+                                  <div className="flex justify-end mb-2">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        onRollback(
+                                          changelog.id,
+                                          getFieldLabel(changelog.field!, entityType),
+                                        )
+                                      }
+                                      disabled={rollbackLoading === changelog.id}
+                                      className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    >
+                                      {rollbackLoading === changelog.id ? (
+                                        <>
+                                          <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                                          Revertendo...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                                          Reverter
+                                        </>
+                                      )}
+                                    </Button>
+                                  </div>
+                                )}
                               <div className="text-sm">
                                 <span className="text-muted-foreground">
                                   Antes:{" "}
@@ -1767,7 +2271,7 @@ const ChangelogTimelineItem = ({
                               </div>
                             </>
                           ) : changelog.field === "layouts" ? (
-                            // Special handling for layouts field from copy operation
+                            // Display layout changelog with dimensions, door count, and SVG
                             (() => {
                               const parseValue = (val: any) => {
                                 if (val === null || val === undefined)
@@ -1790,17 +2294,61 @@ const ChangelogTimelineItem = ({
                               const oldLayouts = parseValue(changelog.oldValue);
                               const newLayouts = parseValue(changelog.newValue);
 
-                              const renderLayoutBadges = (
-                                layouts: any,
+                              const layoutSides = [
+                                {
+                                  key: "leftSideLayoutId",
+                                  label: "Lado Motorista",
+                                },
+                                {
+                                  key: "rightSideLayoutId",
+                                  label: "Lado Sapo",
+                                },
+                                {
+                                  key: "backSideLayoutId",
+                                  label: "Traseira",
+                                },
+                              ];
+
+                              // Find sides that have changes
+                              const changedSides = layoutSides.filter(
+                                ({ key }) =>
+                                  (oldLayouts && oldLayouts[key] !== undefined) ||
+                                  (newLayouts && newLayouts[key] !== undefined),
+                              );
+
+                              if (changedSides.length === 0) {
+                                return (
+                                  <span className="text-muted-foreground text-sm">
+                                    Sem alterações
+                                  </span>
+                                );
+                              }
+
+                              const formatDimensions = (
+                                layout: any,
+                              ) => {
+                                if (!layout) return null;
+                                const widthCm = Math.round(
+                                  (layout.totalWidth || 0) * 100,
+                                );
+                                const heightCm = Math.round(
+                                  (layout.height || 0) * 100,
+                                );
+                                const doors = layout.doorCount || 0;
+                                return `${widthCm}cm × ${heightCm}cm — ${doors} porta${doors !== 1 ? "s" : ""}`;
+                              };
+
+                              const renderLayoutSummary = (
+                                layout: any,
                                 isOld: boolean,
                               ) => {
-                                if (!layouts) {
+                                if (!layout) {
                                   return (
                                     <span
                                       className={
                                         isOld
-                                          ? "text-red-600 dark:text-red-400 font-medium"
-                                          : "text-green-600 dark:text-green-400 font-medium"
+                                          ? "text-red-600 dark:text-red-400 font-medium text-xs"
+                                          : "text-green-600 dark:text-green-400 font-medium text-xs"
                                       }
                                     >
                                       Nenhum
@@ -1808,89 +2356,76 @@ const ChangelogTimelineItem = ({
                                   );
                                 }
 
-                                const layoutConfigs = [
-                                  {
-                                    key: "leftSideLayoutId",
-                                    dimKey: "leftSideDimensions",
-                                    label: "Lado Motorista",
-                                  },
-                                  {
-                                    key: "rightSideLayoutId",
-                                    dimKey: "rightSideDimensions",
-                                    label: "Lado Sapo",
-                                  },
-                                  {
-                                    key: "backSideLayoutId",
-                                    dimKey: "backSideDimensions",
-                                    label: "Traseira",
-                                  },
-                                ];
-
-                                const configuredLayouts = layoutConfigs.filter(
-                                  (l) => layouts[l.key],
-                                );
-                                if (configuredLayouts.length === 0) {
-                                  return (
-                                    <span
-                                      className={
-                                        isOld
-                                          ? "text-red-600 dark:text-red-400 font-medium"
-                                          : "text-green-600 dark:text-green-400 font-medium"
-                                      }
-                                    >
-                                      Nenhum
-                                    </span>
-                                  );
-                                }
+                                const dims =
+                                  formatDimensions(layout);
+                                const svgData = layout.layoutSections
+                                  ? generateLayoutSVG(layout)
+                                  : "";
 
                                 return (
-                                  <div className="flex flex-col gap-2 mt-1">
-                                    {configuredLayouts.map(
-                                      ({ key, dimKey, label }) => {
-                                        const dimensions = layouts[dimKey];
-                                        const dimensionStr =
-                                          dimensions &&
-                                          dimensions.width &&
-                                          dimensions.height
-                                            ? `${dimensions.width}cm × ${dimensions.height}cm`
-                                            : null;
-
-                                        return (
-                                          <div
-                                            key={key}
-                                            className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-muted/30 inline-flex items-center gap-2 w-fit"
-                                          >
-                                            <span className="text-xs font-medium">
-                                              {label}
-                                            </span>
-                                            {dimensionStr && (
-                                              <span className="text-xs text-muted-foreground">
-                                                {dimensionStr}
-                                              </span>
-                                            )}
-                                          </div>
-                                        );
-                                      },
+                                  <div>
+                                    <span
+                                      className={`text-xs font-medium ${
+                                        isOld
+                                          ? "text-red-600 dark:text-red-400"
+                                          : "text-green-600 dark:text-green-400"
+                                      }`}
+                                    >
+                                      {dims}
+                                    </span>
+                                    {svgData && (
+                                      <div
+                                        className="mt-1 max-w-[300px]"
+                                        dangerouslySetInnerHTML={{
+                                          __html: svgData,
+                                        }}
+                                      />
                                     )}
                                   </div>
                                 );
                               };
 
                               return (
-                                <>
-                                  <div className="text-sm">
-                                    <span className="text-muted-foreground">
-                                      Antes:
-                                    </span>
-                                    {renderLayoutBadges(oldLayouts, true)}
-                                  </div>
-                                  <div className="text-sm mt-3">
-                                    <span className="text-muted-foreground">
-                                      Depois:
-                                    </span>
-                                    {renderLayoutBadges(newLayouts, false)}
-                                  </div>
-                                </>
+                                <div className="space-y-4">
+                                  {changedSides.map(
+                                    ({ key, label }) => {
+                                      const oldLayout =
+                                        oldLayouts?.[key] ?? null;
+                                      const newLayout =
+                                        newLayouts?.[key] ?? null;
+                                      return (
+                                        <div
+                                          key={key}
+                                          className="border dark:border-border rounded-lg p-3 bg-muted/20"
+                                        >
+                                          <div className="text-xs font-semibold mb-2">
+                                            {label}
+                                          </div>
+                                          <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                              <div className="text-xs text-muted-foreground mb-1">
+                                                Antes
+                                              </div>
+                                              {renderLayoutSummary(
+                                                oldLayout,
+                                                true,
+                                              )}
+                                            </div>
+                                            <div>
+                                              <div className="text-xs text-muted-foreground mb-1">
+                                                Depois
+                                              </div>
+                                              {renderLayoutSummary(
+                                                newLayout,
+                                                false,
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    },
+                                  )}
+                                </div>
                               );
                             })()
                           ) : changelog.field === "serviceOrders" ? (
@@ -1971,7 +2506,7 @@ const ChangelogTimelineItem = ({
                                             return (
                                               <div
                                                 key={idx}
-                                                className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-muted/30 inline-flex items-center gap-2 w-fit"
+                                                className="border dark:border-border rounded-lg px-2.5 py-1.5 bg-muted/30 inline-flex items-center gap-2 w-fit"
                                               >
                                                 {typeLabel && (
                                                   <span className="text-xs font-semibold text-primary">
@@ -2071,7 +2606,7 @@ const ChangelogTimelineItem = ({
                                 return (
                                   <div className="flex flex-col gap-2 mt-1">
                                     {hasBudgetInfo ? (
-                                      <div className="border dark:border-border/40 rounded-lg px-3 py-2 bg-muted/30">
+                                      <div className="border dark:border-border rounded-lg px-3 py-2 bg-muted/30">
                                         <div className="flex items-center gap-2">
                                           {pricing.budgetNumber && (
                                             <span
@@ -2088,7 +2623,7 @@ const ChangelogTimelineItem = ({
                                             )}
                                         </div>
                                         {items.length > 0 && (
-                                          <div className="mt-2 pt-2 border-t dark:border-border/40">
+                                          <div className="mt-2 pt-2 border-t border-border/40">
                                             <span className="text-xs text-muted-foreground font-medium">
                                               Itens:
                                             </span>
@@ -2143,6 +2678,108 @@ const ChangelogTimelineItem = ({
                                 </>
                               );
                             })()
+                          ) : changelog.field === "items" &&
+                            entityType ===
+                              CHANGE_LOG_ENTITY_TYPE.TASK_PRICING ? (
+                            // Special handling for pricing items changes
+                            (() => {
+                              const parseVal = (val: any) => {
+                                if (!val) return null;
+                                if (typeof val === "object") return val;
+                                if (typeof val === "string") {
+                                  try {
+                                    return JSON.parse(val);
+                                  } catch {
+                                    return null;
+                                  }
+                                }
+                                return null;
+                              };
+                              const oldData = parseVal(
+                                changelog.oldValue,
+                              );
+                              const newData = parseVal(
+                                changelog.newValue,
+                              );
+
+                              const renderItemsList = (
+                                data: any,
+                                isOld: boolean,
+                              ) => {
+                                if (
+                                  !data ||
+                                  !data.items ||
+                                  data.items.length === 0
+                                ) {
+                                  return (
+                                    <span
+                                      className={`text-xs font-medium ${isOld ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
+                                    >
+                                      Nenhum item
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <div className="flex flex-col gap-1">
+                                    <span
+                                      className={`text-xs font-medium ${isOld ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
+                                    >
+                                      {data.count}{" "}
+                                      {data.count === 1
+                                        ? "item"
+                                        : "itens"}
+                                    </span>
+                                    {data.items.map(
+                                      (
+                                        item: any,
+                                        idx: number,
+                                      ) => (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center justify-between text-xs border-b border-border/20 pb-0.5"
+                                        >
+                                          <span className="text-foreground truncate mr-2">
+                                            {item.description}
+                                          </span>
+                                          <span className="text-muted-foreground font-medium whitespace-nowrap">
+                                            {formatCurrency(
+                                              item.amount,
+                                            )}
+                                          </span>
+                                        </div>
+                                      ),
+                                    )}
+                                  </div>
+                                );
+                              };
+
+                              return (
+                                <div className="space-y-3">
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">
+                                      Antes:
+                                    </span>
+                                    <div className="mt-1">
+                                      {renderItemsList(
+                                        oldData,
+                                        true,
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">
+                                      Depois:
+                                    </span>
+                                    <div className="mt-1">
+                                      {renderItemsList(
+                                        newData,
+                                        false,
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()
                           ) : (
                             // Default rendering for other fields
                             <>
@@ -2189,7 +2826,7 @@ const ChangelogTimelineItem = ({
           </div>
 
           {/* Footer */}
-          <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
+          <div className="mt-3 pt-3 border-t border-border/40 text-sm text-muted-foreground">
             <span className="text-muted-foreground">Por: </span>
             <span className="text-foreground font-medium">
               {firstChange.user?.name || "Sistema"}
@@ -2220,6 +2857,7 @@ export function TaskWithServiceOrdersChangelog({
   serviceOrderIds,
   truckId,
   layoutIds = [],
+  pricingId,
   className,
   maxHeight,
   limit = 100,
@@ -2234,11 +2872,41 @@ export function TaskWithServiceOrdersChangelog({
     [userSectorPrivilege],
   );
 
+  // Rollback loading state
+  const queryClient = useQueryClient();
+  const [rollbackLoading, setRollbackLoading] = useState<string | null>(null);
+
+  // Handle rollback action
+  const handleRollback = async (changeLogId: string, _fieldName: string) => {
+    setRollbackLoading(changeLogId);
+    try {
+      await rollbackFieldChange({ changeLogId });
+      // Refresh all changelog data + invalidate entity queries so the detail page updates
+      await Promise.all([
+        refetchTaskChangelogs(),
+        refetchServiceOrderChangelogs(),
+        refetchTruckChangelogs(),
+        refetchLayoutChangelogs(),
+        refetchPricingChangelogs(),
+        queryClient.invalidateQueries({ queryKey: taskKeys.all }),
+        queryClient.invalidateQueries({ queryKey: serviceOrderKeys.all }),
+        queryClient.invalidateQueries({ queryKey: truckKeys.all }),
+        queryClient.invalidateQueries({ queryKey: taskPricingKeys.all }),
+        queryClient.invalidateQueries({ queryKey: changeLogKeys.all }),
+      ]);
+    } catch {
+      // Error toast is handled by the API client interceptor
+    } finally {
+      setRollbackLoading(null);
+    }
+  };
+
   // Fetch task changelogs
   const {
     data: taskChangelogsResponse,
     isLoading: taskLoading,
     error: taskError,
+    refetch: refetchTaskChangelogs,
   } = useChangeLogs({
     where: {
       entityType: CHANGE_LOG_ENTITY_TYPE.TASK,
@@ -2258,6 +2926,7 @@ export function TaskWithServiceOrdersChangelog({
     data: serviceOrderChangelogsResponse,
     isLoading: serviceOrdersLoading,
     error: serviceOrdersError,
+    refetch: refetchServiceOrderChangelogs,
   } = useChangeLogs({
     where: {
       entityType: CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER,
@@ -2279,6 +2948,7 @@ export function TaskWithServiceOrdersChangelog({
     data: truckChangelogsResponse,
     isLoading: truckLoading,
     error: truckError,
+    refetch: refetchTruckChangelogs,
   } = useChangeLogs({
     where: {
       entityType: CHANGE_LOG_ENTITY_TYPE.TRUCK,
@@ -2299,6 +2969,7 @@ export function TaskWithServiceOrdersChangelog({
     data: layoutChangelogsResponse,
     isLoading: layoutsLoading,
     error: layoutsError,
+    refetch: refetchLayoutChangelogs,
   } = useChangeLogs({
     where: {
       entityType: CHANGE_LOG_ENTITY_TYPE.LAYOUT,
@@ -2312,6 +2983,27 @@ export function TaskWithServiceOrdersChangelog({
     },
     take: limit,
     enabled: layoutIds.length > 0,
+  });
+
+  // Fetch task pricing changelogs
+  const {
+    data: pricingChangelogsResponse,
+    isLoading: pricingLoading,
+    error: pricingError,
+    refetch: refetchPricingChangelogs,
+  } = useChangeLogs({
+    where: {
+      entityType: CHANGE_LOG_ENTITY_TYPE.TASK_PRICING,
+      entityId: pricingId || undefined,
+    },
+    include: {
+      user: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: limit,
+    enabled: !!pricingId,
   });
 
   // Combine and sort all changelogs
@@ -2329,6 +3021,8 @@ export function TaskWithServiceOrdersChangelog({
     // Only include layout logs if the query is enabled (has layout IDs)
     const layoutLogs =
       layoutIds.length > 0 ? layoutChangelogsResponse?.data || [] : [];
+    // Only include pricing logs if the query is enabled (has pricing ID)
+    const pricingLogs = pricingId ? pricingChangelogsResponse?.data || [] : [];
 
     // Build a map of service order entityId -> type from CREATE actions
     const serviceOrderTypeMap = new Map<string, SERVICE_ORDER_TYPE>();
@@ -2376,6 +3070,7 @@ export function TaskWithServiceOrdersChangelog({
       ...filteredServiceLogs,
       ...truckLogs,
       ...layoutLogs,
+      ...pricingLogs,
     ];
 
     // Sort by createdAt descending (newest first)
@@ -2389,9 +3084,11 @@ export function TaskWithServiceOrdersChangelog({
     serviceOrderChangelogsResponse,
     truckChangelogsResponse,
     layoutChangelogsResponse,
+    pricingChangelogsResponse,
     serviceOrderIds,
     truckId,
     layoutIds,
+    pricingId,
     visibleServiceOrderTypes,
   ]);
 
@@ -2402,7 +3099,6 @@ export function TaskWithServiceOrdersChangelog({
     const paintIds = new Set<string>();
     const userIds = new Set<string>();
     const invoiceToIds = new Set<string>();
-    const truckIds = new Set<string>();
     const serviceOrderIdsSet = new Set<string>();
 
     combinedChangelogs.forEach((changelog) => {
@@ -2450,7 +3146,7 @@ export function TaskWithServiceOrdersChangelog({
       }
 
       // Extract customer IDs
-      if (changelog.field === "customerId") {
+      if (changelog.field === "customerId" || changelog.field === "invoiceToId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string")
           customerIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string")
@@ -2531,14 +3227,6 @@ export function TaskWithServiceOrdersChangelog({
           invoiceToIds.add(changelog.newValue);
       }
 
-      // Extract truck IDs
-      if (changelog.field === "truckId") {
-        if (changelog.oldValue && typeof changelog.oldValue === "string")
-          truckIds.add(changelog.oldValue);
-        if (changelog.newValue && typeof changelog.newValue === "string")
-          truckIds.add(changelog.newValue);
-      }
-
       // Extract user IDs from negotiatingWith field (DEPRECATED - kept for historical data)
       if (changelog.field === "negotiatingWith") {
         const extractUserIdsFromNegotiating = (value: any) => {
@@ -2555,29 +3243,8 @@ export function TaskWithServiceOrdersChangelog({
         extractUserIdsFromNegotiating(changelog.newValue);
       }
 
-      // Extract representative IDs from representatives/representativeIds fields
-      if (
-        changelog.field === "representatives" ||
-        changelog.field === "representativeIds"
-      ) {
-        const extractRepresentativeIds = (value: any) => {
-          if (!value) return;
-          try {
-            const parsed =
-              typeof value === "string" ? JSON.parse(value) : value;
-            if (Array.isArray(parsed)) {
-              parsed.forEach((rep: any) => {
-                if (typeof rep === "string") userIds.add(rep);
-                else if (rep?.id) userIds.add(rep.id);
-              });
-            }
-          } catch (e) {
-            // Ignore parse errors
-          }
-        };
-        extractRepresentativeIds(changelog.oldValue);
-        extractRepresentativeIds(changelog.newValue);
-      }
+      // Note: representatives/representativeIds are separate entities from users
+      // Their IDs should NOT be added to userIds (causes 404 on /users endpoint)
     });
 
     return {
@@ -2586,7 +3253,6 @@ export function TaskWithServiceOrdersChangelog({
       paintIds: Array.from(paintIds),
       userIds: Array.from(userIds),
       invoiceToIds: Array.from(invoiceToIds),
-      truckIds: Array.from(truckIds),
       serviceOrderIds: Array.from(serviceOrderIdsSet),
     };
   }, [combinedChangelogs]);
@@ -2635,8 +3301,8 @@ export function TaskWithServiceOrdersChangelog({
   }, [combinedChangelogs]);
 
   const isLoading =
-    taskLoading || serviceOrdersLoading || truckLoading || layoutsLoading;
-  const error = taskError || serviceOrdersError || truckError || layoutsError;
+    taskLoading || serviceOrdersLoading || truckLoading || layoutsLoading || pricingLoading;
+  const error = taskError || serviceOrdersError || truckError || layoutsError || pricingError;
 
   if (error) {
     return (
@@ -2751,7 +3417,7 @@ export function TaskWithServiceOrdersChangelog({
                       <div className="pb-1 mb-4 rounded-md">
                         <div className="flex justify-center items-center gap-4">
                           <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
-                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60 border border-border/50">
+                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60 border border-border">
                             <IconCalendar className="h-3.5 w-3.5 text-muted-foreground" />
                             <span className="text-sm font-medium text-muted-foreground">
                               {date}
@@ -2791,6 +3457,8 @@ export function TaskWithServiceOrdersChangelog({
                                 entityType={entityType}
                                 entityDetails={entityDetails}
                                 userSectorPrivilege={userSectorPrivilege}
+                                onRollback={handleRollback}
+                                rollbackLoading={rollbackLoading}
                               />
                             </div>
                           );

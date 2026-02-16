@@ -3,7 +3,6 @@ import { IconServer, IconSettings, IconUserCog, IconFolders, IconChartLine, Icon
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SkeletonCard, LoadingSpinner } from "@/components/ui/loading";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { PageHeader } from "@/components/ui/page-header";
 import { useServerMetrics, useServerStatus } from "../../hooks";

@@ -12,7 +12,9 @@ export function isValidTaskStatusTransition(fromStatus: TASK_STATUS, toStatus: T
     [TASK_STATUS.PREPARATION]: [TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.CANCELLED],
     [TASK_STATUS.WAITING_PRODUCTION]: [TASK_STATUS.IN_PRODUCTION, TASK_STATUS.PREPARATION, TASK_STATUS.CANCELLED],
     [TASK_STATUS.IN_PRODUCTION]: [TASK_STATUS.COMPLETED, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.CANCELLED],
-    [TASK_STATUS.COMPLETED]: [TASK_STATUS.IN_PRODUCTION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.PREPARATION, TASK_STATUS.CANCELLED],
+    [TASK_STATUS.COMPLETED]: [TASK_STATUS.INVOICED, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.PREPARATION, TASK_STATUS.CANCELLED],
+    [TASK_STATUS.INVOICED]: [TASK_STATUS.SETTLED, TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED],
+    [TASK_STATUS.SETTLED]: [TASK_STATUS.INVOICED, TASK_STATUS.CANCELLED],
     [TASK_STATUS.CANCELLED]: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION],
   };
 
@@ -35,6 +37,8 @@ export function getTaskStatusColor(status: TASK_STATUS): string {
     [TASK_STATUS.WAITING_PRODUCTION]: "gray",       // Gray - waiting for production
     [TASK_STATUS.IN_PRODUCTION]: "blue",            // Blue - in progress
     [TASK_STATUS.COMPLETED]: "green",               // Green - finished
+    [TASK_STATUS.INVOICED]: "teal",                 // Teal - invoiced
+    [TASK_STATUS.SETTLED]: "purple",                // Purple - settled/paid
     [TASK_STATUS.CANCELLED]: "red",                 // Red - cancelled
   };
   return colors[status] || "default";
@@ -49,6 +53,8 @@ export function getTaskStatusVariant(status: TASK_STATUS): "default" | "secondar
     [TASK_STATUS.WAITING_PRODUCTION]: "outline",
     [TASK_STATUS.IN_PRODUCTION]: "default",
     [TASK_STATUS.COMPLETED]: "secondary",
+    [TASK_STATUS.INVOICED]: "secondary",
+    [TASK_STATUS.SETTLED]: "secondary",
     [TASK_STATUS.CANCELLED]: "destructive",
   };
   return variants[status] || "default";
@@ -63,7 +69,9 @@ export function getTaskPriority(status: TASK_STATUS): number {
     [TASK_STATUS.WAITING_PRODUCTION]: 2,
     [TASK_STATUS.PREPARATION]: 3,
     [TASK_STATUS.COMPLETED]: 4,
-    [TASK_STATUS.CANCELLED]: 5,
+    [TASK_STATUS.INVOICED]: 5,
+    [TASK_STATUS.SETTLED]: 6,
+    [TASK_STATUS.CANCELLED]: 7,
   };
   return priorities[status] || 999;
 }
@@ -77,6 +85,8 @@ export function getTaskProgress(status: TASK_STATUS): number {
     [TASK_STATUS.WAITING_PRODUCTION]: 25,
     [TASK_STATUS.IN_PRODUCTION]: 50,
     [TASK_STATUS.COMPLETED]: 100,
+    [TASK_STATUS.INVOICED]: 100,
+    [TASK_STATUS.SETTLED]: 100,
     [TASK_STATUS.CANCELLED]: 0,
   };
   return statusProgress[status] || 0;

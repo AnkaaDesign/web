@@ -51,7 +51,7 @@ class RepresentativeService {
    */
   async create(data: RepresentativeCreateFormData): Promise<Representative> {
     const response = await apiClient.post('/representatives', data);
-    return response.data.data;
+    return response.data;
   }
 
   /**

@@ -66,7 +66,7 @@ export function DatabaseSyncPage() {
         toast({
           title: "Sincronização Iniciada",
           description: "A sincronização do banco de dados foi iniciada com sucesso",
-          variant: "default",
+          variant: "success",
         });
 
         // Refresh status after a short delay
@@ -78,7 +78,7 @@ export function DatabaseSyncPage() {
       toast({
         title: "Erro",
         description: error.response?.data?.message || error.message || "Falha ao iniciar sincronização",
-        variant: "destructive",
+        variant: "error",
       });
     } finally {
       setIsSyncing(false);

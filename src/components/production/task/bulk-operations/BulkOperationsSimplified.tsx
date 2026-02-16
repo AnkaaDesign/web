@@ -3,12 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { GeneralPaintingSelector } from "../form/general-painting-selector";
-import { LogoPaintsSelector } from "../form/logo-paints-selector";
 import { useTaskBatchMutations, useFiles } from "../../../../hooks";
 import { toast } from "sonner";
 import { IconPhoto, IconFileText, IconPalette, IconCut, IconLoader2 } from "@tabler/icons-react";
@@ -53,27 +50,17 @@ export const AdvancedBulkActionsHandler = forwardRef<
   const files = filesData?.data || [];
   const fileOptions: ComboboxOption[] = files.map(file => ({
     value: file.id,
-    label: file.name || "Sem nome",
-    data: file,
+    label: String(file.name || "Sem nome"),
   }));
 
   // Filter options by type
-  const artworkOptions = fileOptions.filter(opt => {
-    const file = opt.data;
-    return file.name?.match(/\.(jpg|jpeg|png|gif|svg|pdf|ai|eps)$/i);
+  const artworkOptions = fileOptions.filter((_opt, index) => {
+    const file = files[index];
+    if (!file || !file.name) return false;
+    return String(file.name).match(/\.(jpg|jpeg|png|gif|svg|pdf|ai|eps)$/i);
   });
 
   const documentOptions = fileOptions;
-
-  // Expose the openModal method to parent component
-  useImperativeHandle(ref, () => ({
-    openModal: (type: BulkOperationType, taskIds: string[]) => {
-      setOperationType(type);
-      setCurrentTaskIds(taskIds);
-      resetForm();
-      setIsOpen(true);
-    },
-  }), [resetForm]);
 
   const resetForm = () => {
     setSelectedArtIds([]);
@@ -85,6 +72,16 @@ export const AdvancedBulkActionsHandler = forwardRef<
     setCutFileId(null);
     setDocumentType("budget");
   };
+
+  // Expose the openModal method to parent component
+  useImperativeHandle(ref, () => ({
+    openModal: (type: BulkOperationType, taskIds: string[]) => {
+      setOperationType(type);
+      setCurrentTaskIds(taskIds);
+      resetForm();
+      setIsOpen(true);
+    },
+  }), []);
 
   const handleClose = () => {
     if (!isSubmitting) {
@@ -209,9 +206,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
             <div>
               <Label>Selecionar Artes Existentes</Label>
               <Combobox
-                multiple
+                mode="multiple"
                 value={selectedArtIds}
-                onChange={setSelectedArtIds}
+                onValueChange={(value) => setSelectedArtIds(Array.isArray(value) ? value : [])}
                 options={artworkOptions}
                 placeholder="Selecione arquivos de arte..."
                 disabled={isSubmitting}
@@ -248,8 +245,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
             <div>
               <Label>Selecionar Documento</Label>
               <Combobox
-                value={selectedDocumentIds[0] || null}
-                onChange={(value) => setSelectedDocumentIds(value ? [value] : [])}
+                mode="single"
+                value={selectedDocumentIds[0] || undefined}
+                onValueChange={(value: string | string[] | null | undefined) => setSelectedDocumentIds(value ? [String(value)] : [])}
                 options={documentOptions}
                 placeholder="Selecione um documento..."
                 disabled={isSubmitting}
@@ -267,31 +265,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
       case "paints":
         return (
           <div className="space-y-4">
-            <div>
-              <Label>Pintura Geral</Label>
-              <GeneralPaintingSelector
-                value={generalPaintId}
-                onChange={setGeneralPaintId}
-                placeholder="Selecione uma pintura geral (opcional)"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            <Separator />
-
-            <div>
-              <Label>Tintas de Logomarca</Label>
-              <LogoPaintsSelector
-                value={logoPaintIds}
-                onChange={setLogoPaintIds}
-                placeholder="Selecione tintas de logomarca (opcional)"
-                disabled={isSubmitting}
-              />
-            </div>
-
             <Alert>
               <AlertDescription>
-                Você pode selecionar pintura geral, tintas de logomarca, ou ambas.
+                A funcionalidade de adicionar tintas em lote não está disponível nesta interface simplificada.
+                Por favor, edite cada tarefa individualmente para adicionar tintas.
               </AlertDescription>
             </Alert>
           </div>
@@ -322,9 +299,12 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 <Label>Quantidade</Label>
                 <Input
                   type="number"
-                  min="1"
-                  value={cutQuantity}
-                  onChange={(e) => setCutQuantity(parseInt(e.target.value) || 1)}
+                  min={1}
+                  value={cutQuantity.toString()}
+                  onChange={(value) => {
+                    const numValue = typeof value === 'string' ? parseInt(value) : typeof value === 'number' ? value : 1;
+                    setCutQuantity(isNaN(numValue) ? 1 : numValue);
+                  }}
                   disabled={isSubmitting}
                 />
               </div>
@@ -333,8 +313,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
             <div>
               <Label>Arquivo de Corte (Opcional)</Label>
               <Combobox
-                value={cutFileId}
-                onChange={setCutFileId}
+                mode="single"
+                value={cutFileId || undefined}
+                onValueChange={(value) => setCutFileId(value ? String(value) : null)}
                 options={fileOptions}
                 placeholder="Selecione um arquivo..."
                 disabled={isSubmitting}
@@ -366,7 +347,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       case "documents":
         return selectedDocumentIds.length > 0;
       case "paints":
-        return !!generalPaintId || logoPaintIds.length > 0;
+        return false; // Paints bulk operation is not available
       case "cuttingPlans":
         return true; // Cutting plans are always valid (file is optional)
       default:

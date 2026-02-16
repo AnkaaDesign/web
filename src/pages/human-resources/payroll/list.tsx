@@ -23,6 +23,7 @@ import { extractActiveFilters, createFilterRemover } from "@/components/human-re
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePayrolls, useSectors, usePositions, useUsers } from "../../../hooks";
 import { isUserEligibleForBonus, getCurrentPayrollPeriod } from "../../../utils";
+import { formatCurrency } from "@/utils/number";
 import { StandardizedTable } from "@/components/ui/standardized-table";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
 // Extended filters interface with payroll-specific fields
@@ -180,7 +181,7 @@ interface PayrollRow {
   nightHours?: number;
   nightDifferentialAmount?: number;
   dsrAmount?: number;
-  grossSalary?: number;
+  grossSalary: number;
 
   // Payroll data - Tax deductions
   inssBase?: number;
@@ -371,19 +372,12 @@ function PayrollTableComponent({
       isLoading={isLoading}
       error={error}
       emptyMessage="Nenhuma folha de pagamento encontrada"
-      emptyDescription="Selecione um período para visualizar a folha de pagamento"
       emptyIcon={IconUsers}
-      showPagination={false}
-      showPageInfo={false}
-      currentPage={0}
-      totalPages={1}
-      pageSize={data.length}
-      totalRecords={data.length}
       className="border-0"
       onSort={onSort}
       getSortDirection={getSortDirection}
       getSortOrder={getSortOrder}
-      sortConfigs={sortConfigs}
+      sortConfigs={sortConfigs.map(config => ({ field: config.column, direction: config.direction }))}
     />
   );
 }
@@ -1066,7 +1060,7 @@ export default function PayrollListPage() {
           title="Folha de Pagamento"
           favoritePage={FAVORITE_PAGES.ADMINISTRACAO_FOLHA_DE_PAGAMENTO}
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }, { label: "Folha de Pagamento" }]}
-          description={(() => {
+          subtitle={(() => {
             if (filters.year && filters.months && filters.months.length > 0) {
               if (filters.months.length === 1) {
                 const monthName = new Date(filters.year, parseInt(filters.months[0]) - 1).toLocaleDateString("pt-BR", { month: "long" });

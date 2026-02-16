@@ -64,18 +64,16 @@ export function PaintMergeDialog({ open, onOpenChange, paints, onMerge }: PaintM
           if (value === null || value === undefined) return null;
 
           // Format value for display
-          if (field === "finish" && PAINT_FINISH_LABELS[value]) {
-            formatted = PAINT_FINISH_LABELS[value];
-          } else if (field === "manufacturer" && TRUCK_MANUFACTURER_LABELS[value]) {
-            formatted = TRUCK_MANUFACTURER_LABELS[value];
+          if (field === "finish" && value && PAINT_FINISH_LABELS[value as keyof typeof PAINT_FINISH_LABELS]) {
+            formatted = PAINT_FINISH_LABELS[value as keyof typeof PAINT_FINISH_LABELS];
+          } else if (field === "manufacturer" && value && TRUCK_MANUFACTURER_LABELS[value as keyof typeof TRUCK_MANUFACTURER_LABELS]) {
+            formatted = TRUCK_MANUFACTURER_LABELS[value as keyof typeof TRUCK_MANUFACTURER_LABELS];
           } else if (field === "paintTypeId" && paint.paintType) {
             formatted = paint.paintType.name;
           } else if (field === "paintBrandId" && paint.paintBrand) {
             formatted = paint.paintBrand.name;
           } else if (type === "array" && Array.isArray(value)) {
             formatted = value.length > 0 ? value.join(", ") : "Nenhum";
-          } else if (type === "boolean") {
-            formatted = value ? "Sim" : "Não";
           } else if (type === "color") {
             formatted = value; // Hex color
           } else {
@@ -144,8 +142,9 @@ export function PaintMergeDialog({ open, onOpenChange, paints, onMerge }: PaintM
           break;
         case "combine":
           if (resolution.selectedIds) {
+            const selectedIds = resolution.selectedIds;
             const arrays = paints
-              .filter((paint) => resolution.selectedIds!.includes(paint.id))
+              .filter((paint) => selectedIds.includes(paint.id))
               .map((paint) => (paint as any)[field] || [])
               .flat();
             preview[field] = [...new Set(arrays)]; // Remove duplicates
@@ -188,8 +187,9 @@ export function PaintMergeDialog({ open, onOpenChange, paints, onMerge }: PaintM
             break;
           case "combine":
             if (resolution.selectedIds) {
+              const selectedIds = resolution.selectedIds;
               const arrays = paints
-                .filter((paint) => resolution.selectedIds!.includes(paint.id))
+                .filter((paint) => selectedIds.includes(paint.id))
                 .map((paint) => (paint as any)[field] || [])
                 .flat();
               resolvedData[field] = [...new Set(arrays)];
@@ -269,8 +269,8 @@ export function PaintMergeDialog({ open, onOpenChange, paints, onMerge }: PaintM
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          {paint.finish && <Badge variant="secondary">{PAINT_FINISH_LABELS[paint.finish]}</Badge>}
-                          {paint.manufacturer && <Badge variant="outline">{TRUCK_MANUFACTURER_LABELS[paint.manufacturer]}</Badge>}
+                          {paint.finish && <Badge variant="secondary">{PAINT_FINISH_LABELS[paint.finish as keyof typeof PAINT_FINISH_LABELS]}</Badge>}
+                          {paint.manufacturer && <Badge variant="outline">{TRUCK_MANUFACTURER_LABELS[paint.manufacturer as keyof typeof TRUCK_MANUFACTURER_LABELS]}</Badge>}
                         </div>
                       </div>
                     </Label>
@@ -341,12 +341,13 @@ export function PaintMergeDialog({ open, onOpenChange, paints, onMerge }: PaintM
                             type="text"
                             placeholder="#000000"
                             value={customValues.get(conflict.field) || ""}
-                            onChange={(e) => {
-                              handleCustomValueChange(conflict.field, e.target.value);
+                            onChange={(value) => {
+                              const stringValue = String(value);
+                              handleCustomValueChange(conflict.field, stringValue);
                               handleResolutionChange(conflict.field, {
                                 field: conflict.field,
                                 action: "custom",
-                                customValue: e.target.value,
+                                customValue: stringValue,
                               });
                             }}
                             className="max-w-xs"
@@ -381,32 +382,36 @@ export function PaintMergeDialog({ open, onOpenChange, paints, onMerge }: PaintM
                     {conflict.type === "array" && (
                       <div className="space-y-2">
                         <p className="text-sm text-muted-foreground">Selecione quais valores manter:</p>
-                        {conflict.values.map((value) => (
-                          <div key={value.paintId} className="flex items-start space-x-2">
-                            <Checkbox
-                              id={`${conflict.field}-${value.paintId}`}
-                              checked={resolutions.get(conflict.field)?.selectedIds?.includes(value.paintId)}
-                              onCheckedChange={(checked) => {
-                                const currentIds = resolutions.get(conflict.field)?.selectedIds || [];
-                                const newIds = checked
-                                  ? [...currentIds, value.paintId]
-                                  : currentIds.filter((id) => id !== value.paintId);
+                        {conflict.values.map((value) => {
+                          const resolution = resolutions.get(conflict.field);
+                          const isChecked = resolution?.selectedIds?.includes(value.paintId) ?? false;
+                          return (
+                            <div key={value.paintId} className="flex items-start space-x-2">
+                              <Checkbox
+                                id={`${conflict.field}-${value.paintId}`}
+                                checked={isChecked}
+                                onCheckedChange={(checked) => {
+                                  const currentIds = resolutions.get(conflict.field)?.selectedIds || [];
+                                  const newIds = checked
+                                    ? [...currentIds, value.paintId]
+                                    : currentIds.filter((id) => id !== value.paintId);
 
-                                handleResolutionChange(conflict.field, {
-                                  field: conflict.field,
-                                  action: "combine",
-                                  selectedIds: newIds,
-                                });
-                              }}
-                            />
-                            <Label htmlFor={`${conflict.field}-${value.paintId}`} className="cursor-pointer">
-                              <div>
-                                <span className="font-medium">{value.paintName}</span>
-                                <p className="text-sm text-muted-foreground">{value.formatted}</p>
-                              </div>
-                            </Label>
-                          </div>
-                        ))}
+                                  handleResolutionChange(conflict.field, {
+                                    field: conflict.field,
+                                    action: "combine",
+                                    selectedIds: newIds,
+                                  });
+                                }}
+                              />
+                              <Label htmlFor={`${conflict.field}-${value.paintId}`} className="cursor-pointer">
+                                <div>
+                                  <span className="font-medium">{value.paintName}</span>
+                                  <p className="text-sm text-muted-foreground">{value.formatted}</p>
+                                </div>
+                              </Label>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -443,13 +448,13 @@ export function PaintMergeDialog({ open, onOpenChange, paints, onMerge }: PaintM
                   <div>
                     <Label className="text-muted-foreground">Acabamento</Label>
                     <p className="font-medium">
-                      {mergedPreview.finish ? PAINT_FINISH_LABELS[mergedPreview.finish] : "N/A"}
+                      {mergedPreview.finish ? PAINT_FINISH_LABELS[mergedPreview.finish as keyof typeof PAINT_FINISH_LABELS] : "N/A"}
                     </p>
                   </div>
                   {mergedPreview.manufacturer && (
                     <div>
                       <Label className="text-muted-foreground">Fabricante</Label>
-                      <p className="font-medium">{TRUCK_MANUFACTURER_LABELS[mergedPreview.manufacturer]}</p>
+                      <p className="font-medium">{TRUCK_MANUFACTURER_LABELS[mergedPreview.manufacturer as keyof typeof TRUCK_MANUFACTURER_LABELS]}</p>
                     </div>
                   )}
                   {mergedPreview.tags && mergedPreview.tags.length > 0 && (

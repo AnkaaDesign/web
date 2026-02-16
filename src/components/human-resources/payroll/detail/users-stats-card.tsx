@@ -2,12 +2,11 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/sonner";
 import { formatCurrency, formatDate } from "../../../../utils";
 import type { User, Bonus } from "../../../../types";
-import { IconUsers, IconDownload } from "@tabler/icons-react";
+import { IconUsers } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useTableState } from "@/hooks/common/use-table-state";
 
@@ -507,12 +506,7 @@ export function UsersStatsCard({
               onFetchAllItems={async () => users}
               entityName="estatística de usuário"
               entityNamePlural="estatísticas de usuários"
-            >
-              <Button variant="outline" size="sm">
-                <IconDownload className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-            </BaseExportPopover>
+            />
           )}
         </div>
       </CardHeader>
@@ -557,14 +551,11 @@ export function UsersStatsCard({
               getItemKey={(user) => user.id}
               isLoading={false}
               emptyMessage="Nenhum usuário encontrado"
-              emptyDescription="Não há dados de usuários disponíveis para o período selecionado"
               emptyIcon={IconUsers}
               onSort={toggleSort}
               getSortDirection={getSortDirection}
               getSortOrder={getSortOrder}
               sortConfigs={sortConfigs.map((config) => ({ field: config.column, direction: config.direction }))}
-              showPagination={false}
-              showPageInfo={false}
               currentPage={0}
               totalPages={1}
               pageSize={sortedUsers.length}

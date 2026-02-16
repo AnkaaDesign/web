@@ -67,7 +67,7 @@ export function PayrollTasksTable({ tasks, userName = "Funcionário" }: PayrollT
 
   // Handle navigation to full tasks page
   const handleViewAllTasks = useCallback(() => {
-    navigate(routes.production.history.list);
+    navigate(routes.production.history.root);
   }, [navigate]);
 
   return (

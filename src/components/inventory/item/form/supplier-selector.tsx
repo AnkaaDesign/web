@@ -105,6 +105,7 @@ export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSele
         address: "A definir",
         zipCode: "00000-000", // Default placeholder address
         city: "A definir", // Default placeholder city
+        tags: [], // Required field
       });
 
       if (result.success && result.data) {
@@ -154,7 +155,7 @@ export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSele
                 }
               }}
               isCreating={isCreating}
-              queryKeysToInvalidate={[supplierKeys.all]}
+              queryKeysToInvalidate={[[supplierKeys.all]] as unknown[][]}
               renderOption={(option, _isSelected) => (
                 <div className="flex items-center gap-3 w-full">
                   <SupplierLogoDisplay

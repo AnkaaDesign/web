@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { getApiBaseUrl } from '@/config/api';
 
 /**
  * Connection state for the socket
@@ -39,7 +40,7 @@ class SocketService {
     this.token = token;
     this.setConnectionState('connecting');
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3030';
+    const apiUrl = getApiBaseUrl();
     // Connect to the notifications namespace
     const notificationsUrl = `${apiUrl}/notifications`;
 

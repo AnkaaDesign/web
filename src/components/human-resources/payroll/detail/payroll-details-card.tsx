@@ -202,7 +202,7 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
         {/* Secondary Stats - Financial Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Total Remuneration */}
-          <div className="space-y-2 p-4 bg-card dark:bg-card rounded-lg border border-border/50">
+          <div className="space-y-2 p-4 bg-card dark:bg-card rounded-lg border border-border">
             <div className="flex items-center gap-2">
               <IconCurrencyDollar className="h-4 w-4 text-amber-600" />
               <p className="text-sm font-medium text-muted-foreground">Total Remuneração</p>
@@ -212,7 +212,7 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
           </div>
 
           {/* Total Earnings */}
-          <div className="space-y-2 p-4 bg-card dark:bg-card rounded-lg border border-border/50">
+          <div className="space-y-2 p-4 bg-card dark:bg-card rounded-lg border border-border">
             <div className="flex items-center gap-2">
               <IconCalculator className="h-4 w-4 text-primary" />
               <p className="text-sm font-medium text-muted-foreground">Total Geral</p>

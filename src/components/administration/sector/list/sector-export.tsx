@@ -41,7 +41,9 @@ export function SectorExport({ className, filters, currentSectors = [], totalRec
           limit: 100,
           include: {
             _count: {
-              users: true,
+              select: {
+                users: true,
+              },
             },
           },
         });

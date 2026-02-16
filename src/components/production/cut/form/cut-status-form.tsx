@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { IconClock, IconPlay, IconCheck, IconFileText, IconInfoCircle, IconArrowRight } from "@tabler/icons-react";
+import { IconClock, IconPlayerPlay, IconCheck, IconFileText, IconInfoCircle, IconArrowRight } from "@tabler/icons-react";
 import { useState } from "react";
 import type { Cut } from "../../../../types";
 import { CUT_STATUS, CUT_STATUS_LABELS, CUT_TYPE_LABELS } from "../../../../constants";
@@ -40,7 +40,7 @@ const VALID_TRANSITIONS: Record<CUT_STATUS, CUT_STATUS[]> = {
 
 const STATUS_ICONS = {
   [CUT_STATUS.PENDING]: IconClock,
-  [CUT_STATUS.CUTTING]: IconPlay,
+  [CUT_STATUS.CUTTING]: IconPlayerPlay,
   [CUT_STATUS.COMPLETED]: IconCheck,
 };
 
@@ -54,7 +54,7 @@ export function CutStatusForm({ cut, onSuccess, onCancel, className }: CutStatus
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { update } = useCutMutations();
+  const { updateAsync } = useCutMutations();
 
   const form = useForm<StatusUpdateFormData>({
     resolver: zodResolver(statusUpdateSchema),
@@ -74,7 +74,7 @@ export function CutStatusForm({ cut, onSuccess, onCancel, className }: CutStatus
       toast({
         title: "Nenhuma alteração",
         description: "O status selecionado é o mesmo do atual.",
-        variant: "destructive",
+        variant: "error",
       });
       return;
     }
@@ -93,7 +93,7 @@ export function CutStatusForm({ cut, onSuccess, onCancel, className }: CutStatus
         updateData.startedAt = null;
       }
 
-      const response = await update.mutateAsync({
+      const response = await updateAsync({
         id: cut.id,
         data: updateData,
         include: {
@@ -116,12 +116,12 @@ export function CutStatusForm({ cut, onSuccess, onCancel, className }: CutStatus
         description: `Status alterado para "${CUT_STATUS_LABELS[data.status]}".`,
       });
 
-      onSuccess?.(response.data);
+      onSuccess?.(response.data!);
     } catch (error) {
       toast({
         title: "Erro",
         description: "Erro ao atualizar status do corte.",
-        variant: "destructive",
+        variant: "error",
       });
     } finally {
       setIsSubmitting(false);

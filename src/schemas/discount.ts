@@ -402,8 +402,8 @@ export type DiscountWhere = z.infer<typeof discountWhereSchema>;
 // =====================
 
 export const mapToDiscountFormData = createMapToFormDataHelper<Discount, DiscountUpdateFormData>((discount) => ({
-  percentage: discount.percentage ?? undefined,
-  value: discount.value ?? undefined,
+  percentage: discount.percentage ? (typeof discount.percentage === 'number' ? discount.percentage : discount.percentage.toNumber()) : undefined,
+  value: discount.value ? (typeof discount.value === 'number' ? discount.value : discount.value.toNumber()) : undefined,
   reference: discount.reference,
   calculationOrder: discount.calculationOrder,
 }));

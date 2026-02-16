@@ -19,9 +19,13 @@ export function ResignationDateInput({ disabled }: ResignationDateInputProps) {
       name="dismissedAt"
       render={({ field }) => (
         <DateTimeInput
-          field={field}
+          field={{
+            ...field,
+            value: field.value as Date | null,
+            onChange: (value) => field.onChange(value as Date | null),
+          }}
           label="Data de Demissão"
-          context="termination"
+          context="general"
           disabled={disabled}
           mode="date"
           constraints={{

@@ -12,7 +12,6 @@ export type CopyableTaskField =
   | 'commission'
   | 'representatives'
   | 'customerId'
-  | 'invoiceToId'
   | 'pricingId'
   | 'paintId'
   | 'artworkIds'
@@ -44,7 +43,6 @@ export const COPYABLE_TASK_FIELDS: CopyableTaskField[] = [
   'commission',
   'representatives',
   'customerId',
-  'invoiceToId',
   'pricingId',
   'paintId',
   'artworkIds',
@@ -76,9 +74,6 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
 
   // Commission - disabled for Financial, Designer, Logistic, Warehouse
   commission: ['ADMIN', 'COMMERCIAL', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
-
-  // Invoice To - disabled for Financial, Warehouse, Designer, Logistic
-  invoiceToId: ['ADMIN', 'COMMERCIAL', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Pricing - only visible to ADMIN, FINANCIAL, COMMERCIAL (canViewPricingSections)
   pricingId: ['ADMIN', 'FINANCIAL', 'COMMERCIAL'],
@@ -212,13 +207,6 @@ export const COPYABLE_FIELD_METADATA: Record<CopyableTaskField, CopyableFieldMet
   customerId: {
     label: 'Cliente',
     description: 'Cliente associado à tarefa',
-    category: 'Referências',
-    isShared: true,
-    createNewInstances: false,
-  },
-  invoiceToId: {
-    label: 'Faturar Para',
-    description: 'Cliente para faturamento',
     category: 'Referências',
     isShared: true,
     createNewInstances: false,

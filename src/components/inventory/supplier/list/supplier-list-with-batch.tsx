@@ -42,7 +42,7 @@ export function SupplierListWithBatch({ className }: SupplierListWithBatchProps)
   const columns = useMemo(() => createSupplierColumns(), []);
 
   // URL filters hook
-  const { filters: urlFilters, resetFilters, activeFilterCount } = useSupplierFilters();
+  const { filters: urlFilters, resetFilters, setFilters, activeFilterCount } = useSupplierFilters();
 
   // Combine search and filters
   const combinedFilters = useMemo(() => {
@@ -152,7 +152,7 @@ export function SupplierListWithBatch({ className }: SupplierListWithBatchProps)
               <Input
                 placeholder="Buscar por nome fantasia, razão social, CNPJ ou email..."
                 value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={(value) => handleSearch(value as string)}
                 className="pl-10 pr-4"
               />
               {(searchQuery || activeFilterCount > 0) && (
@@ -189,7 +189,7 @@ export function SupplierListWithBatch({ className }: SupplierListWithBatchProps)
       />
 
       {/* Dialogs */}
-      <SupplierFilters open={showFilters} onOpenChange={setShowFilters} />
+      <SupplierFilters open={showFilters} onOpenChange={setShowFilters} filters={urlFilters} onFilterChange={setFilters} />
     </div>
   );
 }

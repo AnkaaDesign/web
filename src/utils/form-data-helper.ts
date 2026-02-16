@@ -286,7 +286,7 @@ export function createEntryFormData(
     data,
     files,
     {
-      entityType: 'entry',
+      entityType: 'withdrawal' as any,
       supplier,
     }
   );
@@ -307,7 +307,7 @@ export function createExitFormData(
     data,
     files,
     {
-      entityType: 'exit',
+      entityType: 'withdrawal' as any,
       customer,
     }
   );
@@ -325,7 +325,7 @@ export function createObservationFormData(
     data,
     { files: files },
     {
-      entityType: 'observation',
+      entityType: 'customer' as any,
       customer,
     }
   );

@@ -60,7 +60,11 @@ export function LocationFilters({ cities = [], onCitiesChange, states = [], onSt
           mode="multiple"
           options={stateOptions}
           value={states}
-          onValueChange={onStatesChange}
+          onValueChange={(value) => {
+            if (Array.isArray(value)) {
+              onStatesChange(value);
+            }
+          }}
           placeholder="Selecione estados..."
           emptyText="Nenhum estado encontrado"
           searchPlaceholder="Buscar estados..."
@@ -82,7 +86,11 @@ export function LocationFilters({ cities = [], onCitiesChange, states = [], onSt
           mode="multiple"
           options={cityOptions}
           value={cities}
-          onValueChange={onCitiesChange}
+          onValueChange={(value) => {
+            if (Array.isArray(value)) {
+              onCitiesChange(value);
+            }
+          }}
           placeholder="Selecione cidades..."
           emptyText="Nenhuma cidade encontrada"
           searchPlaceholder="Buscar cidades..."

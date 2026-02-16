@@ -149,7 +149,6 @@ export const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   name: 200,
   "customer.fantasyName": 180,
   "representatives": 150,
-  "invoiceTo.fantasyName": 150,
   details: 200,
   observation: 200,
 

@@ -145,7 +145,7 @@ export const useOrderItemMutations = (options?: {
   const createMutation = useMutation({
     mutationFn: (data: OrderItemCreateFormData) => createOrderItem(data),
     onSuccess: (data, variables) => {
-      invalidateQueries(data.data?.orderId, data.data?.itemId);
+      invalidateQueries(data.data?.orderId ?? undefined, data.data?.itemId ?? undefined);
       options?.onCreateSuccess?.(data, variables);
     },
   });
@@ -154,7 +154,7 @@ export const useOrderItemMutations = (options?: {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: OrderItemUpdateFormData }) => updateOrderItem(id, data),
     onSuccess: (data, variables) => {
-      invalidateQueries(data.data?.orderId, data.data?.itemId);
+      invalidateQueries(data.data?.orderId ?? undefined, data.data?.itemId ?? undefined);
 
       // If received quantity changed, invalidate additional queries
       if (data.data?.receivedQuantity !== undefined) {

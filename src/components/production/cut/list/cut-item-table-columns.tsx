@@ -6,6 +6,7 @@ import { CUT_ORIGIN } from "../../../../constants";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import type { CutColumn } from "./types";
+import { getApiBaseUrl } from "@/config/api";
 
 // Helper functions
 const formatDateDisplay = (dateString: string | Date | null) => {
@@ -41,7 +42,7 @@ const getReason = (item: Cut) => {
 };
 
 const getThumbnailUrl = (file: any) => {
-  const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
+  const apiUrl = getApiBaseUrl();
   return `${apiUrl}/files/thumbnail/${file.id}?size=small`;
 };
 

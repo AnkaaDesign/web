@@ -112,7 +112,7 @@ export const ActivityUserSelector = ({
       pageSize={50}
       debounceMs={300}
       value={value}
-      onValueChange={onChange}
+      onValueChange={(value) => onChange(Array.isArray(value) ? value[0] : value || undefined)}
       placeholder={placeholder}
       emptyText="Nenhum usuário encontrado"
       searchable={true}

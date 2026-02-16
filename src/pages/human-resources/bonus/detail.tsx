@@ -20,7 +20,7 @@ import {
   IconUser,
 } from "@tabler/icons-react";
 
-interface BonusDetailPageParams {
+interface BonusDetailPageParams extends Record<string, string | undefined> {
   id: string;
 }
 
@@ -102,7 +102,6 @@ export default function BonusDetailPage() {
                 sector: true,
               },
             },
-            position: true,
             tasks: {
               include: {
                 customer: true,
@@ -117,12 +116,8 @@ export default function BonusDetailPage() {
 
         const responseData = response.data;
 
-        if (responseData?.data) {
-          setBonus(responseData.data);
-        } else if (responseData?.success === false) {
-          setError(responseData.message || 'Bônus não encontrado.');
-        } else if (responseData && !responseData.success) {
-          // Direct bonus object without wrapper
+        // The response is a direct Bonus object, not wrapped in BaseGetUniqueResponse
+        if (responseData) {
           setBonus(responseData);
         } else {
           setError('Bônus não encontrado.');

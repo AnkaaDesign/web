@@ -22,7 +22,7 @@ export interface DateConstraints {
 }
 
 // Context types for auto-applying constraints
-export type DateTimeContext = "birth" | "general";
+export type DateTimeContext = "birth" | "general" | "scheduled" | "due" | "start" | "end";
 
 // Reasonable year bounds for validation
 const MIN_REASONABLE_YEAR = 1900;
@@ -59,9 +59,9 @@ const getContextConstraints = (context?: DateTimeContext): DateConstraints | und
 
 export interface DateTimeInputProps<TFieldValues extends FieldValues = FieldValues, TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>> {
   field?: {
-    onChange: (value: Date | null) => void;
+    onChange: (value: Date | DateRange | null) => void;
     onBlur: () => void;
-    value: Date | null;
+    value: Date | DateRange | null;
     name: TName;
   };
   control?: any;
@@ -70,8 +70,8 @@ export interface DateTimeInputProps<TFieldValues extends FieldValues = FieldValu
   disabled?: boolean;
   readOnly?: boolean;
   constraints?: DateConstraints;
-  onChange?: (date: Date | null) => void;
-  value?: Date | null;
+  onChange?: (date: Date | DateRange | null) => void;
+  value?: Date | DateRange | null;
   className?: string;
   label?: React.ReactNode;
   hideLabel?: boolean;
@@ -223,10 +223,10 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
     // For date-range mode, we need two separate calendar months
     const [calendarMonth, setCalendarMonth] = React.useState<Date>(() => {
       if (mode === "date-range" && currentValue) {
-        const range = currentValue as DateRange;
+        const range = currentValue as DateRange | null;
         return range?.from || new Date();
       }
-      return currentValue || new Date();
+      return (currentValue instanceof Date ? currentValue : null) || new Date();
     });
 
     // Second calendar month for date-range (one month ahead by default)
@@ -296,27 +296,39 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
     // Month names in Portuguese
     const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-    const handleDateSelect = (date: Date | undefined) => {
+    const handleDateSelect = (date: Date | DateRange | undefined) => {
       if (date) {
-        // For datetime mode, preserve time if already set
-        if (mode === "datetime" && currentValue instanceof Date) {
-          const newDate = new Date(date);
-          newDate.setHours(currentValue.getHours(), currentValue.getMinutes(), 0, 0);
-          date = newDate;
+        // For range mode, pass through as-is
+        if (mode === "date-range") {
+          const changeHandler = field?.onChange || onChange;
+          if (changeHandler) {
+            changeHandler(date as DateRange);
+          }
+          // Mark field as touched/dirty for React Hook Form
+          field?.onBlur();
         }
-        // For date mode, set default time to 13:00
-        else if (mode === "date") {
-          const newDate = new Date(date);
-          newDate.setHours(13, 0, 0, 0);
-          date = newDate;
-        }
+        // For single date modes
+        else if (date instanceof Date) {
+          // For datetime mode, preserve time if already set
+          if (mode === "datetime" && currentValue instanceof Date) {
+            const newDate = new Date(date);
+            newDate.setHours(currentValue.getHours(), currentValue.getMinutes(), 0, 0);
+            date = newDate;
+          }
+          // For date mode, set default time to 13:00
+          else if (mode === "date") {
+            const newDate = new Date(date);
+            newDate.setHours(13, 0, 0, 0);
+            date = newDate;
+          }
 
-        const changeHandler = field?.onChange || onChange;
-        if (changeHandler) {
-          changeHandler(date);
+          const changeHandler = field?.onChange || onChange;
+          if (changeHandler) {
+            changeHandler(date);
+          }
+          // Mark field as touched/dirty for React Hook Form
+          field?.onBlur();
         }
-        // Mark field as touched/dirty for React Hook Form
-        field?.onBlur();
       }
       setIsOpen(false);
     };
@@ -333,7 +345,8 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
           setCalendarMonthRight(newDate);
         }
       } else {
-        const newDate = currentValue ? new Date(currentValue) : new Date();
+        const baseDate = currentValue instanceof Date ? currentValue : new Date();
+        const newDate = new Date(baseDate);
         newDate.setFullYear(year);
         setCalendarMonth(newDate);
 
@@ -365,7 +378,8 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
           setCalendarMonthRight(newDate);
         }
       } else {
-        const newDate = currentValue ? new Date(currentValue) : new Date();
+        const baseDate = currentValue instanceof Date ? currentValue : new Date();
+        const newDate = new Date(baseDate);
         newDate.setMonth(monthIndex);
         setCalendarMonth(newDate);
 
@@ -417,7 +431,8 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
 
     const handleTimeChange = (hour: number, minute: number) => {
       if (mode === "datetime") {
-        const newDate = currentValue ? new Date(currentValue) : new Date(calendarMonth);
+        const baseDate = currentValue instanceof Date ? currentValue : calendarMonth;
+        const newDate = new Date(baseDate);
         // Keep the current date but update the time
         newDate.setHours(hour, minute, 0, 0);
         const changeHandler = field?.onChange || onChange;
@@ -637,9 +652,11 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
                   {/* Left Calendar */}
                   <div className="flex-1 px-3 pt-1 pb-3">
                     <Calendar
-                      mode="range"
-                      selected={currentValue as DateRange}
-                      onSelect={handleDateSelect}
+                      {...({
+                        mode: "range",
+                        selected: (currentValue as DateRange | null) || undefined,
+                        onSelect: handleDateSelect as (date: DateRange | undefined) => void,
+                      } as any)}
                       disabled={disabled || isDateDisabled}
                       initialFocus
                       locale={ptBR}
@@ -682,9 +699,11 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
                   {/* Right Calendar */}
                   <div className="flex-1 px-3 pt-1 pb-3">
                     <Calendar
-                      mode="range"
-                      selected={currentValue as DateRange}
-                      onSelect={handleDateSelect}
+                      {...({
+                        mode: "range",
+                        selected: (currentValue as DateRange | null) || undefined,
+                        onSelect: handleDateSelect as (date: DateRange | undefined) => void,
+                      } as any)}
                       disabled={disabled || isDateDisabled}
                       locale={ptBR}
                       numberOfMonths={1}
@@ -724,9 +743,11 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
                 // Single date mode
                 <div className="px-3 pt-1 pb-3">
                   <Calendar
-                    mode="single"
-                    selected={currentValue as Date}
-                    onSelect={handleDateSelect}
+                    {...({
+                      mode: "single",
+                      selected: (currentValue instanceof Date ? currentValue : null) || undefined,
+                      onSelect: handleDateSelect as (date: Date | undefined) => void,
+                    } as any)}
                     disabled={disabled || isDateDisabled}
                     initialFocus
                     locale={ptBR}
@@ -951,7 +972,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
 
     const changeHandler = field?.onChange || onChange;
     if (changeHandler) {
-      changeHandler(date);
+      changeHandler(date as Date | DateRange | null);
     }
   }, [field?.onChange, onChange, context]);
 
@@ -961,12 +982,12 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
       <div className="flex items-center gap-2">
         {/* From date input */}
         <NaturalDateTimeInput
-          value={(currentValue as DateRange)?.from}
+          value={(currentValue as DateRange | null)?.from || null}
           onChange={(date) => {
-            const range = currentValue as DateRange;
+            const range = currentValue as DateRange | null;
             const changeHandler = field?.onChange || onChange;
             if (changeHandler) {
-              changeHandler({ from: date, to: range?.to } as unknown as Date);
+              changeHandler({ from: date, to: range?.to } as DateRange);
             }
           }}
           mode="date"
@@ -980,12 +1001,12 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
 
         {/* To date input */}
         <NaturalDateTimeInput
-          value={(currentValue as DateRange)?.to}
+          value={(currentValue as DateRange | null)?.to || null}
           onChange={(date) => {
-            const range = currentValue as DateRange;
+            const range = currentValue as DateRange | null;
             const changeHandler = field?.onChange || onChange;
             if (changeHandler) {
-              changeHandler({ from: range?.from, to: date } as unknown as Date);
+              changeHandler({ from: range?.from, to: date } as DateRange);
             }
           }}
           mode="date"
@@ -1020,7 +1041,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
         disabled && "opacity-50 cursor-not-allowed",
       )}>
         <NaturalDateTimeInput
-          value={currentValue}
+          value={currentValue instanceof Date ? currentValue : null}
           onChange={handleNaturalInputChange}
           mode={mode === "datetime" ? "datetime" : mode === "time" ? "time" : "date"}
           disabled={disabled}
@@ -1044,14 +1065,14 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
                 <Icon className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
               </div>
             </PopoverTrigger>
-            <PopoverContent className={cn("w-auto p-0", mode === "date-range" && "w-auto min-w-[640px]")} align="end">
+            <PopoverContent className="w-auto p-0" align="end">
               {mode === "time" ? (
                 <div className="p-3">
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium">Hora:</label>
                     <input
                       type="time"
-                      value={formatForHTMLInput(currentValue, "time")}
+                      value={formatForHTMLInput(currentValue instanceof Date ? currentValue : null, "time")}
                       onChange={(e) => {
                         const parsed = parseFromHTMLInput(e.target.value, "time");
                         handleNaturalInputChange(parsed);

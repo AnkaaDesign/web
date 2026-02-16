@@ -692,7 +692,7 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
   // Common status values
   PENDING: "pending",
   IN_PROGRESS: "inProgress",
-  IN_PRODUCTION: "inProduction",
+  IN_PRODUCTION: "inProgress",
   COMPLETED: "completed",
   CANCELLED: "cancelled",
   ACTIVE: "active",
@@ -714,15 +714,15 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
   SUSPENDED: "suspended",
   BLOCKED: "blocked",
   PROCESSING: "processing",
-  PARTIAL: "partial",
-  CUTTING: "cutting",
-  FINISHED: "finished",
-  CHARGED: "charged",
-  RATE_LIMITED: "onHold",
+  PARTIAL: "orange",
+  CUTTING: "processing",
+  FINISHED: "completed",
+  CHARGED: "blue",
+  RATE_LIMITED: "pending",
   BOUNCED: "bounced",
-  DISMISSED: "dismissed",
-  EFFECTED: "effected",
-  REPROVED: "reproved",
+  DISMISSED: "cancelled",
+  EFFECTED: "active",
+  REPROVED: "rejected",
 
   // Operations
   INBOUND: "active", // Green for entry
@@ -734,13 +734,13 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
   EXCELLENT: "green",
   GOOD: "active",
   FAIR: "pending",
-  POOR: "onHold",
+  POOR: "warning",
   CRITICAL: "failed",
 
   // Priority/Urgency levels
   LOW: "muted",
   MEDIUM: "pending",
-  HIGH: "onHold",
+  HIGH: "warning",
   NORMAL: "default",
   URGENT: "failed",
 
@@ -751,7 +751,7 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
   POSITIVE: "active",
   NEGATIVE: "failed",
   NEUTRAL: "default",
-  VOLATILE: "onHold",
+  VOLATILE: "warning",
   SEASONAL: "created",
 
   // Activity levels
@@ -761,13 +761,13 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
 
   // Validation
   ERROR: "failed",
-  WARNING: "onHold",
+  WARNING: "warning",
   INFO: "created",
 
   // Special
   VERBAL: "created",
   WRITTEN: "pending",
-  SUSPENSION: "onHold",
+  SUSPENSION: "suspended",
   FINAL_WARNING: "failed",
   PENDING_JUSTIFICATION: "pending",
   JUSTIFICATION_SUBMITTED: "sent",

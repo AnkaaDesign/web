@@ -14,13 +14,15 @@ import { SECTOR_PRIVILEGES } from "../constants";
  * Privileges are NOT hierarchical - each privilege grants specific access only.
  */
 export const getSectorPrivilegeSortOrder = (privilege: SECTOR_PRIVILEGES): number => {
-  const sortOrder = {
+  const sortOrder: Record<SECTOR_PRIVILEGES, number> = {
     [SECTOR_PRIVILEGES.BASIC]: 1,
     [SECTOR_PRIVILEGES.MAINTENANCE]: 2,
     [SECTOR_PRIVILEGES.WAREHOUSE]: 3,
     [SECTOR_PRIVILEGES.DESIGNER]: 4,
     [SECTOR_PRIVILEGES.LOGISTIC]: 4,
+    [SECTOR_PRIVILEGES.PLOTTING]: 4,
     [SECTOR_PRIVILEGES.PRODUCTION]: 5,
+    [SECTOR_PRIVILEGES.COMMERCIAL]: 5,
     [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: 6,
     [SECTOR_PRIVILEGES.FINANCIAL]: 7,
     [SECTOR_PRIVILEGES.ADMIN]: 8,

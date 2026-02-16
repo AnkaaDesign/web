@@ -116,7 +116,6 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
     displaySearchText,
     setSearch,
     clearAllFilters,
-    clearFilter: clearFilters,
   } = useTableFilters<Partial<RepresentativeGetManyFormData>>({
     defaultFilters: customerId ? { customerId } : {},
     searchDebounceMs: 500,
@@ -149,7 +148,7 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
       toast({
         title: "Erro",
         description: "Erro ao excluir representante(s)",
-        variant: "destructive",
+        variant: "error",
       });
     },
   });
@@ -330,7 +329,7 @@ export function RepresentativeList({ className, customerId }: RepresentativeList
         onOpenChange={setShowFilterModal}
         filters={filters}
         onFiltersChange={updateFilters}
-        onClearFilters={clearFilters}
+        onClearFilters={clearAllFilters}
       />
 
       {/* Delete Confirmation Dialog */}

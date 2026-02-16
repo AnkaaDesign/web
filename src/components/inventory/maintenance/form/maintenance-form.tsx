@@ -62,7 +62,7 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
     description: undefined,
     status: MAINTENANCE_STATUS.PENDING,
     itemId: "",
-    scheduledFor: undefined, // Initialize scheduledFor
+    scheduledFor: new Date(), // Initialize scheduledFor with current date
     itemsNeeded: [],
     ...(defaultValues && Object.fromEntries(Object.entries(defaultValues).filter(([_, value]) => value !== null))),
   };
@@ -201,7 +201,12 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
                         <FormItem className="flex flex-col">
                           <FormLabel className={isRequired ? "after:content-['*'] after:ml-0.5 after:text-destructive" : ""}>Data Agendada</FormLabel>
                           <DateTimeInput
-                            field={field}
+                            {...{
+                              onChange: (value) => field.onChange(value),
+                              onBlur: field.onBlur,
+                              value: field.value ?? null,
+                              name: field.name,
+                            }}
                             hideLabel
                             placeholder="Selecione uma data"
                             mode="date"
@@ -276,9 +281,9 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
                               className="bg-transparent"
                               {...field}
                               value={field.value || 1}
-                              onChange={(e) => {
-                                const value = parseInt(e.target.value);
-                                field.onChange(isNaN(value) || value < 1 ? 1 : value);
+                              onChange={(value) => {
+                                const numValue = typeof value === 'number' ? value : parseInt(String(value) ?? '1');
+                                field.onChange(isNaN(numValue) || numValue < 1 ? 1 : numValue);
                               }}
                             />
                           </FormControl>

@@ -5,7 +5,7 @@ import type { User } from "../../../../types";
 
 interface UserSelectorDropdownProps {
   value?: string;
-  onChange: (value: string | undefined) => void;
+  onChange: (value: string | string[] | null | undefined) => void;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -74,13 +74,18 @@ export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione
     }
   }, []);
 
+  const handleValueChange = (value: string | string[] | null | undefined) => {
+    if (Array.isArray(value) || value === null) return;
+    onChange(value);
+  };
+
   return (
     <Combobox
       async={true}
       queryKey={["user-selector"]}
       queryFn={queryUsers}
       value={value}
-      onValueChange={onChange}
+      onValueChange={handleValueChange}
       placeholder={placeholder}
       searchPlaceholder="Buscar funcionário..."
       emptyText="Nenhum funcionário encontrado"

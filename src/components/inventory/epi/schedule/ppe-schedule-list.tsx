@@ -101,11 +101,10 @@ export function PpeScheduleList({ className, scheduleRoutes }: PpeScheduleListPr
 
   // Update cursor position when user interacts with search input
   const handleSearchInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const target = e.target;
-      cursorPositionRef.current = target.selectionStart || 0;
-      setDisplaySearchText(target.value); // Immediate UI update
-      debouncedSearch(target.value); // Debounced API call
+    (value: string | number | null) => {
+      const stringValue = String(value ?? '');
+      setDisplaySearchText(stringValue); // Immediate UI update
+      debouncedSearch(stringValue); // Debounced API call
     },
     [debouncedSearch],
   );

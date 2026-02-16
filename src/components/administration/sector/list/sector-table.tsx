@@ -422,8 +422,6 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
                   className={cn(
                     "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0",
                     column.className,
-                    column.align === "center" && "text-center",
-                    column.align === "right" && "text-right",
                     "border-r border-border last:border-r-0",
                   )}
                 >
@@ -432,9 +430,7 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
                       onClick={() => toggleSort(column.key)}
                       className={cn(
                         "flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer border-0 bg-transparent",
-                        column.align === "center" && "justify-center",
-                        column.align === "right" && "justify-end",
-                        column.align === "left" && "justify-start text-left",
+                        column.align === "center" ? "justify-center" : column.align === "left" ? "justify-start text-left" : "justify-start",
                       )}
                       disabled={isLoading || sectors.length === 0}
                     >
@@ -443,7 +439,7 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
                     </button>
                   ) : (
                     <div
-                      className={cn("flex items-center h-full min-h-[2.5rem] px-4 py-2", column.align === "center" && "justify-center", column.align === "right" && "justify-end")}
+                      className={cn("flex items-center h-full min-h-[2.5rem] px-4 py-2", column.align === "center" ? "justify-center" : "justify-start")}
                     >
                       <span className="truncate">{column.header}</span>
                     </div>
@@ -527,9 +523,9 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
                     {columns.map((column) => (
                       <TableCell
                         key={column.key}
-                        className={cn("p-0 !border-r-0", column.className, column.align === "center" && "text-center", column.align === "right" && "text-right")}
+                        className={cn("p-0 !border-r-0", column.className, column.align === "center" ? "text-center" : "text-left")}
                       >
-                        <div className={cn("px-4 py-2 text-sm", column.align === "center" && "text-center", column.align === "right" && "text-right")}>
+                        <div className={cn("px-4 py-2 text-sm", column.align === "center" ? "text-center" : "text-left")}>
                           {column.accessor(sector)}
                         </div>
                       </TableCell>

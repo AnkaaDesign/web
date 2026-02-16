@@ -122,10 +122,10 @@ const InlinePerformanceEditor = ({
     <div className="flex items-center gap-2 min-w-[120px]">
       <Input
         type="number"
-        min="1"
-        max="5"
+        min={1}
+        max={5}
         value={performanceLevel}
-        onChange={(value: string) => setPerformanceLevel(value)}
+        onChange={(value: string | number | null) => setPerformanceLevel(typeof value === 'string' ? value : String(value ?? ''))}
         onKeyDown={handleKeyDown}
         className="h-8 w-16 text-center text-sm"
         autoFocus
@@ -147,7 +147,7 @@ export const createBonusSimulationColumns = (): BonusSimulationColumn[] => [
     header: "NOME",
     accessor: (user: BonusSimulationRow) => (
       <div className="flex items-center gap-2">
-        <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0 border border-border/50">
+        <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0 border border-border">
           <span className="text-xs font-semibold text-muted-foreground">
             {user.name?.charAt(0)?.toUpperCase() || "?"}
           </span>

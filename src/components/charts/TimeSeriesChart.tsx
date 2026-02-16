@@ -281,17 +281,12 @@ export const TimeSeriesChart = React.memo<TimeSeriesChartProps>(({
           )}
 
           <Tooltip
-            content={(props) => (
-              <ChartTooltip
-                {...props}
-                labelFormatter={(label) => formatDate(label, dateFormat)}
-              />
-            )}
+            content={<ChartTooltip labelFormatter={(label) => formatDate(label, dateFormat)} />}
           />
 
           {showLegend && (
             <Legend
-              onClick={(e) => handleLegendClick(e.dataKey)}
+              onClick={(e) => handleLegendClick(String(e.dataKey ?? ''))}
               wrapperStyle={{ cursor: 'pointer' }}
             />
           )}

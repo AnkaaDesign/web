@@ -227,12 +227,12 @@ export const AreaChartComponent = React.memo<AreaChartComponentProps>(({
           />
 
           <Tooltip
-            content={(props) => <ChartTooltip {...props} />}
+            content={<ChartTooltip />}
           />
 
           {showLegend && (
             <Legend
-              onClick={(e) => handleLegendClick(e.dataKey)}
+              onClick={(e) => handleLegendClick(String(e.dataKey ?? ''))}
               wrapperStyle={{ cursor: 'pointer' }}
             />
           )}

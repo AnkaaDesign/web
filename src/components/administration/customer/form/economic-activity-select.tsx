@@ -2,7 +2,7 @@ import { useFormContext } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createEconomicActivity } from "@/api-client/economic-activity";
+import { createEconomicActivity, getEconomicActivities } from "@/api-client/economic-activity";
 import type { CustomerCreateFormData, CustomerUpdateFormData } from "@/schemas/customer";
 
 export function EconomicActivitySelect() {
@@ -10,7 +10,7 @@ export function EconomicActivitySelect() {
   const queryClient = useQueryClient();
 
   const { mutateAsync: createActivity, isPending: isCreating } = useMutation({
-    mutationFn: createEconomicActivity,
+    mutationFn: (data: { code: string; description: string }) => createEconomicActivity(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["economic-activities"] });
     },
@@ -32,7 +32,9 @@ export function EconomicActivitySelect() {
         description: searchTerm,
       });
 
-      form.setValue("economicActivityId", result.data.id, { shouldDirty: true, shouldValidate: true });
+      if (result.data) {
+        form.setValue("economicActivityId", result.data.id, { shouldDirty: true, shouldValidate: true });
+      }
     } catch (error) {
       // Error handled by mutation
     }
@@ -65,7 +67,7 @@ export function EconomicActivitySelect() {
               });
 
               return {
-                data: response.data.map((activity) => ({
+                data: (response.data ?? []).map((activity) => ({
                   value: activity.id,
                   label: `${activity.code} - ${activity.description}`,
                   metadata: activity,

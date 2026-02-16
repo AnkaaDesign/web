@@ -30,19 +30,15 @@ export default function SupplierBatchEditPage() {
     data: suppliersResponse,
     isLoading,
     error,
-  } = useSuppliers(
-    {
-      where: {
-        id: { in: supplierIds },
-      },
-      include: {
-        logo: true,
-      },
+  } = useSuppliers({
+    where: {
+      id: { in: supplierIds },
     },
-    {
-      enabled: supplierIds.length > 0,
+    include: {
+      logo: true,
     },
-  );
+    enabled: supplierIds.length > 0,
+  });
 
   const suppliers = suppliersResponse?.data || [];
 

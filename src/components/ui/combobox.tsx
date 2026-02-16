@@ -192,7 +192,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   //   }
   // }, [search, debouncedSearch, async, queryKey, queryFn, minSearchLength]);
 
-  const { data: asyncResponse, isLoading: isLoadingOptions, refetch: _refetch } = useQuery({
+  const { data: asyncResponse, isLoading: isLoadingOptions, refetch: _refetch } = useQuery<{ data: TData[]; hasMore?: boolean; total?: number }>({
     queryKey: queryKey ? [...queryKey, debouncedSearch, 1] : ["combobox", debouncedSearch, 1],
     queryFn: async () => {
       // console.log('[Combobox] queryFn called with:', { debouncedSearch, page: 1 });
@@ -233,7 +233,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
     },
     enabled: async && !!queryKey && !!queryFn,
     staleTime: 0, // Always fetch fresh data when query key changes
-    cacheTime: 0, // Don't cache results between searches
+    gcTime: 0, // Don't cache results between searches (formerly cacheTime)
     refetchOnMount: false,
     refetchOnWindowFocus: false,
   });
@@ -269,7 +269,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
       let newOptions = asyncResponse.data || [];
 
       // Add all fetched items to the cache
-      newOptions.forEach(item => {
+      newOptions.forEach((item: TData) => {
         const itemValue = getOptionValueRef.current(item);
         allItemsCacheRef.current.set(itemValue, item);
       });
@@ -292,7 +292,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
       // ONLY when there's no active search - this ensures selected items show when dropdown opens
       // but don't pollute search results when user is searching for something else
       if (!debouncedSearch || debouncedSearch.trim() === '') {
-        const fetchedValues = new Set(newOptions.map(item => getOptionValueRef.current(item)));
+        const fetchedValues = new Set(newOptions.map((item: TData) => getOptionValueRef.current(item)));
         currentSelectedValues.forEach(selectedValue => {
           if (!fetchedValues.has(selectedValue) && allItemsCacheRef.current.has(selectedValue)) {
             const cachedItem = allItemsCacheRef.current.get(selectedValue);
@@ -305,9 +305,9 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
 
       // Deduplicate items based on their value to prevent duplicate key warnings
       const deduplicatedData = newOptions.filter(
-        (item, index, self) => {
+        (item: TData, index: number, self: TData[]) => {
           const itemValue = getOptionValueRef.current(item);
-          return index === self.findIndex((t) => getOptionValueRef.current(t) === itemValue);
+          return index === self.findIndex((t: TData) => getOptionValueRef.current(t) === itemValue);
         }
       );
 
@@ -596,21 +596,26 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
       return renderValue(isMultiple ? selectedOptions : selectedOptions[0]);
     }
 
+    // For multiple mode, use selectedValues.length (from form value) for counts
+    // since selectedOptions may not include items from unpaginated pages
+    if (isMultiple) {
+      if (selectedValues.length === 0) {
+        return <span className="opacity-70">{placeholder}</span>;
+      }
+      if (singleMode && selectedOptions.length > 0) {
+        const label = formatOptionLabel(selectedOptions[0]);
+        return showCount && selectedValues.length > 1 ? `${label} +${selectedValues.length - 1}` : label;
+      }
+      return showCount ? `${selectedValues.length} selecionado${selectedValues.length !== 1 ? "s" : ""}` : placeholder;
+    }
+
     if (selectedOptions.length === 0) {
       return <span className="opacity-70">{placeholder}</span>;
     }
 
-    if (isMultiple) {
-      if (singleMode) {
-        const label = formatOptionLabel(selectedOptions[0]);
-        return showCount && selectedOptions.length > 1 ? `${label} +${selectedOptions.length - 1}` : label;
-      }
-      return showCount ? `${selectedOptions.length} selecionado${selectedOptions.length !== 1 ? "s" : ""}` : placeholder;
-    }
-
     const formattedLabel = formatOptionLabel(selectedOptions[0]);
     return formattedLabel;
-  }, [renderValue, selectedOptions, placeholder, isMultiple, singleMode, showCount, formatOptionLabel]);
+  }, [renderValue, selectedOptions, selectedValues, placeholder, isMultiple, singleMode, showCount, formatOptionLabel]);
 
   const showCreateOption = allowCreate && search.trim() && filteredOptions.length === 0 && !filteredOptions.some((opt) => getOptionLabel(opt).toLowerCase() === search.toLowerCase());
 
@@ -698,7 +703,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
         >
           <div className="flex flex-col max-h-[400px]">
             {searchable && (
-              <div className="flex items-center border-b px-3 py-2 gap-2">
+              <div className="flex items-center border-b dark:border-border/30 px-3 py-2 gap-2">
                 <IconSearch className="h-4 w-4 text-muted-foreground" />
                 <input
                   type="text"
@@ -724,7 +729,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
             )}
 
             {isMultiple && filteredOptions.length > 0 && (
-              <div className="flex items-center justify-between px-3 py-2 border-b">
+              <div className="flex items-center justify-between px-3 py-2 border-b dark:border-border/30">
                 <span className="text-sm text-muted-foreground">
                   {selectedValues.length} de {filteredOptions.length} selecionados
                 </span>
@@ -892,7 +897,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
 
                 {/* Load more button for async mode */}
                 {async && hasMore && (
-                  <div className="pt-2 pb-1 px-1 border-t mt-1">
+                  <div className="pt-2 pb-1 px-1 border-t dark:border-border/30 mt-1">
                     <Button
                       type="button"
                       variant="ghost"

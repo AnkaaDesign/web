@@ -124,7 +124,11 @@ export function CustomerSelector({
       queryFn={queryCustomers}
       initialOptions={initialOptions}
       value={value || undefined}
-      onValueChange={(value) => onChange(value || null)}
+      onValueChange={(value) => {
+        // Handle string | string[] | null | undefined -> string | null
+        const normalizedValue = Array.isArray(value) ? value[0] : value;
+        onChange(normalizedValue || null);
+      }}
       placeholder={placeholder}
       emptyText={emptyMessage}
       searchable={true}

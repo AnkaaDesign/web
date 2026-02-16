@@ -6,26 +6,26 @@ import { useInventoryDashboard, useOrders, useBorrows, usePpeDeliveries, useItem
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "../../utils";
 import { useState, useMemo } from "react";
+import { IconPackage, IconPlus } from "@tabler/icons-react";
 import {
-  IconPackage,
-  IconPlus,
-  IconArrowUp,
-  IconArrowDown,
-  IconActivity,
-  IconAlertTriangle,
-  IconTrendingUp,
-  IconTrendingDown,
-  IconBuildingStore,
-  IconBarcode,
-  IconTag,
-  IconRefresh,
-  IconCurrencyDollar,
-  IconShoppingCart,
-  IconTool,
-  IconShieldCheck,
-  IconChartBar,
-  IconChartPie,
-} from "@tabler/icons-react";
+  ArrowUp,
+  ArrowDown,
+  Activity as ActivityIcon,
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Store,
+  Barcode,
+  Tag,
+  RefreshCw,
+  DollarSign,
+  ShoppingCart,
+  Wrench,
+  ShieldCheck,
+  BarChart3,
+  PieChart,
+  Package,
+} from "lucide-react";
 import {
   RecentActivitiesCard,
   TrendCard,
@@ -43,7 +43,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export const InventoryRootPage = () => {
   const navigate = useNavigate();
-  const [timePeriod, setTimePeriod] = useState(DASHBOARD_TIME_PERIOD.THIS_MONTH);
+  const [timePeriod, setTimePeriod] = useState<string>(DASHBOARD_TIME_PERIOD.THIS_MONTH);
 
   // Track page access
   usePageTracker({
@@ -89,7 +89,7 @@ export const InventoryRootPage = () => {
   }, [timePeriod]);
 
   // Fetch dashboard data with time period
-  const { data: dashboard, isLoading, error } = useInventoryDashboard({ timePeriod });
+  const { data: dashboard, isLoading, error } = useInventoryDashboard({ timePeriod, includeInactive: false });
 
   // TIME-SENSITIVE DATA (follows selected period)
 
@@ -297,35 +297,35 @@ export const InventoryRootPage = () => {
         status: "Sem Estoque",
         quantity: outOfStockItems.value,
         total,
-        icon: IconPackage, // OUT_OF_STOCK icon
+        icon: Package, // OUT_OF_STOCK icon
         color: "red" as const, // RED - matches OUT_OF_STOCK
       },
       {
         status: "Crítico",
         quantity: criticalItems.value,
         total,
-        icon: IconAlertTriangle, // CRITICAL icon
+        icon: AlertTriangle, // CRITICAL icon
         color: "orange" as const, // ORANGE - matches CRITICAL
       },
       {
         status: "Baixo",
         quantity: lowStockItems.value,
         total,
-        icon: IconTrendingDown, // LOW icon
+        icon: TrendingDown, // LOW icon
         color: "yellow" as const, // YELLOW - matches LOW
       },
       {
         status: "Normal",
         quantity: optimalItems.value,
         total,
-        icon: IconPackage, // OPTIMAL icon
+        icon: Package, // OPTIMAL icon
         color: "green" as const, // GREEN - matches OPTIMAL
       },
       {
         status: "Excesso",
         quantity: overstockedItems.value,
         total,
-        icon: IconTrendingUp, // OVERSTOCKED icon
+        icon: TrendingUp, // OVERSTOCKED icon
         color: "purple" as const, // PURPLE - matches OVERSTOCKED
       },
     ];
@@ -400,23 +400,19 @@ export const InventoryRootPage = () => {
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
         <div className="h-full flex flex-col bg-background">
           {/* Fixed Header */}
-          <div className="flex-shrink-0 bg-background">
-            <div className="px-4 py-4">
-              <PageHeader
-                title="Estoque"
-                icon={IconPackage}
-                favoritePage={FAVORITE_PAGES.ESTOQUE}
-                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
-                actions={[
-                  {
-                    key: "time-period",
-                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                    variant: "ghost",
-                    className: "p-0 hover:bg-transparent",
-                  },
-                ]}
-              />
-            </div>
+          <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+            <PageHeader
+              title="Estoque"
+              icon={IconPackage}
+              favoritePage={FAVORITE_PAGES.ESTATISTICAS_ESTOQUE}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
+              actions={[
+                {
+                  key: "time-period",
+                  label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} /> as any,
+                },
+              ]}
+            />
           </div>
 
           {/* Scrollable Content */}
@@ -439,23 +435,19 @@ export const InventoryRootPage = () => {
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
         <div className="h-full flex flex-col bg-background">
           {/* Fixed Header */}
-          <div className="flex-shrink-0 bg-background">
-            <div className="px-4 py-4">
-              <PageHeader
-                title="Estoque"
-                icon={IconPackage}
-                favoritePage={FAVORITE_PAGES.ESTOQUE}
-                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
-                actions={[
-                  {
-                    key: "time-period",
-                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                    variant: "ghost",
-                    className: "p-0 hover:bg-transparent",
-                  },
-                ]}
-              />
-            </div>
+          <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+            <PageHeader
+              title="Estoque"
+              icon={IconPackage}
+              favoritePage={FAVORITE_PAGES.ESTATISTICAS_ESTOQUE}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
+              actions={[
+                {
+                  key: "time-period",
+                  label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} /> as any,
+                },
+              ]}
+            />
           </div>
 
           {/* Scrollable Content */}
@@ -479,30 +471,26 @@ export const InventoryRootPage = () => {
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
       <div className="h-full flex flex-col bg-background">
         {/* Fixed Header */}
-        <div className="flex-shrink-0 bg-background">
-          <div className="px-4 py-4">
-            <PageHeader
-              title="Estoque"
-              icon={IconPackage}
-              favoritePage={FAVORITE_PAGES.ESTOQUE}
-              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
-              actions={[
-                {
-                  key: "time-period",
-                  label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                  variant: "ghost",
-                  className: "p-0 hover:bg-transparent",
-                },
-                {
-                  key: "create",
-                  label: "Novo Produto",
-                  icon: IconPlus,
-                  onClick: () => navigate(routes.inventory.products.create),
-                  variant: "default",
-                },
-              ]}
-            />
-          </div>
+        <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+          <PageHeader
+            title="Estoque"
+            icon={IconPackage}
+            favoritePage={FAVORITE_PAGES.ESTATISTICAS_ESTOQUE}
+            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
+            actions={[
+              {
+                key: "create",
+                label: "Novo Produto",
+                icon: IconPlus,
+                onClick: () => navigate(routes.inventory.products.create),
+                variant: "default",
+              },
+              {
+                key: "time-period",
+                label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} /> as any,
+              },
+            ]}
+          />
         </div>
 
         {/* Scrollable Content */}
@@ -515,36 +503,36 @@ export const InventoryRootPage = () => {
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <QuickAccessCard
                   title="Atividades"
-                  icon={IconActivity}
+                  icon={ActivityIcon}
                   onClick={() => navigate(routes.inventory.movements.list)}
                   count={activitiesData?.meta?.totalRecords}
                   color="blue"
                 />
                 <QuickAccessCard
                   title="Produtos"
-                  icon={IconPackage}
+                  icon={Package}
                   onClick={() => navigate(routes.inventory.products.list)}
                   count={allItemsData?.meta?.totalRecords}
                   color="green"
                 />
                 <QuickAccessCard
                   title="Fornecedores"
-                  icon={IconBuildingStore}
+                  icon={Store}
                   onClick={() => navigate(routes.inventory.suppliers.root)}
                   count={allSuppliersData?.meta?.totalRecords}
                   color="purple"
                 />
-                <QuickAccessCard title="Empréstimos" icon={IconTool} onClick={() => navigate(routes.inventory.loans.list)} count={borrowsData?.meta?.totalRecords} color="orange" />
+                <QuickAccessCard title="Empréstimos" icon={Wrench} onClick={() => navigate(routes.inventory.loans.list)} count={borrowsData?.meta?.totalRecords} color="orange" />
                 <QuickAccessCard
                   title="Pedidos"
-                  icon={IconShoppingCart}
+                  icon={ShoppingCart}
                   onClick={() => navigate(routes.inventory.orders.list)}
                   count={ordersData?.meta?.totalRecords}
                   color="red"
                 />
                 <QuickAccessCard
                   title="EPIs"
-                  icon={IconShieldCheck}
+                  icon={ShieldCheck}
                   onClick={() => navigate(routes.inventory.ppe.root)}
                   count={ppeDeliveriesData?.meta?.totalRecords}
                   color="teal"
@@ -556,10 +544,10 @@ export const InventoryRootPage = () => {
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4">Atividades Recentes</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <RecentActivitiesCard title="Movimentações Recentes" activities={transformRecentActivities()} icon={IconActivity} color="blue" />
-                <RecentActivitiesCard title="Entradas Recentes" activities={getInboundActivities()} icon={IconArrowDown} color="green" />
-                <RecentActivitiesCard title="Saídas Recentes" activities={getOutboundActivities()} icon={IconArrowUp} color="red" />
-                <RecentActivitiesCard title="Últimos Pedidos" activities={getRecentOrdersInfo()} icon={IconShoppingCart} color="orange" />
+                <RecentActivitiesCard title="Movimentações Recentes" activities={transformRecentActivities()} icon={ActivityIcon} color="blue" />
+                <RecentActivitiesCard title="Entradas Recentes" activities={getInboundActivities()} icon={ArrowDown} color="green" />
+                <RecentActivitiesCard title="Saídas Recentes" activities={getOutboundActivities()} icon={ArrowUp} color="red" />
+                <RecentActivitiesCard title="Últimos Pedidos" activities={getRecentOrdersInfo()} icon={ShoppingCart} color="orange" />
               </div>
             </div>
 
@@ -572,7 +560,7 @@ export const InventoryRootPage = () => {
                   value={data?.overview?.totalItems?.value || 0}
                   trend={data?.overview?.totalItems?.trend}
                   percentage={data?.overview?.totalItems?.changePercent}
-                  icon={IconPackage}
+                  icon={Package}
                   subtitle="Produtos únicos"
                 />
                 <TrendCard
@@ -580,7 +568,7 @@ export const InventoryRootPage = () => {
                   value={formatCurrency(data?.overview?.totalValue?.value || 0)}
                   trend={data?.overview?.totalValue?.trend}
                   percentage={data?.overview?.totalValue?.changePercent}
-                  icon={IconCurrencyDollar}
+                  icon={DollarSign}
                   subtitle="Em estoque"
                 />
                 <TrendCard
@@ -588,7 +576,7 @@ export const InventoryRootPage = () => {
                   value={data?.overview?.criticalItems?.value || 0}
                   trend={data?.overview?.criticalItems?.trend}
                   percentage={data?.overview?.criticalItems?.changePercent}
-                  icon={IconAlertTriangle}
+                  icon={AlertTriangle}
                   subtitle="Requer atenção"
                 />
                 <TrendCard
@@ -596,7 +584,7 @@ export const InventoryRootPage = () => {
                   value={data?.overview?.lowStockItems?.value || 0}
                   trend={data?.overview?.lowStockItems?.trend}
                   percentage={data?.overview?.lowStockItems?.changePercent}
-                  icon={IconArrowDown}
+                  icon={ArrowDown}
                   subtitle="Abaixo do mínimo"
                 />
                 <TrendCard
@@ -604,7 +592,7 @@ export const InventoryRootPage = () => {
                   value={data?.overview?.itemsNeedingReorder?.value || 0}
                   trend={data?.overview?.itemsNeedingReorder?.trend}
                   percentage={data?.overview?.itemsNeedingReorder?.changePercent}
-                  icon={IconRefresh}
+                  icon={RefreshCw}
                   subtitle="Ponto de pedido"
                 />
                 <TrendCard
@@ -612,7 +600,7 @@ export const InventoryRootPage = () => {
                   value={data?.overview?.overstockedItems?.value || 0}
                   trend={data?.overview?.overstockedItems?.trend}
                   percentage={data?.overview?.overstockedItems?.changePercent}
-                  icon={IconArrowUp}
+                  icon={ArrowUp}
                   subtitle="Acima do máximo"
                 />
               </div>
@@ -630,7 +618,7 @@ export const InventoryRootPage = () => {
                       value: data.categoryBreakdown.itemsByCategory.datasets[0]?.data[index] || 0,
                     })) || []
                   }
-                  icon={IconTag}
+                  icon={Tag}
                   color="green"
                 />
                 <ActivityPatternCard
@@ -641,7 +629,7 @@ export const InventoryRootPage = () => {
                       value: data.categoryBreakdown.itemsByBrand.datasets[0]?.data[index] || 0,
                     })) || []
                   }
-                  icon={IconBarcode}
+                  icon={Barcode}
                   color="purple"
                 />
                 <ActivityPatternCard
@@ -652,7 +640,7 @@ export const InventoryRootPage = () => {
                       value: supplier.value,
                     })) || []
                   }
-                  icon={IconBuildingStore}
+                  icon={Store}
                   color="orange"
                 />
               </div>
@@ -672,7 +660,7 @@ export const InventoryRootPage = () => {
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4">Análises de Estoque</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <AnalysisCard title="Análise ABC" type="ABC" data={getABCAnalysis()} icon={IconChartBar} onDetailsClick={() => navigate(routes.inventory.products.list)} />
+                <AnalysisCard title="Análise ABC" type="ABC" data={getABCAnalysis()} icon={BarChart3} onDetailsClick={() => navigate(routes.inventory.products.list)} />
                 <AnalysisCard
                   title="Análise XYZ"
                   type="XYZ"
@@ -699,7 +687,7 @@ export const InventoryRootPage = () => {
                       color: "bg-orange-500",
                     },
                   ]}
-                  icon={IconChartPie}
+                  icon={PieChart}
                   onDetailsClick={() => navigate(routes.inventory.products.list)}
                 />
               </div>

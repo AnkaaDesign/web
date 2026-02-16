@@ -164,10 +164,10 @@ export const AutoPrivilegeRoute: React.FC<AutoPrivilegeRouteProps> = ({ children
   // Only check privilege if it's defined (route requires specific privilege)
   if (requiredPrivilege) {
     // Check if user has required privilege(s)
-    const hasAccess = hasRequiredPrivilegeForRoute(user, requiredPrivilege);
+    const hasAccess = hasRequiredPrivilegeForRoute(user, requiredPrivilege as keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[]);
 
     if (!hasAccess) {
-      return <UnauthorizedAccess currentRoute={location.pathname} requiredPrivilege={requiredPrivilege} />;
+      return <UnauthorizedAccess currentRoute={location.pathname} requiredPrivilege={requiredPrivilege as keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[]} />;
     }
   }
 

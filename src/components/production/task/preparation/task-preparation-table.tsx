@@ -60,10 +60,11 @@ export function TaskPreparationTable({
 }: TaskPreparationTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canEdit = canEditTasks(user);
+  // Cast AuthUser to User for permission checks - AuthUser is a subset of User
+  const canEdit = canEditTasks(user as any);
 
   const userSectorPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
-  const canViewPrice = user && (hasPrivilege(user, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(user, SECTOR_PRIVILEGES.FINANCIAL));
+  const canViewPrice = !!user && (hasPrivilege(user as any, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(user as any, SECTOR_PRIVILEGES.FINANCIAL));
 
   // Column widths
   const storageKey = `task-preparation-column-widths`;
@@ -130,7 +131,7 @@ export function TaskPreparationTable({
   // Fetch tasks
   const { data, isLoading, error } = useTasks(queryParams);
   const tasks = data?.data || [];
-  const totalRecords = data?.totalRecords || 0;
+  const totalRecords = data?.meta?.totalRecords || 0;
 
   // Notify parent of data changes
   useEffect(() => {
@@ -150,7 +151,8 @@ export function TaskPreparationTable({
     if (onGroupsDetected) {
       const groupIds = groupedTasks
         .filter(g => g.type === 'group-collapsed')
-        .map(g => g.groupId);
+        .map(g => g.groupId)
+        .filter((id): id is string => id !== undefined);
       onGroupsDetected(groupIds, groupIds.length > 0);
     }
   }, [groupedTasks, onGroupsDetected]);

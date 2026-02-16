@@ -294,20 +294,6 @@ export function getMenuItemsByDomain(menuItems: MenuItem[], domain: string): Men
  * Uses exact matching for navigation (not hierarchical)
  */
 export function hasAccessToMenuItem(item: MenuItem, userPrivilege?: SECTOR_PRIVILEGES, isTeamLeader: boolean = false): boolean {
-  // Check team leader requirement first
-  if (item.requiresTeamLeader) {
-    return isTeamLeader;
-  }
-
-  if (!item.requiredPrivilege) return true;
-  if (!userPrivilege) return false;
-
-  // Handle array of privileges
-  if (Array.isArray(item.requiredPrivilege)) {
-    // OR logic - user needs to have EXACTLY one of the specified privileges
-    return item.requiredPrivilege.includes(userPrivilege);
-  }
-
-  // Handle single privilege - exact match only
-  return userPrivilege === item.requiredPrivilege;
+  // Use the same logic as hasMenuItemAccess
+  return hasMenuItemAccess(item, userPrivilege, isTeamLeader);
 }

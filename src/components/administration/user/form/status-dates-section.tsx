@@ -80,7 +80,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
 
   // Track previous values to detect actual changes (not just initial mount)
   const prevExp1StartAtRef = useRef<Date | null | undefined>(undefined);
-  const prevStatusRef = useRef<USER_STATUS | undefined>(undefined);
+  const prevStatusRef = useRef<string | undefined>(undefined);
   const isFirstRenderRef = useRef(true);
 
   // Auto-calculate dates when exp1StartAt changes (but not on initial mount)
@@ -150,15 +150,15 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
     USER_STATUS.EXPERIENCE_PERIOD_2,
     USER_STATUS.EFFECTED,
     USER_STATUS.DISMISSED,
-  ].includes(status);
+  ].includes(status as USER_STATUS);
 
   const showExp2Dates = [
     USER_STATUS.EXPERIENCE_PERIOD_2,
     USER_STATUS.EFFECTED,
     USER_STATUS.DISMISSED,
-  ].includes(status);
+  ].includes(status as USER_STATUS);
 
-  const showContractedDate = [USER_STATUS.EFFECTED, USER_STATUS.DISMISSED].includes(status);
+  const showContractedDate = [USER_STATUS.EFFECTED, USER_STATUS.DISMISSED].includes(status as USER_STATUS);
   const showDismissedDate = status === USER_STATUS.DISMISSED;
 
   // Don't render if no dates should be shown
@@ -181,7 +181,12 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                 name="exp1StartAt"
                 render={({ field }) => (
                   <DateTimeInput
-                    field={field}
+                    field={{
+                      onChange: field.onChange,
+                      onBlur: field.onBlur,
+                      value: field.value ?? null,
+                      name: field.name,
+                    }}
                     label={
                       <span className="flex items-center gap-1.5">
                         Início da Experiência 1
@@ -200,11 +205,15 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                 name="exp1EndAt"
                 render={({ field }) => (
                   <DateTimeInput
-                    field={field}
+                    field={{
+                      onChange: field.onChange,
+                      onBlur: field.onBlur,
+                      value: field.value ?? null,
+                      name: field.name,
+                    }}
                     label="Fim da Experiência 1"
                     disabled={true}
                     mode="date"
-                    helperText="Calculado automaticamente (45 dias após o início)"
                   />
                 )}
               />
@@ -225,11 +234,15 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                 name="exp2StartAt"
                 render={({ field }) => (
                   <DateTimeInput
-                    field={field}
+                    field={{
+                      onChange: field.onChange,
+                      onBlur: field.onBlur,
+                      value: field.value ?? null,
+                      name: field.name,
+                    }}
                     label="Início da Experiência 2"
                     disabled={true}
                     mode="date"
-                    helperText="Calculado automaticamente (dia seguinte ao fim da Exp. 1)"
                   />
                 )}
               />
@@ -239,11 +252,15 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                 name="exp2EndAt"
                 render={({ field }) => (
                   <DateTimeInput
-                    field={field}
+                    field={{
+                      onChange: field.onChange,
+                      onBlur: field.onBlur,
+                      value: field.value ?? null,
+                      name: field.name,
+                    }}
                     label="Fim da Experiência 2"
                     disabled={true}
                     mode="date"
-                    helperText="Calculado automaticamente (45 dias após o início real da Exp. 2)"
                   />
                 )}
               />
@@ -264,7 +281,12 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                 name="effectedAt"
                 render={({ field }) => (
                   <DateTimeInput
-                    field={field}
+                    field={{
+                      onChange: field.onChange,
+                      onBlur: field.onBlur,
+                      value: field.value ?? null,
+                      name: field.name,
+                    }}
                     label={
                       <span className="flex items-center gap-1.5">
                         Data de Contratação
@@ -274,7 +296,6 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                     disabled={true}
                     mode="date"
                     required
-                    helperText="Calculado automaticamente (1 dia após o fim da Exp. 2)"
                   />
                 )}
               />
@@ -295,7 +316,12 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                 name="dismissedAt"
                 render={({ field }) => (
                   <DateTimeInput
-                    field={field}
+                    field={{
+                      onChange: field.onChange,
+                      onBlur: field.onBlur,
+                      value: field.value ?? null,
+                      name: field.name,
+                    }}
                     label={
                       <span className="flex items-center gap-1.5">
                         Data de Demissão
@@ -305,7 +331,6 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                     disabled={disabled}
                     mode="date"
                     required
-                    helperText="Data em que o colaborador foi demitido (padrão: hoje)"
                   />
                 )}
               />

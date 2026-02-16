@@ -43,7 +43,7 @@ export function getRowClasses(entryId: string, stateManager: StateManager, isWee
   const isModified = stateManager.actions.isEntryModified(entryId);
 
   return cn(
-    "border-b border-neutral-400 dark:border-border/40",
+    "border-b border-neutral-400 dark:border-border",
     TRACKING_CLASSES.TRANSITION,
     // Priority order: weekend > modified > alternate
     isWeekend && TRACKING_CLASSES.ROW_WEEKEND,
@@ -72,7 +72,7 @@ export function getCellClasses(entryId: string, fieldName: string, stateManager:
  * Time field specific cell classes for time input cells
  */
 export function getTimeFieldCellClasses(entryId: string, fieldName: string, stateManager: StateManager, isWeekend: boolean): string {
-  const baseClasses = "p-1 w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border/40";
+  const baseClasses = "p-1 w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border";
   return getCellClasses(entryId, fieldName, stateManager, isWeekend, baseClasses);
 }
 
@@ -80,7 +80,7 @@ export function getTimeFieldCellClasses(entryId: string, fieldName: string, stat
  * Checkbox field specific cell classes
  */
 export function getCheckboxCellClasses(entryId: string, fieldName: string, stateManager: StateManager, isWeekend: boolean): string {
-  const baseClasses = "p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border/40";
+  const baseClasses = "p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border";
   return getCellClasses(entryId, fieldName, stateManager, isWeekend, baseClasses);
 }
 
@@ -91,7 +91,7 @@ export function getDateCellClasses(entryId: string, stateManager: StateManager, 
   const isModified = stateManager.actions.isEntryModified(entryId);
 
   return cn(
-    "p-2 sticky left-0 z-10 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border/40",
+    "p-2 sticky left-0 z-10 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border",
     TRACKING_CLASSES.TRANSITION,
     // Background handling for sticky date column
     isWeekend ? "bg-red-50 dark:bg-red-900/10" : "bg-background",
@@ -284,7 +284,7 @@ export const debugUtils = {
    * Log modification state for debugging
    */
   logModificationState(_entryId: string, _stateManager: StateManager): void {
-    if (process.env.NODE_ENV === "development") {
+    if (import.meta.env.DEV) {
       // Debug logging disabled
     }
   },
@@ -293,7 +293,7 @@ export const debugUtils = {
    * Log all modifications
    */
   logAllModifications(_stateManager: StateManager): void {
-    if (process.env.NODE_ENV === "development") {
+    if (import.meta.env.DEV) {
       // Debug logging disabled
     }
   },
@@ -302,13 +302,13 @@ export const debugUtils = {
    * Validate CSS class consistency
    */
   validateClasses(entryId: string, fieldName: string, stateManager: StateManager): void {
-    if (process.env.NODE_ENV === "development") {
+    if (import.meta.env.DEV) {
       const isModified = stateManager.actions.isFieldModified(entryId, fieldName);
       const classes = getCellClasses(entryId, fieldName, stateManager, false);
 
       const hasModifiedClass = classes.includes("bg-yellow");
       if (isModified !== hasModifiedClass) {
-        if (process.env.NODE_ENV !== 'production') {
+        if (import.meta.env.DEV) {
           console.warn(`[Tracking Warning] Class mismatch for ${entryId}.${fieldName}: isModified=${isModified}, hasModifiedClass=${hasModifiedClass}`);
         }
       }

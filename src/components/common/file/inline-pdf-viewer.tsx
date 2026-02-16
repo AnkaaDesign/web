@@ -262,6 +262,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           const renderContext = {
             canvasContext: context,
             viewport,
+            canvas,
           };
 
           renderTaskRef.current = page.render(renderContext);

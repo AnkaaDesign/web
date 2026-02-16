@@ -15,6 +15,7 @@ interface UseEditFormProps<TFieldValues extends FieldValues = FieldValues, TCont
 }
 
 interface UseEditFormReturn<TFieldValues extends FieldValues = FieldValues> extends Omit<UseFormReturn<TFieldValues>, "handleSubmit"> {
+  handleSubmit: UseFormReturn<TFieldValues>["handleSubmit"];
   handleSubmitChanges: (onValid?: (data: Partial<TFieldValues>) => unknown, onInvalid?: (errors: any) => unknown) => (e?: React.BaseSyntheticEvent) => Promise<void>;
   reset: UseFormReturn<TFieldValues>["reset"];
   getChangedFields: () => Partial<TFieldValues>;
@@ -361,6 +362,7 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
 
   return {
     ...form,
+    handleSubmit: form.handleSubmit,
     handleSubmitChanges,
     getChangedFields,
   };

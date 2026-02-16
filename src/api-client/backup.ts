@@ -1,4 +1,5 @@
 import { apiClient } from "./axiosClient";
+import { BACKUP_PRIORITY_PATH_MAP } from "@/config/backup-paths";
 
 interface BackupMetadata {
   id: string;
@@ -189,12 +190,8 @@ class BackupApiClient {
   // Get backup priority paths
   async getPathsByPriority(priority: "low" | "medium" | "high" | "critical" = "medium"): Promise<string[]> {
     // This could be an API call in the future, for now return sensible defaults
-    const pathMaps = {
-      critical: ["/home/kennedy/ankaa", "/home/kennedy/ankaa/.env", "/home/kennedy/ankaa/apps/api/.env"],
-      high: ["/home/kennedy/ankaa/apps", "/home/kennedy/ankaa/packages", "/home/kennedy/ankaa/scripts", "/etc/nginx", "/etc/ssl"],
-      medium: ["/home/kennedy/ankaa/docs", "/home/kennedy/ankaa/test-examples", "/var/log/nginx", "/var/www"],
-      low: ["/home/kennedy/ankaa/node_modules", "/home/kennedy/ankaa/.git", "/tmp"],
-    };
+    // Paths are centralized in @/config/backup-paths.ts
+    const pathMaps = BACKUP_PRIORITY_PATH_MAP;
 
     switch (priority) {
       case "critical":

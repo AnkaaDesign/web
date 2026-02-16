@@ -2,13 +2,15 @@ import { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Supplier, BatchOperationResult } from "../../../../types";
+import type { Supplier } from "../../../../types";
 import { useBatchUpdateSuppliers } from "../../../../hooks";
 import { SupplierBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { BRAZILIAN_STATES, routes } from "../../../../constants";
+import type { BatchOperationResult } from "../../../../types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { FormInput } from "@/components/ui/form-input";
 import { Combobox } from "@/components/ui/combobox";
 import { CnpjCell } from "./cells/cnpj-cell";
 import { CepCell } from "./cells/cep-cell";
@@ -65,10 +67,22 @@ interface SupplierBatchEditTableProps {
   onSubmit?: () => void;
 }
 
+// Define the batch result type to match what the dialog expects
+interface SupplierBatchResult {
+  fantasyName?: string;
+  corporateName?: string;
+  cnpj?: string;
+  email?: string;
+  phones?: string[];
+  city?: string;
+  state?: string;
+  [key: string]: any;
+}
+
 export function SupplierBatchEditTable({ suppliers, onCancel: _onCancel, onSubmit: _onSubmit }: SupplierBatchEditTableProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [batchResult, setBatchResult] = useState<BatchOperationResult<Supplier, Supplier> | null>(null);
+  const [batchResult, setBatchResult] = useState<BatchOperationResult<SupplierBatchResult, SupplierBatchResult> | null>(null);
   const [showResultDialog, setShowResultDialog] = useState(false);
   const { mutateAsync: batchUpdateAsync } = useBatchUpdateSuppliers();
 
@@ -151,7 +165,8 @@ export function SupplierBatchEditTable({ suppliers, onCancel: _onCancel, onSubmi
       const result = await batchUpdateAsync(batchPayload);
       if (result?.data) {
         // Show the detailed result dialog
-        setBatchResult(result.data);
+        // Cast the result to the expected type for the dialog
+        setBatchResult(result.data as BatchOperationResult<SupplierBatchResult, SupplierBatchResult>);
         setShowResultDialog(true);
       } else {
         // Even if we don't have detailed results, navigate back on apparent success
@@ -452,7 +467,7 @@ export function SupplierBatchEditTable({ suppliers, onCancel: _onCancel, onSubmi
                                       }
                                       field.onBlur();
                                     }}
-                                    type="url"
+                                    type="text"
                                     placeholder="https://exemplo.com"
                                     className="h-8 border-muted-foreground/20"
                                     disabled={isSubmitting}
@@ -603,7 +618,7 @@ export function SupplierBatchEditTable({ suppliers, onCancel: _onCancel, onSubmi
       </Card>
 
       {/* Batch Operation Result Dialog */}
-      <SupplierBatchResultDialog open={showResultDialog} onOpenChange={handleResultDialogClose} result={batchResult} />
+      <SupplierBatchResultDialog open={showResultDialog} onOpenChange={handleResultDialogClose} result={batchResult} operationType="update" />
     </Form>
   );
 }

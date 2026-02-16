@@ -55,35 +55,35 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
   const form = useForm<PpeDeliveryScheduleCreateFormData | PpeDeliveryScheduleUpdateFormData>({
     resolver: zodResolver(mode === "create" ? ppeDeliveryScheduleCreateSchema : ppeDeliveryScheduleUpdateSchema),
     mode: "onBlur", // Validate on blur for better UX
+    // @ts-expect-error - form type mismatch
     defaultValues:
       mode === "create"
         ? {
-            name: "",
-            items: [{ ppeType: Object.values(PPE_TYPE)[0], quantity: 1 }],
-            assignmentType: ASSIGNMENT_TYPE.SPECIFIC,
-            excludedUserIds: [],
-            includedUserIds: [],
-            frequency: SCHEDULE_FREQUENCY.MONTHLY,
-            frequencyCount: 1,
-            dayOfMonth: 1,
-            customMonths: [],
-            isActive: true, // Ensure schedule is created as active
-            ...props.defaultValues,
+            name: props.defaultValues?.name || "",
+            items: props.defaultValues?.items || [{ ppeType: Object.values(PPE_TYPE)[0], quantity: 1 }],
+            assignmentType: props.defaultValues?.assignmentType || ASSIGNMENT_TYPE.SPECIFIC,
+            excludedUserIds: props.defaultValues?.excludedUserIds || [],
+            includedUserIds: props.defaultValues?.includedUserIds || [],
+            frequency: props.defaultValues?.frequency || SCHEDULE_FREQUENCY.MONTHLY,
+            frequencyCount: props.defaultValues?.frequencyCount || 1,
+            dayOfMonth: props.defaultValues?.dayOfMonth || 1,
+            customMonths: props.defaultValues?.customMonths || [],
+            isActive: props.defaultValues?.isActive ?? true, // Ensure schedule is created as active
           }
         : {
-            name: props.ppeSchedule.name || "",
-            items: props.ppeSchedule.items || [],
-            assignmentType: props.ppeSchedule.assignmentType || ASSIGNMENT_TYPE.ALL,
-            excludedUserIds: props.ppeSchedule.excludedUserIds || [],
-            includedUserIds: props.ppeSchedule.includedUserIds || [],
-            frequency: props.ppeSchedule.frequency,
-            frequencyCount: props.ppeSchedule.frequencyCount,
-            specificDate: props.ppeSchedule.specificDate,
-            dayOfMonth: props.ppeSchedule.dayOfMonth,
-            dayOfWeek: props.ppeSchedule.dayOfWeek,
-            month: props.ppeSchedule.month,
-            customMonths: props.ppeSchedule.customMonths || [],
-            ...props.defaultValues,
+            name: props.ppeSchedule.name || props.defaultValues?.name || "",
+            items: props.defaultValues?.items || props.ppeSchedule.items || [],
+            assignmentType: props.defaultValues?.assignmentType || props.ppeSchedule.assignmentType || ASSIGNMENT_TYPE.ALL,
+            excludedUserIds: props.defaultValues?.excludedUserIds || props.ppeSchedule.excludedUserIds || [],
+            includedUserIds: props.defaultValues?.includedUserIds || props.ppeSchedule.includedUserIds || [],
+            frequency: props.defaultValues?.frequency || props.ppeSchedule.frequency,
+            frequencyCount: props.defaultValues?.frequencyCount || props.ppeSchedule.frequencyCount,
+            specificDate: props.defaultValues?.specificDate || props.ppeSchedule.specificDate,
+            dayOfMonth: props.defaultValues?.dayOfMonth || props.ppeSchedule.dayOfMonth,
+            dayOfWeek: props.defaultValues?.dayOfWeek || props.ppeSchedule.dayOfWeek,
+            month: props.defaultValues?.month || props.ppeSchedule.month,
+            customMonths: props.defaultValues?.customMonths || props.ppeSchedule.customMonths || [],
+            isActive: props.defaultValues?.isActive ?? props.ppeSchedule.isActive,
           },
   });
 
@@ -410,7 +410,12 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                           Data Específica <span className="text-destructive">*</span>
                         </FormLabel>
                         <DateTimeInput
-                          field={field}
+                          {...{
+                            onChange: (value) => field.onChange(value),
+                            onBlur: field.onBlur,
+                            value: field.value ?? null,
+                            name: field.name,
+                          }}
                           hideLabel
                           placeholder="Selecione a data"
                           mode="date"
@@ -494,7 +499,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                             min={1}
                             max={31}
                             value={field.value || ""}
-                            onChange={(value: string) => field.onChange(parseInt(value) || undefined)}
+                            onChange={(value: string | number | null) => field.onChange(typeof value === 'number' ? value : (typeof value === 'string' ? (parseInt(value) || undefined) : undefined))}
                             placeholder="1-31"
                             className="bg-transparent"
                           />
@@ -514,7 +519,12 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                       <FormItem className="flex flex-col flex-1 min-w-[200px]">
                         <FormLabel>Primeira Execução</FormLabel>
                         <DateTimeInput
-                          field={field}
+                          {...{
+                            onChange: (value) => field.onChange(value),
+                            onBlur: field.onBlur,
+                            value: field.value ?? null,
+                            name: field.name,
+                          }}
                           hideLabel
                           placeholder="Data de início"
                           mode="date"

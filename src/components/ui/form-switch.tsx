@@ -28,7 +28,7 @@ export function FormSwitch<T extends Record<string, any>>({
       control={form.control}
       name={name}
       render={({ field }) => (
-        <FormItem className={cn("flex flex-row items-center justify-between rounded-lg border border-border/40 p-3 shadow-sm", className)}>
+        <FormItem className={cn("flex flex-row items-center justify-between rounded-lg border border-border p-3 shadow-sm", className)}>
           <div className="space-y-0.5">
             {label && (
               <FormLabel className="flex items-center gap-2 text-base cursor-pointer">

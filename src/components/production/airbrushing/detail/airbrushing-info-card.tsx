@@ -81,7 +81,7 @@ interface AirbrushingInfoCardProps {
 
 export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoCardProps) {
   const getAirbrushingStatusBadgeVariant = (status: string) => {
-    return (ENTITY_BADGE_CONFIG.AIRBRUSHING[status] || "default") as any;
+    return (ENTITY_BADGE_CONFIG.AIRBRUSHING[status as keyof typeof ENTITY_BADGE_CONFIG.AIRBRUSHING] || "default") as any;
   };
 
   return (
@@ -244,8 +244,8 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
                   <span className="text-sm font-medium text-muted-foreground">
                     Status da Tarefa
                   </span>
-                  <Badge variant={ENTITY_BADGE_CONFIG.TASK[airbrushing.task.status] || "default"}>
-                    {TASK_STATUS_LABELS[airbrushing.task.status] || airbrushing.task.status}
+                  <Badge variant={ENTITY_BADGE_CONFIG.TASK[airbrushing.task.status as keyof typeof ENTITY_BADGE_CONFIG.TASK] || "default"}>
+                    {TASK_STATUS_LABELS[airbrushing.task.status as keyof typeof TASK_STATUS_LABELS] || airbrushing.task.status}
                   </Badge>
                 </div>
               </div>

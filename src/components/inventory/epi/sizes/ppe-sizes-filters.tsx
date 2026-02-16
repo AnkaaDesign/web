@@ -65,22 +65,26 @@ export function PpeSizesFilters({ open, onOpenChange, filters, onFilterChange }:
     onOpenChange(false);
   };
 
-  const handleStatusChange = (statuses: string[]) => {
-    setLocalFilters({ ...localFilters, status: statuses.length > 0 ? statuses : undefined });
+  const handleStatusChange = (statuses: string | string[] | null | undefined) => {
+    const statusArray = Array.isArray(statuses) ? statuses : statuses ? [statuses] : [];
+    setLocalFilters({ ...localFilters, status: statusArray.length > 0 ? statusArray : undefined });
   };
 
-  const handlePositionChange = (positions: string[]) => {
-    setLocalFilters({ ...localFilters, positionId: positions.length > 0 ? positions : undefined });
+  const handlePositionChange = (positions: string | string[] | null | undefined) => {
+    const positionArray = Array.isArray(positions) ? positions : positions ? [positions] : [];
+    setLocalFilters({ ...localFilters, positionId: positionArray.length > 0 ? positionArray : undefined });
   };
 
-  const handleSectorChange = (sectors: string[]) => {
-    setLocalFilters({ ...localFilters, sectorId: sectors.length > 0 ? sectors : undefined });
+  const handleSectorChange = (sectors: string | string[] | null | undefined) => {
+    const sectorArray = Array.isArray(sectors) ? sectors : sectors ? [sectors] : [];
+    setLocalFilters({ ...localFilters, sectorId: sectorArray.length > 0 ? sectorArray : undefined });
   };
 
-  const handlePpeSizeChange = (field: string, values: string[]) => {
+  const handlePpeSizeChange = (field: string, values: string | string[] | null | undefined) => {
+    const valuesArray = Array.isArray(values) ? values : values ? [values] : [];
     const newPpeSizeFilters = { ...ppeSizeFilters };
-    if (values.length > 0) {
-      newPpeSizeFilters[field] = values;
+    if (valuesArray.length > 0) {
+      newPpeSizeFilters[field] = valuesArray;
     } else {
       delete newPpeSizeFilters[field];
     }

@@ -128,7 +128,7 @@ export const useTransformedPreferences = (userId: string) => {
   const { data: preferences, ...queryProps } = useNotificationPreferences(userId);
 
   const transformedData = React.useMemo(() => {
-    if (!preferences || preferences.data.length === 0) return null;
+    if (!preferences?.data || preferences.data.length === 0) return null;
 
     // Group preferences by type and eventType
     const grouped: Record<string, Record<string, UserNotificationPreference>> = {};

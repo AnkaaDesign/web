@@ -226,6 +226,8 @@ export const BorrowBatchCreateForm = () => {
           userId: data.userId,
         }));
 
+        const batchPayload = { borrows: borrowsData };
+
         // Check if batchCreateAsync is available
         if (!batchCreateAsync) {
           if (process.env.NODE_ENV !== 'production') {
@@ -234,12 +236,12 @@ export const BorrowBatchCreateForm = () => {
 
           // Try alternative methods
           if (batchMutations.batchCreate) {
-            
-            batchMutations.batchCreate({ borrows: borrowsData });
+
+            batchMutations.batchCreate(batchPayload);
             return;
           } else if (batchMutations.batchCreateMutation?.mutateAsync) {
-            
-            const result = await batchMutations.batchCreateMutation.mutateAsync({ borrows: borrowsData });
+
+            const result = await batchMutations.batchCreateMutation.mutateAsync({ data: batchPayload });
             if (result.data) {
               openDialog(result.data);
               clearAllSelections();
@@ -255,7 +257,7 @@ export const BorrowBatchCreateForm = () => {
           }
         }
 
-        const result = await batchCreateAsync({ borrows: borrowsData });
+        const result = await batchCreateAsync(batchPayload);
 
         if (result.data) {
           // Open dialog to show detailed results
@@ -342,8 +344,10 @@ export const BorrowBatchCreateForm = () => {
                                 }))}
                                 value={field.value}
                                 onValueChange={(value) => {
-                                  field.onChange(value);
-                                  handleGlobalUserChange(value);
+                                  // Handle string | string[] | null | undefined -> string | undefined
+                                  const normalizedValue = Array.isArray(value) ? value[0] : value;
+                                  field.onChange(normalizedValue);
+                                  handleGlobalUserChange(normalizedValue ?? undefined);
                                 }}
                                 placeholder="Selecionar usuário"
                                 className="h-10"

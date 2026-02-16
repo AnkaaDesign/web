@@ -37,13 +37,13 @@ export interface Task extends BaseEntity {
   forecastDate: Date | null;
   paintId: string | null;
   customerId: string | null;
-  invoiceToId: string | null;
   sectorId: string | null;
   representatives?: Representative[];
   representativeIds?: string[];
   budgetIds?: string[];
   invoiceIds?: string[];
   receiptIds?: string[];
+  bankSlipIds?: string[];
   reimbursementIds?: string[];
   reimbursementInvoiceIds?: string[];
   baseFileIds?: string[];
@@ -52,12 +52,12 @@ export interface Task extends BaseEntity {
   // Relations
   sector?: Sector;
   customer?: Customer;
-  invoiceTo?: Customer;
   budgets?: File[]; // Many-to-many relation (budget files)
   pricingId?: string | null; // Foreign key to TaskPricing
   pricing?: TaskPricing; // Task pricing (one-to-many: one pricing can be shared across multiple tasks)
   invoices?: File[]; // Many-to-many relation
   receipts?: File[]; // Many-to-many relation
+  bankSlips?: File[]; // Many-to-many relation
   reimbursements?: File[]; // Many-to-many relation
   reimbursementInvoices?: File[]; // Many-to-many relation
   baseFiles?: File[]; // Files used as base for artwork design
@@ -67,7 +67,7 @@ export interface Task extends BaseEntity {
   artworks?: File[];
   logoPaints?: Paint[];
   serviceOrders?: ServiceOrder[];
-  airbrushing?: Airbrushing[]; // Note: Field name is singular but value is array
+  airbrushings?: Airbrushing[];
   cuts?: Cut[];
   truck?: Truck;
   relatedTasks?: Task[];
@@ -93,6 +93,7 @@ export interface TaskIncludes {
   pricing?: boolean | { include?: { items?: boolean; layoutFile?: boolean; customerSignature?: boolean } }; // Task pricing (one-to-many: one pricing can be shared across multiple tasks)
   invoices?: boolean; // Many-to-many relation
   receipts?: boolean; // Many-to-many relation
+  bankSlips?: boolean; // Many-to-many relation
   reimbursements?: boolean; // Many-to-many relation
   reimbursementInvoices?: boolean; // Many-to-many relation
   observation?:
@@ -130,7 +131,7 @@ export interface TaskIncludes {
     | {
         include?: ServiceOrderIncludes;
       };
-  airbrushing?:
+  airbrushings?:
     | boolean
     | {
         include?: AirbrushingIncludes;

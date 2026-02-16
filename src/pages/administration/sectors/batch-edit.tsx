@@ -30,7 +30,6 @@ export const SectorBatchEditPage = () => {
       id: { in: selectedIds },
     },
     limit: 100,
-    enabled: selectedIds.length > 0,
   });
 
   const { batchUpdateAsync: batchUpdate } = useSectorBatchMutations();

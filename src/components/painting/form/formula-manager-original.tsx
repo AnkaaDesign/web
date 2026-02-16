@@ -56,7 +56,8 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
                 id: formulas[0].components?.[index]?.id || `temp-comp-${Date.now()}-${index}`,
                 itemId: c?.itemId || "",
                 formulaPaintId: formulas[0].id || "",
-                ratio: c?.ratio || 0,
+                ratio: 0, // Ratio will be calculated from weightInGrams on the backend
+                weight: c?.weightInGrams || 0,
                 createdAt: formulas[0].components?.[index]?.createdAt || new Date(),
                 updatedAt: new Date(),
               };
@@ -76,6 +77,7 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
       <div className="space-y-6">
         <div className="space-y-2">
           <Label htmlFor="description">Descrição da Fórmula</Label>
+          {/* @ts-expect-error - form register onChange type mismatch */}
           <Input id="description" placeholder="Ex: Fórmula Principal, Variação Clara, etc." {...form.register("description")} />
           {form.formState.errors.description && <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>}
         </div>

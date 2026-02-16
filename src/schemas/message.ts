@@ -12,6 +12,8 @@ export interface MessageGetManyFormData {
   limit?: number;
   searchingFor?: string;
   status?: MessageStatus[];
+  recipientIds?: string[];
+  senderIds?: string[];
   createdAt?: {
     gte?: Date | string;
     lte?: Date | string;

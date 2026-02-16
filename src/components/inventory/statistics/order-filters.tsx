@@ -303,8 +303,8 @@ export function OrderFilters({
                 min={1}
                 max={200}
                 value={localFilters.limit || 50}
-                onChange={(value: number | undefined) => {
-                  const numValue = value || 50;
+                onChange={(value: string | number | null) => {
+                  const numValue = typeof value === 'number' ? value : (value ? parseInt(value) : 50);
                   setLocalFilters({
                     ...localFilters,
                     limit: numValue,
@@ -345,7 +345,8 @@ export function OrderFilters({
                   <Combobox
                     value={selectedYear?.toString() || ''}
                     onValueChange={(year) => {
-                      const newYear = year ? parseInt(year) : undefined;
+                      const yearStr = Array.isArray(year) ? year[0] : year;
+                      const newYear = yearStr ? parseInt(yearStr) : undefined;
                       setSelectedYear(newYear);
                       if (!newYear) {
                         setSelectedMonths([]);
@@ -361,7 +362,10 @@ export function OrderFilters({
                   <Combobox
                     mode="multiple"
                     value={selectedMonths}
-                    onValueChange={(months) => setSelectedMonths(months)}
+                    onValueChange={(months) => {
+                      const monthsArray = Array.isArray(months) ? months : (months ? [months] : []);
+                      setSelectedMonths(monthsArray);
+                    }}
                     options={MONTH_OPTIONS}
                     placeholder={selectedYear ? 'Selecione os meses...' : 'Selecione um ano primeiro'}
                     searchPlaceholder="Buscar meses..."
@@ -386,8 +390,8 @@ export function OrderFilters({
                   <DateTimeInput
                     mode="date"
                     value={localFilters.startDate}
-                    onChange={(date: Date | null) => {
-                      if (date) {
+                    onChange={(date) => {
+                      if (date && date instanceof Date) {
                         setLocalFilters({
                           ...localFilters,
                           startDate: startOfDay(date),
@@ -406,8 +410,8 @@ export function OrderFilters({
                   <DateTimeInput
                     mode="date"
                     value={localFilters.endDate}
-                    onChange={(date: Date | null) => {
-                      if (date) {
+                    onChange={(date) => {
+                      if (date && date instanceof Date) {
                         setLocalFilters({
                           ...localFilters,
                           endDate: endOfDay(date),
@@ -438,7 +442,7 @@ export function OrderFilters({
                   ...localFilters,
                   supplierIds: Array.isArray(value) && value.length > 0 ? value : undefined,
                 })}
-                queryKey={supplierKeys.lists()}
+                queryKey={[...supplierKeys.lists()]}
                 queryFn={fetchSuppliers}
                 minSearchLength={0}
                 placeholder="Todos os fornecedores"
@@ -464,7 +468,7 @@ export function OrderFilters({
                   ...localFilters,
                   itemIds: Array.isArray(value) && value.length > 0 ? value : undefined,
                 })}
-                queryKey={itemKeys.lists()}
+                queryKey={[...itemKeys.lists()]}
                 queryFn={fetchItems}
                 minSearchLength={0}
                 placeholder="Todos os itens"
@@ -490,7 +494,7 @@ export function OrderFilters({
                   ...localFilters,
                   brandIds: Array.isArray(value) && value.length > 0 ? value : undefined,
                 })}
-                queryKey={itemBrandKeys.lists()}
+                queryKey={[...itemBrandKeys.lists()]}
                 queryFn={fetchBrands}
                 minSearchLength={0}
                 placeholder="Todas as marcas"
@@ -516,7 +520,7 @@ export function OrderFilters({
                   ...localFilters,
                   categoryIds: Array.isArray(value) && value.length > 0 ? value : undefined,
                 })}
-                queryKey={itemCategoryKeys.lists()}
+                queryKey={[...itemCategoryKeys.lists()]}
                 queryFn={fetchCategories}
                 minSearchLength={0}
                 placeholder="Todas as categorias"

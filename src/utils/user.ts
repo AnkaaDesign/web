@@ -1,6 +1,9 @@
-import type { User } from "../types";
+import type { User, AuthUser } from "../types";
 import { USER_STATUS, SECTOR_PRIVILEGES, TEAM_LEADER } from "../constants";
 import { dateUtils } from "./date";
+
+// Type representing the minimal user shape needed for privilege checks
+type PrivilegeCheckUser = User | AuthUser;
 
 /**
  * Get user status color
@@ -46,7 +49,7 @@ export function isUserBlocked(user: User): boolean {
  * @param requiredPrivilege - Either a SECTOR_PRIVILEGES enum value or the TEAM_LEADER constant
  * @returns true if user has the required privilege, false otherwise
  */
-export function hasPrivilege(user: User, requiredPrivilege: SECTOR_PRIVILEGES | typeof TEAM_LEADER): boolean {
+export function hasPrivilege(user: PrivilegeCheckUser, requiredPrivilege: SECTOR_PRIVILEGES | typeof TEAM_LEADER): boolean {
   // Handle TEAM_LEADER virtual privilege - check if user manages a sector
   if (requiredPrivilege === TEAM_LEADER) {
     return isTeamLeader(user);
@@ -73,7 +76,7 @@ export function hasPrivilege(user: User, requiredPrivilege: SECTOR_PRIVILEGES | 
  * @param requiredPrivileges - Array of SECTOR_PRIVILEGES values and/or TEAM_LEADER constant
  * @returns true if user has any of the required privileges, false otherwise
  */
-export function hasAnyPrivilege(user: User, requiredPrivileges: (SECTOR_PRIVILEGES | typeof TEAM_LEADER)[]): boolean {
+export function hasAnyPrivilege(user: PrivilegeCheckUser, requiredPrivileges: (SECTOR_PRIVILEGES | typeof TEAM_LEADER)[]): boolean {
   if (!requiredPrivileges.length) return false;
 
   // Check for TEAM_LEADER virtual privilege first
@@ -89,7 +92,7 @@ export function hasAnyPrivilege(user: User, requiredPrivileges: (SECTOR_PRIVILEG
   if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) return true;
 
   // Check if user's privilege is in the allowed array (exact match)
-  return requiredPrivileges.includes(userPrivilege);
+  return requiredPrivileges.includes(userPrivilege as typeof TEAM_LEADER | SECTOR_PRIVILEGES);
 }
 
 /**
@@ -266,7 +269,7 @@ export function calculateUserStats(users: User[]) {
  * Check if user is a team leader (manages a sector)
  * Note: This now checks the managedSector relation (Sector.managerId points to this user)
  */
-export function isTeamLeader(user: User): boolean {
+export function isTeamLeader(user: PrivilegeCheckUser): boolean {
   return Boolean(user.managedSector?.id);
 }
 

@@ -20,7 +20,7 @@ import {
   IconCurrencyReal,
 } from "@tabler/icons-react";
 
-interface PayrollDetailPageParams {
+interface PayrollDetailPageParams extends Record<string, string | undefined> {
   payrollId: string;
 }
 
@@ -107,7 +107,6 @@ export default function PayrollDetailPage() {
               include: {
                 bonusDiscounts: true,
                 bonusExtras: true,
-                position: true,
               },
             },
             discounts: true,
@@ -116,13 +115,27 @@ export default function PayrollDetailPage() {
 
         const responseData = response.data;
 
-        // Backend returns consistent format: { success, message, data: payroll }
-        // Both live and saved payrolls have the same structure
-        // Payroll object includes bonus as a relation (not separate)
-        if (responseData?.success && responseData?.data) {
-          setPayroll(responseData.data);
-        } else if (responseData?.success === false) {
-          setError(responseData.message || 'Folha de pagamento não encontrada.');
+        // Backend response handling:
+        // - Regular UUID: returns Payroll directly
+        // - Live ID: returns { success, message, data: { payroll, bonus, calculations } }
+        // Check if response has the wrapped format (live endpoint)
+        if (responseData && typeof responseData === 'object') {
+          // Type guard for live endpoint response
+          const isLiveResponse = (data: any): data is { success: boolean; message: string; data: { payroll: any } } => {
+            return 'success' in data && 'data' in data && typeof data.data === 'object' && data.data !== null && 'payroll' in data.data;
+          };
+
+          if (isLiveResponse(responseData)) {
+            // Live endpoint format: { success, message, data: { payroll, ... } }
+            if (responseData.success) {
+              setPayroll(responseData.data.payroll);
+            } else {
+              setError(responseData.message || 'Folha de pagamento não encontrada.');
+            }
+          } else {
+            // Regular UUID format: Payroll object directly
+            setPayroll(responseData);
+          }
         } else {
           setError('Folha de pagamento não encontrada.');
         }
@@ -281,7 +294,7 @@ export default function PayrollDetailPage() {
                   </div>
                   {/* Table Rows */}
                   {[...Array(8)].map((_, i) => (
-                    <div key={i} className="flex border-b border-border/50 py-3">
+                    <div key={i} className="flex border-b border-border py-3">
                       <Skeleton className="h-4 w-40 flex-1" />
                       <Skeleton className="h-4 w-12 mx-4" />
                       <Skeleton className="h-4 w-20" />
@@ -504,7 +517,7 @@ export default function PayrollDetailPage() {
                 </thead>
                 <tbody>
                   {/* Base Remuneration */}
-                  <tr className="border-b border-border/50">
+                  <tr className="border-b border-border">
                     <td className="py-2 px-0">Salário Base</td>
                     <td className="py-2 px-0 text-left text-muted-foreground text-xs">-</td>
                     <td className="py-2 px-0 text-right font-semibold">{formatAmount(calculations.baseRemuneration)}</td>
@@ -512,7 +525,7 @@ export default function PayrollDetailPage() {
 
                   {/* Overtime 50% */}
                   {calculations.overtime50Amount > 0 && (
-                    <tr className="border-b border-border/50">
+                    <tr className="border-b border-border">
                       <td className="py-2 px-0">Horas Extras 50%</td>
                       <td className="py-2 px-0 text-left text-muted-foreground text-xs">{formatHoursToHHMM(calculations.overtime50Hours)}</td>
                       <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.overtime50Amount)}</td>
@@ -521,7 +534,7 @@ export default function PayrollDetailPage() {
 
                   {/* Overtime 100% */}
                   {calculations.overtime100Amount > 0 && (
-                    <tr className="border-b border-border/50">
+                    <tr className="border-b border-border">
                       <td className="py-2 px-0">Horas Extras 100%</td>
                       <td className="py-2 px-0 text-left text-muted-foreground text-xs">{formatHoursToHHMM(calculations.overtime100Hours)}</td>
                       <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.overtime100Amount)}</td>
@@ -530,7 +543,7 @@ export default function PayrollDetailPage() {
 
                   {/* Night Differential */}
                   {calculations.nightDifferentialAmount > 0 && (
-                    <tr className="border-b border-border/50">
+                    <tr className="border-b border-border">
                       <td className="py-2 px-0">Adicional Noturno</td>
                       <td className="py-2 px-0 text-left text-muted-foreground text-xs">{formatHoursToHHMM(calculations.nightHours)}</td>
                       <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.nightDifferentialAmount)}</td>
@@ -539,7 +552,7 @@ export default function PayrollDetailPage() {
 
                   {/* DSR */}
                   {calculations.dsrAmount > 0 && (
-                    <tr className="border-b border-border/50">
+                    <tr className="border-b border-border">
                       <td className="py-2 px-0">Reflexo Extras DSR</td>
                       <td className="py-2 px-0 text-left text-muted-foreground text-xs">{payroll.dsrDays || '-'}</td>
                       <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.dsrAmount)}</td>
@@ -550,7 +563,7 @@ export default function PayrollDetailPage() {
                   {isBonifiable && calculations.bonusAmount > 0 && (
                     <>
                       {/* Base Bonus */}
-                      <tr className="border-b border-border/50">
+                      <tr className="border-b border-border">
                         <td className="py-2 px-0">Bônus</td>
                         <td className="py-2 px-0 text-left text-muted-foreground text-xs">
                           {payroll.bonus?.weightedTasks !== undefined
@@ -565,7 +578,7 @@ export default function PayrollDetailPage() {
                           ? calculations.bonusAmount * (getNumericValue(extra.percentage) / 100)
                           : getNumericValue(extra.value);
                         return (
-                          <tr key={extra.id || `bonus-extra-${index}`} className="border-b border-border/50">
+                          <tr key={extra.id || `bonus-extra-${index}`} className="border-b border-border">
                             <td className="py-2 px-0 pl-4 text-muted-foreground">{extra.reference || 'Extra Bônus'}</td>
                             <td className="py-2 px-0 text-left text-muted-foreground text-xs">
                               {extra.percentage ? `${getNumericValue(extra.percentage).toFixed(2)}%` : '-'}
@@ -580,7 +593,7 @@ export default function PayrollDetailPage() {
                           ? calculations.bonusAmount * (getNumericValue(discount.percentage) / 100)
                           : getNumericValue(discount.value);
                         return (
-                          <tr key={discount.id || `bonus-discount-${index}`} className="border-b border-border/50">
+                          <tr key={discount.id || `bonus-discount-${index}`} className="border-b border-border">
                             <td className="py-2 px-0 pl-4 text-muted-foreground">{discount.reference || 'Desconto Bônus'}</td>
                             <td className="py-2 px-0 text-left text-muted-foreground text-xs">
                               {discount.percentage ? `${getNumericValue(discount.percentage).toFixed(2)}%` : '-'}
@@ -591,7 +604,7 @@ export default function PayrollDetailPage() {
                       })}
                       {/* Net Bonus (only if there are discounts) */}
                       {hasBonusDiscounts && (
-                        <tr className="border-b border-border/50 bg-muted/30">
+                        <tr className="border-b border-border bg-muted/30">
                           <td className="py-2 px-0 pl-4 font-medium">Bônus Líquido</td>
                           <td className="py-2 px-0 text-left text-muted-foreground text-xs">-</td>
                           <td className="py-2 px-0 text-right font-semibold text-green-600">
@@ -671,7 +684,7 @@ export default function PayrollDetailPage() {
                       }
 
                       return (
-                        <tr key={discount.id || index} className="border-b border-border/50">
+                        <tr key={discount.id || index} className="border-b border-border">
                           <td className="py-2 px-0">{displayDescription}</td>
                           <td className="py-2 px-0 text-left text-muted-foreground text-xs">{referenceText}</td>
                           <td className="py-2 px-0 text-right font-semibold text-destructive">-{formatAmount(discountValue)}</td>

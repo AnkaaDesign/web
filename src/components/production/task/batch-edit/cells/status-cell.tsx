@@ -35,9 +35,9 @@ export function StatusCell({ control, index }: StatusCellProps) {
               onValueChange={field.onChange}
               options={statusOptions}
               placeholder="Selecionar status"
-              emptyMessage="Nenhum status encontrado"
+              emptyText="Nenhum status encontrado"
               searchPlaceholder="Buscar status..."
-              allowClear
+              clearable
             />
           </FormControl>
         </FormItem>

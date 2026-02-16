@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { generateFileUrls } from "@/utils/file-viewer";
-import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 export const ObservationDetailsPage = () => {
   usePageTracker({ title: "observation-detail" });
@@ -23,8 +22,8 @@ export const ObservationDetailsPage = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Permission checks
-  const canEdit = canEditObservations(user);
-  const canDelete = canDeleteObservations(user);
+  const canEdit = canEditObservations(user as any);
+  const canDelete = canDeleteObservations(user as any);
 
   const {
     data: response,

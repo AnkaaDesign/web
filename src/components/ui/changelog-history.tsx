@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FilePreviewCard } from "@/components/common/file";
+import { generateLayoutSVG } from "@/utils/generate-layout-svg";
 import {
   CUT_TYPE_LABELS,
   CUT_STATUS_LABELS,
@@ -20,8 +21,15 @@ import {
   ENTITY_BADGE_CONFIG,
   PAINT_FINISH,
   SECTOR_PRIVILEGES,
+  CUT_STATUS,
+  CUT_TYPE,
+  CUT_ORIGIN,
+  AIRBRUSHING_STATUS,
+  TRUCK_MANUFACTURER,
+  SERVICE_ORDER_TYPE,
+  SERVICE_ORDER_STATUS,
 } from "@/constants";
-import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
+import { formatHexColor, getContrastingTextColor } from "@/components/painting/catalogue/list/color-utils";
 import { useAuth } from "@/contexts/auth-context";
 import { hasAnyPrivilege } from "@/utils";
 import {
@@ -151,93 +159,6 @@ const LogoDisplay = ({
   );
 };
 
-// Helper function to generate layout SVG for changelog display
-const generateLayoutSVG = (layout: any): string => {
-  if (!layout || !layout.layoutSections) return "";
-
-  const height = (layout.height || 0) * 100; // Convert to cm
-  const sections = layout.layoutSections || [];
-  const totalWidth = sections.reduce(
-    (sum: number, s: any) => sum + (s.width || 0) * 100,
-    0,
-  );
-  const margin = 30;
-  const extraSpace = 40;
-  const svgWidth = totalWidth + margin * 2 + extraSpace;
-  const svgHeight = height + margin * 2 + extraSpace;
-
-  let svg = `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
-
-  // Main container
-  svg += `<rect x="${margin}" y="${margin}" width="${totalWidth}" height="${height}" fill="none" stroke="#000" stroke-width="1"/>`;
-
-  // Add section dividers
-  let currentPos = 0;
-  sections.forEach((section: any, index: number) => {
-    const sectionWidth = (section.width || 0) * 100;
-
-    if (index > 0) {
-      const prevSection = sections[index - 1];
-      if (!section.isDoor && !prevSection.isDoor) {
-        const lineX = margin + currentPos;
-        svg += `<line x1="${lineX}" y1="${margin}" x2="${lineX}" y2="${margin + height}" stroke="#333" stroke-width="0.5"/>`;
-      }
-    }
-
-    currentPos += sectionWidth;
-  });
-
-  // Add doors from layoutSections
-  currentPos = 0;
-  sections.forEach((section: any) => {
-    const sectionWidth = (section.width || 0) * 100;
-    const sectionX = margin + currentPos;
-
-    if (
-      section.isDoor &&
-      section.doorHeight !== null &&
-      section.doorHeight !== undefined
-    ) {
-      const doorHeightCm = (section.doorHeight || 0) * 100;
-      const doorTopY = margin + (height - doorHeightCm);
-
-      // Door lines
-      svg += `<line x1="${sectionX}" y1="${doorTopY}" x2="${sectionX}" y2="${margin + height}" stroke="#000" stroke-width="1"/>`;
-      svg += `<line x1="${sectionX + sectionWidth}" y1="${doorTopY}" x2="${sectionX + sectionWidth}" y2="${margin + height}" stroke="#000" stroke-width="1"/>`;
-      svg += `<line x1="${sectionX}" y1="${doorTopY}" x2="${sectionX + sectionWidth}" y2="${doorTopY}" stroke="#000" stroke-width="1"/>`;
-    }
-
-    currentPos += sectionWidth;
-  });
-
-  // Add width dimensions
-  currentPos = 0;
-  sections.forEach((section: any) => {
-    const sectionWidth = (section.width || 0) * 100;
-    const startX = margin + currentPos;
-    const endX = margin + currentPos + sectionWidth;
-    const centerX = startX + sectionWidth / 2;
-    const dimY = margin + height + 15;
-
-    svg += `<line x1="${startX}" y1="${dimY}" x2="${endX}" y2="${dimY}" stroke="#0066cc" stroke-width="1"/>`;
-    svg += `<polygon points="${startX},${dimY} ${startX + 5},${dimY - 3} ${startX + 5},${dimY + 3}" fill="#0066cc"/>`;
-    svg += `<polygon points="${endX},${dimY} ${endX - 5},${dimY - 3} ${endX - 5},${dimY + 3}" fill="#0066cc"/>`;
-    svg += `<text x="${centerX}" y="${dimY + 12}" text-anchor="middle" font-size="10" fill="#0066cc">${Math.round(sectionWidth)}</text>`;
-
-    currentPos += sectionWidth;
-  });
-
-  // Height dimension
-  const dimX = margin - 15;
-  svg += `<line x1="${dimX}" y1="${margin}" x2="${dimX}" y2="${margin + height}" stroke="#0066cc" stroke-width="1"/>`;
-  svg += `<polygon points="${dimX},${margin} ${dimX - 3},${margin + 5} ${dimX + 3},${margin + 5}" fill="#0066cc"/>`;
-  svg += `<polygon points="${dimX},${margin + height} ${dimX - 3},${margin + height - 5} ${dimX + 3},${margin + height - 5}" fill="#0066cc"/>`;
-  svg += `<text x="${dimX - 8}" y="${margin + height / 2}" text-anchor="middle" font-size="10" fill="#0066cc" transform="rotate(-90, ${dimX - 8}, ${margin + height / 2})">${Math.round(height)}</text>`;
-  svg += `</svg>`;
-
-  return svg;
-};
-
 // Map actions to icons and colors
 const actionConfig: Record<
   CHANGE_LOG_ACTION,
@@ -268,6 +189,7 @@ const actionConfig: Record<
   [CHANGE_LOG_ACTION.REJECT]: { icon: IconX, color: "text-red-600" },
   [CHANGE_LOG_ACTION.CANCEL]: { icon: IconX, color: "text-red-600" },
   [CHANGE_LOG_ACTION.COMPLETE]: { icon: IconCheck, color: "text-green-600" },
+  [CHANGE_LOG_ACTION.RESCHEDULE]: { icon: IconCalendar, color: "text-blue-600" },
   [CHANGE_LOG_ACTION.BATCH_CREATE]: { icon: IconPlus, color: "text-green-600" },
   [CHANGE_LOG_ACTION.BATCH_UPDATE]: {
     icon: IconEdit,
@@ -396,10 +318,10 @@ const renderCutsCards = (cuts: any[]) => {
                 </h4>
                 {cut.status && (
                   <Badge
-                    variant={ENTITY_BADGE_CONFIG.CUT?.[cut.status] || "default"}
+                    variant={ENTITY_BADGE_CONFIG.CUT?.[cut.status as CUT_STATUS] || "default"}
                     className="text-[10px] h-4 px-1.5 flex-shrink-0"
                   >
-                    {CUT_STATUS_LABELS[cut.status] || cut.status}
+                    {CUT_STATUS_LABELS[cut.status as CUT_STATUS] || cut.status}
                   </Badge>
                 )}
               </div>
@@ -408,7 +330,7 @@ const renderCutsCards = (cuts: any[]) => {
                 {cut.type && (
                   <div className="flex items-center gap-1">
                     <span className="font-medium">Tipo:</span>
-                    <span>{CUT_TYPE_LABELS[cut.type] || cut.type}</span>
+                    <span>{CUT_TYPE_LABELS[cut.type as CUT_TYPE] || cut.type}</span>
                   </div>
                 )}
                 {cut.quantity && (
@@ -420,7 +342,7 @@ const renderCutsCards = (cuts: any[]) => {
                 {cut.origin && (
                   <div className="flex items-center gap-1">
                     <span className="font-medium">Origem:</span>
-                    <span>{CUT_ORIGIN_LABELS[cut.origin] || cut.origin}</span>
+                    <span>{CUT_ORIGIN_LABELS[cut.origin as CUT_ORIGIN] || cut.origin}</span>
                   </div>
                 )}
               </div>
@@ -552,7 +474,7 @@ const renderAirbrushingsCards = (airbrushings: any[]) => {
                 variant="secondary"
                 className="text-[10px] h-4 px-1.5 flex-shrink-0"
               >
-                {AIRBRUSHING_STATUS_LABELS[airbrushing.status] ||
+                {AIRBRUSHING_STATUS_LABELS[airbrushing.status as AIRBRUSHING_STATUS] ||
                   airbrushing.status}
               </Badge>
             )}
@@ -563,7 +485,11 @@ const renderAirbrushingsCards = (airbrushings: any[]) => {
   );
 };
 
-// Render paints as cards
+// Badge style for paint cards in changelog - matches paint-card.tsx
+const PAINT_BADGE_STYLE = "border-0 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:border-0 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300";
+const PAINT_TAG_BADGE_STYLE = "border-0 bg-neutral-700 text-neutral-100 dark:bg-neutral-300 dark:text-neutral-800 hover:border-0 hover:bg-neutral-700 hover:text-neutral-100 dark:hover:bg-neutral-300 dark:hover:text-neutral-800";
+
+// Render paints as cards - matches the visual style of paint-card.tsx
 const renderPaintsCards = (paints: any[]) => {
   if (!Array.isArray(paints) || paints.length === 0) {
     return (
@@ -572,76 +498,91 @@ const renderPaintsCards = (paints: any[]) => {
   }
 
   return (
-    <div className="space-y-2 mt-2">
-      {paints.map((paint: any, index: number) => (
-        <div
-          key={paint.id || index}
-          className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-card"
-        >
-          <div className="flex items-start gap-3">
-            {/* Paint preview - prefer colorPreview image */}
-            <div className="relative flex-shrink-0">
-              <div className="w-10 h-10 rounded-md ring-1 ring-border shadow-sm overflow-hidden">
-                {paint.colorPreview ? (
-                  <img
-                    src={paint.colorPreview}
-                    alt={paint.name}
-                    className="w-full h-full object-cover rounded-md"
-                    loading="lazy"
-                  />
-                ) : (
-                  <CanvasNormalMapRenderer
-                    baseColor={paint.hex || "#888888"}
-                    finish={
-                      (paint.finish as PAINT_FINISH) || PAINT_FINISH.SOLID
-                    }
-                    width={40}
-                    height={40}
-                    quality="medium"
-                    className="w-full h-full object-cover rounded-md"
-                  />
-                )}
-              </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+      {paints.map((paint: any, index: number) => {
+        const backgroundColor = formatHexColor(paint.hex);
+        const textColor = getContrastingTextColor(paint.hex);
+        const codeOverlayStyle = textColor === "#FFFFFF"
+          ? { backgroundColor: "rgba(255,255,255,0.9)", color: "#000000" }
+          : { backgroundColor: "rgba(0,0,0,0.75)", color: "#FFFFFF" };
+
+        return (
+          <div
+            key={paint.id || index}
+            className="border dark:border-border rounded-lg overflow-hidden bg-card"
+          >
+            {/* Color preview header - matches paint-card.tsx h-28 */}
+            <div className="h-20 relative flex-shrink-0 overflow-hidden">
+              {paint.colorPreview ? (
+                <img
+                  src={paint.colorPreview}
+                  alt={paint.name}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full h-full" style={{ backgroundColor }} />
+              )}
+
+              {/* Paint code overlay */}
+              {paint.code && (
+                <div
+                  className="absolute bottom-1.5 right-1.5 text-[10px] font-mono px-1.5 py-0.5 rounded"
+                  style={codeOverlayStyle}
+                >
+                  {paint.code}
+                </div>
+              )}
             </div>
 
-            {/* Paint information */}
-            <div className="flex-1 min-w-0 space-y-1.5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="text-xs font-semibold truncate">{paint.name}</h4>
-                {paint.code && (
-                  <span className="text-[10px] font-mono text-muted-foreground">
-                    {paint.code}
-                  </span>
-                )}
-              </div>
+            {/* Card content */}
+            <div className="p-2">
+              {/* Name */}
+              <h4 className="font-semibold text-sm line-clamp-2">{paint.name}</h4>
 
-              {/* Badges - unified neutral style, more subtle, no icons */}
-              <div className="flex flex-wrap gap-1">
+              {/* Badges */}
+              <div className="flex flex-nowrap gap-1 overflow-hidden mt-1.5">
                 {paint.paintType?.name && (
-                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
+                  <Badge className={cn("text-[10px] h-4 px-1.5 flex-shrink-0", PAINT_BADGE_STYLE)}>
                     {paint.paintType.name}
                   </Badge>
                 )}
                 {paint.finish && (
-                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
-                    {PAINT_FINISH_LABELS[paint.finish]}
+                  <Badge className={cn("text-[10px] h-4 px-1.5 flex-shrink-0", PAINT_BADGE_STYLE)}>
+                    {PAINT_FINISH_LABELS[paint.finish as PAINT_FINISH]}
                   </Badge>
                 )}
                 {paint.paintBrand?.name && (
-                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
+                  <Badge className={cn("text-[10px] h-4 px-1.5 flex-shrink-0", PAINT_BADGE_STYLE)}>
                     {paint.paintBrand.name}
                   </Badge>
                 )}
                 {paint.manufacturer && (
-                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
-                    {TRUCK_MANUFACTURER_LABELS[paint.manufacturer]}
+                  <Badge className={cn("text-[10px] h-4 px-1.5 flex-shrink-0", PAINT_BADGE_STYLE)}>
+                    {TRUCK_MANUFACTURER_LABELS[paint.manufacturer as TRUCK_MANUFACTURER]}
                   </Badge>
                 )}
               </div>
+
+              {/* Tags */}
+              {paint.tags && paint.tags.length > 0 && (
+                <div className="w-full overflow-x-auto mt-1.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  <div className="flex gap-1 whitespace-nowrap">
+                    {paint.tags.map((tag: string, tagIndex: number) => (
+                      <Badge
+                        key={tagIndex}
+                        className={cn("text-[10px] h-4 px-1.5 flex-shrink-0", PAINT_TAG_BADGE_STYLE)}
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
@@ -661,15 +602,16 @@ const ChangelogTimelineItem = ({
     categories: Map<string, string>;
     brands: Map<string, string>;
     suppliers: Map<string, string>;
-    users: Map<string, string>;
+    users: Map<string, { name: string; email?: string }>;
     customers: Map<string, string>;
     sectors: Map<string, string>;
-    paints: Map<string, string>;
+    paints: Map<string, any>;
     formulas: Map<string, string>;
     items: Map<string, string>;
     files: Map<string, string>;
     observations: Map<string, string>;
     trucks: Map<string, string>;
+    serviceOrders: Map<string, any>;
   };
   onRollback?: (changeLogId: string, fieldName: string) => void;
   rollbackLoading?: string | null;
@@ -731,7 +673,7 @@ const ChangelogTimelineItem = ({
         ) {
           return entityDetails.users.get(value) || "Usuário";
         }
-        if (field === "customerId" && entityDetails.customers.has(value)) {
+        if ((field === "customerId" || field === "invoiceToId") && entityDetails.customers.has(value)) {
           return entityDetails.customers.get(value) || "Cliente";
         }
         if (field === "sectorId" && entityDetails.sectors.has(value)) {
@@ -764,9 +706,6 @@ const ChangelogTimelineItem = ({
         ) {
           return entityDetails.observations.get(value) || "Observação";
         }
-        if (field === "truckId" && entityDetails.trucks.has(value)) {
-          return entityDetails.trucks.get(value) || "Caminhão";
-        }
       }
 
       // If entity details not available, show a placeholder
@@ -775,7 +714,7 @@ const ChangelogTimelineItem = ({
       if (field === "supplierId") return "Fornecedor (carregando...)";
       if (field === "assignedToUserId" || field === "createdById")
         return "Usuário (carregando...)";
-      if (field === "customerId") return "Cliente (carregando...)";
+      if (field === "customerId" || field === "invoiceToId") return "Cliente (carregando...)";
       if (field === "sectorId") return "Setor (carregando...)";
       if (field === "paintId") return "Tinta (carregando...)";
       if (field === "formulaId" || field === "formulaPaintId")
@@ -812,6 +751,14 @@ const ChangelogTimelineItem = ({
 
     // Use parsedValue to ensure arrays/objects are properly formatted
     const result = formatFieldValue(parsedValue, field, entityType, metadata);
+
+    // Render arrays as stacked lines (e.g., representatives)
+    if (Array.isArray(result)) {
+      return result.map((item, i) => (
+        <div key={i}>{String(item)}</div>
+      ));
+    }
+
     return result;
   };
 
@@ -862,7 +809,7 @@ const ChangelogTimelineItem = ({
                     <div className="text-sm">
                       <span className="text-muted-foreground">Tipo: </span>
                       <span className="text-foreground font-medium">
-                        {SERVICE_ORDER_TYPE_LABELS[entityDetails.type] ||
+                        {SERVICE_ORDER_TYPE_LABELS[entityDetails.type as SERVICE_ORDER_TYPE] ||
                           entityDetails.type}
                       </span>
                     </div>
@@ -879,7 +826,7 @@ const ChangelogTimelineItem = ({
                     <div className="text-sm">
                       <span className="text-muted-foreground">Status: </span>
                       <span className="text-foreground font-medium">
-                        {SERVICE_ORDER_STATUS_LABELS[entityDetails.status] ||
+                        {SERVICE_ORDER_STATUS_LABELS[entityDetails.status as SERVICE_ORDER_STATUS] ||
                           entityDetails.status}
                       </span>
                     </div>
@@ -910,7 +857,7 @@ const ChangelogTimelineItem = ({
                   <div className="text-sm">
                     <span className="text-muted-foreground">Categoria: </span>
                     <span className="text-foreground font-medium">
-                      {TRUCK_MANUFACTURER_LABELS[entityDetails.category] ||
+                      {TRUCK_MANUFACTURER_LABELS[entityDetails.category as TRUCK_MANUFACTURER] ||
                         entityDetails.category}
                     </span>
                   </div>
@@ -1301,7 +1248,7 @@ const ChangelogTimelineItem = ({
 
                   return (
                     <div key={changelog.id}>
-                      {showSeparator && <Separator className="my-3" />}
+                      {showSeparator && <Separator className="my-3 opacity-40" />}
 
                       {/* Field name - Hide for services field as it renders as cards */}
                       {changelog.field !== "services" && (
@@ -1322,7 +1269,8 @@ const ChangelogTimelineItem = ({
                             changelog.field &&
                             changelog.oldValue !== null &&
                             onRollback &&
-                            entityType === CHANGE_LOG_ENTITY_TYPE.TASK && (
+                            (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
+                              entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK) && (
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -1682,13 +1630,13 @@ const ChangelogTimelineItem = ({
                                       <span className="text-sm text-muted-foreground">
                                         Antes:
                                       </span>
-                                      {renderPaintsCards(oldPaints)}
+                                      {renderPaintsCards(oldPaints || [])}
                                     </div>
                                     <div className="mt-3">
                                       <span className="text-sm text-muted-foreground">
                                         Depois:
                                       </span>
-                                      {renderPaintsCards(newPaints)}
+                                      {renderPaintsCards(newPaints || [])}
                                     </div>
                                   </>
                                 );
@@ -2040,7 +1988,7 @@ const ChangelogTimelineItem = ({
                                 </div>
                               </>
                             ) : changelog.field === "layouts" ? (
-                              // Special handling for layouts field from copy operation - show layout IDs or SVG
+                              // Display layout changelog with dimensions, door count, and SVG
                               (() => {
                                 const parseValue = (val: any) => {
                                   if (val === null || val === undefined)
@@ -2067,17 +2015,61 @@ const ChangelogTimelineItem = ({
                                   changelog.newValue,
                                 );
 
-                                const renderLayoutIds = (
-                                  layouts: any,
+                                const layoutSides = [
+                                  {
+                                    key: "leftSideLayoutId",
+                                    label: "Lado Motorista",
+                                  },
+                                  {
+                                    key: "rightSideLayoutId",
+                                    label: "Lado Sapo",
+                                  },
+                                  {
+                                    key: "backSideLayoutId",
+                                    label: "Traseira",
+                                  },
+                                ];
+
+                                // Find sides that have changes
+                                const changedSides = layoutSides.filter(
+                                  ({ key }) =>
+                                    (oldLayouts && oldLayouts[key] !== undefined) ||
+                                    (newLayouts && newLayouts[key] !== undefined),
+                                );
+
+                                if (changedSides.length === 0) {
+                                  return (
+                                    <span className="text-muted-foreground text-sm">
+                                      Sem alterações
+                                    </span>
+                                  );
+                                }
+
+                                const formatDimensions = (
+                                  layout: any,
+                                ) => {
+                                  if (!layout) return null;
+                                  const widthCm = Math.round(
+                                    (layout.totalWidth || 0) * 100,
+                                  );
+                                  const heightCm = Math.round(
+                                    (layout.height || 0) * 100,
+                                  );
+                                  const doors = layout.doorCount || 0;
+                                  return `${widthCm}cm × ${heightCm}cm — ${doors} porta${doors !== 1 ? "s" : ""}`;
+                                };
+
+                                const renderLayoutSummary = (
+                                  layout: any,
                                   isOld: boolean,
                                 ) => {
-                                  if (!layouts) {
+                                  if (!layout) {
                                     return (
                                       <span
                                         className={
                                           isOld
-                                            ? "text-red-600 dark:text-red-400 font-medium"
-                                            : "text-green-600 dark:text-green-400 font-medium"
+                                            ? "text-red-600 dark:text-red-400 font-medium text-xs"
+                                            : "text-green-600 dark:text-green-400 font-medium text-xs"
                                         }
                                       >
                                         Nenhum
@@ -2085,81 +2077,76 @@ const ChangelogTimelineItem = ({
                                     );
                                   }
 
-                                  const layoutNames = [
-                                    {
-                                      key: "leftSideLayoutId",
-                                      label: "Lado Motorista",
-                                    },
-                                    {
-                                      key: "rightSideLayoutId",
-                                      label: "Lado Sapo",
-                                    },
-                                    {
-                                      key: "backSideLayoutId",
-                                      label: "Traseira",
-                                    },
-                                  ];
+                                  const dims =
+                                    formatDimensions(layout);
+                                  const svgData = layout.layoutSections
+                                    ? generateLayoutSVG(layout)
+                                    : "";
 
-                                  const hasLayouts = layoutNames.some(
-                                    (l) => layouts[l.key],
-                                  );
-                                  if (!hasLayouts) {
-                                    return (
-                                      <span
-                                        className={
-                                          isOld
-                                            ? "text-red-600 dark:text-red-400 font-medium"
-                                            : "text-green-600 dark:text-green-400 font-medium"
-                                        }
-                                      >
-                                        Nenhum
-                                      </span>
-                                    );
-                                  }
-
-                                  const configuredLayouts = layoutNames.filter(
-                                    (l) => layouts[l.key],
-                                  );
                                   return (
-                                    <div className="flex flex-wrap gap-2 mt-1">
-                                      {configuredLayouts.map(
-                                        ({ key, label }) => (
-                                          <div
-                                            key={key}
-                                            className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-muted/30"
-                                          >
-                                            <span className="text-xs font-medium">
-                                              {label}
-                                            </span>
-                                          </div>
-                                        ),
-                                      )}
-                                      <span className="text-sm text-muted-foreground self-center">
-                                        ({configuredLayouts.length} layout
-                                        {configuredLayouts.length > 1
-                                          ? "s"
-                                          : ""}
-                                        )
+                                    <div>
+                                      <span
+                                        className={`text-xs font-medium ${
+                                          isOld
+                                            ? "text-red-600 dark:text-red-400"
+                                            : "text-green-600 dark:text-green-400"
+                                        }`}
+                                      >
+                                        {dims}
                                       </span>
+                                      {svgData && (
+                                        <div
+                                          className="mt-1 max-w-[300px]"
+                                          dangerouslySetInnerHTML={{
+                                            __html: svgData,
+                                          }}
+                                        />
+                                      )}
                                     </div>
                                   );
                                 };
 
                                 return (
-                                  <>
-                                    <div className="text-sm">
-                                      <span className="text-muted-foreground">
-                                        Antes:
-                                      </span>
-                                      {renderLayoutIds(oldLayouts, true)}
-                                    </div>
-                                    <div className="text-sm mt-3">
-                                      <span className="text-muted-foreground">
-                                        Depois:
-                                      </span>
-                                      {renderLayoutIds(newLayouts, false)}
-                                    </div>
-                                  </>
+                                  <div className="space-y-4">
+                                    {changedSides.map(
+                                      ({ key, label }) => {
+                                        const oldLayout =
+                                          oldLayouts?.[key] ?? null;
+                                        const newLayout =
+                                          newLayouts?.[key] ?? null;
+                                        return (
+                                          <div
+                                            key={key}
+                                            className="border dark:border-border rounded-lg p-3 bg-muted/20"
+                                          >
+                                            <div className="text-xs font-semibold mb-2">
+                                              {label}
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                              <div>
+                                                <div className="text-xs text-muted-foreground mb-1">
+                                                  Antes
+                                                </div>
+                                                {renderLayoutSummary(
+                                                  oldLayout,
+                                                  true,
+                                                )}
+                                              </div>
+                                              <div>
+                                                <div className="text-xs text-muted-foreground mb-1">
+                                                  Depois
+                                                </div>
+                                                {renderLayoutSummary(
+                                                  newLayout,
+                                                  false,
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      },
+                                    )}
+                                  </div>
                                 );
                               })()
                             ) : changelog.field === "serviceOrders" ? (
@@ -2272,7 +2259,7 @@ const ChangelogTimelineItem = ({
           )}
 
           {/* Footer */}
-          <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
+          <div className="mt-3 pt-3 border-t border-border/40 text-sm text-muted-foreground">
             <span className="text-muted-foreground">Por: </span>
             <span className="text-foreground font-medium">
               {firstChange.user?.name || "Sistema"}
@@ -2353,7 +2340,7 @@ export function ChangelogHistory({
     // Check if user can view financial fields (price, budgets, invoices, receipts, etc.)
     const canViewFinancialFields =
       user &&
-      hasAnyPrivilege(user, [
+      hasAnyPrivilege(user as any, [
         SECTOR_PRIVILEGES.FINANCIAL,
         SECTOR_PRIVILEGES.ADMIN,
       ]);
@@ -2361,7 +2348,7 @@ export function ChangelogHistory({
     // Check if user can view commission field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
     const canViewCommissionField =
       user &&
-      hasAnyPrivilege(user, [
+      hasAnyPrivilege(user as any, [
         SECTOR_PRIVILEGES.ADMIN,
         SECTOR_PRIVILEGES.FINANCIAL,
         SECTOR_PRIVILEGES.COMMERCIAL,
@@ -2372,7 +2359,7 @@ export function ChangelogHistory({
     // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER can see these
     const canViewRestrictedFields =
       user &&
-      hasAnyPrivilege(user, [
+      hasAnyPrivilege(user as any, [
         SECTOR_PRIVILEGES.ADMIN,
         SECTOR_PRIVILEGES.FINANCIAL,
         SECTOR_PRIVILEGES.COMMERCIAL,
@@ -2384,7 +2371,7 @@ export function ChangelogHistory({
     // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC can see invoiceTo
     const canViewInvoiceToField =
       user &&
-      hasAnyPrivilege(user, [
+      hasAnyPrivilege(user as any, [
         SECTOR_PRIVILEGES.ADMIN,
         SECTOR_PRIVILEGES.FINANCIAL,
         SECTOR_PRIVILEGES.COMMERCIAL,
@@ -2547,7 +2534,6 @@ export function ChangelogHistory({
     const itemIds = new Set<string>();
     const fileIds = new Set<string>();
     const observationIds = new Set<string>();
-    const truckIds = new Set<string>();
     const serviceOrderIds = new Set<string>();
 
     changelogs.forEach((changelog) => {
@@ -2595,7 +2581,7 @@ export function ChangelogHistory({
           userIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string")
           userIds.add(changelog.newValue);
-      } else if (changelog.field === "customerId") {
+      } else if (changelog.field === "customerId" || changelog.field === "invoiceToId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string")
           customerIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string")
@@ -2684,11 +2670,6 @@ export function ChangelogHistory({
           observationIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string")
           observationIds.add(changelog.newValue);
-      } else if (changelog.field === "truckId") {
-        if (changelog.oldValue && typeof changelog.oldValue === "string")
-          truckIds.add(changelog.oldValue);
-        if (changelog.newValue && typeof changelog.newValue === "string")
-          truckIds.add(changelog.newValue);
       }
     });
 
@@ -2704,7 +2685,6 @@ export function ChangelogHistory({
       itemIds: Array.from(itemIds),
       fileIds: Array.from(fileIds),
       observationIds: Array.from(observationIds),
-      truckIds: Array.from(truckIds),
       serviceOrderIds: Array.from(serviceOrderIds),
     };
   }, [changelogs]);
@@ -2879,7 +2859,7 @@ export function ChangelogHistory({
                       <div className="pb-1 mb-4 rounded-md">
                         <div className="flex justify-center items-center gap-4">
                           <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border to-transparent" />
-                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60 border border-border/50">
+                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60 border border-border">
                             <IconCalendar className="h-3.5 w-3.5 text-muted-foreground" />
                             <span className="text-sm font-medium text-muted-foreground">
                               {date}
@@ -2915,7 +2895,7 @@ export function ChangelogHistory({
                                 changelogGroup={changelogGroup}
                                 isLast={isLastChange}
                                 entityType={entityType}
-                                entityDetails={entityDetails}
+                                entityDetails={entityDetails as any}
                                 onRollback={handleRollback}
                                 rollbackLoading={rollbackLoading}
                               />

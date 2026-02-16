@@ -60,16 +60,16 @@ export function FilterCondition({
               type="number"
               placeholder="Mínimo"
               value={condition.value?.min || ""}
-              onChange={(e) => onUpdate({
-                value: { ...condition.value, min: Number(e.target.value) }
+              onChange={(value) => onUpdate({
+                value: { ...condition.value, min: Number(value) }
               })}
             />
             <Input
               type="number"
               placeholder="Máximo"
               value={condition.value?.max || ""}
-              onChange={(e) => onUpdate({
-                value: { ...condition.value, max: Number(e.target.value) }
+              onChange={(value) => onUpdate({
+                value: { ...condition.value, max: Number(value) }
               })}
             />
           </div>
@@ -83,16 +83,16 @@ export function FilterCondition({
               type="date"
               placeholder="De"
               value={condition.value?.gte instanceof Date ? condition.value.gte.toISOString().split('T')[0] : condition.value?.gte || ""}
-              onChange={(e) => onUpdate({
-                value: { ...condition.value, gte: new Date(e.target.value) }
+              onChange={(value) => onUpdate({
+                value: { ...condition.value, gte: new Date(value as string) }
               })}
             />
             <Input
               type="date"
               placeholder="Até"
               value={condition.value?.lte instanceof Date ? condition.value.lte.toISOString().split('T')[0] : condition.value?.lte || ""}
-              onChange={(e) => onUpdate({
-                value: { ...condition.value, lte: new Date(e.target.value) }
+              onChange={(value) => onUpdate({
+                value: { ...condition.value, lte: new Date(value as string) }
               })}
             />
           </div>
@@ -146,7 +146,7 @@ export function FilterCondition({
           type="date"
           className="flex-1"
           value={condition.value instanceof Date ? condition.value.toISOString().split('T')[0] : condition.value || ""}
-          onChange={(e) => onUpdate({ value: new Date(e.target.value) })}
+          onChange={(value) => onUpdate({ value: new Date(value as string) })}
         />
       );
     }
@@ -159,7 +159,7 @@ export function FilterCondition({
           className="flex-1"
           placeholder="Digite o valor..."
           value={condition.value || ""}
-          onChange={(e) => onUpdate({ value: Number(e.target.value) })}
+          onChange={(value) => onUpdate({ value: Number(value) })}
         />
       );
     }
@@ -171,7 +171,7 @@ export function FilterCondition({
         className="flex-1"
         placeholder="Digite o valor..."
         value={condition.value || ""}
-        onChange={(e) => onUpdate({ value: e.target.value })}
+        onChange={(value) => onUpdate({ value: value as string })}
       />
     );
   };

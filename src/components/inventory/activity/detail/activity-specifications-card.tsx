@@ -69,7 +69,7 @@ export function ActivitySpecificationsCard({ activity, className }: ActivitySpec
           </div>
 
           {/* User Information Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Responsável</h3>
             <div className="bg-muted/30 rounded-lg p-4">
               {activity.user ? (
@@ -98,7 +98,7 @@ export function ActivitySpecificationsCard({ activity, className }: ActivitySpec
           </div>
 
           {/* Date Information Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Data e Hora</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-muted/30 rounded-lg p-4">
@@ -120,7 +120,7 @@ export function ActivitySpecificationsCard({ activity, className }: ActivitySpec
 
           {/* Related Order Section */}
           {activity.order && (
-            <div className="pt-6 border-t border-border/50">
+            <div className="pt-6 border-t border-border">
               <h3 className="text-base font-semibold mb-4 text-foreground">Pedido Relacionado</h3>
               <div className="bg-muted/30 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">

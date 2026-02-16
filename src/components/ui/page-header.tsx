@@ -21,7 +21,7 @@ export interface BaseEntity {
 // Action system for all variants
 export interface PageAction {
   key: string;
-  label: string;
+  label: string | ReactNode;
   icon?: TablerIcon;
   onClick?: () => void;
   href?: string;
@@ -55,6 +55,7 @@ interface BasePageHeaderProps {
   mobileCollapsed?: boolean;
   actions?: PageAction[];
   favoritePage?: FAVORITE_PAGES;
+  onBreadcrumbNavigate?: (path: string) => void;
 }
 
 // Entity-specific props for detail pages
@@ -339,7 +340,7 @@ function ListControls({
             <Input
               placeholder={search.placeholder || "Buscar..."}
               value={search.value}
-              onChange={(e) => search.onChange(e.target.value)}
+              onChange={(value) => search.onChange(value as string)}
               disabled={search.disabled}
               className="pl-10"
             />
@@ -525,7 +526,7 @@ function BatchSelectionInfo({ selection, progress }: { selection?: BatchPageHead
  * - Support for all page types in the application
  */
 export function PageHeader<T extends BaseEntity = BaseEntity>(props: PageHeaderProps<T>) {
-  const { title, subtitle, breadcrumbs, backButton, icon: Icon, className, variant = "default", mobileCollapsed = true, actions = [], favoritePage, ...variantProps } = props;
+  const { title, subtitle, breadcrumbs, backButton, icon: Icon, className, variant = "default", mobileCollapsed = true, actions = [], favoritePage, onBreadcrumbNavigate, ...variantProps } = props;
 
   // Extract specific values to avoid variantProps dependency issues
   const entity = variant === "detail" && "entity" in variantProps ? (variantProps as EntityPageHeaderProps<T>).entity : undefined;
@@ -636,7 +637,7 @@ export function PageHeader<T extends BaseEntity = BaseEntity>(props: PageHeaderP
                   {/* Breadcrumb Navigation */}
                   {breadcrumbs && (
                     <div>
-                      <Breadcrumb items={breadcrumbs} />
+                      <Breadcrumb items={breadcrumbs} onNavigate={onBreadcrumbNavigate} />
                     </div>
                   )}
                 </div>

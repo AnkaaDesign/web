@@ -13,7 +13,6 @@ import {
 } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent, DragMoveEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
-import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 
 // =====================
 // Constants
@@ -558,7 +557,7 @@ function DraggableTruck({ truck, scale, disabled = false, onClick }: DraggableTr
 
   return (
     <g
-      ref={setNodeRef}
+      ref={setNodeRef as any}
       {...(disabled ? {} : listeners)}
       {...attributes}
       style={{ cursor: disabled ? 'default' : onClick ? 'pointer' : 'grab' }}
@@ -836,7 +835,7 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
   }
 
   return (
-    <g ref={setNodeRef}>
+    <g ref={setNodeRef as any}>
       {/* Lane background - always neutral color */}
       <rect
         x={x}
@@ -929,7 +928,7 @@ function DroppablePatio({ scale, width, height, columns, children }: DroppablePa
   const padding = PATIO_CONFIG.PADDING;
 
   return (
-    <g ref={setNodeRef}>
+    <g ref={setNodeRef as any}>
       {/* Patio background */}
       <rect
         x={0}
@@ -1043,6 +1042,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
         // CORRECT PATIO HEIGHT CALCULATION - calculate actual column heights!
         // Trucks are distributed across columns and stacked vertically
         const truckMargin = PATIO_CONFIG.TRUCK_MARGIN;
+        const minLaneLength = PATIO_CONFIG.MIN_LANE_LENGTH;
 
         // Calculate content height for each column
         const columnContentHeights: number[] = Array(columns).fill(truckMargin);

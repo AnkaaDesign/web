@@ -9,18 +9,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { IconUpload, IconCheck, IconAlertCircle, IconLoader2 } from "@tabler/icons-react";
 import type { TaskPricing } from "@/types/task-pricing";
+import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 
-// Company constants (deep forest green to match reference PDF)
+// Company constants assembled from centralized config
 const COMPANY = {
-  name: "Ankaa Design",
-  address: "Rua: Luís Carlos Zani, 2493 - Santa Paula, Ibiporã-PR",
-  phone: "43 9 8428-3228",
-  phoneClean: "5543984283228",
-  website: "ankaadesign.com.br",
-  websiteUrl: "https://ankaadesign.com.br",
-  primaryGreen: "#0a5c1e",
-  directorName: "Sergio Rodrigues",
-  directorTitle: "Diretor Comercial",
+  ...COMPANY_INFO,
+  ...BRAND_COLORS,
 };
 
 // Helper to get original file URL (full quality, preserves transparency)
@@ -36,7 +30,7 @@ interface PricingData extends TaskPricing {
     name?: string;
     serialNumber?: string;
     term?: Date;
-    representatives?: { id: string; name?: string }[];
+    representatives?: { id: string; name?: string; role?: string }[];
     customer?: {
       id: string;
       corporateName?: string;
@@ -171,7 +165,8 @@ export function PublicBudgetPage() {
 
   // Calculate derived data
   const corporateName = pricing.task?.customer?.corporateName || pricing.task?.customer?.fantasyName || "Cliente";
-  const contactName = pricing.task?.representatives?.[0]?.name || "";
+  const commercialRep = pricing.task?.representatives?.find(r => r.role === "COMMERCIAL");
+  const contactName = commercialRep?.name || pricing.task?.representatives?.[0]?.name || "";
   // Format budget number with leading zeros (e.g., "0042")
   const budgetNumber = pricing.budgetNumber
     ? String(pricing.budgetNumber).padStart(4, '0')
@@ -238,11 +233,8 @@ export function PublicBudgetPage() {
             {/* Customer Info */}
             <div className="mb-6">
               <p className="font-bold mb-1" style={{ color: COMPANY.primaryGreen }}>
-                À {corporateName}
+                À {contactName || corporateName}
               </p>
-              {contactName && (
-                <p className="text-gray-700 mb-1">Caro {contactName}</p>
-              )}
               <p className="text-gray-700">
                 Conforme solicitado, apresentamos nossa proposta de preço para execução dos
                 serviços abaixo descriminados
@@ -259,6 +251,14 @@ export function PublicBudgetPage() {
                   </>
                 )}.
               </p>
+              {pricing.invoicesToCustomers && pricing.invoicesToCustomers.length > 0 && (
+                <p className="text-gray-700 mt-2">
+                  <strong>Faturamento para:</strong>{" "}
+                  {pricing.invoicesToCustomers
+                    .map(c => c.fantasyName || c.corporateName || "Cliente")
+                    .join(", ")}
+                </p>
+              )}
             </div>
 
             {/* Services */}
@@ -269,13 +269,19 @@ export function PublicBudgetPage() {
               <div className="space-y-2 pl-4">
                 {pricing.items?.map((item, index) => {
                   // Combine description and observation inline (e.g., "Pintura Geral Azul Firenze")
-                  // All text is displayed in Title Case
+                  // Description is displayed in Title Case, observation is kept as entered
+                  // For "Outros", display only the observation (not "Outros observation")
                   const description = toTitleCase(item.description || "");
-                  const observation = item.observation ? toTitleCase(item.observation) : "";
-                  const displayText = observation ? `${description} ${observation}` : description;
+                  const observation = item.observation || "";
+                  // For "Outros", show only observation; otherwise show description + observation
+                  const displayText = description === "Outros" && observation
+                    ? observation
+                    : observation
+                      ? `${description} ${observation}`
+                      : description;
                   return (
                     <div key={item.id} className="flex justify-between items-baseline">
-                      <span className="text-gray-800 capitalize">
+                      <span className="text-gray-800">
                         {index + 1} - {displayText}
                       </span>
                       <span className="text-gray-800 font-normal ml-4 whitespace-nowrap">
@@ -300,6 +306,9 @@ export function PublicBudgetPage() {
                         {pricing.discountType === "PERCENTAGE"
                           ? ` (${pricing.discountValue}%)`
                           : ""}
+                        {pricing.discountReference && (
+                          <span className="text-gray-500 font-normal"> — Ref: {pricing.discountReference}</span>
+                        )}
                       </span>
                       <span>- {formatCurrency(discountAmount)}</span>
                     </div>
@@ -322,6 +331,9 @@ export function PublicBudgetPage() {
                 </h3>
                 <p className="text-gray-700">
                   O prazo de entrega é de {customDeliveryDays} dias úteis a partir da data de liberação.
+                  {pricing.simultaneousTasks && pricing.simultaneousTasks > 1 && (
+                    <> Capacidade de produção: {pricing.simultaneousTasks} tarefas simultâneas.</>
+                  )}
                 </p>
               </div>
             ) : termDate ? (

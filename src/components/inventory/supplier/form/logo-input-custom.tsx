@@ -6,6 +6,7 @@ import { fileService } from "../../../../api-client";
 import type { File as AnkaaFile } from "../../../../types";
 import { useSupplierForm } from "./supplier-form-context";
 import { backendFileToFileWithPreview } from "@/lib/utils";
+import { getApiBaseUrl } from "@/config/api";
 
 interface LogoInputProps {
   disabled?: boolean;
@@ -38,7 +39,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
           // Convert backend file to FileWithPreview
           const fileWithPreview = backendFileToFileWithPreview(file);
           // Add download URL as preview for images
-          fileWithPreview.preview = `${import.meta.env.VITE_API_URL || "http://localhost:3030"}/files/${file.id}/download`;
+          fileWithPreview.preview = `${getApiBaseUrl()}/files/${file.id}/download`;
           // Preview is handled by the uploadedFile state
         }
       } catch (error) {
@@ -77,14 +78,14 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
 
     // Store the file in state instead of uploading immediately
     setLogoFile(file);
-    setValue("logoFile", file); // Store the actual file in form state
+    // Note: logoFile is not part of the form schema, it's handled separately via FormData
     setValue("logoId", null); // Clear logoId since we have a new file
     setUploadedFile(null); // Clear any previously loaded file
   };
 
   const handleRemoveFile = () => {
     setValue("logoId", null);
-    setValue("logoFile", null);
+    // Note: logoFile is not part of the form schema
     setUploadedFile(null);
     setLogoFile(null);
   };

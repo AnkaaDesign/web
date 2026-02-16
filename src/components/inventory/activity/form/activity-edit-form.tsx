@@ -48,7 +48,7 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
   const availableStock = currentStock - activeBorrowsQuantity;
 
   // Add a flag to force standard form submission
-  const useStandardSubmit = true;
+  // const useStandardSubmit = true;  // Unused - handleDirectSubmit is used instead
 
   // Memoize the mapDataToForm function to prevent recreating it on every render
   const mapDataToForm = useMemo(
@@ -104,30 +104,6 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
     },
   });
 
-  // Alternative submit handler that submits all values
-  const handleDirectSubmit = form.handleSubmitChanges(async (data) => {
-    try {
-      const result = await updateAsync({
-        id: activity.id,
-        data: {
-          quantity: data.quantity,
-          operation: data.operation,
-          userId: data.userId,
-          reason: data.reason,
-        },
-      });
-
-      if (result.success) {
-        // Success toast is handled automatically by API client
-        navigate(routes.inventory.movements.root);
-      }
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Error updating activity:", error);
-      }
-      toast.error("Erro ao atualizar atividade");
-    }
-  });
 
   const isSubmitting = updateMutation.isPending;
 
@@ -150,7 +126,7 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
     <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
       <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden min-h-0">
         <Form {...form}>
-          <form onSubmit={useStandardSubmit ? handleDirectSubmit : form.handleSubmitChanges()} className="flex-1 flex flex-col overflow-y-auto space-y-6">
+          <form onSubmit={form.handleSubmitChanges()} className="flex-1 flex flex-col overflow-y-auto space-y-6">
             {/* Hidden submit button for programmatic form submission */}
             <button type="submit" id="activity-form-submit" className="hidden" aria-hidden="true" />
 

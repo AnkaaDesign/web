@@ -344,6 +344,21 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
   );
 
   // ====================================
+  // Utility Functions (declared early to avoid hoisting issues)
+  // ====================================
+
+  /**
+   * Get a namespaced parameter name
+   */
+  const getParamName = useCallback(
+    (baseName: string | keyof T) => {
+      const name = String(baseName);
+      return namespace ? `${namespace}_${name}` : name;
+    },
+    [namespace],
+  );
+
+  // ====================================
   // State Persistence
   // ====================================
 
@@ -427,47 +442,34 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
     }
   }, [storageKey, onError]);
 
-  // Browser navigation handling
-  useEffect(() => {
-    if (!enableBrowserHistorySync && !enableNavigationTracking) return;
-
-    const handleBeforeUnload = () => {
-      // Process any pending updates before page unload
-      if (updateQueueRef.current.length > 0) {
-        processQueue();
-      }
-    };
-
-    // Track URL changes to detect conflicts
-    const handleUrlChange = () => {
-      const currentUrl = window.location.search;
-      if (currentUrl !== lastUrlStateRef.current && !isNavigatingRef.current) {
-        // URL changed externally, clear queue to prevent conflicts
-        updateQueueRef.current = [];
-        lastUrlStateRef.current = currentUrl;
-      }
-    };
-
-    window.addEventListener("popstate", handleNavigationEvent);
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    // Check for URL changes periodically (for hash routing compatibility)
-    const urlCheckInterval = setInterval(handleUrlChange, 100);
-
-    return () => {
-      window.removeEventListener("popstate", handleNavigationEvent);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      clearInterval(urlCheckInterval);
-
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [enableBrowserHistorySync, enableNavigationTracking, handleNavigationEvent, processQueue]);
-
   // ====================================
   // Update Queue Processing
   // ====================================
+
+  /**
+   * Resolve conflicts between updates
+   */
+  const resolveConflicts = useCallback((updates: UrlUpdate<T>[]): UrlUpdate<T>[] => {
+    const resolvedUpdates: UrlUpdate<T>[] = [];
+    const processedActions = new Set<UrlUpdateAction>();
+
+    for (const update of updates) {
+      // Check for conflicts
+      const hasConflict = update.conflictsWith?.some((action) => processedActions.has(action));
+
+      if (!hasConflict) {
+        resolvedUpdates.push(update);
+        processedActions.add(update.action);
+      } else {
+        // Handle conflict by merging or skipping
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`URL update conflict detected for action ${update.action}, skipping...`);
+        }
+      }
+    }
+
+    return resolvedUpdates;
+  }, []);
 
   /**
    * Process all queued updates in a single batch
@@ -552,32 +554,7 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
     } finally {
       processingRef.current = false;
     }
-  }, [currentState, setSearchParams, enableOptimisticUpdates, parseUrlState, saveStateSnapshot, onStateChange, onUrlChange]);
-
-  /**
-   * Resolve conflicts between updates
-   */
-  const resolveConflicts = useCallback((updates: UrlUpdate<T>[]): UrlUpdate<T>[] => {
-    const resolvedUpdates: UrlUpdate<T>[] = [];
-    const processedActions = new Set<UrlUpdateAction>();
-
-    for (const update of updates) {
-      // Check for conflicts
-      const hasConflict = update.conflictsWith?.some((action) => processedActions.has(action));
-
-      if (!hasConflict) {
-        resolvedUpdates.push(update);
-        processedActions.add(update.action);
-      } else {
-        // Handle conflict by merging or skipping
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn(`URL update conflict detected for action ${update.action}, skipping...`);
-        }
-      }
-    }
-
-    return resolvedUpdates;
-  }, []);
+  }, [currentState, setSearchParams, enableOptimisticUpdates, parseUrlState, saveStateSnapshot, onStateChange, onUrlChange, resolveConflicts]);
 
   /**
    * Schedule an update with appropriate debouncing
@@ -601,6 +578,44 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
     },
     [debounceMs, processQueue],
   );
+
+  // Browser navigation handling
+  useEffect(() => {
+    if (!enableBrowserHistorySync && !enableNavigationTracking) return;
+
+    const handleBeforeUnload = () => {
+      // Process any pending updates before page unload
+      if (updateQueueRef.current.length > 0) {
+        processQueue();
+      }
+    };
+
+    // Track URL changes to detect conflicts
+    const handleUrlChange = () => {
+      const currentUrl = window.location.search;
+      if (currentUrl !== lastUrlStateRef.current && !isNavigatingRef.current) {
+        // URL changed externally, clear queue to prevent conflicts
+        updateQueueRef.current = [];
+        lastUrlStateRef.current = currentUrl;
+      }
+    };
+
+    window.addEventListener("popstate", handleNavigationEvent);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // Check for URL changes periodically (for hash routing compatibility)
+    const urlCheckInterval = setInterval(handleUrlChange, 100);
+
+    return () => {
+      window.removeEventListener("popstate", handleNavigationEvent);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      clearInterval(urlCheckInterval);
+
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [enableBrowserHistorySync, enableNavigationTracking, handleNavigationEvent, processQueue]);
 
   // ====================================
   // Public API Methods
@@ -932,17 +947,6 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
       };
     },
     [enableValidation, schema, currentState],
-  );
-
-  /**
-   * Get a namespaced parameter name
-   */
-  const getParamName = useCallback(
-    (baseName: string | keyof T) => {
-      const name = String(baseName);
-      return namespace ? `${namespace}_${name}` : name;
-    },
-    [namespace],
   );
 
   // ====================================

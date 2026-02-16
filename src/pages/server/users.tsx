@@ -10,7 +10,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { cn } from "@/lib/utils";
 import { useSystemUsers, useCreateSystemUser, useDeleteSystemUser, useSetSystemUserPassword } from "../../hooks";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -187,17 +186,17 @@ export function ServerUsersPage() {
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
                       <Label htmlFor="username">Nome de usuário</Label>
-                      <Input id="username" {...createForm.register("username")} placeholder="Digite o nome de usuário" />
+                      <input id="username" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" {...(createForm.register("username") as any)} placeholder="Digite o nome de usuário" />
                       {createForm.formState.errors.username && <p className="text-sm text-red-600">{createForm.formState.errors.username.message}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="fullName">Nome completo (opcional)</Label>
-                      <Input id="fullName" {...createForm.register("fullName")} placeholder="Digite o nome completo" />
+                      <input id="fullName" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" {...(createForm.register("fullName") as any)} placeholder="Digite o nome completo" />
                       {createForm.formState.errors.fullName && <p className="text-sm text-red-600">{createForm.formState.errors.fullName.message}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="password">Senha (opcional)</Label>
-                      <Input id="password" type="password" {...createForm.register("password")} placeholder="Digite a senha" />
+                      <input id="password" type="password" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" {...(createForm.register("password") as any)} placeholder="Digite a senha" />
                       {createForm.formState.errors.password && <p className="text-sm text-red-600">{createForm.formState.errors.password.message}</p>}
                     </div>
                   </div>
@@ -280,7 +279,7 @@ export function ServerUsersPage() {
                               <div className="space-y-4 py-4">
                                 <div className="space-y-2">
                                   <Label htmlFor="new-password">Nova senha</Label>
-                                  <Input id="new-password" type="password" {...passwordForm.register("password")} placeholder="Digite a nova senha" />
+                                  <input id="new-password" type="password" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm" {...(passwordForm.register("password") as any)} placeholder="Digite a nova senha" />
                                   {passwordForm.formState.errors.password && <p className="text-sm text-red-600">{passwordForm.formState.errors.password.message}</p>}
                                 </div>
                               </div>

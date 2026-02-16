@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -8,27 +8,22 @@ import { Input } from "@/components/ui/input";
 import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
 import { getDefaultVisibleBorrowColumns } from "./column-visibility";
 import { getHeaderText } from "@/components/ui/column-visibility-utils";
-import type { Borrow } from "../../../../types";
 
-// Define column interface directly to avoid import issues
-interface BorrowColumn {
+// Simple column interface for visibility management
+interface BorrowColumnMeta {
   key: string;
   header: string;
-  accessor: (borrow: Borrow) => React.ReactNode;
-  sortable?: boolean;
-  className?: string;
-  align?: "left" | "center" | "right";
 }
 
 // Default columns for borrow table
-const getBorrowColumns = (): BorrowColumn[] => [
-  { key: "item.uniCode", header: "Código", sortable: true },
-  { key: "item.name", header: "Item", sortable: true },
-  { key: "user.name", header: "Usuário", sortable: true },
-  { key: "quantity", header: "Quantidade", sortable: true },
-  { key: "status", header: "Status", sortable: true },
-  { key: "createdAt", header: "Data do Empréstimo", sortable: true },
-  { key: "returnedAt", header: "Data de Devolução", sortable: true },
+const getBorrowColumns = (): BorrowColumnMeta[] => [
+  { key: "item.uniCode", header: "Código" },
+  { key: "item.name", header: "Item" },
+  { key: "user.name", header: "Usuário" },
+  { key: "quantity", header: "Quantidade" },
+  { key: "status", header: "Status" },
+  { key: "createdAt", header: "Data do Empréstimo" },
+  { key: "returnedAt", header: "Data de Devolução" },
 ];
 
 interface ColumnVisibilityManagerProps {

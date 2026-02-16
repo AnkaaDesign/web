@@ -72,7 +72,6 @@ export function PlateTagsInput({ control, disabled }: PlateTagsInputProps) {
                 placeholder={disabled ? "Desabilitado (remova números de série extras)" : "Digite uma placa e pressione Enter (ex: ABC1234)"}
                 disabled={disabled}
                 transparent={true}
-                className="uppercase"
               />
               {disabled && (
                 <p className="text-xs text-muted-foreground">

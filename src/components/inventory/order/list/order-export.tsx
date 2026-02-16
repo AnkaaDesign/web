@@ -9,6 +9,7 @@ interface OrderExportProps {
   className?: string;
   currentItems: Order[];
   totalRecords: number;
+  selectedItems?: Set<string>;
   visibleColumns: Set<string>;
   filters?: Partial<OrderGetManyFormData>;
 }

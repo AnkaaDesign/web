@@ -5,8 +5,11 @@
  */
 
 import { SECTOR_PRIVILEGES } from '@/constants';
-import type { User } from '@/types';
+import type { User, AuthUser } from '@/types';
 import { hasAnyPrivilege, isTeamLeader } from '@/utils';
+
+// Type representing the minimal user shape needed for permission checks
+type PermissionUser = User | AuthUser;
 
 // =====================
 // TASK PERMISSIONS
@@ -16,7 +19,7 @@ import { hasAnyPrivilege, isTeamLeader } from '@/utils';
  * Can user create tasks?
  * ADMIN, COMMERCIAL, FINANCIAL, and LOGISTIC can create new tasks
  */
-export function canCreateTasks(user: User | null): boolean {
+export function canCreateTasks(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -33,7 +36,7 @@ export function canCreateTasks(user: User | null): boolean {
  * Team leaders can start/finish tasks but NOT edit details
  * PRODUCTION is view-only
  */
-export function canEditTasks(user: User | null): boolean {
+export function canEditTasks(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -48,7 +51,7 @@ export function canEditTasks(user: User | null): boolean {
  * Can user delete tasks?
  * Only ADMIN can delete tasks
  */
-export function canDeleteTasks(user: User | null): boolean {
+export function canDeleteTasks(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -60,7 +63,7 @@ export function canDeleteTasks(user: User | null): boolean {
  * Team leaders can start/finish tasks in their managed sector (or tasks without sector)
  * ADMIN can start/finish any task
  */
-export function canManageTaskStatus(user: User | null): boolean {
+export function canManageTaskStatus(user: PermissionUser | null): boolean {
   if (!user) return false;
   return isTeamLeader(user) || hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -71,7 +74,7 @@ export function canManageTaskStatus(user: User | null): boolean {
  * Can user perform batch operations on tasks?
  * Only ADMIN can batch operate tasks
  */
-export function canBatchOperateTasks(user: User | null): boolean {
+export function canBatchOperateTasks(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -83,7 +86,7 @@ export function canBatchOperateTasks(user: User | null): boolean {
  * ADMIN, COMMERCIAL, and FINANCIAL can view cancelled tasks via status filter
  * By default, only COMPLETED tasks are shown - user must explicitly select CANCELLED
  */
-export function canViewCancelledTasks(user: User | null): boolean {
+export function canViewCancelledTasks(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -98,7 +101,7 @@ export function canViewCancelledTasks(user: User | null): boolean {
  * When starting a task without sector, it will be assigned to leader's sector
  * ADMIN can manage any task
  */
-export function canLeaderManageTask(user: User | null, taskSectorId: string | null | undefined): boolean {
+export function canLeaderManageTask(user: PermissionUser | null, taskSectorId: string | null | undefined): boolean {
   if (!user) return false;
 
   // ADMIN can manage any task
@@ -123,7 +126,7 @@ export function canLeaderManageTask(user: User | null, taskSectorId: string | nu
  * Can user create cuts?
  * Only ADMIN can create cuts directly
  */
-export function canCreateCuts(user: User | null): boolean {
+export function canCreateCuts(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -134,7 +137,7 @@ export function canCreateCuts(user: User | null): boolean {
  * Can user edit cuts?
  * Only ADMIN can edit cut details
  */
-export function canEditCuts(user: User | null): boolean {
+export function canEditCuts(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -145,7 +148,7 @@ export function canEditCuts(user: User | null): boolean {
  * Can user delete cuts?
  * Only ADMIN can delete cuts
  */
-export function canDeleteCuts(user: User | null): boolean {
+export function canDeleteCuts(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -157,7 +160,7 @@ export function canDeleteCuts(user: User | null): boolean {
  * WAREHOUSE can start/finish cuts
  * ADMIN can also manage cut status
  */
-export function canManageCutStatus(user: User | null): boolean {
+export function canManageCutStatus(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.WAREHOUSE,
@@ -170,7 +173,7 @@ export function canManageCutStatus(user: User | null): boolean {
  * Team leaders can request cuts for their sector
  * ADMIN can also request cuts
  */
-export function canRequestCut(user: User | null): boolean {
+export function canRequestCut(user: PermissionUser | null): boolean {
   if (!user) return false;
   return isTeamLeader(user) || hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -185,7 +188,7 @@ export function canRequestCut(user: User | null): boolean {
  * Can user create/edit/delete airbrushings?
  * ADMIN, COMMERCIAL, and FINANCIAL can manage airbrushings
  */
-export function canCreateAirbrushings(user: User | null): boolean {
+export function canCreateAirbrushings(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -194,7 +197,7 @@ export function canCreateAirbrushings(user: User | null): boolean {
   ]);
 }
 
-export function canEditAirbrushings(user: User | null): boolean {
+export function canEditAirbrushings(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -203,7 +206,7 @@ export function canEditAirbrushings(user: User | null): boolean {
   ]);
 }
 
-export function canDeleteAirbrushings(user: User | null): boolean {
+export function canDeleteAirbrushings(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -218,7 +221,7 @@ export function canDeleteAirbrushings(user: User | null): boolean {
  * Can user create/edit/delete observations?
  * ADMIN, COMMERCIAL, FINANCIAL, PRODUCTION, and WAREHOUSE can create/edit observations
  */
-export function canCreateObservations(user: User | null): boolean {
+export function canCreateObservations(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -229,7 +232,7 @@ export function canCreateObservations(user: User | null): boolean {
   ]);
 }
 
-export function canEditObservations(user: User | null): boolean {
+export function canEditObservations(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -240,7 +243,7 @@ export function canEditObservations(user: User | null): boolean {
   ]);
 }
 
-export function canDeleteObservations(user: User | null): boolean {
+export function canDeleteObservations(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
@@ -255,7 +258,7 @@ export function canDeleteObservations(user: User | null): boolean {
  * Can user edit/delete inventory items?
  * WAREHOUSE manages all inventory
  */
-export function canEditItems(user: User | null): boolean {
+export function canEditItems(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.WAREHOUSE,
@@ -263,11 +266,11 @@ export function canEditItems(user: User | null): boolean {
   ]);
 }
 
-export function canDeleteItems(user: User | null): boolean {
+export function canDeleteItems(user: PermissionUser | null): boolean {
   return canEditItems(user);
 }
 
-export function canBatchOperateItems(user: User | null): boolean {
+export function canBatchOperateItems(user: PermissionUser | null): boolean {
   return canEditItems(user);
 }
 
@@ -279,7 +282,7 @@ export function canBatchOperateItems(user: User | null): boolean {
  * Can user edit/delete paints?
  * WAREHOUSE manages paint inventory
  */
-export function canEditPaints(user: User | null): boolean {
+export function canEditPaints(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.WAREHOUSE,
@@ -287,11 +290,11 @@ export function canEditPaints(user: User | null): boolean {
   ]);
 }
 
-export function canDeletePaints(user: User | null): boolean {
+export function canDeletePaints(user: PermissionUser | null): boolean {
   return canEditPaints(user);
 }
 
-export function canBatchOperatePaints(user: User | null): boolean {
+export function canBatchOperatePaints(user: PermissionUser | null): boolean {
   return canEditPaints(user);
 }
 
@@ -305,7 +308,7 @@ export const canDeletePaintTypes = canDeletePaints;
  * Can user edit/delete paint productions?
  * PRODUCTION and WAREHOUSE can manage paint productions
  */
-export function canEditPaintProductions(user: User | null): boolean {
+export function canEditPaintProductions(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.PRODUCTION,
@@ -314,7 +317,7 @@ export function canEditPaintProductions(user: User | null): boolean {
   ]);
 }
 
-export function canDeletePaintProductions(user: User | null): boolean {
+export function canDeletePaintProductions(user: PermissionUser | null): boolean {
   return canEditPaintProductions(user);
 }
 
@@ -322,7 +325,7 @@ export function canDeletePaintProductions(user: User | null): boolean {
  * Can user edit/delete paint formulas?
  * WAREHOUSE manages paint formulas
  */
-export function canEditPaintFormulas(user: User | null): boolean {
+export function canEditPaintFormulas(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.WAREHOUSE,
@@ -330,7 +333,7 @@ export function canEditPaintFormulas(user: User | null): boolean {
   ]);
 }
 
-export function canDeletePaintFormulas(user: User | null): boolean {
+export function canDeletePaintFormulas(user: PermissionUser | null): boolean {
   return canEditPaintFormulas(user);
 }
 
@@ -342,7 +345,7 @@ export function canDeletePaintFormulas(user: User | null): boolean {
  * Can user edit/delete customers?
  * FINANCIAL, COMMERCIAL, LOGISTIC, and ADMIN manage customers
  */
-export function canEditCustomers(user: User | null): boolean {
+export function canEditCustomers(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.FINANCIAL,
@@ -352,11 +355,11 @@ export function canEditCustomers(user: User | null): boolean {
   ]);
 }
 
-export function canDeleteCustomers(user: User | null): boolean {
+export function canDeleteCustomers(user: PermissionUser | null): boolean {
   return canEditCustomers(user);
 }
 
-export function canBatchOperateCustomers(user: User | null): boolean {
+export function canBatchOperateCustomers(user: PermissionUser | null): boolean {
   return canEditCustomers(user);
 }
 
@@ -368,7 +371,7 @@ export function canBatchOperateCustomers(user: User | null): boolean {
  * Can user edit/delete orders?
  * WAREHOUSE manages orders
  */
-export function canEditOrders(user: User | null): boolean {
+export function canEditOrders(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.WAREHOUSE,
@@ -376,11 +379,11 @@ export function canEditOrders(user: User | null): boolean {
   ]);
 }
 
-export function canDeleteOrders(user: User | null): boolean {
+export function canDeleteOrders(user: PermissionUser | null): boolean {
   return canEditOrders(user);
 }
 
-export function canBatchOperateOrders(user: User | null): boolean {
+export function canBatchOperateOrders(user: PermissionUser | null): boolean {
   return canEditOrders(user);
 }
 
@@ -392,7 +395,7 @@ export function canBatchOperateOrders(user: User | null): boolean {
  * Can user edit/delete borrows?
  * WAREHOUSE manages equipment borrows
  */
-export function canEditBorrows(user: User | null): boolean {
+export function canEditBorrows(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.WAREHOUSE,
@@ -400,11 +403,11 @@ export function canEditBorrows(user: User | null): boolean {
   ]);
 }
 
-export function canDeleteBorrows(user: User | null): boolean {
+export function canDeleteBorrows(user: PermissionUser | null): boolean {
   return canEditBorrows(user);
 }
 
-export function canBatchOperateBorrows(user: User | null): boolean {
+export function canBatchOperateBorrows(user: PermissionUser | null): boolean {
   return canEditBorrows(user);
 }
 
@@ -416,7 +419,7 @@ export function canBatchOperateBorrows(user: User | null): boolean {
  * Can user edit/delete PPE deliveries?
  * WAREHOUSE manages PPE deliveries
  */
-export function canEditPpeDeliveries(user: User | null): boolean {
+export function canEditPpeDeliveries(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.WAREHOUSE,
@@ -424,11 +427,11 @@ export function canEditPpeDeliveries(user: User | null): boolean {
   ]);
 }
 
-export function canDeletePpeDeliveries(user: User | null): boolean {
+export function canDeletePpeDeliveries(user: PermissionUser | null): boolean {
   return canEditPpeDeliveries(user);
 }
 
-export function canBatchOperatePpeDeliveries(user: User | null): boolean {
+export function canBatchOperatePpeDeliveries(user: PermissionUser | null): boolean {
   return canEditPpeDeliveries(user);
 }
 
@@ -440,7 +443,7 @@ export function canBatchOperatePpeDeliveries(user: User | null): boolean {
  * Can user edit/delete maintenance records?
  * WAREHOUSE and MAINTENANCE sectors manage maintenance
  */
-export function canEditMaintenance(user: User | null): boolean {
+export function canEditMaintenance(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.WAREHOUSE,
@@ -449,11 +452,11 @@ export function canEditMaintenance(user: User | null): boolean {
   ]);
 }
 
-export function canDeleteMaintenance(user: User | null): boolean {
+export function canDeleteMaintenance(user: PermissionUser | null): boolean {
   return canEditMaintenance(user);
 }
 
-export function canBatchOperateMaintenance(user: User | null): boolean {
+export function canBatchOperateMaintenance(user: PermissionUser | null): boolean {
   return canEditMaintenance(user);
 }
 
@@ -465,7 +468,7 @@ export function canBatchOperateMaintenance(user: User | null): boolean {
  * Can user edit/delete external withdrawals?
  * WAREHOUSE manages external withdrawals
  */
-export function canEditExternalWithdrawals(user: User | null): boolean {
+export function canEditExternalWithdrawals(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.WAREHOUSE,
@@ -473,11 +476,11 @@ export function canEditExternalWithdrawals(user: User | null): boolean {
   ]);
 }
 
-export function canDeleteExternalWithdrawals(user: User | null): boolean {
+export function canDeleteExternalWithdrawals(user: PermissionUser | null): boolean {
   return canEditExternalWithdrawals(user);
 }
 
-export function canBatchOperateExternalWithdrawals(user: User | null): boolean {
+export function canBatchOperateExternalWithdrawals(user: PermissionUser | null): boolean {
   return canEditExternalWithdrawals(user);
 }
 
@@ -489,7 +492,7 @@ export function canBatchOperateExternalWithdrawals(user: User | null): boolean {
  * Can user edit/delete suppliers?
  * WAREHOUSE manages suppliers
  */
-export function canEditSuppliers(user: User | null): boolean {
+export function canEditSuppliers(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.WAREHOUSE,
@@ -497,7 +500,7 @@ export function canEditSuppliers(user: User | null): boolean {
   ]);
 }
 
-export function canDeleteSuppliers(user: User | null): boolean {
+export function canDeleteSuppliers(user: PermissionUser | null): boolean {
   return canEditSuppliers(user);
 }
 
@@ -509,7 +512,7 @@ export function canDeleteSuppliers(user: User | null): boolean {
  * Can user edit HR entities (vacations, warnings, positions)?
  * HUMAN_RESOURCES and ADMIN manage HR data
  */
-export function canEditHrEntities(user: User | null): boolean {
+export function canEditHrEntities(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.HUMAN_RESOURCES,
@@ -517,7 +520,7 @@ export function canEditHrEntities(user: User | null): boolean {
   ]);
 }
 
-export function canDeleteHrEntities(user: User | null): boolean {
+export function canDeleteHrEntities(user: PermissionUser | null): boolean {
   return canEditHrEntities(user);
 }
 
@@ -529,7 +532,7 @@ export function canDeleteHrEntities(user: User | null): boolean {
  * Can user edit/delete users?
  * Only ADMIN and HR can manage users
  */
-export function canEditUsers(user: User | null): boolean {
+export function canEditUsers(user: PermissionUser | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.HUMAN_RESOURCES,
@@ -537,7 +540,7 @@ export function canEditUsers(user: User | null): boolean {
   ]);
 }
 
-export function canDeleteUsers(user: User | null): boolean {
+export function canDeleteUsers(user: PermissionUser | null): boolean {
   return canEditUsers(user);
 }
 
@@ -550,7 +553,7 @@ export function canDeleteUsers(user: User | null): boolean {
  * This is the main function to use in table components
  */
 export function shouldShowInteractiveElements(
-  user: User | null,
+  user: PermissionUser | null,
   entityType: 'task' | 'cut' | 'item' | 'paint' | 'customer' | 'order' |
                'borrow' | 'ppe' | 'maintenance' | 'externalWithdrawal' |
                'supplier' | 'hr' | 'user' | 'paintBrand' | 'paintType' |

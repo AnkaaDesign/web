@@ -27,7 +27,7 @@ export function CityInput({ disabled }: CityInputProps) {
             <Input
               ref={field.ref}
               value={field.value || ""}
-              onChange={(value: string) => field.onChange(value || null)}
+              onChange={(value: string | number | null) => field.onChange(typeof value === 'string' ? (value || null) : (value === null ? null : String(value)))}
               onBlur={field.onBlur}
               placeholder="Ex: São Paulo"
               disabled={disabled}

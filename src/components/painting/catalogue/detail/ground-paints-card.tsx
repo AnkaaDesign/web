@@ -70,7 +70,7 @@ export function GroundPaintsCard({ paint, className }: GroundPaintsCardProps) {
                     {groundPaint.finish && (
                       <Badge variant="secondary" className="text-xs">
                         <IconSparkles className="h-3 w-3 mr-1" />
-                        {PAINT_FINISH_LABELS[groundPaint.finish]}
+                        {PAINT_FINISH_LABELS[groundPaint.finish as keyof typeof PAINT_FINISH_LABELS]}
                       </Badge>
                     )}
                     {groundPaint.paintBrand?.name && (

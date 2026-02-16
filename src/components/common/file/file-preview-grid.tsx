@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { IconGrid3x3, IconList, IconDownload, IconFiles, IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
+import { getApiBaseUrl } from "@/config/api";
 
 export interface FilePreviewGridProps {
   files: AnkaaFile[];
@@ -61,7 +62,7 @@ export const FilePreviewGrid: React.FC<FilePreviewGridProps> = ({
       onDownload(file);
     } else {
       // Default download behavior
-      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
+      const apiUrl = getApiBaseUrl();
       const downloadUrl = `${apiUrl}/files/${file.id}/download`;
       window.open(downloadUrl, "_blank");
     }

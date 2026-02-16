@@ -163,17 +163,17 @@ export function ServiceOrderCell({ task, serviceOrderType, navigationRoute }: Se
                     {serviceOrder.description || <span className="text-muted-foreground italic">Sem descrição</span>}
                   </span>
                   <Badge
-                    variant={getServiceOrderStatusColor(serviceOrder.status)}
+                    variant={getServiceOrderStatusColor(serviceOrder.status!)}
                     className="text-[10px] px-1.5 py-0 h-5 flex-shrink-0"
                   >
-                    {SERVICE_ORDER_STATUS_LABELS[serviceOrder.status]}
+                    {SERVICE_ORDER_STATUS_LABELS[serviceOrder.status!]}
                   </Badge>
                 </div>
               ))}
             </div>
 
             {pendingAssignedCount > 0 && (
-              <div className="mt-2 pt-2 border-t border-border/50">
+              <div className="mt-2 pt-2 border-t border-border">
                 <div className="flex items-center gap-2 text-red-500 font-medium">
                   <div className="w-0 h-0 border-t-[14px] border-l-[14px] border-l-transparent border-t-red-500 flex items-center justify-center relative">
                     <span className="absolute -top-[11px] right-[1.5px] text-[8px] text-white font-bold">{pendingAssignedCount}</span>

@@ -143,7 +143,7 @@ export function LastRunCard({ lastExecution, previousExecutions = [], className 
 
           {/* Observations */}
           {lastExecution.observations && (
-            <div className="pt-4 border-t border-border/50">
+            <div className="pt-4 border-t border-border">
               <h4 className="text-sm font-semibold mb-3 text-foreground">Observações</h4>
               <div className="bg-muted/30 rounded-lg p-3">
                 <p className="text-sm text-muted-foreground">{lastExecution.observations}</p>
@@ -153,7 +153,7 @@ export function LastRunCard({ lastExecution, previousExecutions = [], className 
 
           {/* Performance Statistics */}
           {statistics && (
-            <div className="pt-4 border-t border-border/50">
+            <div className="pt-4 border-t border-border">
               <h4 className="text-sm font-semibold mb-3 text-foreground flex items-center gap-2">
                 <IconTool className="h-4 w-4 text-primary" />
                 Estatísticas de Performance
@@ -195,7 +195,7 @@ export function LastRunCard({ lastExecution, previousExecutions = [], className 
 
           {/* Recent History */}
           {previousExecutions.length > 0 && (
-            <div className="pt-4 border-t border-border/50">
+            <div className="pt-4 border-t border-border">
               <h4 className="text-sm font-semibold mb-3 text-foreground">Histórico Recente</h4>
               <div className="space-y-2">
                 {previousExecutions.slice(0, 3).map((execution) => (

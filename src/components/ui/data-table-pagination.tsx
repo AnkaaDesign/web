@@ -31,7 +31,7 @@ export interface DataTablePaginationProps {
   namespace?: string;
 
   // Edge case handling
-  autoCorrectOutOfBounds?: boolean;
+  autoCorrectPageOutOfBounds?: boolean;
   enableDeletionDetection?: boolean;
 }
 
@@ -50,7 +50,7 @@ export function DataTablePagination({
   onPageSizeChange,
   onDataChanged,
   namespace,
-  autoCorrectOutOfBounds = true,
+  autoCorrectPageOutOfBounds = true,
   enableDeletionDetection = true,
 }: DataTablePaginationProps) {
   // Track previous data length for deletion detection
@@ -169,7 +169,7 @@ export function DataTablePagination({
         enableKeyboardNavigation={enableKeyboardNavigation}
         onPageChange={pagination.goToPage}
         onPageSizeChange={pagination.setPageSize}
-        autoCorrectOutOfBounds={autoCorrectOutOfBounds}
+        autoCorrectOutOfBounds={autoCorrectPageOutOfBounds}
         namespace={namespace}
         showPageInfo={true}
         showPageSizeSelector={true}

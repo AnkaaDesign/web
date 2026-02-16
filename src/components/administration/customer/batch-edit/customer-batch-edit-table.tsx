@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { FormInput } from "@/components/ui/form-input";
-import { StateSelector } from "@/components/ui/form-state-selector";
+import { FormStateSelector } from "@/components/ui/form-state-selector";
 import { TagsInput } from "../form/tags-input";
 import { CpfCnpjCell } from "./cells/cpf-cnpj-cell";
 import { Input } from "@/components/ui/input";
@@ -68,7 +68,7 @@ interface CustomerBatchEditTableProps {
 export function CustomerBatchEditTable({ customers, onCancel: _onCancel, onSubmit: _onSubmit }: CustomerBatchEditTableProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [batchResult, setBatchResult] = useState<BatchOperationResult<Customer, Customer> | null>(null);
+  const [batchResult, setBatchResult] = useState<BatchOperationResult<any, any> | null>(null);
   const [showResultDialog, setShowResultDialog] = useState(false);
   const { mutateAsync: batchUpdateAsync } = useBatchUpdateCustomers();
 
@@ -412,7 +412,7 @@ export function CustomerBatchEditTable({ customers, onCancel: _onCancel, onSubmi
                                       }
                                       field.onBlur();
                                     }}
-                                    type="url"
+                                    type="text"
                                     placeholder="https://exemplo.com"
                                     className="h-8 border-muted-foreground/20"
                                     disabled={isSubmitting}
@@ -485,7 +485,7 @@ export function CustomerBatchEditTable({ customers, onCancel: _onCancel, onSubmi
                       {/* Estado */}
                       <TableCell className="w-44 p-0 !border-r-0">
                         <div className="px-4 py-2">
-                          <StateSelector disabled={isSubmitting} />
+                          <FormStateSelector name={`customers.${index}.data.state`} disabled={isSubmitting} />
                         </div>
                       </TableCell>
 

@@ -1,6 +1,7 @@
 import React from "react";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import type { Sector } from "../../../../types";
+import type { DateRange } from "react-day-picker";
 import { IconFilter, IconX } from "@tabler/icons-react";
 import {
   Sheet,
@@ -47,7 +48,8 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
     setLocalFilters(resetFilters);
   };
 
-  const handleFromChange = (date: Date | null) => {
+  const handleFromChange = (date: Date | DateRange | null) => {
+    if (date && !(date instanceof Date)) return;
     if (!date && !localFilters.termRange?.to) {
       const { termRange, ...rest } = localFilters;
       setLocalFilters(rest);
@@ -62,7 +64,8 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
     }
   };
 
-  const handleToChange = (date: Date | null) => {
+  const handleToChange = (date: Date | DateRange | null) => {
+    if (date && !(date instanceof Date)) return;
     if (!date && !localFilters.termRange?.from) {
       const { termRange, ...rest } = localFilters;
       setLocalFilters(rest);
@@ -103,7 +106,11 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
                   label: sector.name,
                 }))}
               value={localFilters.sectorIds || []}
-              onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, sectorIds: value })}
+              onValueChange={(value) => {
+                if (Array.isArray(value)) {
+                  setLocalFilters({ ...localFilters, sectorIds: value });
+                }
+              }}
               placeholder="Selecione os setores"
             />
           </div>

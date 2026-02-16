@@ -1,9 +1,8 @@
 import React, { forwardRef } from "react";
-import { Input } from "./input";
 import { IconSearch, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
-interface TableSearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> {
+interface TableSearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange" | "ref"> {
   /** Current search value */
   value: string;
   /** Callback when search value changes */
@@ -44,19 +43,15 @@ export const TableSearchInput = forwardRef<HTMLInputElement, TableSearchInputPro
         </div>
 
         {/* Search input */}
-        <Input
+        <input
           {...props}
           ref={ref}
           type="text"
           value={value}
-          onChange={(value) => {
-            // Input component now passes the value directly (string)
-            onChange(typeof value === "string" ? value : "");
-          }}
+          onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          transparent={true}
-          className={cn(
+          className={cn("flex h-10 w-full rounded-md border border-border bg-transparent px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
             "pl-9",
             suffix ? "pr-32" : "pr-9",
             isPending && "ring-1 ring-primary/20",

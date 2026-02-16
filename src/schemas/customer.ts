@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, emailSchema } from "./common";
 import type { Customer } from '@types';
-import { isValidCPF, isValidCNPJ } from '@utils';
+import { isValidCPF, isValidCNPJ } from '@/utils';
 
 // =====================
 // Include Schema Based on Prisma Schema
@@ -30,7 +30,7 @@ export const customerIncludeSchema = z
               logoPaints: z.boolean().optional(),
               services: z.boolean().optional(),
               truck: z.boolean().optional(),
-              airbrushing: z.boolean().optional(),
+              airbrushings: z.boolean().optional(),
             })
             .optional(),
         }),
@@ -67,6 +67,8 @@ export const customerOrderBySchema = z
         zipCode: orderByDirectionSchema.optional(),
         site: orderByDirectionSchema.optional(),
         logoId: orderByDirectionSchema.optional(),
+        registrationStatus: orderByDirectionSchema.optional(),
+        stateRegistration: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
       })
@@ -89,6 +91,8 @@ export const customerOrderBySchema = z
           state: orderByDirectionSchema.optional(),
           zipCode: orderByDirectionSchema.optional(),
           site: orderByDirectionSchema.optional(),
+          registrationStatus: orderByDirectionSchema.optional(),
+          stateRegistration: orderByDirectionSchema.optional(),
           createdAt: orderByDirectionSchema.optional(),
           updatedAt: orderByDirectionSchema.optional(),
         })
@@ -330,6 +334,44 @@ export const customerWhereSchema: z.ZodType<any> = z
           startsWith: z.string().optional(),
           endsWith: z.string().optional(),
           mode: z.enum(["default", "insensitive"]).optional(),
+        }),
+      ])
+      .optional(),
+
+    registrationStatus: z
+      .union([
+        z.string().nullable(),
+        z.object({
+          equals: z.string().nullable().optional(),
+          not: z.string().nullable().optional(),
+          in: z.array(z.string()).optional(),
+          notIn: z.array(z.string()).optional(),
+        }),
+      ])
+      .optional(),
+
+    stateRegistration: z
+      .union([
+        z.string().nullable(),
+        z.object({
+          equals: z.string().nullable().optional(),
+          not: z.string().nullable().optional(),
+          contains: z.string().optional(),
+          startsWith: z.string().optional(),
+          endsWith: z.string().optional(),
+          mode: z.enum(["default", "insensitive"]).optional(),
+        }),
+      ])
+      .optional(),
+
+    streetType: z
+      .union([
+        z.string().nullable(),
+        z.object({
+          equals: z.string().nullable().optional(),
+          not: z.string().nullable().optional(),
+          in: z.array(z.string()).optional(),
+          notIn: z.array(z.string()).optional(),
         }),
       ])
       .optional(),
@@ -672,6 +714,12 @@ export const customerCreateSchema = z
       .refine((val) => !val || val === "" || isValidCPF(val), { message: "CPF inválido" }),
     corporateName: z.string().nullable().optional(),
     email: emailSchema.nullable().optional(),
+    streetType: z.enum([
+      "STREET", "AVENUE", "ALLEY", "CROSSING", "SQUARE", "HIGHWAY", "ROAD", "WAY",
+      "PLAZA", "LANE", "DEADEND", "SMALL_STREET", "PATH", "PASSAGE", "GARDEN",
+      "BLOCK", "LOT", "SITE", "PARK", "FARM", "RANCH", "CONDOMINIUM", "COMPLEX",
+      "RESIDENTIAL", "OTHER"
+    ]).nullable().optional(),
     address: z.string().nullable().optional(),
     addressNumber: z.string().nullable().optional(),
     addressComplement: z.string().nullable().optional(),
@@ -683,8 +731,10 @@ export const customerCreateSchema = z
     phones: z.array(z.string()).default([]),
     tags: z.array(z.string()).default([]),
     logoId: z.string().uuid("Logo inválido").nullable().optional(),
+    logoFile: z.any().optional(), // File upload field - handled separately from JSON validation
     economicActivityId: z.string().uuid("Atividade econômica inválida").nullable().optional(),
     registrationStatus: z.enum(["ACTIVE", "SUSPENDED", "UNFIT", "ACTIVE_NOT_REGULAR", "DEREGISTERED"]).nullable().optional(),
+    stateRegistration: z.string().nullable().optional(),
   })
   .transform(toFormData)
   .refine(
@@ -744,6 +794,12 @@ export const customerUpdateSchema = z
       .refine((val) => !val || val === "" || isValidCPF(val), { message: "CPF inválido" }),
     corporateName: z.string().nullable().optional(),
     email: emailSchema.nullable().optional(),
+    streetType: z.enum([
+      "STREET", "AVENUE", "ALLEY", "CROSSING", "SQUARE", "HIGHWAY", "ROAD", "WAY",
+      "PLAZA", "LANE", "DEADEND", "SMALL_STREET", "PATH", "PASSAGE", "GARDEN",
+      "BLOCK", "LOT", "SITE", "PARK", "FARM", "RANCH", "CONDOMINIUM", "COMPLEX",
+      "RESIDENTIAL", "OTHER"
+    ]).nullable().optional(),
     address: z.string().nullable().optional(),
     addressNumber: z.string().nullable().optional(),
     addressComplement: z.string().nullable().optional(),
@@ -755,8 +811,10 @@ export const customerUpdateSchema = z
     phones: z.array(z.string()).optional(),
     tags: z.array(z.string()).optional(),
     logoId: z.string().uuid("Logo inválido").nullable().optional(),
+    logoFile: z.any().optional(), // File upload field - handled separately from JSON validation
     economicActivityId: z.string().uuid("Atividade econômica inválida").nullable().optional(),
     registrationStatus: z.enum(["ACTIVE", "SUSPENDED", "UNFIT", "ACTIVE_NOT_REGULAR", "DEREGISTERED"]).nullable().optional(),
+    stateRegistration: z.string().nullable().optional(),
   })
   .transform(toFormData);
 
@@ -846,6 +904,7 @@ export const mapCustomerToFormData = createMapToFormDataHelper<Customer, Custome
   cpf: customer.cpf,
   corporateName: customer.corporateName,
   email: customer.email,
+  streetType: customer.streetType as any,
   address: customer.address,
   addressNumber: customer.addressNumber,
   addressComplement: customer.addressComplement,
@@ -858,5 +917,6 @@ export const mapCustomerToFormData = createMapToFormDataHelper<Customer, Custome
   tags: customer.tags,
   logoId: customer.logoId,
   economicActivityId: customer.economicActivityId,
-  registrationStatus: customer.registrationStatus,
+  registrationStatus: customer.registrationStatus as any,
+  stateRegistration: customer.stateRegistration,
 }));

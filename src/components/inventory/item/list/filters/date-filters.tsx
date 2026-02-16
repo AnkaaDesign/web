@@ -1,6 +1,7 @@
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import type { DateRange } from "react-day-picker";
 import { IconCalendarPlus, IconCalendarStats } from "@tabler/icons-react";
 
 interface DateFiltersProps {
@@ -11,7 +12,8 @@ interface DateFiltersProps {
 }
 
 export function DateFilters({ createdAtRange, onCreatedAtRangeChange, updatedAtRange, onUpdatedAtRangeChange }: DateFiltersProps) {
-  const handleCreatedAtFromChange = (date: Date | null) => {
+  const handleCreatedAtFromChange = (date: Date | DateRange | null) => {
+    if (date && !(date instanceof Date)) return;
     if (!date && !createdAtRange?.lte) {
       onCreatedAtRangeChange(undefined);
     } else {
@@ -22,7 +24,8 @@ export function DateFilters({ createdAtRange, onCreatedAtRangeChange, updatedAtR
     }
   };
 
-  const handleCreatedAtToChange = (date: Date | null) => {
+  const handleCreatedAtToChange = (date: Date | DateRange | null) => {
+    if (date && !(date instanceof Date)) return;
     if (!date && !createdAtRange?.gte) {
       onCreatedAtRangeChange(undefined);
     } else {
@@ -33,7 +36,8 @@ export function DateFilters({ createdAtRange, onCreatedAtRangeChange, updatedAtR
     }
   };
 
-  const handleUpdatedAtFromChange = (date: Date | null) => {
+  const handleUpdatedAtFromChange = (date: Date | DateRange | null) => {
+    if (date && !(date instanceof Date)) return;
     if (!date && !updatedAtRange?.lte) {
       onUpdatedAtRangeChange(undefined);
     } else {
@@ -44,7 +48,8 @@ export function DateFilters({ createdAtRange, onCreatedAtRangeChange, updatedAtR
     }
   };
 
-  const handleUpdatedAtToChange = (date: Date | null) => {
+  const handleUpdatedAtToChange = (date: Date | DateRange | null) => {
+    if (date && !(date instanceof Date)) return;
     if (!date && !updatedAtRange?.gte) {
       onUpdatedAtRangeChange(undefined);
     } else {

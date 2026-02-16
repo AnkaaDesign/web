@@ -115,24 +115,29 @@ interface ExtendedAxiosInstance extends AxiosInstance {
 // =====================
 
 // Support environment-specific API URLs
+// NOTE: Cannot import from @/config/api here due to circular dependency
+// (config/api.ts imports from api-client). Instead, this checks the
+// window.__ANKAA_API_URL__ global that config/api.ts sets at startup.
 const getApiUrl = (): string => {
   // Check for browser window object first (web environment)
+  // This is set by initializeApiClient() in config/api.ts at app startup
   if (typeof (globalThis as any).window !== "undefined" && typeof (globalThis as any).window.__ANKAA_API_URL__ !== "undefined") {
-    return (globalThis as any).window.__ANKAA_API_URL__; // No /api suffix - using subdomain architecture
-  }
-
-  // Check for global config object (can be set by apps) - React Native safe
-  if (typeof globalThis !== "undefined" && typeof (globalThis as any).window !== "undefined" && typeof (globalThis as any).window.__ANKAA_API_URL__ !== "undefined") {
-    return (globalThis as any).window.__ANKAA_API_URL__; // No /api suffix - using subdomain architecture
+    return (globalThis as any).window.__ANKAA_API_URL__;
   }
 
   // For React Native/Expo apps
   if (typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL; // No /api suffix - using subdomain architecture
+    return process.env.EXPO_PUBLIC_API_URL;
   }
 
-  // Default fallback
-  return "http://localhost:3030"; // No /api suffix - using subdomain architecture
+  // Vite env var fallback (build-time replacement)
+  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+
+  // Default fallback for local development
+  const port = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_PORT) || "3030";
+  return `http://localhost:${port}`;
 };
 
 const DEFAULT_CONFIG: ApiClientConfig = {

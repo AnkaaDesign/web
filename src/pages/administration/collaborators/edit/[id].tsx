@@ -54,9 +54,9 @@ const EditCollaboratorPage = () => {
         : (() => {
             const { currentStatus, ...rest } = data as UserUpdateFormData;
             return rest;
-          })();
+          })() as Omit<UserUpdateFormData, 'currentStatus'>;
 
-      const response = await update({ id, data: dataToSend });
+      const response = await update({ id, data: dataToSend as any });
 
       if (response.success) {
         navigate(routes.administration.collaborators.details(id));

@@ -98,11 +98,17 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
       {} as Record<string, number>,
     );
 
+    const totalValue = tasks.reduce((sum, task) => {
+      const taskValue = (task as any).value || (task as any).totalValue || 0;
+      return sum + (typeof taskValue === 'number' ? taskValue : 0);
+    }, 0);
+
     return {
       totalTasks,
       activeTasks,
       completedTasks,
       statusCounts,
+      totalValue,
     };
   }, [tasks]);
 
@@ -209,7 +215,7 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
 
               return (
                 <Link key={task.id} to={routes.production.schedule.details(task.id)} className="block">
-                  <div className="group relative overflow-hidden rounded-lg border border-border/50 dark:border-border/40 bg-card hover:bg-muted/50 transition-colors cursor-pointer min-h-[180px] flex flex-col">
+                  <div className="group relative overflow-hidden rounded-lg border border-border dark:border-border bg-card hover:bg-muted/50 transition-colors cursor-pointer min-h-[180px] flex flex-col">
                     <div className="p-3 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="flex items-start justify-between gap-2 mb-2">
@@ -221,9 +227,9 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
 
                         {/* Task Assignment and Sector */}
                         <div className="space-y-1 mb-2">
-                          {task.user && (
+                          {task.createdBy && (
                             <p className="text-xs text-muted-foreground truncate">
-                              <span className="font-medium">Responsável:</span> {task.user.name}
+                              <span className="font-medium">Responsável:</span> {task.createdBy.name}
                             </p>
                           )}
                           {task.sector && (
@@ -261,7 +267,7 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
                                     <p className="text-xs">Criado em {formatDate(task.createdAt)}</p>
                                     {task.startedAt && <p className="text-xs">Iniciado em {formatDate(task.startedAt)}</p>}
                                     {task.finishedAt && <p className="text-xs">Finalizado em {formatDate(task.finishedAt)}</p>}
-                                    {task.user && <p className="text-xs">Responsável: {task.user.name}</p>}
+                                    {task.createdBy && <p className="text-xs">Responsável: {task.createdBy.name}</p>}
                                     {task.sector && <p className="text-xs">Setor: {task.sector.name}</p>}
                                   </div>
                                 </TooltipContent>

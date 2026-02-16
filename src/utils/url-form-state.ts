@@ -190,7 +190,7 @@ export function serializeItemFormToUrlParams(formData: Partial<ItemCreateFormDat
   if (formData.monthlyConsumption !== undefined && formData.monthlyConsumption !== null && formData.monthlyConsumption !== 0) params.set("monthlyConsumption", formData.monthlyConsumption.toString());
   if (formData.estimatedLeadTime !== undefined && formData.estimatedLeadTime !== null && formData.estimatedLeadTime !== 30)
     params.set("estimatedLeadTime", formData.estimatedLeadTime.toString());
-  if (formData.price !== undefined && formData.price !== null && formData.price !== "") params.set("price", formData.price.toString());
+  if (formData.price !== undefined && formData.price !== null && formData.price !== 0) params.set("price", formData.price.toString());
 
   // Boolean fields
   if (formData.shouldAssignToUser !== undefined && formData.shouldAssignToUser !== null && formData.shouldAssignToUser !== true) params.set("shouldAssignToUser", formData.shouldAssignToUser.toString());
@@ -395,6 +395,7 @@ export function getDefaultItemFormValues(searchParams: URLSearchParams, baseDefa
     isActive: true,
     price: undefined,
     monthlyConsumption: 0,
+    monthlyConsumptionTrendPercent: null,
     // PPE fields
     ppeType: null,
     ppeSize: null,
@@ -711,6 +712,9 @@ export function serializeCustomerFormToUrlParams(formData: Partial<CustomerCreat
   // Registration Status
   if (formData.registrationStatus && formData.registrationStatus.trim()) params.set("registrationStatus", formData.registrationStatus);
 
+  // State Registration
+  if (formData.stateRegistration && formData.stateRegistration.trim()) params.set("stateRegistration", formData.stateRegistration);
+
   // Serialize arrays
   if (formData.phones && formData.phones.length > 0) {
     params.set("phones", JSON.stringify(formData.phones));
@@ -773,7 +777,10 @@ export function deserializeUrlParamsToCustomerForm(searchParams: URLSearchParams
   if (logoId) formData.logoId = logoId;
 
   const registrationStatus = searchParams.get("registrationStatus");
-  if (registrationStatus) formData.registrationStatus = registrationStatus;
+  if (registrationStatus) formData.registrationStatus = registrationStatus as any;
+
+  const stateRegistration = searchParams.get("stateRegistration");
+  if (stateRegistration) formData.stateRegistration = stateRegistration;
 
   // Parse arrays
   try {
@@ -815,6 +822,7 @@ export function getDefaultCustomerFormValues(searchParams: URLSearchParams, base
     cpf: null,
     corporateName: null,
     email: null,
+    streetType: null,
     address: null,
     addressNumber: null,
     addressComplement: null,
@@ -826,6 +834,7 @@ export function getDefaultCustomerFormValues(searchParams: URLSearchParams, base
     phones: [],
     tags: [],
     logoId: null,
+    stateRegistration: null,
     ...baseDefaults,
     ...urlFormData,
   };
@@ -919,9 +928,6 @@ export function deserializeUrlParamsToSupplierForm(searchParams: URLSearchParams
 
   const logoId = searchParams.get("logoId");
   if (logoId) formData.logoId = logoId;
-
-  const registrationStatus = searchParams.get("registrationStatus");
-  if (registrationStatus) formData.registrationStatus = registrationStatus;
 
   // Parse arrays
   try {

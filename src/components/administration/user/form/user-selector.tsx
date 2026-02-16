@@ -1,8 +1,10 @@
 import { useState, useMemo, useCallback } from "react";
 import type { FieldValues } from "react-hook-form";
+import { useWatch } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import { getUsers } from "../../../../api-client";
+import { getUsers, getUserById } from "../../../../api-client";
 import { USER_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useUserMutations } from "../../../../hooks";
 import type { User } from "../../../../types";
@@ -31,18 +33,38 @@ export function AdminUserSelector<_T extends FieldValues = FieldValues>({
   initialUser,
   excludeSectorPrivileges,
   includeSectorPrivileges,
-}: UserSelectorProps<T>) {
+}: UserSelectorProps<_T>) {
   const [isCreating, setIsCreating] = useState(false);
   const { createAsync: createUserAsync } = useUserMutations();
 
-  // Memoize initial options
+  // Watch selected user ID from form state - persists across accordion unmount/remount
+  const selectedUserId = useWatch({ control, name }) as string | undefined;
+
+  // Fetch selected user details by ID - React Query cache persists across unmount/remount
+  const { data: selectedUserData } = useQuery({
+    queryKey: ["users", "selected-detail", selectedUserId],
+    queryFn: async () => {
+      if (!selectedUserId) return null;
+      const response = await getUserById(selectedUserId, {
+        select: { id: true, name: true },
+      } as any);
+      return response.data || null;
+    },
+    enabled: !!selectedUserId && selectedUserId !== initialUser?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Memoize initial options - include selected user data for accordion remount scenarios
   const initialOptions = useMemo(() => {
-    if (!initialUser) return [];
-    return [{
-      value: initialUser.id,
-      label: initialUser.name,
-    }];
-  }, [initialUser]);
+    const options: { value: string; label: string }[] = [];
+    if (initialUser) {
+      options.push({ value: initialUser.id, label: initialUser.name });
+    }
+    if (selectedUserData && selectedUserData.id !== initialUser?.id) {
+      options.push({ value: selectedUserData.id, label: selectedUserData.name });
+    }
+    return options;
+  }, [initialUser, selectedUserData?.id]);
 
   // Async query function for the combobox
   // Filter by isActive: true and specific statuses for admin user selection
@@ -107,9 +129,17 @@ export function AdminUserSelector<_T extends FieldValues = FieldValues>({
     try {
       const result = await createUserAsync({
         name,
+        birth: new Date(), // Required field - set to current date by default
         status: USER_STATUS.EXPERIENCE_PERIOD_1,
         verified: false,
         performanceLevel: 0,
+        isActive: true,
+        isSectorLeader: false, // Required field
+        email: null,
+        phone: null,
+        cpf: null,
+        positionId: null,
+        sectorId: null,
       });
 
       if (result.success && result.data) {

@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconPlus, IconTrash, IconNote } from "@tabler/icons-react";
 import { Combobox } from "@/components/ui/combobox";
-import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_DISPLAY_ORDER, SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { Textarea } from "@/components/ui/textarea";
 import { getServiceOrderStatusColor } from "../../../../utils";
 import { AdminUserSelector } from "@/components/administration/user/form/user-selector";
@@ -36,10 +36,10 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
   });
 
   // Watch all services
-  const servicesValues = useWatch({
+  const servicesValues = (useWatch({
     control,
     name: "serviceOrders",
-  }) as any[] || [];
+  }) as any[] | undefined) ?? [];
 
   // Helper function to determine if a service order can be edited by the current user
   const canEditServiceOrder = useCallback((serviceOrder: any) => {
@@ -317,8 +317,8 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
 
       {/* Grouped services by type */}
       <div className="space-y-4">
-        {Object.values(SERVICE_ORDER_TYPE).map((type) =>
-          renderServiceGroup(type as SERVICE_ORDER_TYPE)
+        {SERVICE_ORDER_TYPE_DISPLAY_ORDER.map((type) =>
+          renderServiceGroup(type)
         )}
       </div>
     </div>
@@ -649,7 +649,7 @@ function ServiceRow({
           // Show read-only badge when user cannot edit status (e.g., PRODUCTION non-leaders, or cross-sector)
           <div className="min-w-0 flex items-center">
             <Badge variant={getServiceOrderStatusColor(currentStatus)} className="whitespace-nowrap">
-              {SERVICE_ORDER_STATUS_LABELS[currentStatus] || currentStatus}
+              {SERVICE_ORDER_STATUS_LABELS[currentStatus as SERVICE_ORDER_STATUS] || currentStatus}
             </Badge>
           </div>
         ))}

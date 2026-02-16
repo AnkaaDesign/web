@@ -127,7 +127,7 @@ export function ConsumptionFilters({
   // Async query functions for comboboxes
   const fetchSectors = useCallback(async (search: string, page: number = 1) => {
     const response = await getSectors({
-      search: search || undefined,
+      searchingFor: search || undefined,
       page,
       limit: COMBOBOX_PAGE_SIZE,
     });
@@ -341,8 +341,8 @@ export function ConsumptionFilters({
                 min={1}
                 max={200}
                 value={localFilters.limit || 50}
-                onChange={(value: number | undefined) => {
-                  const numValue = value || 50;
+                onChange={(value: string | number | null) => {
+                  const numValue = typeof value === 'number' ? value : (typeof value === 'string' ? parseInt(value) || 50 : 50);
                   setLocalFilters({
                     ...localFilters,
                     limit: numValue,
@@ -383,7 +383,8 @@ export function ConsumptionFilters({
                   <Combobox
                     value={selectedYear?.toString() || ''}
                     onValueChange={(year) => {
-                      const newYear = year ? parseInt(year) : undefined;
+                      const yearStr = Array.isArray(year) ? year[0] : year;
+                      const newYear = yearStr ? parseInt(yearStr) : undefined;
                       setSelectedYear(newYear);
                       if (!newYear) {
                         setSelectedMonths([]);
@@ -399,7 +400,15 @@ export function ConsumptionFilters({
                   <Combobox
                     mode="multiple"
                     value={selectedMonths}
-                    onValueChange={(months) => setSelectedMonths(months)}
+                    onValueChange={(months) => {
+                      if (Array.isArray(months)) {
+                        setSelectedMonths(months);
+                      } else if (months) {
+                        setSelectedMonths([months]);
+                      } else {
+                        setSelectedMonths([]);
+                      }
+                    }}
                     options={MONTH_OPTIONS}
                     placeholder={selectedYear ? 'Selecione os meses...' : 'Selecione um ano primeiro'}
                     searchPlaceholder="Buscar meses..."
@@ -424,8 +433,8 @@ export function ConsumptionFilters({
                   <DateTimeInput
                     mode="date"
                     value={localFilters.startDate}
-                    onChange={(date: Date | null) => {
-                      if (date) {
+                    onChange={(date) => {
+                      if (date && date instanceof Date) {
                         setLocalFilters({
                           ...localFilters,
                           startDate: startOfDay(date),
@@ -444,8 +453,8 @@ export function ConsumptionFilters({
                   <DateTimeInput
                     mode="date"
                     value={localFilters.endDate}
-                    onChange={(date: Date | null) => {
-                      if (date) {
+                    onChange={(date) => {
+                      if (date && date instanceof Date) {
                         setLocalFilters({
                           ...localFilters,
                           endDate: endOfDay(date),
@@ -484,7 +493,7 @@ export function ConsumptionFilters({
                   ...localFilters,
                   sectorIds: Array.isArray(value) && value.length > 0 ? value : undefined,
                 })}
-                queryKey={sectorKeys.lists()}
+                queryKey={[...sectorKeys.lists()]}
                 queryFn={fetchSectors}
                 minSearchLength={0}
                 placeholder="Selecione setores..."
@@ -519,7 +528,7 @@ export function ConsumptionFilters({
                   ...localFilters,
                   userIds: Array.isArray(value) && value.length > 0 ? value : undefined,
                 })}
-                queryKey={userKeys.lists()}
+                queryKey={[...userKeys.lists()]}
                 queryFn={fetchUsers}
                 minSearchLength={0}
                 placeholder="Selecione usuários..."
@@ -546,7 +555,7 @@ export function ConsumptionFilters({
                   ...localFilters,
                   itemIds: Array.isArray(value) && value.length > 0 ? value : undefined,
                 })}
-                queryKey={itemKeys.lists()}
+                queryKey={[...itemKeys.lists()]}
                 queryFn={fetchItems}
                 minSearchLength={0}
                 placeholder="Todos os itens"
@@ -572,7 +581,7 @@ export function ConsumptionFilters({
                   ...localFilters,
                   brandIds: Array.isArray(value) && value.length > 0 ? value : undefined,
                 })}
-                queryKey={itemBrandKeys.lists()}
+                queryKey={[...itemBrandKeys.lists()]}
                 queryFn={fetchBrands}
                 minSearchLength={0}
                 placeholder="Todas as marcas"
@@ -598,7 +607,7 @@ export function ConsumptionFilters({
                   ...localFilters,
                   categoryIds: Array.isArray(value) && value.length > 0 ? value : undefined,
                 })}
-                queryKey={itemCategoryKeys.lists()}
+                queryKey={[...itemCategoryKeys.lists()]}
                 queryFn={fetchCategories}
                 minSearchLength={0}
                 placeholder="Todas as categorias"

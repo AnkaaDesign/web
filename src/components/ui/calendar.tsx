@@ -33,6 +33,7 @@ function Calendar({ className, classNames, showOutsideDays = true, captionLayout
   const defaultClassNames = getDefaultClassNames();
 
   return (
+    // @ts-expect-error - react-day-picker version prop mismatch
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn(

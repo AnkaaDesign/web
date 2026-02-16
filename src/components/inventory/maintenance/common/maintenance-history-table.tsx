@@ -213,7 +213,7 @@ export function MaintenanceHistoryTable({ maintenances, className }: Maintenance
                   </TableCell>
                   <TableCell className="w-40 min-w-40 max-w-40 p-0 !border-r-0">
                     <div className="px-4 py-2">
-                      <Badge variant={ENTITY_BADGE_CONFIG.MAINTENANCE?.[maintenance.status] || "default"} className="text-xs whitespace-nowrap">
+                      <Badge variant={ENTITY_BADGE_CONFIG.MAINTENANCE?.[maintenance.status as keyof typeof ENTITY_BADGE_CONFIG.MAINTENANCE] || "default"} className="text-xs whitespace-nowrap">
                         {MAINTENANCE_STATUS_LABELS[maintenance.status as MAINTENANCE_STATUS] || maintenance.status}
                       </Badge>
                     </div>

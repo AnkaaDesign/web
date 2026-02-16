@@ -32,7 +32,10 @@ export function PositionCell({ control, index, disabled, currentPositionName }: 
           <FormControl>
             <Combobox
               value={field.value || "none"}
-              onValueChange={(value: string | undefined) => field.onChange(value === "none" ? null : value)}
+              onValueChange={(value: string | string[] | null | undefined) => {
+                const stringValue = Array.isArray(value) ? value[0] : value;
+                field.onChange(stringValue === "none" ? null : stringValue);
+              }}
               options={optionsWithNone}
               placeholder={currentPositionName || "Selecione um cargo"}
               emptyText="Nenhum cargo encontrado"

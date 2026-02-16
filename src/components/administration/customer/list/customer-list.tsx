@@ -58,7 +58,8 @@ export function CustomerList({ className }: CustomerListProps) {
 
   // Merge mutation
   const { mutate: mergeMutation } = useMutation({
-    mutationFn: mergeCustomers,
+    mutationFn: (params: { targetCustomerId: string; sourceCustomerIds: string[]; conflictResolutions?: Record<string, any> }) =>
+      mergeCustomers(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customers"] });
     },
@@ -395,7 +396,7 @@ export function CustomerList({ className }: CustomerListProps) {
       </CardContent>
 
       {/* Enhanced Filter Modal */}
-      <CustomerFilters open={showFilterModal} onOpenChange={setShowFilterModal} filters={filters} onFilterChange={handleFilterChange} />
+      <CustomerFilters open={showFilterModal} onOpenChange={setShowFilterModal} />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>

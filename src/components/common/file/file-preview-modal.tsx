@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../../types";
-import { isImageFile, isVideoFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl } from "../../../utils/file";
+import { isImageFile, isVideoFile, getFileUrl, getFileDownloadUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl } from "../../../utils/file";
 import { InlinePdfViewer, type InlinePdfViewerRef } from "./inline-pdf-viewer";
 import { VideoPlayer } from "./video-player";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
@@ -309,6 +309,32 @@ export function FilePreviewModal({
     setImageLoading(false);
     setImageError(true);
   }, []);
+
+  // Drag handler for dragging images to external targets (desktop, etc.)
+  const handleDragStart = React.useCallback(
+    (e: React.DragEvent<HTMLImageElement>) => {
+      if (!currentFile || zoom !== fitZoom) {
+        // Only allow drag when not zoomed (preserve pan behavior when zoomed)
+        e.preventDefault();
+        return;
+      }
+
+      // Set the original file download URL for the drag operation
+      const downloadUrl = getFileDownloadUrl(currentFile);
+      const mimeType = currentFile.mimetype || "application/octet-stream";
+      const filename = currentFile.filename || "download";
+      e.dataTransfer.effectAllowed = "copy";
+      e.dataTransfer.setData("DownloadURL", `${mimeType}:${filename}:${downloadUrl}`);
+      e.dataTransfer.setData("text/uri-list", downloadUrl);
+      e.dataTransfer.setData("text/plain", downloadUrl);
+
+      // Optional: Set drag image to a copy of the current image
+      if (imageRef.current) {
+        e.dataTransfer.setDragImage(imageRef.current, 0, 0);
+      }
+    },
+    [currentFile, zoom, fitZoom],
+  );
 
   // Touch event handlers for mobile support
   const handleTouchStart = React.useCallback(
@@ -822,7 +848,8 @@ export function FilePreviewModal({
                       }
                       alt={currentFile.filename}
                       className={cn(
-                        "transition-all duration-200 rounded-lg shadow-2xl select-none",
+                        "transition-all duration-200 rounded-lg shadow-2xl",
+                        zoom === fitZoom ? "select-auto" : "select-none",
                         zoom > fitZoom ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
                         isEPS && "ring-2 ring-indigo-400 ring-opacity-60",
                         isSVG && "bg-white p-4",
@@ -842,7 +869,8 @@ export function FilePreviewModal({
                       onLoad={handleImageLoad}
                       onError={handleImageError}
                       onClick={zoom === fitZoom ? handleZoomIn : handleResetZoom}
-                      draggable={false}
+                      draggable={zoom === fitZoom}
+                      onDragStart={handleDragStart}
                       onMouseDown={() => setIsDragging(true)}
                       onMouseUp={() => setIsDragging(false)}
                     />

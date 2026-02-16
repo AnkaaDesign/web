@@ -41,8 +41,16 @@ export function MeasureSelector({
     <div className={cn("space-y-2", className)}>
       {label && <Label>{label}</Label>}
       <Combobox
-        value={value}
-        onValueChange={onValueChange}
+        value={typeof value === 'string' ? value : Array.isArray(value) ? value : value ?? ''}
+        onValueChange={(newValue) => {
+          if (typeof newValue === 'string') {
+            onValueChange?.(newValue as MEASURE_UNIT);
+          } else if (Array.isArray(newValue)) {
+            onValueChange?.(newValue as MEASURE_UNIT[]);
+          } else {
+            onValueChange?.(undefined);
+          }
+        }}
         options={options}
         mode={mode}
         placeholder={placeholder}

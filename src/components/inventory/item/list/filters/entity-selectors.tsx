@@ -203,7 +203,9 @@ export function EntitySelectors({
           queryFn={queryCategoriesFn}
           initialOptions={initialCategoryOptions}
           value={categoryIds}
-          onValueChange={onCategoryIdsChange}
+          onValueChange={(value) => {
+            if (Array.isArray(value)) onCategoryIdsChange(value);
+          }}
           placeholder="Selecione categorias..."
           emptyText="Nenhuma categoria encontrada"
           searchPlaceholder="Buscar categorias..."
@@ -231,7 +233,9 @@ export function EntitySelectors({
           queryFn={queryBrandsFn}
           initialOptions={initialBrandOptions}
           value={brandIds}
-          onValueChange={onBrandIdsChange}
+          onValueChange={(value) => {
+            if (Array.isArray(value)) onBrandIdsChange(value);
+          }}
           placeholder="Selecione marcas..."
           emptyText="Nenhuma marca encontrada"
           searchPlaceholder="Buscar marcas..."
@@ -259,7 +263,9 @@ export function EntitySelectors({
           queryFn={querySuppliersFn}
           initialOptions={initialSupplierOptions}
           value={supplierIds}
-          onValueChange={onSupplierIdsChange}
+          onValueChange={(value) => {
+            if (Array.isArray(value)) onSupplierIdsChange(value);
+          }}
           placeholder="Selecione fornecedores..."
           emptyText="Nenhum fornecedor encontrado"
           searchPlaceholder="Buscar fornecedores..."

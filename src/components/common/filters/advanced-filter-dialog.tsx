@@ -14,7 +14,7 @@ import {
   IconFilter,
   IconX,
   IconPlus,
-  IconSave,
+  IconDeviceFloppy,
   IconTrash,
   IconSearch,
   IconCalendar,
@@ -25,7 +25,7 @@ import {
   IconAlertCircle,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { toast } from "@/hooks/common/use-toast";
+import { toast } from "sonner";
 import type {
   FilterDefinition,
   FilterCondition,
@@ -337,10 +337,8 @@ export function AdvancedFilterDialog({
   // Add new group
   const addGroup = useCallback(() => {
     if (filterDefinition.groups.length >= maxGroups) {
-      toast({
-        title: "Limite atingido",
+      toast.error("Limite atingido", {
         description: `Máximo de ${maxGroups} grupos permitido`,
-        variant: "destructive",
       });
       return;
     }
@@ -387,10 +385,8 @@ export function AdvancedFilterDialog({
     (groupIndex: number) => {
       const group = filterDefinition.groups[groupIndex];
       if (group.conditions.length >= maxConditionsPerGroup) {
-        toast({
-          title: "Limite atingido",
+        toast.error("Limite atingido", {
           description: `Máximo de ${maxConditionsPerGroup} condições por grupo`,
-          variant: "destructive",
         });
         return;
       }
@@ -462,10 +458,8 @@ export function AdvancedFilterDialog({
   const handleApply = useCallback(() => {
     const errors = validateDefinition(filterDefinition);
     if (Object.keys(errors).length > 0) {
-      toast({
-        title: "Erro de validação",
+      toast.error("Erro de validação", {
         description: "Corrija os erros antes de aplicar os filtros",
-        variant: "destructive",
       });
       return;
     }
@@ -477,10 +471,8 @@ export function AdvancedFilterDialog({
   // Save preset
   const handleSavePreset = useCallback(async () => {
     if (!presetName.trim()) {
-      toast({
-        title: "Nome obrigatório",
+      toast.error("Nome obrigatório", {
         description: "Digite um nome para o preset",
-        variant: "destructive",
       });
       return;
     }
@@ -495,15 +487,12 @@ export function AdvancedFilterDialog({
       setPresets(await presetStorage.loadPresets(userId));
       setPresetName("");
       setShowPresetSave(false);
-      toast({
-        title: "Preset salvo",
+      toast.success("Preset salvo", {
         description: `Preset "${preset.name}" foi salvo com sucesso`,
       });
     } catch (error) {
-      toast({
-        title: "Erro ao salvar",
+      toast.error("Erro ao salvar", {
         description: "Não foi possível salvar o preset",
-        variant: "destructive",
       });
     }
   }, [presetName, filterDefinition, userId, presetStorage]);
@@ -519,10 +508,8 @@ export function AdvancedFilterDialog({
           setSelectedPreset(presetId);
         }
       } catch (error) {
-        toast({
-          title: "Erro ao carregar",
+        toast.error("Erro ao carregar", {
           description: "Não foi possível carregar o preset",
-          variant: "destructive",
         });
       }
     },
@@ -538,15 +525,12 @@ export function AdvancedFilterDialog({
         if (selectedPreset === presetId) {
           setSelectedPreset(null);
         }
-        toast({
-          title: "Preset removido",
+        toast.success("Preset removido", {
           description: "Preset foi removido com sucesso",
         });
       } catch (error) {
-        toast({
-          title: "Erro ao remover",
+        toast.error("Erro ao remover", {
           description: "Não foi possível remover o preset",
-          variant: "destructive",
         });
       }
     },
@@ -595,7 +579,7 @@ export function AdvancedFilterDialog({
             <Input
               type="number"
               value={condition.value || ""}
-              onChange={(e) => updateValue(Number(e.target.value))}
+              onChange={(value) => updateValue(Number(value))}
               placeholder="Digite o número..."
               className={cn(hasError && "border-destructive")}
             />
@@ -684,7 +668,7 @@ export function AdvancedFilterDialog({
             <Input
               type="date"
               value={condition.value instanceof Date ? condition.value.toISOString().split("T")[0] : condition.value || ""}
-              onChange={(e) => updateValue(new Date(e.target.value))}
+              onChange={(value) => updateValue(new Date(value as string))}
               className={cn(hasError && "border-destructive")}
             />
           );
@@ -696,14 +680,14 @@ export function AdvancedFilterDialog({
                 <Input
                   type="number"
                   value={condition.value?.min || ""}
-                  onChange={(e) => updateValue({ ...condition.value, min: Number(e.target.value) })}
+                  onChange={(value) => updateValue({ ...condition.value, min: Number(value) })}
                   placeholder="Mínimo"
                   className={cn(hasError && "border-destructive")}
                 />
                 <Input
                   type="number"
                   value={condition.value?.max || ""}
-                  onChange={(e) => updateValue({ ...condition.value, max: Number(e.target.value) })}
+                  onChange={(value) => updateValue({ ...condition.value, max: Number(value) })}
                   placeholder="Máximo"
                   className={cn(hasError && "border-destructive")}
                 />
@@ -897,7 +881,7 @@ export function AdvancedFilterDialog({
                     ))}
 
                     {filterDefinition.groups.length < maxGroups && (
-                      <Button variant="dashed" onClick={addGroup} className="w-full">
+                      <Button variant="outline" onClick={addGroup} className="w-full">
                         <IconPlus className="h-4 w-4 mr-2" />
                         Adicionar Grupo
                       </Button>
@@ -912,7 +896,7 @@ export function AdvancedFilterDialog({
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-medium">Presets Salvos</h3>
                       <Button size="sm" onClick={() => setShowPresetSave(true)} disabled={isEmpty}>
-                        <IconSave className="h-4 w-4 mr-2" />
+                        <IconDeviceFloppy className="h-4 w-4 mr-2" />
                         Salvar Atual
                       </Button>
                     </div>
@@ -946,7 +930,7 @@ export function AdvancedFilterDialog({
                       <div className="space-y-2">
                         {presets.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground">
-                            <IconSave className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <IconDeviceFloppy className="h-8 w-8 mx-auto mb-2 opacity-50" />
                             <p>Nenhum preset salvo</p>
                           </div>
                         ) : (

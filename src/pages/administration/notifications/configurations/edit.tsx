@@ -39,7 +39,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FormCombobox } from "@/components/ui/form-combobox";
 import { Separator } from "@/components/ui/separator";
-import { routes, SECTOR_PRIVILEGES, type NOTIFICATION_CHANNEL } from "@/constants";
+import { routes, SECTOR_PRIVILEGES, NOTIFICATION_CHANNEL } from "@/constants";
 import { cn } from "@/lib/utils";
 import {
   useNotificationConfiguration,
@@ -52,7 +52,7 @@ import { notificationConfigurationService } from "@/api-client/services/notifica
 // =====================
 
 const channelConfigSchema = z.object({
-  channel: z.enum(["IN_APP", "PUSH", "EMAIL", "WHATSAPP"]),
+  channel: z.nativeEnum(NOTIFICATION_CHANNEL),
   enabled: z.boolean(),
   mandatory: z.boolean(),
   defaultOn: z.boolean(),
@@ -171,7 +171,12 @@ const SECTOR_OPTIONS = [
   { value: "EXTERNAL", label: "Externo" },
 ];
 
-const ALL_CHANNELS = ["IN_APP", "PUSH", "EMAIL", "WHATSAPP"] as const;
+const ALL_CHANNELS = [
+  NOTIFICATION_CHANNEL.IN_APP,
+  NOTIFICATION_CHANNEL.PUSH,
+  NOTIFICATION_CHANNEL.EMAIL,
+  NOTIFICATION_CHANNEL.WHATSAPP,
+] as const;
 
 // =====================
 // Channel Config Card Component
@@ -212,7 +217,7 @@ function ChannelConfigCard({ channel, value, onChange }: ChannelConfigCardProps)
       </div>
 
       {value.enabled && (
-        <div className="space-y-3 pt-2 border-t border-border/50">
+        <div className="space-y-3 pt-2 border-t border-border">
           <label className="flex items-center justify-between cursor-pointer">
             <div className="flex items-center gap-2">
               <IconLock className="w-4 h-4 text-muted-foreground" />
@@ -297,7 +302,7 @@ export function NotificationConfigurationEditPage() {
   const isValidKey = key && !key.startsWith(":");
 
   const { data: response, isLoading, error } = useNotificationConfiguration(isValidKey ? key : "", {
-    enabled: isValidKey,
+    enabled: !!isValidKey,
   });
   const { update: updateMutation } = useNotificationConfigurationMutations();
 
@@ -544,11 +549,19 @@ export function NotificationConfigurationEditPage() {
                       <Label htmlFor="key">
                         Chave <span className="text-destructive">*</span>
                       </Label>
-                      <Input
-                        id="key"
-                        placeholder="Ex: service_order.completed"
-                        transparent
-                        {...form.register("key")}
+                      <Controller
+                        name="key"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Input
+                            id="key"
+                            placeholder="Ex: service_order.completed"
+                            transparent
+                            value={field.value}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                          />
+                        )}
                       />
                       {form.formState.errors.key && (
                         <p className="text-sm text-destructive">{form.formState.errors.key.message}</p>
@@ -562,11 +575,19 @@ export function NotificationConfigurationEditPage() {
                       <Label htmlFor="name">
                         Nome <span className="text-destructive">*</span>
                       </Label>
-                      <Input
-                        id="name"
-                        placeholder="Ex: Ordem de Serviço Concluída"
-                        transparent
-                        {...form.register("name")}
+                      <Controller
+                        name="name"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Input
+                            id="name"
+                            placeholder="Ex: Ordem de Serviço Concluída"
+                            transparent
+                            value={field.value}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                          />
+                        )}
                       />
                       {form.formState.errors.name && (
                         <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
@@ -581,11 +602,19 @@ export function NotificationConfigurationEditPage() {
                     <Label htmlFor="eventType">
                       Tipo de Evento <span className="text-destructive">*</span>
                     </Label>
-                    <Input
-                      id="eventType"
-                      placeholder="Ex: task.created"
-                      transparent
-                      {...form.register("eventType")}
+                    <Controller
+                      name="eventType"
+                      control={form.control}
+                      render={({ field }) => (
+                        <Input
+                          id="eventType"
+                          placeholder="Ex: task.created"
+                          transparent
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                        />
+                      )}
                     />
                     {form.formState.errors.eventType && (
                       <p className="text-sm text-destructive">{form.formState.errors.eventType.message}</p>
@@ -786,15 +815,21 @@ export function NotificationConfigurationEditPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="maxFrequencyPerDay">Frequência máxima por dia</Label>
-                      <Input
-                        id="maxFrequencyPerDay"
-                        type="number"
-                        min={0}
-                        placeholder="Sem limite"
-                        transparent
-                        {...form.register("maxFrequencyPerDay", {
-                          setValueAs: (v) => (v === "" || v == null ? null : parseInt(v, 10)),
-                        })}
+                      <Controller
+                        name="maxFrequencyPerDay"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Input
+                            id="maxFrequencyPerDay"
+                            type="number"
+                            min={0}
+                            placeholder="Sem limite"
+                            transparent
+                            value={field.value ?? undefined}
+                            onChange={(value) => field.onChange(value)}
+                            onBlur={field.onBlur}
+                          />
+                        )}
                       />
                       {form.formState.errors.maxFrequencyPerDay && (
                         <p className="text-sm text-destructive">{form.formState.errors.maxFrequencyPerDay.message}</p>
@@ -806,15 +841,21 @@ export function NotificationConfigurationEditPage() {
 
                     <div className="space-y-2">
                       <Label htmlFor="deduplicationWindow">Janela de deduplicação (min)</Label>
-                      <Input
-                        id="deduplicationWindow"
-                        type="number"
-                        min={0}
-                        placeholder="Desabilitada"
-                        transparent
-                        {...form.register("deduplicationWindow", {
-                          setValueAs: (v) => (v === "" || v == null ? null : parseInt(v, 10)),
-                        })}
+                      <Controller
+                        name="deduplicationWindow"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Input
+                            id="deduplicationWindow"
+                            type="number"
+                            min={0}
+                            placeholder="Desabilitada"
+                            transparent
+                            value={field.value ?? undefined}
+                            onChange={(value) => field.onChange(value)}
+                            onBlur={field.onBlur}
+                          />
+                        )}
                       />
                       {form.formState.errors.deduplicationWindow && (
                         <p className="text-sm text-destructive">{form.formState.errors.deduplicationWindow.message}</p>

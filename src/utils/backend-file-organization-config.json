@@ -1,6 +1,7 @@
 {
   "description": "File organization configuration for backend services - Maps file types and entities to remote storage directories",
   "storageRoot": "/srv/remote-storage",
+  "_storageRootNote": "This value is a server-side default. The API should override it via the STORAGE_ROOT environment variable. This JSON is a reference config sent to the API.",
   "fileOrganization": {
     "customer": {
       "logo": "Logos/Clientes/{customerFantasyName}/"

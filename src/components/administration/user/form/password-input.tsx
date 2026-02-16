@@ -27,7 +27,7 @@ export function PasswordInput({ disabled, required = false }: PasswordInputProps
               <Input
                 ref={field.ref}
                 value={field.value || ""}
-                onChange={(value: string) => field.onChange(value || undefined)}
+                onChange={(value: string | number | null) => field.onChange(value || undefined)}
                 onBlur={field.onBlur}
                 type={showPassword ? "text" : "password"}
                 placeholder={required ? "Digite a senha" : "Deixe em branco para manter a atual"}

@@ -22,6 +22,7 @@ import {
   IconPaperclip,
 } from "@tabler/icons-react";
 import type { FileWithPreview } from "./file-uploader";
+import { getApiBaseUrl } from "@/config/api";
 
 export interface FileUploadFieldProps {
   onFilesChange: (files: FileWithPreview[]) => void;
@@ -272,7 +273,7 @@ export function FileUploadField({
         <div
           {...getRootProps()}
           className={cn(
-            "relative border-2 border-dashed border-border/40 rounded-lg p-4 text-center transition-colors",
+            "relative border-2 border-dashed border-border rounded-lg p-4 text-center transition-colors",
             !isAtLimit && !disabled && "cursor-pointer hover:border-primary/50 hover:bg-muted/30",
             isDragActive && !isAtLimit && "border-primary bg-primary/5",
             (disabled || isAtLimit) && "cursor-not-allowed opacity-50 bg-muted/10",
@@ -336,7 +337,7 @@ export function FileUploadField({
                 const shouldShowThumbnail = showPreview && !thumbnailError && (file.preview || (isUploaded && file.thumbnailUrl));
 
                 const getThumbnailSrc = () => {
-                  const apiBaseUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
+                  const apiBaseUrl = getApiBaseUrl();
                   if (file.thumbnailUrl) {
                     if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
                     if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;
@@ -403,7 +404,7 @@ export function FileUploadField({
       <div
         {...getRootProps()}
         className={cn(
-          "border-2 border-dashed border-border/40 rounded-lg p-4 text-center transition-colors",
+          "border-2 border-dashed border-border rounded-lg p-4 text-center transition-colors",
           !isAtLimit && !disabled && "cursor-pointer hover:border-primary/50 hover:bg-muted/30",
           isDragActive && !isAtLimit && "border-primary bg-primary/5",
           (disabled || isAtLimit) && "cursor-not-allowed opacity-50 bg-muted/10",
@@ -462,7 +463,7 @@ export function FileUploadField({
                 const shouldShowThumbnail = showPreview && !thumbnailError && (file.preview || (isUploaded && file.thumbnailUrl));
 
                 const getThumbnailSrc = () => {
-                  const apiBaseUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
+                  const apiBaseUrl = getApiBaseUrl();
                   if (file.thumbnailUrl) {
                     if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
                     if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;

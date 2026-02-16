@@ -34,21 +34,19 @@ export function QuantityInput({ control, name = "quantity", label, disabled, sel
           <FormControl>
             <Input
               type="number"
-              min="1"
+              min={1}
               max={availableQuantity || undefined}
-              step="1"
+              step={1}
               placeholder="1"
               {...field}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                const inputValue = e.target.value;
-
+              onChange={(value: string | number | null) => {
                 // If empty, set to undefined (will be handled by default value or onBlur)
-                if (inputValue === "" || inputValue === null || inputValue === undefined) {
+                if (value === "" || value === null || value === undefined) {
                   field.onChange(undefined);
                   return;
                 }
 
-                const numericValue = Number(inputValue);
+                const numericValue = typeof value === 'number' ? value : Number(value);
 
                 // Validate input immediately
                 if (!isNaN(numericValue) && typeof numericValue === "number") {
@@ -86,7 +84,7 @@ export function QuantityInput({ control, name = "quantity", label, disabled, sel
                 }
                 field.onBlur();
               }}
-              value={field.value ?? ""}
+              value={field.value}
               disabled={disabled || !selectedItemId}
               className={fieldState.error ? "border-destructive" : ""}
             />

@@ -113,7 +113,7 @@ export function NumericRangeFilter({
               step={step}
               placeholder={minPlaceholder}
               value={localMin}
-              onChange={(e) => setLocalMin(e.target.value)}
+              onChange={(value) => setLocalMin(value as string)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleApply();
@@ -129,7 +129,7 @@ export function NumericRangeFilter({
               step={step}
               placeholder={maxPlaceholder}
               value={localMax}
-              onChange={(e) => setLocalMax(e.target.value)}
+              onChange={(value) => setLocalMax(value as string)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleApply();

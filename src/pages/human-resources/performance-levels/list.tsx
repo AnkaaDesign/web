@@ -59,8 +59,7 @@ export default function PerformanceLevelsListPage() {
 
   return (
     <PrivilegeRoute
-      requiredPrivileges={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}
-      fallback={<div>Acesso negado</div>}
+      requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}
     >
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
         <PageHeader

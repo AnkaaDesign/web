@@ -226,7 +226,7 @@ export function PpeSizesList({ className }: PpeSizesListProps) {
           label: "Status",
           value: USER_STATUS_LABELS[status as USER_STATUS] || status,
           onRemove: () => {
-            const newStatuses = (filters.status || []).filter((s) => s !== status);
+            const newStatuses = (filters.status || []).filter((s: string) => s !== status);
             handleFilterChange({ ...filters, status: newStatuses.length > 0 ? newStatuses : undefined });
           },
         });
@@ -242,7 +242,7 @@ export function PpeSizesList({ className }: PpeSizesListProps) {
             label: "Cargo",
             value: pos.name,
             onRemove: () => {
-              const newPositions = (filters.positionId || []).filter((p) => p !== id);
+              const newPositions = (filters.positionId || []).filter((p: string) => p !== id);
               handleFilterChange({ ...filters, positionId: newPositions.length > 0 ? newPositions : undefined });
             },
           });
@@ -259,7 +259,7 @@ export function PpeSizesList({ className }: PpeSizesListProps) {
             label: "Setor",
             value: sec.name,
             onRemove: () => {
-              const newSectors = (filters.sectorId || []).filter((s) => s !== id);
+              const newSectors = (filters.sectorId || []).filter((s: string) => s !== id);
               handleFilterChange({ ...filters, sectorId: newSectors.length > 0 ? newSectors : undefined });
             },
           });

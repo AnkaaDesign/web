@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import type { DateRange } from "react-day-picker";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -264,7 +265,7 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
               initialOptions={initialItemOptions}
               mode="multiple"
               value={localState.itemIds || []}
-              onValueChange={(value) => setLocalState((prev) => ({ ...prev, itemIds: value }))}
+              onValueChange={(value) => setLocalState((prev) => ({ ...prev, itemIds: Array.isArray(value) ? value : value ? [value] : [] }))}
               placeholder="Selecione itens..."
               emptyText="Nenhum item encontrado"
               searchPlaceholder="Buscar itens..."
@@ -287,7 +288,7 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
               initialOptions={initialUserOptions}
               mode="multiple"
               value={localState.userIds || []}
-              onValueChange={(value) => setLocalState((prev) => ({ ...prev, userIds: value }))}
+              onValueChange={(value) => setLocalState((prev) => ({ ...prev, userIds: Array.isArray(value) ? value : value ? [value] : [] }))}
               placeholder="Selecione usuários..."
               emptyText="Nenhum usuário encontrado"
               searchPlaceholder="Buscar usuários..."
@@ -307,7 +308,7 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
               mode="multiple"
               options={frequencyOptions}
               value={localState.frequency || []}
-              onValueChange={(value) => setLocalState((prev) => ({ ...prev, frequency: value }))}
+              onValueChange={(value) => setLocalState((prev) => ({ ...prev, frequency: Array.isArray(value) ? value : value ? [value] : [] }))}
               placeholder="Selecione frequências..."
               emptyText="Nenhuma frequência encontrada"
               searchPlaceholder="Buscar frequências..."
@@ -356,7 +357,8 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.nextRunRange?.from}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.nextRunRange?.to) {
                       setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
                     } else {
@@ -378,7 +380,8 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.nextRunRange?.to}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.nextRunRange?.from) {
                       setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
                     } else {

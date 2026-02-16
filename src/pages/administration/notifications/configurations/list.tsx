@@ -156,9 +156,11 @@ function createConfigurationColumns(): ConfigurationColumn[] {
       header: "Descrição",
       sortable: false,
       className: "min-w-[200px]",
-      accessor: (config) => (
-        <TruncatedTextWithTooltip text={config.description || "-"} maxLength={50} />
-      ),
+      accessor: (config) => {
+        const description = config.description || "-";
+        const truncated = description.length > 50 ? description.slice(0, 50) + "..." : description;
+        return <TruncatedTextWithTooltip text={truncated} tooltipText={description} />;
+      },
     },
     {
       key: "notificationType",

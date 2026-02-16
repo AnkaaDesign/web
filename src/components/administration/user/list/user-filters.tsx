@@ -190,7 +190,10 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 mode="multiple"
                 options={statusOptions}
                 value={selectedStatuses}
-                onValueChange={handleStatusChange}
+                onValueChange={(value) => {
+                  const arr = Array.isArray(value) ? value : (value ? [value] : []);
+                  handleStatusChange(arr);
+                }}
                 placeholder="Selecione os status"
                 searchable={true}
                 minSearchLength={0}
@@ -209,7 +212,10 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 queryFn={queryPositions}
                 initialOptions={[]}
                 value={selectedPositions}
-                onValueChange={handlePositionChange}
+                onValueChange={(value) => {
+                  const arr = Array.isArray(value) ? value : (value ? [value] : []);
+                  handlePositionChange(arr);
+                }}
                 placeholder="Selecione os cargos"
                 searchable={true}
                 minSearchLength={0}
@@ -230,7 +236,10 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 queryFn={querySectors}
                 initialOptions={[]}
                 value={selectedSectors}
-                onValueChange={handleSectorChange}
+                onValueChange={(value) => {
+                  const arr = Array.isArray(value) ? value : (value ? [value] : []);
+                  handleSectorChange(arr);
+                }}
                 placeholder="Selecione os setores"
                 searchable={true}
                 minSearchLength={0}
@@ -252,14 +261,15 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                     <DateTimeInput
                       mode="date"
                       value={localFilters.birth?.gte}
-                      onChange={(date: Date | null) => {
-                        if (!date && !localFilters.birth?.lte) {
+                      onChange={(date) => {
+                        const dateValue = date instanceof Date ? date : null;
+                        if (!dateValue && !localFilters.birth?.lte) {
                           setLocalFilters({ ...localFilters, birth: undefined });
                         } else {
                           setLocalFilters({
                             ...localFilters,
                             birth: {
-                              ...(date && { gte: date }),
+                              ...(dateValue && { gte: dateValue }),
                               ...(localFilters.birth?.lte && { lte: localFilters.birth.lte }),
                             },
                           });
@@ -274,15 +284,16 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                     <DateTimeInput
                       mode="date"
                       value={localFilters.birth?.lte}
-                      onChange={(date: Date | null) => {
-                        if (!date && !localFilters.birth?.gte) {
+                      onChange={(date) => {
+                        const dateValue = date instanceof Date ? date : null;
+                        if (!dateValue && !localFilters.birth?.gte) {
                           setLocalFilters({ ...localFilters, birth: undefined });
                         } else {
                           setLocalFilters({
                             ...localFilters,
                             birth: {
                               ...(localFilters.birth?.gte && { gte: localFilters.birth.gte }),
-                              ...(date && { lte: date }),
+                              ...(dateValue && { lte: dateValue }),
                             },
                           });
                         }
@@ -306,14 +317,15 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                     <DateTimeInput
                       mode="date"
                       value={localFilters.dismissedAt?.gte}
-                      onChange={(date: Date | null) => {
-                        if (!date && !localFilters.dismissedAt?.lte) {
+                      onChange={(date) => {
+                        const dateValue = date instanceof Date ? date : null;
+                        if (!dateValue && !localFilters.dismissedAt?.lte) {
                           setLocalFilters({ ...localFilters, dismissedAt: undefined });
                         } else {
                           setLocalFilters({
                             ...localFilters,
                             dismissedAt: {
-                              ...(date && { gte: date }),
+                              ...(dateValue && { gte: dateValue }),
                               ...(localFilters.dismissedAt?.lte && { lte: localFilters.dismissedAt.lte }),
                             },
                           });
@@ -328,15 +340,16 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                     <DateTimeInput
                       mode="date"
                       value={localFilters.dismissedAt?.lte}
-                      onChange={(date: Date | null) => {
-                        if (!date && !localFilters.dismissedAt?.gte) {
+                      onChange={(date) => {
+                        const dateValue = date instanceof Date ? date : null;
+                        if (!dateValue && !localFilters.dismissedAt?.gte) {
                           setLocalFilters({ ...localFilters, dismissedAt: undefined });
                         } else {
                           setLocalFilters({
                             ...localFilters,
                             dismissedAt: {
                               ...(localFilters.dismissedAt?.gte && { gte: localFilters.dismissedAt.gte }),
-                              ...(date && { lte: date }),
+                              ...(dateValue && { lte: dateValue }),
                             },
                           });
                         }
@@ -360,14 +373,15 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                     <DateTimeInput
                       mode="date"
                       value={localFilters.exp1EndAt?.gte}
-                      onChange={(date: Date | null) => {
-                        if (!date && !localFilters.exp1EndAt?.lte) {
+                      onChange={(date) => {
+                        const dateValue = date instanceof Date ? date : null;
+                        if (!dateValue && !localFilters.exp1EndAt?.lte) {
                           setLocalFilters({ ...localFilters, exp1EndAt: undefined });
                         } else {
                           setLocalFilters({
                             ...localFilters,
                             exp1EndAt: {
-                              ...(date && { gte: date }),
+                              ...(dateValue && { gte: dateValue }),
                               ...(localFilters.exp1EndAt?.lte && { lte: localFilters.exp1EndAt.lte }),
                             },
                           });
@@ -382,15 +396,16 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                     <DateTimeInput
                       mode="date"
                       value={localFilters.exp1EndAt?.lte}
-                      onChange={(date: Date | null) => {
-                        if (!date && !localFilters.exp1EndAt?.gte) {
+                      onChange={(date) => {
+                        const dateValue = date instanceof Date ? date : null;
+                        if (!dateValue && !localFilters.exp1EndAt?.gte) {
                           setLocalFilters({ ...localFilters, exp1EndAt: undefined });
                         } else {
                           setLocalFilters({
                             ...localFilters,
                             exp1EndAt: {
                               ...(localFilters.exp1EndAt?.gte && { gte: localFilters.exp1EndAt.gte }),
-                              ...(date && { lte: date }),
+                              ...(dateValue && { lte: dateValue }),
                             },
                           });
                         }

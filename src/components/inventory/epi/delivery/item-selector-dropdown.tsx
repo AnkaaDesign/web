@@ -9,7 +9,7 @@ import { getPpeSizeFromMeasures } from "@/utils/ppe-size-helpers";
 
 interface ItemSelectorDropdownProps {
   value?: string;
-  onChange: (value: string | undefined) => void;
+  onChange: (value: string | string[] | null | undefined) => void;
   placeholder?: string;
   userId?: string;
   disabled?: boolean;
@@ -223,6 +223,11 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
     [userId, userSizes, showAllSizes, hasSizesConfigured]
   );
 
+  const handleValueChange = (value: string | string[] | null | undefined) => {
+    if (Array.isArray(value) || value === null) return;
+    onChange(value);
+  };
+
   return (
     <div className="space-y-1.5">
       <Combobox
@@ -230,7 +235,7 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
         queryKey={["item-selector", userId, queryKey]}
         queryFn={queryItems}
         value={value}
-        onValueChange={onChange}
+        onValueChange={handleValueChange}
         placeholder={userId ? placeholder : "Selecione um funcionário primeiro"}
         searchPlaceholder="Buscar EPI..."
         emptyText={userId ? "Nenhum EPI encontrado" : "Selecione um funcionário primeiro"}

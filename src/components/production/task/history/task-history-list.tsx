@@ -78,7 +78,7 @@ export function TaskHistoryList({
 
   // Check if user can view/change status filter (Admin, Commercial, or Financial only, and not explicitly hidden)
   // This allows these sectors to see cancelled tasks in the history by selecting them in the filter
-  const canViewStatusFilter = !hideStatusFilter && canViewCancelledTasks(currentUser);
+  const canViewStatusFilter = !hideStatusFilter && canViewCancelledTasks(currentUser as any);
 
   // Get table state for selected tasks functionality
   const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds, resetSelection } = useTableState({
@@ -457,10 +457,10 @@ export function TaskHistoryList({
         throw new Error('Failed to fetch source task details');
       }
 
-      setCopyFromTaskState((prev) => ({
+      setCopyFromTaskState((prev): CopyFromTaskState => ({
         ...prev,
         step: "confirming",
-        sourceTask: fullSourceTask.data,
+        sourceTask: fullSourceTask.data ?? null,
       }));
     } catch (error) {
       console.error('Failed to fetch source task:', error);

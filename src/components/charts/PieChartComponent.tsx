@@ -17,7 +17,6 @@ import {
   ResponsiveContainer,
   Tooltip,
   Label,
-  Sector,
 } from 'recharts';
 import { ChartWrapper } from './base/ChartWrapper';
 import type { ExportData } from './base/ChartWrapper';
@@ -81,43 +80,6 @@ export interface PieChartComponentProps {
   error?: Error | string | null;
 }
 
-// Active shape for interactive pie
-const renderActiveShape = (props: any) => {
-  const {
-    cx,
-    cy,
-    innerRadius,
-    outerRadius,
-    startAngle,
-    endAngle,
-    fill,
-  } = props;
-
-  return (
-    <g>
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius}
-        outerRadius={outerRadius + 6}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-      />
-      <Sector
-        cx={cx}
-        cy={cy}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        innerRadius={outerRadius + 8}
-        outerRadius={outerRadius + 10}
-        fill={fill}
-        opacity={0.8}
-      />
-    </g>
-  );
-};
-
 export const PieChartComponent = React.memo<PieChartComponentProps>(({
   data,
   className,
@@ -146,7 +108,6 @@ export const PieChartComponent = React.memo<PieChartComponentProps>(({
   isLoading,
   error,
 }) => {
-  const [activeIndex, setActiveIndex] = useState<number | undefined>();
   const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set());
 
   // Filter hidden items
@@ -277,17 +238,10 @@ export const PieChartComponent = React.memo<PieChartComponentProps>(({
               innerRadius={chartInnerRadius}
               fill="#8884d8"
               dataKey={valueKey}
-              nameKey={nameKey}
               startAngle={chartAngles.startAngle}
               endAngle={chartAngles.endAngle}
-              activeIndex={interactive ? activeIndex : undefined}
-              activeShape={interactive ? renderActiveShape : undefined}
-              onMouseEnter={(_, index) => {
-                if (interactive) setActiveIndex(index);
-              }}
-              onMouseLeave={() => {
-                if (interactive) setActiveIndex(undefined);
-              }}
+              onMouseEnter={() => {}}
+              onMouseLeave={() => {}}
               onClick={(entry) => {
                 if (onSegmentClick) onSegmentClick(entry);
               }}

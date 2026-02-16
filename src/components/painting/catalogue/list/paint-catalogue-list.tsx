@@ -132,7 +132,7 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onResetOrder
   // Sort state
   const [currentSort, setCurrentSort] = useState<SortOption>(() => {
     const sortParam = searchParams.get("sort");
-    if (sortParam && ["name", "color", "type", "paintBrand", "finish", "manufacturer"].includes(sortParam)) {
+    if (sortParam && ["name", "color", "type", "paintBrand", "brand", "finish", "manufacturer"].includes(sortParam)) {
       return sortParam as SortOption;
     }
     return "color"; // Default to color sorting

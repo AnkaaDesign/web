@@ -45,9 +45,9 @@ export function WebsiteInput({ disabled }: WebsiteInputProps) {
           <FormControl>
             <Input
               ref={ref}
-              type="url"
+              type="text"
               value={value || ""}
-              onChange={(value: string) => {
+              onChange={(value: string | number | null) => {
                 onChange(value === "" ? null : value);
               }}
               onBlur={(e) => {
@@ -56,7 +56,7 @@ export function WebsiteInput({ disabled }: WebsiteInputProps) {
                   const formattedUrl = formatUrl(val);
                   onChange(formattedUrl);
                 }
-                onBlur?.(e);
+                onBlur?.();
               }}
               placeholder="https://www.exemplo.com.br"
               disabled={disabled}

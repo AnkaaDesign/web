@@ -11,7 +11,6 @@ import {
   getItemById,
   getFileById,
   getObservationById,
-  getTruckById,
   getServiceOrderById,
 } from "../../api-client";
 
@@ -27,7 +26,6 @@ interface EntityDetails {
   items: Map<string, string>;
   files: Map<string, string>;
   observations: Map<string, string>;
-  trucks: Map<string, string>;
   serviceOrders: Map<string, any>; // Store full service order objects with description, type, status, etc.
 }
 
@@ -43,7 +41,6 @@ export function useEntityDetails(entityIds: {
   itemIds?: string[];
   fileIds?: string[];
   observationIds?: string[];
-  truckIds?: string[];
   serviceOrderIds?: string[];
 }) {
   const uniqueCategoryIds = [...new Set(entityIds.categoryIds || [])].filter(Boolean);
@@ -57,7 +54,6 @@ export function useEntityDetails(entityIds: {
   const uniqueItemIds = [...new Set(entityIds.itemIds || [])].filter(Boolean);
   const uniqueFileIds = [...new Set(entityIds.fileIds || [])].filter(Boolean);
   const uniqueObservationIds = [...new Set(entityIds.observationIds || [])].filter(Boolean);
-  const uniqueTruckIds = [...new Set(entityIds.truckIds || [])].filter(Boolean);
   const uniqueServiceOrderIds = [...new Set(entityIds.serviceOrderIds || [])].filter(Boolean);
 
   return useQuery({
@@ -74,7 +70,6 @@ export function useEntityDetails(entityIds: {
       uniqueItemIds,
       uniqueFileIds,
       uniqueObservationIds,
-      uniqueTruckIds,
       uniqueServiceOrderIds,
     ],
     queryFn: async () => {
@@ -90,7 +85,6 @@ export function useEntityDetails(entityIds: {
         items: new Map(),
         files: new Map(),
         observations: new Map(),
-        trucks: new Map(),
         serviceOrders: new Map(),
       };
 
@@ -127,7 +121,7 @@ export function useEntityDetails(entityIds: {
         try {
           const response = await getSupplierById(id, {});
           if (response?.success && response.data) {
-            details.suppliers.set(id, response.data.fantasyName || response.data.name || "");
+            details.suppliers.set(id, response.data.fantasyName || "");
           }
         } catch (error) {
           if (process.env.NODE_ENV !== 'production') {
@@ -258,20 +252,6 @@ export function useEntityDetails(entityIds: {
         }
       });
 
-      // Fetch all trucks
-      const truckPromises = uniqueTruckIds.map(async (id) => {
-        try {
-          const response = await getTruckById(id, {});
-          if (response?.success && response.data) {
-            details.trucks.set(id, (response.data as any).plate || (response.data as any).model || `Caminhão ${id.slice(0, 8)}`);
-          }
-        } catch (error) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error(`Failed to fetch truck ${id}:`, error);
-          }
-        }
-      });
-
       // Fetch all service orders with full details
       const serviceOrderPromises = uniqueServiceOrderIds.map(async (id) => {
         try {
@@ -304,7 +284,6 @@ export function useEntityDetails(entityIds: {
         ...itemPromises,
         ...filePromises,
         ...observationPromises,
-        ...truckPromises,
         ...serviceOrderPromises,
       ]);
 
@@ -322,7 +301,6 @@ export function useEntityDetails(entityIds: {
       uniqueItemIds.length > 0 ||
       uniqueFileIds.length > 0 ||
       uniqueObservationIds.length > 0 ||
-      uniqueTruckIds.length > 0 ||
       uniqueServiceOrderIds.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

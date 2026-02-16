@@ -21,6 +21,7 @@ export function CustomerEditForm({ customer, onSubmit, isSubmitting, onDirtyChan
       cpf: customer.cpf,
       corporateName: customer.corporateName,
       email: customer.email,
+      streetType: customer.streetType as any,
       address: customer.address,
       addressNumber: customer.addressNumber,
       addressComplement: customer.addressComplement,
@@ -32,6 +33,7 @@ export function CustomerEditForm({ customer, onSubmit, isSubmitting, onDirtyChan
       phones: customer.phones || [],
       tags: customer.tags || [],
       logoId: customer.logoId,
+      stateRegistration: customer.stateRegistration,
     }),
     [customer],
   );

@@ -388,8 +388,8 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
       <Card className={cn("flex flex-col overflow-hidden", className)}>
         <div className="flex h-full">
           {/* Left Panel - Request List */}
-          <div className="w-[420px] flex-shrink-0 border-r border-border/50 flex flex-col">
-            <div className="px-6 py-4 border-b border-border/50">
+          <div className="w-[420px] flex-shrink-0 border-r border-border flex flex-col">
+            <div className="px-6 py-4 border-b border-border">
               <div className="flex items-center gap-3">
                 <IconClockEdit className="h-5 w-5 text-primary" />
                 <h3 className="text-lg font-semibold">
@@ -425,7 +425,7 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
                         "relative p-4 rounded-lg border cursor-pointer transition-all duration-200",
                         selectedRequest?.Id === request.Id
                           ? "border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-                          : "border-border/50 bg-card hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:shadow-sm"
+                          : "border-border bg-card hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:shadow-sm"
                       )}
                     >
                       <div className="flex items-start justify-between">
@@ -494,7 +494,7 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
               </div>
             ) : (
               <>
-                <div className="px-8 py-6 border-b border-border/50 flex-shrink-0">
+                <div className="px-8 py-6 border-b border-border flex-shrink-0">
                   <div className="flex items-start justify-between">
                     <div className="space-y-2">
                       <div className="flex items-center gap-3">
@@ -541,7 +541,7 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
                       </div>
                     </div>
                     {selectedRequest.Observacoes && (
-                      <div className="mt-4 pt-4 border-t border-border/50">
+                      <div className="mt-4 pt-4 border-t border-border">
                         <div className="space-y-1">
                           <p className="text-xs text-muted-foreground">Observação</p>
                           <p className="text-sm">{selectedRequest.Observacoes}</p>
@@ -562,7 +562,7 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
                       </Badge>
                     </div>
 
-                    <div className="overflow-hidden rounded-lg border border-border/50">
+                    <div className="overflow-hidden rounded-lg border border-border">
                       <Table>
                         <TableHeader className="bg-muted/50">
                           <TableRow className="h-9">

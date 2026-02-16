@@ -175,7 +175,7 @@ export const PPEScheduleEditPage = () => {
               isSubmitting={updateMutation.isPending}
               defaultValues={{
                 name: ppeSchedule.data?.name || "",
-                items: ppeSchedule.data?.items || [],
+                items: (ppeSchedule.data?.items || []) as any,
                 assignmentType: ppeSchedule.data?.assignmentType,
                 excludedUserIds: ppeSchedule.data?.excludedUserIds || [],
                 includedUserIds: ppeSchedule.data?.includedUserIds || [],

@@ -166,7 +166,7 @@ export function AdvancedFilterBuilder({
       ))}
 
       {definition.groups.length < maxGroups && (
-        <Button variant="dashed" onClick={addGroup} className="w-full">
+        <Button variant="outline" onClick={addGroup} className="w-full">
           <IconPlus className="h-4 w-4 mr-2" />
           Adicionar Grupo
         </Button>

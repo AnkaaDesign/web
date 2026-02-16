@@ -3,15 +3,10 @@ import { IconDownload, IconTrash, IconPlus, IconCopy, IconFlipHorizontal, IconCa
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useTheme } from "@/contexts/theme-context";
 import type { LayoutCreateFormData } from "../../../schemas";
+import { getApiBaseUrl } from "@/config/api";
 
 interface LayoutFormProps {
   selectedSide?: 'left' | 'right' | 'back';
@@ -661,19 +656,19 @@ export const LayoutForm = ({
       return;
     }
 
-    if (layout.photo) {
+    if (layout.photoId) {
       // Only sync if the photo ID changed
-      if (photoState.photoId === layout.photo.id) {
+      if (photoState.photoId === layout.photoId) {
         return;
       }
 
-      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
-      const imageUrl = `${apiUrl}/files/${layout.photo.id}/download`;
+      const apiUrl = getApiBaseUrl();
+      const imageUrl = `${apiUrl}/files/${layout.photoId}/download`;
 
       setPhotoState({
         imageUrl,
-        photoId: layout.photo.id,
-        file: null,
+        photoId: layout.photoId,
+        file: undefined,
       });
     } else {
       // Layout has no photo - clear photoState only if it had a photoId (not a new file)
@@ -845,23 +840,13 @@ export const LayoutForm = ({
           onChange(oppositeSide, oppositeLayoutData);
         }
       } else if (onSave) {
-        // Call onSave and handle the promise
-        const saveResult = onSave(layoutData);
+        // Call onSave - it doesn't return a promise
+        onSave(layoutData);
 
-        // If onSave returns a promise, wait for it to complete
-        if (saveResult && typeof saveResult.then === 'function') {
-          saveResult.finally(() => {
-            // Reset the flag after a delay to allow the backend to process
-            setTimeout(() => {
-              isSavingRef.current = false;
-            }, 500);
-          });
-        } else {
-          // If not a promise, reset after a delay
-          setTimeout(() => {
-            isSavingRef.current = false;
-          }, 500);
-        }
+        // Reset after a delay to allow the backend to process
+        setTimeout(() => {
+          isSavingRef.current = false;
+        }, 500);
       } else {
         // No callback, reset immediately
         isSavingRef.current = false;
@@ -1303,7 +1288,7 @@ export const LayoutForm = ({
   // Early return if no current state
   if (!currentState) {
     return (
-      <div className="space-y-4 p-4 border border-border/40 rounded-lg bg-background/50">
+      <div className="space-y-4 p-4 border border-border rounded-lg bg-background/50">
         <p className="text-muted-foreground">Carregando layout...</p>
       </div>
     );
@@ -1312,7 +1297,7 @@ export const LayoutForm = ({
   return (
     <div className="space-y-4">
       {/* Preview Container with centered content */}
-      <div className="p-4 border border-border/40 rounded-lg bg-background/50">
+      <div className="p-4 border border-border rounded-lg bg-background/50">
         {/* Zoom Controls */}
         <div className="flex justify-end items-center gap-1 mb-3 pb-3 border-b border-border/30">
           <span className="text-xs text-muted-foreground mr-2">

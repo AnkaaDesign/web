@@ -42,7 +42,7 @@ export function StreetTypeSelect({ disabled }: StreetTypeSelectProps) {
   return (
     <FormField
       control={form.control}
-      name="streetType"
+      name={"streetType" as any}
       render={({ field }) => (
         <FormItem>
           <FormLabel className="flex items-center gap-2">
@@ -52,7 +52,7 @@ export function StreetTypeSelect({ disabled }: StreetTypeSelectProps) {
           <Combobox
             value={field.value || undefined}
             onValueChange={field.onChange}
-            options={STREET_TYPES}
+            options={[...STREET_TYPES]}
             placeholder="Selecione o tipo"
             disabled={disabled}
             searchable={true}

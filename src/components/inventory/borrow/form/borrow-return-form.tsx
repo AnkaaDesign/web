@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconPackage, IconUser, IconCalendar, IconArrowLeft, IconCheck, IconExclamationCircle } from "@tabler/icons-react";
 import { type Borrow } from "../../../../types";
-import { BORROW_STATUS, routes } from "../../../../constants";
+import { BORROW_STATUS, routes, USER_STATUS } from "../../../../constants";
 import { formatDateTime, formatRelativeTime } from "../../../../utils";
 import { toast } from "sonner";
 import { useBorrowMutations } from "../../../../hooks";
@@ -71,7 +71,7 @@ export function BorrowReturnForm({ borrow, onCancel }: BorrowReturnFormProps) {
       }
 
       // Validate user is still active (warning only)
-      if (borrow.user?.status !== "ACTIVE") {
+      if (borrow.user?.status && borrow.user.status !== USER_STATUS.EFFECTED) {
         toast.warning("Aviso: Usuário do empréstimo está inativo");
       }
 
@@ -226,8 +226,8 @@ export function BorrowReturnForm({ borrow, onCancel }: BorrowReturnFormProps) {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium">{borrow.user?.name || "-"}</p>
                     {borrow.user?.status && (
-                      <Badge variant={borrow.user.status === "ACTIVE" ? "default" : "destructive"} className="text-xs">
-                        {borrow.user.status === "ACTIVE" ? "Ativo" : "Inativo"}
+                      <Badge variant={borrow.user.status === USER_STATUS.EFFECTED ? "default" : "destructive"} className="text-xs">
+                        {borrow.user.status === USER_STATUS.EFFECTED ? "Ativo" : "Inativo"}
                       </Badge>
                     )}
                   </div>

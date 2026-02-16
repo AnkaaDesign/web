@@ -173,7 +173,7 @@ export const ComboChart: React.FC<ComboChartProps> = ({ config, data }) => {
 
           <XAxis
             dataKey={config.xAxis?.dataKey}
-            type={config.xAxis?.type}
+            type={config.xAxis?.type === 'time' ? 'number' : config.xAxis?.type}
             tickFormatter={formatXAxisTick}
             stroke="hsl(var(--muted-foreground))"
             fontSize={12}
@@ -194,7 +194,7 @@ export const ComboChart: React.FC<ComboChartProps> = ({ config, data }) => {
 
           <YAxis
             yAxisId="left"
-            type={config.yAxis?.type}
+            type={config.yAxis?.type === 'time' ? 'number' : config.yAxis?.type}
             tickFormatter={formatYAxisTick}
             stroke="hsl(var(--muted-foreground))"
             fontSize={12}
@@ -219,7 +219,7 @@ export const ComboChart: React.FC<ComboChartProps> = ({ config, data }) => {
             <YAxis
               yAxisId="right"
               orientation="right"
-              type={config.secondaryYAxis.type}
+              type={config.secondaryYAxis.type === 'time' ? 'number' : config.secondaryYAxis.type}
               tickFormatter={formatSecondaryYAxisTick}
               stroke="hsl(var(--muted-foreground))"
               fontSize={12}

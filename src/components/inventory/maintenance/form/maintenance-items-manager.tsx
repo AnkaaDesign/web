@@ -100,13 +100,13 @@ export function MaintenanceItemsManager({ control, fieldArray, disabled = false 
                       <FormControl>
                         <Input
                           type="number"
-                          min="1"
-                          step="1"
+                          min={1}
+                          step={1}
                           placeholder="Quantidade"
                           disabled={disabled}
                           ref={field.ref}
                           value={field.value || ""}
-                          onChange={(value: string) => field.onChange(Number(value) || 1)}
+                          onChange={(value: string | number | null) => field.onChange(typeof value === 'number' ? value : (typeof value === 'string' ? (Number(value) || 1) : 1))}
                           onBlur={field.onBlur}
                         />
                       </FormControl>

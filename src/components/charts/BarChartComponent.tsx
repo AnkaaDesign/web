@@ -276,13 +276,13 @@ export const BarChartComponent = React.memo<BarChartComponentProps>(({
           )}
 
           <Tooltip
-            content={(props) => <ChartTooltip {...props} />}
+            content={<ChartTooltip />}
             cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
           />
 
           {showLegend && (
             <Legend
-              onClick={(e) => handleLegendClick(e.dataKey)}
+              onClick={(e) => handleLegendClick(String(e.dataKey ?? ''))}
               wrapperStyle={{ cursor: 'pointer' }}
             />
           )}

@@ -74,7 +74,7 @@ export const sectorIncludeSchema = z
               logoPaints: z.boolean().optional(),
               commissions: z.boolean().optional(),
               services: z.boolean().optional(),
-              airbrushing: z.boolean().optional(),
+              airbrushings: z.boolean().optional(),
               truck: z.boolean().optional(),
               relatedTasks: z.boolean().optional(),
               relatedTo: z.boolean().optional(),

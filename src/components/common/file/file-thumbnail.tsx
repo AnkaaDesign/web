@@ -18,6 +18,7 @@ import {
   IconFileTypeDoc,
   IconFileTypeXls,
 } from "@tabler/icons-react";
+import { getApiBaseUrl } from "@/config/api";
 
 export interface FileThumbnailProps {
   file: AnkaaFile;
@@ -74,7 +75,7 @@ const getFileIcon = (file: AnkaaFile, size: number = 16) => {
 };
 
 const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" = "small"): string => {
-  const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
+  const apiUrl = getApiBaseUrl();
 
   // Handle PDF thumbnails
   if (isPDFFile(file)) {

@@ -7,22 +7,25 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import {
   IconSettings,
-  IconUsers,
-  IconBuilding,
-  IconUserCheck,
-  IconBell,
-  IconFolder,
-  IconChartBar,
   IconUserPlus,
-  IconBuildingBank,
-  IconActivity,
-  IconClock,
-  IconUserX,
-  IconMail,
-  IconShield,
-  IconChartPie,
-  IconUsersGroup,
 } from "@tabler/icons-react";
+import {
+  Users as LucideUsers,
+  Building as LucideBuilding,
+  UserCheck as LucideUserCheck,
+  UserPlus as LucideUserPlus,
+  Building2 as LucideBuildingBank,
+  Activity as LucideActivity,
+  Clock as LucideClock,
+  UserX as LucideUserX,
+  Mail as LucideMail,
+  Shield as LucideShield,
+  PieChart as LucidePieChart,
+  Users2 as LucideUsersGroup,
+  BarChart3 as LucideChartBar,
+  Folder as LucideFolder,
+  Bell as LucideBell,
+} from "lucide-react";
 import {
   RecentActivitiesCard,
   TrendCard,
@@ -81,36 +84,36 @@ export const AdministrationRootPage = () => {
   const getUserStatus = () => {
     if (!dashboard?.data?.userMetrics) return [];
 
-    const { totalUsers, experiencePeriod1Users, experiencePeriod2Users, effectedUsers, dismissedUsers } = dashboard.data.userMetrics;
+    const { totalUsers, activeUsers, inactiveUsers, pendingUsers } = dashboard.data.userMetrics;
 
     return [
       {
-        status: "Experiência 1/2",
-        quantity: experiencePeriod1Users?.value || 0,
+        status: "Ativos",
+        quantity: activeUsers?.value || 0,
         total: totalUsers?.value || 0,
-        icon: IconClock,
-        color: "orange" as const,
-      },
-      {
-        status: "Experiência 2/2",
-        quantity: experiencePeriod2Users?.value || 0,
-        total: totalUsers?.value || 0,
-        icon: IconClock,
-        color: "blue" as const,
-      },
-      {
-        status: "Efetivado",
-        quantity: effectedUsers?.value || 0,
-        total: totalUsers?.value || 0,
-        icon: IconUserCheck,
+        icon: LucideUserCheck,
         color: "green" as const,
       },
       {
-        status: "Desligado",
-        quantity: dismissedUsers?.value || 0,
+        status: "Inativos",
+        quantity: inactiveUsers?.value || 0,
         total: totalUsers?.value || 0,
-        icon: IconUserX,
+        icon: LucideUserX,
         color: "red" as const,
+      },
+      {
+        status: "Pendentes",
+        quantity: pendingUsers?.value || 0,
+        total: totalUsers?.value || 0,
+        icon: LucideClock,
+        color: "orange" as const,
+      },
+      {
+        status: "Novos (Semana)",
+        quantity: dashboard.data.userMetrics.newUsersThisWeek?.value || 0,
+        total: totalUsers?.value || 0,
+        icon: LucideUserPlus,
+        color: "blue" as const,
       },
     ];
   };
@@ -146,23 +149,19 @@ export const AdministrationRootPage = () => {
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
         <div className="h-full flex flex-col bg-background">
           {/* Fixed Header */}
-          <div className="flex-shrink-0 bg-background">
-            <div className="px-4 py-4">
-              <PageHeader
-                title="Administração"
-                icon={IconSettings}
-                favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
-                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
-                actions={[
-                  {
-                    key: "time-period",
-                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                    variant: "ghost",
-                    className: "p-0 hover:bg-transparent",
-                  },
-                ]}
-              />
-            </div>
+          <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+            <PageHeader
+              title="Administração"
+              icon={IconSettings}
+              favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
+              actions={[
+                {
+                  key: "time-period",
+                  label: <TimePeriodSelector value={timePeriod} onChange={(val) => setTimePeriod(val as DASHBOARD_TIME_PERIOD)} /> as any,
+                },
+              ]}
+            />
           </div>
 
           {/* Scrollable Content */}
@@ -185,23 +184,19 @@ export const AdministrationRootPage = () => {
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
         <div className="h-full flex flex-col bg-background">
           {/* Fixed Header */}
-          <div className="flex-shrink-0 bg-background">
-            <div className="px-4 py-4">
-              <PageHeader
-                title="Administração"
-                icon={IconSettings}
-                favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
-                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
-                actions={[
-                  {
-                    key: "time-period",
-                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                    variant: "ghost",
-                    className: "p-0 hover:bg-transparent",
-                  },
-                ]}
-              />
-            </div>
+          <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+            <PageHeader
+              title="Administração"
+              icon={IconSettings}
+              favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
+              actions={[
+                {
+                  key: "time-period",
+                  label: <TimePeriodSelector value={timePeriod} onChange={(val) => setTimePeriod(val as DASHBOARD_TIME_PERIOD)} /> as any,
+                },
+              ]}
+            />
           </div>
 
           {/* Scrollable Content */}
@@ -225,30 +220,26 @@ export const AdministrationRootPage = () => {
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
       <div className="h-full flex flex-col bg-background">
         {/* Fixed Header */}
-        <div className="flex-shrink-0 bg-background">
-          <div className="px-4 py-4">
-            <PageHeader
-              title="Administração"
-              icon={IconSettings}
-              favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
-              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
-              actions={[
-                {
-                  key: "time-period",
-                  label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                  variant: "ghost",
-                  className: "p-0 hover:bg-transparent",
-                },
-                {
-                  key: "create-user",
-                  label: "Novo Colaborador",
-                  icon: IconUserPlus,
-                  onClick: () => navigate(routes.administration.collaborators.create),
-                  variant: "default",
-                },
-              ]}
-            />
-          </div>
+        <div className="flex-shrink-0 bg-background px-4 pt-4 pb-4">
+          <PageHeader
+            title="Administração"
+            icon={IconSettings}
+            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
+            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
+            actions={[
+              {
+                key: "create-user",
+                label: "Novo Colaborador",
+                icon: IconUserPlus,
+                onClick: () => navigate(routes.administration.collaborators.create),
+                variant: "default",
+              },
+              {
+                key: "time-period",
+                label: <TimePeriodSelector value={timePeriod} onChange={(val) => setTimePeriod(val as DASHBOARD_TIME_PERIOD)} /> as any,
+              },
+            ]}
+          />
         </div>
 
         {/* Scrollable Content */}
@@ -261,28 +252,28 @@ export const AdministrationRootPage = () => {
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <QuickAccessCard
                   title="Colaboradores"
-                  icon={IconUsers}
+                  icon={LucideUsers}
                   onClick={() => navigate(routes.administration.collaborators.root)}
                   count={data?.userMetrics?.totalUsers?.value ?? 0}
                   color="blue"
                 />
                 <QuickAccessCard
                   title="Clientes"
-                  icon={IconBuildingBank}
+                  icon={LucideBuildingBank}
                   onClick={() => navigate(routes.administration.customers.root)}
                   count={data?.customerAnalysis?.totalCustomers?.value ?? 0}
                   color="green"
                 />
                 <QuickAccessCard
                   title="Setores"
-                  icon={IconBuilding}
+                  icon={LucideBuilding}
                   onClick={() => navigate(routes.administration.sectors.root)}
                   count={data?.sectorMetrics?.totalSectors?.value ?? 0}
                   color="purple"
                 />
                 <QuickAccessCard
                   title="Notificações"
-                  icon={IconBell}
+                  icon={LucideBell}
                   onClick={() => navigate(routes.administration.notifications.root)}
                   count={data?.notificationMetrics?.totalNotifications?.value ?? 0}
                   color="red"
@@ -294,7 +285,7 @@ export const AdministrationRootPage = () => {
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4">Atividades Recentes</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <RecentActivitiesCard title="Ações Recentes" activities={transformRecentActivities()} icon={IconActivity} color="blue" />
+                <RecentActivitiesCard title="Ações Recentes" activities={transformRecentActivities()} icon={LucideActivity} color="blue" />
                 <RecentActivitiesCard
                   title="Novos Usuários"
                   activities={[
@@ -305,7 +296,7 @@ export const AdministrationRootPage = () => {
                       time: "Hoje",
                     },
                   ]}
-                  icon={IconUserPlus}
+                  icon={LucideUserPlus}
                   color="green"
                 />
                 <RecentActivitiesCard
@@ -318,7 +309,7 @@ export const AdministrationRootPage = () => {
                       time: "Criadas",
                     },
                   ]}
-                  icon={IconMail}
+                  icon={LucideMail}
                   color="orange"
                 />
                 <RecentActivitiesCard
@@ -331,8 +322,8 @@ export const AdministrationRootPage = () => {
                       time: "Uptime",
                     },
                   ]}
-                  icon={IconShield}
-                  color="teal"
+                  icon={LucideShield}
+                  color="purple"
                 />
               </div>
             </div>
@@ -346,7 +337,7 @@ export const AdministrationRootPage = () => {
                   value={data?.userMetrics?.totalUsers?.value ?? 0}
                   trend={data?.userMetrics?.userGrowthTrend}
                   percentage={Number(data?.userMetrics?.userGrowthPercent ?? 0)}
-                  icon={IconUsers}
+                  icon={LucideUsers}
                   subtitle="Colaboradores ativos"
                 />
                 <TrendCard
@@ -354,19 +345,19 @@ export const AdministrationRootPage = () => {
                   value={data?.customerAnalysis?.totalCustomers?.value ?? 0}
                   trend={data?.customerAnalysis?.totalCustomers?.trend}
                   percentage={data?.customerAnalysis?.totalCustomers?.changePercent ?? 0}
-                  icon={IconBuildingBank}
+                  icon={LucideBuildingBank}
                   subtitle="Clientes cadastrados"
                 />
-                <TrendCard title="Setores" value={data?.sectorMetrics?.totalSectors?.value ?? 0} trend="stable" percentage={0} icon={IconBuilding} subtitle="Departamentos" />
+                <TrendCard title="Setores" value={data?.sectorMetrics?.totalSectors?.value ?? 0} trend="stable" percentage={0} icon={LucideBuilding} subtitle="Departamentos" />
                 <TrendCard
                   title="Tarefas Ativas"
                   value={data?.taskOverview?.totalTasks?.value ?? 0}
                   trend={data?.taskOverview?.totalTasks?.trend}
                   percentage={data?.taskOverview?.totalTasks?.changePercent ?? 0}
-                  icon={IconChartBar}
+                  icon={LucideChartBar}
                   subtitle="Tarefas em produção"
                 />
-                <TrendCard title="Arquivos" value={data?.fileMetrics?.totalFiles?.value ?? 0} trend="up" percentage={5} icon={IconFolder} subtitle="Documentos" />
+                <TrendCard title="Arquivos" value={data?.fileMetrics?.totalFiles?.value ?? 0} trend="up" percentage={5} icon={LucideFolder} subtitle="Documentos" />
               </div>
             </div>
 
@@ -387,12 +378,12 @@ export const AdministrationRootPage = () => {
                 <ActivityPatternCard
                   title="Colaboradores por Cargo"
                   data={(() => {
-                    if (!data?.userActivity?.byPosition?.labels) return [];
+                    if (!data?.userActivity?.byPosition?.labels || !data?.userActivity?.byPosition?.datasets) return [];
 
                     // Create array of position data with labels and values
                     const positionData = data.userActivity.byPosition.labels.map((label, index) => ({
                       label: label.substring(0, 20),
-                      value: data.userActivity.byPosition.datasets[0]?.data[index] || 0,
+                      value: data.userActivity.byPosition?.datasets[0]?.data[index] || 0,
                       fullLabel: label, // Keep full label for position lookup
                     }));
 
@@ -401,8 +392,8 @@ export const AdministrationRootPage = () => {
                       return positionData
                         .sort((a, b) => {
                           // Find positions by name
-                          const posA = positions.data.find((p) => p.name === a.fullLabel);
-                          const posB = positions.data.find((p) => p.name === b.fullLabel);
+                          const posA = positions.data?.find((p) => p.name === a.fullLabel);
+                          const posB = positions.data?.find((p) => p.name === b.fullLabel);
 
                           // Get remuneration values (use first remuneration if multiple exist)
                           const remunerationA = posA?.remunerations?.[0]?.value || 0;
@@ -416,7 +407,7 @@ export const AdministrationRootPage = () => {
 
                     return positionData.map(({ label, value }) => ({ label, value }));
                   })()}
-                  icon={IconUsers}
+                  icon={LucideUsers}
                   color="blue"
                 />
                 <ActivityPatternCard
@@ -427,7 +418,7 @@ export const AdministrationRootPage = () => {
                       value: data.sectorMetrics.usersBySector.datasets[0]?.data[index] || 0,
                     })) || []
                   }
-                  icon={IconBuilding}
+                  icon={LucideBuilding}
                   color="purple"
                 />
                 <ActivityPatternCard
@@ -438,7 +429,7 @@ export const AdministrationRootPage = () => {
                       value: data.taskOverview.tasksByStatus.datasets[0]?.data[index] || 0,
                     })) || []
                   }
-                  icon={IconChartBar}
+                  icon={LucideChartBar}
                   color="green"
                 />
               </div>
@@ -450,9 +441,9 @@ export const AdministrationRootPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <AnalysisCard
                   title="Distribuição por Setor"
-                  type="SECTOR"
+                  type="custom"
                   data={getSectorAnalysis()}
-                  icon={IconChartPie}
+                  icon={LucidePieChart}
                   onDetailsClick={() => navigate(routes.administration.sectors.root)}
                 />
                 <AnalysisCard
@@ -494,7 +485,7 @@ export const AdministrationRootPage = () => {
                       };
                     });
                   })()}
-                  icon={IconUsersGroup}
+                  icon={LucideUsersGroup}
                   onDetailsClick={() => navigate(routes.administration.collaborators.root)}
                 />
               </div>

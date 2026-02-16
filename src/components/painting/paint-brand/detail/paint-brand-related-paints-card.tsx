@@ -160,13 +160,13 @@ export function PaintBrandRelatedPaintsCard({ paintBrand }: PaintBrandRelatedPai
               return (
                 <div
                   key={paint.id}
-                  className="group relative overflow-hidden rounded-lg border border-border/50 dark:border-border/40 bg-card hover:bg-muted/50 transition-colors cursor-pointer"
+                  className="group relative overflow-hidden rounded-lg border border-border dark:border-border bg-card hover:bg-muted/50 transition-colors cursor-pointer"
                   onClick={() => navigate(routes.painting.catalog.details(paint.id))}
                 >
                   <div className="p-4 space-y-3">
                     {/* Color Preview and Name - prefer colorPreview image */}
                     <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 rounded-lg ring-1 ring-border/60 dark:ring-border/50 shadow-sm overflow-hidden">
+                      <div className="h-12 w-12 rounded-lg ring-1 ring-border/60 dark:ring-border shadow-sm overflow-hidden">
                         {paint.colorPreview ? (
                           <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" loading="lazy" />
                         ) : (

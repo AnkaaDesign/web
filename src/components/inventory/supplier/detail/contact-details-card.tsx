@@ -38,7 +38,7 @@ export function ContactDetailsCard({ supplier, className }: ContactDetailsCardPr
 
           {/* Phone Numbers Section */}
           {supplier.phones && supplier.phones.length > 0 && (
-            <div className={supplier.email ? "pt-6 border-t border-border/50" : ""}>
+            <div className={supplier.email ? "pt-6 border-t border-border" : ""}>
               <h3 className="text-base font-semibold mb-4 text-foreground">Telefones</h3>
               <div className="space-y-3">
                 {supplier.phones.map((phone, index) => {
@@ -75,7 +75,7 @@ export function ContactDetailsCard({ supplier, className }: ContactDetailsCardPr
 
           {/* Website Section */}
           {supplier.site && (
-            <div className={supplier.email || (supplier.phones && supplier.phones.length > 0) ? "pt-6 border-t border-border/50" : ""}>
+            <div className={supplier.email || (supplier.phones && supplier.phones.length > 0) ? "pt-6 border-t border-border" : ""}>
               <h3 className="text-base font-semibold mb-4 text-foreground">Website</h3>
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -96,7 +96,7 @@ export function ContactDetailsCard({ supplier, className }: ContactDetailsCardPr
 
           {/* Pix Section */}
           {supplier.pix && (
-            <div className={supplier.email || (supplier.phones && supplier.phones.length > 0) || supplier.site ? "pt-6 border-t border-border/50" : ""}>
+            <div className={supplier.email || (supplier.phones && supplier.phones.length > 0) || supplier.site ? "pt-6 border-t border-border" : ""}>
               <h3 className="text-base font-semibold mb-4 text-foreground">Pagamento</h3>
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">

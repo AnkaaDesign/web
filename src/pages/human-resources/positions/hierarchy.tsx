@@ -62,7 +62,7 @@ function SortableRow({ position, index }: SortableRowProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className="flex items-center gap-3 p-2 bg-card border dark:border-border/40 rounded-lg hover:bg-muted/50 transition-colors cursor-grab active:cursor-grabbing"
+      className="flex items-center gap-3 p-2 bg-card border dark:border-border rounded-lg hover:bg-muted/50 transition-colors cursor-grab active:cursor-grabbing"
     >
       <IconGripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
       <span className="font-mono text-xs text-muted-foreground min-w-[2.5rem]">#{index + 1}</span>
@@ -97,7 +97,7 @@ export const PositionHierarchyPage = () => {
         if (a.hierarchy === null) return 1;
         if (b.hierarchy === null) return -1;
         return a.hierarchy - b.hierarchy;
-      });
+      }) as Position[];
       setPositions(sorted);
     }
   }, [positionsData]);

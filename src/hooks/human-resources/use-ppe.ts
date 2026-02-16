@@ -24,15 +24,6 @@ import {
   batchMarkPpeDeliveriesAsDelivered,
   batchApprovePpeDeliveries,
   batchRejectPpeDeliveries,
-  // PpeConfig - COMMENTED OUT: PPE config now in Item model
-  // createPpeConfig,
-  // deletePpeConfig,
-  // getPpeConfigById,
-  // getPpeConfigs,
-  // updatePpeConfig,
-  // batchCreatePpeConfigs,
-  // batchUpdatePpeConfigs,
-  // batchDeletePpeConfigs,
   // PpeDeliverySchedule
   createPpeDeliverySchedule,
   deletePpeDeliverySchedule,
@@ -42,6 +33,7 @@ import {
   batchCreatePpeDeliverySchedules,
   batchUpdatePpeDeliverySchedules,
   batchDeletePpeDeliverySchedules,
+  executePpeDeliveryScheduleNow,
 } from "../../api-client";
 import type {
   // PpeSize types
@@ -58,13 +50,6 @@ import type {
   PpeDeliveryBatchCreateFormData,
   PpeDeliveryBatchUpdateFormData,
   PpeDeliveryBatchDeleteFormData,
-  // PpeConfig types - COMMENTED OUT: PPE config now in Item model
-  // PpeConfigCreateFormData,
-  // PpeConfigUpdateFormData,
-  // PpeConfigGetManyFormData,
-  // PpeConfigBatchCreateFormData,
-  // PpeConfigBatchUpdateFormData,
-  // PpeConfigBatchDeleteFormData,
   // PpeDeliverySchedule types
   PpeDeliveryScheduleCreateFormData,
   PpeDeliveryScheduleUpdateFormData,
@@ -92,15 +77,6 @@ import type {
   PpeDeliveryBatchCreateResponse,
   PpeDeliveryBatchUpdateResponse,
   PpeDeliveryBatchDeleteResponse,
-  // PpeConfig response types - COMMENTED OUT: PPE config now in Item model
-  // PpeConfigGetManyResponse,
-  // PpeConfigGetUniqueResponse,
-  // PpeConfigCreateResponse,
-  // PpeConfigUpdateResponse,
-  // PpeConfigDeleteResponse,
-  // PpeConfigBatchCreateResponse,
-  // PpeConfigBatchUpdateResponse,
-  // PpeConfigBatchDeleteResponse,
   // PpeDeliverySchedule response types
   PpeDeliveryScheduleGetManyResponse,
   PpeDeliveryScheduleGetUniqueResponse,
@@ -114,8 +90,8 @@ import type {
   BatchOperationResult,
   BatchOperationError,
 } from "../../types";
-import { ppeSizeKeys, ppeDeliveryKeys, /* ppeConfigKeys, */ ppeDeliveryScheduleKeys, userKeys, itemKeys, changeLogKeys } from "../common/query-keys";
-import { createEntityHooks, createSpecializedQueryHook } from "../common/create-entity-hooks";
+import { ppeSizeKeys, ppeDeliveryKeys, ppeDeliveryScheduleKeys, userKeys, itemKeys, changeLogKeys } from "../common/query-keys";
+import { createEntityHooks } from "../common/create-entity-hooks";
 
 // =====================================================
 // PPE Size Service Adapter
@@ -164,21 +140,6 @@ export const usePpeSizes = basePpeSizeHooks.useList;
 export const usePpeSize = basePpeSizeHooks.useDetail;
 export const usePpeSizeMutations = basePpeSizeHooks.useMutations;
 export const usePpeSizeBatchMutations = basePpeSizeHooks.useBatchMutations;
-
-// =====================================================
-// PPE Size Specialized Hooks
-// =====================================================
-
-// Hook to get PPE sizes by mask size
-export const usePpeSizesByMask = createSpecializedQueryHook({
-  queryKeyFn: (maskSize: string) => [...ppeSizeKeys.all, "byMask", maskSize] as const,
-  queryFn: (maskSize: string) =>
-    ppeSizeService.getMany({
-      where: { mask: maskSize },
-      include: { user: true },
-    }),
-  staleTime: 1000 * 60 * 10, // 10 minutes
-});
 
 // =====================================================
 // PPE Delivery Service Adapter
@@ -247,8 +208,8 @@ export const useBatchApprovePpeDeliveries = () => {
           failed.push({
             index,
             id: deliveryIds[index],
-            error: result.error || "Erro desconhecido",
-          });
+            error: String(result.error || "Erro desconhecido"),
+          } as BatchOperationError<unknown>);
         }
       });
 
@@ -304,8 +265,8 @@ export const useBatchRejectPpeDeliveries = () => {
           failed.push({
             index,
             id: deliveryIds[index],
-            error: result.error || "Erro desconhecido",
-          });
+            error: String(result.error || "Erro desconhecido"),
+          } as BatchOperationError<unknown>);
         }
       });
 
@@ -342,175 +303,6 @@ export const useBatchRejectPpeDeliveries = () => {
   });
 };
 
-// =====================================================
-// PPE Delivery Specialized Hooks
-// =====================================================
-
-// Hook to get PPE deliveries by user and date range
-export const usePpeDeliveriesByUserAndDateRange = createSpecializedQueryHook({
-  queryKeyFn: ({ userId, startDate, endDate }: { userId: string; startDate?: Date; endDate?: Date }) =>
-    [...ppeDeliveryKeys.all, "byUserAndDateRange", userId, startDate?.toISOString(), endDate?.toISOString()] as const,
-  queryFn: ({ userId, startDate, endDate }: { userId: string; startDate?: Date; endDate?: Date }) => {
-    const where: any = { userId };
-    if (startDate || endDate) {
-      where.actualDeliveryDate = {};
-      if (startDate) where.actualDeliveryDate.gte = startDate;
-      if (endDate) where.actualDeliveryDate.lte = endDate;
-    }
-    return ppeDeliveryService.getMany({
-      where,
-      include: { item: true, user: true },
-      orderBy: { actualDeliveryDate: "desc" },
-    });
-  },
-  staleTime: 1000 * 60 * 5, // 5 minutes
-});
-
-// Hook to get PPE deliveries by item (useful for tracking item usage)
-export const usePpeDeliveriesByItem = createSpecializedQueryHook({
-  queryKeyFn: (itemId: string) => [...ppeDeliveryKeys.all, "byItem", itemId] as const,
-  queryFn: (itemId: string) =>
-    ppeDeliveryService.getMany({
-      where: { itemId },
-      include: { user: true, item: true },
-      orderBy: { actualDeliveryDate: "desc" },
-    }),
-  staleTime: 1000 * 60 * 5, // 5 minutes
-});
-
-// Hook to get pending PPE deliveries
-export const usePendingPpeDeliveries = createSpecializedQueryHook({
-  queryKeyFn: () => [...ppeDeliveryKeys.all, "pending"] as const,
-  queryFn: () =>
-    ppeDeliveryService.getMany({
-      where: { status: "PENDING" },
-      include: { user: true, item: true },
-      orderBy: { scheduledDate: "asc" },
-    }),
-  staleTime: 1000 * 60 * 2, // 2 minutes for pending items
-});
-
-// =====================================================
-// PPE Config Service Adapter - COMMENTED OUT: PPE config now in Item model
-// =====================================================
-
-/*
-const ppeConfigService = {
-  getMany: getPpeConfigs,
-  getById: getPpeConfigById,
-  create: createPpeConfig,
-  update: updatePpeConfig,
-  delete: deletePpeConfig,
-  batchCreate: batchCreatePpeConfigs,
-  batchUpdate: batchUpdatePpeConfigs,
-  batchDelete: batchDeletePpeConfigs,
-};
-
-// =====================================================
-// Base PPE Config Hooks
-// =====================================================
-
-const basePpeConfigHooks = createEntityHooks<
-  PpeConfigGetManyFormData,
-  PpeConfigGetManyResponse,
-  PpeConfigGetUniqueResponse,
-  PpeConfigCreateFormData,
-  PpeConfigCreateResponse,
-  PpeConfigUpdateFormData,
-  PpeConfigUpdateResponse,
-  PpeConfigDeleteResponse,
-  PpeConfigBatchCreateFormData,
-  PpeConfigBatchCreateResponse<PpeConfigCreateFormData>,
-  PpeConfigBatchUpdateFormData,
-  PpeConfigBatchUpdateResponse<PpeConfigUpdateFormData>,
-  PpeConfigBatchDeleteFormData,
-  PpeConfigBatchDeleteResponse
->({
-  queryKeys: ppeConfigKeys,
-  service: ppeConfigService,
-  staleTime: 1000 * 60 * 10, // 10 minutes
-  relatedQueryKeys: [itemKeys], // Invalidate items since they have PPE configs
-});
-
-// Export base hooks with standard names
-export const usePpeConfigsInfinite = basePpeConfigHooks.useInfiniteList;
-export const usePpeConfigs = basePpeConfigHooks.useList;
-export const usePpeConfig = basePpeConfigHooks.useDetail;
-export const usePpeConfigMutations = basePpeConfigHooks.useMutations;
-export const usePpeConfigBatchMutations = basePpeConfigHooks.useBatchMutations;
-
-// =====================================================
-// PPE Config Specialized Hooks
-// =====================================================
-
-// Hook to get PPE configs by PPE type
-export const usePpeConfigsByType = createSpecializedQueryHook({
-  queryKeyFn: (ppeType: string) => [...ppeConfigKeys.all, "byType", ppeType] as const,
-  queryFn: (ppeType: string) =>
-    ppeConfigService.getMany({
-      where: { ppeType },
-      include: { item: true },
-    }),
-  staleTime: 1000 * 60 * 10, // 10 minutes
-});
-
-// Hook to get PPE configs by PPE type and delivery mode
-export const usePpeConfigsByTypeAndMode = createSpecializedQueryHook({
-  queryKeyFn: ({ ppeType, deliveryMode }: { ppeType: string; deliveryMode: string }) => 
-    [...ppeConfigKeys.all, "byTypeAndMode", ppeType, deliveryMode] as const,
-  queryFn: ({ ppeType, deliveryMode }: { ppeType: string; deliveryMode: string }) =>
-    ppeConfigService.getMany({
-      where: { ppeType, deliveryMode },
-      include: { item: true },
-    }),
-  staleTime: 1000 * 60 * 10, // 10 minutes
-});
-
-// Hook to get PPE configs by size
-export const usePpeConfigsBySize = createSpecializedQueryHook({
-  queryKeyFn: (size: string) => [...ppeConfigKeys.all, "bySize", size] as const,
-  queryFn: (size: string) =>
-    ppeConfigService.getMany({
-      where: { size },
-      include: { item: true },
-    }),
-  staleTime: 1000 * 60 * 10, // 10 minutes
-});
-
-// Hook to get PPE configs by PPE type and size
-export const usePpeConfigsByTypeAndSize = createSpecializedQueryHook({
-  queryKeyFn: ({ ppeType, size }: { ppeType: string; size: string }) => 
-    [...ppeConfigKeys.all, "byTypeAndSize", ppeType, size] as const,
-  queryFn: ({ ppeType, size }: { ppeType: string; size: string }) =>
-    ppeConfigService.getMany({
-      where: { ppeType, size },
-      include: { item: true },
-    }),
-  staleTime: 1000 * 60 * 10, // 10 minutes
-});
-
-export function useUpdatePpeConfig(id: string) {
-  const queryClient = useQueryClient();
-  const { _updateMutation } = usePpeConfigMutations();
-
-  return useMutation({
-    mutationFn: (_data: PpeConfigUpdateFormData) => updatePpeConfig(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ppeConfigKeys.detail(id),
-      });
-      queryClient.invalidateQueries({
-        queryKey: ppeConfigKeys.all,
-      });
-    },
-  });
-}
-
-export function useDeletePpeConfig() {
-  const { deleteMutation } = usePpeConfigMutations();
-  return deleteMutation;
-}
-*/
 
 // =====================================================
 // PPE Schedule Service Adapter
@@ -559,44 +351,6 @@ export const usePpeDeliverySchedules = basePpeDeliveryScheduleHooks.useList;
 export const usePpeDeliverySchedule = basePpeDeliveryScheduleHooks.useDetail;
 export const usePpeDeliveryScheduleMutations = basePpeDeliveryScheduleHooks.useMutations;
 export const usePpeDeliveryScheduleBatchMutations = basePpeDeliveryScheduleHooks.useBatchMutations;
-
-// =====================================================
-// PPE Schedule Specialized Hooks
-// =====================================================
-
-// Hook to get PPE schedules by PPE type
-export const usePpeDeliverySchedulesByPpeType = createSpecializedQueryHook({
-  queryKeyFn: (ppeType: string) => [...ppeDeliveryScheduleKeys.all, "byPpeType", ppeType] as const,
-  queryFn: (ppeType: string) =>
-    ppeDeliveryScheduleService.getMany({
-      where: { ppes: { has: ppeType } },
-      include: { user: true },
-    }),
-  staleTime: 1000 * 60 * 5, // 5 minutes
-});
-
-// Hook to get active PPE schedules
-export const useActivePpeDeliverySchedules = createSpecializedQueryHook({
-  queryKeyFn: () => [...ppeDeliveryScheduleKeys.all, "active"] as const,
-  queryFn: () =>
-    ppeDeliveryScheduleService.getMany({
-      where: { isActive: true },
-      include: { user: true },
-      orderBy: { specificDate: "asc" },
-    }),
-  staleTime: 1000 * 60 * 5, // 5 minutes
-});
-
-// Hook to get PPE schedules by assignment type
-export const usePpeDeliverySchedulesByAssignmentType = createSpecializedQueryHook({
-  queryKeyFn: (assignmentType: string) => [...ppeDeliveryScheduleKeys.all, "byAssignmentType", assignmentType] as const,
-  queryFn: (assignmentType: string) =>
-    ppeDeliveryScheduleService.getMany({
-      where: { assignmentType },
-      include: { user: true },
-    }),
-  staleTime: 1000 * 60 * 5, // 5 minutes
-});
 
 // Legacy individual mutation exports for backward compatibility
 export function useCreatePpeDeliverySchedule() {
@@ -661,24 +415,6 @@ export function useBatchDeletePpeDeliveries() {
   return batchDeleteMutation;
 }
 
-// PpeConfig Batch Mutations - COMMENTED OUT: PPE config now in Item model
-/*
-export function useBatchCreatePpeConfigs() {
-  const { batchCreateMutation } = usePpeConfigBatchMutations();
-  return batchCreateMutation;
-}
-
-export function useBatchUpdatePpeConfigs() {
-  const { batchUpdateMutation } = usePpeConfigBatchMutations();
-  return batchUpdateMutation;
-}
-
-export function useBatchDeletePpeConfigs() {
-  const { batchDeleteMutation } = usePpeConfigBatchMutations();
-  return batchDeleteMutation;
-}
-*/
-
 // PpeDeliverySchedule Batch Mutations
 export function useBatchCreatePpeDeliverySchedules() {
   const { batchCreateMutation } = usePpeDeliveryScheduleBatchMutations();
@@ -701,7 +437,7 @@ export function useExecutePpeDeliverySchedule() {
 
   return useMutation({
     mutationFn: async (scheduleId: string) => {
-      return ppeDeliveryScheduleService.executeScheduleNow(scheduleId);
+      return executePpeDeliveryScheduleNow(scheduleId);
     },
     onSuccess: () => {
       // Invalidate all relevant queries
@@ -815,7 +551,5 @@ export { usePpeSizeMutations as usePpeSizeCrud };
 export { usePpeSizeBatchMutations as usePpeSizeBatchOperations };
 export { usePpeDeliveryMutations as usePpeDeliveryCrud };
 export { usePpeDeliveryBatchMutations as usePpeDeliveryBatchOperations };
-// export { usePpeConfigMutations as usePpeConfigCrud }; // COMMENTED OUT: PPE config now in Item model
-// export { usePpeConfigBatchMutations as usePpeConfigBatchOperations }; // COMMENTED OUT: PPE config now in Item model
 export { usePpeDeliveryScheduleMutations as usePpeDeliveryScheduleCrud };
 export { usePpeDeliveryScheduleBatchMutations as usePpeDeliveryScheduleBatchOperations };

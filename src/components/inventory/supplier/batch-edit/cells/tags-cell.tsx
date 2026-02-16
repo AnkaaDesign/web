@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { FieldValues, Path } from "react-hook-form";
 import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -8,16 +9,17 @@ import { IconX, IconPlus } from "@tabler/icons-react";
 interface TagsCellProps {
   control: any;
   index: number;
+  fieldName: string;
   disabled?: boolean;
 }
 
-export function TagsCell<TFieldValues extends FieldValues = FieldValues>({ control, index, disabled }: TagsCellProps) {
+export function TagsCell<_TFieldValues extends FieldValues = FieldValues>({ control, index, fieldName, disabled }: TagsCellProps) {
   const [inputValue, setInputValue] = useState("");
 
   return (
     <FormField
       control={control}
-      name={`customers.${index}.data.tags` as unknown as Path<TFieldValues>}
+      name={`${fieldName}.${index}.data.tags` as unknown as Path<_TFieldValues>}
       render={({ field }) => (
         <FormItem className="space-y-2">
           <FormControl>
@@ -48,7 +50,7 @@ export function TagsCell<TFieldValues extends FieldValues = FieldValues>({ contr
               <div className="flex gap-1">
                 <Input
                   value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
+                  onChange={(value) => setInputValue(value as string)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && inputValue.trim()) {
                       e.preventDefault();

@@ -12,7 +12,7 @@ import { BONUS_STATUS_LABELS, routes } from "../../../../constants";
 import { getBadgeVariant } from "../../../../constants";
 import type { Bonus } from "../../../../types";
 import type { BonusGetManyFormData } from "../../../../schemas";
-import { IconPlus, IconEye, IconEdit, IconCalculator } from "@tabler/icons-react";
+import { IconPlus, IconEye, IconCalculator } from "@tabler/icons-react";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { BonusSimulationInteractiveTable } from "../../bonus-simulation/bonus-simulation-interactive-table";
 
@@ -41,20 +41,20 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
   const [showSimulation, setShowSimulation] = useState(false);
 
   const {
-    searchTerm,
     page,
     pageSize,
     sortConfigs,
-    selectedRows,
-    handleSearch,
-    handlePageChange,
-    handlePageSizeChange,
-    handleSort,
-    handleRowSelection,
-    handleSelectAll,
+    setPage,
+    setPageSize,
+    toggleSort,
+    toggleSelection,
+    toggleSelectAll,
+    isSelected,
+    isAllSelected,
+    isPartiallySelected,
   } = useTableState({
     defaultPageSize: 10,
-    defaultSortConfigs: [{ key: "createdAt", direction: "desc" }],
+    defaultSort: [{ column: "createdAt", direction: "desc" }],
   });
 
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
@@ -70,7 +70,6 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       orderBy,
-      searchingFor: searchTerm || undefined,
     };
 
     onFilter?.(filters);
@@ -79,13 +78,13 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
   // Apply filters when table state changes
   React.useEffect(() => {
     handleTableStateChange();
-  }, [searchTerm, page, pageSize, sortConfigs]);
+  }, [page, pageSize, sortConfigs]);
 
   // Define all table columns
   const allColumns: StandardizedColumn<Bonus>[] = [
     {
       key: "user.name",
-      title: "Funcionário",
+      header: "Funcionário",
       sortable: true,
       render: (bonus) => (
         <div className="font-medium">
@@ -95,13 +94,13 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
     },
     {
       key: "year",
-      title: "Ano",
+      header: "Ano",
       sortable: true,
       render: (bonus) => bonus.year.toString(),
     },
     {
       key: "month",
-      title: "Mês",
+      header: "Mês",
       sortable: true,
       render: (bonus) => {
         const monthNames = [
@@ -113,17 +112,17 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
     },
     {
       key: "baseBonus",
-      title: "Valor Base",
+      header: "Valor Base",
       sortable: true,
       render: (bonus) => (
         <span className="font-medium">
-          {formatCurrency(bonus.baseBonus)}
+          {formatCurrency(Number(bonus.baseBonus))}
         </span>
       ),
     },
     {
       key: "bonusExtra",
-      title: "Extra Ponto",
+      header: "Extra Ponto",
       render: (bonus) => {
         const extras = bonus.bonusExtras || [];
         if (extras.length === 0) return <span className="text-muted-foreground">-</span>;
@@ -138,7 +137,7 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
     },
     {
       key: "performanceLevel",
-      title: "Nível",
+      header: "Nível",
       sortable: true,
       render: (bonus) => (
         <Badge variant={bonus.performanceLevel > 0 ? "success" : "secondary"}>
@@ -148,23 +147,23 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
     },
     {
       key: "status",
-      title: "Status",
+      header: "Status",
       sortable: true,
       render: (bonus) => (
-        <Badge variant={getBadgeVariant(bonus.status)}>
-          {BONUS_STATUS_LABELS[bonus.status] || bonus.status}
+        <Badge variant={bonus.status ? getBadgeVariant(bonus.status) : "secondary"}>
+          {bonus.status ? (BONUS_STATUS_LABELS[bonus.status] || bonus.status) : "N/A"}
         </Badge>
       ),
     },
     {
       key: "createdAt",
-      title: "Data de Criação",
+      header: "Data de Criação",
       sortable: true,
       render: (bonus) => formatDate(bonus.createdAt),
     },
     {
       key: "actions",
-      title: "Ações",
+      header: "Ações",
       render: (bonus) => (
         <div className="flex items-center gap-2">
           <Button
@@ -173,13 +172,6 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
             onClick={() => navigate(routes.humanResources.bonus.details(bonus.id))}
           >
             <IconEye className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(routes.humanResources.bonus.edit(bonus.id))}
-          >
-            <IconEdit className="h-4 w-4" />
           </Button>
         </div>
       ),
@@ -228,9 +220,9 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
               Simulação de Bônus
             </Button>
             {!showSimulation && (
-              <Button onClick={() => navigate(routes.humanResources.bonus.create)}>
+              <Button onClick={() => navigate(routes.humanResources.bonus.simulation)}>
                 <IconPlus className="h-4 w-4 mr-2" />
-                Criar Bonificação
+                Nova Simulação
               </Button>
             )}
           </div>
@@ -245,19 +237,25 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
           <StandardizedTable
             data={bonuses}
             columns={columns}
-            searchTerm={searchTerm}
-            onSearchChange={handleSearch}
-            searchPlaceholder="Buscar por funcionário, ano ou mês..."
-            page={page}
+            getItemKey={(bonus) => bonus.id}
+            currentPage={page + 1}
             pageSize={pageSize}
-            totalCount={bonuses.length}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
-            sortConfigs={sortConfigs}
-            onSort={handleSort}
-            selectedRows={selectedRows}
-            onRowSelection={handleRowSelection}
-            onSelectAll={handleSelectAll}
+            totalRecords={bonuses.length}
+            totalPages={Math.ceil(bonuses.length / pageSize)}
+            onPageChange={(newPage) => setPage(newPage - 1)}
+            onPageSizeChange={setPageSize}
+            sortConfigs={sortConfigs.map(s => ({ field: s.column, direction: s.direction }))}
+            onSort={toggleSort}
+            getSortDirection={(key) => sortConfigs.find(s => s.column === key)?.direction || null}
+            getSortOrder={(key) => {
+              const idx = sortConfigs.findIndex(s => s.column === key);
+              return idx >= 0 ? idx : null;
+            }}
+            isSelected={isSelected}
+            onSelectionChange={toggleSelection}
+            onSelectAll={() => toggleSelectAll(bonuses.map(b => b.id))}
+            allSelected={isAllSelected(bonuses.map(b => b.id))}
+            partiallySelected={isPartiallySelected(bonuses.map(b => b.id))}
             emptyMessage="Nenhuma bonificação encontrada"
           />
         )}

@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 import { TASK_STATUS, SECTOR_PRIVILEGES, routes } from "../../../../constants";
 import { hasPrivilege } from "../../../../utils/user";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
-import { isDateInPast, getHoursBetween } from "../../../../utils";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { IconAlertTriangle, IconHistory } from "@tabler/icons-react";

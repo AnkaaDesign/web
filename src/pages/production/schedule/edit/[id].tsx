@@ -1,4 +1,4 @@
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES, routes } from "../../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -8,13 +8,14 @@ import { TaskEditSkeleton } from "@/components/production/task/skeleton/task-edi
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconCheck } from "@tabler/icons-react";
+import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
+import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import React from "react";
 
 export const TaskEditPage = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const location = useLocation();
-  const [formState, setFormState] = React.useState({ isValid: false, isDirty: false });
+  const [formState, setFormState] = React.useState({ isValid: false, isDirty: false, isSubmitting: false });
 
   // Determine the source section from the URL path
   // /producao/cronograma/editar/123 → 'cronograma'
@@ -49,6 +50,12 @@ export const TaskEditPage = () => {
   };
 
   const breadcrumbConfig = getBreadcrumbConfig(source);
+
+  // Unsaved changes guard
+  const { showDialog, confirmNavigation, cancelNavigation, guardedNavigate } = useUnsavedChangesGuard({
+    isDirty: formState.isDirty,
+    isSubmitting: formState.isSubmitting,
+  });
 
   // Debug form state
   React.useEffect(() => {
@@ -110,17 +117,26 @@ export const TaskEditPage = () => {
 
   const task = response?.data;
 
-  // Get display name with fallbacks
+  // Get display name with serial number or plate
   const getTaskDisplayName = (task: any) => {
-    if (task.name) return task.name;
-    if (task.customer?.fantasyName) return task.customer.fantasyName;
-    if (task.serialNumberFrom) return `Série ${task.serialNumberFrom}`;
-    if (task.truck?.plate) return task.truck.plate;
-    return "Sem nome";
+    const taskName = task.name || task.customer?.fantasyName || "Sem nome";
+
+    // Append serial number if available
+    if (task.serialNumber) {
+      return `${taskName} - ${task.serialNumber}`;
+    }
+
+    // Otherwise append plate if available
+    if (task.truck?.plate) {
+      return `${taskName} - ${task.truck.plate}`;
+    }
+
+    // Just the task name if neither are available
+    return taskName;
   };
 
   const handleCancel = () => {
-    navigate(breadcrumbConfig.href);
+    guardedNavigate(breadcrumbConfig.href);
   };
 
   if (isLoading) {
@@ -139,6 +155,7 @@ export const TaskEditPage = () => {
               { label: breadcrumbConfig.label, href: breadcrumbConfig.href },
               { label: "Editar" },
             ]}
+            onBreadcrumbNavigate={guardedNavigate}
           />
         </div>
         <div className="flex-1 overflow-y-auto pb-6">
@@ -203,11 +220,13 @@ export const TaskEditPage = () => {
               { label: "Editar" },
             ]}
             actions={actions}
+            onBreadcrumbNavigate={guardedNavigate}
           />
         </div>
         <div className="flex-1 overflow-y-auto pb-6">
           <TaskEditForm task={task} onFormStateChange={setFormState} detailsRoute={breadcrumbConfig.detailsRoute} />
         </div>
+        <UnsavedChangesDialog open={showDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
       </div>
     </PrivilegeRoute>
   );

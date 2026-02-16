@@ -1,8 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import type { OrderSchedule } from "../../../../types";
 import type { OrderScheduleGetManyFormData } from "../../../../schemas";
-import { routes } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -20,7 +17,6 @@ interface OrderScheduleListProps {
 const DEFAULT_PAGE_SIZE = 40;
 
 export function OrderScheduleList({ className }: OrderScheduleListProps) {
-  const navigate = useNavigate();
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [filters, setFilters] = useState<Partial<OrderScheduleGetManyFormData>>({
@@ -75,13 +71,6 @@ export function OrderScheduleList({ className }: OrderScheduleListProps) {
     return count;
   }, [filters]);
 
-  const handleEditSchedule = (schedule: OrderSchedule) => {
-    navigate(routes.inventory.orders.schedules.edit(schedule.id));
-  };
-
-  const handleClearSearch = () => {
-    setSearchValue("");
-  };
 
   return (
     <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
@@ -91,7 +80,6 @@ export function OrderScheduleList({ className }: OrderScheduleListProps) {
           <TableSearchInput
             value={searchValue}
             onChange={setSearchValue}
-            onClear={handleClearSearch}
             placeholder="Buscar agendamentos..."
             className="flex-1"
           />
@@ -119,7 +107,6 @@ export function OrderScheduleList({ className }: OrderScheduleListProps) {
         <div className="flex-1 min-h-0 overflow-auto">
           <OrderScheduleTable
             visibleColumns={visibleColumns}
-            onEdit={handleEditSchedule}
             filters={queryFilters}
             className="h-full"
           />

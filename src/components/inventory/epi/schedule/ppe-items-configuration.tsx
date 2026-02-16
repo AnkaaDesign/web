@@ -176,12 +176,16 @@ export function PpeItemsConfiguration({ value = [], onChange, className }: PpeIt
                   mode="single"
                   queryKey={["items-others"]}
                   queryFn={queryOthersItems}
-                  initialOptions={item.itemId && itemCacheRef.current.has(item.itemId)
-                    ? [itemCacheRef.current.get(item.itemId)!]
-                    : []
+                  initialOptions={
+                    item.itemId && itemCacheRef.current.has(item.itemId)
+                      ? (() => {
+                          const cachedItem = itemCacheRef.current.get(item.itemId);
+                          return cachedItem ? [cachedItem] : [];
+                        })()
+                      : []
                   }
                   value={item.itemId || ""}
-                  onValueChange={(newItemId) => updatePpeItem(originalIndex, { itemId: newItemId || undefined })}
+                  onValueChange={(newItemId) => updatePpeItem(originalIndex, { itemId: Array.isArray(newItemId) ? newItemId[0] : newItemId || undefined })}
                   placeholder="Selecione o item..."
                   searchable={true}
                   minSearchLength={0}
@@ -208,8 +212,9 @@ export function PpeItemsConfiguration({ value = [], onChange, className }: PpeIt
                 min={MIN_QUANTITY}
                 max={MAX_QUANTITY}
                 value={currentQuantity}
-                onChange={(e) => {
-                  const inputValue = e.target.value;
+                onChange={(value) => {
+                  // Input component passes the parsed value directly (string | number | null)
+                  const inputValue = String(value ?? '');
                   // Allow empty input temporarily for better UX when typing
                   if (inputValue === "") {
                     return;
@@ -220,7 +225,7 @@ export function PpeItemsConfiguration({ value = [], onChange, className }: PpeIt
                   }
                 }}
                 onBlur={(e) => {
-                  // On blur, ensure we have a valid value
+                  // onBlur still receives the native event
                   const inputValue = e.target.value;
                   const qty = parseInt(inputValue, 10);
                   if (isNaN(qty) || qty < MIN_QUANTITY) {

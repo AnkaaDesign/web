@@ -16,6 +16,7 @@ export interface PayrollUserRow extends User {
   bonusStatus?: 'DRAFT' | 'CONFIRMED' | 'LIVE_CALCULATION';
   hasBonus?: boolean; // Flag to determine if user has bonus this period
   monthAverage?: number; // Month-specific average calculated from all eligible users
+  averageTasksPerEmployee?: number; // Average tasks across all employees
 }
 
 export interface PayrollColumn {

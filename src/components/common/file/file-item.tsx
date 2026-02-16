@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import type { File as AnkaaFile } from "../../../types";
-import { formatFileSize, getFileDisplayName, isImageFile } from "../../../utils/file";
+import { formatFileSize, getFileDisplayName, getFileDownloadUrl, isImageFile } from "../../../utils/file";
 import { getPDFThumbnailUrl, isPDFFile } from "../../../utils/pdf-thumbnail";
 import { formatRelativeTime } from "../../../utils";
 import { cn } from "@/lib/utils";
 import { FileTypeIcon } from "@/components/ui/file-type-icon";
-import { useFileViewer } from "./file-viewer";
+import { FileViewerContext } from "./file-viewer";
+import { getApiBaseUrl } from "@/config/api";
 
 export type FileViewMode = "grid" | "list";
 
@@ -22,32 +23,40 @@ export interface FileItemProps {
   className?: string;
 }
 
-// Removed getFileIcon function - now using FileTypeIcon/FileTypeAvatar components
-
 const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" | "large" = "medium"): string => {
-  // Get API URL and ensure no trailing slash
-  let apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
-  apiUrl = apiUrl.replace(/\/+$/, ''); // Remove any trailing slashes
+  let apiUrl = getApiBaseUrl();
+  apiUrl = apiUrl.replace(/\/+$/, '');
 
-  // Handle PDF thumbnails
   if (isPDFFile(file)) {
     return getPDFThumbnailUrl(file, { size });
   }
 
   if (file.thumbnailUrl) {
-    // If it's already a full URL, use it
     if (file.thumbnailUrl.startsWith("http")) {
       return file.thumbnailUrl;
     }
-    // Otherwise build the URL with API base
     return `${apiUrl}/files/thumbnail/${file.id}?size=${size}`;
   }
-  // For images without thumbnails, use the file itself
   if (isImageFile(file)) {
     return `${apiUrl}/files/serve/${file.id}`;
   }
   return "";
 };
+
+/**
+ * Sets up drag data for downloading the original file.
+ * Uses Chrome's DownloadURL type which works on Windows/macOS.
+ * On Linux, browser-to-file-manager drag is a platform limitation.
+ */
+function handleFileDragStart(e: React.DragEvent, file: AnkaaFile) {
+  e.stopPropagation();
+  e.dataTransfer.effectAllowed = "copy";
+
+  const url = getFileDownloadUrl(file);
+  const mimeType = file.mimetype || "application/octet-stream";
+  const filename = file.filename || "download";
+  e.dataTransfer.setData("DownloadURL", `${mimeType}:${filename}:${url}`);
+}
 
 const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _onDownload, onDelete: _onDelete, showActions: _showActions = true, showFilename = true, showFileSize = true, showRelativeTime: _showRelativeTime = true, className }) => {
   const [thumbnailError, setThumbnailError] = useState(false);
@@ -58,13 +67,11 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
   const isPdf = isPDFFile(file);
   const hasThumbnail = file.thumbnailUrl || isImage || isPdf;
 
-  // Get file viewer context - always available since FileViewerProvider wraps the app
-  const { actions } = useFileViewer();
+  const fileViewer = React.useContext(FileViewerContext);
+  const imgRef = React.useRef<HTMLImageElement>(null);
 
-  // Only show thumbnail after initial render to prevent flash
   React.useEffect(() => {
     if (hasThumbnail) {
-      // Small delay to ensure smooth transition
       const timer = setTimeout(() => {
         setShowThumbnail(true);
       }, 100);
@@ -73,23 +80,11 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
   }, [hasThumbnail]);
 
   const handleClick = () => {
-    // Prioritize onPreview prop (for collections with next/previous)
     if (onPreview) {
       onPreview(file);
     } else {
-      // Fall back to default viewer for single files
-      actions.viewFile(file);
+      fileViewer?.actions.viewFile(file);
     }
-  };
-
-  const handleThumbnailLoad = () => {
-    setThumbnailLoading(false);
-  };
-
-  const handleThumbnailError = () => {
-    setThumbnailError(true);
-    setThumbnailLoading(false);
-    setShowThumbnail(false);
   };
 
   return (
@@ -103,8 +98,19 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Thumbnail/Icon Area */}
-      <div className="flex items-center justify-center rounded-lg bg-muted/30" style={{ height: "8rem" }}>
+      {/* Thumbnail/Icon Area — only this area is draggable */}
+      <div
+        className="flex items-center justify-center rounded-lg bg-muted/30"
+        style={{ height: "8rem" }}
+        draggable={true}
+        onDragStart={(e) => {
+          handleFileDragStart(e, file);
+          // Use the thumbnail as drag ghost
+          if (imgRef.current) {
+            e.dataTransfer.setDragImage(imgRef.current, 0, 0);
+          }
+        }}
+      >
         {showThumbnail && hasThumbnail && !thumbnailError ? (
           <div className="relative w-full h-full">
             {thumbnailLoading && (
@@ -113,14 +119,20 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
               </div>
             )}
             <img
+              ref={imgRef}
               src={getThumbnailUrl(file, "medium")}
               alt={file.filename}
               className={cn(
                 "w-full h-full object-contain rounded-md transition-all duration-300",
                 thumbnailLoading ? "opacity-0" : "opacity-100"
               )}
-              onLoad={handleThumbnailLoad}
-              onError={handleThumbnailError}
+              onLoad={() => setThumbnailLoading(false)}
+              onError={() => {
+                setThumbnailError(true);
+                setThumbnailLoading(false);
+                setShowThumbnail(false);
+              }}
+              draggable={false}
             />
           </div>
         ) : (
@@ -132,7 +144,6 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
         {/* Hover Overlay with File Info */}
         {isHovered && (showFilename || showFileSize) && (
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-all duration-300">
-            {/* File Information - Bottom */}
             <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
               <div className="flex items-center justify-between gap-2">
                 {showFilename && (
@@ -162,13 +173,11 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
   const isPdf = isPDFFile(file);
   const hasThumbnail = file.thumbnailUrl || isImage || isPdf;
 
-  // Get file viewer context - always available since FileViewerProvider wraps the app
-  const { actions } = useFileViewer();
+  const fileViewer = React.useContext(FileViewerContext);
+  const imgRef = React.useRef<HTMLImageElement>(null);
 
-  // Only show thumbnail after initial render to prevent flash
   React.useEffect(() => {
     if (hasThumbnail) {
-      // Small delay to ensure smooth transition
       const timer = setTimeout(() => {
         setShowThumbnail(true);
       }, 100);
@@ -177,29 +186,29 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
   }, [hasThumbnail]);
 
   const handleClick = () => {
-    // Prioritize onPreview prop (for collections with next/previous)
     if (onPreview) {
       onPreview(file);
     } else {
-      // Fall back to default viewer for single files
-      actions.viewFile(file);
+      fileViewer?.actions.viewFile(file);
     }
   };
 
-  const handleThumbnailLoad = () => {
-    setThumbnailLoading(false);
-  };
-
-  const handleThumbnailError = () => {
-    setThumbnailError(true);
-    setThumbnailLoading(false);
-    setShowThumbnail(false);
-  };
-
   return (
-    <div className={cn("group relative flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer border border-border", className)} onClick={handleClick}>
-      {/* Thumbnail/Icon */}
-      <div className="flex items-center justify-center w-10 h-10 rounded bg-muted/30 shrink-0">
+    <div
+      className={cn("group relative flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer border border-border", className)}
+      onClick={handleClick}
+    >
+      {/* Thumbnail/Icon — only this area is draggable */}
+      <div
+        className="flex items-center justify-center w-10 h-10 rounded bg-muted/30 shrink-0 relative"
+        draggable={true}
+        onDragStart={(e) => {
+          handleFileDragStart(e, file);
+          if (imgRef.current) {
+            e.dataTransfer.setDragImage(imgRef.current, 0, 0);
+          }
+        }}
+      >
         {showThumbnail && hasThumbnail && !thumbnailError ? (
           <div className="relative w-full h-full">
             {thumbnailLoading && (
@@ -208,14 +217,20 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
               </div>
             )}
             <img
+              ref={imgRef}
               src={getThumbnailUrl(file, "small")}
               alt={file.filename}
               className={cn(
                 "w-full h-full object-contain rounded transition-all duration-300",
                 thumbnailLoading ? "opacity-0" : "opacity-100"
               )}
-              onLoad={handleThumbnailLoad}
-              onError={handleThumbnailError}
+              onLoad={() => setThumbnailLoading(false)}
+              onError={() => {
+                setThumbnailError(true);
+                setThumbnailLoading(false);
+                setShowThumbnail(false);
+              }}
+              draggable={false}
             />
           </div>
         ) : (

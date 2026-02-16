@@ -17,12 +17,12 @@ import { FormInput } from "@/components/ui/form-input";
 import { PixKeyInput } from "./pix-key-input";
 import { WebsiteInput } from "./website-input";
 import { PhoneArrayInput } from "@/components/ui/phone-array-input";
-import { AddressInput } from "@/components/ui/form-address-input";
-import { AddressNumberInput } from "@/components/ui/form-address-number-input";
-import { AddressComplementInput } from "@/components/ui/form-address-complement-input";
-import { NeighborhoodInput } from "@/components/ui/form-neighborhood-input";
-import { CityInput } from "@/components/ui/form-city-input";
-import { StateSelector } from "@/components/ui/form-state-selector";
+import { FormAddressInput } from "@/components/ui/form-address-input";
+import { FormAddressNumberInput } from "@/components/ui/form-address-number-input";
+import { FormAddressComplementInput } from "@/components/ui/form-address-complement-input";
+import { FormNeighborhoodInput } from "@/components/ui/form-neighborhood-input";
+import { FormCityInput } from "@/components/ui/form-city-input";
+import { FormStateSelector } from "@/components/ui/form-state-selector";
 import { StreetSelect } from "@/components/ui/form-street-select";
 import { LogoInput } from "./logo-input";
 import { TagsInput } from "./tags-input";
@@ -47,7 +47,7 @@ export interface SupplierUpdateSubmitData extends SupplierUpdateFormData {
 interface UpdateSupplierFormProps extends BaseSupplierFormProps {
   mode: "update";
   onSubmit: (data: SupplierUpdateSubmitData) => Promise<void>;
-  defaultValues?: Partial<SupplierUpdateFormData>;
+  defaultValues?: Partial<SupplierUpdateFormData> & { id?: string };
 }
 
 type SupplierFormProps = CreateSupplierFormProps | UpdateSupplierFormProps;
@@ -223,7 +223,7 @@ export function SupplierForm(props: SupplierFormProps) {
           const cleanedData = Object.entries(formData).reduce((acc, [key, value]) => {
             // Keep the value if it's not null, undefined, or empty string
             if (value !== null && value !== undefined && value !== "") {
-              acc[key as keyof SupplierCreateFormData] = value;
+              (acc as any)[key] = value;
             }
             return acc;
           }, {} as Partial<SupplierCreateFormData>);
@@ -434,8 +434,8 @@ export function SupplierForm(props: SupplierFormProps) {
                   stateFieldName="state"
                   logradouroFieldName="streetType"
                 />
-                <CityInput disabled={isSubmitting} required={false} />
-                <StateSelector disabled={isSubmitting} />
+                <FormCityInput<SupplierCreateFormData | SupplierUpdateFormData> name="city" disabled={isSubmitting} required={false} />
+                <FormStateSelector<SupplierCreateFormData | SupplierUpdateFormData> name="state" disabled={isSubmitting} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
@@ -443,16 +443,16 @@ export function SupplierForm(props: SupplierFormProps) {
                   <StreetSelect<SupplierCreateFormData | SupplierUpdateFormData> disabled={isSubmitting} />
                 </div>
                 <div className="md:col-span-3">
-                  <AddressInput disabled={isSubmitting} required={false} />
+                  <FormAddressInput<SupplierCreateFormData | SupplierUpdateFormData> name="address" disabled={isSubmitting} required={false} />
                 </div>
                 <div className="md:col-span-1">
-                  <AddressNumberInput disabled={isSubmitting} />
+                  <FormAddressNumberInput<SupplierCreateFormData | SupplierUpdateFormData> name="addressNumber" disabled={isSubmitting} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <NeighborhoodInput disabled={isSubmitting} />
-                <AddressComplementInput disabled={isSubmitting} />
+                <FormNeighborhoodInput<SupplierCreateFormData | SupplierUpdateFormData> name="neighborhood" disabled={isSubmitting} />
+                <FormAddressComplementInput<SupplierCreateFormData | SupplierUpdateFormData> name="addressComplement" disabled={isSubmitting} />
               </div>
             </CardContent>
           </Card>

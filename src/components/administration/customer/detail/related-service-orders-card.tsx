@@ -76,8 +76,8 @@ export function RelatedServiceOrdersCard({ customer, className }: RelatedService
 
       if (aPriority !== bPriority) return aPriority - bPriority;
 
-      // Then sort by date (newest first)
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      // Then sort by position
+      return (a.position ?? 0) - (b.position ?? 0);
     });
   }, [serviceOrders]);
 
@@ -182,7 +182,7 @@ export function RelatedServiceOrdersCard({ customer, className }: RelatedService
 
               return (
                 <div key={serviceOrder.id} className="block">
-                  <div className="group relative overflow-hidden rounded-lg border border-border/50 dark:border-border/40 bg-card hover:bg-muted/50 transition-colors cursor-pointer min-h-[140px] flex flex-col">
+                  <div className="group relative overflow-hidden rounded-lg border border-border dark:border-border bg-card hover:bg-muted/50 transition-colors cursor-pointer min-h-[140px] flex flex-col">
                     <div className="p-3 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="flex items-start justify-between gap-2 mb-1">

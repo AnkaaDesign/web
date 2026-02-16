@@ -194,7 +194,7 @@ export function PaintBrandComponentsCard({ paintBrand }: PaintBrandComponentsCar
         </div>
 
         {/* Table Container with min/max height */}
-        <div className="rounded-md border border-border/50 flex-1 flex flex-col bg-muted/30 min-h-[400px] max-h-[600px]">
+        <div className="rounded-md border border-border flex-1 flex flex-col bg-muted/30 min-h-[400px] max-h-[600px]">
           <div className="overflow-auto flex-1">
             <Table className="w-full [&>div]:border-0 [&>div]:rounded-none">
               <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted sticky top-0 z-10">

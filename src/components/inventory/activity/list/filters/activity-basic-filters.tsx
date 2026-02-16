@@ -92,7 +92,7 @@ export const ActivityBasicFilters = ({ filters, updateFilter }: ActivityBasicFil
           mode="multiple"
           options={reasonOptions}
           value={selectedReasons}
-          onValueChange={handleReasonsChange}
+          onValueChange={(value) => handleReasonsChange(Array.isArray(value) ? value : value ? [value] : [])}
           placeholder="Selecione os motivos..."
           emptyText="Nenhum motivo encontrado"
           searchPlaceholder="Buscar motivos..."

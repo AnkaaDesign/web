@@ -227,7 +227,7 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
                   <Combobox
                     options={getComboboxOptionsForRow(index)}
                     value={watch(`components.${index}.itemId`)}
-                    onValueChange={(value) => handleItemSelect(index, value || "")}
+                    onValueChange={(value) => handleItemSelect(index, (Array.isArray(value) ? value[0] : value) || "")}
                     placeholder="Selecione um componente"
                     emptyText="Nenhum item disponível"
                     searchable={true}
@@ -251,11 +251,11 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
                     type="text"
                     placeholder="0"
                     value={watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`) || ""}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      // Input component passes event object (react-hook-form compatible)
-                      const value = e.target.value;
+                    onChange={(value) => {
+                      // Input component passes value (string | number | null)
+                      const str = String(value ?? '');
                       const previousValue = watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`)?.toString() || "";
-                      handleAmountChange(index, value, previousValue);
+                      handleAmountChange(index, str, previousValue);
                     }}
                     onKeyDown={(e) => handleKeyDown(e, index, "input")}
                     onBlur={async (e: React.FocusEvent<HTMLInputElement>) => {

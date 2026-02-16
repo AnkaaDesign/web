@@ -7,7 +7,7 @@ interface FormFieldProps {
   name: keyof import("../../../../schemas").SupplierCreateFormData;
   label?: string;
   icon?: React.ReactNode;
-  type?: string;
+  type?: "text" | "email" | "password" | "number" | "decimal" | "currency" | "percentage" | "cpf" | "cnpj" | "cpf-cnpj" | "phone" | "pis" | "cep" | "date" | "time" | "rg" | "plate" | "chassis" | "integer" | "natural";
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -55,12 +55,12 @@ export function FormField({ name, label, icon, type = "text", placeholder, disab
       )}
       <Input
         id={name}
-        type={type}
+        type={type as any}
         placeholder={placeholder}
         disabled={disabled}
         {...fieldProps}
-        value={fieldProps.value || ""}
-        onChange={(value: string) => fieldProps.onChange(value)}
+        value={typeof fieldProps.value === 'string' ? fieldProps.value : Array.isArray(fieldProps.value) ? fieldProps.value[0] || "" : ""}
+        onChange={(value) => fieldProps.onChange(typeof value === 'number' ? String(value) : value)}
         onBlur={handleBlur}
       />
       {showError && <p className="text-sm text-destructive">{errors[name]}</p>}

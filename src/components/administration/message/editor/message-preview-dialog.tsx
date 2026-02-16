@@ -186,7 +186,7 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
             right: 'justify-end',
           };
           return (
-            <div className={`flex my-4 first:mt-0 last:mb-0 ${buttonAlignmentClasses[block.alignment]}`}>
+            <div className={`flex my-4 first:mt-0 last:mb-0 ${buttonAlignmentClasses[block.alignment as keyof typeof buttonAlignmentClasses]}`}>
               {buttonContent}
             </div>
           );
@@ -216,7 +216,7 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
           lg: 'h-12', // 3rem / 48px
           xl: 'h-16', // 4rem / 64px
         };
-        return <div className={spacerHeights[block.height || 'md']} />;
+        return <div className={spacerHeights[(block.height || 'md') as keyof typeof spacerHeights]} />;
       case 'icon':
         const IconComponent = block.icon ? (TablerIcons as any)[block.icon] : null;
         if (!IconComponent) return null;
@@ -236,13 +236,13 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
 
         const iconContent = (
           <IconComponent
-            className={`flex-shrink-0 ${iconSizeClasses[block.size || 'md']} ${block.color || 'text-foreground'}`}
+            className={`flex-shrink-0 ${iconSizeClasses[(block.size || 'md') as keyof typeof iconSizeClasses]} ${block.color || 'text-foreground'}`}
           />
         );
 
         // Apply alignment wrapper for standalone icons (not in rows)
         return block.alignment ? (
-          <div className={`flex my-4 first:mt-0 last:mb-0 ${iconAlignmentClasses[block.alignment]}`}>
+          <div className={`flex my-4 first:mt-0 last:mb-0 ${iconAlignmentClasses[block.alignment as keyof typeof iconAlignmentClasses]}`}>
             {iconContent}
           </div>
         ) : iconContent;
@@ -261,7 +261,7 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
         };
 
         return (
-          <div className={`flex flex-wrap md:flex-nowrap ${rowGapClasses[block.gap || 'md']} ${rowAlignClasses[block.verticalAlign || 'top']} my-4 first:mt-0 last:mb-0 [&>*]:m-0`}>
+          <div className={`flex flex-wrap md:flex-nowrap ${rowGapClasses[(block.gap || 'md') as keyof typeof rowGapClasses]} ${rowAlignClasses[(block.verticalAlign || 'top') as keyof typeof rowAlignClasses]} my-4 first:mt-0 last:mb-0 [&>*]:m-0`}>
             {(block.blocks || []).map((nestedBlock: any, idx: number) => {
               // Icons should only take their natural width, other blocks should grow
               const isIconBlock = nestedBlock.type === 'icon';
@@ -288,8 +288,10 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
         return 'Todos os usuários';
       case 'specific':
         return `${data.targeting.userIds?.length || 0} usuários específicos`;
-      case 'roles':
-        return `${data.targeting.roleIds?.length || 0} cargos selecionados`;
+      case 'sector':
+        return `${data.targeting.sectorIds?.length || 0} setores selecionados`;
+      case 'position':
+        return `${data.targeting.positionIds?.length || 0} cargos selecionados`;
       default:
         return 'Não definido';
     }

@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Form } from "@/components/ui/form";
+import { FormInput } from "@/components/ui/form-input";
 import { toast } from "sonner";
 import { adjustItemPrices } from "../../../../api-client";
 import { formatCurrency } from "../../../../utils";

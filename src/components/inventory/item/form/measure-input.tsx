@@ -135,6 +135,17 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
       [MEASURE_UNIT.CENTIMETER]: `${MEASURE_UNIT_LABELS[unit]} - Centímetro`,
       [MEASURE_UNIT.METER]: `${MEASURE_UNIT_LABELS[unit]} - Metro`,
       [MEASURE_UNIT.INCHES]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
+      [MEASURE_UNIT.INCH_1_8]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
+      [MEASURE_UNIT.INCH_1_4]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
+      [MEASURE_UNIT.INCH_3_8]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
+      [MEASURE_UNIT.INCH_1_2]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
+      [MEASURE_UNIT.INCH_5_8]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
+      [MEASURE_UNIT.INCH_3_4]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
+      [MEASURE_UNIT.INCH_7_8]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
+      [MEASURE_UNIT.INCH_1]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
+      [MEASURE_UNIT.INCH_1_1_4]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
+      [MEASURE_UNIT.INCH_1_1_2]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
+      [MEASURE_UNIT.INCH_2]: `${MEASURE_UNIT_LABELS[unit]} - Polegada`,
 
       // Area
       [MEASURE_UNIT.SQUARE_CENTIMETER]: `${MEASURE_UNIT_LABELS[unit]} - Centímetro Quadrado`,
@@ -187,7 +198,8 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
           <Combobox
             key="measure-type-select"
             value={newMeasure.measureType}
-            onValueChange={(value: string) => {
+            onValueChange={(value: string | string[] | null | undefined) => {
+              if (!value || typeof value !== 'string') return;
               const measureType = value as MEASURE_TYPE;
               const availableUnits = getAvailableUnits(measureType);
               setNewMeasure({
@@ -249,7 +261,8 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
           <Combobox
             key={`measure-unit-select-${newMeasure.measureType}`}
             value={newMeasure.unit}
-            onValueChange={(value: string) => {
+            onValueChange={(value: string | string[] | null | undefined) => {
+              if (!value || typeof value !== 'string') return;
               const newUnit = value as MEASURE_UNIT;
               // If switching to INCHES and we have a value, convert to fraction string
               if (newUnit === MEASURE_UNIT.INCHES && newMeasure.value > 0) {

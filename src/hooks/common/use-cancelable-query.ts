@@ -1,10 +1,15 @@
 import { useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import type { QueryKey, UseQueryOptions, UseInfiniteQueryOptions, QueryFunction, InfiniteQueryFunction } from "@tanstack/react-query";
+import type { QueryKey, UseQueryOptions, UseInfiniteQueryOptions, QueryFunction, InfiniteData, QueryFunctionContext } from "@tanstack/react-query";
 
 // =====================================================
 // Types & Interfaces
 // =====================================================
+
+// Define the infinite query function type
+type InfiniteQueryFn<TData, TQueryKey extends QueryKey, TPageParam> = (
+  context: QueryFunctionContext<TQueryKey, TPageParam>
+) => Promise<TData>;
 
 interface CancelableQueryOptions {
   queryKey: QueryKey;
@@ -29,11 +34,12 @@ interface UseQueryWithCancellationOptions<TData, TError, TQueryKey extends Query
   prefetchStaleTime?: number;
 }
 
-interface UseInfiniteQueryWithCancellationOptions<TData, TError, TQueryKey extends QueryKey = QueryKey>
-  extends Omit<UseInfiniteQueryOptions<TData, TError, TData, TQueryKey>, "queryFn"> {
+interface UseInfiniteQueryWithCancellationOptions<TData, TError, TQueryKey extends QueryKey = QueryKey, TPageParam = unknown>
+  extends UseInfiniteQueryOptions<TData, TError, InfiniteData<TData>, TQueryKey, TPageParam> {
   cancelOnParamsChange?: boolean;
   cancelOnUnmount?: boolean;
   deduplicationWindow?: number;
+  queryFn?: never; // Exclude queryFn since it's passed as a separate parameter
 }
 
 // =====================================================
@@ -204,7 +210,7 @@ export function useCancelableQuery({
 export function useQueryWithCancellation<TData = unknown, TError = unknown>(
   queryKey: QueryKey,
   queryFn: QueryFunction<TData, QueryKey>,
-  options: UseQueryWithCancellationOptions<TData, TError> = {},
+  options?: UseQueryWithCancellationOptions<TData, TError>,
 ) {
   const {
     cancelOnParamsChange = true,
@@ -214,13 +220,13 @@ export function useQueryWithCancellation<TData = unknown, TError = unknown>(
     prefetchStaleTime = 5 * 60 * 1000, // 5 minutes
     enabled = true,
     ...queryOptions
-  } = options;
+  } = options || {};
 
   const queryClient = useQueryClient();
 
   const { createRequest, cancel, cancelAll, cancelQueries, getRequestStatus } = useCancelableQuery({
     queryKey,
-    enabled,
+    enabled: enabled as boolean,
     cancelOnParamsChange,
     cancelOnUnmount,
     deduplicationWindow,
@@ -299,6 +305,7 @@ export function useQueryWithCancellation<TData = unknown, TError = unknown>(
 
   // Execute the query
   const query = useQuery({
+    ...queryOptions,
     queryKey,
     queryFn: wrappedQueryFn,
     enabled,
@@ -312,7 +319,6 @@ export function useQueryWithCancellation<TData = unknown, TError = unknown>(
       return failureCount < 3;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    ...queryOptions,
   });
 
   const requestStatus = getRequestStatus();
@@ -338,24 +344,24 @@ export function useQueryWithCancellation<TData = unknown, TError = unknown>(
 /**
  * Enhanced useInfiniteQuery with automatic cancellation and race condition prevention
  */
-export function useInfiniteQueryWithCancellation<TData = unknown, TError = unknown>(
+export function useInfiniteQueryWithCancellation<TData = unknown, TError = unknown, TPageParam = unknown>(
   queryKey: QueryKey,
-  queryFn: InfiniteQueryFunction<TData, QueryKey>,
-  options: UseInfiniteQueryWithCancellationOptions<TData, TError> = {},
+  queryFn: InfiniteQueryFn<TData, QueryKey, TPageParam>,
+  options?: UseInfiniteQueryWithCancellationOptions<TData, TError, QueryKey, TPageParam>,
 ) {
-  const { cancelOnParamsChange = true, cancelOnUnmount = true, deduplicationWindow = 50, enabled = true, ...queryOptions } = options;
+  const { cancelOnParamsChange = true, cancelOnUnmount = true, deduplicationWindow = 50, enabled = true, ...queryOptions } = options || {};
 
   const { createRequest, cancel, cancelAll, cancelQueries, getRequestStatus } = useCancelableQuery({
     queryKey,
-    enabled,
+    enabled: enabled as boolean,
     cancelOnParamsChange,
     cancelOnUnmount,
     deduplicationWindow,
   });
 
   // Wrap query function to include signal
-  const wrappedQueryFn = useCallback<InfiniteQueryFunction<TData, QueryKey>>(
-    async (context) => {
+  const wrappedQueryFn = useCallback<InfiniteQueryFn<TData, QueryKey, TPageParam>>(
+    async (context: QueryFunctionContext<QueryKey, TPageParam>) => {
       const requestInfo = createRequest();
 
       try {
@@ -403,9 +409,10 @@ export function useInfiniteQueryWithCancellation<TData = unknown, TError = unkno
   );
 
   const query = useInfiniteQuery({
+    ...queryOptions,
     queryKey,
     queryFn: wrappedQueryFn,
-    enabled,
+    enabled: enabled as boolean | undefined,
     staleTime: 5 * 60 * 1000,
     retry: (failureCount, error: any) => {
       if (error?.message?.includes("cancelled") || error?.name === "AbortError") {
@@ -414,8 +421,7 @@ export function useInfiniteQueryWithCancellation<TData = unknown, TError = unkno
       return failureCount < 3;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    ...queryOptions,
-  });
+  } as UseInfiniteQueryOptions<TData, TError, InfiniteData<TData>, QueryKey, TPageParam>);
 
   const requestStatus = getRequestStatus();
 
@@ -427,7 +433,7 @@ export function useInfiniteQueryWithCancellation<TData = unknown, TError = unkno
     requestStatus,
     isLoadingFirstTime: query.isLoading && !query.data,
     isLoadingMore: query.isFetchingNextPage,
-    hasData: !!query.data?.pages?.length,
+    hasData: !!(query.data as InfiniteData<TData> | undefined)?.pages?.length,
   };
 }
 

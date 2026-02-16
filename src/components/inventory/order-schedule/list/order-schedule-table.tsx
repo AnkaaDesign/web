@@ -116,7 +116,7 @@ export function OrderScheduleTable({
   const { data, isLoading, error } = useOrderSchedules(queryParams);
 
   const schedules = data?.data || [];
-  const totalRecords = data?.totalRecords || 0;
+  const totalRecords = data?.meta?.totalRecords || 0;
   const totalPages = Math.ceil(totalRecords / pageSize);
 
   // Notify parent component of data changes
@@ -219,7 +219,7 @@ export function OrderScheduleTable({
         onActivate(contextMenu.items);
       } else {
         for (const schedule of contextMenu.items) {
-          await updateSchedule({ id: schedule.id, isActive: true });
+          await updateSchedule({ id: schedule.id, data: { isActive: true } });
         }
       }
       setContextMenu(null);
@@ -232,7 +232,7 @@ export function OrderScheduleTable({
         onDeactivate(contextMenu.items);
       } else {
         for (const schedule of contextMenu.items) {
-          await updateSchedule({ id: schedule.id, isActive: false });
+          await updateSchedule({ id: schedule.id, data: { isActive: false } });
         }
       }
       setContextMenu(null);

@@ -358,8 +358,9 @@ export const ChartWrapper = React.memo<ChartWrapperProps>(({
               description={description}
               icon={icon}
               badge={badge}
-              actions={actions}
-            />
+            >
+              {actions}
+            </ChartHeader>
           </CardHeader>
         )}
         <CardContent className={cn('pt-6', contentClassName)}>
@@ -397,8 +398,9 @@ export const ChartWrapper = React.memo<ChartWrapperProps>(({
               description={description}
               icon={icon}
               badge={badge}
-              actions={actions}
-            />
+            >
+              {actions}
+            </ChartHeader>
           </CardHeader>
         )}
         <CardContent className={cn('pt-6', contentClassName)}>

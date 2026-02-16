@@ -195,10 +195,11 @@ export function PaintProductionFilters({ open, onOpenChange, filters, onFiltersC
                 <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
                 <DateTimeInput
                   mode="date"
-                  context="generic"
+                  context="general"
                   value={localFilters.createdAt?.gte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localFilters.createdAt?.lte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localFilters.createdAt?.lte) {
                       setLocalFilters({
                         ...localFilters,
                         createdAt: undefined,
@@ -207,7 +208,7 @@ export function PaintProductionFilters({ open, onOpenChange, filters, onFiltersC
                       setLocalFilters({
                         ...localFilters,
                         createdAt: {
-                          ...(date && { gte: date }),
+                          ...(dateValue && { gte: dateValue }),
                           ...(localFilters.createdAt?.lte && { lte: localFilters.createdAt.lte }),
                         },
                       });
@@ -221,10 +222,11 @@ export function PaintProductionFilters({ open, onOpenChange, filters, onFiltersC
                 <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
                 <DateTimeInput
                   mode="date"
-                  context="generic"
+                  context="general"
                   value={localFilters.createdAt?.lte}
-                  onChange={(date: Date | null) => {
-                    if (!date && !localFilters.createdAt?.gte) {
+                  onChange={(date) => {
+                    const dateValue = date instanceof Date ? date : null;
+                    if (!dateValue && !localFilters.createdAt?.gte) {
                       setLocalFilters({
                         ...localFilters,
                         createdAt: undefined,
@@ -234,7 +236,7 @@ export function PaintProductionFilters({ open, onOpenChange, filters, onFiltersC
                         ...localFilters,
                         createdAt: {
                           ...(localFilters.createdAt?.gte && { gte: localFilters.createdAt.gte }),
-                          ...(date && { lte: date }),
+                          ...(dateValue && { lte: dateValue }),
                         },
                       });
                     }
@@ -257,16 +259,16 @@ export function PaintProductionFilters({ open, onOpenChange, filters, onFiltersC
                 <Label className="text-xs text-muted-foreground">Volume mín.</Label>
                 <Input
                   type="number"
-                  min="0"
-                  step="0.1"
+                  min={0}
+                  step={0.1}
                   placeholder="Volume mínimo"
-                  value={localFilters.volumeRange?.min ?? ""}
-                  onChange={(e) =>
+                  value={localFilters.volumeRange?.min ?? null}
+                  onChange={(value) =>
                     setLocalFilters({
                       ...localFilters,
                       volumeRange: {
                         ...localFilters.volumeRange,
-                        min: e.target.value ? parseFloat(e.target.value) : undefined,
+                        min: typeof value === 'number' ? value : undefined,
                       },
                     })
                   }
@@ -277,16 +279,16 @@ export function PaintProductionFilters({ open, onOpenChange, filters, onFiltersC
                 <Label className="text-xs text-muted-foreground">Volume máx.</Label>
                 <Input
                   type="number"
-                  min="0"
-                  step="0.1"
+                  min={0}
+                  step={0.1}
                   placeholder="Volume máximo"
-                  value={localFilters.volumeRange?.max ?? ""}
-                  onChange={(e) =>
+                  value={localFilters.volumeRange?.max ?? null}
+                  onChange={(value) =>
                     setLocalFilters({
                       ...localFilters,
                       volumeRange: {
                         ...localFilters.volumeRange,
-                        max: e.target.value ? parseFloat(e.target.value) : undefined,
+                        max: typeof value === 'number' ? value : undefined,
                       },
                     })
                   }

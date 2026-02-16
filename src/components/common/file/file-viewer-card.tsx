@@ -35,7 +35,8 @@ import {
   IconVectorBezier,
 } from "@tabler/icons-react";
 import { fileViewerService } from "../../../utils/file-viewer";
-import { useFileViewer } from "./file-viewer";
+import { FileViewerContext } from "./file-viewer";
+import { getApiBaseUrl } from "@/config/api";
 
 // =====================
 // Type Definitions
@@ -205,7 +206,7 @@ export const generateThumbnailUrl = (
   fileType: FileType,
   baseUrl?: string
 ): string | null => {
-  const apiUrl = baseUrl || (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
+  const apiUrl = baseUrl || getApiBaseUrl();
 
   // If file has a thumbnail URL, use it
   if (file.thumbnailUrl) {
@@ -301,7 +302,7 @@ export const FileViewerCard: React.FC<FileViewerCardProps> = ({
   // File Viewer Context
   // =====================
 
-  const fileViewerContext = React.useContext(useFileViewer as any);
+  const fileViewerContext = React.useContext(FileViewerContext);
 
   // =====================
   // Computed Values
@@ -399,6 +400,13 @@ export const FileViewerCard: React.FC<FileViewerCardProps> = ({
     [handleClick]
   );
 
+  // Get the original file URL for dragging
+  const getOriginalFileUrl = useCallback(() => {
+    const apiUrl = baseUrl || getApiBaseUrl();
+    // Use download endpoint to get the original file, not serve which may compress
+    return `${apiUrl}/files/${file.id}/download`;
+  }, [file, baseUrl]);
+
   // =====================
   // Render
   // =====================
@@ -432,6 +440,25 @@ export const FileViewerCard: React.FC<FileViewerCardProps> = ({
               </div>
             )}
 
+            {/* Draggable link overlay for proper file dragging */}
+            {!disabled && (
+              <a
+                href={getOriginalFileUrl()}
+                download={file.filename}
+                draggable={true}
+                className="absolute inset-0 z-10"
+                onClick={(e) => {
+                  // Prevent navigation, let the card's onClick handle it
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDragStart={(e) => {
+                  // Allow drag to proceed with original file URL
+                  e.stopPropagation();
+                }}
+              />
+            )}
+
             {/* Actual Thumbnail */}
             <img
               src={thumbnailUrl}
@@ -445,6 +472,7 @@ export const FileViewerCard: React.FC<FileViewerCardProps> = ({
               onLoad={handleThumbnailLoad}
               onError={handleThumbnailError}
               loading="lazy"
+              draggable={false}
             />
           </>
         ) : (

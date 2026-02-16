@@ -13,9 +13,10 @@ interface BreadcrumbItem {
 
 interface BreadcrumbProps {
   items?: BreadcrumbItem[];
+  onNavigate?: (path: string) => void;
 }
 
-export function Breadcrumb({ items }: BreadcrumbProps = {}) {
+export function Breadcrumb({ items, onNavigate }: BreadcrumbProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -36,7 +37,11 @@ export function Breadcrumb({ items }: BreadcrumbProps = {}) {
   const handleBreadcrumbClick = (path?: string) => {
     if (path) {
       const fixedPath = fixNavigationPath(path);
-      navigate(fixedPath);
+      if (onNavigate) {
+        onNavigate(fixedPath);
+      } else {
+        navigate(fixedPath);
+      }
     }
   };
 
@@ -48,7 +53,7 @@ export function Breadcrumb({ items }: BreadcrumbProps = {}) {
       {/* Home link - only show if not already in custom items */}
       {showHomeIcon && (
         <>
-          <button onClick={() => navigate(routes.home)} className="flex items-center gap-1 hover:text-foreground transition-colors">
+          <button onClick={() => onNavigate ? onNavigate(routes.home) : navigate(routes.home)} className="flex items-center gap-1 hover:text-foreground transition-colors">
             <IconHome2 className="w-4 h-4" />
             <span>Início</span>
           </button>

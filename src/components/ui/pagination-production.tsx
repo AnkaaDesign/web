@@ -3,7 +3,6 @@ import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight,
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { usePaginationState } from "@/hooks/common/use-pagination-state";
 import type { PaginationMeta } from "@/hooks/common/use-pagination-state";
@@ -203,15 +202,15 @@ export function ProductionPagination({
           {showGoToPage && pagination.totalPages > 5 && (
             <form onSubmit={handleGoToPage} className={cn("flex items-center", styles.gap)}>
               <span className={cn("text-muted-foreground whitespace-nowrap", styles.text)}>Ir para:</span>
-              <Input
+              <input
                 type="number"
                 min="1"
                 max={pagination.totalPages}
                 value={pageInput}
-                onChange={(value) => setPageInput(String(value || ""))}
+                onChange={(e) => setPageInput(e.target.value)}
                 onFocus={() => setIsPageInputFocused(true)}
                 onBlur={() => setIsPageInputFocused(false)}
-                className={cn(styles.input, "px-3 py-2 bg-transparent")}
+                className={cn(styles.input, "px-3 py-2 bg-transparent flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm")}
                 placeholder="..."
                 disabled={pagination.isLoading}
               />

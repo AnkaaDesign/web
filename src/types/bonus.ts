@@ -5,6 +5,7 @@
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, DecimalValue } from "./common";
 import type { ORDER_BY_DIRECTION } from "../constants";
+import { BONUS_STATUS } from "../constants/enums";
 import type { User, UserIncludes } from "./user";
 import type { Task, TaskIncludes } from "./task";
 import type { BonusDiscount, BonusDiscountIncludes } from "./bonusDiscount";
@@ -20,10 +21,23 @@ export interface Bonus extends BaseEntity {
   year: number;
   month: number;
   performanceLevel: number;
-  baseBonus: DecimalValue;
-  netBonus: DecimalValue;
-  weightedTasks: DecimalValue;
-  averageTaskPerUser: DecimalValue;
+  baseBonus: DecimalValue | number;
+  netBonus: DecimalValue | number;
+  weightedTasks: DecimalValue | number;
+  averageTaskPerUser: DecimalValue | number;
+
+  // Status tracking
+  status?: BONUS_STATUS;
+  statusOrder?: number;
+
+  // Calculation period
+  calculationPeriodStart?: Date | null;
+  calculationPeriodEnd?: Date | null;
+
+  // Note: ponderedTaskCount might be a duplicate of weightedTasks
+  // Consider if these should be aliases or separate properties
+  ponderedTaskCount?: DecimalValue | number;
+  averageTasksPerUser?: DecimalValue | number;
 
   // Relations (optional, populated based on query)
   user?: User;
@@ -39,6 +53,13 @@ export interface Bonus extends BaseEntity {
     periodStart?: Date; // Computed from year/month
     periodEnd?: Date; // Computed from year/month
   };
+
+  // Bonus values
+  finalValue?: DecimalValue | number;
+  baseValue?: DecimalValue | number;
+  taskCount?: number;
+  weightedTaskCount?: number;
+  multiplier?: number;
 }
 
 

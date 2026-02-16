@@ -2,6 +2,7 @@ import { formatCurrency, formatDate, toTitleCase } from "./index";
 import type { Task } from "../types/task";
 import { generatePaymentText, generateGuaranteeText } from "./pricing-text-generators";
 import { getApiBaseUrl } from "./file";
+import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 
 interface BudgetPdfOptions {
   task: Task;
@@ -32,20 +33,20 @@ const PDF_CONFIG = {
   signatureSectionHeight: 35,
   // Spacing
   sectionSpacing: 5,
-  // Colors (deep forest green to match reference PDF)
-  primaryGreen: '#0a5c1e',
-  textDark: '#1a1a1a',
-  textGray: '#666666',
-  // Company info
-  companyName: 'Ankaa Design',
-  companyAddress: 'Rua: Luís Carlos Zani, 2493 - Santa Paula, Ibiporã-PR',
-  companyPhone: '43 9 8428-3228',
-  companyPhoneClean: '5543984283228',
-  companyWebsite: 'ankaadesign.com.br',
-  companyWebsiteUrl: 'https://ankaadesign.com.br',
-  // Director info
-  directorName: 'Sergio Rodrigues',
-  directorTitle: 'Diretor Comercial',
+  // Colors (deep forest green to match reference PDF) - from centralized config
+  primaryGreen: BRAND_COLORS.primaryGreen,
+  textDark: BRAND_COLORS.textDark,
+  textGray: BRAND_COLORS.textGray,
+  // Company info - from centralized config
+  companyName: COMPANY_INFO.name,
+  companyAddress: COMPANY_INFO.address,
+  companyPhone: COMPANY_INFO.phone,
+  companyPhoneClean: COMPANY_INFO.phoneClean,
+  companyWebsite: COMPANY_INFO.website,
+  companyWebsiteUrl: COMPANY_INFO.websiteUrl,
+  // Director info - from centralized config
+  directorName: COMPANY_INFO.directorName,
+  directorTitle: COMPANY_INFO.directorTitle,
 };
 
 /**
@@ -109,7 +110,10 @@ function calculateAdaptiveLayout(
   hasDeliveryTerm: boolean,
   hasPaymentConditions: boolean,
   hasGuarantee: boolean,
-  hasDiscount: boolean
+  hasDiscount: boolean,
+  hasInvoiceToCustomers: boolean,
+  hasSimultaneousTasks: boolean,
+  hasDiscountReference: boolean
 ): AdaptiveLayoutConfig {
   // A4 page height = 297mm
   const PAGE_HEIGHT = 297;
@@ -136,19 +140,19 @@ function calculateAdaptiveLayout(
     // Title section
     titleHeight:         { default: 6, min: 5, current: 6 },
     titleMarginBottom:   { default: 3, min: 1, current: 3 },
-    // Customer section - INCREASED to account for customer name + contact + intro text with serial/plate
-    customerHeight:      { default: 28, min: 18, current: 28 },
+    // Customer section - INCREASED to account for customer name + contact + intro text with serial/plate + invoicesToCustomers
+    customerHeight:      { default: hasInvoiceToCustomers ? 32 : 28, min: 18, current: hasInvoiceToCustomers ? 32 : 28 },
     customerMarginBottom:{ default: 4, min: 1, current: 4 },
     // Services section
     servicesTitle:       { default: 5, min: 4, current: 5 },
     servicesTitleMargin: { default: 2, min: 1, current: 2 },
     // Service items - INCREASED to account for potential text wrapping
     serviceItemHeight:   { default: 5.5, min: 3.0, current: 5.5 },
-    // Totals
+    // Totals - INCREASED if discountReference is present
     totalsMarginTop:     { default: 3, min: 1, current: 3 },
-    totalsHeight:        { default: hasDiscount ? 16 : 10, min: hasDiscount ? 10 : 7, current: hasDiscount ? 16 : 10 },
-    // Terms sections (per section) - INCREASED for guarantee text which can be 2-3 lines
-    termsSectionHeight:  { default: 20, min: 12, current: 20 },
+    totalsHeight:        { default: hasDiscount ? (hasDiscountReference ? 20 : 16) : 10, min: hasDiscount ? 10 : 7, current: hasDiscount ? (hasDiscountReference ? 20 : 16) : 10 },
+    // Terms sections (per section) - INCREASED for guarantee text which can be 2-3 lines, and simultaneousTasks info
+    termsSectionHeight:  { default: hasSimultaneousTasks ? 24 : 20, min: 12, current: hasSimultaneousTasks ? 24 : 20 },
     // Footer
     footerHeight:        { default: 16, min: 12, current: 16 },
   };
@@ -316,7 +320,8 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
 
   // Get customer info
   const corporateName = task.customer?.corporateName || task.customer?.fantasyName || "Cliente";
-  const contactName = task.representatives?.[0]?.name || "";
+  const commercialRep = task.representatives?.find((r: any) => r.role === "COMMERCIAL");
+  const contactName = commercialRep?.name || task.representatives?.[0]?.name || "";
 
   // Get dates
   const currentDate = formatDate(new Date());
@@ -378,6 +383,10 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     // Vehicle identification
     serialNumber: task.serialNumber || null,
     plate: task.truck?.plate || null,
+    // New TaskPricing fields
+    invoicesToCustomers: task.pricing.invoicesToCustomers,
+    simultaneousTasks: task.pricing.simultaneousTasks || null,
+    discountReference: task.pricing.discountReference || null,
   });
 
   // Open print window
@@ -421,6 +430,10 @@ interface BudgetHtmlData {
   // Vehicle identification
   serialNumber: string | null;
   plate: string | null;
+  // New TaskPricing fields
+  invoicesToCustomers?: Array<{ corporateName?: string; fantasyName?: string }>;
+  simultaneousTasks?: number | null;
+  discountReference?: string | null;
 }
 
 /**
@@ -430,13 +443,19 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
   // Calculate adaptive layout based on content
   const hasDiscount = data.discountType !== 'NONE' && data.discountValue && data.discountValue > 0;
   const hasDeliveryTerm = !!(data.customDeliveryDays || data.termDate);
+  const hasInvoiceToCustomers = !!(data.invoicesToCustomers && data.invoicesToCustomers.length > 0);
+  const hasSimultaneousTasks = !!(data.customDeliveryDays && data.simultaneousTasks && data.simultaneousTasks > 1);
+  const hasDiscountReference = !!(hasDiscount && data.discountReference);
 
   const layout = calculateAdaptiveLayout(
     data.items.length,
     hasDeliveryTerm,
     !!data.paymentText,
     !!data.guaranteeText,
-    hasDiscount
+    Boolean(hasDiscount),
+    hasInvoiceToCustomers,
+    hasSimultaneousTasks,
+    hasDiscountReference
   );
 
   // All layout values are now from the adaptive calculator
@@ -444,15 +463,21 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 
   // Generate services list with numbers
   // Description + observation shown inline (e.g., "Pintura Geral Azul Firenze")
-  // All text is displayed in Title Case
+  // Description is displayed in Title Case, observation is kept as entered
+  // For "Outros", display only the observation (not "Outros observation")
   const servicesHtml = data.items
     .map((item, index) => {
       const amount = typeof item.amount === "number" ? item.amount : Number(item.amount) || 0;
       const valueDisplay = formatCurrency(amount);
       // Combine description and observation inline (Title Case)
       const description = toTitleCase(item.description || "Serviço");
-      const observation = item.observation ? toTitleCase(item.observation) : "";
-      const descriptionWithObs = observation ? `${description} ${observation}` : description;
+      const observation = item.observation || "";
+      // For "Outros", show only observation; otherwise show description + observation
+      const descriptionWithObs = description === "Outros" && observation
+        ? observation
+        : observation
+          ? `${description} ${observation}`
+          : description;
       return `
         <div class="service-item">
           <span class="service-desc">${index + 1} - ${escapeHtml(descriptionWithObs)}</span>
@@ -463,9 +488,10 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     .join("");
 
   // Generate totals section
+  const discountRefSuffix = data.discountReference ? ` — Ref: ${escapeHtml(data.discountReference)}` : '';
   const discountLabel = data.discountType === 'PERCENTAGE'
-    ? `Desconto (${data.discountValue}%)`
-    : 'Desconto';
+    ? `Desconto (${data.discountValue}%)${discountRefSuffix}`
+    : `Desconto${discountRefSuffix}`;
   const discountAmount = data.discountType === 'PERCENTAGE'
     ? (data.subtotal * (data.discountValue || 0) / 100)
     : (data.discountValue || 0);
@@ -921,9 +947,9 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 
       <!-- Customer Info -->
       <div class="customer-section">
-        <div class="customer-name">À ${escapeHtml(corporateName(data.corporateName))}</div>
-        ${data.contactName ? `<div class="contact-line">Caro ${escapeHtml(data.contactName)}</div>` : ""}
+        <div class="customer-name">À ${escapeHtml(data.contactName || corporateName(data.corporateName))}</div>
         <p class="intro-text">Conforme solicitado, apresentamos nossa proposta de preço para execução dos serviços abaixo descriminados${data.serialNumber || data.plate ? ` no veículo${data.serialNumber ? ` nº série: <strong>${escapeHtml(data.serialNumber)}</strong>` : ''}${data.serialNumber && data.plate ? ',' : ''}${data.plate ? ` placa: <strong style="font-weight: 600;">${escapeHtml(data.plate)}</strong>` : ''}` : ''}.</p>
+        ${data.invoicesToCustomers && data.invoicesToCustomers.length > 0 ? `<p class="intro-text" style="margin-top: 3mm;"><strong>Faturamento para:</strong> ${data.invoicesToCustomers.map(c => escapeHtml(c.fantasyName || c.corporateName || "Cliente")).join(", ")}</p>` : ""}
       </div>
 
       <!-- Services -->
@@ -939,7 +965,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       ${data.customDeliveryDays ? `
       <section class="terms-section">
         <h2 class="terms-title">Prazo de entrega</h2>
-        <p class="terms-content">O prazo de entrega é de ${data.customDeliveryDays} dias úteis a partir da data de liberação.</p>
+        <p class="terms-content">O prazo de entrega é de ${data.customDeliveryDays} dias úteis a partir da data de liberação.${data.simultaneousTasks && data.simultaneousTasks > 1 ? ` Neste período, ${data.simultaneousTasks} tarefas poderão ser produzidas simultaneamente.` : ''}</p>
       </section>
       ` : data.termDate ? `
       <section class="terms-section">

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useUnifiedTableState } from "./use-unified-table-state";
 
 export interface SelectionStats {
@@ -67,31 +67,78 @@ export interface AdvancedSelectionOptions<T extends { id: string }> {
 export function useAdvancedTableSelection<T extends { id: string }>(options: AdvancedSelectionOptions<T>) {
   const { currentPageData, allFilteredData, totalCount = 0, getAllIds, getAllFilteredIds, onSelectionChange, preserveSelectionAcrossPages = true, maxSelection } = options;
 
+  const tableState = useUnifiedTableState();
+
   const {
     selectedIds,
-    selectionMode,
-    showSelectedOnly,
     selectionCount,
     hasSelection,
     toggleSelection,
     setSelectedIds,
-    setSelectionMode,
-    handleKeyboardSelection,
     resetSelection,
     selectAll: _selectAll,
     deselectAll: _deselectAll,
     toggleSelectAll,
-    selectAllFiltered,
-    selectAllAcrossPages,
-    setShowSelectedOnly,
-    toggleShowSelectedOnly,
     isSelected,
-    isAllSelected,
-    isPartiallySelected,
-    getSelectedCount,
-  } = useUnifiedTableState();
+    invertSelection: _invertSelection,
+  } = tableState.selection;
+
+  // Local state for advanced selection features
+  const [selectionMode, setSelectionMode] = useState<"page" | "all" | "filtered">("page");
+  const [showSelectedOnly, setShowSelectedOnly] = useState(false);
 
   const lastClickIndexRef = useRef<number | null>(null);
+
+  // Helper functions for advanced selection
+  const getSelectedCount = useCallback((ids: string[]) => {
+    return ids.filter(id => selectedIds.includes(id)).length;
+  }, [selectedIds]);
+
+  const isAllSelected = useCallback((ids: string[]) => {
+    if (ids.length === 0) return false;
+    return ids.every(id => selectedIds.includes(id));
+  }, [selectedIds]);
+
+  const isPartiallySelected = useCallback((ids: string[]) => {
+    const count = getSelectedCount(ids);
+    return count > 0 && count < ids.length;
+  }, [getSelectedCount]);
+
+  const handleKeyboardSelection = useCallback((id: string, allIds: string[], event: React.MouseEvent) => {
+    if (event.shiftKey && lastClickIndexRef.current !== null) {
+      // Range selection
+      const currentIndex = allIds.indexOf(id);
+      if (currentIndex !== -1) {
+        const start = Math.min(lastClickIndexRef.current, currentIndex);
+        const end = Math.max(lastClickIndexRef.current, currentIndex);
+        const rangeIds = allIds.slice(start, end + 1);
+
+        const newSelectedIds = Array.from(new Set([...selectedIds, ...rangeIds]));
+        setSelectedIds(newSelectedIds);
+      }
+    } else if (event.ctrlKey || event.metaKey) {
+      // Toggle individual item
+      toggleSelection(id);
+    } else {
+      // Regular selection
+      toggleSelection(id);
+    }
+  }, [selectedIds, setSelectedIds, toggleSelection]);
+
+  const selectAllFiltered = useCallback((ids: string[]) => {
+    setSelectedIds(ids);
+    setSelectionMode("filtered");
+  }, [setSelectedIds]);
+
+  const selectAllAcrossPages = useCallback(async (_total: number, getAllIdsFn: () => Promise<string[]>) => {
+    const allIds = await getAllIdsFn();
+    setSelectedIds(allIds);
+    setSelectionMode("all");
+  }, [setSelectedIds]);
+
+  const toggleShowSelectedOnly = useCallback(() => {
+    setShowSelectedOnly(prev => !prev);
+  }, []);
 
   // Current page item IDs
   const currentPageIds = useMemo(() => currentPageData.map((item) => item.id), [currentPageData]);

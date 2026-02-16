@@ -358,23 +358,23 @@ export const mergeChartConfigs = (base: ChartConfiguration, override: Partial<Ch
     ...override,
     style: {
       ...base.style,
-      ...override.style,
+      ...(override.style || {}),
     },
     legend: {
       ...base.legend,
-      ...override.legend,
+      ...(override.legend || {}),
     },
     tooltip: {
       ...base.tooltip,
-      ...override.tooltip,
+      ...(override.tooltip || {}),
     },
     export: {
       ...base.export,
-      ...override.export,
-    },
+      ...(override.export || {}),
+    } as ExportConfig,
     interaction: {
       ...base.interaction,
-      ...override.interaction,
+      ...(override.interaction || {}),
     },
   };
 };

@@ -41,7 +41,7 @@ export function ServiceDescriptionInput({
     <div className={cn("relative", className)}>
       <Combobox
         value={value || ""}
-        onValueChange={onChange}
+        onValueChange={(val) => onChange(String(val || ""))}
         disabled={disabled}
         options={options}
         placeholder={placeholder}

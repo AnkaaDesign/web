@@ -6,7 +6,6 @@
  */
 
 export { MediaViewer } from '../MediaViewer';
-export { MediaViewerExamples } from '../MediaViewerExamples';
 
 export type { MediaItem } from '../MediaViewer';
 export type {

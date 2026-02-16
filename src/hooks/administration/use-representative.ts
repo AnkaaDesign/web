@@ -156,7 +156,7 @@ export function useRepresentativeMutations() {
 
     // Delete
     delete: deleteMutation.mutate,
-    deleteAsync: deleteMutation.deleteAsync,
+    deleteAsync: deleteMutation.mutateAsync,
     deleteMutation,
 
     // Toggle Active

@@ -128,7 +128,7 @@ export function CategorySelector({ disabled, required, onCategoryChange, initial
               value={field.value || ""}
               onValueChange={(value) => {
                 field.onChange(value);
-                onCategoryChange?.(value || undefined);
+                onCategoryChange?.((typeof value === 'string' ? value : undefined) || undefined);
               }}
               async={true}
               queryKey={["item-categories", "selector"]}

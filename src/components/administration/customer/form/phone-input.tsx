@@ -1,4 +1,4 @@
-import type { Control, FieldValues } from "react-hook-form";
+import type { Control, FieldValues, Path } from "react-hook-form";
 import { PhoneInput as StandardizedPhoneInput } from "@/components/ui/phone-input";
 
 interface PhoneInputProps<TFieldValues extends FieldValues = FieldValues> {
@@ -10,7 +10,7 @@ export function PhoneInput<TFieldValues extends FieldValues = FieldValues>({ con
   return (
     <StandardizedPhoneInput
       control={control}
-      name="phones"
+      name={"phones" as Path<TFieldValues>}
       label="Telefones"
       disabled={disabled}
       multiple={true}

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import type { ComponentType } from "react";
-import { LoadingPage } from "@/pages/loading-page";
+import { LoadingPage } from "@/components/navigation/loading-page";
 
 interface SafeLazyComponentProps {
   Component: ComponentType<any>;

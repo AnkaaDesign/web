@@ -103,7 +103,7 @@ export const ChartFilters: React.FC<ChartFiltersProps> = ({
           <Input
             type="number"
             value={filter.value}
-            onChange={(e) => handleFilterChange(index, Number(e.target.value))}
+            onChange={(value) => handleFilterChange(index, Number(value as string))}
             className="h-9"
             placeholder={`Enter ${filter.label}`}
           />
@@ -114,7 +114,7 @@ export const ChartFilters: React.FC<ChartFiltersProps> = ({
           <Input
             type="date"
             value={filter.value}
-            onChange={(e) => handleFilterChange(index, e.target.value)}
+            onChange={(value) => handleFilterChange(index, value as string)}
             className="h-9"
           />
         );
@@ -125,7 +125,7 @@ export const ChartFilters: React.FC<ChartFiltersProps> = ({
           <Input
             type="text"
             value={filter.value}
-            onChange={(e) => handleFilterChange(index, e.target.value)}
+            onChange={(value) => handleFilterChange(index, value as string)}
             className="h-9"
             placeholder={`Enter ${filter.label}`}
           />

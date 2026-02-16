@@ -1,9 +1,10 @@
 import { useMemo, useCallback } from "react";
+import { useWatch } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import { getPaints } from "../../../../api-client";
+import { getPaints, getPaintById } from "../../../../api-client";
 import type { Paint } from "../../../../types";
-import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
 
 interface SinglePaintSelectorProps {
   control: any;
@@ -12,8 +13,30 @@ interface SinglePaintSelectorProps {
 }
 
 export function SinglePaintSelector({ control, disabled, initialPaint }: SinglePaintSelectorProps) {
-  // Memoize initialOptions to prevent infinite loop
-  const initialOptions = useMemo(() => initialPaint ? [initialPaint] : [], [initialPaint?.id]);
+  // Watch paintId from form state - persists across accordion unmount/remount
+  const selectedPaintId = useWatch({ control, name: "paintId" }) as string | undefined;
+
+  // Fetch selected paint details by ID - React Query cache persists across unmount/remount
+  const { data: selectedPaintData } = useQuery({
+    queryKey: ["paints", "selected-detail", selectedPaintId],
+    queryFn: async () => {
+      if (!selectedPaintId) return null;
+      const response = await getPaintById(selectedPaintId);
+      return response.data || null;
+    },
+    enabled: !!selectedPaintId && selectedPaintId !== initialPaint?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Memoize initialOptions - include selected paint data for accordion remount scenarios
+  const initialOptions = useMemo(() => {
+    const options: Paint[] = [];
+    if (initialPaint) options.push(initialPaint);
+    if (selectedPaintData && selectedPaintData.id !== initialPaint?.id) {
+      options.push(selectedPaintData);
+    }
+    return options;
+  }, [initialPaint?.id, selectedPaintData?.id]);
 
   // Memoize callbacks to prevent infinite loop
   const getOptionLabel = useCallback((paint: Paint) => paint.name, []);

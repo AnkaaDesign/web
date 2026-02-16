@@ -59,9 +59,6 @@ const taskBatchEditSchema = z.object({
           customerId: z.string().uuid().nullable().optional(),
           sectorId: z.string().uuid().nullable().optional(),
           paintId: z.string().uuid().nullable().optional(),
-          truckHeight: z.number().min(0).max(10).nullable().optional(),
-          truckLength: z.number().min(0).max(30).nullable().optional(),
-          truckWidth: z.number().min(0).max(5).nullable().optional(),
         })
         .partial(),
     }),
@@ -118,9 +115,6 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                 customerId: task.customerId || null,
                 sectorId: task.sectorId || null,
                 paintId: task.generalPainting?.id || null,
-                truckHeight: task.truck?.height || null,
-                truckLength: task.truck?.length || null,
-                truckWidth: task.truck?.width || null,
               },
             }))
           : [],
@@ -152,9 +146,6 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
           customerId: task.customerId || null,
           sectorId: task.sectorId || null,
           paintId: task.generalPainting?.id || null,
-          truckHeight: task.truck?.height || null,
-          truckLength: task.truck?.length || null,
-          truckWidth: task.truck?.width || null,
         },
       }));
       replace(formattedTasks);
@@ -217,14 +208,12 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
     }
   };
 
-  const handleResultDialogClose = (open: boolean) => {
-    setShowResultDialog(open);
-    if (!open) {
-      setBatchResult(null);
-      // If there were no failures, navigate back to list
-      if (batchResult && batchResult.totalFailed === 0 && batchResult.totalSuccess > 0) {
-        navigate(routes.production.schedule.root);
-      }
+  const handleResultDialogClose = () => {
+    setShowResultDialog(false);
+    setBatchResult(null);
+    // If there were no failures, navigate back to list
+    if (batchResult && batchResult.totalFailed === 0 && batchResult.totalSuccess > 0) {
+      navigate(routes.production.schedule.root);
     }
   };
 
@@ -312,7 +301,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                       >
                         <TableCell className="w-64 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <FormInput control={form.control} name={`tasks.${index}.data.name`} placeholder="Nome da tarefa" />
+                            <FormInput name={`tasks.${index}.data.name`} placeholder="Nome da tarefa" />
                           </div>
                         </TableCell>
                         <TableCell className="w-44 p-0 !border-r-0">
@@ -332,17 +321,17 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                         </TableCell>
                         <TableCell className="w-24 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <FormInput control={form.control} name={`tasks.${index}.data.serialNumber`} placeholder="Nº Série" className="uppercase" />
+                            <FormInput name={`tasks.${index}.data.serialNumber`} placeholder="Nº Série" className="uppercase" />
                           </div>
                         </TableCell>
                         <TableCell className="w-24 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <FormInput control={form.control} name={`tasks.${index}.data.plate`} placeholder="Placa" className="uppercase" />
+                            <FormInput name={`tasks.${index}.data.plate`} placeholder="Placa" className="uppercase" />
                           </div>
                         </TableCell>
                         <TableCell className="w-48 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <FormInput control={form.control} name={`tasks.${index}.data.chassisNumber`} placeholder="Chassi" className="uppercase" />
+                            <FormInput name={`tasks.${index}.data.chassisNumber`} placeholder="Chassi" className="uppercase" />
                           </div>
                         </TableCell>
                         <TableCell className="w-72 p-0 !border-r-0">

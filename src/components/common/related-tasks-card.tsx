@@ -21,6 +21,7 @@ import { TASK_STATUS, TASK_STATUS_LABELS, COMMISSION_STATUS, COMMISSION_STATUS_L
 import { cn } from "@/lib/utils";
 import { getBadgeVariantFromStatus } from "@/components/ui/badge";
 import { useTableState } from "@/hooks/common/use-table-state";
+import { formatDate } from "@/utils/date";
 
 interface RelatedTasksCardProps {
   tasks: Task[];
@@ -75,7 +76,7 @@ export function RelatedTasksCard({
       const normalizedPlate = plate.replace(/[\s\-_./]/g, "");
       const customerName = task.customer?.fantasyName?.toLowerCase() || "";
       // Support both user and createdBy fields for compatibility
-      const userName = (task.user?.name || (task as any).createdBy?.name)?.toLowerCase() || "";
+      const userName = (task.createdBy?.name || (task as any).user?.name)?.toLowerCase() || "";
       const sectorName = task.sector?.name?.toLowerCase() || "";
       const taskId = task.id?.toLowerCase() || "";
 
@@ -362,7 +363,7 @@ export function RelatedTasksCard({
           <Input
             placeholder="Buscar por nome, cliente, setor, S/N ou placa..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e?.target?.value || "")}
+            onChange={(value) => setSearchTerm(String(value))}
             className="pl-10"
           />
         </div>
@@ -427,14 +428,14 @@ export function RelatedTasksCard({
                         )}
 
                         {/* User */}
-                        {(task.user || (task as any).createdBy) && (
+                        {task.createdBy && (
                           <div className="p-3 rounded-lg bg-muted/50">
                             <div className="flex items-start gap-2">
                               <IconUser className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
                               <div className="space-y-0.5 flex-1 min-w-0">
                                 <p className="text-xs text-muted-foreground">Responsável</p>
-                                <p className="text-sm font-medium truncate" title={task.user?.name || (task as any).createdBy?.name || 'Sem responsável'}>
-                                  {task.user?.name || (task as any).createdBy?.name || 'Sem responsável'}
+                                <p className="text-sm font-medium truncate" title={task.createdBy?.name || 'Sem responsável'}>
+                                  {task.createdBy?.name || 'Sem responsável'}
                                 </p>
                               </div>
                             </div>
@@ -457,7 +458,7 @@ export function RelatedTasksCard({
 
                       {/* Footer with Date */}
                       {(task.finishedAt || task.createdAt) && (
-                        <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                        <div className="flex items-center justify-between pt-3 border-t border-border">
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <IconCalendar className="h-3.5 w-3.5" />
                             <span>{task.finishedAt ? 'Concluída' : 'Criada'}</span>
@@ -485,18 +486,12 @@ export function RelatedTasksCard({
               getItemKey={(task) => task.id}
               isLoading={false}
               emptyMessage="Nenhuma tarefa encontrada"
-              emptyDescription="Não há tarefas que correspondam aos filtros selecionados"
               emptyIcon={IconChecklist}
               onSort={toggleSort}
               getSortDirection={getSortDirection}
               getSortOrder={getSortOrder}
               sortConfigs={sortConfigs.map((config) => ({ field: config.column, direction: config.direction }))}
               onRowClick={(task) => navigate(routes.production.schedule.details(task.id))}
-              currentPage={0}
-              totalPages={1}
-              pageSize={sortedTasks.length}
-              totalRecords={sortedTasks.length}
-              showPagination={false}
               showPageInfo={false}
               className="[&_table]:border-0 [&_tbody_tr]:border-b-0 [&_tbody_tr:hover]:bg-muted/50"
             />

@@ -74,7 +74,7 @@ export function SpecificationsCard({ vacation, className }: SpecificationsCardPr
           )}
 
           {/* Period Section */}
-          <div className={cn(vacation.user && "pt-6 border-t border-border/50")}>
+          <div className={cn(vacation.user && "pt-6 border-t border-border")}>
             <h3 className="text-base font-semibold mb-4 text-foreground">Período</h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
@@ -118,7 +118,7 @@ export function SpecificationsCard({ vacation, className }: SpecificationsCardPr
           </div>
 
           {/* Details Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Detalhes</h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">

@@ -84,12 +84,12 @@ const getCommercialArtworkOrdersStatus = (task: Task): {
   // Check commercial service orders
   const commercialOrders = task.serviceOrders?.filter(so => so.type === SERVICE_ORDER_TYPE.COMMERCIAL) || [];
   const commercialMissing = commercialOrders.length === 0;
-  const commercialIncomplete = !commercialMissing && commercialOrders.some(so => incompleteStatuses.includes(so.status));
+  const commercialIncomplete = !commercialMissing && commercialOrders.some(so => so.status && incompleteStatuses.includes(so.status));
 
   // Check artwork service orders
   const artworkOrders = task.serviceOrders?.filter(so => so.type === SERVICE_ORDER_TYPE.ARTWORK) || [];
   const artworkMissing = artworkOrders.length === 0;
-  const artworkIncomplete = !artworkMissing && artworkOrders.some(so => incompleteStatuses.includes(so.status));
+  const artworkIncomplete = !artworkMissing && artworkOrders.some(so => so.status && incompleteStatuses.includes(so.status));
 
   const hasIssue = commercialMissing || commercialIncomplete || artworkMissing || artworkIncomplete;
 
@@ -351,19 +351,6 @@ export const createTaskHistoryColumns = (options?: {
     width: "150px",
     formatter: (value: string, row: Task) => {
       if (!row.representatives || row.representatives.length === 0) return <span className="text-muted-foreground">-</span>;
-      return <TruncatedTextWithTooltip text={value} className="truncate" />;
-    },
-  },
-  {
-    id: "invoiceTo.fantasyName",
-    header: "FATURAR PARA",
-    accessorFn: (row) => row.invoiceTo?.fantasyName || "",
-    sortable: true,
-    filterable: true,
-    defaultVisible: false,
-    width: "150px",
-    formatter: (value: string, row: Task) => {
-      if (!row.invoiceTo) return <span className="text-muted-foreground">-</span>;
       return <TruncatedTextWithTooltip text={value} className="truncate" />;
     },
   },
@@ -844,14 +831,6 @@ export const createTaskHistoryColumns = (options?: {
     sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER
   );
 
-  // Define sectors that can view invoiceTo field (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC - NOT Designer)
-  const canViewInvoiceToField = sectorPrivilege && (
-    sectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
-    sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
-    sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
-    sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC
-  );
-
   // Define sectors that can view commission field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
   const canViewCommissionField = sectorPrivilege && (
     sectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
@@ -867,11 +846,6 @@ export const createTaskHistoryColumns = (options?: {
       col.id !== 'representatives' &&
       col.id !== 'forecastDate'
     );
-  }
-
-  // Filter out invoiceTo column - DESIGNER cannot see it (only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC)
-  if (!canViewInvoiceToField) {
-    filteredColumns = filteredColumns.filter(col => col.id !== 'invoiceTo.fantasyName');
   }
 
   // Filter out commission column for users without permission (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only)

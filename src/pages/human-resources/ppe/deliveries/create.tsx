@@ -80,7 +80,7 @@ export const EPIDeliveryCreate = () => {
         />
         <div className="flex-1 overflow-y-auto pb-6">
           <div className="mt-4 space-y-4">
-            <PpeDeliveryForm mode="create" onSubmit={handleSubmit} isSubmitting={batchCreateMutation.isPending} />
+            <PpeDeliveryForm mode="create" onSubmit={handleSubmit as any} isSubmitting={batchCreateMutation.isPending} />
           </div>
         </div>
       </div>

@@ -91,13 +91,13 @@ export function RangeFilters({
             <Label htmlFor="quantityMin" className="text-xs text-muted-foreground">
               Mínimo
             </Label>
-            <Input id="quantityMin" type="number" min="0" step="0.01" placeholder="0" value={quantityRange?.min || ""} onChange={(value) => handleQuantityMinChange(value as string)} />
+            <Input id="quantityMin" type="number" min={0} step={0.01} placeholder="0" value={quantityRange?.min ?? null} onChange={(value) => handleQuantityMinChange(value as string)} />
           </div>
           <div>
             <Label htmlFor="quantityMax" className="text-xs text-muted-foreground">
               Máximo
             </Label>
-            <Input id="quantityMax" type="number" min="0" step="0.01" placeholder="∞" value={quantityRange?.max || ""} onChange={(value) => handleQuantityMaxChange(value as string)} />
+            <Input id="quantityMax" type="number" min={0} step={0.01} placeholder="∞" value={quantityRange?.max ?? null} onChange={(value) => handleQuantityMaxChange(value as string)} />
           </div>
         </div>
       </div>
@@ -190,10 +190,10 @@ export function RangeFilters({
             <Input
               id="monthlyConsumptionMin"
               type="number"
-              min="0"
-              step="1"
+              min={0}
+              step={1}
               placeholder="0"
-              value={monthlyConsumptionRange?.min || ""}
+              value={monthlyConsumptionRange?.min ?? null}
               onChange={(value) => handleMonthlyConsumptionMinChange(value as string)}
             />
           </div>
@@ -204,10 +204,10 @@ export function RangeFilters({
             <Input
               id="monthlyConsumptionMax"
               type="number"
-              min="0"
-              step="1"
+              min={0}
+              step={1}
               placeholder="∞"
-              value={monthlyConsumptionRange?.max || ""}
+              value={monthlyConsumptionRange?.max ?? null}
               onChange={(value) => handleMonthlyConsumptionMaxChange(value as string)}
             />
           </div>

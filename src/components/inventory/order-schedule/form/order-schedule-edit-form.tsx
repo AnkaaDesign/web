@@ -407,7 +407,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                 />
 
                                 {/* Show interval field only for frequencies that support it */}
-                                {watchedFrequency && frequencyGroups.withInterval.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.withInterval.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="frequencyCount"
@@ -449,18 +449,18 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                 )}
 
                                 {/* Specific date field (for ONCE and CUSTOM frequencies) */}
-                                {watchedFrequency && frequencyGroups.needsSpecificDate.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.needsSpecificDate.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="specificDate"
-                                    render={({ field }) => (
+                                    render={({ field: { onChange, onBlur, value, name } }) => (
                                       <FormItem className="flex flex-col flex-1 min-w-[200px]">
                                         <FormLabel>
                                           {watchedFrequency === SCHEDULE_FREQUENCY.ONCE ? "Data do Pedido" : "Próxima Execução"}
                                           <span className="text-destructive">*</span>
                                         </FormLabel>
                                         <DateTimeInput
-                                          field={field}
+                                          field={{ onChange, onBlur, value: value || null, name }}
                                           hideLabel
                                           placeholder="Selecione a data"
                                           mode="date"
@@ -473,7 +473,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                 )}
 
                                 {/* Day of week field (for WEEKLY and BIWEEKLY) */}
-                                {watchedFrequency && frequencyGroups.needsDayOfWeek.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.needsDayOfWeek.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="dayOfWeek"
@@ -497,7 +497,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                 )}
 
                                 {/* Month field (for ANNUAL only) */}
-                                {watchedFrequency && frequencyGroups.needsMonth.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.needsMonth.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="month"
@@ -521,7 +521,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                 )}
 
                                 {/* Day of month field (for monthly/quarterly/annual frequencies) */}
-                                {watchedFrequency && frequencyGroups.needsDayOfMonth.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.needsDayOfMonth.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="dayOfMonth"
@@ -549,15 +549,15 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                 )}
 
                                 {/* Next run date field (for all except ONCE and CUSTOM) */}
-                                {watchedFrequency && frequencyGroups.needsNextRun.includes(watchedFrequency) && (
+                                {watchedFrequency && frequencyGroups.needsNextRun.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
                                   <FormField
                                     control={form.control}
                                     name="nextRun"
-                                    render={({ field }) => (
+                                    render={({ field: { onChange, onBlur, value, name } }) => (
                                       <FormItem className="flex flex-col flex-1 min-w-[200px]">
                                         <FormLabel>Próxima Execução</FormLabel>
                                         <DateTimeInput
-                                          field={field}
+                                          field={{ onChange, onBlur, value: value || null, name }}
                                           hideLabel
                                           placeholder="Data de execução"
                                           mode="date"
@@ -630,7 +630,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                         <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                           <span className="text-sm font-medium text-muted-foreground">Frequência</span>
                           <span className="text-sm font-semibold text-foreground">
-                            {SCHEDULE_FREQUENCY_LABELS[watchedFrequency] || watchedFrequency}
+                            {watchedFrequency && SCHEDULE_FREQUENCY_LABELS[watchedFrequency as SCHEDULE_FREQUENCY] || watchedFrequency}
                             {watchedFrequencyCount && watchedFrequencyCount > 1 && ` - A cada ${watchedFrequencyCount}`}
                           </span>
                         </div>
@@ -638,7 +638,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                         {watchedDayOfWeek && (
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                             <span className="text-sm font-medium text-muted-foreground">Dia da Semana</span>
-                            <span className="text-sm font-semibold text-foreground">{WEEK_DAY_LABELS[watchedDayOfWeek]}</span>
+                            <span className="text-sm font-semibold text-foreground">{WEEK_DAY_LABELS[watchedDayOfWeek as keyof typeof WEEK_DAY_LABELS]}</span>
                           </div>
                         )}
 
@@ -652,7 +652,7 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                         {watchedMonth && (
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                             <span className="text-sm font-medium text-muted-foreground">Mês</span>
-                            <span className="text-sm font-semibold text-foreground">{MONTH_LABELS[watchedMonth]}</span>
+                            <span className="text-sm font-semibold text-foreground">{MONTH_LABELS[watchedMonth as keyof typeof MONTH_LABELS]}</span>
                           </div>
                         )}
 

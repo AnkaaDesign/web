@@ -1,3 +1,4 @@
+import type { FieldErrors } from "react-hook-form";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import type { ItemBrandCreateFormData, ItemBrandUpdateFormData } from "../../../../../schemas";

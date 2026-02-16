@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { IconFilter, IconX } from "@tabler/icons-react";
+import type { DateRange } from "react-day-picker";
 import {
   Sheet,
   SheetContent,
@@ -158,8 +159,8 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
                 label: AIRBRUSHING_STATUS_LABELS[status],
               }))}
               value={localState.status}
-              onValueChange={(status: string[]) => {
-                setLocalState((prev) => ({ ...prev, status: status as AIRBRUSHING_STATUS[] }));
+              onValueChange={(status: string | string[] | null | undefined) => {
+                setLocalState((prev) => ({ ...prev, status: (Array.isArray(status) ? status : []) as AIRBRUSHING_STATUS[] }));
               }}
               placeholder="Selecionar status..."
               searchPlaceholder="Buscar status..."
@@ -185,8 +186,8 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
                 label: task.name,
               }))}
               value={localState.taskIds}
-              onValueChange={(taskIds: string[]) => {
-                setLocalState((prev) => ({ ...prev, taskIds }));
+              onValueChange={(taskIds: string | string[] | null | undefined) => {
+                setLocalState((prev) => ({ ...prev, taskIds: Array.isArray(taskIds) ? taskIds : [] }));
               }}
               placeholder="Selecionar tarefas..."
               searchPlaceholder="Buscar tarefas..."
@@ -205,11 +206,10 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
                   type="number"
                   placeholder="0.00"
                   value={localState.priceMin || ""}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const value = e.target.value;
+                  onChange={(value: string | number | null) => {
                     setLocalState((prev) => ({
                       ...prev,
-                      priceMin: value ? parseFloat(value) : undefined,
+                      priceMin: value ? parseFloat(String(value)) : undefined,
                     }));
                   }}
                 />
@@ -220,11 +220,10 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
                   type="number"
                   placeholder="999999.99"
                   value={localState.priceMax || ""}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const value = e.target.value;
+                  onChange={(value: string | number | null) => {
                     setLocalState((prev) => ({
                       ...prev,
-                      priceMax: value ? parseFloat(value) : undefined,
+                      priceMax: value ? parseFloat(String(value)) : undefined,
                     }));
                   }}
                 />
@@ -240,10 +239,10 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.createdAfter}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
                     setLocalState((prev) => ({
                       ...prev,
-                      createdAfter: date || undefined,
+                      createdAfter: (date instanceof Date ? date : null) || undefined,
                     }));
                   }}
                   hideLabel
@@ -255,10 +254,10 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
                 <DateTimeInput
                   mode="date"
                   value={localState.createdBefore}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
                     setLocalState((prev) => ({
                       ...prev,
-                      createdBefore: date || undefined,
+                      createdBefore: (date instanceof Date ? date : null) || undefined,
                     }));
                   }}
                   hideLabel

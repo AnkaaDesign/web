@@ -59,23 +59,6 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     resetSelectionOnPageChange: false,
   });
 
-  // State to hold current page items from the table component
-  const [_tableData, setTableData] = useState<{
-    items: PpeDelivery[];
-    totalRecords: number;
-  }>({
-    items: [],
-    totalRecords: 0,
-  });
-
-  // Stable callback for table data updates
-  const handleTableDataChange = useCallback(
-    (data: { items: PpeDelivery[]; totalRecords: number }) => {
-      setTableData(data);
-    },
-    [],
-  );
-
   // State from URL params - must be declared before any callbacks that use them
   const [searchingFor, setSearchingFor] = useState(() => searchParams.get("search") || "");
   const [displaySearchText, setDisplaySearchText] = useState(() => searchParams.get("search") || "");
@@ -321,9 +304,8 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
       // Single delivery - navigate to edit page
       navigate(routes.inventory.ppe.deliveries.edit(deliveries[0].id));
     } else {
-      // Multiple deliveries - navigate to batch edit page
-      const ids = deliveries.map((delivery) => delivery.id).join(",");
-      navigate(`/estoque/epi/entregas/editar-lote?ids=${ids}`);
+      // Batch edit not yet implemented - edit individually
+      toast.info("Edição em lote não disponível. Edite cada entrega individualmente.");
     }
   }, [navigate]);
 
@@ -525,11 +507,16 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
       return;
     }
 
-    // Filter only deliveries that can be reverted (DELIVERED status)
-    const deliveriesToRevert = deliveries.filter((d) => d.status === PPE_DELIVERY_STATUS.DELIVERED);
+    // Filter only deliveries that can be reverted (DELIVERED, WAITING_SIGNATURE, or SIGNATURE_REJECTED status)
+    const deliveriesToRevert = deliveries.filter(
+      (d) =>
+        d.status === PPE_DELIVERY_STATUS.DELIVERED ||
+        d.status === PPE_DELIVERY_STATUS.WAITING_SIGNATURE ||
+        d.status === PPE_DELIVERY_STATUS.SIGNATURE_REJECTED
+    );
 
     if (deliveriesToRevert.length === 0) {
-      toast.warning("Nenhuma entrega selecionada está entregue. Apenas entregas já entregues podem ser revertidas.");
+      toast.warning("Nenhuma entrega selecionada pode ser revertida. Apenas entregas entregues, aguardando assinatura ou com assinatura rejeitada podem ser revertidas.");
       return;
     }
 
@@ -609,7 +596,7 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
             <Input
               ref={searchInputRef}
               type="text"
-              placeholder="Buscar por item, usuário, observações..."
+              placeholder="Buscar por item, usuário..."
               value={displaySearchText}
               onChange={handleSearchInputChange}
               transparent={true}
@@ -643,7 +630,6 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
             onDelete={handleBulkDelete}
             filters={queryFilters}
             className="h-full"
-            onDataChange={handleTableDataChange}
           />
         </div>
       </CardContent>

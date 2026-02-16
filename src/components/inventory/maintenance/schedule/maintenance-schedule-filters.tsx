@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { DateRange } from "react-day-picker";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -180,7 +181,7 @@ export function MaintenanceScheduleFilters({
               mode="multiple"
               options={itemOptions}
               value={localState.itemIds || []}
-              onValueChange={(value) => setLocalState((prev) => ({ ...prev, itemIds: value }))}
+              onValueChange={(value) => setLocalState((prev) => ({ ...prev, itemIds: Array.isArray(value) ? value : [] }))}
               placeholder="Selecione itens..."
               emptyText="Nenhum item encontrado"
               searchPlaceholder="Buscar itens..."
@@ -197,7 +198,7 @@ export function MaintenanceScheduleFilters({
               mode="multiple"
               options={frequencyOptions}
               value={localState.frequency || []}
-              onValueChange={(value) => setLocalState((prev) => ({ ...prev, frequency: value }))}
+              onValueChange={(value) => setLocalState((prev) => ({ ...prev, frequency: Array.isArray(value) ? value : [] }))}
               placeholder="Selecione frequências..."
               emptyText="Nenhuma frequência encontrada"
               searchPlaceholder="Buscar frequências..."
@@ -250,7 +251,8 @@ export function MaintenanceScheduleFilters({
                 <DateTimeInput
                   mode="date"
                   value={localState.nextRunRange?.from}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.nextRunRange?.to) {
                       setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
                     } else {
@@ -272,7 +274,8 @@ export function MaintenanceScheduleFilters({
                 <DateTimeInput
                   mode="date"
                   value={localState.nextRunRange?.to}
-                  onChange={(date: Date | null) => {
+                  onChange={(date: Date | DateRange | null) => {
+                    if (date && !(date instanceof Date)) return;
                     if (!date && !localState.nextRunRange?.from) {
                       setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
                     } else {

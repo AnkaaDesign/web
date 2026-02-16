@@ -236,7 +236,7 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               onValueChange={(value) =>
                 setLocalFilters({
                   ...localFilters,
-                  itemIds: value.length > 0 ? value : undefined,
+                  itemIds: value && value.length > 0 ? value : undefined,
                 })
               }
               placeholder="Selecione itens..."
@@ -269,7 +269,7 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               onValueChange={(value) =>
                 setLocalFilters({
                   ...localFilters,
-                  userIds: value.length > 0 ? value : undefined,
+                  userIds: value && value.length > 0 ? value : undefined,
                 })
               }
               placeholder="Selecione usuários..."
@@ -302,7 +302,7 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               onValueChange={(value) =>
                 setLocalFilters({
                   ...localFilters,
-                  categoryIds: value.length > 0 ? value : undefined,
+                  categoryIds: value && value.length > 0 ? value : undefined,
                 })
               }
               placeholder="Selecione categorias..."
@@ -335,7 +335,7 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               onValueChange={(value) =>
                 setLocalFilters({
                   ...localFilters,
-                  brandIds: value.length > 0 ? value : undefined,
+                  brandIds: value && value.length > 0 ? value : undefined,
                 })
               }
               placeholder="Selecione marcas..."
@@ -361,7 +361,7 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
             <Combobox
               value={localFilters.where?.status ? String(localFilters.where.status) : "all"}
               onValueChange={(value) => {
-                const newWhere = { ...localFilters.where };
+                const newWhere = { ...(localFilters.where || {}) };
                 if (value === "all") {
                   delete newWhere.status;
                 } else {
@@ -394,13 +394,13 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Data inicial</Label>
                 <DateTimeInput
-                  type="datetime-local"
+                  mode="datetime"
                   value={localFilters.createdAt?.gte || undefined}
                   onChange={(value) =>
                     setLocalFilters({
                       ...localFilters,
                       createdAt: {
-                        ...localFilters.createdAt,
+                        ...(localFilters.createdAt || {}),
                         gte: value || undefined,
                       },
                     })
@@ -411,13 +411,13 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Data final</Label>
                 <DateTimeInput
-                  type="datetime-local"
+                  mode="datetime"
                   value={localFilters.createdAt?.lte || undefined}
                   onChange={(value) =>
                     setLocalFilters({
                       ...localFilters,
                       createdAt: {
-                        ...localFilters.createdAt,
+                        ...(localFilters.createdAt || {}),
                         lte: value || undefined,
                       },
                     })
@@ -438,13 +438,13 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Data inicial</Label>
                 <DateTimeInput
-                  type="datetime-local"
+                  mode="datetime"
                   value={localFilters.returnedAt?.gte || undefined}
                   onChange={(value) =>
                     setLocalFilters({
                       ...localFilters,
                       returnedAt: {
-                        ...localFilters.returnedAt,
+                        ...(localFilters.returnedAt || {}),
                         gte: value || undefined,
                       },
                     })
@@ -455,13 +455,13 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Data final</Label>
                 <DateTimeInput
-                  type="datetime-local"
+                  mode="datetime"
                   value={localFilters.returnedAt?.lte || undefined}
                   onChange={(value) =>
                     setLocalFilters({
                       ...localFilters,
                       returnedAt: {
-                        ...localFilters.returnedAt,
+                        ...(localFilters.returnedAt || {}),
                         lte: value || undefined,
                       },
                     })

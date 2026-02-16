@@ -68,7 +68,9 @@ export function MaxQuantityInput({
                 placeholder="Quantidade máxima"
                 disabled={disabled}
                 value={field.value ?? ''}
-                onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                onChange={(value: string | number | null) => {
+                  field.onChange(value !== null && value !== '' ? parseFloat(String(value)) : null);
+                }}
                 transparent={true}
                 className="transition-all duration-200"
               />

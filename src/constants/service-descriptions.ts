@@ -26,12 +26,13 @@ export const PRODUCTION_SERVICE_DESCRIPTIONS = [
   'Faixa Veículo Longo Traseira',
 
   // Logomarca
+  'Logomarca Frente',
   'Logomarca Lateral',
   'Logomarca Laterais',
   'Logomarca no Teto',
   'Logomarca Parcial',
   'Logomarca Plataforma',
-  'Logomarca Portas Traseiras',
+  'Logomarca Traseira',
 
   // Pintura
   'Pintura Caixa de Cozinha',

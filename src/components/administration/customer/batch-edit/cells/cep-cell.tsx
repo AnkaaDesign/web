@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import type { FieldValues, Path } from "react-hook-form";
 import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui";
 import { IconLoader2 } from "@tabler/icons-react";
@@ -56,7 +57,7 @@ export function CepCell<_TFieldValues extends FieldValues = FieldValues>({ contr
   return (
     <FormField
       control={control}
-      name={`customers.${index}.data.zipCode` as unknown as Path<TFieldValues>}
+      name={`customers.${index}.data.zipCode` as unknown as Path<_TFieldValues>}
       render={({ field }) => (
         <FormItem>
           <FormControl>
@@ -66,7 +67,7 @@ export function CepCell<_TFieldValues extends FieldValues = FieldValues>({ contr
                 value={field.value ?? ""}
                 onChange={(value: string | number | null) => {
                   field.onChange(value ?? null);
-                  handleCepLookup(value || "");
+                  handleCepLookup(String(value || ""));
                 }}
                 disabled={disabled || isLoading}
                 onBlur={field.onBlur}

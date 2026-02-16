@@ -11,7 +11,7 @@ const buttonVariants = cva(
         default: "bg-primary text-primary-foreground shadow-sm hover:opacity-[var(--hover-opacity)]",
         destructive: "bg-destructive text-destructive-foreground shadow-sm hover:opacity-[var(--hover-opacity)]",
         outline: "bg-transparent border border-border text-foreground hover:bg-muted/30",
-        secondary: "bg-secondary text-secondary-foreground border border-border/50 hover:opacity-[var(--hover-opacity)]",
+        secondary: "bg-secondary text-secondary-foreground border border-border hover:opacity-[var(--hover-opacity)]",
         ghost: "bg-transparent text-foreground hover:bg-muted/30",
         link: "bg-transparent text-primary underline underline-offset-4 p-0 h-auto hover:opacity-[var(--hover-opacity)]",
       },

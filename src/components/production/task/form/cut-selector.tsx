@@ -91,8 +91,8 @@ export function CutSelector({ control, disabled }: CutSelectorProps) {
               <FormControl>
                 <Input
                   type="number"
-                  min="1"
-                  max="100"
+                  min={1}
+                  max={100}
                   value={field.value || 1}
                   onChange={(value) => {
                     const num = typeof value === "number" ? value : parseInt(String(value), 10);

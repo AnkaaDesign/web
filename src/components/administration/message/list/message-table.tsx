@@ -550,21 +550,21 @@ export function MessageTable({
             Visualizar
           </DropdownMenuItem>
 
-          {contextMenu?.items.length === 1 && contextMenu.items[0].status !== 'ARCHIVED' && (
+          {contextMenu?.items.length === 1 && contextMenu.items[0].status !== 'archived' && (
             <DropdownMenuItem onClick={handleEdit}>
               <IconEdit className="mr-2 h-4 w-4" />
               Editar
             </DropdownMenuItem>
           )}
 
-          {contextMenu?.items.length === 1 && contextMenu.items[0].status !== 'ACTIVE' && (
+          {contextMenu?.items.length === 1 && contextMenu.items[0].status !== 'active' && (
             <DropdownMenuItem onClick={handleActivate}>
               <IconCheck className="mr-2 h-4 w-4" />
               Ativar
             </DropdownMenuItem>
           )}
 
-          {contextMenu?.items.length === 1 && contextMenu.items[0].status === 'ACTIVE' && (
+          {contextMenu?.items.length === 1 && contextMenu.items[0].status === 'active' && (
             <DropdownMenuItem onClick={handleArchive}>
               <IconArchive className="mr-2 h-4 w-4" />
               Arquivar

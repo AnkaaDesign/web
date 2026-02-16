@@ -1,7 +1,7 @@
 // packages/hooks/src/payroll.ts
 
 import { createEntityHooks } from "../common/create-entity-hooks";
-import { payrollService } from "../../api-client";
+import { payrollService, discountService } from "../../api-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { payrollKeys, bonusKeys } from "../common/query-keys";
@@ -10,6 +10,7 @@ import type {
   PayrollGetManyResponse,
   PayrollGetByIdParams,
   Payroll,
+  Discount,
 } from "../../types";
 import type {
   PayrollCreateFormData,
@@ -30,16 +31,27 @@ const payrollServiceAdapter = {
     payrollService.getMany(params).then(response => response.data),
   getById: (id: string, params?: PayrollGetByIdParams) =>
     payrollService.getById(id, params).then(response => response.data),
-  create: (data: PayrollCreateFormData) =>
-    payrollService.create(data).then(response => response.data),
+  // Payrolls are created by cronjobs, not manually - provide stub for EntityService compatibility
+  create: (_data: PayrollCreateFormData): Promise<Payroll> => {
+    throw new Error('Payroll creation is handled by cronjobs. Use generateMonthlyPayrolls instead.');
+  },
   update: (id: string, data: PayrollUpdateFormData) =>
     payrollService.update(id, data).then(response => response.data),
   delete: (id: string) =>
     payrollService.delete(id).then(() => undefined),
-  batchCreate: (data: PayrollBatchCreateFormData) =>
-    payrollService.batchCreate(data).then(response => response.data),
+  // Batch create is not supported - payrolls are created by cronjobs
+  batchCreate: (_data: PayrollBatchCreateFormData): Promise<{ created: number; skipped: number }> => {
+    throw new Error('Batch payroll creation is handled by cronjobs. Use generateMonthlyPayrolls instead.');
+  },
   batchUpdate: (data: PayrollBatchUpdateFormData) =>
-    payrollService.batchUpdate(data).then(response => response.data),
+    payrollService.batchUpdate(data).then(response => {
+      const result = response.data;
+      // Transform API response to match EntityService expected format
+      return {
+        updated: result.success?.length ?? 0,
+        errors: result.failed?.length ?? 0,
+      };
+    }),
   batchDelete: (data: PayrollBatchDeleteFormData) =>
     payrollService.batchDelete(data).then(() => undefined),
 };
@@ -263,6 +275,7 @@ export const usePayrollComparison = (
 
 /**
  * Hook for finalizing payroll for a month
+ * @deprecated This method is deprecated - payrolls are finalized by cronjobs
  */
 export const useFinalizePayrollMonth = () => {
   const queryClient = useQueryClient();
@@ -285,7 +298,7 @@ export const useFinalizePayrollMonth = () => {
       const monthName = new Date(variables.year, variables.month - 1).toLocaleDateString('pt-BR', { month: 'long' });
       toast.success(`Folha de pagamento de ${monthName} finalizada com sucesso!`);
     },
-    onError: (error: any, variables, context) => {
+    onError: (error: Error & { response?: { data?: { message?: string } } }, variables, context) => {
       if (context?.previousPayrolls) {
         queryClient.setQueryData(payrollKeys.list(), context.previousPayrolls);
       }
@@ -313,6 +326,7 @@ export const useGenerateMonthlyPayrolls = () => {
 
 /**
  * Hook for payroll discount management
+ * Note: Uses discountService since discounts are managed separately
  */
 export const usePayrollDiscountMutations = () => {
   const queryClient = useQueryClient();
@@ -321,26 +335,30 @@ export const usePayrollDiscountMutations = () => {
     mutationFn: ({ payrollId, discount }: {
       payrollId: string;
       discount: DiscountCreateFormData
-    }) => payrollService.addDiscount(payrollId, discount).then(response => response.data),
+    }): Promise<Discount> => {
+      // Create discount with payrollId included
+      return discountService.create({ ...discount, payrollId } as any).then(response => response.data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: payrollKeys.all });
     },
   });
 
   const removeDiscount = useMutation({
-    mutationFn: ({ payrollId, discountId }: { payrollId: string; discountId: string }) =>
-      payrollService.removeDiscount(payrollId, discountId),
+    mutationFn: ({ discountId }: { payrollId: string; discountId: string }): Promise<void> =>
+      discountService.delete(discountId).then(() => undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: payrollKeys.all });
     },
   });
 
   const updateDiscount = useMutation({
-    mutationFn: ({ payrollId, discountId, discount }: {
+    mutationFn: ({ discountId, discount }: {
       payrollId: string;
       discountId: string;
       discount: DiscountUpdateFormData
-    }) => payrollService.updateDiscount(payrollId, discountId, discount).then(response => response.data),
+    }): Promise<Discount> =>
+      discountService.update(discountId, discount).then(response => response.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: payrollKeys.all });
     },

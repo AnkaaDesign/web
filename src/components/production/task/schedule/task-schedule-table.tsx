@@ -563,7 +563,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       observation: taskToDuplicate.observation
         ? {
             description: taskToDuplicate.observation.description,
-            artworkIds: taskToDuplicate.observation.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
+            artworkIds: taskToDuplicate.observation.files?.map((file: any) => file.id) || [],
           }
         : null,
     });
@@ -830,7 +830,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
 
       <SetSectorModal open={setSectorModalOpen} onOpenChange={setSetSectorModalOpen} tasks={tasksToUpdate} onConfirm={handleSetSectorConfirm} />
 
-      <SetStatusModal open={setStatusModalOpen} onOpenChange={setSetStatusModalOpen} tasks={tasksToUpdate} onConfirm={handleSetStatusConfirm} />
+      <SetStatusModal open={setStatusModalOpen} onOpenChange={setSetStatusModalOpen} tasks={tasksToUpdate} onConfirm={(status) => handleSetStatusConfirm(status as any)} />
 
       {/* Only render AdvancedBulkActionsHandler if using internal ref (not shared) */}
       {!externalAdvancedActionsRef && (

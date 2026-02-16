@@ -460,7 +460,7 @@ export function TaskTable({
                         )}
                         disabled={isLoading || items.length === 0}
                       >
-                        <TruncatedTextWithTooltip text={column.header} />
+                        <TruncatedTextWithTooltip text={String(column.header)} />
                         {renderSortIndicator(column.accessorKey || column.id)}
                       </button>
                     ) : (
@@ -472,7 +472,7 @@ export function TaskTable({
                           !column.className?.includes("text-") && "justify-start text-left",
                         )}
                       >
-                        <TruncatedTextWithTooltip text={column.header} />
+                        <TruncatedTextWithTooltip text={String(column.header)} />
                       </div>
                     )}
                   </TableHead>

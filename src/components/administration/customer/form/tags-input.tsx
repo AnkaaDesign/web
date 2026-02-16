@@ -1,4 +1,4 @@
-import { useFieldArray, useWatch } from "react-hook-form";
+import { useFieldArray, useWatch, type FieldValues, type Path, type ArrayPath } from "react-hook-form";
 import { useState } from "react";
 import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -10,15 +10,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 interface TagsInputProps<_TFieldValues extends FieldValues = FieldValues> {
   control: any;
   disabled?: boolean;
+  name?: string;
 }
 
-export function TagsInput<_TFieldValues extends FieldValues = FieldValues>({ control, disabled }: TagsInputProps<_TFieldValues>) {
+export function TagsInput<_TFieldValues extends FieldValues = FieldValues>({ control, disabled, name = "tags" }: TagsInputProps<_TFieldValues>) {
   const [newTag, setNewTag] = useState<string>("");
 
   // Watch the tags array with explicit typing
   const watchedTags = useWatch({
     control,
-    name: "tags" as Path<TFieldValues>,
+    name: name as Path<_TFieldValues>,
   });
 
   // Ensure tags is always an array with proper type assertion
@@ -26,7 +27,7 @@ export function TagsInput<_TFieldValues extends FieldValues = FieldValues>({ con
 
   const { append, remove } = useFieldArray({
     control,
-    name: "tags" as ArrayPath<TFieldValues>,
+    name: name as ArrayPath<_TFieldValues>,
   });
 
   const handleAddTag = () => {
@@ -40,7 +41,7 @@ export function TagsInput<_TFieldValues extends FieldValues = FieldValues>({ con
   return (
     <FormField
       control={control}
-      name={"tags" as Path<TFieldValues>}
+      name={name as Path<_TFieldValues>}
       render={({ field }) => {
         // Ensure field.value is always an array with proper type assertion
         const fieldValue: string[] = Array.isArray(field.value) ? field.value : [];

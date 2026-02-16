@@ -16,6 +16,8 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import type { WarningGetManyFormData } from "../../schemas";
+import { WARNING_SEVERITY_LABELS } from "@/constants/enum-labels";
+import type { WARNING_SEVERITY } from "@/constants/enums";
 
 export default function MyTeamWarningsPage() {
   // Track page access
@@ -117,18 +119,21 @@ export default function MyTeamWarningsPage() {
 
   const hasActiveFilters = selectedUserId;
 
-  // Get severity badge color
-  const getSeverityColor = (severity: string) => {
-    switch (severity?.toLowerCase()) {
-      case "leve":
-        return "bg-yellow-100 text-yellow-800";
-      case "moderada":
-        return "bg-orange-100 text-orange-800";
-      case "grave":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+  // Get severity badge
+  const getSeverityBadge = (severity: WARNING_SEVERITY) => {
+    const config: Record<WARNING_SEVERITY, string> = {
+      VERBAL: "bg-blue-100 text-blue-800",
+      WRITTEN: "bg-yellow-100 text-yellow-800",
+      SUSPENSION: "bg-orange-100 text-orange-800",
+      FINAL_WARNING: "bg-red-100 text-red-800",
+    };
+    const colorClass = config[severity] || "bg-gray-100 text-gray-800";
+    return (
+      <Badge className={colorClass}>
+        <IconAlertTriangle className="h-3 w-3 mr-1" />
+        {WARNING_SEVERITY_LABELS[severity]}
+      </Badge>
+    );
   };
 
   return (
@@ -152,7 +157,7 @@ export default function MyTeamWarningsPage() {
                 <Label htmlFor="user-filter">Colaborador</Label>
                 <Combobox
                   value={selectedUserId}
-                  onValueChange={(value) => setSelectedUserId(value || "")}
+                  onValueChange={(value) => setSelectedUserId((Array.isArray(value) ? value[0] : value) || "")}
                   options={[
                     { value: "", label: "Todos os colaboradores" },
                     ...teamUsers.map((user) => ({
@@ -230,13 +235,10 @@ export default function MyTeamWarningsPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge className={getSeverityColor(warning.type || "")}>
-                            <IconAlertTriangle className="h-3 w-3 mr-1" />
-                            {warning.type || "-"}
-                          </Badge>
+                          {warning.severity ? getSeverityBadge(warning.severity) : "-"}
                         </TableCell>
                         <TableCell>
-                          <TruncatedTextWithTooltip text={warning.reason || "-"} maxLength={50} />
+                          <TruncatedTextWithTooltip text={warning.reason || "-"} />
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">

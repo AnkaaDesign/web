@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useWatch } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
-import { getPaints } from "../../../../api-client";
+import { getPaints, getPaintById } from "../../../../api-client";
 import type { Paint } from "../../../../types";
 import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH } from "../../../../constants";
 import { IconX, IconFlask, IconBriefcase } from "@tabler/icons-react";
@@ -23,11 +25,54 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint, onDes
   const [selectedPaint, setSelectedPaint] = useState<Paint | null>(initialPaint || null);
   const paintsCache = useRef<Map<string, Paint>>(new Map());
 
+  // Watch paintId from form state - persists across accordion unmount/remount
+  const selectedPaintId = useWatch({ control, name: "paintId" }) as string | undefined;
+
+  // Fetch selected paint details by ID - React Query cache persists across unmount/remount
+  const { data: selectedPaintData } = useQuery({
+    queryKey: ["paints", "selected-general-detail", selectedPaintId],
+    queryFn: async () => {
+      if (!selectedPaintId) return null;
+      const response = await getPaintById(selectedPaintId, {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          hex: true,
+          finish: true,
+          colorPreview: true,
+          manufacturer: true,
+          paintType: { select: { id: true, name: true, needGround: true } },
+          paintBrand: { select: { id: true, name: true } },
+          _count: { select: { formulas: true } },
+        },
+      } as any);
+      return response.data || null;
+    },
+    enabled: !!selectedPaintId && selectedPaintId !== initialPaint?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Update selectedPaint and cache when fetched data arrives
+  useEffect(() => {
+    if (selectedPaintData) {
+      paintsCache.current.set(selectedPaintData.id, selectedPaintData);
+      setSelectedPaint(selectedPaintData);
+    }
+  }, [selectedPaintData]);
+
   // State for Designar Service Order dialog
   const [designarDialogOpen, setDesignarDialogOpen] = useState(false);
 
-  // Memoize initialOptions to prevent infinite loop
-  const initialOptions = useMemo(() => initialPaint ? [initialPaint] : [], [initialPaint?.id]);
+  // Memoize initialOptions - include selected paint data for accordion remount scenarios
+  const initialOptions = useMemo(() => {
+    const options: Paint[] = [];
+    if (initialPaint) options.push(initialPaint);
+    if (selectedPaintData && selectedPaintData.id !== initialPaint?.id) {
+      options.push(selectedPaintData);
+    }
+    return options;
+  }, [initialPaint?.id, selectedPaintData?.id]);
 
   // Memoize callbacks to prevent infinite loop
   const getOptionLabel = useCallback((paint: Paint) => paint.name, []);
@@ -215,7 +260,6 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint, onDes
                   pageSize={20}
                   debounceMs={500}
                   clearable={true}
-                  loadOnMount={false}  // Enable lazy loading - only load when dropdown opens
                   initialOptions={initialOptions}
                   customEmptyAction={onDesignarServiceOrder ? {
                     label: "Designar Ordem de Serviço",

@@ -97,7 +97,7 @@ export function UserFilter({
               <Input
                 placeholder="Buscar usuários..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(value) => setSearch(value as string)}
                 className="pl-8"
               />
             </div>

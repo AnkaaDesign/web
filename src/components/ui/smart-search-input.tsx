@@ -1,5 +1,4 @@
 import React, { forwardRef, useCallback, useEffect, useRef, useState } from "react";
-import { Input } from "./input";
 import { Button } from "./button";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { Badge } from "./badge";
@@ -98,7 +97,7 @@ export const SmartSearchInput = forwardRef<HTMLInputElement, SmartSearchInputPro
         }))
       : suggestions.slice(0, maxVisibleSuggestions);
 
-    const shouldShowPopover = isPopoverOpen && (showSuggestions || (showHistoryMode && searchHistory.length > 0) || suggestionsLoading || currentEmptyState);
+    const shouldShowPopover = isPopoverOpen && (showSuggestions || (showHistoryMode && searchHistory.length > 0) || suggestionsLoading || !!currentEmptyState);
 
     // Handle input changes
     const handleInputChange = useCallback(
@@ -249,7 +248,7 @@ export const SmartSearchInput = forwardRef<HTMLInputElement, SmartSearchInputPro
     }, [effectiveRef]);
 
     return (
-      <Popover open={shouldShowPopover} onOpenChange={setIsPopoverOpen}>
+      <Popover open={shouldShowPopover ?? undefined} onOpenChange={setIsPopoverOpen}>
         <PopoverTrigger asChild>
           <div className="relative flex-1">
             {/* Search icon */}
@@ -258,18 +257,18 @@ export const SmartSearchInput = forwardRef<HTMLInputElement, SmartSearchInputPro
             </div>
 
             {/* Search input */}
-            <Input
+            <input
               {...props}
               ref={effectiveRef}
               type="text"
               value={searchQuery}
-              onChange={handleInputChange}
+              onChange={(e) => handleInputChange(e)}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={disabled}
-              className={cn("pl-10 pr-10", className)}
+              className={cn("flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm pl-10 pr-10", className)}
             />
 
             {/* Clear button */}

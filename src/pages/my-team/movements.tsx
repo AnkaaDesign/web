@@ -18,6 +18,8 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Navigate } from "react-router-dom";
+import { ACTIVITY_OPERATION_LABELS } from "@/constants/enum-labels";
+import type { ACTIVITY_OPERATION } from "@/constants/enums";
 
 export const TeamMovementsPage = () => {
   const { user: currentUser } = useAuth();
@@ -100,7 +102,7 @@ export const TeamMovementsPage = () => {
         activity.user?.position?.name || "",
         activity.item?.name || "",
         activity.item?.uniCode || "",
-        activity.type || "",
+        activity.operation ? ACTIVITY_OPERATION_LABELS[activity.operation] : "",
         activity.quantity?.toString() || "",
         formatDateTime(activity.createdAt),
       ]),
@@ -133,7 +135,7 @@ export const TeamMovementsPage = () => {
         activity.user?.position?.name || "",
         activity.item?.name || "",
         activity.item?.uniCode || "",
-        activity.type || "",
+        activity.operation ? ACTIVITY_OPERATION_LABELS[activity.operation] : "",
         activity.quantity?.toString() || "",
         formatDateTime(activity.createdAt),
       ]),
@@ -156,15 +158,13 @@ export const TeamMovementsPage = () => {
 
   const hasActiveFilters = selectedUserId;
 
-  const getTypeLabel = (type: string) => {
-    const labels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-      ENTRADA: { label: "Entrada", variant: "default" },
-      SAIDA: { label: "Saída", variant: "secondary" },
-      AJUSTE: { label: "Ajuste", variant: "outline" },
-      TRANSFERENCIA: { label: "Transferência", variant: "outline" },
+  const getOperationBadge = (operation: ACTIVITY_OPERATION) => {
+    const config: Record<ACTIVITY_OPERATION, { variant: "default" | "secondary" | "destructive" | "outline" }> = {
+      INBOUND: { variant: "default" },
+      OUTBOUND: { variant: "secondary" },
     };
-    const config = labels[type] || { label: type, variant: "outline" as const };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    const badgeConfig = config[operation] || { variant: "outline" as const };
+    return <Badge variant={badgeConfig.variant}>{ACTIVITY_OPERATION_LABELS[operation]}</Badge>;
   };
 
   return (
@@ -187,7 +187,7 @@ export const TeamMovementsPage = () => {
               <Label htmlFor="user-filter">Colaborador</Label>
               <Combobox
                 value={selectedUserId}
-                onValueChange={(value) => setSelectedUserId(value || "")}
+                onValueChange={(value) => setSelectedUserId((Array.isArray(value) ? value[0] : value) || "")}
                 options={[
                   { value: "", label: "Todos os colaboradores" },
                   ...teamUsers.map((user) => ({
@@ -295,7 +295,7 @@ export const TeamMovementsPage = () => {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{getTypeLabel(activity.type || "")}</TableCell>
+                      <TableCell>{activity.operation ? getOperationBadge(activity.operation) : "-"}</TableCell>
                       <TableCell className="text-right font-medium">{activity.quantity || "-"}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">

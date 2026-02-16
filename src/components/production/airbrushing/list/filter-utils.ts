@@ -114,34 +114,15 @@ export function extractActiveFilters(filters: Partial<AirbrushingGetManyFormData
 }
 
 /**
- * Create filter remover functions for each active filter
+ * Create filter remover function for removing specific filters
  */
-export function createFilterRemover(filters: Partial<AirbrushingGetManyFormData>, onFilterChange: (filters: Partial<AirbrushingGetManyFormData>) => void) {
-  return {
-    taskIds: () => {
-      const { taskIds, ...rest } = filters;
-      onFilterChange(rest);
-    },
-    status: () => {
-      const { status, ...rest } = filters;
-      onFilterChange(rest);
-    },
-    priceRange: () => {
-      const { priceRange, ...rest } = filters;
-      onFilterChange(rest);
-    },
-    hasStartDate: () => {
-      const { hasStartDate, ...rest } = filters;
-      onFilterChange(rest);
-    },
-    hasFinishDate: () => {
-      const { hasFinishDate, ...rest } = filters;
-      onFilterChange(rest);
-    },
-    createdAt: () => {
-      const { createdAt, ...rest } = filters;
-      onFilterChange(rest);
-    },
+export function createFilterRemover(
+  filters: Partial<AirbrushingGetManyFormData>,
+  onFilterChange: (filters: Partial<AirbrushingGetManyFormData>) => void
+): (key: string, value?: any) => void {
+  return (key: string) => {
+    const { [key]: _, ...rest } = filters as Record<string, any>;
+    onFilterChange(rest as Partial<AirbrushingGetManyFormData>);
   };
 }
 

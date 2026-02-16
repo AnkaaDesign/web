@@ -92,7 +92,7 @@ export function PositionBatchEditTable({ positions, onCancel: _onCancel, onSubmi
       const result = await batchUpdateAsync(batchPayload);
       if (result?.data) {
         // Show the detailed result dialog
-        setBatchResult(result.data);
+        setBatchResult(result.data as BatchOperationResult<Position, Position>);
         setShowResultDialog(true);
       } else {
         // Even if we don't have detailed results, navigate back on apparent success

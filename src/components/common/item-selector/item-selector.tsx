@@ -500,7 +500,11 @@ export const ItemSelector = ({
                       mode="multiple"
                       placeholder="Todas as categorias"
                       value={categoryIds}
-                      onValueChange={onCategoryIdsChange || (() => {})}
+                      onValueChange={(value) => {
+                        if (onCategoryIdsChange && Array.isArray(value)) {
+                          onCategoryIdsChange(value);
+                        }
+                      }}
                       className="h-10"
                       minSearchLength={0}
                       pageSize={50}
@@ -519,7 +523,11 @@ export const ItemSelector = ({
                       mode="multiple"
                       placeholder="Todas as marcas"
                       value={brandIds}
-                      onValueChange={onBrandIdsChange || (() => {})}
+                      onValueChange={(value) => {
+                        if (onBrandIdsChange && Array.isArray(value)) {
+                          onBrandIdsChange(value);
+                        }
+                      }}
                       className="h-10"
                       minSearchLength={0}
                       pageSize={50}
@@ -538,7 +546,11 @@ export const ItemSelector = ({
                       mode="multiple"
                       placeholder="Todos os fornecedores"
                       value={supplierIds}
-                      onValueChange={onSupplierIdsChange || (() => {})}
+                      onValueChange={(value) => {
+                        if (onSupplierIdsChange && Array.isArray(value)) {
+                          onSupplierIdsChange(value);
+                        }
+                      }}
                       className="h-10"
                       minSearchLength={0}
                       pageSize={50}
@@ -722,11 +734,11 @@ export const ItemSelector = ({
                                 {itemIsSelected ? (
                                   <Input
                                     type="number"
-                                    min="0.01"
-                                    max="999999"
-                                    step="0.01"
+                                    min={0.01}
+                                    max={999999}
+                                    step={0.01}
                                     value={quantity}
-                                    onChange={(e) => onQuantityChange?.(item.id, parseFloat(e.target.value) || 0.01)}
+                                    onChange={(value) => onQuantityChange?.(item.id, parseFloat(value as string) || 0.01)}
                                     className="w-full h-6 text-sm py-0 px-2"
                                   />
                                 ) : (

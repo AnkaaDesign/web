@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { routes, SECTOR_PRIVILEGES } from '@/constants';
 import { useNavigate } from 'react-router-dom';
 import { hasPrivilege } from '@/utils/user';
+import { getApiBaseUrl } from '@/config/api';
 
 interface TruckDetailModalProps {
   taskId: string | null;
@@ -202,10 +203,7 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
   };
 
   const handleDownload = (file: any) => {
-    const apiUrl =
-      (window as any).__ANKAA_API_URL__ ||
-      (import.meta as any).env?.VITE_API_URL ||
-      'http://localhost:3030';
+    const apiUrl = getApiBaseUrl();
     const downloadUrl = `${apiUrl}/files/${file.id}/download`;
     window.open(downloadUrl, '_blank');
   };
@@ -449,10 +447,9 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
       {/* File Preview Modal */}
       <FilePreviewModal
         files={previewFiles}
-        initialIndex={previewIndex}
+        initialFileIndex={previewIndex}
         open={isPreviewOpen}
         onOpenChange={setIsPreviewOpen}
-        onDownload={handleDownload}
       />
     </Dialog>
   );

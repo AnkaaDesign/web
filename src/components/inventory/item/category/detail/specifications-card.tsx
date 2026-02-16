@@ -61,7 +61,7 @@ export function SpecificationsCard({ category, itemCount = 0, className }: Speci
           </div>
 
           {/* Identification Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Identificação</h3>
             <div className="grid grid-cols-1 gap-6">
               <div>
@@ -75,7 +75,7 @@ export function SpecificationsCard({ category, itemCount = 0, className }: Speci
           </div>
 
           {/* Timestamps Section */}
-          <div className="pt-6 border-t border-border/50">
+          <div className="pt-6 border-t border-border">
             <h3 className="text-base font-semibold mb-4 text-foreground">Histórico</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>

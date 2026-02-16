@@ -54,6 +54,8 @@ import { FileUploadField, type FileWithPreview } from "@/components/common/file"
 import { ArtworkFileUploadField } from "./artwork-file-upload-field";
 import type { RepresentativeRowData } from "@/types/representative";
 import { RepresentativeRole } from "@/types/representative";
+import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
+import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toast } from "sonner";
 import { getUniqueDescriptions } from "../../../../api-client/serviceOrder";
 import { uploadSingleFile } from "../../../../api-client/file";
@@ -70,7 +72,6 @@ const taskCreateFormSchema = z.object({
   status: z.string(),
   name: z.string(),
   customerId: z.string().optional(),
-  invoiceToId: z.string().optional(),
   details: z.string().nullable().optional(),
   plates: z.array(z.string()).default([]),
   serialNumbers: z.array(z.number()).default([]),
@@ -106,8 +107,6 @@ export const TaskCreateForm = () => {
   const showLayout = isAdminUser || isLogisticUser;
   const showPricing = isAdminUser || isCommercialUser;
   const showArtworks = isAdminUser || isCommercialUser;
-  // Invoice To visible to ADMIN and COMMERCIAL
-  const showInvoiceTo = isAdminUser || isCommercialUser;
 
   // Initialize form
   const form = useForm<TaskCreateFormSchemaType>({
@@ -117,7 +116,6 @@ export const TaskCreateForm = () => {
       status: TASK_STATUS.PREPARATION,
       name: "",
       customerId: "",
-      invoiceToId: "",
       details: "",
       plates: [],
       serialNumbers: [],
@@ -168,7 +166,6 @@ export const TaskCreateForm = () => {
   const plates = useWatch({ control: form.control, name: "plates" }) || [];
   const serialNumbers = useWatch({ control: form.control, name: "serialNumbers" }) || [];
   const customerIdValue = useWatch({ control: form.control, name: "customerId" });
-  const invoiceToIdValue = useWatch({ control: form.control, name: "invoiceToId" });
 
   // Watch service orders and pricing for sync
   const servicesValues = useWatch({ control: form.control, name: "serviceOrders" });
@@ -612,7 +609,7 @@ export const TaskCreateForm = () => {
           clearTimeout(syncTimeoutRef.current);
         }
 
-        const { plates, serialNumbers, name, customerId, status, category, implementType, forecastDate, term, invoiceToId, details, paintId, paintIds } = data;
+        const { plates, serialNumbers, name, customerId, status, category, implementType, forecastDate, term, details, paintId, paintIds } = data;
 
         // Upload artwork files that haven't been uploaded yet
         const artworkFileIds: string[] = [...uploadedFileIds];
@@ -703,7 +700,6 @@ export const TaskCreateForm = () => {
             status,
             name: name || undefined,
             customerId: customerId || undefined,
-            invoiceToId: invoiceToId || undefined,
             details: details || undefined,
             forecastDate: forecastDate || undefined,
             term: term || undefined,
@@ -863,13 +859,19 @@ export const TaskCreateForm = () => {
     [createAsync, representativeRows, customerIdValue, uploadedFileIds, baseFileIds, uploadedFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, artworkStatuses],
   );
 
-  const handleCancel = useCallback(() => {
-    window.location.href = "/producao/agenda";
-  }, []);
-
   // Get form state
   const { formState } = form;
   const hasErrors = Object.keys(formState.errors).length > 0;
+
+  // Unsaved changes guard
+  const { showDialog, confirmNavigation, cancelNavigation, guardedNavigate } = useUnsavedChangesGuard({
+    isDirty: formState.isDirty,
+    isSubmitting,
+  });
+
+  const handleCancel = useCallback(() => {
+    guardedNavigate("/producao/agenda");
+  }, [guardedNavigate]);
 
   // Navigation actions
   const navigationActions = [
@@ -906,6 +908,7 @@ export const TaskCreateForm = () => {
             { label: "Cadastrar" }
           ]}
           actions={navigationActions}
+          onBreadcrumbNavigate={guardedNavigate}
         />
       </div>
       <div className="flex-1 overflow-y-auto pb-6">
@@ -923,7 +926,7 @@ export const TaskCreateForm = () => {
                 <AccordionItem
                   value="basic-information"
                   id="accordion-item-basic-information"
-                  className="border border-border/40 rounded-lg"
+                  className="border border-border rounded-lg"
                 >
                   <Card className="border-0">
                     <AccordionTrigger className="px-0 hover:no-underline">
@@ -939,19 +942,8 @@ export const TaskCreateForm = () => {
                         {/* Name */}
                         <TaskNameAutocomplete control={form.control} disabled={isSubmitting} />
 
-                        {/* Customer + Invoice To in same row */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <CustomerSelector control={form.control} disabled={isSubmitting} />
-                          {showInvoiceTo && (
-                            <CustomerSelector
-                              control={form.control}
-                              name="invoiceToId"
-                              label="Faturar Para"
-                              placeholder="Selecione o cliente para faturamento"
-                              disabled={isSubmitting}
-                            />
-                          )}
-                        </div>
+                        {/* Customer */}
+                        <CustomerSelector control={form.control} disabled={isSubmitting} />
 
                         {/* Truck Category and Implement Type */}
                         <div className="grid grid-cols-2 gap-4">
@@ -1016,13 +1008,13 @@ export const TaskCreateForm = () => {
 
                         {/* Plates + Serial Numbers in same row */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <PlateTagsInput
-                            control={form.control}
-                            disabled={isSubmitting || serialNumbers.length > 1}
-                          />
                           <SerialNumberRangeInput
                             control={form.control}
                             disabled={isSubmitting || plates.length > 1}
+                          />
+                          <PlateTagsInput
+                            control={form.control}
+                            disabled={isSubmitting || serialNumbers.length > 1}
                           />
                         </div>
 
@@ -1050,11 +1042,10 @@ export const TaskCreateForm = () => {
                             name="forecastDate"
                             render={({ field }) => (
                               <DateTimeInput
-                                field={field}
+                                {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
                                 mode="date"
                                 label="Data de Previsão de Liberação"
                                 disabled={isSubmitting}
-                                allowManualInput={true}
                               />
                             )}
                           />
@@ -1063,11 +1054,10 @@ export const TaskCreateForm = () => {
                             name="term"
                             render={({ field }) => (
                               <DateTimeInput
-                                field={field}
+                                {...{ onChange: field.onChange, onBlur: field.onBlur, value: field.value ?? null }}
                                 mode="datetime"
                                 label="Prazo de Entrega"
                                 disabled={isSubmitting}
-                                allowManualInput={true}
                               />
                             )}
                           />
@@ -1107,7 +1097,7 @@ export const TaskCreateForm = () => {
                   <AccordionItem
                     value="representatives"
                     id="accordion-item-representatives"
-                    className="border border-border/40 rounded-lg"
+                    className="border border-border rounded-lg"
                   >
                     <Card className="border-0">
                       <AccordionTrigger className="px-0 hover:no-underline">
@@ -1122,7 +1112,6 @@ export const TaskCreateForm = () => {
                         <CardContent className="pt-0">
                           <RepresentativeManager
                             customerId={customerIdValue}
-                            invoiceToId={invoiceToIdValue}
                             value={representativeRows}
                             onChange={handleRepresentativeRowsChange}
                             disabled={isSubmitting}
@@ -1140,7 +1129,7 @@ export const TaskCreateForm = () => {
                 <AccordionItem
                   value="serviceOrders"
                   id="accordion-item-serviceOrders"
-                  className="border border-border/40 rounded-lg"
+                  className="border border-border rounded-lg"
                 >
                   <Card className="border-0">
                     <AccordionTrigger className="px-0 hover:no-underline">
@@ -1179,7 +1168,7 @@ export const TaskCreateForm = () => {
                   <AccordionItem
                     value="paint"
                     id="accordion-item-paint"
-                    className="border border-border/40 rounded-lg"
+                    className="border border-border rounded-lg"
                   >
                     <Card className="border-0">
                       <AccordionTrigger className="px-0 hover:no-underline">
@@ -1216,7 +1205,7 @@ export const TaskCreateForm = () => {
                   <AccordionItem
                     value="layout"
                     id="accordion-item-layout"
-                    className="border border-border/40 rounded-lg"
+                    className="border border-border rounded-lg"
                   >
                     <Card className="border-0">
                       <AccordionTrigger className="px-0 hover:no-underline">
@@ -1326,7 +1315,7 @@ export const TaskCreateForm = () => {
                   <AccordionItem
                     value="pricing"
                     id="accordion-item-pricing"
-                    className="border border-border/40 rounded-lg"
+                    className="border border-border rounded-lg"
                   >
                     <Card className="border-0">
                       <AccordionTrigger className="px-0 hover:no-underline">
@@ -1364,7 +1353,7 @@ export const TaskCreateForm = () => {
                 <AccordionItem
                   value="base-files"
                   id="accordion-item-base-files"
-                  className="border border-border/40 rounded-lg"
+                  className="border border-border rounded-lg"
                 >
                   <Card className="border-0">
                     <AccordionTrigger className="px-0 hover:no-underline">
@@ -1408,7 +1397,7 @@ export const TaskCreateForm = () => {
                   <AccordionItem
                     value="artworks"
                     id="accordion-item-artworks"
-                    className="border border-border/40 rounded-lg"
+                    className="border border-border rounded-lg"
                   >
                     <Card className="border-0">
                       <AccordionTrigger className="px-0 hover:no-underline">
@@ -1446,6 +1435,7 @@ export const TaskCreateForm = () => {
           </form>
         </Form>
       </div>
+      <UnsavedChangesDialog open={showDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
     </>
   );
 };

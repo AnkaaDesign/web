@@ -31,7 +31,7 @@ import {
 } from "@tabler/icons-react";
 import {
   usePayrolls,
-  useBatchCreatePayroll,
+  useGenerateMonthlyPayrolls,
   useFinalizePayrollMonth,
   useSectors
 } from "../../../hooks";
@@ -39,6 +39,7 @@ import { formatCurrency } from "../../../utils";
 import { routes } from "../../../constants";
 import type { Payroll } from "../../../types";
 import type { PayrollGetManyParams } from "../../../types";
+import { toNumber } from "../../../types/common";
 import { PayrollFilters } from "./list/payroll-filters";
 
 interface PayrollListProps {
@@ -56,20 +57,20 @@ interface PayrollFiltersState {
 
 // Calculate net salary for a payroll entry
 const calculateNetSalary = (payroll: Payroll): number => {
-  let netSalary = payroll.baseRemuneration;
+  let netSalary = toNumber(payroll.baseRemuneration);
 
   // Add bonus if exists
   if (payroll.bonus?.finalValue) {
-    netSalary += payroll.bonus.finalValue;
+    netSalary += toNumber(payroll.bonus.finalValue);
   }
 
   // Subtract discounts
   if (payroll.discounts) {
     for (const discount of payroll.discounts) {
       if (discount.value) {
-        netSalary -= discount.value;
+        netSalary -= toNumber(discount.value);
       } else if (discount.percentage) {
-        netSalary -= (netSalary * discount.percentage) / 100;
+        netSalary -= (netSalary * toNumber(discount.percentage)) / 100;
       }
     }
   }
@@ -82,13 +83,13 @@ const getTotalDiscounts = (payroll: Payroll): number => {
   if (!payroll.discounts) return 0;
 
   let totalDiscounts = 0;
-  let baseAmount = payroll.baseRemuneration + (payroll.bonus?.finalValue || 0);
+  let baseAmount = toNumber(payroll.baseRemuneration) + toNumber(payroll.bonus?.finalValue);
 
   for (const discount of payroll.discounts) {
     if (discount.value) {
-      totalDiscounts += discount.value;
+      totalDiscounts += toNumber(discount.value);
     } else if (discount.percentage) {
-      totalDiscounts += (baseAmount * discount.percentage) / 100;
+      totalDiscounts += (baseAmount * toNumber(discount.percentage)) / 100;
     }
   }
 
@@ -124,7 +125,7 @@ export function PayrollList({ className }: PayrollListProps) {
   const [finalizeDialog, setFinalizeDialog] = useState<{ year: number; month: number } | null>(null);
 
   // Batch operations mutations
-  const { mutate: batchCreatePayroll, isPending: isCreatingBatch } = useBatchCreatePayroll();
+  const { mutate: generatePayrolls, isPending: isCreatingBatch } = useGenerateMonthlyPayrolls();
   const { mutate: finalizeMonth, isPending: isFinalizing } = useFinalizePayrollMonth();
 
   // Fetch sectors for filtering
@@ -155,7 +156,7 @@ export function PayrollList({ className }: PayrollListProps) {
 
   // Build query parameters
   const queryParams = useMemo((): PayrollGetManyParams => {
-    const orderBy = convertSortConfigsToOrderBy(sortConfigs) || { createdAt: "desc" };
+    const orderBy = convertSortConfigsToOrderBy(sortConfigs) || { createdAt: "desc" as const };
 
     // Build user filter conditions
     // Default filters: only active users with payroll numbers
@@ -201,7 +202,7 @@ export function PayrollList({ className }: PayrollListProps) {
     return {
       page: page + 1, // Convert 0-based to 1-based
       limit: pageSize,
-      orderBy,
+      orderBy: orderBy as any, // Type cast due to complex nested orderBy structures
       where: whereClause,
       include: {
         user: {
@@ -250,14 +251,14 @@ export function PayrollList({ className }: PayrollListProps) {
     {
       key: "position",
       header: "Cargo",
-      accessor: (payroll) => payroll.user?.position?.title || "N/A",
+      accessor: (payroll) => payroll.user?.position?.name || "N/A",
       sortable: false,
       className: "min-w-[120px]",
     },
     {
       key: "baseRemuneration",
       header: "Salário Base",
-      accessor: (payroll) => formatCurrency(payroll.baseRemuneration),
+      accessor: (payroll) => formatCurrency(toNumber(payroll.baseRemuneration)),
       sortable: true,
       className: "text-right min-w-[120px]",
       align: "right",
@@ -265,7 +266,7 @@ export function PayrollList({ className }: PayrollListProps) {
     {
       key: "bonus",
       header: "Bônus",
-      accessor: (payroll) => formatCurrency(payroll.bonus?.finalValue || 0),
+      accessor: (payroll) => formatCurrency(toNumber(payroll.bonus?.finalValue)),
       sortable: true,
       className: "text-right min-w-[120px]",
       align: "right",
@@ -326,7 +327,7 @@ export function PayrollList({ className }: PayrollListProps) {
   const handleBatchCreatePayroll = () => {
     // Use the first month if multiple are selected
     const month = filters.months.length > 0 ? parseInt(filters.months[0]) : currentMonth;
-    batchCreatePayroll({
+    generatePayrolls({
       year: filters.year,
       month: month
     });
@@ -361,8 +362,8 @@ export function PayrollList({ className }: PayrollListProps) {
   const summaryStats = useMemo(() => {
     return payrolls.reduce((acc, payroll) => ({
       totalEmployees: acc.totalEmployees + 1,
-      totalBaseRemuneration: acc.totalBaseRemuneration + payroll.baseRemuneration,
-      totalBonuses: acc.totalBonuses + (payroll.bonus?.finalValue || 0),
+      totalBaseRemuneration: acc.totalBaseRemuneration + toNumber(payroll.baseRemuneration),
+      totalBonuses: acc.totalBonuses + toNumber(payroll.bonus?.finalValue),
       totalDiscounts: acc.totalDiscounts + getTotalDiscounts(payroll),
       totalNetSalary: acc.totalNetSalary + calculateNetSalary(payroll),
     }), {
@@ -515,7 +516,6 @@ export function PayrollList({ className }: PayrollListProps) {
             isLoading={isLoading}
             error={error}
             emptyMessage="Nenhuma folha de pagamento encontrada"
-            emptyDescription="Tente ajustar os filtros ou criar uma nova folha de pagamento"
             emptyIcon={IconUsers}
             onSort={toggleSort}
             getSortDirection={getSortDirection}
@@ -529,7 +529,6 @@ export function PayrollList({ className }: PayrollListProps) {
             pageSize={pageSize}
             totalRecords={meta?.totalRecords || 0}
             onPageChange={setPage}
-            showPagination={true}
             showPageInfo={true}
             className={className}
           />

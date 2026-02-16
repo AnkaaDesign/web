@@ -72,22 +72,32 @@ const CHART_COLORS = [
 ];
 
 // Chart type options with context awareness
-const getAvailableChartTypes = (isComparisonMode: boolean) => {
-  const baseTypes = [
+const getAvailableChartTypes = (isComparisonMode: boolean): Array<{
+  value: ConsumptionChartType;
+  label: string;
+  icon: typeof IconChartBar;
+  description: string;
+}> => {
+  const baseTypes: Array<{
+    value: ConsumptionChartType;
+    label: string;
+    icon: typeof IconChartBar;
+    description: string;
+  }> = [
     {
-      value: 'bar' as const,
+      value: 'bar',
       label: 'Barras',
       icon: IconChartBar,
       description: 'Gráfico de barras vertical',
     },
     {
-      value: 'line' as const,
+      value: 'line',
       label: 'Linhas',
       icon: IconChartLine,
       description: 'Gráfico de linhas',
     },
     {
-      value: 'area' as const,
+      value: 'area',
       label: 'Área',
       icon: IconChartArea,
       description: 'Gráfico de área',
@@ -96,14 +106,14 @@ const getAvailableChartTypes = (isComparisonMode: boolean) => {
 
   if (isComparisonMode) {
     baseTypes.push({
-      value: 'bar-stacked' as const,
+      value: 'bar-stacked',
       label: 'Barras Empilhadas',
       icon: IconStack2,
       description: 'Barras empilhadas para comparação',
     });
   } else {
     baseTypes.push({
-      value: 'pie' as const,
+      value: 'pie',
       label: 'Pizza',
       icon: IconChartPie,
       description: 'Gráfico de pizza',
@@ -349,7 +359,7 @@ const ConsumptionPage = () => {
       const option: EChartsOption = {
         tooltip: {
           trigger: 'item',
-          formatter: (params: { name: string; value: number; percent: number; data: { totalQuantity: number; totalValue: number } }) => {
+          formatter: (params: any) => {
             const qty = Math.round(params.data.totalQuantity);
             const val = formatCurrency(params.data.totalValue);
             return `<strong>${params.name}</strong><br/>Quantidade: ${qty} un<br/>Valor: ${val}<br/>${params.percent}%`;
@@ -373,7 +383,7 @@ const ConsumptionPage = () => {
               },
             },
             label: {
-              formatter: (params: { name: string; value: number }) => {
+              formatter: (params: any) => {
                 const formattedValue = yAxisMode === 'quantity'
                   ? Math.round(params.value).toString()
                   : formatCurrency(params.value);
@@ -538,7 +548,7 @@ const ConsumptionPage = () => {
           show: true,
           position: 'top',
           fontSize: 9,
-          formatter: (params: { data: { value: number } }) => {
+          formatter: (params: any) => {
             if (params.data.value > 0) {
               return yAxisMode === 'quantity'
                 ? Math.round(params.data.value).toString()
@@ -553,11 +563,11 @@ const ConsumptionPage = () => {
         tooltip: {
           trigger: 'axis',
           axisPointer: { type: 'shadow' },
-          formatter: (params: Array<{ seriesName: string; marker: string; data: { quantity: number; totalValue: number } }>) => {
+          formatter: (params: any) => {
             if (!Array.isArray(params) || params.length === 0) return '';
-            const itemName = xAxisData[params[0].dataIndex as unknown as number] || '';
+            const itemName = xAxisData[params[0].dataIndex] || '';
             let content = `<strong>${itemName}</strong>`;
-            params.forEach((p, idx) => {
+            params.forEach((p: any, idx: number) => {
               const qty = Math.round(p.data.quantity);
               const price = formatCurrency(p.data.totalValue);
               if (idx > 0) content += '<hr style="margin: 8px 0; border: 0; border-top: 1px solid #e5e5e5;"/>';
@@ -574,7 +584,7 @@ const ConsumptionPage = () => {
         yAxis: yAxisConfig,
         color: CHART_COLORS,
         dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 10, height: 25 }] : [],
-        series,
+        series: series as any,
       };
 
       return <ReactECharts option={option} style={{ height: '600px', width: '100%' }} />;
@@ -589,7 +599,7 @@ const ConsumptionPage = () => {
         tooltip: {
           trigger: 'axis',
           axisPointer: { type: 'shadow' },
-          formatter: (params: Array<{ marker: string; data: { quantity: number; totalValue: number }; name: string }>) => {
+          formatter: (params: any) => {
             if (!Array.isArray(params) || params.length === 0) return '';
             const p = params[0];
             const qty = Math.round(p.data.quantity);
@@ -611,7 +621,7 @@ const ConsumptionPage = () => {
             show: true,
             position: 'top',
             fontSize: 9,
-            formatter: (params: { data: { value: number } }) => {
+            formatter: (params: any) => {
               if (params.data.value > 0) {
                 return yAxisMode === 'quantity'
                   ? Math.round(params.data.value).toString()
@@ -633,7 +643,7 @@ const ConsumptionPage = () => {
         <PageHeader
           title="Análise de Consumo"
           icon={IconChartBar}
-          favoriteKey={FAVORITE_PAGES.STATISTICS_CONSUMPTION}
+          favoritePage={FAVORITE_PAGES.STATISTICS_CONSUMPTION}
           breadcrumbs={[
             { label: 'Início', href: routes.home },
             { label: 'Estatísticas', href: routes.statistics.root },

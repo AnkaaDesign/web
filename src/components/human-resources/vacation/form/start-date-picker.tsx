@@ -29,7 +29,7 @@ export function StartDatePicker({ control, disabled, required, endDate }: StartD
               field={field}
               hideLabel={true}
               mode="date"
-              context="vacation"
+              context="start"
               disabled={disabled}
               constraints={{
                 minDate: new Date(), // Can't select past dates

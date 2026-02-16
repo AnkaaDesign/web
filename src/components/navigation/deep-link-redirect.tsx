@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { routes } from '@/constants';
+import { APP_URI_SCHEME } from '@/config/deployment';
 
 /**
  * Deep link entity types and their corresponding web routes
@@ -124,7 +125,7 @@ export function DeepLinkRedirect() {
 
   const handleOpenInApp = () => {
     // Try to open the custom URL scheme
-    const deepLinkUrl = `ankaadesign://${entityType}/${entityId}`;
+    const deepLinkUrl = `${APP_URI_SCHEME}://${entityType}/${entityId}`;
     window.location.href = deepLinkUrl;
   };
 

@@ -38,7 +38,7 @@ export function ContactDetailsCard({ customer, className }: ContactDetailsCardPr
 
           {/* Phone Numbers Section */}
           {customer.phones && customer.phones.length > 0 && (
-            <div className={customer.email ? "pt-6 border-t border-border/50" : ""}>
+            <div className={customer.email ? "pt-6 border-t border-border" : ""}>
               <h3 className="text-base font-semibold mb-4 text-foreground">Telefones</h3>
               <div className="space-y-3">
                 {customer.phones.map((phone: string, index: number) => {
@@ -75,7 +75,7 @@ export function ContactDetailsCard({ customer, className }: ContactDetailsCardPr
 
           {/* Website Section */}
           {customer.site && (
-            <div className={customer.email || (customer.phones && customer.phones.length > 0) ? "pt-6 border-t border-border/50" : ""}>
+            <div className={customer.email || (customer.phones && customer.phones.length > 0) ? "pt-6 border-t border-border" : ""}>
               <h3 className="text-base font-semibold mb-4 text-foreground">Website</h3>
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">

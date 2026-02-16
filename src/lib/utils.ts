@@ -3,6 +3,7 @@ import type { ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { File as BackendFile } from "../types";
 import type { FileWithPreview } from "@/components/common/file";
+import { getApiBaseUrl } from "@/config/api";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -38,28 +39,8 @@ export function getBadgeVariant(status: string): string {
   return variants[status] || "default";
 }
 
-// Get API URL dynamically based on how the app is accessed
-export function getApiBaseUrl(): string {
-  // Use cached value if available
-  if ((window as any).__ANKAA_API_URL__) {
-    return (window as any).__ANKAA_API_URL__;
-  }
-
-  const hostname = window.location.hostname;
-
-  // Local IP access - use local API
-  if (hostname === "192.168.10.180" || hostname.startsWith("192.168.")) {
-    return `http://${hostname}:3030`;
-  }
-
-  // Localhost development
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return import.meta.env.VITE_API_URL || "http://localhost:3030";
-  }
-
-  // Domain access - use production API
-  return import.meta.env.VITE_API_URL || "https://api.ankaadesign.com.br";
-}
+// Re-export centralized API URL resolver for backward compatibility
+export { getApiBaseUrl };
 
 export function backendFileToFileWithPreview(backendFile: BackendFile): FileWithPreview {
   const apiBaseUrl = getApiBaseUrl();

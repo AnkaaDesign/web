@@ -35,7 +35,7 @@ export function extractActiveFilters(
 
   // Name filter
   if (filters.names && filters.names.length > 0) {
-    filters.names.forEach((name, _index) => {
+    filters.names.forEach((name: string, _index: number) => {
       activeFilters.push({
         key: "names",
         label: "Nome",
@@ -127,7 +127,7 @@ export function createFilterRemover(currentFilters: Partial<PaintBrandGetManyFor
         break;
       case "names":
         if (itemId && newFilters.names) {
-          newFilters.names = newFilters.names.filter((name) => name !== itemId);
+          newFilters.names = newFilters.names.filter((name: string) => name !== itemId);
           if (newFilters.names.length === 0) {
             delete newFilters.names;
           }

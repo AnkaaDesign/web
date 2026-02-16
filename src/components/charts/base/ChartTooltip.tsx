@@ -55,7 +55,7 @@ export const ChartTooltip = React.memo<ChartTooltipProps>(({
   if (customContent) {
     return (
       <div className={cn('chart-tooltip', className)}>
-        {customContent(payload, label)}
+        {customContent(payload, label ?? '')}
       </div>
     );
   }

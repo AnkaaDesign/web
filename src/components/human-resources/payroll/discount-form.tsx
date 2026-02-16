@@ -32,10 +32,10 @@ import { Separator } from "@/components/ui/separator";
 import {
   IconPercentage,
   IconCurrencyReal,
-  IconSave,
+  IconDeviceFloppy,
   IconX,
   IconCalculator,
-  IconInfo,
+  IconInfoCircle,
 } from "@tabler/icons-react";
 import { formatCurrency } from "../../../utils";
 import { discountCreateSchema, discountUpdateSchema } from "../../../schemas";
@@ -44,7 +44,6 @@ import type {
   DiscountUpdateFormData
 } from "../../../schemas";
 import type { Discount } from "../../../types";
-import { Input } from "@/components/ui/input";
 
 interface DiscountFormProps {
   initialData?: Discount;
@@ -106,6 +105,13 @@ const DISCOUNT_PRESETS = [
   }
 ];
 
+// Helper function to convert DecimalValue to number
+const toNumber = (value: number | { toNumber(): number } | null | undefined): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "number") return value;
+  return value.toNumber();
+};
+
 export function DiscountForm({
   initialData,
   onSubmit,
@@ -125,8 +131,8 @@ export function DiscountForm({
     resolver: zodResolver(isEditing ? discountUpdateSchema : discountCreateSchema),
     defaultValues: {
       reference: initialData?.reference || "",
-      percentage: initialData?.percentage || undefined,
-      value: initialData?.value || undefined,
+      percentage: toNumber(initialData?.percentage),
+      value: toNumber(initialData?.value),
     }
   });
 
@@ -286,14 +292,14 @@ export function DiscountForm({
                       <FormControl>
                         <div className="relative">
                           <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="100"
+                            type="decimal"
+                            decimals={2}
+                            min={0}
+                            max={100}
                             placeholder="0.00"
                             ref={field.ref}
-                            value={field.value}
-                            onChange={(value: string) => field.onChange(parseFloat(value) || undefined)}
+                            value={field.value ?? null}
+                            onChange={(value) => field.onChange(value)}
                             onBlur={field.onBlur}
                           />
                           <IconPercentage className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -319,8 +325,8 @@ export function DiscountForm({
                       <FormControl>
                         <Input
                           type="currency"
-                          value={field.value || 0}
-                          onChange={field.onChange}
+                          value={field.value ?? null}
+                          onChange={(value) => field.onChange(value)}
                           placeholder="R$ 0,00"
                         />
                       </FormControl>
@@ -371,7 +377,7 @@ export function DiscountForm({
                 </div>
 
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
-                  <IconInfo className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <IconInfoCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-blue-700">
                     <p className="font-medium">Informação:</p>
                     <p>
@@ -393,7 +399,7 @@ export function DiscountForm({
               </Button>
             )}
             <Button type="submit" disabled={isLoading}>
-              <IconSave className="h-4 w-4 mr-2" />
+              <IconDeviceFloppy className="h-4 w-4 mr-2" />
               {isLoading
                 ? "Salvando..."
                 : isEditing

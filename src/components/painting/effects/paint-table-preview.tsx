@@ -45,7 +45,7 @@ export const PaintTablePreview: React.FC<PaintTablePreviewProps> = ({ paint, siz
     <div className="w-full">
       {isMetallicOrPearl ? (
         <div
-          className="w-full h-6 rounded-md overflow-hidden ring-1 ring-border/50 shadow-sm"
+          className="w-full h-6 rounded-md overflow-hidden ring-1 ring-border shadow-sm"
           style={{
             position: "relative",
           }}
@@ -60,7 +60,7 @@ export const PaintTablePreview: React.FC<PaintTablePreviewProps> = ({ paint, siz
           />
         </div>
       ) : (
-        <div className="w-full h-6 rounded-md ring-1 ring-border/50 shadow-sm" style={{ backgroundColor: paint.hex || "#888888" }} />
+        <div className="w-full h-6 rounded-md ring-1 ring-border shadow-sm" style={{ backgroundColor: paint.hex || "#888888" }} />
       )}
     </div>
   );
