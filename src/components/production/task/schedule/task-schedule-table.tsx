@@ -797,11 +797,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
                     {column.id === "serialNumberOrPlate" && <span className="truncate block">{task.serialNumber || task.truck?.plate || "-"}</span>}
                     {column.id === "spot" && (
                       task.truck?.spot ? (
-                        task.truck.spot === "PATIO" ? (
-                          <Badge variant="secondary" className="font-mono">Pátio</Badge>
-                        ) : (
-                          <Badge variant="default" className="font-mono">{task.truck.spot.replace(/_/g, "-")}</Badge>
-                        )
+                        <Badge variant="default" className="font-mono">{task.truck.spot.replace(/_/g, "-")}</Badge>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )

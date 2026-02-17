@@ -13,6 +13,7 @@ import * as TablerIcons from "@tabler/icons-react";
 import type { MessageFormData } from "./types";
 import { useState } from "react";
 import { parseMarkdownToInlineFormat } from "@/utils/markdown-parser";
+import { getApiBaseUrl } from "@/config/api";
 
 interface MessagePreviewDialogProps {
   open: boolean;
@@ -66,6 +67,12 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
           return null;
       }
     });
+  };
+
+  const resolveImageUrl = (url: string) => {
+    if (!url) return url;
+    if (url.startsWith("/")) return `${getApiBaseUrl()}${url}`;
+    return url;
   };
 
   const renderBlock = (block: any) => {
@@ -159,7 +166,7 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
           <div className={`flex ${block.alignment === 'center' ? 'justify-center' : block.alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
             <div style={getSizeStyle()}>
               <img
-                src={block.url}
+                src={resolveImageUrl(block.url)}
                 alt={block.alt || ''}
                 className="w-full h-auto rounded-lg"
               />

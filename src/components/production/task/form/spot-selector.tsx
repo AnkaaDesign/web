@@ -2,48 +2,16 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Combobox } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
-// TODO: Truck API client module doesn't exist - needs to be implemented
-// import {
-//   getGaragesAvailability,
-// } from '../../../../api-client/truck';
+import {
+  getGaragesAvailability,
+  type GarageAvailability,
+  type LaneAvailability,
+} from '../../../../api-client/truck';
 import { TRUCK_SPOT } from '../../../../constants';
 
 type GarageId = 'B1' | 'B2' | 'B3';
 type LaneId = 'F1' | 'F2' | 'F3';
 type SpotNumber = 1 | 2 | 3;
-
-// Types for garage availability API response
-interface LaneAvailability {
-  laneId: LaneId;
-  canFit: boolean;
-  availableSpace: number;
-  occupiedSpots: SpotNumber[];
-  spotOccupants?: Array<{
-    spotNumber: SpotNumber;
-    taskName?: string;
-  }>;
-}
-
-interface GarageAvailability {
-  garageId: GarageId;
-  canFit: boolean;
-  lanes: LaneAvailability[];
-}
-
-interface GaragesAvailabilityResponse {
-  data: GarageAvailability[];
-}
-
-// Mock API function until the actual API is implemented
-const getGaragesAvailability = async (
-  _truckLength: number,
-  _truckId?: string
-): Promise<GaragesAvailabilityResponse> => {
-  // TODO: Replace with actual API call when available
-  return {
-    data: [],
-  };
-};
 
 interface SpotSelectorProps {
   truckLength: number | null;
@@ -77,7 +45,7 @@ function parseSpot(spot: TRUCK_SPOT | null): {
   lane: LaneId | null;
   spotNumber: SpotNumber | null;
 } {
-  if (!spot || spot === TRUCK_SPOT.PATIO) {
+  if (!spot) {
     return { garage: null, lane: null, spotNumber: null };
   }
 
@@ -110,7 +78,7 @@ export function SpotSelector({
   const parsedSpot = useMemo(() => parseSpot(currentSpot), [currentSpot]);
 
   const [selectedGarage, setSelectedGarage] = useState<GarageId | 'PATIO' | null>(
-    currentSpot === TRUCK_SPOT.PATIO ? 'PATIO' : parsedSpot.garage
+    parsedSpot.garage
   );
   const [selectedLane, setSelectedLane] = useState<LaneId | null>(parsedSpot.lane);
   const [selectedSpotNumber, setSelectedSpotNumber] = useState<SpotNumber | null>(parsedSpot.spotNumber);
@@ -203,7 +171,7 @@ export function SpotSelector({
       const isCurrentSpot = parsedSpot.spotNumber === spotNum && parsedSpot.lane === selectedLane && parsedSpot.garage === selectedGarage;
 
       // Find who occupies this spot
-      const occupant = selectedLaneData.spotOccupants?.find((o: { spotNumber: SpotNumber; taskName?: string }) => o.spotNumber === spotNum);
+      const occupant = selectedLaneData.spotOccupants?.find((o) => o.spotNumber === spotNum);
 
       // Build label with occupant info if occupied
       let label = SPOT_LABELS[spotNum];
@@ -237,7 +205,7 @@ export function SpotSelector({
       });
     } else if (v1Occupied && v2Occupied && hasEnoughSpace) {
       // V3 available when V1/V2 are full and there's 6m+ space
-      const v3Occupant = selectedLaneData.spotOccupants?.find((o: { spotNumber: SpotNumber; taskName?: string }) => o.spotNumber === 3);
+      const v3Occupant = selectedLaneData.spotOccupants?.find((o) => o.spotNumber === 3);
       let v3Label = SPOT_LABELS[3];
       if (v3IsOccupied && v3Occupant) {
         const taskName = v3Occupant.taskName || 'Sem tarefa';
@@ -298,11 +266,7 @@ export function SpotSelector({
   // Sync state when currentSpot changes externally
   useEffect(() => {
     const parsed = parseSpot(currentSpot);
-    if (currentSpot === TRUCK_SPOT.PATIO) {
-      setSelectedGarage('PATIO');
-      setSelectedLane(null);
-      setSelectedSpotNumber(null);
-    } else if (parsed.garage) {
+    if (parsed.garage) {
       setSelectedGarage(parsed.garage);
       setSelectedLane(parsed.lane);
       setSelectedSpotNumber(parsed.spotNumber);
@@ -353,7 +317,7 @@ export function SpotSelector({
       )}
 
       {/* Current spot display */}
-      {currentSpot && currentSpot !== TRUCK_SPOT.PATIO && (
+      {currentSpot && (
         <p className="text-xs text-muted-foreground">
           Local atual: {currentSpot.replace(/_/g, '-')}
         </p>

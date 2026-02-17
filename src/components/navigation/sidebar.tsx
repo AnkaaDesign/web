@@ -107,6 +107,7 @@ import {
   IconDeviceIpadDollar,
   IconActivity,
   IconMessageCircle,
+  IconServer,
 } from "@tabler/icons-react";
 
 // Types for better type safety
@@ -206,6 +207,7 @@ const iconComponents: Record<string, any> = {
   IconDeviceIpadDollar,
   IconActivity,
   IconMessageCircle,
+  IconServer,
 };
 
 // Get icon component helper

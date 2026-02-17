@@ -19,7 +19,7 @@ interface PendingChange {
   truckId: string;
   taskId: string;
   oldSpot: string | null;
-  newSpot: string;
+  newSpot: string | null;
 }
 
 export function GaragesPage() {
@@ -76,14 +76,28 @@ export function GaragesPage() {
   const { isAdmin, isTeamLeader, canAccess } = usePrivileges();
   const canEditGaragePositions = isAdmin || isTeamLeader || canAccess([SECTOR_PRIVILEGES.LOGISTIC]);
 
-  // Fetch active tasks with trucks AND their layouts for dimensions
+  // Fetch tasks with trucks for garage display
+  // OR logic: include tasks where truck has a spot (any status), OR not completed with forecastDate <= today
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 999);
+    return d.toISOString();
+  }, []);
+
   const { data: tasksResponse, isLoading, error, refetch } = useTasks({
     page: 1,
-    limit: 100,
+    limit: 50,
     where: {
-      truck: {
-        isNot: null,
-      },
+      truck: { isNot: null },
+      OR: [
+        // Trucks with a garage spot assigned (any status, including completed)
+        { truck: { spot: { not: null } } },
+        // Non-completed trucks with forecastDate <= today (for patio display)
+        {
+          status: { in: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION] },
+          forecastDate: { lte: todayStr },
+        },
+      ],
     },
     select: {
       id: true,
@@ -169,15 +183,16 @@ export function GaragesPage() {
 
         const truck = task.truck as any;
 
-        // Must have a layout defined (for dimensions)
+        // If truck has a spot assigned in a garage, always include it
+        // (even if completed or without layout — use default length)
+        if (truck?.spot) {
+          return true;
+        }
+
+        // For patio/unassigned trucks: must have a layout defined (for dimensions)
         const layout = truck?.leftSideLayout || truck?.rightSideLayout;
         const layoutSections = layout?.layoutSections || [];
         if (layoutSections.length === 0) return false;
-
-        // If truck has a spot assigned in a garage, always include it (even if completed)
-        if (truck?.spot && truck.spot !== 'PATIO') {
-          return true;
-        }
 
         // For patio: only include if forecastDate <= today AND status is not COMPLETED
         const forecastDate = (task as any).forecastDate;
@@ -247,7 +262,7 @@ export function GaragesPage() {
 
   // Handle truck movement (add to pending changes, don't save yet)
   const handleTruckMove = useCallback(
-    (taskId: string, newSpot: string) => {
+    (taskId: string, newSpot: string | null) => {
       // Find the task to get truck data
       const task = tasksResponse?.data?.find((t) => t.id === taskId);
       if (!task?.truck) return;
@@ -276,7 +291,7 @@ export function GaragesPage() {
 
   // Handle truck swap (both trucks in a single state update)
   const handleTruckSwap = useCallback(
-    (task1Id: string, spot1: string, task2Id: string, spot2: string) => {
+    (task1Id: string, spot1: string, task2Id: string, spot2: string | null) => {
       // Find both tasks
       const task1 = tasksResponse?.data?.find((t) => t.id === task1Id);
       const task2 = tasksResponse?.data?.find((t) => t.id === task2Id);

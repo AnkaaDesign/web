@@ -757,8 +757,16 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     customerSignatureId: "Assinatura do Cliente",
     customForecastDays: "Dias de Previsão Personalizados",
     items: "Itens do Orçamento",
+    items_snapshot: "Itens do Orçamento (snapshot)",
     // Nested relationship fields
     "items.length": "Quantidade de Itens",
+  },
+  [CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM]: {
+    amount: "Valor",
+    description: "Descrição",
+    observation: "Observação",
+    shouldSync: "Sincronizar com O.S.",
+    position: "Posição",
   },
   [CHANGE_LOG_ENTITY_TYPE.LAYOUT]: {
     height: "Altura",
@@ -1338,7 +1346,6 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     if (!value || value === "" || value === null) return "Pátio";
 
     if (typeof value === "string") {
-      if (value === "PATIO") return "Pátio";
       // Parse B1_F1_V1 format -> "Garagem 1 - Fila 1 - Vaga 1"
       const match = value.match(/B(\d)_F(\d)_V(\d)/);
       if (match) {

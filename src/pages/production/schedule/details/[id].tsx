@@ -838,6 +838,7 @@ const TASK_SECTIONS: SectionConfig[] = [
       { id: "budgetDocs", label: "Orçamentos", sectionId: "documents" },
       { id: "invoices", label: "Notas Fiscais", sectionId: "documents" },
       { id: "receipts", label: "Recibos", sectionId: "documents" },
+      { id: "bankSlips", label: "Boletos", sectionId: "documents" },
     ],
   },
   {
@@ -1054,7 +1055,7 @@ export const TaskDetailsPage = () => {
   // Handler for documents collection viewing (budgets, invoices, receipts)
   const handleDocumentFileClick = (file: any) => {
     if (!fileViewerContext) return;
-    const allDocuments = [...(task?.budgets || []), ...(task?.invoices || []), ...(task?.receipts || [])];
+    const allDocuments = [...(task?.budgets || []), ...(task?.invoices || []), ...(task?.receipts || []), ...(task?.bankSlips || [])];
     const index = allDocuments.findIndex(f => f.id === file.id);
     fileViewerContext.actions.viewFiles(allDocuments, index);
   };
@@ -1104,6 +1105,7 @@ export const TaskDetailsPage = () => {
       budgets: true,
       invoices: true,
       receipts: true,
+      bankSlips: true,
       observation: {
         include: {
           files: true,
@@ -2614,7 +2616,7 @@ export const TaskDetailsPage = () => {
               )}
 
               {/* Documents Card - Budget, NFE, Receipt - Only visible to ADMIN, FINANCIAL, and COMMERCIAL sectors */}
-              {sectionVisibility.isSectionVisible("documents") && canViewDocumentsSection && ((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0)) && (
+              {sectionVisibility.isSectionVisible("documents") && canViewDocumentsSection && ((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0) || (task.bankSlips && task.bankSlips.length > 0)) && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1050">
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
@@ -2622,7 +2624,7 @@ export const TaskDetailsPage = () => {
                         <IconFileText className="h-5 w-5 text-muted-foreground" />
                         Documentos
                         <Badge variant="secondary" className="ml-2">
-                          {[...(task.budgets || []), ...(task.invoices || []), ...(task.receipts || [])].length}
+                          {[...(task.budgets || []), ...(task.invoices || []), ...(task.receipts || []), ...(task.bankSlips || [])].length}
                         </Badge>
                       </CardTitle>
                       <div className="flex gap-1">
@@ -2700,6 +2702,27 @@ export const TaskDetailsPage = () => {
                   <FileItem
                     key={receipt.id}
                     file={receipt}
+                    viewMode={documentsViewMode}
+                    onPreview={handleDocumentFileClick}
+                    onDownload={handleDownload}
+                    showActions
+                  />
+                    ))}
+                  </div>
+                </div>
+                  )}
+
+                  {task.bankSlips && task.bankSlips.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <IconBarcode className="h-4 w-4 text-muted-foreground" />
+                    <h4 className="text-sm font-semibold">Boletos</h4>
+                  </div>
+                  <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                    {task.bankSlips.map((bankSlip: any) => (
+                  <FileItem
+                    key={bankSlip.id}
+                    file={bankSlip}
                     viewMode={documentsViewMode}
                     onPreview={handleDocumentFileClick}
                     onDownload={handleDownload}

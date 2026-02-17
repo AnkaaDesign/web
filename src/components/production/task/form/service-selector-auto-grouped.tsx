@@ -1,10 +1,10 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useFieldArray, useWatch, useController } from "react-hook-form";
 import { FormField } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { IconPlus, IconTrash, IconNote } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconNote, IconArrowsSort } from "@tabler/icons-react";
 import { Combobox } from "@/components/ui/combobox";
 import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_DISPLAY_ORDER, SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,13 +27,27 @@ interface ServiceSelectorProps {
   userPrivilege?: string;
   isTeamLeader?: boolean;
   onItemDeleted?: (description: string) => void;
+  isAccordionOpen?: boolean;
 }
 
-export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege, isTeamLeader = false, onItemDeleted }: ServiceSelectorProps) {
+export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege, isTeamLeader = false, onItemDeleted, isAccordionOpen }: ServiceSelectorProps) {
   const { fields, append, remove } = useFieldArray({
     control,
     name: "serviceOrders",
   });
+
+  // Track field IDs that are "pending organization" — they stay in the ungrouped section
+  // even after being filled in, until the user presses "Organizar" or the accordion closes
+  const [pendingFieldIds, setPendingFieldIds] = useState<Set<string>>(new Set());
+  const prevAccordionOpen = useRef(isAccordionOpen);
+
+  // Organize (clear pending) when accordion closes
+  useEffect(() => {
+    if (prevAccordionOpen.current === true && isAccordionOpen === false) {
+      setPendingFieldIds(new Set());
+    }
+    prevAccordionOpen.current = isAccordionOpen;
+  }, [isAccordionOpen]);
 
   // Watch all services
   const servicesValues = (useWatch({
@@ -127,20 +141,21 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     };
     const ungrouped: number[] = [];
 
-    fields.forEach((_field, index) => {
+    fields.forEach((field, index) => {
       const service = servicesValues[index];
       // A service is "complete" if it has both type and description (at least 3 chars)
       const isComplete = service?.type && service?.description && service.description.trim().length >= 3;
 
-      if (isComplete) {
-        groups[service.type as SERVICE_ORDER_TYPE].push(index);
-      } else {
+      // Keep in ungrouped if: incomplete OR pending organization (recently added/edited)
+      if (!isComplete || pendingFieldIds.has(field.id)) {
         ungrouped.push(index);
+      } else {
+        groups[service.type as SERVICE_ORDER_TYPE].push(index);
       }
     });
 
     return { groupedServices: groups, ungroupedIndices: ungrouped };
-  }, [fields, servicesValues]);
+  }, [fields, servicesValues, pendingFieldIds]);
 
   // Get the default type for the user's sector (the type they work with most)
   const getDefaultTypeForSector = useCallback(() => {
@@ -160,9 +175,29 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     }
   }, [userPrivilege]);
 
+  // Track previous field IDs to detect newly added fields
+  const prevFieldIdsRef = useRef<Set<string>>(new Set(fields.map(f => f.id)));
+
+  // Detect newly added fields and mark them as pending
+  useEffect(() => {
+    const currentIds = new Set(fields.map(f => f.id));
+    const newIds = new Set<string>();
+    currentIds.forEach(id => {
+      if (!prevFieldIdsRef.current.has(id)) {
+        newIds.add(id);
+      }
+    });
+    if (newIds.size > 0) {
+      setPendingFieldIds(prev => {
+        const updated = new Set(prev);
+        newIds.forEach(id => updated.add(id));
+        return updated;
+      });
+    }
+    prevFieldIdsRef.current = currentIds;
+  }, [fields]);
+
   const handleAddService = () => {
-    // Use append to add new service at the end (bottom)
-    // This preserves addition order: first added = first in list
     append({
       status: SERVICE_ORDER_STATUS.PENDING,
       statusOrder: 1,
@@ -263,38 +298,50 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     );
   };
 
+  const handleOrganize = useCallback(() => {
+    setPendingFieldIds(new Set());
+  }, []);
+
   return (
     <div className="space-y-4">
-      {/* Add Service Button - Full width above rows */}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={handleAddService}
-        disabled={disabled || userPrivilege === SECTOR_PRIVILEGES.DESIGNER}
-        className="w-full"
-      >
-        <IconPlus className="h-4 w-4 mr-2" />
-        Adicionar Serviço
-      </Button>
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleAddService}
+          disabled={disabled || userPrivilege === SECTOR_PRIVILEGES.DESIGNER}
+          className="flex-1"
+        >
+          <IconPlus className="h-4 w-4 mr-2" />
+          Adicionar Serviço
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleOrganize}
+          disabled={disabled || pendingFieldIds.size === 0}
+          className="shrink-0"
+        >
+          <IconArrowsSort className="h-4 w-4 mr-2" />
+          Organizar
+        </Button>
+      </div>
 
-      {/* Ungrouped services (being edited) - shown in a card for consistency */}
+      {/* Ungrouped services (being edited / pending organization) */}
       {ungroupedIndices.length > 0 && (
         <Card className="bg-transparent border-muted border-dashed">
           <CardContent className="pt-4 space-y-3">
-            {/* Header for new/editing services */}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-muted-foreground">
-                Configurando Serviço
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Preencha o tipo e descrição
-              </span>
-            </div>
 
-            {ungroupedIndices.map((index) => {
+            {[...ungroupedIndices].reverse().map((index) => {
               const serviceOrder = servicesValues[index];
               const isServiceDisabled = disabled || !canEditServiceOrder(serviceOrder);
+              const isStatusDisabled = disabled || !canEditServiceOrderStatus(serviceOrder);
+              // Pending items that are complete should show type + status (flat view mode)
+              const isPendingComplete = pendingFieldIds.has(fields[index].id) &&
+                serviceOrder?.type && serviceOrder?.description && serviceOrder.description.trim().length >= 3;
 
               return (
                 <ServiceRow
@@ -303,8 +350,10 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
                   index={index}
                   type={servicesValues[index]?.type || SERVICE_ORDER_TYPE.PRODUCTION}
                   disabled={isServiceDisabled}
+                  statusDisabled={isStatusDisabled}
                   onRemove={() => handleRemoveItem(index)}
                   isGrouped={false}
+                  isFlatView={isPendingComplete}
                   userPrivilege={userPrivilege}
                   currentUserId={currentUserId}
                   isTeamLeader={isTeamLeader}
@@ -333,6 +382,7 @@ interface ServiceRowProps {
   statusDisabled?: boolean;
   onRemove: () => void;
   isGrouped: boolean; // Whether this service is in a group card or being edited
+  isFlatView?: boolean; // Whether we're in flat (unorganized) view - shows type + status
   userPrivilege?: string;
   currentUserId?: string;
   isTeamLeader?: boolean;
@@ -346,6 +396,7 @@ function ServiceRow({
   statusDisabled,
   onRemove,
   isGrouped,
+  isFlatView = false,
   userPrivilege,
   currentUserId: _currentUserId,
   isTeamLeader = false,
@@ -490,7 +541,8 @@ function ServiceRow({
   // For PRODUCTION sector users who are NOT team leaders: show as badge (read-only)
   // For team leaders and other sectors with edit permissions: show as combobox
   const showStatusField = useMemo(() => {
-    if (!isGrouped) return false; // Never show status for ungrouped (new) service orders
+    // Show status for grouped items or flat view (existing items shown ungrouped)
+    if (!isGrouped && !isFlatView) return false; // Never show status for truly new service orders
 
     // If user is PRODUCTION sector but NOT a team leader, show as badge instead of combobox
     if (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION && !isTeamLeader) {
@@ -498,7 +550,7 @@ function ServiceRow({
     }
 
     return true; // Show combobox for team leaders and other sectors
-  }, [isGrouped, userPrivilege, isTeamLeader]);
+  }, [isGrouped, userPrivilege, isTeamLeader, isFlatView]);
 
   // Determine which service order types the user can CREATE based on their privilege
   // Note: This is separate from what they can UPDATE (handled by canEditServiceOrder)
@@ -552,21 +604,27 @@ function ServiceRow({
     return [SERVICE_ORDER_TYPE.PRODUCTION];
   }, [userPrivilege]);
 
+  // Show type selector when not grouped (new items or flat view)
+  const showTypeSelector = !isGrouped;
+
   // Grid layout: consistent proportions for both grouped and ungrouped
   // Using min-w-0 on children to prevent content from affecting column width
   // Grouped: [Description 2fr] [User 1fr] [Status 1fr] [Buttons 90px]
   // Ungrouped: [Type 150px] [Description 2fr] [User 1fr] [Buttons 90px]
+  // Flat view: [Type 150px] [Description 2fr] [User 1fr] [Status 1fr] [Buttons 90px]
   // Note: Type column needs 150px to fit "Comercial" without truncation
   // Note: Buttons column now 90px to fit both observation and trash buttons (2 icons + gap)
-  const gridClass = isGrouped
-    ? "grid grid-cols-[2fr_1fr_1fr_90px] gap-3 items-center"
-    : "grid grid-cols-[150px_2fr_1fr_90px] gap-3 items-center";
+  const gridClass = isFlatView
+    ? "grid grid-cols-[150px_2fr_1fr_1fr_90px] gap-3 items-center"
+    : isGrouped
+      ? "grid grid-cols-[2fr_1fr_1fr_90px] gap-3 items-center"
+      : "grid grid-cols-[150px_2fr_1fr_90px] gap-3 items-center";
 
   return (
     <>
       <div className={gridClass}>
-        {/* Type Field - Only show if not grouped (no label, inline) */}
-        {!isGrouped && (
+        {/* Type Field - Only show if not grouped or in flat view (no label, inline) */}
+        {showTypeSelector && (
           <div className="min-w-0">
             <FormField
               control={control}
@@ -622,8 +680,8 @@ function ServiceRow({
           />
         </div>
 
-        {/* Status Field - Only rendered for grouped (existing) service orders */}
-        {isGrouped && (showStatusField && !statusDisabled ? (
+        {/* Status Field - Rendered for grouped or flat view service orders */}
+        {(isGrouped || isFlatView) && (showStatusField && !statusDisabled ? (
           <div className="min-w-0">
             <FormField
               control={control}

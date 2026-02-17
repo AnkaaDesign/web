@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,17 @@ import {
 } from "../../../../constants";
 import type { NotificationGetManyFormData } from "../../../../schemas";
 import { IconSearch, IconFilter, IconPlus, IconX } from "@tabler/icons-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInfiniteScroll } from "@/hooks";
 
@@ -51,6 +62,8 @@ export function NotificationList({ className }: NotificationListProps) {
   const { data, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = notificationQuery;
 
   const { delete: deleteNotification } = useNotificationMutations();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const pendingDeleteId = useRef<string | null>(null);
 
   const { lastElementRef } = useInfiniteScroll({
     hasNextPage,
@@ -103,11 +116,18 @@ export function NotificationList({ className }: NotificationListProps) {
     navigate(`/administracao/notificacoes/editar/${id}`);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Tem certeza que deseja excluir esta notificação?")) {
-      await deleteNotification(id);
-    }
+  const handleDelete = (id: string) => {
+    pendingDeleteId.current = id;
+    setDeleteDialogOpen(true);
   };
+
+  const confirmDelete = useCallback(async () => {
+    if (pendingDeleteId.current) {
+      await deleteNotification(pendingDeleteId.current);
+      pendingDeleteId.current = null;
+    }
+    setDeleteDialogOpen(false);
+  }, [deleteNotification]);
 
   const handleCreate = () => {
     navigate("/administracao/notificacoes/cadastrar");
@@ -284,6 +304,22 @@ export function NotificationList({ className }: NotificationListProps) {
           )}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir notificação</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta notificação? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className={buttonVariants({ variant: "destructive" })}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

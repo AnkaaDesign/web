@@ -1172,7 +1172,7 @@ const taskTruckCreateSchema = z.object({
     .optional()
     .nullable()
     .transform((val) => (val === "" ? null : val?.toUpperCase())),
-  // Truck spot in garage (e.g., "B1_F1_V1", "B2_F2_V3", "PATIO", or null)
+  // Truck spot in garage (e.g., "B1_F1_V1", "B2_F2_V3") — null means patio
   spot: z.string().nullable().optional(),
   // Truck specifications
   category: z.string().nullable().optional(),

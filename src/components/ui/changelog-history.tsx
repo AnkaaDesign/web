@@ -668,7 +668,7 @@ const ChangelogTimelineItem = ({
           return entityDetails.suppliers.get(value) || "Fornecedor";
         }
         if (
-          (field === "assignedToUserId" || field === "createdById") &&
+          (field === "assignedToUserId" || field === "createdById" || field === "startedById" || field === "completedById" || field === "approvedById" || field === "assignedToId") &&
           entityDetails.users.has(value)
         ) {
           return entityDetails.users.get(value) || "Usuário";
@@ -712,7 +712,7 @@ const ChangelogTimelineItem = ({
       if (field === "categoryId") return "Categoria (carregando...)";
       if (field === "brandId") return "Marca (carregando...)";
       if (field === "supplierId") return "Fornecedor (carregando...)";
-      if (field === "assignedToUserId" || field === "createdById")
+      if (field === "assignedToUserId" || field === "createdById" || field === "startedById" || field === "completedById" || field === "approvedById" || field === "assignedToId")
         return "Usuário (carregando...)";
       if (field === "customerId" || field === "invoiceToId") return "Cliente (carregando...)";
       if (field === "sectorId") return "Setor (carregando...)";
@@ -1270,7 +1270,9 @@ const ChangelogTimelineItem = ({
                             changelog.oldValue !== null &&
                             onRollback &&
                             (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
-                              entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK) && (
+                              entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK ||
+                              entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING ||
+                              entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM) && (
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -2045,63 +2047,87 @@ const ChangelogTimelineItem = ({
                                   );
                                 }
 
-                                const formatDimensions = (
-                                  layout: any,
-                                ) => {
+                                const getDimensions = (layout: any) => {
                                   if (!layout) return null;
-                                  const widthCm = Math.round(
-                                    (layout.totalWidth || 0) * 100,
-                                  );
-                                  const heightCm = Math.round(
-                                    (layout.height || 0) * 100,
-                                  );
-                                  const doors = layout.doorCount || 0;
-                                  return `${widthCm}cm × ${heightCm}cm — ${doors} porta${doors !== 1 ? "s" : ""}`;
+                                  return {
+                                    width: Math.round((layout.totalWidth || 0) * 100),
+                                    height: Math.round((layout.height || 0) * 100),
+                                    doors: layout.doorCount || 0,
+                                  };
                                 };
 
-                                const renderLayoutSummary = (
-                                  layout: any,
-                                  isOld: boolean,
+                                const renderLayoutChange = (
+                                  oldLayout: any,
+                                  newLayout: any,
                                 ) => {
-                                  if (!layout) {
+                                  const oldDims = getDimensions(oldLayout);
+                                  const newDims = getDimensions(newLayout);
+
+                                  // One side is null (added or removed)
+                                  if (!oldDims && newDims) {
                                     return (
-                                      <span
-                                        className={
-                                          isOld
-                                            ? "text-red-600 dark:text-red-400 font-medium text-xs"
-                                            : "text-green-600 dark:text-green-400 font-medium text-xs"
-                                        }
-                                      >
-                                        Nenhum
-                                      </span>
+                                      <div className="space-y-1">
+                                        <div>
+                                          <span className="text-xs text-muted-foreground">Antes: </span>
+                                          <span className="text-red-600 dark:text-red-400 font-medium text-xs">Nenhum</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-xs text-muted-foreground">Depois: </span>
+                                          <span className="text-green-600 dark:text-green-400 font-medium text-xs">
+                                            {newDims.width}cm × {newDims.height}cm — {newDims.doors} porta{newDims.doors !== 1 ? "s" : ""}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  if (oldDims && !newDims) {
+                                    return (
+                                      <div className="space-y-1">
+                                        <div>
+                                          <span className="text-xs text-muted-foreground">Antes: </span>
+                                          <span className="text-red-600 dark:text-red-400 font-medium text-xs">
+                                            {oldDims.width}cm × {oldDims.height}cm — {oldDims.doors} porta{oldDims.doors !== 1 ? "s" : ""}
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <span className="text-xs text-muted-foreground">Depois: </span>
+                                          <span className="text-green-600 dark:text-green-400 font-medium text-xs">Nenhum</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  if (!oldDims && !newDims) {
+                                    return <span className="text-muted-foreground text-xs">Sem alterações</span>;
+                                  }
+
+                                  // Both have values - check if dimensions are the same
+                                  const sameMeasures = oldDims!.width === newDims!.width && oldDims!.height === newDims!.height;
+
+                                  if (sameMeasures) {
+                                    // Same measures → show door count change
+                                    return (
+                                      <div className="flex items-center gap-2 text-xs font-medium">
+                                        <span className="text-red-600 dark:text-red-400">
+                                          {oldDims!.doors} porta{oldDims!.doors !== 1 ? "s" : ""}
+                                        </span>
+                                        <span className="text-muted-foreground">→</span>
+                                        <span className="text-green-600 dark:text-green-400">
+                                          {newDims!.doors} porta{newDims!.doors !== 1 ? "s" : ""}
+                                        </span>
+                                      </div>
                                     );
                                   }
 
-                                  const dims =
-                                    formatDimensions(layout);
-                                  const svgData = layout.layoutSections
-                                    ? generateLayoutSVG(layout)
-                                    : "";
-
+                                  // Different measures → show dimensions change
                                   return (
-                                    <div>
-                                      <span
-                                        className={`text-xs font-medium ${
-                                          isOld
-                                            ? "text-red-600 dark:text-red-400"
-                                            : "text-green-600 dark:text-green-400"
-                                        }`}
-                                      >
-                                        {dims}
+                                    <div className="flex items-center gap-2 text-xs font-medium">
+                                      <span className="text-red-600 dark:text-red-400">
+                                        {oldDims!.width}cm × {oldDims!.height}cm
                                       </span>
-                                      {svgData && (
-                                        <div
-                                          className="mt-1 max-w-[300px]"
-                                          dangerouslySetInnerHTML={{
-                                            __html: svgData,
-                                          }}
-                                        />
-                                      )}
+                                      <span className="text-muted-foreground">→</span>
+                                      <span className="text-green-600 dark:text-green-400">
+                                        {newDims!.width}cm × {newDims!.height}cm
+                                      </span>
                                     </div>
                                   );
                                 };
@@ -2122,26 +2148,7 @@ const ChangelogTimelineItem = ({
                                             <div className="text-xs font-semibold mb-2">
                                               {label}
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                              <div>
-                                                <div className="text-xs text-muted-foreground mb-1">
-                                                  Antes
-                                                </div>
-                                                {renderLayoutSummary(
-                                                  oldLayout,
-                                                  true,
-                                                )}
-                                              </div>
-                                              <div>
-                                                <div className="text-xs text-muted-foreground mb-1">
-                                                  Depois
-                                                </div>
-                                                {renderLayoutSummary(
-                                                  newLayout,
-                                                  false,
-                                                )}
-                                              </div>
-                                            </div>
+                                            {renderLayoutChange(oldLayout, newLayout)}
                                           </div>
                                         );
                                       },
@@ -2308,8 +2315,12 @@ export function ChangelogHistory({
 
   // Handle rollback action
   const handleRollback = async (changeLogId: string, _fieldName: string) => {
-    // Only allow rollback for task entities
-    if (entityType !== CHANGE_LOG_ENTITY_TYPE.TASK) {
+    // Only allow rollback for supported entities
+    if (
+      entityType !== CHANGE_LOG_ENTITY_TYPE.TASK &&
+      entityType !== CHANGE_LOG_ENTITY_TYPE.TASK_PRICING &&
+      entityType !== CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM
+    ) {
       return;
     }
 

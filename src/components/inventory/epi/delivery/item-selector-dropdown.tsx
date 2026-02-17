@@ -4,7 +4,7 @@ import { getItems } from "../../../../api-client";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Item } from "../../../../types";
-import { ITEM_CATEGORY_TYPE, PPE_TYPE, PPE_TYPE_ORDER, PPE_TYPE_LABELS, PPE_SIZE_LABELS, BOOT_SIZE_ORDER, PANTS_SIZE_ORDER, SHIRT_SIZE_ORDER, MASK_SIZE_ORDER } from "../../../../constants";
+import { ITEM_CATEGORY_TYPE, PPE_TYPE, PPE_TYPE_ORDER, BOOT_SIZE_ORDER, PANTS_SIZE_ORDER, SHIRT_SIZE_ORDER, MASK_SIZE_ORDER } from "../../../../constants";
 import { getPpeSizeFromMeasures } from "@/utils/ppe-size-helpers";
 
 interface ItemSelectorDropdownProps {
@@ -19,8 +19,11 @@ interface UserPpeSizes {
   boots?: string;
   pants?: string;
   shirts?: string;
+  shorts?: string;
   sleeves?: string;
   mask?: string;
+  gloves?: string;
+  rainBoots?: string;
 }
 
 // Map PPE types to user size fields and their sort orders
@@ -28,8 +31,11 @@ const PPE_TYPE_TO_USER_SIZE_FIELD: Record<string, keyof UserPpeSizes> = {
   [PPE_TYPE.BOOTS]: "boots",
   [PPE_TYPE.PANTS]: "pants",
   [PPE_TYPE.SHIRT]: "shirts",
+  [PPE_TYPE.SHORT]: "shorts",
   [PPE_TYPE.SLEEVES]: "sleeves",
   [PPE_TYPE.MASK]: "mask",
+  [PPE_TYPE.GLOVES]: "gloves",
+  [PPE_TYPE.RAIN_BOOTS]: "rainBoots",
 };
 
 // Get the correct sort order based on PPE type
@@ -73,8 +79,11 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
         boots: userPpeSize.boots || undefined,
         pants: userPpeSize.pants || undefined,
         shirts: userPpeSize.shirts || undefined,
+        shorts: userPpeSize.shorts || undefined,
         sleeves: userPpeSize.sleeves || undefined,
         mask: userPpeSize.mask || undefined,
+        gloves: userPpeSize.gloves || undefined,
+        rainBoots: userPpeSize.rainBoots || undefined,
       };
       setUserSizes(sizes);
       // Don't automatically show all sizes if user has sizes configured
@@ -110,6 +119,7 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
           page: page,
           take: 50,
           where: {
+            isActive: true,
             category: {
               type: ITEM_CATEGORY_TYPE.PPE,
             },
@@ -248,38 +258,10 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
         renderOption={(option: ComboboxOption) => {
           const meta = option.metadata as any;
 
-          // Build the label: unicode - name - type • size
-          let label = '';
-
-          // Add unicode if available
-          if (meta.uniCode) {
-            label += meta.uniCode;
-          }
-
-          // Add name
-          if (meta.displayName) {
-            label += (label ? ' - ' : '') + meta.displayName;
-          }
-
-          // Add type
-          if (meta.ppeType) {
-            const typeLabel = PPE_TYPE_LABELS[meta.ppeType as keyof typeof PPE_TYPE_LABELS] || meta.ppeType;
-            label += (label ? ' - ' : '') + typeLabel;
-          }
-
-          // Add size (or brand for OUTROS type) with bullet separator
-          // Only add if it's different from unicode to avoid duplication
-          if (meta.ppeType === PPE_TYPE.OTHERS) {
-            if (meta.brandName && meta.brandName !== meta.uniCode) {
-              label += (label ? ' • ' : '') + meta.brandName;
-            }
-          } else if (meta.size) {
-            const sizeLabel = PPE_SIZE_LABELS[meta.size as keyof typeof PPE_SIZE_LABELS] || meta.size;
-            // Only add size if it's different from unicode (to avoid showing "46" twice)
-            if (sizeLabel !== meta.uniCode) {
-              label += (label ? ' • ' : '') + sizeLabel;
-            }
-          }
+          // Build the label: unicode - name
+          const label = meta.uniCode
+            ? `${meta.uniCode} - ${meta.displayName}`
+            : meta.displayName || '';
 
           return (
             <div className="flex items-center justify-between w-full gap-2">

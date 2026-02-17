@@ -10,15 +10,11 @@ export function getTruckManufacturerLabel(manufacturer: TRUCK_MANUFACTURER): str
 
 /**
  * Format truck spot to full descriptive format
- * @param spot - Truck spot value (e.g., "B1_F2_V3", "PATIO")
- * @returns Formatted string (e.g., "Barracão 1 - Faixa 2 - Vaga 3", "Pátio")
+ * @param spot - Truck spot value (e.g., "B1_F2_V3")
+ * @returns Formatted string (e.g., "Barracão 1 - Faixa 2 - Vaga 3")
  */
 export function formatTruckSpot(spot: string | null | undefined): string {
   if (!spot) return "-";
-
-  if (spot === "PATIO") {
-    return "Pátio";
-  }
 
   // Parse the spot format: B{garage}_F{lane}_V{spot}
   const match = spot.match(/^B(\d+)_F(\d+)_V(\d+)$/);

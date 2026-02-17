@@ -1,6 +1,7 @@
 import * as React from "react";
 import type { ImageBlock as ImageBlockType } from "./types";
 import { cn } from "@/lib/utils";
+import { getApiBaseUrl } from "@/config/api";
 
 interface ImageBlockProps {
   block: ImageBlockType;
@@ -13,7 +14,11 @@ interface ImageBlockProps {
  */
 export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => {
   // Support both 'src' (standard) and 'url' (from editor) properties
-  const imageSrc = (block as any).src || (block as any).url;
+  // Resolve any API-relative URL (starting with "/") against the API base URL
+  const rawSrc = (block as any).src || (block as any).url;
+  const imageSrc = rawSrc?.startsWith("/")
+    ? `${getApiBaseUrl()}${rawSrc}`
+    : rawSrc;
   const { alt, caption, width, height, id, size, alignment } = block;
   const [isLoading, setIsLoading] = React.useState(true);
   const [hasError, setHasError] = React.useState(false);

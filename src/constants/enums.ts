@@ -845,8 +845,6 @@ export enum TRUCK_SPOT {
   B3_F3_V1 = 'B3_F3_V1',
   B3_F3_V2 = 'B3_F3_V2',
   B3_F3_V3 = 'B3_F3_V3',
-  // Patio (outside, not assigned to a garage spot)
-  PATIO = 'PATIO',
 }
 
 export enum TRUCK_MANUFACTURER {
@@ -1588,6 +1586,7 @@ export enum CHANGE_LOG_ENTITY_TYPE {
   SUPPLIER = "SUPPLIER",
   TASK = "TASK",
   TASK_PRICING = "TASK_PRICING",
+  TASK_PRICING_ITEM = "TASK_PRICING_ITEM",
   TIME_CLOCK_ENTRY = "TIME_CLOCK_ENTRY",
   TRUCK = "TRUCK",
   USER = "USER",

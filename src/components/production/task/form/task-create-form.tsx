@@ -1153,6 +1153,7 @@ export const TaskCreateForm = () => {
                                 currentUserId={user?.id}
                                 userPrivilege={user?.sector?.privileges}
                                 onItemDeleted={handleServiceOrderDeleted}
+                                isAccordionOpen={openAccordion === "serviceOrders"}
                               />
                               <FormMessage />
                             </FormItem>

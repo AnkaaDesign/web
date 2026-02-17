@@ -146,15 +146,7 @@ export const createTaskColumns = (): TaskColumn[] => [
     width: "120px",
     formatter: (value: string | null) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
-      // Format spot name for display (e.g., "B1_F1_V1" -> "B1-F1-V1", "PATIO" -> "Pátio")
-      if (value === "PATIO") {
-        return (
-          <Badge variant="secondary">
-            Pátio
-          </Badge>
-        );
-      }
-      // Format garage spot (e.g., "B1_F1_V1" -> "B1-F1-V1")
+      // Format spot name for display (e.g., "B1_F1_V1" -> "B1-F1-V1")
       const formattedSpot = value.replace(/_/g, "-");
       return (
         <Badge variant="default">

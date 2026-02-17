@@ -3459,6 +3459,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             userPrivilege={user?.sector?.privileges}
                             isTeamLeader={isTeamLeader}
                             onItemDeleted={handleServiceOrderDeleted}
+                            isAccordionOpen={openAccordion === "serviceOrders"}
                           />
                           <FormMessage />
                         </FormItem>

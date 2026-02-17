@@ -13,6 +13,9 @@ import {
 } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent, DragMoveEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
+import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { PositionedDropdownMenuContent } from '@/components/ui/positioned-dropdown-menu';
+import { IconHomeMove } from '@tabler/icons-react';
 
 // =====================
 // Constants
@@ -136,7 +139,6 @@ interface AreaLayout {
 // =====================
 
 function parseSpot(spot: string): { garage: GarageId | null; lane: LaneId | null; spotNumber: number | null } {
-  if (spot === 'PATIO') return { garage: null, lane: null, spotNumber: null };
   const match = spot.match(/^B(\d)_F(\d)_V(\d)$/);
   if (!match) return { garage: null, lane: null, spotNumber: null };
   return {
@@ -168,7 +170,7 @@ function calculateSwapAvailability(
   // Find all trucks in this lane EXCLUDING both the dragged truck AND the swap target
   const trucksInLaneAfterSwap = trucks.filter(t => {
     if (t.id === draggedTruckId || t.id === swapTargetTruckId) return false;
-    if (!t.spot || t.spot === 'PATIO') return false;
+    if (!t.spot) return false;
     const parsed = parseSpot(t.spot);
     return parsed.garage === garageId && parsed.lane === laneId;
   });
@@ -202,7 +204,7 @@ function calculateLaneAvailability(
   // Find all trucks in this lane (excluding the truck being dragged)
   const trucksInLane = trucks.filter(t => {
     if (t.id === excludeTruckId) return false;
-    if (!t.spot || t.spot === 'PATIO') return false;
+    if (!t.spot) return false;
     const parsed = parseSpot(t.spot);
     return parsed.garage === garageId && parsed.lane === laneId;
   });
@@ -267,9 +269,9 @@ function calculateAreaLayout(areaId: AreaId, trucks: GarageTruck[], patioColumns
   const isPatio = areaId === 'PATIO';
 
   if (isPatio) {
-    // Patio - show all trucks without a spot or with PATIO spot in a responsive grid
+    // Patio - show all trucks without a spot in a responsive grid
     const patioTrucksList = trucks
-      .filter((t) => !t.spot || t.spot === 'PATIO')
+      .filter((t) => !t.spot)
       .sort((a, b) => b.length - a.length); // Sort by length descending (longest first)
 
     const cols = patioColumns;
@@ -525,9 +527,10 @@ interface DraggableTruckProps {
   scale: number;
   disabled?: boolean;
   onClick?: () => void;
+  onContextMenu?: (truckId: string, e: React.MouseEvent) => void;
 }
 
-function DraggableTruck({ truck, scale, disabled = false, onClick }: DraggableTruckProps) {
+function DraggableTruck({ truck, scale, disabled = false, onClick, onContextMenu }: DraggableTruckProps) {
   const [isHovering, setIsHovering] = useState(false);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: truck.id,
@@ -555,6 +558,14 @@ function DraggableTruck({ truck, scale, disabled = false, onClick }: DraggableTr
     }
   }, [isDragging, onClick]);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    if (!isDragging && onContextMenu) {
+      e.preventDefault();
+      e.stopPropagation();
+      onContextMenu(truck.id, e);
+    }
+  }, [isDragging, onContextMenu, truck.id]);
+
   return (
     <g
       ref={setNodeRef as any}
@@ -564,6 +575,7 @@ function DraggableTruck({ truck, scale, disabled = false, onClick }: DraggableTr
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       onClick={handleClick}
+      onContextMenu={handleContextMenu}
     >
       <TruckElement truck={truck} scale={scale} isDragging={isDragging} />
       {/* Invisible larger hitbox for better tooltip activation */}
@@ -616,7 +628,7 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
     // Get trucks currently in this lane (excluding the dragged truck)
     const trucksInLane = trucks.filter((t) => {
       if (t.id === draggedTruckId) return false;
-      if (!t.spot || t.spot === 'PATIO') return false;
+      if (!t.spot) return false;
       const parsed = parseSpot(t.spot);
       return parsed.garage === garageId && parsed.lane === laneId;
     });
@@ -989,19 +1001,29 @@ interface AllGaragesViewProps {
   containerHeight: number;
   garageCounts: Record<AreaId, number>;
   viewMode?: 'all' | 'week';
-  onTruckMove?: (truckId: string, newSpot: string) => void;
-  onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string) => void;
+  onTruckMove?: (truckId: string, newSpot: string | null) => void;
+  onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string | null) => void;
   onTruckClick?: (taskId: string) => void;
   readOnly?: boolean;
 }
 
 function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts, viewMode = 'all', onTruckMove, onTruckSwap, onTruckClick, readOnly = false }: AllGaragesViewProps) {
+  // Right-click context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; truckId: string } | null>(null);
+
+  const handleTruckContextMenu = useCallback((truckId: string, e: React.MouseEvent) => {
+    const truck = trucks.find(t => t.id === truckId);
+    if (!truck?.spot || !onTruckMove) return;
+
+    setContextMenu({ x: e.clientX, y: e.clientY, truckId });
+  }, [trucks, onTruckMove]);
+
   // Show all 4 areas (including PATIO/yard) in both Grade and Calendar views
   const areasToShow = AREAS;
 
   // Calculate patio columns dynamically based on truck count (same logic as dimensions calculation)
   // Target: ~3-4 trucks per column for optimal layout
-  const patioTrucks = trucks.filter(t => !t.spot || t.spot === 'PATIO');
+  const patioTrucks = trucks.filter(t => !t.spot);
   const patioColumns = Math.max(5, Math.ceil(patioTrucks.length / 3));
 
   // Drag-and-drop state
@@ -1029,7 +1051,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
   const areaDimensions = useMemo(() => {
     return allAreaLayouts.map(({ areaId, layout }) => {
       if (layout.isPatio) {
-        const patioTrucks = trucks.filter(t => !t.spot || t.spot === 'PATIO');
+        const patioTrucks = trucks.filter(t => !t.spot);
         const patioTrucksSorted = [...patioTrucks].sort((a, b) => b.length - a.length);
         const columns = Math.max(5, Math.ceil(patioTrucks.length / 3));
 
@@ -1176,7 +1198,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
 
       // Drop on patio
       if (dropData?.isPatio) {
-        onTruckMove(truckId, 'PATIO');
+        onTruckMove(truckId, null);
         return;
       }
 
@@ -1245,14 +1267,12 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
       if (truckAtPreferredSpot && truckAtPreferredSpot.id !== truckId) {
         // SWAP: Preferred spot is occupied - validate if swap would work
         const newSpotForDragged = `${targetGarageId}_${targetLaneId}_V${preferredSpotNum}`;
-        const swapTargetSpot = draggedTruckCurrentSpot && draggedTruckCurrentSpot !== 'PATIO'
-          ? draggedTruckCurrentSpot
-          : 'PATIO';
+        const swapTargetSpot = draggedTruckCurrentSpot || null;
 
         // Validate the swap: Check if dragged truck fits in target lane after swap
         const trucksInTargetLane = trucks.filter(t => {
           if (t.id === truckId || t.id === truckAtPreferredSpot.id) return false;
-          if (!t.spot || t.spot === 'PATIO') return false;
+          if (!t.spot) return false;
           const parsed = parseSpot(t.spot);
           return parsed.garage === targetGarageId && parsed.lane === targetLaneId;
         });
@@ -1357,6 +1377,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
                           scale={uniformScale}
                           disabled={false}
                           onClick={onTruckClick ? () => onTruckClick(truck.id) : undefined}
+                          onContextMenu={handleTruckContextMenu}
                         />
                       ) : (
                         <TruckElement
@@ -1413,6 +1434,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
                                   scale={uniformScale}
                                   disabled={false}
                                   onClick={onTruckClick ? () => onTruckClick(truck.id) : undefined}
+                                  onContextMenu={handleTruckContextMenu}
                                 />
                               ))}
                             </DroppableLane>
@@ -1457,34 +1479,66 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
     </div>
   );
 
+  const truckContextMenu = (
+    <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+      <PositionedDropdownMenuContent
+        position={contextMenu}
+        isOpen={!!contextMenu}
+        className="w-48"
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        <DropdownMenuItem
+          onClick={() => {
+            if (contextMenu && onTruckMove) {
+              onTruckMove(contextMenu.truckId, null);
+            }
+            setContextMenu(null);
+          }}
+          className="text-destructive"
+        >
+          <IconHomeMove className="mr-2 h-4 w-4" />
+          Colocar no pátio
+        </DropdownMenuItem>
+      </PositionedDropdownMenuContent>
+    </DropdownMenu>
+  );
+
   // Wrap in DndContext only if drag-and-drop is enabled
   if (enableDragDrop) {
     return (
-      <DndContext
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragMove={handleDragMove}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-      >
-        {content}
-        <DragOverlay>
-          {activeTruck ? (
-            <div style={{ opacity: 0.8, cursor: 'grabbing' }}>
-              <svg
-                width={COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW * uniformScale}
-                height={activeTruck.length * uniformScale}
-              >
-                <TruckElement truck={{ ...activeTruck, xPosition: 0, yPosition: 0 }} scale={uniformScale} />
-              </svg>
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+      <>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
+          {content}
+          <DragOverlay>
+            {activeTruck ? (
+              <div style={{ opacity: 0.8, cursor: 'grabbing' }}>
+                <svg
+                  width={COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW * uniformScale}
+                  height={activeTruck.length * uniformScale}
+                >
+                  <TruckElement truck={{ ...activeTruck, xPosition: 0, yPosition: 0 }} scale={uniformScale} />
+                </svg>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+        {truckContextMenu}
+      </>
     );
   }
 
-  return content;
+  return (
+    <>
+      {content}
+      {truckContextMenu}
+    </>
+  );
 }
 
 // =====================
@@ -1493,8 +1547,8 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
 
 interface GarageViewProps {
   trucks: GarageTruck[];
-  onTruckMove?: (truckId: string, newSpot: string) => void;
-  onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string) => void;
+  onTruckMove?: (truckId: string, newSpot: string | null) => void;
+  onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string | null) => void;
   onTruckClick?: (taskId: string) => void;
   className?: string;
   readOnly?: boolean;
@@ -1658,7 +1712,7 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
   const garageCounts = useMemo(() => {
     const counts: Record<string, number> = { B1: 0, B2: 0, B3: 0, PATIO: 0 };
     displayTrucks.forEach((t) => {
-      if (!t.spot || t.spot === 'PATIO') {
+      if (!t.spot) {
         counts.PATIO++;
       } else {
         const parsed = parseSpot(t.spot);

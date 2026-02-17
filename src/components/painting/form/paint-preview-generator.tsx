@@ -324,16 +324,17 @@ function renderBeamLight(
     centerX, centerY, radius
   );
 
-  // INCREASED intensity values for more visible light
-  // Core: bright light color (very visible)
-  const coreAlpha = Math.min(1, 0.95 * intensity); // Almost fully opaque at max
-  const midAlpha = 0.6 * intensity * (0.3 + spread * 0.7); // Visible even at low spread
-  const edgeAlpha = 0.15 * intensity * spread;
-
-  beamGradient.addColorStop(0, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${coreAlpha})`);
-  beamGradient.addColorStop(0.25, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${midAlpha})`);
-  beamGradient.addColorStop(0.6, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${edgeAlpha})`);
-  beamGradient.addColorStop(1, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},0)`);
+  // Smooth Gaussian-like falloff with many stops to avoid banding
+  const coreAlpha = Math.min(1, 0.95 * intensity);
+  const steps = 16;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps; // 0 to 1
+    // Gaussian falloff: exp(-k * t^2), adjusted by spread for tighter/wider beam
+    const k = 3.0 + (1 - spread) * 5.0; // tighter beam when spread is low
+    const falloff = Math.exp(-k * t * t);
+    const alpha = coreAlpha * falloff;
+    beamGradient.addColorStop(t, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${alpha})`);
+  }
 
   ctx.save();
   ctx.globalCompositeOperation = "screen"; // Additive blending for light
@@ -362,40 +363,25 @@ function renderLinearLight(
 
   if (intensity <= 0) return;
 
-  // Stripe width based on spread: small = thin strip, large = wide band
-  const stripeWidth = 0.08 + spread * 0.5; // 8% to 58% of diagonal
+  // Stripe half-width based on spread
+  const halfWidth = 0.04 + spread * 0.25; // 4% to 29% each side
 
-  // Calculate stripe boundaries
-  const stripeStart = Math.max(0, position - stripeWidth / 2);
-  const stripeEnd = Math.min(1, position + stripeWidth / 2);
-
-  // INCREASED alpha values for more visible light
-  const peakAlpha = Math.min(1, 0.95 * intensity); // Almost fully opaque at max
-  const edgeAlpha = 0.25 * intensity * (0.2 + spread * 0.8); // Visible even at low spread
+  const peakAlpha = Math.min(1, 0.95 * intensity);
 
   // Linear gradient across diagonal (top-left to bottom-right)
   const linearGradient = ctx.createLinearGradient(0, 0, width, height);
 
-  // Outside the stripe: transparent
-  linearGradient.addColorStop(0, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},0)`);
-
-  // Fade in to stripe
-  if (stripeStart > 0.03) {
-    linearGradient.addColorStop(stripeStart - 0.03, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},0)`);
+  // Smooth Gaussian-like falloff with many stops to avoid hard center
+  const steps = 20;
+  const k = 3.0 + (1 - spread) * 5.0; // tighter when spread is low
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps; // 0 to 1 across full diagonal
+    // Distance from center position, normalized by halfWidth
+    const dist = (t - position) / halfWidth;
+    const falloff = Math.exp(-k * dist * dist);
+    const alpha = peakAlpha * falloff;
+    linearGradient.addColorStop(t, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${alpha})`);
   }
-  linearGradient.addColorStop(stripeStart, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${edgeAlpha})`);
-
-  // Peak at position
-  linearGradient.addColorStop(position, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${peakAlpha})`);
-
-  // Fade out from stripe
-  linearGradient.addColorStop(stripeEnd, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${edgeAlpha})`);
-  if (stripeEnd < 0.97) {
-    linearGradient.addColorStop(stripeEnd + 0.03, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},0)`);
-  }
-
-  // Outside the stripe: transparent
-  linearGradient.addColorStop(1, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},0)`);
 
   ctx.save();
   ctx.globalCompositeOperation = "screen"; // Additive blending for light

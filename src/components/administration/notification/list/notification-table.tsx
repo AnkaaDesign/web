@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Table,
@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -46,6 +46,16 @@ import {
   NOTIFICATION_CHANNEL_LABELS,
   routes,
 } from "@/constants";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { NotificationTableSkeleton } from "./notification-table-skeleton";
 
@@ -96,6 +106,14 @@ export function NotificationTable({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
   });
+
+  // Confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{
+    type: "delete" | "send";
+    items: NotificationListItem[];
+  } | null>(null);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -307,26 +325,39 @@ export function NotificationTable({
     }
   };
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (contextMenu?.items[0] && !contextMenu.items[0].sentAt) {
-      if (confirm("Deseja enviar esta notificação agora?")) {
-        await sendNotification.mutateAsync(contextMenu.items[0].id);
-      }
+      setPendingAction({ type: "send", items: [contextMenu.items[0]] });
+      setSendDialogOpen(true);
       setContextMenu(null);
     }
   };
 
-  const handleDelete = async () => {
+  const confirmSend = useCallback(async () => {
+    if (pendingAction?.type === "send" && pendingAction.items[0]) {
+      await sendNotification.mutateAsync(pendingAction.items[0].id);
+    }
+    setSendDialogOpen(false);
+    setPendingAction(null);
+  }, [pendingAction, sendNotification]);
+
+  const handleDelete = () => {
     if (contextMenu) {
-      const count = contextMenu.items.length;
-      if (confirm(`Tem certeza que deseja excluir ${count > 1 ? `${count} notificações` : "esta notificação"}?`)) {
-        for (const item of contextMenu.items) {
-          await deleteNotification(item.id);
-        }
-      }
+      setPendingAction({ type: "delete", items: contextMenu.items });
+      setDeleteDialogOpen(true);
       setContextMenu(null);
     }
   };
+
+  const confirmDelete = useCallback(async () => {
+    if (pendingAction?.type === "delete") {
+      for (const item of pendingAction.items) {
+        await deleteNotification(item.id);
+      }
+    }
+    setDeleteDialogOpen(false);
+    setPendingAction(null);
+  }, [pendingAction, deleteNotification]);
 
   // Close context menu when clicking outside
   React.useEffect(() => {
@@ -562,6 +593,40 @@ export function NotificationTable({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Send Confirmation Dialog */}
+      <AlertDialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enviar notificação</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja enviar esta notificação agora?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSend}>Enviar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {pendingAction?.items && pendingAction.items.length > 1 ? "notificações" : "notificação"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAction?.items && pendingAction.items.length > 1
+                ? `Tem certeza que deseja excluir ${pendingAction.items.length} notificações? Esta ação não pode ser desfeita.`
+                : "Tem certeza que deseja excluir esta notificação? Esta ação não pode ser desfeita."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className={buttonVariants({ variant: "destructive" })}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

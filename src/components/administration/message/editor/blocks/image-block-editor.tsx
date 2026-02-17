@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { IconUpload, IconPhoto } from "@tabler/icons-react";
+import { fileService } from "@/api-client/file";
+import { getApiBaseUrl } from "@/config/api";
 import type { ImageBlock } from "../types";
 
 interface ImageBlockEditorProps {
@@ -29,20 +31,24 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
     return { maxWidth: '50%' };
   };
 
+  const resolveImageUrl = (url: string) => {
+    if (!url) return url;
+    if (url.startsWith('/')) return `${getApiBaseUrl()}${url}`;
+    return url;
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploading(true);
     try {
-      // TODO: Implement actual file upload
-      // const url = await uploadFile(file);
-      // For now, use a placeholder
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        onUpdate({ url: event.target?.result as string });
-      };
-      reader.readAsDataURL(file);
+      const response = await fileService.uploadSingleFile(file, {
+        fileContext: 'messageImages',
+      });
+      if (response.success && response.data) {
+        onUpdate({ url: `/files/serve/${response.data.id}` });
+      }
     } catch (error) {
       console.error('Upload failed:', error);
     } finally {
@@ -90,7 +96,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
           <div className={`flex ${block.alignment === 'center' ? 'justify-center' : block.alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
             <div style={getSizeStyle()}>
               <img
-                src={block.url}
+                src={resolveImageUrl(block.url)}
                 alt={block.alt || ''}
                 className="w-full h-auto rounded-lg border dark:border-muted"
               />

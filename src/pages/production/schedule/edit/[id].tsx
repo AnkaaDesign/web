@@ -86,6 +86,7 @@ export const TaskEditPage = () => {
       budgets: true,
       invoices: true,
       receipts: true,
+      bankSlips: true,
       baseFiles: true,
       cuts: {
         include: {

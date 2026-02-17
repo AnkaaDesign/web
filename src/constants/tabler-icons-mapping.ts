@@ -197,6 +197,7 @@ export const TABLER_ICONS = {
   auditLog: "IconList", // Audit logs
   log: "IconList",
   system: "IconDeviceDesktop",
+  server: "IconServer", // Server management
 
   // Notifications
   bell: "IconBell",
