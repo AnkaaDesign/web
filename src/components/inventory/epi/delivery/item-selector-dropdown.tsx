@@ -182,8 +182,9 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
           const itemSize = getPpeSizeFromMeasures(sizeMeasures);
           const isMatchingSize = item.ppeType && userSizes[PPE_TYPE_TO_USER_SIZE_FIELD[item.ppeType]] === itemSize;
 
-          // Format label
-          const label = item.uniCode ? `${item.uniCode} - ${item.name}` : item.name;
+          // Format label: name + size (if available)
+          const displaySize = itemSize ? (itemSize.startsWith("SIZE_") ? itemSize.replace("SIZE_", "") : itemSize) : null;
+          const label = displaySize ? `${item.name} - ${displaySize}` : item.name;
 
           const typeOrder = item.ppeType ? PPE_TYPE_ORDER[item.ppeType as keyof typeof PPE_TYPE_ORDER] || 999 : 999;
           const sizeOrder = getSizeOrder(item.ppeType, itemSize);
@@ -258,10 +259,8 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
         renderOption={(option: ComboboxOption) => {
           const meta = option.metadata as any;
 
-          // Build the label: unicode - name
-          const label = meta.uniCode
-            ? `${meta.uniCode} - ${meta.displayName}`
-            : meta.displayName || '';
+          const displaySize = meta.size ? (meta.size.startsWith("SIZE_") ? meta.size.replace("SIZE_", "") : meta.size) : null;
+          const label = displaySize ? `${meta.displayName} - ${displaySize}` : (meta.displayName || '');
 
           return (
             <div className="flex items-center justify-between w-full gap-2">
