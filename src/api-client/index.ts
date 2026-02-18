@@ -70,7 +70,7 @@ export * from "./serviceOrder";
 export * from "./supplier";
 export * from "./task";
 export * from "./throttler";
-// export * from "./truck"; // Module doesn't exist - truck types/schemas exist in src/types/ and src/schemas/
+export * from "./truck";
 export * from "./layout";
 export * from "./services/layoutSection";
 export * from "./services/team-staff";

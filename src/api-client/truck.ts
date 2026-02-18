@@ -51,3 +51,30 @@ export const getGaragesAvailability = async (
   );
   return response.data;
 };
+
+// =====================
+// Batch Update Spots
+// =====================
+
+export interface BatchUpdateSpotsRequest {
+  updates: Array<{ truckId: string; spot: string | null }>;
+}
+
+export interface BatchUpdateSpotsResponse {
+  success: boolean;
+  message: string;
+  data: {
+    success: boolean;
+    updated: number;
+  };
+}
+
+export const batchUpdateSpots = async (
+  updates: Array<{ truckId: string; spot: string | null }>,
+): Promise<BatchUpdateSpotsResponse> => {
+  const response = await apiClient.post<BatchUpdateSpotsResponse>(
+    `/trucks/batch-update-spots`,
+    { updates },
+  );
+  return response.data;
+};

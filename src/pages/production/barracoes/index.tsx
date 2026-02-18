@@ -6,8 +6,7 @@ import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, TASK_STATUS } from '@/consta
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { usePrivileges } from '@/hooks/common/use-privileges';
 import { useTasks } from '@/hooks/production/use-task';
-// TODO: Truck API client module doesn't exist - needs to be implemented
-// import { truckService } from '@/api-client';
+import { batchUpdateSpots } from '@/api-client';
 import { GarageView, TruckDetailModal } from '@/components/production/garage';
 import type { GarageTruck } from '@/components/production/garage';
 import { IconDeviceFloppy, IconRestore } from '@tabler/icons-react';
@@ -142,15 +141,13 @@ export function GaragesPage() {
 
   // Update truck spots mutation - uses batch API for single transaction
   const updateTruckMutation = useMutation({
-    mutationFn: async (_updates: PendingChange[]) => {
-      // TODO: Implement truck service API endpoint for batch updates
+    mutationFn: async (updates: PendingChange[]) => {
       // Convert to batch format and update all trucks in single API call
-      // const batchUpdates = updates.map((change) => ({
-      //   truckId: change.truckId,
-      //   spot: change.newSpot,
-      // }));
-      // return truckService.batchUpdateSpots(batchUpdates);
-      throw new Error('Truck service API not yet implemented');
+      const batchUpdates = updates.map((change) => ({
+        truckId: change.truckId,
+        spot: change.newSpot,
+      }));
+      return batchUpdateSpots(batchUpdates);
     },
     onSuccess: async () => {
       // Toast is already shown by api client
