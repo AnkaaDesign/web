@@ -37,7 +37,7 @@ export const OrderCreateForm = () => {
   // File upload state
   const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>([]);
   const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
-  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>([]);
+  const [invoiceFiles, setInvoiceFiles] = useState<FileWithPreview[]>([]);
 
   // URL state management for item selection and form navigation (includes step)
   const {
@@ -428,8 +428,8 @@ export const OrderCreateForm = () => {
     form.setValue("receiptIds", files.length > 0 ? ["pending"] : undefined, { shouldDirty: true, shouldTouch: true });
   }, [form]);
 
-  const handleNfeFilesChange = useCallback((files: FileWithPreview[]) => {
-    setNfeFiles(files);
+  const handleInvoiceFilesChange = useCallback((files: FileWithPreview[]) => {
+    setInvoiceFiles(files);
     form.setValue("invoiceIds", files.length > 0 ? ["pending"] : undefined, { shouldDirty: true, shouldTouch: true });
   }, [form]);
 
@@ -579,9 +579,9 @@ export const OrderCreateForm = () => {
       // Check if there are files to upload (all files in FileWithPreview arrays are new for create)
       const newBudgetFiles = budgetFiles.filter(f => f instanceof File);
       const newReceiptFiles = receiptFiles.filter(f => f instanceof File);
-      const newNfeFiles = nfeFiles.filter(f => f instanceof File);
+      const newInvoiceFiles = invoiceFiles.filter(f => f instanceof File);
 
-      const hasFiles = newBudgetFiles.length > 0 || newReceiptFiles.length > 0 || newNfeFiles.length > 0;
+      const hasFiles = newBudgetFiles.length > 0 || newReceiptFiles.length > 0 || newInvoiceFiles.length > 0;
 
       let result;
       if (hasFiles) {
@@ -592,7 +592,7 @@ export const OrderCreateForm = () => {
           {
             budgets: newBudgetFiles.length > 0 ? newBudgetFiles as File[] : undefined,
             receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
-            invoices: newNfeFiles.length > 0 ? newNfeFiles as File[] : undefined,
+            invoices: newInvoiceFiles.length > 0 ? newInvoiceFiles as File[] : undefined,
           },
           supplier ? {
             id: supplier.id,
@@ -630,7 +630,7 @@ export const OrderCreateForm = () => {
       }
       // Error is handled by the mutation hook, but let's log it
     }
-  }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, icmses, ipis, orderItemMode, budgetFiles, receiptFiles, nfeFiles, suppliers, createAsync, form, clearAllSelections, navigate]);
+  }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, icmses, ipis, orderItemMode, budgetFiles, receiptFiles, invoiceFiles, suppliers, createAsync, form, clearAllSelections, navigate]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.orders.root);
@@ -1393,8 +1393,8 @@ export const OrderCreateForm = () => {
                                   Nota Fiscal
                                 </Label>
                                 <FileUploadField
-                                  onFilesChange={handleNfeFilesChange}
-                                  existingFiles={nfeFiles}
+                                  onFilesChange={handleInvoiceFilesChange}
+                                  existingFiles={invoiceFiles}
                                   maxFiles={10}
                                   maxSize={10 * 1024 * 1024} // 10MB
                                   acceptedFileTypes={{

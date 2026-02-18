@@ -25,7 +25,7 @@ interface AirbrushingItem {
   startDate: Date | null;
   finishDate: Date | null;
   receiptFiles: FileWithPreview[];
-  nfeFiles: FileWithPreview[];
+  invoiceFiles: FileWithPreview[];
   artworkFiles: FileWithPreview[];
   receiptIds?: string[];
   invoiceIds?: string[];
@@ -82,9 +82,9 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           ...convertFilesToFileWithPreview(airbrushing.receipts || []),
           ...(airbrushing.receiptFiles || [])
         ],
-        nfeFiles: [
+        invoiceFiles: [
           ...convertFilesToFileWithPreview(airbrushing.invoices || []),
-          ...(airbrushing.nfeFiles || [])
+          ...(airbrushing.invoiceFiles || [])
         ],
         artworkFiles: [
           ...convertFilesToFileWithPreview(airbrushing.artworks || []),
@@ -133,9 +133,9 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
               ...convertFilesToFileWithPreview(airbrushing.receipts || []),
               ...(airbrushing.receiptFiles || [])
             ],
-            nfeFiles: [
+            invoiceFiles: [
               ...convertFilesToFileWithPreview(airbrushing.invoices || []),
-              ...(airbrushing.nfeFiles || [])
+              ...(airbrushing.invoiceFiles || [])
             ],
             artworkFiles: [
               ...convertFilesToFileWithPreview(airbrushing.artworks || []),
@@ -179,7 +179,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           artworkIds: airbrushing.artworkIds || [],
           // Include the actual files for submission with the form
           receiptFiles: airbrushing.receiptFiles,
-          nfeFiles: airbrushing.nfeFiles,
+          invoiceFiles: airbrushing.invoiceFiles,
           artworkFiles: airbrushing.artworkFiles,
         };
       });
@@ -205,7 +205,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         startDate: null,
         finishDate: null,
         receiptFiles: [],
-        nfeFiles: [],
+        invoiceFiles: [],
         artworkFiles: [],
         receiptIds: [],
         invoiceIds: [],
@@ -247,11 +247,11 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       [updateAirbrushing],
     );
 
-    const handleNfeFilesChange = useCallback(
+    const handleInvoiceFilesChange = useCallback(
       (airbrushingId: string, files: FileWithPreview[]) => {
         // Store files without uploading - they'll be submitted with the form
         updateAirbrushing(airbrushingId, {
-          nfeFiles: files,
+          invoiceFiles: files,
           invoiceIds: files.filter(f => f.uploaded).map(f => f.uploadedFileId!).filter(Boolean),
         });
       },
@@ -400,15 +400,15 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                     />
                   </div>
 
-                  {/* NFEs - aligns with Início */}
+                  {/* Invoices - aligns with Início */}
                   <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                     <FormLabel className="flex items-center gap-2">
                       <IconFileInvoice className="h-4 w-4" />
                       Notas Fiscais
                     </FormLabel>
                     <FileUploadField
-                      onFilesChange={(files) => handleNfeFilesChange(airbrushing.id, files)}
-                      existingFiles={airbrushing.nfeFiles}
+                      onFilesChange={(files) => handleInvoiceFilesChange(airbrushing.id, files)}
+                      existingFiles={airbrushing.invoiceFiles}
                       maxFiles={10}
                       showPreview={true}
                       variant="compact"

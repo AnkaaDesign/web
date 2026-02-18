@@ -87,7 +87,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
     return files;
   }, [withdrawal.receipts]);
 
-  const initialNfeFiles = useMemo(() => {
+  const initialInvoiceFiles = useMemo(() => {
     const files = (withdrawal.invoices || []).map(file => ({
       id: file.id,
       name: file.filename || file.originalName,
@@ -104,14 +104,14 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
 
   // File upload state
   const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>(initialReceiptFiles);
-  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>(initialNfeFiles);
+  const [invoiceFiles, setInvoiceFiles] = useState<FileWithPreview[]>(initialInvoiceFiles);
   const [hasFileChanges, setHasFileChanges] = useState(false);
 
   // Sync file state when withdrawal files change
   useEffect(() => {
     setReceiptFiles(initialReceiptFiles);
-    setNfeFiles(initialNfeFiles);
-  }, [initialReceiptFiles, initialNfeFiles]);
+    setInvoiceFiles(initialInvoiceFiles);
+  }, [initialReceiptFiles, initialInvoiceFiles]);
 
   // Convert existing withdrawal data to initial state
   const initialSelectedItems = useMemo(() => new Set(withdrawal.items.map((item: ExternalWithdrawalItem) => item.itemId)), [withdrawal.items]);
@@ -329,8 +329,8 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
     form.setValue("receiptId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
   }, [form]);
 
-  const handleNfeFilesChange = useCallback((files: FileWithPreview[]) => {
-    setNfeFiles(files);
+  const handleInvoiceFilesChange = useCallback((files: FileWithPreview[]) => {
+    setInvoiceFiles(files);
     setHasFileChanges(true);
     form.setValue("nfeId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
   }, [form]);
@@ -353,8 +353,8 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
     try {
       // Check if there are new files to upload
       const newReceiptFiles = receiptFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
-      const newNfeFiles = nfeFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
-      const hasNewFiles = newReceiptFiles.length > 0 || newNfeFiles.length > 0;
+      const newInvoiceFiles = invoiceFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+      const hasNewFiles = newReceiptFiles.length > 0 || newInvoiceFiles.length > 0;
 
       const updateData = {
         withdrawerName: withdrawerName?.trim() || "",
@@ -367,7 +367,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
           updateData,
           {
             receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
-            invoices: newNfeFiles.length > 0 ? newNfeFiles as File[] : undefined,
+            invoices: newInvoiceFiles.length > 0 ? newInvoiceFiles as File[] : undefined,
           },
           undefined // No customer context for external withdrawals
         );
@@ -391,7 +391,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       }
       // Error is handled by the mutation hook
     }
-  }, [validateCurrentStep, selectedItems, quantities, prices, withdrawerName, withdrawalType, notes, updateAsync, withdrawal.id, navigate, receiptFiles, nfeFiles]);
+  }, [validateCurrentStep, selectedItems, quantities, prices, withdrawerName, withdrawalType, notes, updateAsync, withdrawal.id, navigate, receiptFiles, invoiceFiles]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === steps.length;
@@ -957,8 +957,8 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                                 Nota Fiscal
                               </Label>
                               <FileUploadField
-                                onFilesChange={handleNfeFilesChange}
-                                existingFiles={nfeFiles}
+                                onFilesChange={handleInvoiceFilesChange}
+                                existingFiles={invoiceFiles}
                                 maxFiles={1}
                                 maxSize={10 * 1024 * 1024}
                                 acceptedFileTypes={{

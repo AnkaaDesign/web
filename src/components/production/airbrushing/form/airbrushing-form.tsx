@@ -90,10 +90,10 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
   // State for file uploads
   const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
-  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>([]);
+  const [invoiceFiles, setInvoiceFiles] = useState<FileWithPreview[]>([]);
   const [artworkFiles, setArtworkFiles] = useState<FileWithPreview[]>([]);
   const [_receiptFileIds, setReceiptFileIds] = useState<string[]>([]);
-  const [_nfeFileIds, setNfeFileIds] = useState<string[]>([]);
+  const [_invoiceFileIds, setInvoiceFileIds] = useState<string[]>([]);
   const [_artworkFileIds, setArtworkFileIds] = useState<string[]>([]);
 
   // State for artwork statuses (keyed by file ID)
@@ -240,10 +240,10 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       setArtworkStatuses(initialStatuses);
 
       setReceiptFiles(receipts);
-      setNfeFiles(invoices);
+      setInvoiceFiles(invoices);
       setArtworkFiles(artworks);
       setReceiptFileIds(receipts.map((f) => f.id));
-      setNfeFileIds(invoices.map((f) => f.id));
+      setInvoiceFileIds(invoices.map((f) => f.id));
       setArtworkFileIds(artworks.map((f) => f.id));
     }
   }, [mode, airbrushing, form]);
@@ -385,15 +385,15 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
   };
 
   // Handle NFe file changes
-  const handleNfeFilesChange = (files: FileWithPreview[]) => {
-    setNfeFiles(files);
+  const handleInvoiceFilesChange = (files: FileWithPreview[]) => {
+    setInvoiceFiles(files);
     // Only include IDs from already uploaded files (valid UUIDs)
     // New files don't have valid UUIDs yet - they're sent as FormData during submission
     const fileIds = files
       .filter(f => f.uploaded && f.uploadedFileId)
       .map(f => f.uploadedFileId!)
       .filter(Boolean);
-    setNfeFileIds(fileIds);
+    setInvoiceFileIds(fileIds);
     form.setValue("invoiceIds", fileIds);
   };
 
@@ -446,15 +446,15 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       // Separate existing files from new files using the 'uploaded' flag
       // Existing files have uploaded=true, new files have uploaded=false
       const newReceiptFiles = receiptFiles.filter(f => !f.uploaded);
-      const newNfeFiles = nfeFiles.filter(f => !f.uploaded);
+      const newInvoiceFiles = invoiceFiles.filter(f => !f.uploaded);
       const newArtworkFiles = artworkFiles.filter(f => !f.uploaded);
 
       // Get IDs of existing files to keep
       const existingReceiptIds = receiptFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-      const existingNfeIds = nfeFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+      const existingInvoiceIds = invoiceFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
       const existingArtworkIds = artworkFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
-      const hasNewFiles = newReceiptFiles.length > 0 || newNfeFiles.length > 0 || newArtworkFiles.length > 0;
+      const hasNewFiles = newReceiptFiles.length > 0 || newInvoiceFiles.length > 0 || newArtworkFiles.length > 0;
 
       let result;
 
@@ -482,7 +482,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
         const submitData = {
           ...data,
           receiptIds: existingReceiptIds,
-          invoiceIds: existingNfeIds,
+          invoiceIds: existingInvoiceIds,
           artworkIds: existingArtworkIds,
           // Wrap artworkStatuses in array for FormData serialization (backend preprocess handles it)
           artworkStatuses: Object.keys(existingArtworkStatusesMap).length > 0 ? [existingArtworkStatusesMap] : undefined,
@@ -492,7 +492,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
           submitData,
           {
             receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
-            invoices: newNfeFiles.length > 0 ? newNfeFiles as File[] : undefined,
+            invoices: newInvoiceFiles.length > 0 ? newInvoiceFiles as File[] : undefined,
             artworks: newArtworkFiles.length > 0 ? newArtworkFiles as File[] : undefined,
           },
           customerInfo
@@ -511,7 +511,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
         const submitData = {
           ...data,
           receiptIds: existingReceiptIds,
-          invoiceIds: existingNfeIds,
+          invoiceIds: existingInvoiceIds,
           artworkIds: existingArtworkIds,
           // Include artworkStatuses as a plain object for JSON submission
           artworkStatuses: Object.keys(existingArtworkStatusesMap).length > 0 ? existingArtworkStatusesMap : undefined,
@@ -533,10 +533,10 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       if (mode === "create") {
         form.reset();
         setReceiptFiles([]);
-        setNfeFiles([]);
+        setInvoiceFiles([]);
         setArtworkFiles([]);
         setReceiptFileIds([]);
-        setNfeFileIds([]);
+        setInvoiceFileIds([]);
         setArtworkFileIds([]);
         setArtworkStatuses({});
         setSelectedTasks(new Set());
@@ -556,7 +556,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       }
       throw error; // Rethrow so parent can handle
     }
-  }, [validateCurrentStep, form, mode, create, update, airbrushingId, onSuccess, navigate, receiptFiles, nfeFiles, artworkFiles, artworkStatuses, selectedTask, selectedTasks, currentStep]);
+  }, [validateCurrentStep, form, mode, create, update, airbrushingId, onSuccess, navigate, receiptFiles, invoiceFiles, artworkFiles, artworkStatuses, selectedTask, selectedTasks, currentStep]);
 
   const isLastStep = currentStep === steps.length;
   const isFirstStep = currentStep === 1;
@@ -578,7 +578,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
         return selectedTasks.size > 0;
       },
     }),
-    [handleNext, prevStep, handleSubmit, currentStep, isLastStep, isFirstStep, selectedTasks, receiptFiles, nfeFiles, artworkFiles, mode],
+    [handleNext, prevStep, handleSubmit, currentStep, isLastStep, isFirstStep, selectedTasks, receiptFiles, invoiceFiles, artworkFiles, mode],
   );
 
   // Notify parent about step changes
@@ -594,7 +594,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
     if (onFormStateChange) {
       onFormStateChange();
     }
-  }, [receiptFiles, nfeFiles, artworkFiles, selectedTasks, onFormStateChange]);
+  }, [receiptFiles, invoiceFiles, artworkFiles, selectedTasks, onFormStateChange]);
 
   // Loading state
   if (mode === "edit" && isLoadingAirbrushing) {
@@ -696,10 +696,10 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
                         control={form.control}
                         mode={mode}
                         receiptFiles={receiptFiles}
-                        nfeFiles={nfeFiles}
+                        invoiceFiles={invoiceFiles}
                         artworkFiles={artworkFiles}
                         onReceiptFilesChange={handleReceiptFilesChange}
-                        onNfeFilesChange={handleNfeFilesChange}
+                        onInvoiceFilesChange={handleInvoiceFilesChange}
                         onArtworkFilesChange={handleArtworkFilesChange}
                         onArtworkStatusChange={handleArtworkStatusChange}
                         errors={form.formState.errors}
@@ -778,7 +778,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
                             <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
                             <p className="text-xs font-medium text-muted-foreground">NOTAS FISCAIS</p>
                           </div>
-                          <p className="text-2xl font-semibold text-foreground">{nfeFiles.length}</p>
+                          <p className="text-2xl font-semibold text-foreground">{invoiceFiles.length}</p>
                         </div>
 
                         <div>

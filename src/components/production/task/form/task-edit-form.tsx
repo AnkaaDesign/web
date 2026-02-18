@@ -330,7 +330,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const [budgetFile, setBudgetFile] = useState<FileWithPreview[]>(
     convertToFileWithPreview((task as any).budgets)
   );
-  const [nfeFile, setNfeFile] = useState<FileWithPreview[]>(
+  const [invoiceFile, setInvoiceFile] = useState<FileWithPreview[]>(
     convertToFileWithPreview((task as any).invoices)
   );
   const [receiptFile, setReceiptFile] = useState<FileWithPreview[]>(
@@ -1055,7 +1055,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             const hasInvoiceFiles = airbrushing.invoiceIds && airbrushing.invoiceIds.length > 0;
             const hasArtworkFiles = airbrushing.artworkIds && airbrushing.artworkIds.length > 0;
             const hasNewReceiptFiles = airbrushing.receiptFiles && airbrushing.receiptFiles.some((f: any) => f instanceof File);
-            const hasNewInvoiceFiles = airbrushing.nfeFiles && airbrushing.nfeFiles.some((f: any) => f instanceof File);
+            const hasNewInvoiceFiles = airbrushing.invoiceFiles && airbrushing.invoiceFiles.some((f: any) => f instanceof File);
             const hasNewArtworkFiles = airbrushing.artworkFiles && airbrushing.artworkFiles.some((f: any) => f instanceof File);
 
             return hasPrice || hasStartDate || hasFinishDate || hasReceiptFiles || hasInvoiceFiles || hasArtworkFiles || hasNewReceiptFiles || hasNewInvoiceFiles || hasNewArtworkFiles;
@@ -1214,7 +1214,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         // Check if we have new files that need to be uploaded
         
         const newBudgetFiles = budgetFile.filter(f => !f.uploaded);
-        const newNnvoiceFiles = nfeFile.filter(f => !f.uploaded);
+        const newInvoiceFiles = invoiceFile.filter(f => !f.uploaded);
         const newReceiptFiles = receiptFile.filter(f => !f.uploaded);
         const newBankSlipFiles = bankSlipFile.filter(f => !f.uploaded);
         const newArtworkFiles = uploadedFiles.filter(f => !f.uploaded);
@@ -1230,11 +1230,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         const airbrushings = changedData.airbrushings as any[] || [];
         const hasAirbrushingFiles = airbrushings.some(a =>
           (a.receiptFiles && a.receiptFiles.some((f: any) => f instanceof File)) ||
-          (a.nfeFiles && a.nfeFiles.some((f: any) => f instanceof File)) ||
+          (a.invoiceFiles && a.invoiceFiles.some((f: any) => f instanceof File)) ||
           (a.artworkFiles && a.artworkFiles.some((f: any) => f instanceof File))
         );
 
-        const hasNewFiles = newBudgetFiles.length > 0 || newNnvoiceFiles.length > 0 ||
+        const hasNewFiles = newBudgetFiles.length > 0 || newInvoiceFiles.length > 0 ||
                            newReceiptFiles.length > 0 || newBankSlipFiles.length > 0 || newArtworkFiles.length > 0 ||
                            newBaseFiles.length > 0 || hasCutFiles || hasAirbrushingFiles ||
                            newObservationFiles.length > 0 || layoutPhotoFiles.length > 0 ||
@@ -1255,8 +1255,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           if (newBudgetFiles.length > 0) {
             files.budgets = newBudgetFiles.filter(f => f instanceof File) as File[];
           }
-          if (newNnvoiceFiles.length > 0) {
-            files.invoices = newNnvoiceFiles.filter(f => f instanceof File) as File[];
+          if (newInvoiceFiles.length > 0) {
+            files.invoices = newInvoiceFiles.filter(f => f instanceof File) as File[];
           }
           if (newReceiptFiles.length > 0) {
             files.receipts = newReceiptFiles.filter(f => f instanceof File) as File[];
@@ -1308,13 +1308,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 // Remove file objects from airbrushing data to avoid sending them in JSON body
                 delete airbrushing.receiptFiles;
               }
-              if (airbrushing.nfeFiles && Array.isArray(airbrushing.nfeFiles)) {
-                const airbrushingInvoices = airbrushing.nfeFiles.filter((f: any) => f instanceof File);
+              if (airbrushing.invoiceFiles && Array.isArray(airbrushing.invoiceFiles)) {
+                const airbrushingInvoices = airbrushing.invoiceFiles.filter((f: any) => f instanceof File);
                 if (airbrushingInvoices.length > 0) {
                   files[`airbrushings[${index}].invoices`] = airbrushingInvoices;
                 }
                 // Remove file objects from airbrushing data to avoid sending them in JSON body
-                delete airbrushing.nfeFiles;
+                delete airbrushing.invoiceFiles;
               }
               if (airbrushing.artworkFiles && Array.isArray(airbrushing.artworkFiles)) {
                 const airbrushingArtworks = airbrushing.artworkFiles.filter((f: any) => f instanceof File);
@@ -1413,7 +1413,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
           const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentInvoiceIds = nfeFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentInvoiceIds = invoiceFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBankSlipIds = bankSlipFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
@@ -1703,7 +1703,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           const currentArtworkIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentInvoiceIds = nfeFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentInvoiceIds = invoiceFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBankSlipIds = bankSlipFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
@@ -1764,19 +1764,27 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             (submitData as any).artworkStatuses = existingArtworkStatusesJson;
             console.log('[Task Update] ✅ Including artworkStatuses in JSON (UUID-keyed object):', existingArtworkStatusesJson);
           }
-          if (currentBaseFileIds.length > 0) {
+          // CRITICAL FIX: Always send file IDs if the task originally had files OR if there are current files
+          // This ensures file removals are properly communicated to the backend (empty array = remove all)
+          const taskHadBaseFiles = task.baseFiles && task.baseFiles.length > 0;
+          const taskHadBudgets = task.budgets && task.budgets.length > 0;
+          const taskHadInvoices = task.invoices && task.invoices.length > 0;
+          const taskHadReceipts = task.receipts && task.receipts.length > 0;
+          const taskHadBankSlips = task.bankSlips && task.bankSlips.length > 0;
+
+          if (currentBaseFileIds.length > 0 || taskHadBaseFiles) {
             submitData.baseFileIds = [...currentBaseFileIds];
           }
-          if (currentBudgetIds.length > 0) {
+          if (currentBudgetIds.length > 0 || taskHadBudgets) {
             submitData.budgetIds = [...currentBudgetIds];
           }
-          if (currentInvoiceIds.length > 0) {
+          if (currentInvoiceIds.length > 0 || taskHadInvoices) {
             submitData.invoiceIds = [...currentInvoiceIds];
           }
-          if (currentReceiptIds.length > 0) {
+          if (currentReceiptIds.length > 0 || taskHadReceipts) {
             submitData.receiptIds = [...currentReceiptIds];
           }
-          if (currentBankSlipIds.length > 0) {
+          if (currentBankSlipIds.length > 0 || taskHadBankSlips) {
             submitData.bankSlipIds = [...currentBankSlipIds];
           }
 
@@ -2032,7 +2040,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         }, 100);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, budgetFile, nfeFile, receiptFile, bankSlipFile, uploadedFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, budgetFile, invoiceFile, receiptFile, bankSlipFile, uploadedFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -2082,9 +2090,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     // Files will be submitted with the form, not uploaded separately
   };
 
-  // Handle NFe file change (no longer uploads immediately)
-  const handleNfeFileChange = (files: FileWithPreview[]) => {
-    setNfeFile(files);
+  // Handle invoice file change (no longer uploads immediately)
+  const handleInvoiceFileChange = (files: FileWithPreview[]) => {
+    setInvoiceFile(files);
     setHasFileChanges(true);
     // Files will be submitted with the form, not uploaded separately
   };
@@ -3842,18 +3850,18 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             />
                           </div>
 
-                          {/* NFe File */}
+                          {/* Invoice File */}
                           <div className="space-y-2">
                             <label className="text-sm font-medium flex items-center gap-2">
                               <IconFile className="h-4 w-4 text-muted-foreground" />
                               Nota Fiscal
                             </label>
                             <FileUploadField
-                              onFilesChange={handleNfeFileChange}
+                              onFilesChange={handleInvoiceFileChange}
                               maxFiles={5}
                               disabled={isSubmitting}
                               showPreview={true}
-                              existingFiles={nfeFile}
+                              existingFiles={invoiceFile}
                               variant="compact"
                               placeholder="Adicionar NFes"
                               label=""

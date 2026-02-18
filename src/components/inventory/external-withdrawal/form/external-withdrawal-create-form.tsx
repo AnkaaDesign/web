@@ -66,7 +66,7 @@ export const ExternalWithdrawalCreateForm = () => {
 
   // File upload state
   const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
-  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>([]);
+  const [invoiceFiles, setInvoiceFiles] = useState<FileWithPreview[]>([]);
 
   // URL state management for item selection (Stage 2)
   const {
@@ -346,8 +346,8 @@ export const ExternalWithdrawalCreateForm = () => {
     form.setValue("receiptId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
   }, [form]);
 
-  const handleNfeFilesChange = useCallback((files: FileWithPreview[]) => {
-    setNfeFiles(files);
+  const handleInvoiceFilesChange = useCallback((files: FileWithPreview[]) => {
+    setInvoiceFiles(files);
     form.setValue("nfeId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
   }, [form]);
 
@@ -382,8 +382,8 @@ export const ExternalWithdrawalCreateForm = () => {
 
       // Check if there are new files to upload
       const newReceiptFiles = receiptFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
-      const newNfeFiles = nfeFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
-      const hasNewFiles = newReceiptFiles.length > 0 || newNfeFiles.length > 0;
+      const newInvoiceFiles = invoiceFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+      const hasNewFiles = newReceiptFiles.length > 0 || newInvoiceFiles.length > 0;
 
       let result;
       if (hasNewFiles) {
@@ -391,7 +391,7 @@ export const ExternalWithdrawalCreateForm = () => {
           withdrawalData,
           {
             receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
-            invoices: newNfeFiles.length > 0 ? newNfeFiles as File[] : undefined,
+            invoices: newInvoiceFiles.length > 0 ? newInvoiceFiles as File[] : undefined,
           },
           undefined // No customer context for external withdrawals
         );
@@ -421,7 +421,7 @@ export const ExternalWithdrawalCreateForm = () => {
       }
       // Error is handled by the mutation hook, but let's log it
     }
-  }, [validateCurrentStep, withdrawerName, withdrawalType, notes, selectedItems, quantities, prices, createAsync, form, clearAllSelections, navigate, receiptFiles, nfeFiles]);
+  }, [validateCurrentStep, withdrawerName, withdrawalType, notes, selectedItems, quantities, prices, createAsync, form, clearAllSelections, navigate, receiptFiles, invoiceFiles]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.externalWithdrawals.root);
@@ -1146,8 +1146,8 @@ export const ExternalWithdrawalCreateForm = () => {
                                 Nota Fiscal
                               </Label>
                               <FileUploadField
-                                onFilesChange={handleNfeFilesChange}
-                                existingFiles={nfeFiles}
+                                onFilesChange={handleInvoiceFilesChange}
+                                existingFiles={invoiceFiles}
                                 maxFiles={1}
                                 maxSize={10 * 1024 * 1024}
                                 acceptedFileTypes={{

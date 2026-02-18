@@ -13,10 +13,10 @@ interface AirbrushingFormFieldsProps {
   control: any;
   mode: "create" | "edit";
   receiptFiles: FileWithPreview[];
-  nfeFiles: FileWithPreview[];
+  invoiceFiles: FileWithPreview[];
   artworkFiles: FileWithPreview[];
   onReceiptFilesChange: (files: FileWithPreview[]) => void;
-  onNfeFilesChange: (files: FileWithPreview[]) => void;
+  onInvoiceFilesChange: (files: FileWithPreview[]) => void;
   onArtworkFilesChange: (files: FileWithPreview[]) => void;
   onArtworkStatusChange: (fileId: string, status: 'DRAFT' | 'APPROVED' | 'REPROVED') => void;
   errors?: FieldErrors<AirbrushingCreateFormData | AirbrushingUpdateFormData>;
@@ -26,10 +26,10 @@ export function AirbrushingFormFields({
   control,
   mode: _mode,
   receiptFiles,
-  nfeFiles,
+  invoiceFiles,
   artworkFiles,
   onReceiptFilesChange,
-  onNfeFilesChange,
+  onInvoiceFilesChange,
   onArtworkFilesChange,
   onArtworkStatusChange,
 }: AirbrushingFormFieldsProps) {
@@ -138,8 +138,8 @@ export function AirbrushingFormFields({
           </FormLabel>
           <FormControl>
             <FileUploadField
-              onFilesChange={onNfeFilesChange}
-              existingFiles={nfeFiles}
+              onFilesChange={onInvoiceFilesChange}
+              existingFiles={invoiceFiles}
               maxFiles={10}
               showPreview={true}
               variant="compact"

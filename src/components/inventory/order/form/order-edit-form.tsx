@@ -187,7 +187,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     return files;
   }, [order.receipts]);
 
-  const initialNfeFiles = useMemo(() => {
+  const initialInvoiceFiles = useMemo(() => {
     const files = (order.invoices || []).map(file => ({
       id: file.id,
       name: file.filename || file.originalName,
@@ -205,15 +205,15 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   // File upload state
   const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>(initialBudgetFiles);
   const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>(initialReceiptFiles);
-  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>(initialNfeFiles);
+  const [invoiceFiles, setInvoiceFiles] = useState<FileWithPreview[]>(initialInvoiceFiles);
   const [hasFileChanges, setHasFileChanges] = useState(false);
 
   // Sync file state when order files change
   useEffect(() => {
     setBudgetFiles(initialBudgetFiles);
     setReceiptFiles(initialReceiptFiles);
-    setNfeFiles(initialNfeFiles);
-  }, [initialBudgetFiles, initialReceiptFiles, initialNfeFiles]);
+    setInvoiceFiles(initialInvoiceFiles);
+  }, [initialBudgetFiles, initialReceiptFiles, initialInvoiceFiles]);
 
   // Local state for notes input to avoid slow typing from URL state updates
   const [localNotes, setLocalNotes] = useState(order.notes || "");
@@ -573,8 +573,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     setHasFileChanges(true);
   }, []);
 
-  const handleNfeFilesChange = useCallback((files: FileWithPreview[]) => {
-    setNfeFiles(files);
+  const handleInvoiceFilesChange = useCallback((files: FileWithPreview[]) => {
+    setInvoiceFiles(files);
     setHasFileChanges(true);
   }, []);
 
@@ -746,9 +746,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       // Check if there are new files to upload (files without uploadedFileId)
       const newBudgetFiles = budgetFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
       const newReceiptFiles = receiptFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
-      const newNfeFiles = nfeFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+      const newInvoiceFiles = invoiceFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
 
-      const hasNewFiles = newBudgetFiles.length > 0 || newReceiptFiles.length > 0 || newNfeFiles.length > 0;
+      const hasNewFiles = newBudgetFiles.length > 0 || newReceiptFiles.length > 0 || newInvoiceFiles.length > 0;
 
 
       if (hasNewFiles) {
@@ -761,7 +761,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
         const currentBudgetIds = budgetFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
         const currentReceiptIds = receiptFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-        const currentInvoiceIds = nfeFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+        const currentInvoiceIds = invoiceFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
         // Always send file IDs arrays when any file operation occurs
         (data as any).budgetIds = currentBudgetIds;
@@ -773,7 +773,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
           {
             budgets: newBudgetFiles.length > 0 ? newBudgetFiles as File[] : undefined,
             receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
-            invoices: newNfeFiles.length > 0 ? newNfeFiles as File[] : undefined,
+            invoices: newInvoiceFiles.length > 0 ? newInvoiceFiles as File[] : undefined,
           },
           supplierInfo
         );
@@ -789,7 +789,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
         const currentBudgetIds = budgetFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
         const currentReceiptIds = receiptFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-        const currentInvoiceIds = nfeFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+        const currentInvoiceIds = invoiceFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
         // Always send file IDs arrays when any file operation occurs
         (data as any).budgetIds = currentBudgetIds;
@@ -816,7 +816,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       }
       // Error is handled by the mutation hook
     }
-  }, [validateCurrentStep, orderItemMode, selectedItems, quantities, prices, icmses, ipis, description, supplierId, forecast, notes, budgetFiles, receiptFiles, nfeFiles, updateAsync, order, navigate, form, temporaryItemsState]);
+  }, [validateCurrentStep, orderItemMode, selectedItems, quantities, prices, icmses, ipis, description, supplierId, forecast, notes, budgetFiles, receiptFiles, invoiceFiles, updateAsync, order, navigate, form, temporaryItemsState]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === steps.length;
@@ -1575,8 +1575,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 Nota Fiscal
                               </Label>
                               <FileUploadField
-                                onFilesChange={handleNfeFilesChange}
-                                existingFiles={nfeFiles}
+                                onFilesChange={handleInvoiceFilesChange}
+                                existingFiles={invoiceFiles}
                                 maxFiles={10}
                                 maxSize={10 * 1024 * 1024}
                                 acceptedFileTypes={{
