@@ -321,7 +321,7 @@ export const OrderCreateForm = () => {
           }
         } else {
           // Temporary mode - validate temporary items
-          const tempItems = form.getValues("items") || [];
+          const tempItems = form.getValues("temporaryItems") || [];
           if (tempItems.length === 0) {
             toast.error("Pelo menos um item temporário deve ser adicionado");
             return false;
@@ -357,7 +357,7 @@ export const OrderCreateForm = () => {
           }
         } else {
           // Temporary mode - validate temporary items
-          const tempItems = form.getValues("items") || [];
+          const tempItems = form.getValues("temporaryItems") || [];
           if (tempItems.length === 0) {
             toast.error("Pelo menos um item temporário deve ser adicionado");
             return false;

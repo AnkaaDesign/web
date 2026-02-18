@@ -26,11 +26,13 @@ export function FormMoneyInput<T extends Record<string, any>>({
       name={name}
       render={({ field }) => (
         <FormItem>
-          <FormLabel className="flex items-center gap-2">
-            <IconCurrencyReal className="h-4 w-4" />
-            {label}
-            {required && <span className="text-destructive">*</span>}
-          </FormLabel>
+          {label && (
+            <FormLabel className="flex items-center gap-2">
+              <IconCurrencyReal className="h-4 w-4" />
+              {label}
+              {required && <span className="text-destructive">*</span>}
+            </FormLabel>
+          )}
           <FormControl>
             <Input
               type="currency"
