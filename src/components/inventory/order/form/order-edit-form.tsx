@@ -331,13 +331,14 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     supplierId: supplierId || order.supplierId || undefined,
     forecast: forecast || order.forecast || undefined,
     notes: notes || order.notes || "",
-    // Initialize items from URL state or order data (temporary items go in the items array)
-    // Normalize to ensure icms and ipi are numbers (not optional)
-    items: (temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems).map(item => ({
+    // Initialize items as empty for inventory mode (managed via URL state)
+    items: [],
+    // Initialize temporaryItems for the TemporaryItemsInput component's useFieldArray
+    temporaryItems: (temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems).map(item => ({
       ...item,
       icms: item.icms ?? 0,
       ipi: item.ipi ?? 0,
-    })),
+    })) as any,
     // Payment fields
     paymentMethod: order.paymentMethod || null,
     paymentPix: order.paymentPix || null,
@@ -424,7 +425,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   }, [notes]);
 
   useEffect(() => {
-    const currentValue = form.getValues("items");
+    const currentValue = form.getValues("temporaryItems") || [];
     const newValue = (temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems).map(item => ({
       ...item,
       icms: item.icms ?? 0,
@@ -433,7 +434,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     // Only update if value has actually changed
     // Deep comparison for array of objects
     if (JSON.stringify(currentValue) !== JSON.stringify(newValue)) {
-      form.setValue("items", newValue, {
+      form.setValue("temporaryItems", newValue as any, {
         shouldValidate: false,
         shouldDirty: false,
         shouldTouch: false
@@ -442,13 +443,13 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [temporaryItemsState, temporaryItems]);
 
-  // Sync form items back to URL state when they change (for temporary items mode)
+  // Sync form temporaryItems back to URL state when they change (for temporary items mode)
   // This ensures that temporary items are preserved when navigating between steps
   useEffect(() => {
     if (orderItemMode === "temporary") {
       const subscription = form.watch((value, { name }) => {
-        if (name?.startsWith('items')) {
-          const currentItems = value.items || [];
+        if (name?.startsWith('temporaryItems')) {
+          const currentItems = (value as any).temporaryItems || [];
           const urlTemporaryItems = temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems;
 
           // Only update URL state if form state has actually changed
@@ -517,7 +518,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       }, 0);
     } else {
       // Temporary mode
-      const tempItems = (form.getValues("items") || temporaryItemsState || []) as any[];
+      const tempItems = (form.getValues("temporaryItems") || temporaryItemsState || []) as any[];
       return tempItems.reduce((total: number, item: any) => {
         const quantity = Number(item.orderedQuantity) || 1;
         const price = Number(item.price) || 0;
@@ -537,7 +538,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     if (orderItemMode === "inventory") {
       return selectionCount;
     } else {
-      const tempItems = (form.getValues("items") || temporaryItemsState || []) as any[];
+      const tempItems = (form.getValues("temporaryItems") || temporaryItemsState || []) as any[];
       return tempItems.length;
     }
   }, [orderItemMode, selectionCount, form, temporaryItemsState]);
@@ -658,7 +659,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
           }
         } else {
           // Validate temporary items
-          const tempItems = (form.getValues("items") || temporaryItemsState || []) as any[];
+          const tempItems = (form.getValues("temporaryItems") || temporaryItemsState || []) as any[];
           if (tempItems.length === 0) {
             toast.error("Pelo menos um item temporário deve ser adicionado");
             return false;
@@ -715,8 +716,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
           ipi: ipis[itemId] || 0,
         }));
       } else {
-        // Temporary mode - get items from form state
-        const tempItems = (form.getValues("items") || temporaryItemsState || []) as any[];
+        // Temporary mode - get items from form state (stored under "temporaryItems" by useFieldArray)
+        const tempItems = (form.getValues("temporaryItems") || temporaryItemsState || []) as any[];
         items = tempItems.map((item: any) => ({
           temporaryItemDescription: item.temporaryItemDescription,
           orderedQuantity: Number(item.orderedQuantity) || 1,
@@ -1785,7 +1786,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {((form.getValues("items") || temporaryItemsState || []) as any[]).map((item: any, index: number) => {
+                                {((form.getValues("temporaryItems") || temporaryItemsState || []) as any[]).map((item: any, index: number) => {
                                   const quantity = Number(item.orderedQuantity) || 1;
                                   const price = Number(item.price) || 0;
                                   const icms = Number(item.icms) || 0;

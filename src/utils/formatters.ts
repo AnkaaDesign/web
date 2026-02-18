@@ -214,7 +214,7 @@ export const detectPixKeyType = (key: string): PixKeyInfo => {
   if (emailRegex.test(cleaned)) {
     return {
       type: "email",
-      formatted: cleaned.toLowerCase(),
+      formatted: cleaned,
       isValid: true
     };
   }
