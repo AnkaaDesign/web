@@ -9,7 +9,7 @@
 import { SERVICE_ORDER_TYPE } from './enums';
 
 // =====================
-// PRODUCTION - Physical Work Actions (48 items including Outros)
+// PRODUCTION - Physical Work Actions (50 items including Outros)
 // =====================
 export const PRODUCTION_SERVICE_DESCRIPTIONS = [
   // Adesivo
@@ -32,6 +32,7 @@ export const PRODUCTION_SERVICE_DESCRIPTIONS = [
   'Logomarca no Teto',
   'Logomarca Parcial',
   'Logomarca Plataforma',
+  'Logomarca Portas Traseiras',
   'Logomarca Traseira',
 
   // Pintura
@@ -42,6 +43,7 @@ export const PRODUCTION_SERVICE_DESCRIPTIONS = [
   'Pintura Cubos das Rodas',
   'Pintura Frontal',
   'Pintura Frota no Teto',
+  'Pintura Geral',
   'Pintura Lateral',
   'Pintura Laterais',
   'Pintura Para-choque',

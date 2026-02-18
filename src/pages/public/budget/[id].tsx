@@ -269,12 +269,11 @@ export function PublicBudgetPage() {
               <div className="space-y-2 pl-4">
                 {pricing.items?.map((item, index) => {
                   // Combine description and observation inline (e.g., "Pintura Geral Azul Firenze")
-                  // Description is displayed in Title Case, observation is kept as entered
-                  // For "Outros", display only the observation (not "Outros observation")
+                  // For "Outros" items, display only the observation (not "Outros observation")
+                  const isOutros = item.description?.trim().toLowerCase() === "outros";
                   const description = toTitleCase(item.description || "");
                   const observation = item.observation || "";
-                  // For "Outros", show only observation; otherwise show description + observation
-                  const displayText = description === "Outros" && observation
+                  const displayText = isOutros && observation
                     ? observation
                     : observation
                       ? `${description} ${observation}`

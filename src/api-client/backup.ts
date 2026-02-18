@@ -7,7 +7,7 @@ interface BackupMetadata {
   type: "database" | "files" | "system" | "full";
   size: number;
   createdAt: string;
-  status: "pending" | "in_progress" | "completed" | "failed";
+  status: "pending" | "in_progress" | "completed" | "failed" | "deleted";
   description?: string;
   paths?: string[];
   error?: string;
@@ -15,6 +15,7 @@ interface BackupMetadata {
   compressionLevel?: number;
   encrypted?: boolean;
   progress?: number; // Progress percentage (0-100)
+  deletedAt?: string; // ISO date string when backup files were deleted
   autoDelete?: {
     enabled: boolean;
     retention: '1_day' | '3_days' | '1_week' | '2_weeks' | '1_month' | '3_months' | '6_months' | '1_year';
@@ -85,7 +86,7 @@ interface ScheduledBackupJob {
 
 interface BackupQueryParams {
   type?: "database" | "files" | "system" | "full";
-  status?: "pending" | "in_progress" | "completed" | "failed";
+  status?: "pending" | "in_progress" | "completed" | "failed" | "deleted";
   limit?: number;
 }
 

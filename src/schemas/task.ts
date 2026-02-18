@@ -888,6 +888,8 @@ export const taskGetManySchema = z
     shouldDisplayInPreparation: z.boolean().optional(),
     preparationExcludeFinancial: z.boolean().optional(), // When true, excludes FINANCIAL SO from preparation completion check
     preparationExcludeLogistic: z.boolean().optional(), // When true, excludes LOGISTIC SO from preparation completion check
+    preparationDesignerOnly: z.boolean().optional(), // Designer view: only check ARTWORK service order for completion
+    preparationFinancialOnly: z.boolean().optional(), // Financial view: only check FINANCIAL service order for completion
     // Boolean status convenience filters
     isOverdue: z.boolean().optional(),
     isActive: z.boolean().optional(),

@@ -41,6 +41,7 @@ import {
   IconShieldCheck,
   IconActivity,
   IconEye,
+  IconArchive,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -50,6 +51,7 @@ import { backupApi } from "../../api-client/backup";
 import {
   useBackups,
   useScheduledBackups,
+  useBackupHistory,
   useBackupSystemHealthSummary,
   useBackupMutations,
   useBackupUtils,
@@ -171,6 +173,7 @@ const BackupManagementPage = () => {
   // Fetch backups data (only when authenticated)
   const { data: backupsData, isLoading, refetch: refetchBackups } = useBackups(undefined, isAuthenticated);
   const { data: scheduledBackupsData } = useScheduledBackups(isAuthenticated);
+  const { data: deletedBackupsData, refetch: refetchDeletedBackups } = useBackupHistory(isAuthenticated);
   const { data: systemHealth } = useBackupSystemHealthSummary(isAuthenticated);
 
   // Mutations
@@ -187,6 +190,7 @@ const BackupManagementPage = () => {
   // Extract data with fallbacks
   const backups: BackupMetadata[] = backupsData || [];
   const scheduledBackups: ScheduledBackupJob[] = scheduledBackupsData || [];
+  const deletedBackups: BackupMetadata[] = deletedBackupsData || [];
 
   // Loading states from mutations
   const isCreating = createBackupMutation.isPending || scheduleBackupMutation.isPending;
@@ -226,8 +230,9 @@ const BackupManagementPage = () => {
           if (process.env.NODE_ENV !== "production") {
             console.log("Backup deleted event:", data);
           }
-          // Refetch backups to update the list
+          // Refetch backups and deleted backups to update the lists
           refetchBackups();
+          refetchDeletedBackups();
         });
 
         // Listen for backup completion events
@@ -259,7 +264,7 @@ const BackupManagementPage = () => {
         socket.disconnect();
       }
     };
-  }, [isAuthenticated, refetchBackups]);
+  }, [isAuthenticated, refetchBackups, refetchDeletedBackups]);
 
   // Wrapper functions for mutations with proper typing and error handling
   const createBackup = async (data: any) => {
@@ -328,6 +333,8 @@ const BackupManagementPage = () => {
         return "default" as const;
       case "pending":
         return "secondary" as const;
+      case "deleted":
+        return "outline" as const;
       default:
         return "default" as const;
     }
@@ -371,6 +378,8 @@ const BackupManagementPage = () => {
         return "Em progresso";
       case "pending":
         return "Pendente";
+      case "deleted":
+        return "Excluído";
       default:
         return "Desconhecido";
     }
@@ -1012,12 +1021,12 @@ const BackupManagementPage = () => {
             />
           </div>
         </TableCell>
-        <TableCell>
+        <TableCell className="w-[20%]">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <div className="font-medium">{backup.name}</div>
+              <div className="font-medium truncate">{backup.name}</div>
               {backup.encrypted && (
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-xs flex-shrink-0">
                   <IconShieldCheck className="h-3 w-3 mr-1" />
                   Criptografado
                 </Badge>
@@ -1025,13 +1034,13 @@ const BackupManagementPage = () => {
             </div>
           </div>
         </TableCell>
-        <TableCell>
+        <TableCell className="w-[12%]">
           <div className="flex items-center gap-2">
             <TypeIcon className="h-4 w-4 text-muted-foreground" />
             {getBackupTypeLabel(backup.type)}
           </div>
         </TableCell>
-        <TableCell>
+        <TableCell className="w-[10%]">
           {backup.priority ? (
             <Badge variant={getPriorityBadgeVariant(backup.priority)} className="text-xs">
               {getPriorityLabel(backup.priority)}
@@ -1040,12 +1049,12 @@ const BackupManagementPage = () => {
             <span className="text-sm text-muted-foreground">-</span>
           )}
         </TableCell>
-        <TableCell>
+        <TableCell className="w-[12%]">
           {formatPathsDisplay()}
         </TableCell>
-        <TableCell>{formatBytes(backup.size)}</TableCell>
-        <TableCell>{formatBackupDateTime(backup.createdAt)}</TableCell>
-        <TableCell>
+        <TableCell className="w-[10%]">{formatBytes(backup.size)}</TableCell>
+        <TableCell className="w-[18%]">{formatBackupDateTime(backup.createdAt)}</TableCell>
+        <TableCell className="w-[12%]">
           <div className="space-y-2">
             {backup.status === "in_progress" ? (
               <div className="space-y-1">
@@ -1093,10 +1102,10 @@ const BackupManagementPage = () => {
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-6 space-y-6 mt-4">
+        <div className="flex-1 flex flex-col gap-4 mt-4 min-h-0 pb-4">
           {/* Summary Statistics */}
           {systemHealth && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="flex-shrink-0 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
@@ -1154,138 +1163,197 @@ const BackupManagementPage = () => {
             </div>
           )}
 
-          {/* Backup List */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconDatabase className="h-5 w-5" />
-                Backups Existentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border dark:border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]">
-                        <div className="flex items-center justify-center">
-                          <Checkbox
-                            checked={isAllSelected(backups.map(b => b.id))}
-                            indeterminate={isPartiallySelected(backups.map(b => b.id))}
-                            onCheckedChange={() => toggleSelectAll(backups.map(b => b.id))}
-                            aria-label="Selecionar todos"
-                            disabled={isLoading || backups.length === 0}
-                          />
-                        </div>
-                      </TableHead>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Prioridade</TableHead>
-                      <TableHead>Pastas/Arquivos</TableHead>
-                      <TableHead>Tamanho</TableHead>
-                      <TableHead>Data de Criação</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {backups.length === 0 ? (
+          {/* Tables Grid - each table has fixed header and scrollable body */}
+          <div className="flex-1 grid grid-rows-[1fr_auto_auto] gap-4 min-h-0">
+            {/* Backup List */}
+            <Card className="flex flex-col min-h-0">
+              <CardHeader className="flex-shrink-0 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <IconDatabase className="h-5 w-5" />
+                  Backups Existentes
+                  <span className="text-sm font-normal text-muted-foreground">({backups.length})</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 min-h-0 pt-0 pb-3">
+                <div className="rounded-md border dark:border-border h-full flex flex-col">
+                  <Table className="table-fixed">
+                    <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                          Nenhum backup encontrado
-                        </TableCell>
+                        <TableHead className="w-[50px]">
+                          <div className="flex items-center justify-center">
+                            <Checkbox
+                              checked={isAllSelected(backups.map(b => b.id))}
+                              indeterminate={isPartiallySelected(backups.map(b => b.id))}
+                              onCheckedChange={() => toggleSelectAll(backups.map(b => b.id))}
+                              aria-label="Selecionar todos"
+                              disabled={isLoading || backups.length === 0}
+                            />
+                          </div>
+                        </TableHead>
+                        <TableHead className="w-[20%]">Nome</TableHead>
+                        <TableHead className="w-[12%]">Tipo</TableHead>
+                        <TableHead className="w-[10%]">Prioridade</TableHead>
+                        <TableHead className="w-[12%]">Pastas/Arquivos</TableHead>
+                        <TableHead className="w-[10%]">Tamanho</TableHead>
+                        <TableHead className="w-[18%]">Data de Criação</TableHead>
+                        <TableHead className="w-[12%]">Status</TableHead>
                       </TableRow>
-                    ) : (
-                      backups.map((backup) => <BackupTableRow key={backup.id} backup={backup} />)
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Scheduled Backups */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconClock className="h-5 w-5" />
-                Backups Agendados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border dark:border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Prioridade</TableHead>
-                      <TableHead>Agendamento</TableHead>
-                      <TableHead>Próxima Execução</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {scheduledBackups.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          Nenhum backup agendado
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      scheduledBackups.map((schedule) => {
-                        const TypeIcon =
-                          schedule.type === "database" ? IconDatabase :
-                          schedule.type === "files" ? IconFolder :
-                          schedule.type === "full" ? IconServer :
-                          IconDatabase;
-
-                        return (
-                          <TableRow
-                            key={schedule.id}
-                            className="cursor-pointer hover:bg-muted/20"
-                            onContextMenu={(e) => handleScheduleContextMenu(e, schedule)}
-                          >
-                            <TableCell className="font-medium">{schedule.name}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <TypeIcon className="h-4 w-4 text-muted-foreground" />
-                                {getBackupTypeLabel(schedule.type || "database")}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {schedule.priority ? (
-                                <Badge variant={getPriorityBadgeVariant(schedule.priority)} className="text-xs">
-                                  {getPriorityLabel(schedule.priority)}
-                                </Badge>
-                              ) : (
-                                <span className="text-sm text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="space-y-1">
-                                {schedule.description && (
-                                  <div className="text-sm text-muted-foreground">
-                                    {schedule.description}
-                                  </div>
-                                )}
-                                <div className="text-sm font-medium">
-                                  {parseCronToHuman(schedule.cron)}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>{formatNextExecution(schedule.next)}</TableCell>
-                            <TableCell>
-                              <Badge variant="success">Ativo</Badge>
+                    </TableHeader>
+                  </Table>
+                  <div className="flex-1 overflow-y-auto">
+                    <Table className="table-fixed">
+                      <TableBody>
+                        {backups.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                              Nenhum backup encontrado
                             </TableCell>
                           </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                        ) : (
+                          backups.map((backup) => <BackupTableRow key={backup.id} backup={backup} />)
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Scheduled Backups */}
+            <Card className="flex flex-col max-h-[280px]">
+              <CardHeader className="flex-shrink-0 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <IconClock className="h-5 w-5" />
+                  Backups Agendados
+                  <span className="text-sm font-normal text-muted-foreground">({scheduledBackups.length})</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 min-h-0 pt-0 pb-3">
+                <div className="rounded-md border dark:border-border h-full flex flex-col">
+                  <Table className="table-fixed">
+                    <TableHeader className="sticky top-0 z-10 bg-background">
+                      <TableRow>
+                        <TableHead className="w-[25%]">Nome</TableHead>
+                        <TableHead className="w-[15%]">Tipo</TableHead>
+                        <TableHead className="w-[12%]">Prioridade</TableHead>
+                        <TableHead className="w-[18%]">Agendamento</TableHead>
+                        <TableHead className="w-[20%]">Próxima Execução</TableHead>
+                        <TableHead className="w-[10%]">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                  </Table>
+                  <div className="flex-1 overflow-y-auto">
+                    <Table className="table-fixed">
+                      <TableBody>
+                        {scheduledBackups.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                              Nenhum backup agendado
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          scheduledBackups.map((schedule) => {
+                            const TypeIcon =
+                              schedule.type === "database" ? IconDatabase :
+                              schedule.type === "files" ? IconFolder :
+                              schedule.type === "full" ? IconServer :
+                              IconDatabase;
+
+                            return (
+                              <TableRow
+                                key={schedule.id}
+                                className="cursor-pointer hover:bg-muted/20"
+                                onContextMenu={(e) => handleScheduleContextMenu(e, schedule)}
+                              >
+                                <TableCell className="w-[25%] font-medium">{schedule.name}</TableCell>
+                                <TableCell className="w-[15%]">
+                                  <div className="flex items-center gap-2">
+                                    <TypeIcon className="h-4 w-4 text-muted-foreground" />
+                                    {getBackupTypeLabel(schedule.type || "database")}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="w-[12%]">
+                                  {schedule.priority ? (
+                                    <Badge variant={getPriorityBadgeVariant(schedule.priority)} className="text-xs">
+                                      {getPriorityLabel(schedule.priority)}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="w-[18%]">
+                                  <span className="text-sm">{parseCronToHuman(schedule.cron)}</span>
+                                </TableCell>
+                                <TableCell className="w-[20%]">{formatNextExecution(schedule.next)}</TableCell>
+                                <TableCell className="w-[10%]">
+                                  <Badge variant="success">Ativo</Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Deleted Backups */}
+            {deletedBackups.length > 0 && (
+              <Card className="flex flex-col max-h-[280px]">
+                <CardHeader className="flex-shrink-0 py-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <IconArchive className="h-5 w-5" />
+                    Backups Excluídos
+                    <span className="text-sm font-normal text-muted-foreground">({deletedBackups.length})</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 min-h-0 pt-0 pb-3">
+                  <div className="rounded-md border dark:border-border h-full flex flex-col">
+                    <Table className="table-fixed">
+                      <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableRow>
+                          <TableHead className="w-[25%]">Nome</TableHead>
+                          <TableHead className="w-[15%]">Tipo</TableHead>
+                          <TableHead className="w-[12%]">Tamanho Original</TableHead>
+                          <TableHead className="w-[18%]">Data de Criação</TableHead>
+                          <TableHead className="w-[18%]">Data de Exclusão</TableHead>
+                          <TableHead className="w-[12%]">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                    </Table>
+                    <div className="flex-1 overflow-y-auto">
+                      <Table className="table-fixed">
+                        <TableBody>
+                          {deletedBackups.map((backup) => {
+                            const TypeIcon = backup.type === "database" ? IconDatabase : backup.type === "files" ? IconFolder : IconServer;
+                            return (
+                              <TableRow key={backup.id} className="opacity-60">
+                                <TableCell className="w-[25%] font-medium">{backup.name}</TableCell>
+                                <TableCell className="w-[15%]">
+                                  <div className="flex items-center gap-2">
+                                    <TypeIcon className="h-4 w-4 text-muted-foreground" />
+                                    {getBackupTypeLabel(backup.type)}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="w-[12%]">{formatBytes(backup.size)}</TableCell>
+                                <TableCell className="w-[18%]">{formatBackupDateTime(backup.createdAt)}</TableCell>
+                                <TableCell className="w-[18%]">{backup.deletedAt ? formatBackupDateTime(backup.deletedAt) : "-"}</TableCell>
+                                <TableCell className="w-[12%]">
+                                  <Badge variant={getStatusBadgeVariant("deleted")}>{getStatusLabel("deleted")}</Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
 
         {/* Create Backup Dialog */}

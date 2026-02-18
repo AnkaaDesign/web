@@ -470,10 +470,12 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       const amount = typeof item.amount === "number" ? item.amount : Number(item.amount) || 0;
       const valueDisplay = formatCurrency(amount);
       // Combine description and observation inline (Title Case)
+      // For "Outros" items, display only the observation
+      const isOutros = item.description?.trim().toLowerCase() === "outros";
       const description = toTitleCase(item.description || "Serviço");
       const observation = item.observation || "";
       // For "Outros", show only observation; otherwise show description + observation
-      const descriptionWithObs = description === "Outros" && observation
+      const descriptionWithObs = isOutros && observation
         ? observation
         : observation
           ? `${description} ${observation}`

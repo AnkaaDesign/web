@@ -13,6 +13,7 @@ export const backupQueryKeys = {
   list: (params?: BackupQueryParams) => [...backupQueryKeys.lists(), params] as const,
   detail: (id: string) => [...backupQueryKeys.all, "detail", id] as const,
   scheduled: () => [...backupQueryKeys.all, "scheduled"] as const,
+  history: () => [...backupQueryKeys.all, "history"] as const,
   systemHealth: () => [...backupQueryKeys.all, "systemHealth"] as const,
   systemHealthSummary: () => [...backupQueryKeys.all, "systemHealthSummary"] as const,
   verification: (id: string) => [...backupQueryKeys.all, "verification", id] as const,
@@ -45,6 +46,16 @@ export function useScheduledBackups(enabled: boolean = true) {
     queryFn: () => backupApi.getScheduledBackups(),
     enabled, // Only fetch when enabled (e.g., when user is authenticated)
     staleTime: 60 * 1000, // 1 minute
+  });
+}
+
+// Backup history (deleted backups) hook
+export function useBackupHistory(enabled: boolean = true) {
+  return useQuery({
+    queryKey: backupQueryKeys.history(),
+    queryFn: () => backupApi.getBackupHistory(),
+    enabled,
+    staleTime: 30 * 1000, // 30 seconds
   });
 }
 
@@ -100,6 +111,7 @@ export function useBackupMutations() {
     mutationFn: (id: string) => backupApi.deleteBackup(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: backupQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: backupQueryKeys.history() });
     },
   });
 
