@@ -204,16 +204,16 @@ export const OrderCreateForm = () => {
   // Auto-add first temporary item when switching to temporary mode
   useEffect(() => {
     if (orderItemMode === "temporary") {
-      const currentItems = form.getValues("items") || [];
+      const currentItems = form.getValues("temporaryItems") || [];
       // Only add if there are no items yet
       if (currentItems.length === 0) {
-        form.setValue("items", [{
+        form.setValue("temporaryItems", [{
           temporaryItemDescription: "",
           orderedQuantity: 1,
           price: 0,
           icms: 0,
           ipi: 0,
-        }], {
+        }] as any, {
           shouldDirty: true,
           shouldTouch: true,
         });
@@ -515,8 +515,8 @@ export const OrderCreateForm = () => {
           ipi: Number(ipis[itemId]) || 0,
         }));
       } else {
-        // Temporary items
-        const tempItems = form.getValues("items") || [];
+        // Temporary items (stored under "temporaryItems" by useFieldArray)
+        const tempItems = form.getValues("temporaryItems") || [];
         itemsData = tempItems.map((item: any) => ({
           temporaryItemDescription: item.temporaryItemDescription,
           orderedQuantity: Number(item.orderedQuantity) || 1,
@@ -650,19 +650,20 @@ export const OrderCreateForm = () => {
   // Watch form state to trigger validation when it changes
   const watchedDescription = form.watch("description");
   const watchedItems = form.watch("items");
+  const watchedTemporaryItems = form.watch("temporaryItems");
 
   // Compute if form is ready to submit (no useMemo - compute on every render)
   const computeFormReadiness = () => {
     // Use watched values (they're live and trigger re-renders)
-    const items = watchedItems || [];
     const hasDescription = watchedDescription?.trim().length > 0;
 
     // Check based on order mode
     if (orderItemMode === "temporary") {
-      // Temporary mode: check for valid temporary items
-      const hasTemporaryItems = items.length > 0;
+      // Temporary mode: check for valid temporary items (stored under "temporaryItems" by useFieldArray)
+      const tempItems = watchedTemporaryItems || [];
+      const hasTemporaryItems = tempItems.length > 0;
 
-      const allTemporaryItemsValid = items.every((item: any, _index: number) => {
+      const allTemporaryItemsValid = tempItems.every((item: any, _index: number) => {
         const hasDescription = item.temporaryItemDescription && item.temporaryItemDescription.trim() !== "";
         const hasValidQuantity = item.orderedQuantity && item.orderedQuantity > 0;
         const hasValidPrice = item.price !== undefined && item.price !== null && Number(item.price) > 0;
@@ -891,7 +892,7 @@ export const OrderCreateForm = () => {
           <div class="header-info">
             <h1 class="title">${orderDescription}</h1>
             <div class="info">
-              <p><strong>Data do Pedido:</strong> ${formatDate(new Date())}${form.watch("forecast") ? ` | <strong>Data de Entrega:</strong> ${formatDate(form.watch("forecast") as Date)}` : ""} | <strong>Fornecedor:</strong> ${selectedSupplier ? selectedSupplier.fantasyName : "-"} | <strong>Total de itens:</strong> ${orderItemMode === "inventory" ? selectedItemsData.length : (form.watch("items") || []).length}</p>
+              <p><strong>Data do Pedido:</strong> ${formatDate(new Date())}${form.watch("forecast") ? ` | <strong>Data de Entrega:</strong> ${formatDate(form.watch("forecast") as Date)}` : ""} | <strong>Fornecedor:</strong> ${selectedSupplier ? selectedSupplier.fantasyName : "-"} | <strong>Total de itens:</strong> ${orderItemMode === "inventory" ? selectedItemsData.length : (form.watch("temporaryItems") || []).length}</p>
             </div>
           </div>
         </div>
@@ -926,7 +927,7 @@ export const OrderCreateForm = () => {
                       `;
                       })
                       .join("")
-                  : (form.watch("items") || [])
+                  : (form.watch("temporaryItems") || [])
                       .map((item: any) => {
                         const quantity = Number(item.orderedQuantity) || 0;
                         return `
@@ -1526,7 +1527,7 @@ export const OrderCreateForm = () => {
                               <p className="text-xs font-medium text-muted-foreground">ITENS</p>
                             </div>
                             <p className="text-2xl font-semibold text-foreground">
-                              {orderItemMode === "inventory" ? selectionCount : (form.watch("items") || []).filter((item: any) => item.temporaryItemDescription).length}
+                              {orderItemMode === "inventory" ? selectionCount : (form.watch("temporaryItems") || []).filter((item: any) => item.temporaryItemDescription).length}
                             </p>
                           </div>
 
@@ -1538,7 +1539,7 @@ export const OrderCreateForm = () => {
                             <p className="text-2xl font-semibold text-foreground">
                               {orderItemMode === "inventory"
                                 ? Array.from(selectedItems).reduce((total: number, itemId: string) => total + (Number(quantities[itemId]) || 1), 0)
-                                : (form.watch("items") || []).reduce((total: number, item: any) => total + (Number(item.orderedQuantity) || 0), 0)}
+                                : (form.watch("temporaryItems") || []).reduce((total: number, item: any) => total + (Number(item.orderedQuantity) || 0), 0)}
                             </p>
                           </div>
 
@@ -1551,7 +1552,7 @@ export const OrderCreateForm = () => {
                               {formatCurrency(
                                 orderItemMode === "inventory"
                                   ? totalPrice
-                                  : (form.watch("items") || []).reduce((total: number, item: any) => {
+                                  : (form.watch("temporaryItems") || []).reduce((total: number, item: any) => {
                                       const quantity = Number(item.orderedQuantity) || 0;
                                       const price = Number(item.price) || 0;
                                       const icms = Number(item.icms) || 0;
@@ -1668,7 +1669,7 @@ export const OrderCreateForm = () => {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {((form.watch("items") || []).filter((item: any) => item.temporaryItemDescription)).map((item: any, index: number) => {
+                                {((form.watch("temporaryItems") || []).filter((item: any) => item.temporaryItemDescription)).map((item: any, index: number) => {
                                   const quantity = Number(item.orderedQuantity) || 0;
                                   const price = Number(item.price) || 0;
                                   const icms = Number(item.icms) || 0;
@@ -1698,7 +1699,7 @@ export const OrderCreateForm = () => {
                                   </TableCell>
                                   <TableCell className="text-right">
                                     {formatCurrency(
-                                      ((form.watch("items") || []).filter((item: any) => item.temporaryItemDescription)).reduce((total: number, item: any) => {
+                                      ((form.watch("temporaryItems") || []).filter((item: any) => item.temporaryItemDescription)).reduce((total: number, item: any) => {
                                         const quantity = Number(item.orderedQuantity) || 0;
                                         const price = Number(item.price) || 0;
                                         const icms = Number(item.icms) || 0;
