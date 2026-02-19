@@ -162,9 +162,26 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
   // Show urgency indicator when approaching forecast with incomplete orders (but not today or past)
   const showUrgencyIndicator = showIndicators && urgencyInfo && !isForecastToday && !isForecastPast;
 
+  // Green text when entryDate is filled (vehicle has entered) and task is not completed
+  const hasEntryDate = !!task.entryDate && task.status !== TASK_STATUS.COMPLETED;
+
   return (
     <>
-      {showIndicators && isForecastToday ? (
+      {showIndicators && hasEntryDate ? (
+        <Tooltip delayDuration={500}>
+          <TooltipTrigger asChild>
+            <span className="truncate text-green-500 font-medium cursor-help">
+              {formatted}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              <div className="font-medium text-green-500">Veículo já entrou</div>
+              <div className="text-muted-foreground">Data de entrada preenchida. Previsão: {formatted}</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      ) : showIndicators && isForecastToday ? (
         <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
             <span className="truncate text-blue-500 font-medium cursor-help">

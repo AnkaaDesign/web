@@ -6,6 +6,7 @@ import { toast, TOAST_Z_NOTIFICATION } from '@/components/ui/sonner';
 import { useSocket } from './use-socket';
 import { notificationKeys } from './query-keys';
 import { socketService, type ConnectionState } from '@/lib/socket';
+import { shouldShowNotification } from '@/lib/notification-dedup';
 import type { Notification } from '@/types';
 
 /**
@@ -70,6 +71,10 @@ export function useNotificationSocket() {
 
     // Handler for new notifications
     const handleNewNotification = (notification: Notification) => {
+      // Skip if this notification was already shown (prevents duplicates from socket + push)
+      if (!shouldShowNotification(notification.id)) {
+        return;
+      }
 
       // Update React Query cache - add to beginning of list
       queryClient.setQueryData<{ data: Notification[] }>(

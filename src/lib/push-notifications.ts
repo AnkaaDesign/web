@@ -1,6 +1,10 @@
 import { messaging, getToken, onMessage } from './firebase';
 import { registerDeviceToken as registerToken } from '@/api-client/push-notifications';
 import { toast } from '@/components/ui/sonner';
+import { shouldShowNotification } from './notification-dedup';
+
+// Track if push notification handler is already set up (prevents duplicate listeners)
+let pushHandlerInitialized = false;
 
 /**
  * Request notification permission and get FCM token
@@ -106,6 +110,12 @@ export function onForegroundMessage(callback: (payload: any) => void): void {
 export function setupPushNotifications(
   onNotificationClick?: (url?: string) => void
 ): void {
+  // Prevent registering multiple listeners (React StrictMode, component remounts)
+  if (pushHandlerInitialized) {
+    return;
+  }
+  pushHandlerInitialized = true;
+
   onForegroundMessage((payload) => {
     const { notification, data } = payload;
 
@@ -114,6 +124,14 @@ export function setupPushNotifications(
     const title = notification.title || 'Notificação';
     const body = notification.body || '';
     const url = data?.url;
+
+    // Use notification ID from data if available, otherwise generate from content
+    const notificationId = data?.notificationId || data?.id || `push:${title}:${body}`;
+
+    // Skip if this notification was already shown (e.g., via socket)
+    if (!shouldShowNotification(notificationId)) {
+      return;
+    }
 
     // Show toast with click action
     toast.info(title, body, {
