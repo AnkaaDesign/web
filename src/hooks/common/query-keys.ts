@@ -549,10 +549,16 @@ export const orderScheduleKeys = {
   detail: (id: string, include?: any) => (include ? (["orderSchedules", "detail", id, include] as const) : (["orderSchedules", "detail", id] as const)),
   byIds: (ids: string[]) => ["orderSchedules", "byIds", ids] as const,
 
+  // Infinite query
+  infinite: (filters?: Partial<OrderScheduleGetManyFormData>) =>
+    filters ? (["orderSchedules", "infinite", filters] as const) : (["orderSchedules", "infinite"] as const),
+
   // Specialized queries
   bySupplier: (supplierId: string, filters?: Partial<OrderScheduleGetManyFormData>) =>
     filters ? (["orderSchedules", "bySupplier", supplierId, filters] as const) : (["orderSchedules", "bySupplier", supplierId] as const),
   active: (filters?: Partial<OrderScheduleGetManyFormData>) => (filters ? (["orderSchedules", "active", filters] as const) : (["orderSchedules", "active"] as const)),
+  inactive: (filters?: Partial<OrderScheduleGetManyFormData>) =>
+    filters ? (["orderSchedules", "inactive", filters] as const) : (["orderSchedules", "inactive"] as const),
 };
 
 // =====================================================

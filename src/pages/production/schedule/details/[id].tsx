@@ -38,7 +38,7 @@ import { exportBudgetPdf } from "@/utils/budget-pdf-generator";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text-generators";
 import { getApiBaseUrl } from "@/utils/file";
 import { SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_DISPLAY_ORDER } from "../../../../constants";
-import { REPRESENTATIVE_ROLE_LABELS } from "@/types/representative";
+import { REPRESENTATIVE_ROLE_LABELS, RepresentativeRole } from "@/types/representative";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
   AlertDialog,
@@ -907,6 +907,9 @@ export const TaskDetailsPage = () => {
   // Check if user is from Production sector (for changelog visibility)
   const isProductionSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION;
 
+  // Check if user is from Designer sector (for representative filtering)
+  const isDesignerSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
+
   // Check if user can view base files (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
   const canViewBaseFiles = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
@@ -1645,10 +1648,17 @@ export const TaskDetailsPage = () => {
                   </div>
                 )}
 
-                {/* Representatives */}
-                {sectionVisibility.isFieldVisible("representatives") && task.representatives && task.representatives.length > 0 && (
-                  <>
-                    {task.representatives.map((rep) => {
+                {/* Representatives - Designers only see MARKETING reps (fallback to COMMERCIAL) */}
+                {sectionVisibility.isFieldVisible("representatives") && (() => {
+                  if (!task.representatives || task.representatives.length === 0) return null;
+                  const reps = isDesignerSector
+                    ? (() => {
+                        const marketing = task.representatives.filter(r => r.role === RepresentativeRole.MARKETING);
+                        return marketing.length > 0 ? marketing : task.representatives.filter(r => r.role === RepresentativeRole.COMMERCIAL);
+                      })()
+                    : task.representatives;
+                  if (reps.length === 0) return null;
+                  return reps.map((rep) => {
                       const cleanPhone = rep.phone.replace(/\D/g, "");
                       const whatsappNumber = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
                       const formatPhone = (phone: string) => {
@@ -1689,9 +1699,8 @@ export const TaskDetailsPage = () => {
                           </div>
                         </div>
                       );
-                    })}
-                  </>
-                )}
+                    });
+                })()}
 
                 {/* Sector */}
                 {sectionVisibility.isFieldVisible("sector") && (
@@ -1992,7 +2001,7 @@ export const TaskDetailsPage = () => {
                                   <IconNote className="h-4 w-4 text-muted-foreground" />
                                   <span className="text-sm font-medium">Observação</span>
                                 </div>
-                                <p className="text-sm text-muted-foreground capitalize">{item.observation}</p>
+                                <p className="text-sm text-muted-foreground">{item.observation}</p>
                               </div>
                             </HoverCardContent>
                           </HoverCard>
@@ -2230,7 +2239,7 @@ export const TaskDetailsPage = () => {
                                     <IconNote className="h-4 w-4 text-muted-foreground" />
                                     <span className="text-sm font-medium">Observação</span>
                                   </div>
-                                  <p className="text-sm text-muted-foreground capitalize">{serviceOrder.observation}</p>
+                                  <p className="text-sm text-muted-foreground">{serviceOrder.observation}</p>
                                 </div>
                               </HoverCardContent>
                             </HoverCard>

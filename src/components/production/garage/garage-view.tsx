@@ -479,6 +479,13 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
 
       {/* Content group with clipping */}
       <g clipPath={`url(#${clipId})`}>
+        {/* Corner flag: primary if entryDate exists, destructive if not — only for patio trucks */}
+        {!truck.spot && (
+          <polygon
+            points={`${width - 14},0 ${width},0 ${width},14`}
+            fill={truck.entryDate ? 'hsl(var(--primary))' : 'hsl(var(--destructive))'}
+          />
+        )}
         {/* Task name (rotated 90deg) */}
         <text
           x={width / 2}
@@ -518,6 +525,7 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
           </text>
         )}
       </g>
+
     </g>
   );
 }

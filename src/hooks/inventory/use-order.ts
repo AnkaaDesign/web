@@ -483,6 +483,7 @@ export {
   useOrderSchedules,
   useOrderSchedule,
   useActiveOrderSchedules,
+  useInactiveOrderSchedules,
   useCreateOrderSchedule,
   useUpdateOrderSchedule,
   useDeleteOrderSchedule,

@@ -10,6 +10,8 @@ import {
   batchCreateOrderSchedules,
   batchUpdateOrderSchedules,
   batchDeleteOrderSchedules,
+  finishOrderSchedule,
+  createOrderFromSchedule,
 } from "../../api-client";
 import type {
   OrderScheduleGetManyFormData,
@@ -89,6 +91,13 @@ export const useActiveOrderSchedules = createSpecializedQueryHook<Partial<OrderS
   staleTime: 1000 * 60 * 10, // 10 minutes
 });
 
+// Inactive order schedules
+export const useInactiveOrderSchedules = createSpecializedQueryHook<Partial<OrderScheduleGetManyFormData>, OrderScheduleGetManyResponse>({
+  queryKeyFn: (filters) => orderScheduleKeys.inactive(filters),
+  queryFn: (filters) => getOrderSchedules({ ...filters, isActive: false }),
+  staleTime: 1000 * 60 * 10, // 10 minutes
+});
+
 // =====================================================
 // Custom OrderSchedule Mutations with Enhanced Invalidation
 // =====================================================
@@ -109,6 +118,11 @@ export const useOrderScheduleMutations = (options?: {
     // Invalidate active schedules
     queryClient.invalidateQueries({
       queryKey: orderScheduleKeys.active(),
+    });
+
+    // Invalidate inactive schedules
+    queryClient.invalidateQueries({
+      queryKey: orderScheduleKeys.inactive(),
     });
 
     // Invalidate order queries
@@ -178,6 +192,9 @@ export const useOrderScheduleBatchMutations = (options?: {
     });
     queryClient.invalidateQueries({
       queryKey: orderScheduleKeys.active(),
+    });
+    queryClient.invalidateQueries({
+      queryKey: orderScheduleKeys.inactive(),
     });
     queryClient.invalidateQueries({
       queryKey: orderKeys.all,
@@ -263,4 +280,38 @@ export const useDeleteOrderSchedule = () => {
     mutate: mutations.delete,
     mutateAsync: mutations.deleteAsync,
   };
+};
+
+// =====================================================
+// Schedule Action Hooks
+// =====================================================
+
+export const useFinishOrderSchedule = (options?: {
+  onSuccess?: (data: OrderScheduleUpdateResponse) => void;
+}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => finishOrderSchedule(id),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: orderScheduleKeys.all });
+      queryClient.invalidateQueries({ queryKey: orderKeys.all });
+      options?.onSuccess?.(data);
+    },
+  });
+};
+
+export const useCreateOrderFromSchedule = (options?: {
+  onSuccess?: (data: any) => void;
+}) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => createOrderFromSchedule(id),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: orderScheduleKeys.all });
+      queryClient.invalidateQueries({ queryKey: orderKeys.all });
+      options?.onSuccess?.(data);
+    },
+  });
 };

@@ -3310,7 +3310,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                       customerId={customerIdValue || undefined}
                       customerName={task.customer?.fantasyName || task.customer?.corporateName || undefined}
                       invoiceToCustomers={task.pricing?.invoicesToCustomers}
-                      value={representativeRows}
+                      value={isDesignerUser
+                        ? (() => {
+                            const marketing = representativeRows.filter(r => r.role === RepresentativeRole.MARKETING);
+                            return marketing.length > 0 ? marketing : representativeRows.filter(r => r.role === RepresentativeRole.COMMERCIAL);
+                          })()
+                        : representativeRows}
                       onChange={handleRepresentativeRowsChange}
                       disabled={isSubmitting || isFinancialUser || isDesignerUser || isLogisticUser}
                       readOnly={isFinancialUser || isDesignerUser || isLogisticUser}

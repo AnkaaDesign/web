@@ -241,6 +241,16 @@ export class OrderService {
     const response = await apiClient.delete<OrderScheduleBatchDeleteResponse>(`${this.schedulesBasePath}/batch`, { data });
     return response.data;
   }
+
+  async finishOrderSchedule(id: string): Promise<OrderScheduleUpdateResponse> {
+    const response = await apiClient.put<OrderScheduleUpdateResponse>(`${this.schedulesBasePath}/${id}/finish`);
+    return response.data;
+  }
+
+  async createOrderFromSchedule(id: string): Promise<any> {
+    const response = await apiClient.post<any>(`${this.schedulesBasePath}/${id}/create-order`);
+    return response.data;
+  }
 }
 
 // =====================
@@ -288,3 +298,5 @@ export const deleteOrderSchedule = (id: string) => orderService.deleteOrderSched
 export const batchCreateOrderSchedules = (data: OrderScheduleBatchCreateFormData, query?: OrderScheduleQueryFormData) => orderService.batchCreateOrderSchedules(data, query);
 export const batchUpdateOrderSchedules = (data: OrderScheduleBatchUpdateFormData, query?: OrderScheduleQueryFormData) => orderService.batchUpdateOrderSchedules(data, query);
 export const batchDeleteOrderSchedules = (data: OrderScheduleBatchDeleteFormData) => orderService.batchDeleteOrderSchedules(data);
+export const finishOrderSchedule = (id: string) => orderService.finishOrderSchedule(id);
+export const createOrderFromSchedule = (id: string) => orderService.createOrderFromSchedule(id);

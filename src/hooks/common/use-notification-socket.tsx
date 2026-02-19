@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { toast as sonnerToast } from 'sonner';
 import { useSocket } from './use-socket';
 import { notificationKeys } from './query-keys';
 import { socketService, type ConnectionState } from '@/lib/socket';
@@ -58,47 +58,63 @@ export function useNotificationSocket() {
         }
       );
 
-      // Show toast notification
-      const toastAction = notification.actionUrl
-        ? {
-            label: 'Ver',
-            onClick: () => {
-              navigate(notification.actionUrl!);
-            },
-          }
-        : undefined;
+      // Show toast notification - entire toast is clickable when actionUrl exists
+      const getDuration = () => {
+        switch (notification.importance) {
+          case 'URGENT': return 10000;
+          case 'HIGH': return 7000;
+          case 'NORMAL': return 5000;
+          default: return 4000;
+        }
+      };
 
-      // Determine toast type based on importance
-      switch (notification.importance) {
-        case 'URGENT':
-          toast.error(notification.title, {
-            description: notification.body,
-            action: toastAction,
-            duration: 10000, // 10 seconds for urgent
-          });
-          break;
-        case 'HIGH':
-          toast.warning(notification.title, {
-            description: notification.body,
-            action: toastAction,
-            duration: 7000,
-          });
-          break;
-        case 'NORMAL':
-          toast.info(notification.title, {
-            description: notification.body,
-            action: toastAction,
-            duration: 5000,
-          });
-          break;
-        case 'LOW':
-        default:
-          toast(notification.title, {
-            description: notification.body,
-            action: toastAction,
-            duration: 4000,
-          });
-          break;
+      if (notification.actionUrl) {
+        const actionUrl = notification.actionUrl;
+        const importanceColors: Record<string, string> = {
+          URGENT: 'bg-destructive/95 text-destructive-foreground border-destructive/50',
+          HIGH: 'bg-yellow-500/95 text-white border-yellow-500/50',
+          NORMAL: 'bg-blue-500/95 text-white border-blue-500/50',
+        };
+        const colorClass = importanceColors[notification.importance || ''] || 'bg-background text-foreground border-border';
+
+        sonnerToast.custom(
+          (id) => (
+            <div
+              className={`cursor-pointer w-full rounded-lg border p-4 shadow-sm ${colorClass}`}
+              onClick={() => {
+                navigate(actionUrl);
+                sonnerToast.dismiss(id);
+              }}
+            >
+              <div className="font-medium text-sm">{notification.title}</div>
+              {notification.body && (
+                <div className="text-sm opacity-80 mt-1">{notification.body}</div>
+              )}
+            </div>
+          ),
+          { duration: getDuration() }
+        );
+      } else {
+        const toastOptions = {
+          description: notification.body,
+          duration: getDuration(),
+        };
+
+        switch (notification.importance) {
+          case 'URGENT':
+            sonnerToast.error(notification.title, toastOptions);
+            break;
+          case 'HIGH':
+            sonnerToast.warning(notification.title, toastOptions);
+            break;
+          case 'NORMAL':
+            sonnerToast.info(notification.title, toastOptions);
+            break;
+          case 'LOW':
+          default:
+            sonnerToast(notification.title, toastOptions);
+            break;
+        }
       }
 
       // Invalidate unread count
@@ -210,7 +226,7 @@ export function useNotificationSocket() {
 
       // Show toast if there are missed notifications
       if (data.notifications && data.notifications.length > 0) {
-        toast.info('Notificações sincronizadas', {
+        sonnerToast.info('Notificações sincronizadas', {
           description: `${data.notifications.length} ${data.notifications.length === 1 ? 'notificação recebida' : 'notificações recebidas'} enquanto você estava offline.`,
         });
       }
