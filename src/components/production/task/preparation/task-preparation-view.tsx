@@ -295,6 +295,9 @@ export function TaskPreparationView({
   // Filter modal state
   const [showFilterModal, setShowFilterModal] = useState(false);
 
+  // For table ordering: use exact match so admins get regular table order (not financial order)
+  const useFinancialTableOrder = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
+
   // Aggregate table data from all three tables
   const [preparationTableData, setPreparationTableData] = useState<Task[]>([]);
   const [productionTableData, setProductionTableData] = useState<Task[]>([]);
@@ -306,22 +309,38 @@ export function TaskPreparationView({
   const [completedOrderedIds, setCompletedOrderedIds] = useState<string[]>([]);
 
   // Combined ordered task IDs for cross-table shift+click selection
+  // Order matches display: financial = completed first, others = production first
   const allOrderedTaskIds = useMemo(() => {
+    if (useFinancialTableOrder) {
+      return [
+        ...completedOrderedIds,
+        ...productionOrderedIds,
+        ...preparationOrderedIds,
+      ];
+    }
     return [
-      ...preparationOrderedIds,
       ...productionOrderedIds,
+      ...preparationOrderedIds,
       ...completedOrderedIds,
     ];
-  }, [preparationOrderedIds, productionOrderedIds, completedOrderedIds]);
+  }, [preparationOrderedIds, productionOrderedIds, completedOrderedIds, useFinancialTableOrder]);
 
   // Combined table data for export (includes all three tables)
+  // Order matches display: financial = completed first, others = production first
   const allTableData = useMemo(() => {
+    if (useFinancialTableOrder) {
+      return [
+        ...completedTableData,
+        ...productionTableData,
+        ...preparationTableData,
+      ];
+    }
     return [
-      ...preparationTableData,
       ...productionTableData,
+      ...preparationTableData,
       ...completedTableData,
     ];
-  }, [preparationTableData, productionTableData, completedTableData]);
+  }, [preparationTableData, productionTableData, completedTableData, useFinancialTableOrder]);
 
   // Get all columns for visibility manager
   const allColumns = useMemo(
@@ -338,8 +357,6 @@ export function TaskPreparationView({
   // For filtering: use hasPrivilege() so admins can see all service order types
   const isFinancialUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL);
   const isLogisticUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC);
-  // For table ordering: use exact match so admins get regular table order (not financial order)
-  const useFinancialTableOrder = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
   const isDesignerUser = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
 
   // Prepare final query filters with preparation-specific logic
@@ -515,20 +532,21 @@ export function TaskPreparationView({
       const { targetTasks } = copyFromTaskState;
 
       try {
-        const copyPromises = targetTasks.map(async (targetTask) => {
+        // Call the copy-from endpoint for each target task sequentially
+        // to avoid budgetNumber unique constraint race conditions when copying pricing
+        const results: { success: boolean; taskId: string; result?: any; error?: any }[] = [];
+        for (const targetTask of targetTasks) {
           try {
             const result = await taskService.copyFromTask(targetTask.id, {
               sourceTaskId: sourceTask.id,
               fields: selectedFields,
             });
-            return { success: true, taskId: targetTask.id, result };
+            results.push({ success: true, taskId: targetTask.id, result });
           } catch (error) {
             console.error(`Failed to copy to task ${targetTask.id}:`, error);
-            return { success: false, taskId: targetTask.id, error };
+            results.push({ success: false, taskId: targetTask.id, error });
           }
-        });
-
-        const results = await Promise.all(copyPromises);
+        }
         const successCount = results.filter(r => r.success).length;
         const failureCount = results.length - successCount;
 
@@ -743,32 +761,7 @@ export function TaskPreparationView({
           </div>
         ) : (
           <div className="space-y-8 pb-8">
-            {/* Table 1: Em Preparação + Aguardando Produção */}
-            <div>
-              <TaskPreparationTable
-                filters={{
-                  ...queryFilters,
-                  status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION],
-                  limit: 1000,
-                }}
-                visibleColumns={visibleColumns}
-                onDataChange={handlePreparationTableDataChange}
-                advancedActionsRef={advancedActionsRef}
-                onStartCopyFromTask={handleStartCopyFromTask}
-                isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
-                onSourceTaskSelect={handleSourceTaskSelected}
-                onShiftClickSelect={handleShiftClickSelect}
-                onSingleClickSelect={handleSingleClickSelect}
-                externalExpandedGroups={expandedGroups}
-                onExpandedGroupsChange={setExpandedGroups}
-                onGroupsDetected={handleGroupsDetected}
-                onOrderedTaskIdsChange={handlePreparationOrderedIdsChange}
-                showSelectedOnly={showSelectedOnly}
-                allOrderedTaskIds={allOrderedTaskIds}
-              />
-            </div>
-
-            {/* Table 2: Em Produção */}
+            {/* Table 1: Em Produção - First for non-financial */}
             <div>
               <TaskPreparationTable
                 filters={{
@@ -788,6 +781,31 @@ export function TaskPreparationView({
                 onExpandedGroupsChange={setExpandedGroups}
                 onGroupsDetected={handleGroupsDetected}
                 onOrderedTaskIdsChange={handleProductionOrderedIdsChange}
+                showSelectedOnly={showSelectedOnly}
+                allOrderedTaskIds={allOrderedTaskIds}
+              />
+            </div>
+
+            {/* Table 2: Em Preparação + Aguardando Produção */}
+            <div>
+              <TaskPreparationTable
+                filters={{
+                  ...queryFilters,
+                  status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION],
+                  limit: 1000,
+                }}
+                visibleColumns={visibleColumns}
+                onDataChange={handlePreparationTableDataChange}
+                advancedActionsRef={advancedActionsRef}
+                onStartCopyFromTask={handleStartCopyFromTask}
+                isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+                onSourceTaskSelect={handleSourceTaskSelected}
+                onShiftClickSelect={handleShiftClickSelect}
+                onSingleClickSelect={handleSingleClickSelect}
+                externalExpandedGroups={expandedGroups}
+                onExpandedGroupsChange={setExpandedGroups}
+                onGroupsDetected={handleGroupsDetected}
+                onOrderedTaskIdsChange={handlePreparationOrderedIdsChange}
                 showSelectedOnly={showSelectedOnly}
                 allOrderedTaskIds={allOrderedTaskIds}
               />

@@ -474,20 +474,21 @@ export function TaskHistoryList({
       const { targetTasks } = copyFromTaskState;
 
       try {
-        const copyPromises = targetTasks.map(async (targetTask) => {
+        // Call the copy-from endpoint for each target task sequentially
+        // to avoid budgetNumber unique constraint race conditions when copying pricing
+        const results: { success: boolean; taskId: string; result?: any; error?: any }[] = [];
+        for (const targetTask of targetTasks) {
           try {
             const result = await taskService.copyFromTask(targetTask.id, {
               sourceTaskId: sourceTask.id,
               fields: selectedFields,
             });
-            return { success: true, taskId: targetTask.id, result };
+            results.push({ success: true, taskId: targetTask.id, result });
           } catch (error) {
             console.error(`Failed to copy to task ${targetTask.id}:`, error);
-            return { success: false, taskId: targetTask.id, error };
+            results.push({ success: false, taskId: targetTask.id, error });
           }
-        });
-
-        const results = await Promise.all(copyPromises);
+        }
         const successCount = results.filter(r => r.success).length;
         const failureCount = results.length - successCount;
 

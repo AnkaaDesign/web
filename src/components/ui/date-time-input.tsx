@@ -330,7 +330,10 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
           field?.onBlur();
         }
       }
-      setIsOpen(false);
+      // Only close popover if NOT in datetime mode (datetime needs time selection too)
+      if (mode !== "datetime") {
+        setIsOpen(false);
+      }
     };
 
     const handleYearSelect = (year: number, calendar: 'left' | 'right' = 'left') => {
@@ -429,7 +432,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
       }
     };
 
-    const handleTimeChange = (hour: number, minute: number) => {
+    const handleTimeChange = (hour: number, minute: number, isMinuteSelect?: boolean) => {
       if (mode === "datetime") {
         const baseDate = currentValue instanceof Date ? currentValue : calendarMonth;
         const newDate = new Date(baseDate);
@@ -443,7 +446,10 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
         field?.onBlur();
         setSelectedHour(hour);
         setSelectedMinute(minute);
-        // Don't close anything - allow continuous selection
+        // Close popover after minute selection
+        if (isMinuteSelect) {
+          setIsOpen(false);
+        }
       }
     };
 
@@ -924,7 +930,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
                           key={i}
                           id={`minute-${i}`}
                           onClick={() => {
-                            handleTimeChange(selectedHour, i);
+                            handleTimeChange(selectedHour, i, true);
                           }}
                           className={cn(
                             "w-full px-2 py-1 text-sm hover:bg-accent hover:text-accent-foreground transition-colors",

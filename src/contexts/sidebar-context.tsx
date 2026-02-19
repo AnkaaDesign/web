@@ -10,7 +10,14 @@ interface SidebarContextType {
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export const SidebarProvider: React.FC<{ children: ReactNode }> = memo(({ children }) => {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(() => {
+    const stored = localStorage.getItem("ankaa-sidebar-open");
+    return stored !== null ? stored === "true" : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("ankaa-sidebar-open", String(isOpen));
+  }, [isOpen]);
 
   const toggle = useCallback(() => {
     setIsOpen((prev) => !prev);

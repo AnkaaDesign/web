@@ -2,13 +2,41 @@ import * as React from "react";
 import { useTheme } from "@/contexts/theme-context";
 import { useSidebar } from "@/contexts/sidebar-context";
 import { Toaster as Sonner, toast as sonnerToast } from "sonner";
-import { IconCircleCheck, IconCircleX, IconAlertCircle, IconInfoCircle } from "@tabler/icons-react";
+import { IconCircleCheck, IconCircleX, IconAlertCircle, IconInfoCircle, IconX } from "@tabler/icons-react";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
-type ToastOptions = Parameters<typeof sonnerToast>[1];
+type ToastOptions = Parameters<typeof sonnerToast>[1] & { allowDuplicate?: boolean };
 
 // Unique toast IDs for specific error types
 const NETWORK_ERROR_TOAST_ID = 'network-error-toast';
+
+// Z-index layers — API toasts render above notification toasts
+const TOAST_Z_API = 10000;
+const TOAST_Z_NOTIFICATION = 9990;
+
+// Color + icon config per toast type
+const TOAST_STYLES = {
+  success: {
+    colors: 'bg-green-600/95 text-white border-green-600/50',
+    icon: <IconCircleCheck className="h-4 w-4 shrink-0" />,
+    defaultDuration: 5000,
+  },
+  error: {
+    colors: 'bg-destructive/95 text-destructive-foreground border-destructive/50',
+    icon: <IconCircleX className="h-4 w-4 shrink-0" />,
+    defaultDuration: 8000,
+  },
+  warning: {
+    colors: 'bg-yellow-500/95 text-white border-yellow-500/50',
+    icon: <IconAlertCircle className="h-4 w-4 shrink-0" />,
+    defaultDuration: 6000,
+  },
+  info: {
+    colors: 'bg-blue-500/95 text-white border-blue-500/50',
+    icon: <IconInfoCircle className="h-4 w-4 shrink-0" />,
+    defaultDuration: 5000,
+  },
+} as const;
 
 // Simplified toast deduplication system
 class ToastManager {
@@ -39,8 +67,6 @@ class ToastManager {
 
     // Special handling for network errors - use a single toast that gets updated
     if (this.isNetworkError(title, description)) {
-      // Return the fixed ID - sonner will update the existing toast and reset its timer
-      // This keeps one toast visible that refreshes each time an error occurs
       return { show: true, id: NETWORK_ERROR_TOAST_ID };
     }
 
@@ -54,7 +80,6 @@ class ToastManager {
   }
 
   trackToast(toastId: string, title: string, description?: string | string[]) {
-    // Don't track network errors - they use a fixed ID
     if (this.isNetworkError(title, description)) {
       return;
     }
@@ -62,7 +87,6 @@ class ToastManager {
     const key = this.generateKey(title, description);
     this.activeToasts.set(key, toastId);
 
-    // Auto-cleanup when toast expires
     setTimeout(() => {
       this.activeToasts.delete(key);
     }, 6000);
@@ -87,38 +111,29 @@ const Toaster = ({ ...props }: ToasterProps) => {
   const { isOpen: isSidebarOpen } = useSidebar();
 
   // Sidebar widths: 288px (w-72) when open, 64px (w-16) when minimized
-  const toastWidth = isSidebarOpen ? 288 : 64;
+  const sidebarWidth = isSidebarOpen ? 288 : 64;
 
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
       position="bottom-right"
-      visibleToasts={1}
+      visibleToasts={2}
       expand={true}
       richColors={true}
-      closeButton={true}
+      closeButton={false}
       duration={5000}
       offset={8}
       style={{
-        '--width': `${toastWidth}px`,
-        right: 0,
+        '--width': '280px',
+        right: `${sidebarWidth}px`,
       } as React.CSSProperties}
       toastOptions={{
-        classNames: {
-          toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-sm group-[.toaster]:backdrop-blur-sm",
-          description: "group-[.toast]:text-muted-foreground group-[.toast]:text-sm group-[.toast]:whitespace-pre-wrap",
-          actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
-          error: "group-[.toaster]:bg-destructive/95 group-[.toaster]:text-destructive-foreground group-[.toaster]:border-destructive/50",
-          success: "group-[.toaster]:bg-green-600/95 group-[.toaster]:text-white group-[.toaster]:border-green-600/50",
-          warning: "group-[.toaster]:bg-yellow-500/95 group-[.toaster]:text-white group-[.toaster]:border-yellow-500/50",
-          info: "group-[.toaster]:bg-blue-500/95 group-[.toaster]:text-white group-[.toaster]:border-blue-500/50",
-        },
         style: {
-          zIndex: 9999,
-          width: `${toastWidth}px`,
+          padding: 0,
+          background: 'transparent',
+          border: 'none',
+          boxShadow: 'none',
         },
       }}
       {...props}
@@ -126,93 +141,100 @@ const Toaster = ({ ...props }: ToasterProps) => {
   );
 };
 
-// Simplified toast system with deduplication
+/**
+ * Renders a custom toast with unified design.
+ * All toast types (success, error, warning, info) use this same layout.
+ * zIndex controls layering — API toasts use TOAST_Z_API, notification toasts use TOAST_Z_NOTIFICATION.
+ */
+function renderCustomToast(
+  id: string | number,
+  type: keyof typeof TOAST_STYLES,
+  title: string,
+  description?: string,
+  action?: { label: string; onClick: () => void },
+  zIndex: number = TOAST_Z_API,
+) {
+  const style = TOAST_STYLES[type];
+
+  return (
+    <div
+      className={`w-full rounded-lg border p-4 shadow-sm relative overflow-hidden ${style.colors}`}
+      style={{ width: 280, maxHeight: 128, zIndex }}
+    >
+      <button
+        className="absolute top-2 right-2 p-0.5 rounded-full opacity-60 hover:opacity-100 transition-opacity"
+        onClick={(e) => {
+          e.stopPropagation();
+          toastManager.clearAll();
+        }}
+      >
+        <IconX className="h-3.5 w-3.5" />
+      </button>
+      <div className="flex items-start gap-2 pr-5">
+        {style.icon}
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-sm truncate">{title}</div>
+          {description && (
+            <div className="text-sm opacity-80 mt-1 line-clamp-3">{description}</div>
+          )}
+          {action && (
+            <button
+              className="text-sm font-medium mt-2 underline underline-offset-2 opacity-80 hover:opacity-100 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation();
+                action.onClick();
+                toastManager.clearAll();
+              }}
+            >
+              {action.label}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Creates a toast method for a given type.
+ */
+function createToastMethod(type: keyof typeof TOAST_STYLES) {
+  return (title: string, description?: string | string[], options?: ToastOptions) => {
+    const desc = Array.isArray(description) ? description.join("\n") : description;
+
+    let dedupResult: { show: boolean; id?: string } = { show: true };
+    if (!options?.allowDuplicate) {
+      dedupResult = toastManager.shouldShowToast(title, desc);
+    }
+
+    const duration = (options as any)?.duration ?? TOAST_STYLES[type].defaultDuration;
+    const action = (options as any)?.action as { label: string; onClick: () => void } | undefined;
+
+    const toastId = sonnerToast.custom(
+      (id) => renderCustomToast(id, type, title, desc, action),
+      {
+        duration,
+        ...(dedupResult.id ? { id: dedupResult.id } : {}),
+        ...((options as any)?.id ? { id: (options as any).id } : {}),
+      },
+    );
+
+    if (!options?.allowDuplicate && toastId) {
+      toastManager.trackToast(String(toastId), title, desc);
+    }
+
+    return toastId;
+  };
+}
+
+// Unified toast system — all types render with the same custom design
 const toast = {
-  success: (title: string, description?: string, options?: ToastOptions & { allowDuplicate?: boolean }) => {
-    let dedupResult: { show: boolean; id?: string } = { show: true };
-    if (!options?.allowDuplicate) {
-      dedupResult = toastManager.shouldShowToast(title, description);
-    }
+  success: createToastMethod('success'),
+  error: createToastMethod('error'),
+  warning: createToastMethod('warning'),
+  info: createToastMethod('info'),
 
-    const toastId = sonnerToast.success(title, {
-      description,
-      icon: <IconCircleCheck className="h-4 w-4" />,
-      ...options,
-      ...(dedupResult.id ? { id: dedupResult.id } : {}),
-    });
-
-    if (!options?.allowDuplicate && toastId) {
-      toastManager.trackToast(String(toastId), title, description);
-    }
-
-    return toastId;
-  },
-
-  error: (title: string, description?: string | string[], options?: ToastOptions & { allowDuplicate?: boolean }) => {
-    const errorDescription = Array.isArray(description) ? description.join("\n") : description;
-
-    let dedupResult: { show: boolean; id?: string } = { show: true };
-    if (!options?.allowDuplicate) {
-      dedupResult = toastManager.shouldShowToast(title, errorDescription);
-    }
-
-    const toastId = sonnerToast.error(title, {
-      description: errorDescription,
-      icon: <IconCircleX className="h-4 w-4" />,
-      duration: 8000,
-      ...options,
-      ...(dedupResult.id ? { id: dedupResult.id } : {}),
-    });
-
-    if (!options?.allowDuplicate && toastId) {
-      toastManager.trackToast(String(toastId), title, errorDescription);
-    }
-
-    return toastId;
-  },
-
-  warning: (title: string, description?: string, options?: ToastOptions & { allowDuplicate?: boolean }) => {
-    let dedupResult: { show: boolean; id?: string } = { show: true };
-    if (!options?.allowDuplicate) {
-      dedupResult = toastManager.shouldShowToast(title, description);
-    }
-
-    const toastId = sonnerToast.warning(title, {
-      description,
-      icon: <IconAlertCircle className="h-4 w-4" />,
-      duration: 6000,
-      ...options,
-      ...(dedupResult.id ? { id: dedupResult.id } : {}),
-    });
-
-    if (!options?.allowDuplicate && toastId) {
-      toastManager.trackToast(String(toastId), title, description);
-    }
-
-    return toastId;
-  },
-
-  info: (title: string, description?: string, options?: ToastOptions & { allowDuplicate?: boolean }) => {
-    let dedupResult: { show: boolean; id?: string } = { show: true };
-    if (!options?.allowDuplicate) {
-      dedupResult = toastManager.shouldShowToast(title, description);
-    }
-
-    const toastId = sonnerToast.info(title, {
-      description,
-      icon: <IconInfoCircle className="h-4 w-4" />,
-      ...options,
-      ...(dedupResult.id ? { id: dedupResult.id } : {}),
-    });
-
-    if (!options?.allowDuplicate && toastId) {
-      toastManager.trackToast(String(toastId), title, description);
-    }
-
-    return toastId;
-  },
-
-  // For custom toasts and direct sonner access
+  // For fully custom toasts and direct sonner access
   custom: sonnerToast.custom,
   promise: sonnerToast.promise,
   dismiss: sonnerToast.dismiss,
@@ -225,4 +247,4 @@ const toast = {
   manager: toastManager,
 };
 
-export { Toaster, toast };
+export { Toaster, toast, renderCustomToast, TOAST_Z_API, TOAST_Z_NOTIFICATION, TOAST_STYLES };

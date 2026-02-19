@@ -1,5 +1,5 @@
 import { useCallback, useRef } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 interface ToastOptions {
   title: string;
@@ -78,37 +78,22 @@ export function useToast() {
           }
         })();
 
-      // Call appropriate sonner toast method
+      // Call appropriate toast method from unified wrapper
       switch (options.variant) {
         case "success":
-          toast.success(options.title, {
-            description: formattedDescription,
-            duration,
-          });
+          toast.success(options.title, formattedDescription, { duration });
           break;
         case "error":
-          toast.error(options.title, {
-            description: formattedDescription,
-            duration,
-          });
+          toast.error(options.title, formattedDescription, { duration });
           break;
         case "warning":
-          toast.warning(options.title, {
-            description: formattedDescription,
-            duration,
-          });
+          toast.warning(options.title, formattedDescription, { duration });
           break;
         case "info":
-          toast.info(options.title, {
-            description: formattedDescription,
-            duration,
-          });
+          toast.info(options.title, formattedDescription, { duration });
           break;
         default:
-          toast(options.title, {
-            description: formattedDescription,
-            duration,
-          });
+          toast.info(options.title, formattedDescription, { duration });
       }
     },
     [manager],
@@ -155,10 +140,7 @@ export function useToast() {
 
       const retryDescription = `${description}\n\nTentativa ${attempt} de ${maxAttempts}`;
 
-      toast.info(`🔄 ${title}`, {
-        description: retryDescription,
-        duration: 8000,
-      });
+      toast.info(`🔄 ${title}`, retryDescription, { duration: 8000 });
 
       // Auto-clear retry flag after 10 seconds
       setTimeout(() => {

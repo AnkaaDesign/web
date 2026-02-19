@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { ServiceOrderCell } from "../history/service-order-cell";
 import { TaskTableContextMenu, type TaskAction } from "./task-table-context-menu";
-import { DuplicateTaskModal, type DuplicateTaskCopyData } from "./duplicate-task-modal";
+import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetStatusModal } from "./set-status-modal";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
@@ -507,73 +507,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
     }
   };
 
-  const handleDuplicateConfirm = async (copies: DuplicateTaskCopyData) => {
-    if (!taskToDuplicate || copies.length === 0) return;
-
-    // Build task data for each copy
-    // NOTE: task.artworks are now Artwork entities with { id, fileId, status, file?: File }
-    // We need to extract File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
-    const buildTaskData = (copyData: { serialNumber?: string; plate?: string }) => ({
-      // Basic fields
-      name: taskToDuplicate.name,
-      status: TASK_STATUS.PREPARATION,
-      serialNumber: copyData.serialNumber || null,
-      plate: copyData.plate || null,
-      details: taskToDuplicate.details,
-      entryDate: taskToDuplicate.entryDate,
-      term: taskToDuplicate.term,
-      startedAt: null, // Reset
-      finishedAt: null, // Reset
-
-      // ID fields only (no relation objects)
-      paintId: taskToDuplicate.paintId,
-      customerId: taskToDuplicate.customerId,
-      sectorId: taskToDuplicate.sectorId,
-      budgetIds: taskToDuplicate.budgets?.map((b: any) => b.id) || [],
-      invoiceIds: taskToDuplicate.invoices?.map((i: any) => i.id) || [],
-      receiptIds: taskToDuplicate.receipts?.map((r: any) => r.id) || [],
-      commission: taskToDuplicate.commission, // Required field
-
-      // Relations - only IDs
-      // artworkIds must be File IDs, not Artwork entity IDs
-      artworkIds: taskToDuplicate.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
-      paintIds: taskToDuplicate.logoPaints?.map((paint) => paint.id) || [],
-
-      // Services - ensure it's an array with only required fields
-      services: Array.isArray(taskToDuplicate.serviceOrders)
-        ? taskToDuplicate.serviceOrders.map((service) => ({
-            status: service.status,
-            statusOrder: service.statusOrder,
-            description: service.description,
-            startedAt: null, // Reset service dates
-            finishedAt: null,
-          }))
-        : [],
-
-      // Truck (if exists or if plate provided)
-      truck: taskToDuplicate.truck || copyData.plate
-        ? {
-            plate: copyData.plate || taskToDuplicate.truck?.plate || null,
-            chassisNumber: taskToDuplicate.truck?.chassisNumber || null,
-            spot: taskToDuplicate.truck?.spot || null,
-          }
-        : null,
-
-      // Observation (if exists) - artworkIds must also be File IDs
-      observation: taskToDuplicate.observation
-        ? {
-            description: taskToDuplicate.observation.description,
-            artworkIds: taskToDuplicate.observation.files?.map((file: any) => file.id) || [],
-          }
-        : null,
-    });
-
-    // Create all copies - use Promise.all for parallel creation
-    const tasksToCreate = copies.map(buildTaskData);
-    await Promise.all(tasksToCreate.map(taskData => createAsync(taskData)));
-
-    setTaskToDuplicate(null);
-  };
+  // handleDuplicateConfirm is now handled internally by TaskDuplicateModal
 
   const handleSetSectorConfirm = async (sectorId: string | null) => {
     await batchUpdateAsync({
@@ -585,7 +519,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
     setTasksToUpdate([]);
   };
 
-  const handleSetStatusConfirm = async (status: typeof TASK_STATUS.INVOICED | typeof TASK_STATUS.SETTLED) => {
+  const handleSetStatusConfirm = async (status: TASK_STATUS) => {
     try {
       await batchUpdateAsync({
         tasks: tasksToUpdate.map((task) => ({
@@ -594,11 +528,10 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
         })),
       });
 
-      const statusLabel = status === TASK_STATUS.INVOICED ? "Faturado" : "Liquidado";
       const taskCount = tasksToUpdate.length;
 
       toast.success(
-        `${taskCount} tarefa${taskCount > 1 ? "s" : ""} marcada${taskCount > 1 ? "s" : ""} como ${statusLabel}`,
+        `${taskCount} tarefa${taskCount > 1 ? "s" : ""} atualizada${taskCount > 1 ? "s" : ""}`,
         {
           description: taskCount === 1 ? tasksToUpdate[0].name : `${taskCount} tarefas atualizadas`,
         }
@@ -822,11 +755,16 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
         </Table>
       </div>
 
-      <DuplicateTaskModal open={duplicateModalOpen} onOpenChange={setDuplicateModalOpen} task={taskToDuplicate} onConfirm={handleDuplicateConfirm} />
+      <TaskDuplicateModal
+        task={taskToDuplicate}
+        open={!!taskToDuplicate}
+        onOpenChange={(open) => { if (!open) { setTaskToDuplicate(null); setDuplicateModalOpen(false); } }}
+        onSuccess={() => { setTaskToDuplicate(null); setDuplicateModalOpen(false); }}
+      />
 
       <SetSectorModal open={setSectorModalOpen} onOpenChange={setSetSectorModalOpen} tasks={tasksToUpdate} onConfirm={handleSetSectorConfirm} />
 
-      <SetStatusModal open={setStatusModalOpen} onOpenChange={setSetStatusModalOpen} tasks={tasksToUpdate} onConfirm={(status) => handleSetStatusConfirm(status as any)} />
+      <SetStatusModal open={setStatusModalOpen} onOpenChange={setSetStatusModalOpen} tasks={tasksToUpdate} onConfirm={handleSetStatusConfirm} />
 
       {/* Only render AdvancedBulkActionsHandler if using internal ref (not shared) */}
       {!externalAdvancedActionsRef && (

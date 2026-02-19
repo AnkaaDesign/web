@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconBuilding, IconCertificate, IconUser, IconFileDescription } from "@tabler/icons-react";
+import { IconBuilding, IconCertificate, IconUser, IconFileDescription, IconPhone, IconMail, IconWorld, IconBrandWhatsapp } from "@tabler/icons-react";
 import type { Customer } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { maskCNPJ, maskCPF } from "../../../../utils";
+import { maskCNPJ, maskCPF, formatBrazilianPhone } from "../../../../utils";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { REGISTRATION_STATUS_OPTIONS } from "@/constants/enums";
 
@@ -12,6 +12,8 @@ interface BasicInfoCardProps {
 }
 
 export function BasicInfoCard({ customer, className }: BasicInfoCardProps) {
+  const hasContact = customer.email || (customer.phones && customer.phones.length > 0) || customer.site;
+
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
@@ -82,6 +84,71 @@ export function BasicInfoCard({ customer, className }: BasicInfoCardProps) {
               )}
             </div>
           </div>
+
+          {/* Contact Section */}
+          {hasContact && (
+            <div className="pt-6 border-t border-border">
+              <h3 className="text-base font-semibold mb-4 text-foreground">Contato</h3>
+              <div className="space-y-3">
+                {customer.email && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconMail className="h-4 w-4" />
+                      E-mail
+                    </span>
+                    <a href={`mailto:${customer.email}`} className="text-sm font-semibold text-green-600 dark:text-green-600 hover:underline">
+                      {customer.email}
+                    </a>
+                  </div>
+                )}
+
+                {customer.phones && customer.phones.length > 0 && customer.phones.map((phone: string, index: number) => {
+                  const cleanPhone = phone.replace(/\D/g, "");
+                  const whatsappNumber = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+
+                  return (
+                    <div key={index} className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <IconPhone className="h-4 w-4" />
+                        Telefone {customer.phones.length > 1 ? `${index + 1}` : ""}
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <a href={`tel:${phone}`} className="text-sm font-semibold text-green-600 dark:text-green-600 hover:underline font-mono">
+                          {formatBrazilianPhone(phone)}
+                        </a>
+                        <a
+                          href={`https://wa.me/${whatsappNumber}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-600 dark:text-green-600 hover:text-green-700 dark:hover:text-green-500 transition-colors"
+                          title="Enviar mensagem no WhatsApp"
+                        >
+                          <IconBrandWhatsapp className="h-5 w-5" />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {customer.site && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconWorld className="h-4 w-4" />
+                      Site
+                    </span>
+                    <a
+                      href={customer.site.startsWith("http") ? customer.site : `https://${customer.site}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-semibold text-green-600 dark:text-green-600 hover:underline"
+                    >
+                      {customer.site}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Tags Section */}
           {customer.tags && customer.tags.length > 0 && (

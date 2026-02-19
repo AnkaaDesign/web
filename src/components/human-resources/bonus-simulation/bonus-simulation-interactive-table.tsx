@@ -29,10 +29,11 @@ import {
   IconSelector
 } from "@tabler/icons-react";
 import { formatCurrency, getBonusPeriod, getCurrentPayrollPeriod, formatDate } from "../../../utils";
-import { useUsers, useSectors, useTasks } from "../../../hooks";
+import { useUsers, useSectors } from "../../../hooks";
+import { bonusService } from "../../../api-client";
 import { calculateBonusForPosition } from "../../../utils/bonus";
 import { cn } from "@/lib/utils";
-import { TASK_STATUS, COMMISSION_STATUS, USER_STATUS } from "../../../constants";
+import { USER_STATUS } from "../../../constants";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
 import { toast } from "sonner";
@@ -156,6 +157,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   const [averageInput, setAverageInput] = useState<string>('0,00'); // String value for controlled input (Brazilian format) - 2 decimals
   const [simulatedUsers, setSimulatedUsers] = useState<SimulatedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [liveTaskInfo, setLiveTaskInfo] = useState<{ rawCount: number; weightedCount: number; suspendedCount: number; eligibleUsers: number; averageTasksPerEmployee: number } | null>(null);
 
   // Filter state - no default filters, show all eligible users
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -184,30 +186,51 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     limit: 100
   });
 
-  // Fetch tasks for current period to get actual count
-  // Ensure dates are set to exact times: 26th at 00:00:00.000 and 25th at 23:59:59.999
-  const startDate = new Date(currentPeriod.startDate);
-  startDate.setHours(0, 0, 0, 0);
+  // Fetch weighted task count from the lightweight period stats endpoint
+  // This returns only task counts without Secullum integration (fast)
+  useEffect(() => {
+    const fetchWeightedTaskCount = async () => {
+      try {
+        const response = await bonusService.getPeriodTaskStats(periodYear, periodMonth);
+        const liveData = (response.data as any)?.data ?? response.data;
 
-  const endDate = new Date(currentPeriod.endDate);
-  endDate.setHours(23, 59, 59, 999);
+        // Use totalWeightedTasks from the live calculation (excludes suspended commissions)
+        const weightedTaskCount = typeof liveData.totalWeightedTasks === 'number'
+          ? liveData.totalWeightedTasks
+          : Number(liveData.totalWeightedTasks) || 0;
 
-  const taskQuery = {
-    where: {
-      status: { in: [TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED] }, // Only count completed, invoiced, or settled tasks
-      finishedAt: {
-        gte: startDate,
-        lte: endDate
-      },
-      commission: {
-        in: [COMMISSION_STATUS.FULL_COMMISSION, COMMISSION_STATUS.PARTIAL_COMMISSION]
+        const rawCount = typeof liveData.totalRawTaskCount === 'number'
+          ? liveData.totalRawTaskCount
+          : Number(liveData.totalRawTaskCount) || 0;
+
+        const suspendedCount = typeof liveData.totalSuspendedTasks === 'number'
+          ? liveData.totalSuspendedTasks
+          : Number(liveData.totalSuspendedTasks) || 0;
+
+        const eligibleUsers = typeof liveData.eligibleUsers === 'number'
+          ? liveData.eligibleUsers
+          : Number(liveData.eligibleUsers) || 0;
+
+        const averageTasksPerEmployee = typeof liveData.averageTasksPerEmployee === 'number'
+          ? liveData.averageTasksPerEmployee
+          : Number(liveData.averageTasksPerEmployee) || 0;
+
+        // Store task info for the period info display
+        setLiveTaskInfo({ rawCount, weightedCount: weightedTaskCount, suspendedCount, eligibleUsers, averageTasksPerEmployee });
+
+        // Only set if taskQuantity is still 0 (initial state)
+        if (weightedTaskCount > 0) {
+          setTaskQuantity(weightedTaskCount);
+          setOriginalTaskQuantity(weightedTaskCount);
+          setTaskInput(weightedTaskCount.toFixed(1).replace('.', ','));
+        }
+      } catch (err) {
+        console.error('[BonusSimulation] Failed to fetch weighted task count:', err);
       }
-    },
-    limit: 1000, // Maximum allowed by API
-    enabled: true // Always enabled to get the count
-  };
+    };
 
-  const { data: currentPeriodTasks } = useTasks(taskQuery);
+    fetchWeightedTaskCount();
+  }, [periodYear, periodMonth]);
 
   // Fetch all effected users for bonus simulation
   // Client-side filters will handle eligibility, sectors, positions, etc.
@@ -223,61 +246,44 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     limit: 100
   });
 
-  // Set default task quantity from current period when data is available
-  useEffect(() => {
-    if (currentPeriodTasks?.data && currentPeriodTasks.success) {
-      // Calculate weighted task count: full commission = 1.0, partial commission = 0.5
-      const weightedTaskCount = currentPeriodTasks.data.reduce((sum, task) => {
-        if (task.commission === COMMISSION_STATUS.FULL_COMMISSION) {
-          return sum + 1.0;
-        } else if (task.commission === COMMISSION_STATUS.PARTIAL_COMMISSION) {
-          return sum + 0.5;
-        }
-        return sum;
-      }, 0);
-
-      // Only set if taskQuantity is still 0 (initial state)
-      if (taskQuantity === 0) {
-        setTaskQuantity(weightedTaskCount);
-        setOriginalTaskQuantity(weightedTaskCount);
-        setTaskInput(weightedTaskCount.toFixed(1).replace('.', ','));
-      }
-    }
-  }, [currentPeriodTasks]);
-
   // Initialize simulated users from fetched data
   useEffect(() => {
-    if (usersData?.data && usersData.data.length > 0) {
-      // Calculate initial average for bonus calculation
-      const eligibleCount = usersData.data.length;
-      const initialAverage = eligibleCount > 0 ? taskQuantity / eligibleCount : 0;
+    if (usersData?.data) {
+      if (usersData.data.length > 0) {
+        // Calculate initial average for bonus calculation
+        // Only count users that are truly eligible (bonifiable position + performanceLevel > 0)
+        const eligibleCount = usersData.data.filter(u =>
+          u.position?.bonifiable === true && (u.performanceLevel ?? 0) > 0
+        ).length;
+        const initialAverage = eligibleCount > 0 ? taskQuantity / eligibleCount : 0;
 
-      const users = usersData.data.map(user => {
-        const initialPosition = user.position?.name || "Pleno I";
-        const initialPerformanceLevel = user.performanceLevel || 3;
+        const users = usersData.data.map(user => {
+          const initialPosition = user.position?.name || "Pleno I";
+          const initialPerformanceLevel = user.performanceLevel ?? 0;
 
-        // Calculate initial bonus immediately
-        const initialBonus = calculateBonusForPosition(
-          initialPosition,
-          initialPerformanceLevel,
-          initialAverage
-        );
+          // Calculate initial bonus immediately
+          const initialBonus = calculateBonusForPosition(
+            initialPosition,
+            initialPerformanceLevel,
+            initialAverage
+          );
 
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          payrollNumber: user.payrollNumber || null,
-          originalPosition: initialPosition,
-          originalPerformanceLevel: initialPerformanceLevel,
-          sectorId: user.sector?.id || null,
-          sectorName: user.sector?.name || null,
-          position: initialPosition,
-          performanceLevel: initialPerformanceLevel,
-          bonusAmount: initialBonus
-        };
-      }) as SimulatedUser[];
-      setSimulatedUsers(users);
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            payrollNumber: user.payrollNumber || null,
+            originalPosition: initialPosition,
+            originalPerformanceLevel: initialPerformanceLevel,
+            sectorId: user.sector?.id || null,
+            sectorName: user.sector?.name || null,
+            position: initialPosition,
+            performanceLevel: initialPerformanceLevel,
+            bonusAmount: initialBonus
+          };
+        }) as SimulatedUser[];
+        setSimulatedUsers(users);
+      }
       setIsLoading(false);
     }
   }, [usersData]); // Only reinitialize when usersData changes, not when taskQuantity changes
@@ -1130,32 +1136,22 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
         )}
 
         {/* Current Period Info - Only show when there's actual data and task quantity is not modified */}
-        {!isTaskQuantityModified && currentPeriodTasks?.success && currentPeriodTasks.data && currentPeriodTasks.data.length > 0 && (() => {
-          const fullCommissionCount = currentPeriodTasks.data.filter(
-            t => t.commission === COMMISSION_STATUS.FULL_COMMISSION
-          ).length;
-          const partialCommissionCount = currentPeriodTasks.data.filter(
-            t => t.commission === COMMISSION_STATUS.PARTIAL_COMMISSION
-          ).length;
-          const weightedCount = fullCommissionCount + (partialCommissionCount * 0.5);
-
-          return (
-            <div className="mt-4 p-3 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg border border-blue-500/30">
-              <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
-                <IconCalculator className="h-4 w-4" />
-                <span className="font-medium">
-                  Período atual ({currentPeriod.startDate.toLocaleDateString('pt-BR')} a {currentPeriod.endDate.toLocaleDateString('pt-BR')}):
-                </span>
-                <Badge variant="outline" className="bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30">
-                  {weightedCount.toFixed(1)} tarefas ponderadas
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  ({fullCommissionCount} integral{fullCommissionCount !== 1 ? '' : ''} + {partialCommissionCount} parcial{partialCommissionCount !== 1 ? '' : ''})
-                </span>
-              </div>
+        {!isTaskQuantityModified && liveTaskInfo && liveTaskInfo.weightedCount > 0 && (
+          <div className="mt-4 p-3 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg border border-blue-500/30">
+            <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+              <IconCalculator className="h-4 w-4" />
+              <span className="font-medium">
+                Período atual ({currentPeriod.startDate.toLocaleDateString('pt-BR')} a {currentPeriod.endDate.toLocaleDateString('pt-BR')}):
+              </span>
+              <Badge variant="outline" className="bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30">
+                {liveTaskInfo.weightedCount.toFixed(1)} tarefas ponderadas
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                ({liveTaskInfo.rawCount} total{liveTaskInfo.suspendedCount > 0 ? `, ${liveTaskInfo.suspendedCount} suspensa${liveTaskInfo.suspendedCount !== 1 ? 's' : ''}` : ''})
+              </span>
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
 
 

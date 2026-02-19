@@ -119,6 +119,13 @@ export const bonusService = {
   // =====================================================
 
   /**
+   * Get lightweight period task stats for bonus simulation (no Secullum)
+   * Uses endpoint: GET /bonus/period-stats/:year/:month
+   */
+  getPeriodTaskStats: (year: number, month: number) =>
+    apiClient.get<any>(`/bonus/period-stats/${year}/${month}`),
+
+  /**
    * Get live bonus calculations for a specific period
    * Uses new clean endpoint: GET /bonus/live/:year/:month
    */

@@ -383,6 +383,7 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     // Vehicle identification
     serialNumber: task.serialNumber || null,
     plate: task.truck?.plate || null,
+    chassisNumber: task.truck?.chassisNumber || null,
     // New TaskPricing fields
     invoicesToCustomers: task.pricing.invoicesToCustomers,
     simultaneousTasks: task.pricing.simultaneousTasks || null,
@@ -430,6 +431,7 @@ interface BudgetHtmlData {
   // Vehicle identification
   serialNumber: string | null;
   plate: string | null;
+  chassisNumber: string | null;
   // New TaskPricing fields
   invoicesToCustomers?: Array<{ corporateName?: string; fantasyName?: string }>;
   simultaneousTasks?: number | null;
@@ -950,7 +952,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       <!-- Customer Info -->
       <div class="customer-section">
         <div class="customer-name">À ${escapeHtml(data.contactName || corporateName(data.corporateName))}</div>
-        <p class="intro-text">Conforme solicitado, apresentamos nossa proposta de preço para execução dos serviços abaixo descriminados${data.serialNumber || data.plate ? ` no veículo${data.serialNumber ? ` nº série: <strong>${escapeHtml(data.serialNumber)}</strong>` : ''}${data.serialNumber && data.plate ? ',' : ''}${data.plate ? ` placa: <strong style="font-weight: 600;">${escapeHtml(data.plate)}</strong>` : ''}` : ''}.</p>
+        <p class="intro-text">Conforme solicitado, apresentamos nossa proposta de preço para execução dos serviços abaixo descriminados${data.serialNumber || data.plate || data.chassisNumber ? ` no veículo${data.serialNumber ? ` nº série: <strong>${escapeHtml(data.serialNumber)}</strong>` : ''}${data.serialNumber && (data.plate || data.chassisNumber) ? ',' : ''}${data.plate ? ` placa: <strong style="font-weight: 600;">${escapeHtml(data.plate)}</strong>` : ''}${data.plate && data.chassisNumber ? ',' : ''}${data.chassisNumber ? ` chassi: <strong style="font-weight: 600;">${escapeHtml(data.chassisNumber)}</strong>` : ''}` : ''}.</p>
         ${data.invoicesToCustomers && data.invoicesToCustomers.length > 0 ? `<p class="intro-text" style="margin-top: 3mm;"><strong>Faturamento para:</strong> ${data.invoicesToCustomers.map(c => escapeHtml(c.fantasyName || c.corporateName || "Cliente")).join(", ")}</p>` : ""}
       </div>
 

@@ -138,9 +138,18 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     if (actionUrl.startsWith('{')) {
       try {
         const parsed = JSON.parse(actionUrl);
-        // Return the web URL from the parsed object
-        if (parsed && typeof parsed === 'object' && parsed.web) {
-          return parsed.web;
+        if (parsed && typeof parsed === 'object') {
+          // Prefer webPath for internal navigation
+          if (parsed.webPath) return parsed.webPath;
+          // Fall back to extracting path from web URL
+          if (parsed.web) {
+            try {
+              const url = new URL(parsed.web);
+              return url.pathname;
+            } catch {
+              return parsed.web;
+            }
+          }
         }
       } catch {
         // Not valid JSON, continue with original value

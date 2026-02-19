@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import type { BatchOperationResult, BatchOperationSuccess, BatchOperationError } from '@types';
 
 export interface BatchToastOptions {
@@ -72,28 +72,16 @@ export function showBatchOperationToast<T, U = unknown>(result: DetailedBatchRes
 
   // Show appropriate toast
   if (isComplete) {
-    toast.success(fullMessage, {
+    toast.success(mainMessage, detailsMessage || undefined, {
       duration: 5000,
-      style: {
-        whiteSpace: "pre-line", // Allow line breaks
-      },
     });
   } else if (isCompleteFailure) {
-    toast.error(fullMessage, {
+    toast.error(mainMessage, detailsMessage || undefined, {
       duration: 8000,
-      style: {
-        whiteSpace: "pre-line", // Allow line breaks
-      },
     });
   } else if (isPartialSuccess) {
-    toast.warning(fullMessage, {
+    toast.warning(mainMessage, detailsMessage || undefined, {
       duration: 8000,
-      style: {
-        backgroundColor: "#fbbf24", // Yellow/amber background
-        border: "1px solid #f59e0b",
-        color: "#92400e",
-        whiteSpace: "pre-line", // Allow line breaks
-      },
     });
   }
 }

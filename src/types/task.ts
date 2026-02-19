@@ -54,7 +54,7 @@ export interface Task extends BaseEntity {
   customer?: Customer;
   budgets?: File[]; // Many-to-many relation (budget files)
   pricingId?: string | null; // Foreign key to TaskPricing
-  pricing?: TaskPricing; // Task pricing (one-to-many: one pricing can be shared across multiple tasks)
+  pricing?: TaskPricing; // Task pricing (one-to-one: each task has its own unique pricing)
   invoices?: File[]; // Many-to-many relation
   receipts?: File[]; // Many-to-many relation
   bankSlips?: File[]; // Many-to-many relation
@@ -90,7 +90,7 @@ export interface TaskIncludes {
         include?: CustomerIncludes;
       };
   budgets?: boolean; // Many-to-many relation (budget files)
-  pricing?: boolean | { include?: { items?: boolean; layoutFile?: boolean; customerSignature?: boolean } }; // Task pricing (one-to-many: one pricing can be shared across multiple tasks)
+  pricing?: boolean | { include?: { items?: boolean; layoutFile?: boolean; customerSignature?: boolean } }; // Task pricing (one-to-one: each task has its own unique pricing)
   invoices?: boolean; // Many-to-many relation
   receipts?: boolean; // Many-to-many relation
   bankSlips?: boolean; // Many-to-many relation

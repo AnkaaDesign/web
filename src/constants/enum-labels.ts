@@ -174,8 +174,6 @@ export const TASK_STATUS_LABELS: Record<TASK_STATUS, string> = {
   [TASK_STATUS.WAITING_PRODUCTION]: "Aguardando Produção",
   [TASK_STATUS.IN_PRODUCTION]: "Em Produção",
   [TASK_STATUS.COMPLETED]: "Concluído",
-  [TASK_STATUS.INVOICED]: "Faturado",
-  [TASK_STATUS.SETTLED]: "Liquidado",
   [TASK_STATUS.CANCELLED]: "Cancelado",
 };
 

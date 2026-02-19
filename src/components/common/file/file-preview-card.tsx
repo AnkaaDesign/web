@@ -116,8 +116,11 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
 
     const url = getFileDownloadUrl(file);
     const mimeType = file.mimetype || "application/octet-stream";
-    const filename = file.filename || "download";
+    // Sanitize filename: colons break DownloadURL format (mime:name:url)
+    const filename = (file.filename || "download").replace(/:/g, "_");
     e.dataTransfer.setData("DownloadURL", `${mimeType}:${filename}:${url}`);
+    e.dataTransfer.setData("text/uri-list", url);
+    e.dataTransfer.setData("text/plain", url);
 
     if (imgRef.current) {
       e.dataTransfer.setDragImage(imgRef.current, 0, 0);
@@ -184,7 +187,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
                   setThumbnailLoading(false);
                   setShowThumbnail(false);
                 }}
-                draggable={false}
+                draggable
               />
             </div>
           ) : (

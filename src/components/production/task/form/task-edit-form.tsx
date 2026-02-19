@@ -739,14 +739,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
               shouldSync: (so as any).shouldSync !== false, // Include shouldSync flag (default true)
               createdAt: so.createdAt, // Keep createdAt for ordering
             }))
-            // Sort by creation order (oldest first), cancelled items go to end
+            // Push cancelled items to end, preserve API order (type + position) for the rest
             .sort((a, b) => {
               const aCancelled = a.status === SERVICE_ORDER_STATUS.CANCELLED ? 1 : 0;
               const bCancelled = b.status === SERVICE_ORDER_STATUS.CANCELLED ? 1 : 0;
               if (aCancelled !== bCancelled) return aCancelled - bCancelled;
-              const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-              const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-              return aTime - bTime;
+              return 0; // Preserve API order (ordered by type asc, position asc)
             });
         }
         return [{
@@ -867,12 +865,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           changedData.entryDate = entryDate;
         }
 
-        // Set forecast date to 7:30 if provided (since the date picker only allows date selection)
-        if (changedData.forecastDate) {
-          const forecastDate = new Date(changedData.forecastDate);
-          forecastDate.setHours(7, 30, 0, 0);
-          changedData.forecastDate = forecastDate;
-        }
 
         // Set term date to 18:00 (end of work day) if provided
         if (changedData.term) {
@@ -2293,6 +2285,52 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     }
   }, []);
 
+  // Reorder synced pricing items to match PRODUCTION service order reorder
+  const handleProductionReorder = useCallback((descriptions: string[]) => {
+    const currentPricingItems = ((form.getValues('pricing') as any)?.items as any[]) || [];
+    if (currentPricingItems.length === 0) return;
+
+    // Build a map: normalized description → target order index
+    const orderMap = new Map<string, number>();
+    descriptions.forEach((desc, idx) => {
+      orderMap.set(normalizeDescription(desc), idx);
+    });
+
+    // Separate synced (matched) and unsynced pricing items, keeping original indices
+    const synced: { item: any; orderIdx: number; origIdx: number }[] = [];
+    const unsynced: { item: any; origIdx: number }[] = [];
+
+    currentPricingItems.forEach((item: any, origIdx: number) => {
+      const normalized = normalizeDescription(item.description || '');
+      const orderIdx = orderMap.get(normalized);
+      if (orderIdx !== undefined && item.shouldSync !== false) {
+        synced.push({ item, orderIdx, origIdx });
+      } else {
+        unsynced.push({ item, origIdx });
+      }
+    });
+
+    if (synced.length < 2) return; // Nothing to reorder
+
+    // Sort synced items by the new order
+    synced.sort((a, b) => a.orderIdx - b.orderIdx);
+
+    // Reconstruct: place synced items back into the same slot positions they originally occupied
+    const syncedSlots = synced.map(s => s.origIdx).sort((a, b) => a - b);
+    const newItems = [...currentPricingItems];
+    syncedSlots.forEach((slot, i) => {
+      newItems[slot] = synced[i].item;
+    });
+
+    // Use PricingSelector's useFieldArray replace method instead of form.setValue
+    // to ensure proper sync with useFieldArray's internal state
+    if (pricingSelectorRef.current) {
+      pricingSelectorRef.current.replaceItems(newItems);
+    } else {
+      form.setValue('pricing.items', newItems, { shouldDirty: true });
+    }
+  }, [form]);
+
   // Representative rows are now managed by RepresentativeManager component
   // Handler to update representative rows and sync with form
   const handleRepresentativeRowsChange = useCallback((rows: RepresentativeRowData[]) => {
@@ -2594,10 +2632,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             added: pricingItemsToAdd.length,
             observationsUpdated: pricingObservationsUpdated,
           });
-          form.setValue('pricing.items', finalPricingItems, {
-            shouldDirty: true,
-            shouldTouch: true,
-          });
+          // Use PricingSelector's useFieldArray replace method instead of form.setValue
+          if (pricingSelectorRef.current) {
+            pricingSelectorRef.current.replaceItems(finalPricingItems);
+          } else {
+            form.setValue('pricing.items', finalPricingItems, {
+              shouldDirty: true,
+              shouldTouch: true,
+            });
+          }
         }
 
         // =====================================================================
@@ -3361,7 +3404,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                               value: field.value ?? null,
                               name: field.name,
                             },
-                            mode: "date",
+                            mode: "datetime",
                             context: "start",
                             label: "Data de Previsão de Liberação",
                             disabled: isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser,
@@ -3473,6 +3516,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             isTeamLeader={isTeamLeader}
                             onItemDeleted={handleServiceOrderDeleted}
                             isAccordionOpen={openAccordion === "serviceOrders"}
+                            onProductionReorder={handleProductionReorder}
                           />
                           <FormMessage />
                         </FormItem>

@@ -1,11 +1,38 @@
 import { useEffect, useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { toast as sonnerToast } from 'sonner';
+import { IconX } from '@tabler/icons-react';
+import { toast, TOAST_Z_NOTIFICATION } from '@/components/ui/sonner';
 import { useSocket } from './use-socket';
 import { notificationKeys } from './query-keys';
 import { socketService, type ConnectionState } from '@/lib/socket';
 import type { Notification } from '@/types';
+
+/**
+ * Parse actionUrl which may be a JSON string containing web, mobile, webPath URLs.
+ * Returns the internal webPath for navigation, or extracts path from web URL.
+ */
+function parseActionUrl(actionUrl: string): string | null {
+  if (actionUrl.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(actionUrl);
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.webPath) return parsed.webPath;
+        if (parsed.web) {
+          try {
+            const url = new URL(parsed.web);
+            return url.pathname;
+          } catch {
+            return parsed.web;
+          }
+        }
+      }
+    } catch {
+      // Not valid JSON, fall through
+    }
+  }
+  return actionUrl;
+}
 
 /**
  * Hook to handle real-time notification events via Socket.io
@@ -58,7 +85,7 @@ export function useNotificationSocket() {
         }
       );
 
-      // Show toast notification - entire toast is clickable when actionUrl exists
+      // Show toast notification
       const getDuration = () => {
         switch (notification.importance) {
           case 'URGENT': return 10000;
@@ -68,8 +95,10 @@ export function useNotificationSocket() {
         }
       };
 
-      if (notification.actionUrl) {
-        const actionUrl = notification.actionUrl;
+      const actionUrl = notification.actionUrl ? parseActionUrl(notification.actionUrl) : null;
+
+      if (actionUrl) {
+        // Clickable notification toast with close button
         const importanceColors: Record<string, string> = {
           URGENT: 'bg-destructive/95 text-destructive-foreground border-destructive/50',
           HIGH: 'bg-yellow-500/95 text-white border-yellow-500/50',
@@ -77,42 +106,56 @@ export function useNotificationSocket() {
         };
         const colorClass = importanceColors[notification.importance || ''] || 'bg-background text-foreground border-border';
 
-        sonnerToast.custom(
+        toast.custom(
           (id) => (
             <div
-              className={`cursor-pointer w-full rounded-lg border p-4 shadow-sm ${colorClass}`}
+              className={`cursor-pointer rounded-lg border p-4 shadow-sm relative overflow-hidden ${colorClass}`}
+              style={{ zIndex: TOAST_Z_NOTIFICATION, width: 280, maxHeight: 128 }}
               onClick={() => {
-                navigate(actionUrl);
-                sonnerToast.dismiss(id);
+                if (actionUrl.startsWith('http://') || actionUrl.startsWith('https://')) {
+                  window.open(actionUrl, '_blank');
+                } else {
+                  navigate(actionUrl);
+                }
+                toast.clearAll();
               }}
             >
-              <div className="font-medium text-sm">{notification.title}</div>
+              <button
+                className="absolute top-2 right-2 p-0.5 rounded-full opacity-60 hover:opacity-100 transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toast.clearAll();
+                }}
+              >
+                <IconX className="h-3.5 w-3.5" />
+              </button>
+              <div className="font-medium text-sm pr-5 truncate">{notification.title}</div>
               {notification.body && (
-                <div className="text-sm opacity-80 mt-1">{notification.body}</div>
+                <div className="text-sm opacity-80 mt-1 line-clamp-4">{notification.body}</div>
               )}
             </div>
           ),
           { duration: getDuration() }
         );
       } else {
+        // Standard toast for notifications without action URL
         const toastOptions = {
-          description: notification.body,
           duration: getDuration(),
         };
 
         switch (notification.importance) {
           case 'URGENT':
-            sonnerToast.error(notification.title, toastOptions);
+            toast.error(notification.title, notification.body, toastOptions);
             break;
           case 'HIGH':
-            sonnerToast.warning(notification.title, toastOptions);
+            toast.warning(notification.title, notification.body, toastOptions);
             break;
           case 'NORMAL':
-            sonnerToast.info(notification.title, toastOptions);
+            toast.info(notification.title, notification.body, toastOptions);
             break;
           case 'LOW':
           default:
-            sonnerToast(notification.title, toastOptions);
+            toast.info(notification.title, notification.body, toastOptions);
             break;
         }
       }
@@ -226,9 +269,7 @@ export function useNotificationSocket() {
 
       // Show toast if there are missed notifications
       if (data.notifications && data.notifications.length > 0) {
-        sonnerToast.info('Notificações sincronizadas', {
-          description: `${data.notifications.length} ${data.notifications.length === 1 ? 'notificação recebida' : 'notificações recebidas'} enquanto você estava offline.`,
-        });
+        toast.info('Notificações sincronizadas', `${data.notifications.length} ${data.notifications.length === 1 ? 'notificação recebida' : 'notificações recebidas'} enquanto você estava offline.`);
       }
     };
 

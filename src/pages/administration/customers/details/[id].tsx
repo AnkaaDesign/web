@@ -9,7 +9,7 @@ import { hasAnyPrivilege } from "@/utils";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { BasicInfoCard, ContactDetailsCard, AddressInfoCard, CustomerTasksList, DocumentsCard } from "@/components/administration/customer/detail";
+import { BasicInfoCard, AddressInfoCard, CustomerTasksList, DocumentsCard } from "@/components/administration/customer/detail";
 import { CustomerDetailSkeleton } from "@/components/administration/customer/detail/customer-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
@@ -133,20 +133,17 @@ export const CustomerDetailsPage = () => {
         />
         <div className="flex-1 overflow-y-auto pb-6">
           <div className="space-y-4">
-            {/* Core Information Grid */}
+            {/* Basic Info + Address */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <BasicInfoCard customer={customer} />
-              <ContactDetailsCard customer={customer} />
-            </div>
-
-            {/* Address and Changelog Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
               <AddressInfoCard customer={customer} />
-              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.CUSTOMER} entityId={id} maxHeight="650px" />
             </div>
 
-            {/* Documents (ADMIN and FINANCIAL only) */}
-            {canViewDocuments && <DocumentsCard customer={customer} />}
+            {/* Changelog and Documents Side by Side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.CUSTOMER} entityId={id} maxHeight="650px" />
+              {canViewDocuments && <DocumentsCard customer={customer} />}
+            </div>
 
             {/* Customer Tasks - Full Width at Bottom */}
             <CustomerTasksList

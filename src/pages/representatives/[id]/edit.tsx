@@ -5,7 +5,7 @@ import { RepresentativeForm } from '@/components/administration/customer/represe
 import { PageHeader } from '@/components/ui/page-header';
 import { IconUsers, IconCheck, IconLoader2 } from '@tabler/icons-react';
 import { representativeService } from '@/services/representativeService';
-import { useToast } from '@/hooks/common/use-toast';
+
 import { LoadingSpinner } from '@/components/ui/loading';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { routes } from '@/constants';
@@ -15,7 +15,6 @@ export default function EditRepresentativePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { toast } = useToast();
   const [formState, setFormState] = useState({ isValid: false, isDirty: false });
 
   // Fetch representative data
@@ -32,18 +31,7 @@ export default function EditRepresentativePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['representatives'] });
       queryClient.invalidateQueries({ queryKey: ['representative', id] });
-      toast({
-        title: 'Sucesso',
-        description: 'Representante atualizado com sucesso',
-      });
       navigate(routes.representatives.root);
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Erro ao atualizar representante',
-        variant: 'error',
-      });
     },
   });
 

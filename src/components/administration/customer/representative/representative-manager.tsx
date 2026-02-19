@@ -1,11 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { IconPlus } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { representativeService } from '@/services/representativeService';
 import { useToast } from '@/hooks/common/use-toast';
 import type {
-  Representative,
   RepresentativeRole,
   RepresentativeRowData,
 } from '@/types/representative';
@@ -76,67 +74,6 @@ export const RepresentativeManager: React.FC<RepresentativeManagerProps> = ({
     customerOptions.push({ id: invoiceToId, name: invoiceToName });
   }
   const { toast } = useToast();
-
-  // State
-  const [availableRepresentatives, setAvailableRepresentatives] = useState<Representative[]>([]);
-  const [loadingRepresentatives, setLoadingRepresentatives] = useState(false);
-
-  // Build list of all invoiceTo customer IDs for dependency tracking
-  const invoiceToCustomerIds = invoiceToCustomers?.map(c => c.id).join(',') || '';
-
-  // Load available representatives - for customer, invoiceTo customers, or all if no customer selected
-  useEffect(() => {
-    loadRepresentatives();
-  }, [customerId, invoiceToId, invoiceToCustomerIds]);
-
-  const loadRepresentatives = async () => {
-    setLoadingRepresentatives(true);
-    try {
-      let reps: Representative[] = [];
-
-      // Collect unique customer IDs to fetch representatives from
-      const customerIds = new Set<string>();
-      if (customerId) customerIds.add(customerId);
-      if (invoiceToCustomers && invoiceToCustomers.length > 0) {
-        invoiceToCustomers.forEach(c => customerIds.add(c.id));
-      } else if (invoiceToId) {
-        customerIds.add(invoiceToId);
-      }
-
-      if (customerIds.size > 0) {
-        // Fetch representatives for each customer in parallel
-        const promises = Array.from(customerIds).map(cId =>
-          representativeService.getByCustomer(cId)
-        );
-        const results = await Promise.all(promises);
-
-        // Merge and deduplicate representatives by ID
-        const repsMap = new Map<string, Representative>();
-        results.flat().forEach(rep => {
-          if (!repsMap.has(rep.id)) {
-            repsMap.set(rep.id, rep);
-          }
-        });
-        reps = Array.from(repsMap.values());
-      } else {
-        // Get all representatives if no customer selected
-        const response = await representativeService.getAll({ pageSize: 1000 });
-        reps = response.data;
-      }
-
-      // Filter by allowed roles if specified
-      const filteredReps = allowedRoles
-        ? reps.filter(r => allowedRoles.includes(r.role))
-        : reps;
-
-      setAvailableRepresentatives(filteredReps);
-    } catch (error: any) {
-      console.error('Error loading representatives:', error);
-      setAvailableRepresentatives([]);
-    } finally {
-      setLoadingRepresentatives(false);
-    }
-  };
 
   // Ensure at least minRows are always present
   useEffect(() => {
@@ -240,13 +177,11 @@ export const RepresentativeManager: React.FC<RepresentativeManagerProps> = ({
             invoiceToId={invoiceToId || ''}
             invoiceToCustomerIds={invoiceToCustomers?.map(c => c.id)}
             customerOptions={customerOptions}
-            disabled={disabled || loadingRepresentatives}
+            disabled={disabled}
             readOnly={readOnly}
             onRemove={() => handleRemoveRow(index)}
             isFirstRow={index === 0}
             isLastRow={index === value.length - 1}
-            availableRepresentatives={availableRepresentatives}
-            loadingRepresentatives={loadingRepresentatives}
             value={row}
             onChange={(updates) => handleUpdateRow(index, updates)}
           />
@@ -265,7 +200,7 @@ export const RepresentativeManager: React.FC<RepresentativeManagerProps> = ({
           variant="outline"
           size="sm"
           onClick={handleAddRow}
-          disabled={disabled || readOnly || loadingRepresentatives}
+          disabled={disabled || readOnly}
           className="w-full"
         >
           <IconPlus className="h-4 w-4 mr-2" />

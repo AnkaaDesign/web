@@ -21,9 +21,10 @@ interface PendingChange {
   newSpot: string | null;
 }
 
+const DAY_NAMES = ['Domingo', 'Segunda-Feira', 'Terça-Feira', 'Quarta-Feira', 'Quinta-Feira', 'Sexta-Feira', 'Sábado'];
+
 export function GaragesPage() {
   const [pendingChanges, setPendingChanges] = useState<Map<string, PendingChange>>(new Map());
-  const [viewMode, setViewMode] = useState<'all' | 'week'>('all');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -43,18 +44,29 @@ export function GaragesPage() {
     return days;
   }, []);
 
-  // Format date for display
-  const formatDate = (date: Date) => {
+  const isToday = useCallback((date: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    date.setHours(0, 0, 0, 0);
+    const check = new Date(date);
+    check.setHours(0, 0, 0, 0);
+    return check.getTime() === today.getTime();
+  }, []);
 
-    if (date.getTime() === today.getTime()) return 'Hoje';
-
+  // Format date as "Segunda-Feira - 24/08"
+  const formatDateFull = useCallback((date: Date) => {
+    const dayName = DAY_NAMES[date.getDay()];
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    return `${day}/${month}`;
-  };
+    return `${dayName} - ${day}/${month}`;
+  }, []);
+
+  // Format date for the header display - "Hoje - 19/02" or "Segunda-Feira - 24/08"
+  const formatDateForHeader = useCallback((date: Date) => {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    if (isToday(date)) return `Hoje - ${day}/${month}`;
+    return formatDateFull(date);
+  }, [isToday, formatDateFull]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -424,77 +436,59 @@ export function GaragesPage() {
           ]}
           favoritePage={FAVORITE_PAGES.PRODUCAO_GARAGENS_LISTAR}
           actions={[
-            // View mode selector as custom action with React element label
             {
-              key: 'view-mode',
+              key: 'date-picker',
               label: (
-                <div className="flex gap-1.5 items-center relative">
-                  <div className="flex rounded-lg border border-border overflow-visible">
-                    <button
-                      onClick={() => setViewMode('all')}
-                      className={`h-9 px-4 text-xs font-medium transition-opacity duration-200 ${
-                        viewMode === 'all'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-transparent text-foreground hover:bg-muted/30'
-                      }`}
-                    >
-                      Grade
-                    </button>
-                    <div
-                      className="relative"
-                      onMouseEnter={() => {
-                        // Clear any pending close timeout
-                        if (datePickerTimeoutRef.current) {
-                          clearTimeout(datePickerTimeoutRef.current);
-                          datePickerTimeoutRef.current = null;
-                        }
-                        setShowDatePicker(true);
-                      }}
-                      onMouseLeave={() => {
-                        // Delay closing to prevent flicker
-                        datePickerTimeoutRef.current = setTimeout(() => {
-                          setShowDatePicker(false);
-                        }, 150);
-                      }}
-                    >
-                      <button
-                        className={`h-9 px-4 text-xs font-medium transition-opacity duration-200 border-l border-border ${
-                          viewMode === 'week'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-transparent text-foreground hover:bg-muted/30'
-                        }`}
-                      >
-                        Calendário
-                      </button>
+                <div
+                  className="relative"
+                  onMouseEnter={() => {
+                    if (datePickerTimeoutRef.current) {
+                      clearTimeout(datePickerTimeoutRef.current);
+                      datePickerTimeoutRef.current = null;
+                    }
+                    setShowDatePicker(true);
+                  }}
+                  onMouseLeave={() => {
+                    datePickerTimeoutRef.current = setTimeout(() => {
+                      setShowDatePicker(false);
+                    }, 150);
+                  }}
+                >
+                  <button className="h-9 px-4 text-sm font-medium rounded-lg border border-border bg-transparent text-foreground hover:bg-muted/30 transition-colors">
+                    {formatDateForHeader(selectedDate)}
+                  </button>
 
-                      {/* Date picker dropdown */}
-                      {showDatePicker && (
-                        <div
-                          className="absolute top-full right-0 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[120px]"
-                          style={{ zIndex: 9999 }}
-                        >
-                          {next5Days.map((day, index) => (
-                            <button
-                              key={index}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedDate(day);
-                                setViewMode('week');
-                                setShowDatePicker(false);
-                                if (datePickerTimeoutRef.current) {
-                                  clearTimeout(datePickerTimeoutRef.current);
-                                  datePickerTimeoutRef.current = null;
-                                }
-                              }}
-                              className="w-full px-4 py-2 text-left text-xs text-foreground hover:bg-muted/30 transition-colors block"
-                            >
-                              {formatDate(day)}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                  {showDatePicker && (
+                    <div
+                      className="absolute top-full right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[220px]"
+                      style={{ zIndex: 9999 }}
+                    >
+                      {next5Days.map((day, index) => {
+                        const selected = selectedDate.toDateString() === day.toDateString();
+                        return (
+                          <button
+                            key={index}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedDate(day);
+                              setShowDatePicker(false);
+                              if (datePickerTimeoutRef.current) {
+                                clearTimeout(datePickerTimeoutRef.current);
+                                datePickerTimeoutRef.current = null;
+                              }
+                            }}
+                            className={`w-full px-4 py-2 text-left text-sm transition-colors block ${
+                              selected
+                                ? 'bg-primary/10 text-primary font-medium'
+                                : 'text-foreground hover:bg-muted/30'
+                            }`}
+                          >
+                            {isToday(day) ? `Hoje - ${day.getDate().toString().padStart(2, '0')}/${(day.getMonth() + 1).toString().padStart(2, '0')}` : formatDateFull(day)}
+                          </button>
+                        );
+                      })}
                     </div>
-                  </div>
+                  )}
                 </div>
               ) as any,
             },
@@ -532,7 +526,7 @@ export function GaragesPage() {
                 onTruckClick={handleTruckClick}
                 className={isUpdating ? 'opacity-50 pointer-events-none' : ''}
                 readOnly={!canEditGaragePositions}
-                viewMode={viewMode}
+                viewMode="week"
                 selectedDate={selectedDate}
               />
             </div>

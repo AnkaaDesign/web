@@ -61,6 +61,6 @@ export interface TaskPricing extends BaseEntity {
     fantasyName?: string;
   }>;
 
-  tasks?: any[];  // Tasks that share this pricing (one-to-many)
+  task?: any;  // One-to-one relationship with task
   items?: TaskPricingItem[];
 }

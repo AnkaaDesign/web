@@ -57,6 +57,7 @@ interface PricingSelectorProps {
 export interface PricingSelectorRef {
   addItem: () => void;
   clearAll: () => void;
+  replaceItems: (newItems: any[]) => void;
 }
 
 // Payment condition options (simplified - maps directly to PaymentCondition enum)
@@ -101,7 +102,7 @@ export const PricingSelector = forwardRef<
   const lastRowRef = useRef<HTMLDivElement>(null);
   const { setValue, clearErrors, getValues } = useFormContext();
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "pricing.items",
   });
@@ -362,7 +363,7 @@ export const PricingSelector = forwardRef<
     setLayoutFiles([]);
   }, [fields.length, remove, setValue, clearErrors]);
 
-  useImperativeHandle(ref, () => ({ addItem: handleAddItem, clearAll }), [handleAddItem, clearAll]);
+  useImperativeHandle(ref, () => ({ addItem: handleAddItem, clearAll, replaceItems: replace }), [handleAddItem, clearAll, replace]);
 
   const canEditStatus = userRole === 'ADMIN' || userRole === 'FINANCIAL' || userRole === 'COMMERCIAL';
 

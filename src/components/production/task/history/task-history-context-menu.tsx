@@ -9,7 +9,7 @@ import type { Task } from "../../../../types";
 import { toast } from "sonner";
 import { SetStatusModal } from "../schedule/set-status-modal";
 import { SetSectorModal } from "../schedule/set-sector-modal";
-import { DuplicateTaskModal, type DuplicateTaskCopyData } from "../schedule/duplicate-task-modal";
+import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { useAuth } from "@/contexts/auth-context";
 import { canDeleteTasks } from "@/utils/permissions/entity-permissions";
 import { isTeamLeader } from "@/utils/user";
@@ -46,7 +46,7 @@ export function TaskHistoryContextMenu({
 }: TaskHistoryContextMenuProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { update, delete: deleteTask, createAsync } = useTaskMutations();
+  const { update, delete: deleteTask } = useTaskMutations();
   const { batchUpdate, batchDeleteAsync } = useTaskBatchMutations();
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
@@ -465,77 +465,6 @@ export function TaskHistoryContextMenu({
     setDuplicateModalOpen(true);
   };
 
-  const handleDuplicateConfirm = async (copies: DuplicateTaskCopyData) => {
-    if (!task || copies.length === 0) return;
-
-    try {
-      // Build task data for each copy
-      // NOTE: task.artworks are now Artwork entities with { id, fileId, status, file?: File }
-      // We need to extract File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
-      const buildTaskData = (copyData: { serialNumber?: string; plate?: string }) => ({
-        // Basic fields
-        name: task.name,
-        status: TASK_STATUS.PREPARATION,
-        serialNumber: copyData.serialNumber || null,
-        plate: copyData.plate || null,
-        details: task.details,
-        entryDate: task.entryDate,
-        term: task.term,
-        startedAt: null,
-        finishedAt: null,
-
-        // ID fields only (no relation objects)
-        paintId: task.paintId,
-        customerId: task.customerId,
-        sectorId: task.sectorId,
-        budgetIds: task.budgets?.map((b: any) => b.id) || [],
-        invoiceIds: task.invoices?.map((i: any) => i.id) || [],
-        receiptIds: task.receipts?.map((r: any) => r.id) || [],
-        commission: task.commission,
-
-        // Relations - only IDs
-        // artworkIds must be File IDs, not Artwork entity IDs
-        artworkIds: task.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
-        paintIds: task.logoPaints?.map((paint) => paint.id) || [],
-
-        // Services
-        services: Array.isArray(task.serviceOrders)
-          ? task.serviceOrders.map((service) => ({
-              status: service.status,
-              statusOrder: service.statusOrder,
-              description: service.description,
-              startedAt: null,
-              finishedAt: null,
-            }))
-          : [],
-
-        // Truck
-        truck: task.truck || copyData.plate
-          ? {
-              plate: copyData.plate || task.truck?.plate || null,
-              chassisNumber: task.truck?.chassisNumber || null,
-              spot: task.truck?.spot || null,
-            }
-          : null,
-
-        // Observation - artworkIds must also be File IDs
-        observation: task.observation
-          ? {
-              description: task.observation.description,
-              artworkIds: task.observation.files?.map((file: any) => file.id) || [],
-            }
-          : null,
-      });
-
-      const tasksToCreate = copies.map(buildTaskData);
-      await Promise.all(tasksToCreate.map(taskData => createAsync(taskData)));
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Error duplicating task:", error);
-      }
-    }
-  };
-
   // Advanced bulk operations handlers
   const handleBulkArts = () => {
     if (advancedActionsRef?.current) {
@@ -683,8 +612,8 @@ export function TaskHistoryContextMenu({
             <span className="truncate">{isBulk ? "Editar em lote" : "Editar"}</span>
           </DropdownMenuItem>
 
-          {/* Admin-only actions: duplicate, setSector (conditionally), setStatus */}
-          {isAdmin && !isBulk && (
+          {/* Duplicate - ADMIN and COMMERCIAL */}
+          {(isAdmin || isCommercial) && !isBulk && (
             <DropdownMenuItem onClick={handleDuplicate}>
               <IconCopy className="mr-2 h-4 w-4" />
               <span className="truncate">Criar Cópias</span>
@@ -812,16 +741,18 @@ export function TaskHistoryContextMenu({
       />
 
       {/* Duplicate Task Modal */}
-      <DuplicateTaskModal
+      <TaskDuplicateModal
+        task={task}
         open={duplicateModalOpen}
         onOpenChange={(open) => {
           if (process.env.NODE_ENV !== 'production') {
-            console.log('[TaskHistoryContextMenu] DuplicateTaskModal onOpenChange:', open);
+            console.log('[TaskHistoryContextMenu] TaskDuplicateModal onOpenChange:', open);
           }
           setDuplicateModalOpen(open);
         }}
-        task={task}
-        onConfirm={handleDuplicateConfirm}
+        onSuccess={() => {
+          setDuplicateModalOpen(false);
+        }}
       />
 
       {/* Delete Confirmation Dialog */}

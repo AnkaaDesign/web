@@ -8,7 +8,7 @@
  */
 
 import { useEffect } from 'react';
-import { toast as sonnerToast } from 'sonner';
+import { toast } from '@/components/ui/sonner';
 
 // Unique toast ID for connection error toasts - prevents duplicates
 const CONNECTION_ERROR_TOAST_ID = 'socket-connection-error';
@@ -19,20 +19,22 @@ export function SocketReconnectHandler(): null {
       const customEvent = event as CustomEvent<{ message: string }>;
 
       // Dismiss any existing connection error toast before showing a new one
-      sonnerToast.dismiss(CONNECTION_ERROR_TOAST_ID);
+      toast.dismiss(CONNECTION_ERROR_TOAST_ID);
 
-      // Use raw sonner toast since we need the action button
-      sonnerToast.error('Conexão perdida', {
-        id: CONNECTION_ERROR_TOAST_ID,
-        description: customEvent.detail?.message || 'Não foi possível restabelecer a conexão. Por favor, atualize a página.',
-        duration: Infinity, // Keep showing until user acts
-        action: {
-          label: 'Atualizar',
-          onClick: () => {
-            window.location.reload();
+      toast.error(
+        'Conexão perdida',
+        customEvent.detail?.message || 'Não foi possível restabelecer a conexão. Por favor, atualize a página.',
+        {
+          id: CONNECTION_ERROR_TOAST_ID,
+          duration: Infinity,
+          action: {
+            label: 'Atualizar',
+            onClick: () => {
+              window.location.reload();
+            },
           },
         },
-      });
+      );
     };
 
     // Listen for socket reconnection failures

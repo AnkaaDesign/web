@@ -4,7 +4,10 @@ import { FormField } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { IconPlus, IconTrash, IconNote, IconArrowsSort } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconNote, IconArrowsSort, IconGripVertical } from "@tabler/icons-react";
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Combobox } from "@/components/ui/combobox";
 import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_DISPLAY_ORDER, SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,10 +31,11 @@ interface ServiceSelectorProps {
   isTeamLeader?: boolean;
   onItemDeleted?: (description: string) => void;
   isAccordionOpen?: boolean;
+  onProductionReorder?: (descriptions: string[]) => void;
 }
 
-export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege, isTeamLeader = false, onItemDeleted, isAccordionOpen }: ServiceSelectorProps) {
-  const { fields, append, remove } = useFieldArray({
+export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege, isTeamLeader = false, onItemDeleted, isAccordionOpen, onProductionReorder }: ServiceSelectorProps) {
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "serviceOrders",
   });
@@ -177,17 +181,32 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
 
   // Track previous field IDs to detect newly added fields
   const prevFieldIdsRef = useRef<Set<string>>(new Set(fields.map(f => f.id)));
+  // Flag to skip new-field detection after reorder (replace() regenerates all field IDs)
+  const isReorderingRef = useRef(false);
 
   // Detect newly added fields and mark them as pending
+  // Only treats items as "new" when existing fields are preserved (i.e., user appended).
+  // When ALL field IDs change (form.reset/replace), it's a data load or reorder — skip.
   useEffect(() => {
+    if (isReorderingRef.current) {
+      // Reorder just happened — replace() regenerated all field IDs, skip detection
+      isReorderingRef.current = false;
+      prevFieldIdsRef.current = new Set(fields.map(f => f.id));
+      return;
+    }
     const currentIds = new Set(fields.map(f => f.id));
     const newIds = new Set<string>();
+    let preservedCount = 0;
     currentIds.forEach(id => {
-      if (!prevFieldIdsRef.current.has(id)) {
+      if (prevFieldIdsRef.current.has(id)) {
+        preservedCount++;
+      } else {
         newIds.add(id);
       }
     });
-    if (newIds.size > 0) {
+    // Only mark as pending if some previous fields still exist (user appended items).
+    // If no fields were preserved, this is a form reset/load — don't mark as pending.
+    if (newIds.size > 0 && prevFieldIdsRef.current.size > 0 && preservedCount > 0) {
       setPendingFieldIds(prev => {
         const updated = new Set(prev);
         newIds.forEach(id => updated.add(id));
@@ -244,6 +263,52 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     return Object.values(SERVICE_ORDER_TYPE);
   }, [userPrivilege]);
 
+  // Drag-and-drop sensors for reordering within groups
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // Reorder items within a single type group
+  const handleReorderWithinGroup = useCallback((type: SERVICE_ORDER_TYPE, event: any) => {
+    const { active, over } = event;
+    if (!active || !over || active.id === over.id) return;
+
+    const serviceIndices = groupedServices[type];
+    if (!serviceIndices || serviceIndices.length < 2) return;
+
+    // Map field IDs to local indices within the group
+    const activeLocalIndex = serviceIndices.findIndex(i => fields[i].id === active.id);
+    const overLocalIndex = serviceIndices.findIndex(i => fields[i].id === over.id);
+    if (activeLocalIndex === -1 || overLocalIndex === -1) return;
+
+    // Get current form values
+    const currentValues = [...servicesValues];
+
+    // Extract items at the group's global indices
+    const groupItems = serviceIndices.map(i => currentValues[i]);
+
+    // Apply arrayMove on the group items using local indices
+    const reorderedGroupItems = arrayMove(groupItems, activeLocalIndex, overLocalIndex);
+
+    // Place reordered items back into the same global index slots
+    const newValues = [...currentValues];
+    serviceIndices.forEach((globalIndex, localIndex) => {
+      newValues[globalIndex] = reorderedGroupItems[localIndex];
+    });
+
+    isReorderingRef.current = true;
+    replace(newValues);
+
+    // Notify parent to reorder synced pricing items for PRODUCTION groups
+    if (type === SERVICE_ORDER_TYPE.PRODUCTION && onProductionReorder) {
+      const newDescriptionOrder = reorderedGroupItems
+        .map((item: any) => item.description)
+        .filter(Boolean);
+      onProductionReorder(newDescriptionOrder);
+    }
+  }, [groupedServices, fields, servicesValues, replace, onProductionReorder]);
+
   // Render a service group card
   const renderServiceGroup = (type: SERVICE_ORDER_TYPE) => {
     // Skip if this type is not visible for the current user
@@ -271,28 +336,33 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
             </span>
           </div>
 
-          {/* Services in this group */}
-          {serviceIndices.map((index) => {
-            const serviceOrder = servicesValues[index];
-            const isServiceDisabled = disabled || !canEditServiceOrder(serviceOrder);
-            const isStatusDisabled = disabled || !canEditServiceOrderStatus(serviceOrder);
+          {/* Services in this group — draggable */}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleReorderWithinGroup(type, e)}>
+            <SortableContext items={serviceIndices.map(i => fields[i].id)} strategy={verticalListSortingStrategy}>
+              {serviceIndices.map((index) => {
+                const serviceOrder = servicesValues[index];
+                const isServiceDisabled = disabled || !canEditServiceOrder(serviceOrder);
+                const isStatusDisabled = disabled || !canEditServiceOrderStatus(serviceOrder);
 
-            return (
-              <ServiceRow
-                key={fields[index].id}
-                control={control}
-                index={index}
-                type={type}
-                disabled={isServiceDisabled}
-                statusDisabled={isStatusDisabled}
-                onRemove={() => handleRemoveItem(index)}
-                isGrouped={true}
-                userPrivilege={userPrivilege}
-                currentUserId={currentUserId}
-                isTeamLeader={isTeamLeader}
-              />
-            );
-          })}
+                return (
+                  <ServiceRow
+                    key={fields[index].id}
+                    control={control}
+                    index={index}
+                    type={type}
+                    disabled={isServiceDisabled}
+                    statusDisabled={isStatusDisabled}
+                    onRemove={() => handleRemoveItem(index)}
+                    isGrouped={true}
+                    userPrivilege={userPrivilege}
+                    currentUserId={currentUserId}
+                    isTeamLeader={isTeamLeader}
+                    sortableId={fields[index].id}
+                  />
+                );
+              })}
+            </SortableContext>
+          </DndContext>
         </CardContent>
       </Card>
     );
@@ -386,6 +456,7 @@ interface ServiceRowProps {
   userPrivilege?: string;
   currentUserId?: string;
   isTeamLeader?: boolean;
+  sortableId?: string; // When provided, enables drag-and-drop reordering
 }
 
 function ServiceRow({
@@ -400,7 +471,18 @@ function ServiceRow({
   userPrivilege,
   currentUserId: _currentUserId,
   isTeamLeader = false,
+  sortableId,
 }: ServiceRowProps) {
+  // Sortable drag-and-drop support
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: sortableId || "",
+    disabled: !sortableId || disabled,
+  });
+  const sortableStyle = sortableId ? {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  } : undefined;
   // Observation modal state
   const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
   const [tempObservation, setTempObservation] = useState("");
@@ -617,12 +699,19 @@ function ServiceRow({
   const gridClass = isFlatView
     ? "grid grid-cols-[150px_2fr_1fr_1fr_90px] gap-3 items-center"
     : isGrouped
-      ? "grid grid-cols-[2fr_1fr_1fr_90px] gap-3 items-center"
+      ? (sortableId ? "grid grid-cols-[24px_2fr_1fr_1fr_90px] gap-3 items-center" : "grid grid-cols-[2fr_1fr_1fr_90px] gap-3 items-center")
       : "grid grid-cols-[150px_2fr_1fr_90px] gap-3 items-center";
 
   return (
     <>
-      <div className={gridClass}>
+      <div ref={sortableId ? setNodeRef : undefined} style={sortableStyle} className={gridClass}>
+        {/* Drag Handle - Only for sortable grouped rows */}
+        {sortableId && (
+          <div {...attributes} {...listeners} className="flex items-center justify-center cursor-grab active:cursor-grabbing">
+            <IconGripVertical className="h-5 w-5 text-muted-foreground" />
+          </div>
+        )}
+
         {/* Type Field - Only show if not grouped or in flat view (no label, inline) */}
         {showTypeSelector && (
           <div className="min-w-0">

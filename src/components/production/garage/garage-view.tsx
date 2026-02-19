@@ -1009,13 +1009,14 @@ interface AllGaragesViewProps {
   containerHeight: number;
   garageCounts: Record<AreaId, number>;
   viewMode?: 'all' | 'week';
+  selectedDate?: Date;
   onTruckMove?: (truckId: string, newSpot: string | null) => void;
   onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string | null) => void;
   onTruckClick?: (taskId: string) => void;
   readOnly?: boolean;
 }
 
-function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts, viewMode = 'all', onTruckMove, onTruckSwap, onTruckClick, readOnly = false }: AllGaragesViewProps) {
+function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts, viewMode = 'all', selectedDate, onTruckMove, onTruckSwap, onTruckClick, readOnly = false }: AllGaragesViewProps) {
   // Right-click context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; truckId: string } | null>(null);
 
@@ -1039,8 +1040,16 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
   const [_activeDropTarget, setActiveDropTarget] = useState<{ garageId: GarageId; laneId: LaneId } | null>(null);
   const lastDragPositionRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Enable drag-and-drop only when viewMode === 'all' and onTruckMove is provided
-  const enableDragDrop = viewMode === 'all' && !readOnly && !!onTruckMove;
+  // Enable drag-and-drop only when selected date is today
+  const isSelectedDateToday = useMemo(() => {
+    if (!selectedDate) return true;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const check = new Date(selectedDate);
+    check.setHours(0, 0, 0, 0);
+    return check.getTime() === today.getTime();
+  }, [selectedDate]);
+  const enableDragDrop = isSelectedDateToday && !readOnly && !!onTruckMove;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1354,7 +1363,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
                 {getAreaTitle(areaId)}
               </span>
               <span className={cn(
-                "text-sm font-bold px-3 py-1.5 rounded-full",
+                "text-sm font-bold px-2.5 py-0.5 rounded-md",
                 isPatio ? "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-100" : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100"
               )}>
                 {count}
@@ -1746,6 +1755,7 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
           containerHeight={containerSize.height}
           garageCounts={garageCounts}
           viewMode={viewMode}
+          selectedDate={selectedDate}
           onTruckMove={onTruckMove}
           onTruckSwap={onTruckSwap}
           onTruckClick={onTruckClick}

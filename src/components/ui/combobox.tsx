@@ -89,6 +89,9 @@ interface ComboboxProps<TData = ComboboxOption> {
   singleMode?: boolean;
   showCount?: boolean;
   hideDefaultBadges?: boolean;
+
+  // Fixed content rendered between search and scrollable list
+  fixedTopContent?: React.ReactNode;
 }
 
 export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
@@ -132,6 +135,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   singleMode = false,
   showCount = true,
   hideDefaultBadges = false,
+  fixedTopContent,
 }: ComboboxProps<TData>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -743,6 +747,8 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
                 </div>
               </div>
             )}
+
+            {fixedTopContent}
 
             <div
               className="max-h-[15rem] overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100"

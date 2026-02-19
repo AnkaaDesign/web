@@ -1,12 +1,14 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconFileText, IconFileInvoice, IconReceipt, IconFileSpreadsheet } from "@tabler/icons-react";
+import { IconFileText, IconFileInvoice, IconReceipt, IconFileSpreadsheet, IconList, IconLayoutGrid } from "@tabler/icons-react";
 import type { Customer } from "../../../../types";
 import type { File as FileType } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { FilePreviewGrid } from "@/components/common/file";
+import { FileItem, useFileViewer, type FileViewMode } from "@/components/common/file";
 import { useTasks } from "../../../../hooks";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface DocumentsCardProps {
   customer: Customer;
@@ -14,6 +16,15 @@ interface DocumentsCardProps {
 }
 
 export function DocumentsCard({ customer, className }: DocumentsCardProps) {
+  const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("list");
+
+  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
+  try {
+    fileViewerContext = useFileViewer();
+  } catch {
+    // Context not available
+  }
+
   // Fetch tasks with documents for this customer
   const { data: tasksResponse, isLoading } = useTasks({
     where: {
@@ -63,6 +74,25 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
 
   const hasDocuments = totalDocuments > 0;
 
+  const handleDocumentFileClick = (file: FileType) => {
+    if (!fileViewerContext) return;
+    const allDocuments = [
+      ...budgets,
+      ...invoices,
+      ...receipts,
+      ...reimbursements,
+      ...reimbursementInvoices,
+    ];
+    const index = allDocuments.findIndex((f) => f.id === file.id);
+    fileViewerContext.actions.viewFiles(allDocuments, index);
+  };
+
+  const handleDownload = (file: FileType) => {
+    if (fileViewerContext) {
+      fileViewerContext.actions.downloadFile(file);
+    }
+  };
+
   // Show loading skeleton while fetching tasks
   if (isLoading) {
     return (
@@ -88,10 +118,35 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
-        <CardTitle className="flex items-center gap-2">
-          <IconFileText className="h-5 w-5 text-muted-foreground" />
-          Documentos
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <IconFileText className="h-5 w-5 text-muted-foreground" />
+            Documentos
+            {totalDocuments > 0 && (
+              <Badge variant="secondary" className="ml-1">{totalDocuments}</Badge>
+            )}
+          </CardTitle>
+          {hasDocuments && (
+            <div className="flex gap-1">
+              <Button
+                variant={documentsViewMode === "list" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDocumentsViewMode("list")}
+                className="h-7 w-7 p-0"
+              >
+                <IconList className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant={documentsViewMode === "grid" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDocumentsViewMode("grid")}
+                className="h-7 w-7 p-0"
+              >
+                <IconLayoutGrid className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="pt-0 flex-1">
         {hasDocuments ? (
@@ -103,13 +158,18 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
                   <IconFileSpreadsheet className="h-4 w-4 text-muted-foreground" />
                   <h3 className="text-sm font-semibold text-foreground">Orçamentos</h3>
                 </div>
-                <FilePreviewGrid
-                  files={budgets}
-                  title=""
-                  size="md"
-                  showViewToggle={true}
-                  showMetadata={false}
-                />
+                <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                  {budgets.map((file: FileType) => (
+                    <FileItem
+                      key={file.id}
+                      file={file}
+                      viewMode={documentsViewMode}
+                      onPreview={handleDocumentFileClick}
+                      onDownload={handleDownload}
+                      showActions
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -120,13 +180,18 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
                   <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
                   <h3 className="text-sm font-semibold text-foreground">Notas Fiscais</h3>
                 </div>
-                <FilePreviewGrid
-                  files={invoices}
-                  title=""
-                  size="md"
-                  showViewToggle={true}
-                  showMetadata={false}
-                />
+                <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                  {invoices.map((file: FileType) => (
+                    <FileItem
+                      key={file.id}
+                      file={file}
+                      viewMode={documentsViewMode}
+                      onPreview={handleDocumentFileClick}
+                      onDownload={handleDownload}
+                      showActions
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -137,13 +202,18 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
                   <IconReceipt className="h-4 w-4 text-muted-foreground" />
                   <h3 className="text-sm font-semibold text-foreground">Recibos</h3>
                 </div>
-                <FilePreviewGrid
-                  files={receipts}
-                  title=""
-                  size="md"
-                  showViewToggle={true}
-                  showMetadata={false}
-                />
+                <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                  {receipts.map((file: FileType) => (
+                    <FileItem
+                      key={file.id}
+                      file={file}
+                      viewMode={documentsViewMode}
+                      onPreview={handleDocumentFileClick}
+                      onDownload={handleDownload}
+                      showActions
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -154,13 +224,18 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
                   <IconFileText className="h-4 w-4 text-muted-foreground" />
                   <h3 className="text-sm font-semibold text-foreground">Reembolsos</h3>
                 </div>
-                <FilePreviewGrid
-                  files={reimbursements}
-                  title=""
-                  size="md"
-                  showViewToggle={true}
-                  showMetadata={false}
-                />
+                <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                  {reimbursements.map((file: FileType) => (
+                    <FileItem
+                      key={file.id}
+                      file={file}
+                      viewMode={documentsViewMode}
+                      onPreview={handleDocumentFileClick}
+                      onDownload={handleDownload}
+                      showActions
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -171,13 +246,18 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
                   <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
                   <h3 className="text-sm font-semibold text-foreground">NF Reembolso</h3>
                 </div>
-                <FilePreviewGrid
-                  files={reimbursementInvoices}
-                  title=""
-                  size="md"
-                  showViewToggle={true}
-                  showMetadata={false}
-                />
+                <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                  {reimbursementInvoices.map((file: FileType) => (
+                    <FileItem
+                      key={file.id}
+                      file={file}
+                      viewMode={documentsViewMode}
+                      onPreview={handleDocumentFileClick}
+                      onDownload={handleDownload}
+                      showActions
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>

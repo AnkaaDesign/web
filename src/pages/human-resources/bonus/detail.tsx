@@ -116,9 +116,10 @@ export default function BonusDetailPage() {
 
         const responseData = response.data;
 
-        // The response is a direct Bonus object, not wrapped in BaseGetUniqueResponse
-        if (responseData) {
-          setBonus(responseData);
+        // API wraps the bonus in { success, data, message }
+        const bonusData = (responseData as any)?.data ?? responseData;
+        if (bonusData) {
+          setBonus(bonusData);
         } else {
           setError('Bônus não encontrado.');
         }

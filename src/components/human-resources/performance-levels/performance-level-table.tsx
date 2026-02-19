@@ -16,10 +16,9 @@ import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { IconSelector, IconChevronUp, IconChevronDown } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useUserMutations, useUserBatchMutations } from "../../../hooks/human-resources/use-user";
-import { useTasks } from "../../../hooks";
-import { formatCurrency, getCurrentPayrollPeriod, getBonusPeriod } from "../../../utils";
+import { formatCurrency, getCurrentPayrollPeriod } from "../../../utils";
 import { calculateBonusForPosition } from "../../../utils/bonus";
-import { TASK_STATUS, COMMISSION_STATUS } from "../../../constants";
+import { bonusService } from "../../../api-client";
 import type { User } from "../../../types";
 
 interface PerformanceLevelTableProps {
@@ -141,25 +140,31 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
   // If today is Sept 26th or later, this returns October
   const { year: currentYear, month: currentMonth } = getCurrentPayrollPeriod();
 
-  // Get current bonus period for task counting
-  const currentPeriod = getBonusPeriod(currentYear, currentMonth);
+  // Fetch weighted task count from the lightweight period stats endpoint
+  // This uses GET /bonus/period-stats/:year/:month which is accessible to HR users
+  // (unlike GET /tasks which doesn't include HUMAN_RESOURCES in @Roles)
+  const [taskQuantityFromApi, setTaskQuantityFromApi] = useState<number>(0);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 
-  // Fetch tasks for the current period to calculate bonuses
-  const taskQuery = useMemo(() => ({
-    limit: 1000,
-    where: {
-      status: TASK_STATUS.COMPLETED,
-      commission: {
-        in: [COMMISSION_STATUS.FULL_COMMISSION, COMMISSION_STATUS.PARTIAL_COMMISSION]
-      },
-      finishedAt: {
-        gte: currentPeriod.startDate,
-        lte: currentPeriod.endDate
+  useEffect(() => {
+    const fetchPeriodStats = async () => {
+      setIsLoadingTasks(true);
+      try {
+        const response = await bonusService.getPeriodTaskStats(currentYear, currentMonth);
+        const data = (response.data as any)?.data ?? response.data;
+        const weightedTasks = typeof data.totalWeightedTasks === 'number'
+          ? data.totalWeightedTasks
+          : Number(data.totalWeightedTasks) || 0;
+        setTaskQuantityFromApi(weightedTasks);
+      } catch (err) {
+        console.error('[PerformanceLevelTable] Failed to fetch period task stats:', err);
+        setTaskQuantityFromApi(0);
+      } finally {
+        setIsLoadingTasks(false);
       }
-    }
-  }), [currentPeriod.startDate, currentPeriod.endDate]);
-
-  const { data: currentPeriodTasks, isLoading: isLoadingTasks } = useTasks(taskQuery);
+    };
+    fetchPeriodStats();
+  }, [currentYear, currentMonth]);
 
   // Initialize user performance levels from props
   useEffect(() => {
@@ -170,21 +175,8 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
     setUserPerformanceLevels(levels);
   }, [users]);
 
-  // Calculate task quantity for bonus calculation
-  const taskQuantity = useMemo(() => {
-    if (!currentPeriodTasks?.data) return 0;
-
-    const tasks = currentPeriodTasks.data;
-    const fullCommissionCount = tasks.filter((t: any) =>
-      t.commission === COMMISSION_STATUS.FULL_COMMISSION
-    ).length;
-    const partialCommissionCount = tasks.filter((t: any) =>
-      t.commission === COMMISSION_STATUS.PARTIAL_COMMISSION
-    ).length;
-
-    // Weighted task count: full commission = 1.0, partial commission = 0.5
-    return fullCommissionCount + (partialCommissionCount * 0.5);
-  }, [currentPeriodTasks]);
+  // Task quantity comes from the API's period stats endpoint (already weighted)
+  const taskQuantity = taskQuantityFromApi;
 
   // Calculate average tasks per user
   const averageTasksPerUser = useMemo(() => {

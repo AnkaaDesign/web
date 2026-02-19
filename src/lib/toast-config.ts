@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 export const toastConfig = {
   // Default positions and durations
@@ -19,36 +19,24 @@ export const toastConfig = {
 
   // Common toast methods with consistent messaging
   success: (message: string, description?: string) => {
-    toast.success(message, {
-      description,
-      duration: toastConfig.duration.success,
-    });
+    toast.success(message, description, { duration: toastConfig.duration.success });
   },
 
   error: (message: string, description?: string) => {
-    toast.error(message, {
-      description,
-      duration: toastConfig.duration.error,
-    });
+    toast.error(message, description, { duration: toastConfig.duration.error });
   },
 
   warning: (message: string, description?: string) => {
-    toast.warning(message, {
-      description,
-      duration: toastConfig.duration.warning,
-    });
+    toast.warning(message, description, { duration: toastConfig.duration.warning });
   },
 
   info: (message: string, description?: string) => {
-    toast.info(message, {
-      description,
-      duration: toastConfig.duration.info,
-    });
+    toast.info(message, description, { duration: toastConfig.duration.info });
   },
 
   // Special toast for copy operations
   copy: (itemName: string) => {
-    toast.success(`${itemName} copiado para a área de transferência`, {
+    toast.success(`${itemName} copiado para a área de transferência`, undefined, {
       duration: toastConfig.duration.success,
     });
   },
@@ -56,17 +44,17 @@ export const toastConfig = {
   // Special toast for export operations
   export: {
     start: (format: string) => {
-      toast.info(`Exportando dados em formato ${format}...`, {
+      toast.info(`Exportando dados em formato ${format}...`, undefined, {
         duration: toastConfig.duration.info,
       });
     },
     success: (format: string) => {
-      toast.success(`Dados exportados com sucesso em formato ${format}`, {
+      toast.success(`Dados exportados com sucesso em formato ${format}`, undefined, {
         duration: toastConfig.duration.success,
       });
     },
     error: (format: string) => {
-      toast.error(`Erro ao exportar dados em formato ${format}`, {
+      toast.error(`Erro ao exportar dados em formato ${format}`, undefined, {
         duration: toastConfig.duration.error,
       });
     },

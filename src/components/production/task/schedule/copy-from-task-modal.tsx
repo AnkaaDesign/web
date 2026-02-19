@@ -230,13 +230,12 @@ export function CopyFromTaskModal({
   // Get category order
   const categoryOrder = [
     'Ações Rápidas',
-    'Básico',
-    'Referências',
-    'Arquivos',
-    'Recursos Compartilhados',
-    'Recursos Individuais',
+    'Informações Gerais',
+    'Datas',
+    'Comercial',
+    'Pintura e Artes',
+    'Produção',
     'Veículo',
-    'Observações',
   ];
 
   // All individual fields (excluding 'all' meta-option)
@@ -318,7 +317,7 @@ export function CopyFromTaskModal({
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Campos para copiar</Label>
 
-              <ScrollArea className="h-[300px] pr-3">
+              <ScrollArea className="h-[400px] pr-3">
                 <div className="space-y-4">
                   {categoryOrder.map((category) => {
                     const fields = fieldsByCategory[category];

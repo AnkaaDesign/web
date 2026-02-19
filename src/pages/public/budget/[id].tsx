@@ -38,6 +38,7 @@ interface PricingData extends TaskPricing {
     };
     truck?: {
       plate?: string;
+      chassisNumber?: string;
     };
   };
 }
@@ -238,15 +239,19 @@ export function PublicBudgetPage() {
               <p className="text-gray-700">
                 Conforme solicitado, apresentamos nossa proposta de preço para execução dos
                 serviços abaixo descriminados
-                {(pricing.task?.serialNumber || pricing.task?.truck?.plate) && (
+                {(pricing.task?.serialNumber || pricing.task?.truck?.plate || pricing.task?.truck?.chassisNumber) && (
                   <>
                     {" "}no veículo
                     {pricing.task?.serialNumber && (
                       <> nº série: <strong>{pricing.task.serialNumber}</strong></>
                     )}
-                    {pricing.task?.serialNumber && pricing.task?.truck?.plate && ","}
+                    {pricing.task?.serialNumber && (pricing.task?.truck?.plate || pricing.task?.truck?.chassisNumber) && ","}
                     {pricing.task?.truck?.plate && (
-                      <> placa: <span className="font-semibold">{pricing.task.truck.plate}</span></>
+                      <> placa: <strong>{pricing.task.truck.plate}</strong></>
+                    )}
+                    {pricing.task?.truck?.plate && pricing.task?.truck?.chassisNumber && ","}
+                    {pricing.task?.truck?.chassisNumber && (
+                      <> chassi: <strong>{pricing.task.truck.chassisNumber}</strong></>
                     )}
                   </>
                 )}.
