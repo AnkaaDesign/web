@@ -27,9 +27,9 @@ import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
 import { useTaskMutations, useCutsByTask } from "../../../../hooks";
 import { cutService } from "../../../../api-client/cut";
-import type { RepresentativeRowData } from "@/types/representative";
-import { RepresentativeRole } from "@/types/representative";
-import { RepresentativeManager } from "@/components/administration/customer/representative";
+import type { ResponsibleRowData } from "@/types/responsible";
+import { ResponsibleRole } from "@/types/responsible";
+import { ResponsibleManager } from "@/components/administration/customer/responsible";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { useAuth } from "../../../../contexts/auth-context";
@@ -143,7 +143,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   // Pricing sections should be visible to ADMIN, FINANCIAL, and COMMERCIAL users
   const canViewPricingSections = isAdminUser || isFinancialUser || isCommercialUser;
 
-  // Restricted fields (forecastDate, representatives) visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER only
+  // Restricted fields (forecastDate, responsibles) visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER only
   const canViewRestrictedFields = isAdminUser || isFinancialUser || isCommercialUser || isLogisticUser || isDesignerUser;
 
   // Commission field visible to ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION
@@ -359,11 +359,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     task.pricing?.layoutFile ? convertToFileWithPreview([task.pricing.layoutFile]) : []
   );
 
-  // Representatives state - using row-based system
-  const [representativeRows, setRepresentativeRows] = useState<RepresentativeRowData[]>(() => {
-    // Initialize from task representatives
-    if (task.representatives && task.representatives.length > 0) {
-      return task.representatives.map(rep => ({
+  // Responsibles state - using row-based system
+  const [responsibleRows, setResponsibleRows] = useState<ResponsibleRowData[]>(() => {
+    // Initialize from task responsibles
+    if (task.responsibles && task.responsibles.length > 0) {
+      return task.responsibles.map(rep => ({
         id: rep.id,
         name: rep.name,
         phone: rep.phone,
@@ -382,7 +382,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       name: '',
       phone: '',
       email: '',
-      role: 'COMMERCIAL' as RepresentativeRole,
+      role: 'COMMERCIAL' as ResponsibleRole,
       isActive: true,
       isNew: true,
       isEditing: false,
@@ -641,7 +641,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       forecastDate: taskData.forecastDate ? new Date(taskData.forecastDate) : null,
       customerId: taskData.customerId || null,
       sectorId: taskData.sectorId || null,
-      representativeIds: taskData.representativeIds || [],
+      responsibleIds: taskData.responsibleIds || [],
       paintId: taskData.paintId || null,
       // Initialize pricing with default structure - default row is part of initial state, not a change
       pricing: taskData.pricing ? {
@@ -670,6 +670,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         layoutFileId: taskData.pricing.layoutFileId || null,
         // Invoice To Customers (extract IDs from full customer objects returned by API)
         invoicesToCustomerIds: taskData.pricing.invoicesToCustomers?.map((c: any) => c.id) || taskData.pricing.invoicesToCustomerIds || [],
+        // Budget Responsible
+        responsibleId: taskData.pricing.responsibleId || null,
         // New Fields
         simultaneousTasks: taskData.pricing.simultaneousTasks || null,
         discountReference: taskData.pricing.discountReference || null,
@@ -716,6 +718,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         layoutFileId: null,
         // Invoice To Customers (defaults)
         invoicesToCustomerIds: [],
+        // Budget Responsible (defaults)
+        responsibleId: null,
         // New Fields (defaults)
         simultaneousTasks: null,
         discountReference: null,
@@ -1076,7 +1080,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           hasArtworkStatusChanges,
           hasCutsToCreate,
         });
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate && !hasNewRepresentatives) {
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate && !hasNewResponsibles) {
           console.log('[TaskEditForm] ❌ Early return: no changes detected');
           return;
         }
@@ -1197,10 +1201,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           (changedData as any)._onlyCuts = true; // Marker field to prevent empty body
         }
 
-        // If only new representatives exist (no other changes), we still need to update the task
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate && hasNewRepresentatives) {
-          console.log('[TaskEditForm] Only new representatives detected, adding marker field');
-          (changedData as any)._onlyNewRepresentatives = true; // Marker field to prevent empty body
+        // If only new responsibles exist (no other changes), we still need to update the task
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate && hasNewResponsibles) {
+          console.log('[TaskEditForm] Only new responsibles detected, adding marker field');
+          (changedData as any)._onlyNewResponsibles = true; // Marker field to prevent empty body
         }
 
         // Check if we have new files that need to be uploaded
@@ -1333,7 +1337,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             'receiptIds',
             'reimbursementIds',
             'reimbursementInvoiceIds',
-            'representativeIds', // Handled separately at lines 1556-1593
+            'responsibleIds', // Handled separately below
           ]);
 
           // Prepare data object with only changed fields (excluding large arrays unless they changed)
@@ -1551,20 +1555,20 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             console.log('[Task Update] 📦 FormData - Including newArtworkStatuses:', newArtworkStatuses);
           }
 
-          // Handle representatives - only send if there's an actual change
-          // Get original representative IDs from the task
-          const originalRepIds = (task.representatives || []).map(r => r.id).sort();
+          // Handle responsibles - only send if there's an actual change
+          // Get original responsible IDs from the task
+          const originalRepIds = (task.responsibles || []).map(r => r.id).sort();
 
-          // Collect existing representative IDs from the form
-          const existingRepIds = representativeRows
+          // Collect existing responsible IDs from the form
+          const existingRepIds = responsibleRows
             .filter(row => !row.isNew && row.id && !row.id.startsWith('temp-'))
             .map(row => row.id)
             .sort();
 
-          // Prepare new representatives to create inline
-          // Use the row's customerId if set, otherwise fall back to task's primary customerId
-          const defaultCustomerId = changedData.customerId || task.customerId;
-          const newReps = representativeRows
+          // Prepare new responsibles to create inline
+          // Use the row's companyId if set (from customer combobox), otherwise fall back to task's customerId
+          const defaultCompanyId = changedData.customerId || task.customerId;
+          const newReps = responsibleRows
             .filter(row => row.isNew && row.name.trim() && row.phone.trim())
             .map(row => ({
               name: row.name.trim(),
@@ -1572,14 +1576,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
               email: row.email?.trim() || undefined,
               role: row.role,
               isActive: row.isActive !== undefined ? row.isActive : true,
-              customerId: row.customerId || defaultCustomerId, // Use row's customerId (could be invoiceTo)
+              companyId: row.companyId || defaultCompanyId,
             }));
 
-          // Check if representatives actually changed
+          // Check if responsibles actually changed
           const repIdsChanged = originalRepIds.join(',') !== existingRepIds.join(',');
           const hasNewReps = newReps.length > 0;
 
-          console.log('[Task Update] Processing representatives:', {
+          console.log('[Task Update] Processing responsibles:', {
             originalRepIds,
             existingRepIds,
             repIdsChanged,
@@ -1587,24 +1591,24 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             newReps: newReps.length,
           });
 
-          // Only send representative data if there's an actual change
+          // Only send responsible data if there's an actual change
           if (repIdsChanged || hasNewReps) {
-            // Always send representativeIds when changed (even empty to remove all)
-            dataForFormData.representativeIds = existingRepIds;
-            console.log('[Task Update] Including representative IDs (changed):', existingRepIds);
+            // Always send responsibleIds when changed (even empty to remove all)
+            dataForFormData.responsibleIds = existingRepIds;
+            console.log('[Task Update] Including responsible IDs (changed):', existingRepIds);
 
-            // Include new representatives to be created by the backend
+            // Include new responsibles to be created by the backend
             if (hasNewReps) {
-              dataForFormData.newRepresentatives = newReps;
-              console.log('[Task Update] Including new representatives to create:', JSON.stringify(newReps, null, 2));
+              dataForFormData.newResponsibles = newReps;
+              console.log('[Task Update] Including new responsibles to create:', JSON.stringify(newReps, null, 2));
             }
           } else {
-            console.log('[Task Update] Representatives unchanged, not sending');
+            console.log('[Task Update] Responsibles unchanged, not sending');
           }
 
           // Remove marker fields before sending to API
           delete dataForFormData._onlyCuts;
-          delete dataForFormData._onlyNewRepresentatives;
+          delete dataForFormData._onlyNewResponsibles;
 
           // Use the helper to create FormData with proper context
           const formData = createFormDataWithContext(
@@ -1686,8 +1690,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // Sending cuts here would cause backend to deleteMany + create, losing existing cut statuses
           delete submitData.cuts;
 
-          // Exclude representativeIds - handled separately below to avoid false changelog entries
-          delete submitData.representativeIds;
+          // Exclude responsibleIds - handled separately below to avoid false changelog entries
+          delete submitData.responsibleIds;
 
           // Even if no new files, check for deleted files
           // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
@@ -1839,20 +1843,20 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // CRITICAL: paintIds is already in changedData (not excluded in JSON path)
           // No need to add it separately like in FormData path
 
-          // Handle representatives - only send if there's an actual change
-          // Get original representative IDs from the task
-          const originalRepIdsJson = (task.representatives || []).map(r => r.id).sort();
+          // Handle responsibles - only send if there's an actual change
+          // Get original responsible IDs from the task
+          const originalRepIdsJson = (task.responsibles || []).map(r => r.id).sort();
 
-          // Collect existing representative IDs from the form
-          const existingRepIdsJson = representativeRows
+          // Collect existing responsible IDs from the form
+          const existingRepIdsJson = responsibleRows
             .filter(row => !row.isNew && row.id && !row.id.startsWith('temp-'))
             .map(row => row.id)
             .sort();
 
-          // Prepare new representatives to create inline
-          // Use the row's customerId if set, otherwise fall back to task's primary customerId
-          const defaultCustomerIdForJson = changedData.customerId || task.customerId;
-          const newRepsJson = representativeRows
+          // Prepare new responsibles to create inline
+          // Use the row's companyId if set (from customer combobox), otherwise fall back to task's customerId
+          const defaultCompanyIdForJson = changedData.customerId || task.customerId;
+          const newRepsJson = responsibleRows
             .filter(row => row.isNew && row.name.trim() && row.phone.trim())
             .map(row => ({
               name: row.name.trim(),
@@ -1860,37 +1864,37 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
               email: row.email?.trim() || undefined,
               role: row.role,
               isActive: row.isActive,
-              customerId: row.customerId || defaultCustomerIdForJson, // Use row's customerId (could be invoiceTo)
+              companyId: row.companyId || defaultCompanyIdForJson,
             }));
 
-          // Check if representatives actually changed
+          // Check if responsibles actually changed
           const repIdsChangedJson = originalRepIdsJson.join(',') !== existingRepIdsJson.join(',');
           const hasNewRepsJson = newRepsJson.length > 0;
 
-          console.log('[TaskEditForm] 📤 JSON - Processing representatives:', {
+          console.log('[TaskEditForm] 📤 JSON - Processing responsibles:', {
             originalRepIdsJson,
             existingRepIdsJson,
             repIdsChangedJson,
             hasNewRepsJson,
           });
 
-          // Only send representative data if there's an actual change
+          // Only send responsible data if there's an actual change
           if (repIdsChangedJson || hasNewRepsJson) {
-            // Always send representativeIds when changed (even empty to remove all)
-            submitData.representativeIds = existingRepIdsJson;
-            console.log('[TaskEditForm] 📤 JSON - Including representative IDs (changed):', existingRepIdsJson);
+            // Always send responsibleIds when changed (even empty to remove all)
+            submitData.responsibleIds = existingRepIdsJson;
+            console.log('[TaskEditForm] 📤 JSON - Including responsible IDs (changed):', existingRepIdsJson);
 
             if (hasNewRepsJson) {
-              submitData.newRepresentatives = newRepsJson;
-              console.log('[TaskEditForm] 📤 JSON - Including newRepresentatives:', newRepsJson);
+              submitData.newResponsibles = newRepsJson;
+              console.log('[TaskEditForm] 📤 JSON - Including newResponsibles:', newRepsJson);
             }
           } else {
-            console.log('[TaskEditForm] 📤 JSON - Representatives unchanged, not sending');
+            console.log('[TaskEditForm] 📤 JSON - Responsibles unchanged, not sending');
           }
 
           // Remove marker fields before sending to API
           delete (submitData as any)._onlyCuts;
-          delete (submitData as any)._onlyNewRepresentatives;
+          delete (submitData as any)._onlyNewResponsibles;
 
           // DEBUG: Log submitData right before API call
           console.log('[TaskEditForm] JSON path - submitData before API call:', JSON.stringify(submitData, (_key, value) => {
@@ -2226,7 +2230,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     name: 'customerId',
   });
 
-  // Representatives are now managed by the RepresentativeManager component
+  // Responsibles are now managed by the ResponsibleManager component
 
   // =====================================================================
   // BIDIRECTIONAL SYNC: Pricing Items ↔ Production Service Orders
@@ -2331,10 +2335,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     }
   }, [form]);
 
-  // Representative rows are now managed by RepresentativeManager component
-  // Handler to update representative rows and sync with form
-  const handleRepresentativeRowsChange = useCallback((rows: RepresentativeRowData[]) => {
-    console.log('[TaskEditForm] handleRepresentativeRowsChange called:', {
+  // Responsible rows are now managed by ResponsibleManager component
+  // Handler to update responsible rows and sync with form
+  const handleResponsibleRowsChange = useCallback((rows: ResponsibleRowData[]) => {
+    console.log('[TaskEditForm] handleResponsibleRowsChange called:', {
       rows,
       rowsWithData: rows.map(r => ({
         id: r.id,
@@ -2345,27 +2349,27 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       }))
     });
 
-    // Update representative rows state
-    setRepresentativeRows(rows);
+    // Update responsible rows state
+    setResponsibleRows(rows);
 
-    // Update the form's representativeIds with existing representatives
+    // Update the form's responsibleIds with existing responsibles
     const existingRepIds = rows
       .filter(row => !row.isNew && row.id && row.id.trim() !== '')
       .map(row => row.id);
 
-    // Check if there are new representatives with data to mark form as dirty
+    // Check if there are new responsibles with data to mark form as dirty
     const hasNewRepsWithData = rows.some(row =>
       row.isNew && row.name && row.name.trim() && row.phone && row.phone.trim()
     );
 
     // Get current form value to compare
-    const currentFormIds = form.getValues("representativeIds") || [];
-    const originalIds = task.representatives?.map(r => r.id) || [];
+    const currentFormIds = form.getValues("responsibleIds") || [];
+    const originalIds = task.responsibles?.map(r => r.id) || [];
 
     // Only update form if the IDs actually changed from the original
     const idsChanged = existingRepIds.join(',') !== originalIds.join(',');
 
-    console.log('[TaskEditForm] Representative state:', {
+    console.log('[TaskEditForm] Responsible state:', {
       existingRepIds,
       hasNewRepsWithData,
       currentFormIds,
@@ -2376,13 +2380,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     // Only call setValue if IDs changed or we have new reps with data
     // This prevents unnecessary form dirty state when only empty rows exist
     if (idsChanged || hasNewRepsWithData) {
-      form.setValue("representativeIds", existingRepIds, {
+      form.setValue("responsibleIds", existingRepIds, {
         shouldDirty: true,
         shouldTouch: true,
         shouldValidate: true
       });
     }
-  }, [form, task.representatives]);
+  }, [form, task.responsibles]);
 
   // Fetch historical PRODUCTION service order descriptions on mount
   useEffect(() => {
@@ -2743,15 +2747,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     });
   }, [cutsValues]);
 
-  // Check if there are new representatives to be created
-  const hasNewRepresentatives = useMemo(() => {
-    const result = representativeRows.some(row =>
+  // Check if there are new responsibles to be created
+  const hasNewResponsibles = useMemo(() => {
+    const result = responsibleRows.some(row =>
       row.isNew && row.name && row.name.trim() && row.phone && row.phone.trim()
     );
-    console.log('[TaskEditForm] hasNewRepresentatives calculation:', {
+    console.log('[TaskEditForm] hasNewResponsibles calculation:', {
       result,
-      representativeRows,
-      rowsDetail: representativeRows.map(r => ({
+      responsibleRows,
+      rowsDetail: responsibleRows.map(r => ({
         id: r.id,
         name: r.name,
         phone: r.phone,
@@ -2762,10 +2766,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       }))
     });
     return result;
-  }, [representativeRows]);
+  }, [responsibleRows]);
 
-  // Compute hasChanges including cuts to create, artwork status changes, and new representatives
-  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges || hasCutsToCreate || hasNewRepresentatives;
+  // Compute hasChanges including cuts to create, artwork status changes, and new responsibles
+  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges || hasCutsToCreate || hasNewResponsibles;
 
   console.log('[TaskEditForm] hasChanges calculation:', {
     hasChanges,
@@ -2775,7 +2779,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     hasFileChanges,
     hasArtworkStatusChanges,
     hasCutsToCreate,
-    hasNewRepresentatives
+    hasNewResponsibles
   });
 
 
@@ -2876,7 +2880,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   useEffect(() => {
     if (onFormStateChange) {
       const changedFields = getChangedFields();
-      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges || hasCutsToCreate || hasNewRepresentatives;
+      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges || hasCutsToCreate || hasNewResponsibles;
 
       // Check if form is valid (no blocking validation errors)
       // This matches the form's internal validation but WITHOUT the hasChanges check
@@ -2901,7 +2905,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     hasFileChanges,
     hasArtworkStatusChanges,
     hasCutsToCreate,
-    hasNewRepresentatives,
+    hasNewResponsibles,
     isSubmitting,
     hasCutsWithoutFiles,
     hasIncompletePricing,
@@ -2927,7 +2931,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   //     isSubmitDisabled,
   //     isSubmitting,
   //     hasChanges,
-  //     hasNewRepresentatives,
+  //     hasNewResponsibles,
   //     formFieldChangesCount: Object.keys(formFieldChanges).length,
   //     hasCutsWithoutFiles,
   //     hasIncompletePricing,
@@ -2956,7 +2960,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   //       loading: isSubmitting,
   //     },
   //   ];
-  // }, [isSubmitting, hasChanges, hasCutsWithoutFiles, hasIncompletePricing, hasIncompleteServices, hasIncompleteObservation, layoutWidthError, handleCancel, handleSubmitChanges, hasNewRepresentatives]);
+  // }, [isSubmitting, hasChanges, hasCutsWithoutFiles, hasIncompletePricing, hasIncompleteServices, hasIncompleteObservation, layoutWidthError, handleCancel, handleSubmitChanges, hasNewResponsibles]);
 
   return (
     <Form {...(form as any)}>
@@ -3331,11 +3335,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 </Card>
           </AccordionItem>
 
-          {/* Representatives Section - Visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER (edit for ADMIN/COMMERCIAL only, view only for others) */}
+          {/* Responsibles Section - Visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER (edit for ADMIN/COMMERCIAL only, view only for others) */}
           {canViewRestrictedFields && (
             <AccordionItem
-              value="representatives"
-              id="accordion-item-representatives"
+              value="responsibles"
+              id="accordion-item-responsibles"
               className="border border-border rounded-lg"
             >
               <Card className="border-0">
@@ -3343,23 +3347,21 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                   <CardHeader className="flex-1 py-4">
                     <CardTitle className="flex items-center gap-2">
                       <IconUser className="h-5 w-5" />
-                      Representantes
+                      Responsáveis
                     </CardTitle>
                   </CardHeader>
                 </AccordionTrigger>
                 <AccordionContent>
                   <CardContent className="pt-0">
-                    <RepresentativeManager
-                      customerId={customerIdValue || undefined}
-                      customerName={task.customer?.corporateName || task.customer?.fantasyName || undefined}
-                      invoiceToCustomers={task.pricing?.invoicesToCustomers}
+                    <ResponsibleManager
+                      companyId={customerIdValue || undefined}
                       value={isDesignerUser
                         ? (() => {
-                            const marketing = representativeRows.filter(r => r.role === RepresentativeRole.MARKETING);
-                            return marketing.length > 0 ? marketing : representativeRows.filter(r => r.role === RepresentativeRole.COMMERCIAL);
+                            const marketing = responsibleRows.filter(r => r.role === ResponsibleRole.MARKETING);
+                            return marketing.length > 0 ? marketing : responsibleRows.filter(r => r.role === ResponsibleRole.COMMERCIAL);
                           })()
-                        : representativeRows}
-                      onChange={handleRepresentativeRowsChange}
+                        : responsibleRows}
+                      onChange={handleResponsibleRowsChange}
                       disabled={isSubmitting || isFinancialUser || isDesignerUser || isLogisticUser}
                       readOnly={isFinancialUser || isDesignerUser || isLogisticUser}
                       minRows={0}
@@ -3794,6 +3796,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         onLayoutFilesChange={setPricingLayoutFiles}
                         onItemDeleted={handlePricingItemDeleted}
                         initialInvoiceToCustomers={task?.pricing?.invoicesToCustomers}
+                        taskResponsibles={task?.responsibles}
                       />
                     </CardContent>
                   </AccordionContent>

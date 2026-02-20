@@ -13,7 +13,7 @@ import type {
   TaskDuplicateFormData,
   TaskQueryFormData,
   TaskCopyRequest,
-  RepresentativeCreateInlineFormData,
+  ResponsibleCreateInlineFormData,
 } from "../schemas";
 import type {
   // Interface types (for responses)
@@ -27,7 +27,7 @@ import type {
   TaskBatchUpdateResponse,
   TaskBatchDeleteResponse,
 } from "../types";
-import { representativeService } from "@/services/representativeService";
+import { responsibleService } from "@/services/responsibleService";
 
 // =====================
 // Task Service Class
@@ -41,55 +41,55 @@ export class TaskService {
   // =====================
 
   /**
-   * Process representatives and create new ones if needed.
+   * Process responsibles and create new ones if needed.
    * This should be called before creating or updating a task.
    *
-   * @param customerId - The customer ID for the new representatives (optional - can be empty/null)
-   * @param representativeIds - Array of representative IDs (may include existing IDs)
-   * @param newRepresentatives - Array of new representatives to create
-   * @returns Updated array of representative IDs with newly created ones
+   * @param customerId - The customer ID for the new responsibles (optional - can be empty/null)
+   * @param responsibleIds - Array of responsible IDs (may include existing IDs)
+   * @param newResponsibles - Array of new responsibles to create
+   * @returns Updated array of responsible IDs with newly created ones
    */
-  private async processRepresentatives(
+  private async processResponsibles(
     customerId: string | null | undefined,
-    representativeIds: string[] = [],
-    newRepresentatives: RepresentativeCreateInlineFormData[] = []
+    responsibleIds: string[] = [],
+    newResponsibles: ResponsibleCreateInlineFormData[] = []
   ): Promise<string[]> {
-    if (!newRepresentatives || newRepresentatives.length === 0) {
-      return representativeIds;
+    if (!newResponsibles || newResponsibles.length === 0) {
+      return responsibleIds;
     }
 
-    const createdRepresentativeIds: string[] = [];
-    const errors: Array<{ representative: RepresentativeCreateInlineFormData; error: any }> = [];
+    const createdResponsibleIds: string[] = [];
+    const errors: Array<{ responsible: ResponsibleCreateInlineFormData; error: any }> = [];
 
-    // Create each new representative
-    for (const repData of newRepresentatives) {
+    // Create each new responsible
+    for (const repData of newResponsibles) {
       try {
         // Use repData.customerId if available, otherwise use the passed customerId
         // Pass undefined if empty string to let backend handle optional field
         const effectiveCustomerId = repData.customerId || customerId || undefined;
-        const created = await representativeService.create({
+        const created = await responsibleService.create({
           ...repData,
           customerId: effectiveCustomerId,
         });
-        createdRepresentativeIds.push(created.id);
+        createdResponsibleIds.push(created.id);
       } catch (error) {
-        errors.push({ representative: repData, error });
+        errors.push({ responsible: repData, error });
       }
     }
 
-    // If any representative creation failed, throw an error
+    // If any responsible creation failed, throw an error
     if (errors.length > 0) {
       const errorMessages = errors.map(
-        ({ representative, error }) =>
-          `${representative.name} (${representative.role}): ${error.message || 'Erro desconhecido'}`
+        ({ responsible, error }) =>
+          `${responsible.name} (${responsible.role}): ${error.message || 'Erro desconhecido'}`
       ).join('; ');
 
-      throw new Error(`Falha ao criar representantes: ${errorMessages}`);
+      throw new Error(`Falha ao criar responsáveis: ${errorMessages}`);
     }
 
-    // Combine existing representative IDs with newly created ones
-    const existingIds = representativeIds.filter(id => id && typeof id === 'string');
-    return [...existingIds, ...createdRepresentativeIds];
+    // Combine existing responsible IDs with newly created ones
+    const existingIds = responsibleIds.filter(id => id && typeof id === 'string');
+    return [...existingIds, ...createdResponsibleIds];
   }
 
   // =====================
@@ -113,63 +113,63 @@ export class TaskService {
   // =====================
 
   async createTask(data: TaskCreateFormData | FormData, query?: TaskQueryFormData): Promise<TaskCreateResponse> {
-    // Handle representative creation if needed
+    // Handle responsible creation if needed
     let processedData = data;
 
     if (!(data instanceof FormData)) {
       // JSON payload - can directly access and modify properties
-      if (data.newRepresentatives && data.newRepresentatives.length > 0) {
-        // Get customerId from data or from the first newRepresentative (they all have the same customerId)
-        // customerId is now optional - representatives can be created without a customer
-        const customerId = data.customerId || data.newRepresentatives[0]?.customerId;
+      if (data.newResponsibles && data.newResponsibles.length > 0) {
+        // Get customerId from data or from the first newResponsible (they all have the same customerId)
+        // customerId is now optional - responsibles can be created without a customer
+        const customerId = data.customerId || data.newResponsibles[0]?.customerId;
 
         try {
-          // Create representatives and get their IDs
-          const updatedRepIds = await this.processRepresentatives(
+          // Create responsibles and get their IDs
+          const updatedRepIds = await this.processResponsibles(
             customerId || '', // Pass empty string if no customerId - backend handles optional
-            data.representativeIds,
-            data.newRepresentatives
+            data.responsibleIds,
+            data.newResponsibles
           );
 
-          // Update the data with the new representative IDs
+          // Update the data with the new responsible IDs
           processedData = {
             ...data,
-            representativeIds: updatedRepIds,
+            responsibleIds: updatedRepIds,
           };
 
-          // Remove newRepresentatives from the payload as they've been processed
-          delete (processedData as any).newRepresentatives;
+          // Remove newResponsibles from the payload as they've been processed
+          delete (processedData as any).newResponsibles;
         } catch (error: any) {
           // Re-throw with more context
-          throw new Error(`Erro ao processar representantes: ${error.message}`);
+          throw new Error(`Erro ao processar responsáveis: ${error.message}`);
         }
       }
     } else {
       // FormData payload - need to extract and process
-      // FormData arrays are serialized with indexed keys like newRepresentatives[0], newRepresentatives[1], etc.
-      const newRepresentatives: any[] = [];
+      // FormData arrays are serialized with indexed keys like newResponsibles[0], newResponsibles[1], etc.
+      const newResponsibles: any[] = [];
       for (const [key, value] of data.entries()) {
-        if (key.startsWith('newRepresentatives[') && key.endsWith(']')) {
+        if (key.startsWith('newResponsibles[') && key.endsWith(']')) {
           try {
-            newRepresentatives.push(JSON.parse(value as string));
+            newResponsibles.push(JSON.parse(value as string));
           } catch {
             // Skip invalid JSON entries
           }
         }
       }
 
-      if (newRepresentatives.length > 0) {
+      if (newResponsibles.length > 0) {
         try {
-          // Get customerId from FormData OR from the first newRepresentative (they all have the same customerId)
+          // Get customerId from FormData OR from the first newResponsible (they all have the same customerId)
           const customerIdFromFormData = data.get('customerId') as string | null;
-          const customerId = customerIdFromFormData || newRepresentatives[0]?.customerId || '';
+          const customerId = customerIdFromFormData || newResponsibles[0]?.customerId || '';
 
-          // Get existing representative IDs (also may be indexed)
+          // Get existing responsible IDs (also may be indexed)
           const existingRepIds: string[] = [];
           for (const [key, value] of data.entries()) {
-            if (key.startsWith('representativeIds[') && key.endsWith(']')) {
+            if (key.startsWith('responsibleIds[') && key.endsWith(']')) {
               existingRepIds.push(value as string);
-            } else if (key === 'representativeIds') {
+            } else if (key === 'responsibleIds') {
               try {
                 const parsed = JSON.parse(value as string);
                 if (Array.isArray(parsed)) {
@@ -182,28 +182,28 @@ export class TaskService {
             }
           }
 
-          // Create representatives and get their IDs
-          const updatedRepIds = await this.processRepresentatives(
+          // Create responsibles and get their IDs
+          const updatedRepIds = await this.processResponsibles(
             customerId,
             existingRepIds,
-            newRepresentatives
+            newResponsibles
           );
 
-          // Create new FormData with updated representative IDs
+          // Create new FormData with updated responsible IDs
           processedData = new FormData();
 
-          // Copy all existing entries except representativeIds and newRepresentatives
+          // Copy all existing entries except responsibleIds and newResponsibles
           for (const [key, value] of data.entries()) {
-            if (!key.startsWith('representativeIds') && !key.startsWith('newRepresentatives')) {
+            if (!key.startsWith('responsibleIds') && !key.startsWith('newResponsibles')) {
               processedData.append(key, value);
             }
           }
 
-          // Add updated representative IDs as JSON array
-          processedData.append('representativeIds', JSON.stringify(updatedRepIds));
+          // Add updated responsible IDs as JSON array
+          processedData.append('responsibleIds', JSON.stringify(updatedRepIds));
         } catch (error: any) {
           // Re-throw with more context
-          throw new Error(`Erro ao processar representantes: ${error.message}`);
+          throw new Error(`Erro ao processar responsáveis: ${error.message}`);
         }
       }
     }
@@ -216,63 +216,63 @@ export class TaskService {
   }
 
   async updateTask(id: string, data: TaskUpdateFormData | FormData, query?: TaskQueryFormData): Promise<TaskUpdateResponse> {
-    // Handle representative creation if needed
+    // Handle responsible creation if needed
     let processedData = data;
 
     if (!(data instanceof FormData)) {
       // JSON payload - can directly access and modify properties
-      if (data.newRepresentatives && data.newRepresentatives.length > 0) {
-        // Get customerId from data or from the first newRepresentative (they all have the same customerId)
-        // customerId is now optional - representatives can be created without a customer
-        const customerId = data.customerId || data.newRepresentatives[0]?.customerId;
+      if (data.newResponsibles && data.newResponsibles.length > 0) {
+        // Get customerId from data or from the first newResponsible (they all have the same customerId)
+        // customerId is now optional - responsibles can be created without a customer
+        const customerId = data.customerId || data.newResponsibles[0]?.customerId;
 
         try {
-          // Create representatives and get their IDs
-          const updatedRepIds = await this.processRepresentatives(
+          // Create responsibles and get their IDs
+          const updatedRepIds = await this.processResponsibles(
             customerId || '', // Pass empty string if no customerId - backend handles optional
-            data.representativeIds,
-            data.newRepresentatives
+            data.responsibleIds,
+            data.newResponsibles
           );
 
-          // Update the data with the new representative IDs
+          // Update the data with the new responsible IDs
           processedData = {
             ...data,
-            representativeIds: updatedRepIds,
+            responsibleIds: updatedRepIds,
           };
 
-          // Remove newRepresentatives from the payload as they've been processed
-          delete (processedData as any).newRepresentatives;
+          // Remove newResponsibles from the payload as they've been processed
+          delete (processedData as any).newResponsibles;
         } catch (error: any) {
           // Re-throw with more context
-          throw new Error(`Erro ao processar representantes: ${error.message}`);
+          throw new Error(`Erro ao processar responsáveis: ${error.message}`);
         }
       }
     } else {
       // FormData payload - need to extract and process
-      // FormData arrays are serialized with indexed keys like newRepresentatives[0], newRepresentatives[1], etc.
-      const newRepresentatives: any[] = [];
+      // FormData arrays are serialized with indexed keys like newResponsibles[0], newResponsibles[1], etc.
+      const newResponsibles: any[] = [];
       for (const [key, value] of data.entries()) {
-        if (key.startsWith('newRepresentatives[') && key.endsWith(']')) {
+        if (key.startsWith('newResponsibles[') && key.endsWith(']')) {
           try {
-            newRepresentatives.push(JSON.parse(value as string));
+            newResponsibles.push(JSON.parse(value as string));
           } catch {
             // Skip invalid JSON entries
           }
         }
       }
 
-      if (newRepresentatives.length > 0) {
+      if (newResponsibles.length > 0) {
         try {
-          // Get customerId from FormData OR from the first newRepresentative (they all have the same customerId)
+          // Get customerId from FormData OR from the first newResponsible (they all have the same customerId)
           const customerIdFromFormData = data.get('customerId') as string | null;
-          const customerId = customerIdFromFormData || newRepresentatives[0]?.customerId || '';
+          const customerId = customerIdFromFormData || newResponsibles[0]?.customerId || '';
 
-          // Get existing representative IDs (also may be indexed)
+          // Get existing responsible IDs (also may be indexed)
           const existingRepIds: string[] = [];
           for (const [key, value] of data.entries()) {
-            if (key.startsWith('representativeIds[') && key.endsWith(']')) {
+            if (key.startsWith('responsibleIds[') && key.endsWith(']')) {
               existingRepIds.push(value as string);
-            } else if (key === 'representativeIds') {
+            } else if (key === 'responsibleIds') {
               try {
                 const parsed = JSON.parse(value as string);
                 if (Array.isArray(parsed)) {
@@ -285,28 +285,28 @@ export class TaskService {
             }
           }
 
-          // Create representatives and get their IDs
-          const updatedRepIds = await this.processRepresentatives(
+          // Create responsibles and get their IDs
+          const updatedRepIds = await this.processResponsibles(
             customerId,
             existingRepIds,
-            newRepresentatives
+            newResponsibles
           );
 
-          // Create new FormData with updated representative IDs
+          // Create new FormData with updated responsible IDs
           processedData = new FormData();
 
-          // Copy all existing entries except representativeIds and newRepresentatives
+          // Copy all existing entries except responsibleIds and newResponsibles
           for (const [key, value] of data.entries()) {
-            if (!key.startsWith('representativeIds') && !key.startsWith('newRepresentatives')) {
+            if (!key.startsWith('responsibleIds') && !key.startsWith('newResponsibles')) {
               processedData.append(key, value);
             }
           }
 
-          // Add updated representative IDs as JSON array
-          processedData.append('representativeIds', JSON.stringify(updatedRepIds));
+          // Add updated responsible IDs as JSON array
+          processedData.append('responsibleIds', JSON.stringify(updatedRepIds));
         } catch (error: any) {
           // Re-throw with more context
-          throw new Error(`Erro ao processar representantes: ${error.message}`);
+          throw new Error(`Erro ao processar responsáveis: ${error.message}`);
         }
       }
     }

@@ -320,8 +320,12 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
 
   // Get customer info
   const corporateName = task.customer?.corporateName || task.customer?.fantasyName || "Cliente";
-  const commercialRep = task.representatives?.find((r: any) => r.role === "COMMERCIAL");
-  const contactName = commercialRep?.name || task.representatives?.[0]?.name || "";
+  // Prefer the explicitly selected budget responsible from pricing
+  const commercialRep = task.responsibles?.find((r: any) => r.role === "COMMERCIAL");
+  const contactName = task.pricing?.responsible?.name
+    || commercialRep?.name
+    || task.responsibles?.[0]?.name
+    || "";
 
   // Get dates
   const currentDate = formatDate(new Date());

@@ -36,6 +36,7 @@ import { formatCurrency, formatCNPJ } from "../../../../utils";
 import { cn } from "@/lib/utils";
 import { DISCOUNT_TYPE, SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
+import { RESPONSIBLE_ROLE_LABELS } from "@/types/responsible";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { ServiceAutocomplete } from "../form/service-autocomplete";
 import { getCustomers } from "../../../../api-client";
@@ -52,6 +53,7 @@ interface PricingSelectorProps {
   onLayoutFilesChange?: (files: FileWithPreview[]) => void;
   onItemDeleted?: (description: string) => void;
   initialInvoiceToCustomers?: Array<{ id: string; fantasyName?: string; corporateName?: string; cnpj?: string }>;
+  taskResponsibles?: Array<{ id: string; name: string; role: string }>;
 }
 
 export interface PricingSelectorRef {
@@ -90,7 +92,7 @@ const VALIDITY_DAYS_OPTIONS = Array.from({ length: 30 }, (_, i) => ({
 export const PricingSelector = forwardRef<
   PricingSelectorRef,
   PricingSelectorProps
->(({ control, disabled, userRole, readOnly, onItemCountChange, layoutFiles: externalLayoutFiles, onLayoutFilesChange, onItemDeleted, initialInvoiceToCustomers }, ref) => {
+>(({ control, disabled, userRole, readOnly, onItemCountChange, layoutFiles: externalLayoutFiles, onLayoutFilesChange, onItemDeleted, initialInvoiceToCustomers, taskResponsibles }, ref) => {
   const [initialized, setInitialized] = useState(false);
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
   const [showCustomPayment, setShowCustomPayment] = useState(false);
@@ -695,6 +697,39 @@ export const PricingSelector = forwardRef<
               </FormItem>
             );
           }}
+        />
+      )}
+
+      {/* Budget Responsible */}
+      {hasPricingItems && taskResponsibles && taskResponsibles.length > 0 && (
+        <FormField
+          control={control}
+          name="pricing.responsibleId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Responsável do Orçamento</FormLabel>
+              <FormControl>
+                <Combobox
+                  value={field.value || ''}
+                  onValueChange={(value) => {
+                    field.onChange(value || null);
+                  }}
+                  options={taskResponsibles
+                    .filter(r => !r.id.startsWith('temp-'))
+                    .map(r => ({
+                      value: r.id,
+                      label: `${r.name} (${RESPONSIBLE_ROLE_LABELS[r.role as keyof typeof RESPONSIBLE_ROLE_LABELS] || r.role})`,
+                    }))}
+                  placeholder="Selecione o responsável do orçamento"
+                  emptyText="Nenhum responsável disponível"
+                  disabled={disabled || readOnly}
+                  searchable={false}
+                  clearable={true}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
       )}
 

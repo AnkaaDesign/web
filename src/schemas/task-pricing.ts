@@ -149,6 +149,7 @@ export const taskPricingCreateNestedSchema = z
     ),
     discountReference: z.string().max(500).optional().nullable(),
     invoicesToCustomerIds: z.array(z.string().uuid()).optional(),
+    responsibleId: z.string().uuid().optional().nullable(),
   })
   .optional()
   .superRefine((data, ctx) => {

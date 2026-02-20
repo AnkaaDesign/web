@@ -359,15 +359,15 @@ export const createTaskHistoryColumns = (options?: {
     },
   },
   {
-    id: "representatives",
-    header: "REPRESENTANTES",
-    accessorFn: (row) => row.representatives?.map(r => r.name).join(", ") || "",
+    id: "responsibles",
+    header: "RESPONSÁVEIS",
+    accessorFn: (row) => row.responsibles?.map(r => r.name).join(", ") || "",
     sortable: true,
     filterable: true,
     defaultVisible: false,
     width: "150px",
     formatter: (value: string, row: Task) => {
-      if (!row.representatives || row.representatives.length === 0) return <span className="text-muted-foreground">-</span>;
+      if (!row.responsibles || row.responsibles.length === 0) return <span className="text-muted-foreground">-</span>;
       return <TruncatedTextWithTooltip text={value} className="truncate" />;
     },
   },
@@ -839,7 +839,7 @@ export const createTaskHistoryColumns = (options?: {
     filteredColumns = filteredColumns.filter(col => col.id !== 'price');
   }
 
-  // Define privileged sectors that can view restricted fields (representatives, forecastDate)
+  // Define privileged sectors that can view restricted fields (responsibles, forecastDate)
   const canViewRestrictedFields = sectorPrivilege && (
     sectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
     sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
@@ -857,10 +857,10 @@ export const createTaskHistoryColumns = (options?: {
   );
 
   // Filter out restricted columns for users without permission
-  // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, and DESIGNER can see representatives and forecastDate
+  // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, and DESIGNER can see responsibles and forecastDate
   if (!canViewRestrictedFields) {
     filteredColumns = filteredColumns.filter(col =>
-      col.id !== 'representatives' &&
+      col.id !== 'responsibles' &&
       col.id !== 'forecastDate'
     );
   }

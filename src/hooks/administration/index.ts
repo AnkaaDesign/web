@@ -6,7 +6,7 @@ export * from "./use-layout";
 export * from "./use-layout-list";
 export * from "./use-layout-section";
 export * from "./use-changelog";
-export * from "./use-representative";
+export * from "./use-responsible";
 export * from "./use-notification";
 export {
   notificationAdminKeys,

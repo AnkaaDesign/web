@@ -642,7 +642,7 @@ const formatValueWithEntity = (
   // Use parsedValue to ensure arrays/objects are properly formatted
   const result = formatFieldValue(parsedValue, field, entityType, metadata);
 
-  // Render arrays as stacked lines (e.g., representatives)
+  // Render arrays as stacked lines (e.g., responsibles)
   if (Array.isArray(result)) {
     return result.map((item, i) => (
       <div key={i}>{String(item)}</div>
@@ -1505,7 +1505,7 @@ const ChangelogTimelineItem = ({
                   return false;
                 }
 
-                // Filter out restricted fields (forecastDate, representatives) for users who can't view them
+                // Filter out restricted fields (forecastDate, responsibles) for users who can't view them
                 // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER can see these
                 const canViewRestrictedFields =
                   userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
@@ -1515,8 +1515,8 @@ const ChangelogTimelineItem = ({
                   userSectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
                 const restrictedFields = [
                   "forecastDate",
-                  "representatives",
-                  "representativeIds",
+                  "responsibles",
+                  "responsibleIds",
                   "negotiatingWith",
                 ]; // invoiceTo removed - has its own check
                 if (
@@ -3054,7 +3054,7 @@ export function TaskWithServiceOrdersChangelog({
         extractUserIdsFromNegotiating(changelog.newValue);
       }
 
-      // Note: representatives/representativeIds are separate entities from users
+      // Note: responsibles/responsibleIds are separate entities from users
       // Their IDs should NOT be added to userIds (causes 404 on /users endpoint)
     });
 

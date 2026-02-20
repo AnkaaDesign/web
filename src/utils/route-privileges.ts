@@ -18,12 +18,12 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   [routes.administration.customers.edit(":id")]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can edit customers
   "/administracao/clientes/editar/:id": ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can edit customers - explicit pattern
   [routes.administration.customers.create]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can create customers
-  // Representatives - Admin and Commercial can manage representatives
-  [routes.representatives.root]: ["ADMIN", "COMMERCIAL"],
-  [routes.representatives.create]: ["ADMIN", "COMMERCIAL"],
-  [routes.representatives.details(":id")]: ["ADMIN", "COMMERCIAL"],
-  [routes.representatives.edit(":id")]: ["ADMIN", "COMMERCIAL"],
-  [routes.representatives.password(":id")]: ["ADMIN", "COMMERCIAL"],
+  // Responsibles - Admin and Commercial can manage responsibles
+  [routes.responsibles.root]: ["ADMIN", "COMMERCIAL"],
+  [routes.responsibles.create]: ["ADMIN", "COMMERCIAL"],
+  [routes.responsibles.details(":id")]: ["ADMIN", "COMMERCIAL"],
+  [routes.responsibles.edit(":id")]: ["ADMIN", "COMMERCIAL"],
+  [routes.responsibles.password(":id")]: ["ADMIN", "COMMERCIAL"],
 
   "/administracao/registros-de-alteracoes": "ADMIN",
   "/administracao/arquivos": "ADMIN",

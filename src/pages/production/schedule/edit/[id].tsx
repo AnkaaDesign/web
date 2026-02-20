@@ -94,7 +94,7 @@ export const TaskEditPage = () => {
         },
       },
       logoPaints: true,
-      representatives: true,
+      responsibles: true,
       airbrushings: {
         include: {
           receipts: true,

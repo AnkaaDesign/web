@@ -49,11 +49,11 @@ import { PricingSelector, type PricingSelectorRef } from "../pricing/pricing-sel
 import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { LayoutForm } from "@/components/production/layout/layout-form";
-import { RepresentativeManager } from "@/components/administration/customer/representative";
+import { ResponsibleManager } from "@/components/administration/customer/responsible";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { ArtworkFileUploadField } from "./artwork-file-upload-field";
-import type { RepresentativeRowData } from "@/types/representative";
-import { RepresentativeRole } from "@/types/representative";
+import type { ResponsibleRowData } from "@/types/responsible";
+import { ResponsibleRole } from "@/types/responsible";
 import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toast } from "sonner";
@@ -101,7 +101,7 @@ export const TaskCreateForm = () => {
   const isLogisticUser = user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC;
   const isAdminUser = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
 
-  const showRepresentatives = isAdminUser || isCommercialUser;
+  const showResponsibles = isAdminUser || isCommercialUser;
   const showPaint = isAdminUser || isCommercialUser;
   const showLogoPaints = isAdminUser; // Commercial can't see logo paints
   const showLayout = isAdminUser || isLogisticUser;
@@ -181,13 +181,13 @@ export const TaskCreateForm = () => {
     }
   }, [openAccordion, scrollToAccordion]);
 
-  // Representatives state
-  const [representativeRows, setRepresentativeRows] = useState<RepresentativeRowData[]>([{
+  // Responsibles state
+  const [responsibleRows, setResponsibleRows] = useState<ResponsibleRowData[]>([{
     id: `temp-${Date.now()}-0`,
     name: '',
     phone: '',
     email: '',
-    role: 'COMMERCIAL' as RepresentativeRole,
+    role: 'COMMERCIAL' as ResponsibleRole,
     isActive: true,
     isNew: true,
     isEditing: false,
@@ -195,8 +195,8 @@ export const TaskCreateForm = () => {
     error: null,
   }]);
 
-  const handleRepresentativeRowsChange = useCallback((rows: RepresentativeRowData[]) => {
-    setRepresentativeRows(rows);
+  const handleResponsibleRowsChange = useCallback((rows: ResponsibleRowData[]) => {
+    setResponsibleRows(rows);
   }, []);
 
   // Layout state
@@ -709,11 +709,11 @@ export const TaskCreateForm = () => {
         const pricingRaw = data.pricing;
         const hasPricingItems = pricingRaw?.items?.some((item: any) => item.description && item.description.trim().length > 0);
 
-        // Build representative data
-        const existingRepIds = representativeRows
+        // Build responsible data
+        const existingRepIds = responsibleRows
           .filter(row => !row.isNew && row.id && row.id.trim() !== '')
           .map(row => row.id);
-        const newRepresentatives = representativeRows
+        const newResponsibles = responsibleRows
           .filter(row => row.isNew && row.name?.trim() && row.phone?.trim())
           .map(row => ({
             name: row.name.trim(),
@@ -756,7 +756,7 @@ export const TaskCreateForm = () => {
             artworkIds: artworkFileIds.length > 0 ? artworkFileIds : undefined,
             artworkStatuses: artworkFileIds.length > 0 && Object.keys(remappedArtworkStatuses).length > 0 ? remappedArtworkStatuses : undefined,
             baseFileIds: uploadedBaseFileIds.length > 0 ? uploadedBaseFileIds : undefined,
-            representativeIds: existingRepIds.length > 0 ? existingRepIds : undefined,
+            responsibleIds: existingRepIds.length > 0 ? existingRepIds : undefined,
             // Service orders and pricing are cloned per task (individual instances)
             serviceOrders: serviceOrders.length > 0 ? serviceOrders.map((so: any) => ({
               description: so.description,
@@ -839,13 +839,13 @@ export const TaskCreateForm = () => {
             ...truckData,
           });
 
-          // For the first task, include newRepresentatives
-          // For subsequent tasks, use the created representative IDs
-          if (i === 0 && newRepresentatives.length > 0) {
-            (task as any).newRepresentatives = newRepresentatives;
+          // For the first task, include newResponsibles
+          // For subsequent tasks, use the created responsible IDs
+          if (i === 0 && newResponsibles.length > 0) {
+            (task as any).newResponsibles = newResponsibles;
           } else if (i > 0 && firstCreatedRepIds && firstCreatedRepIds.length > 0) {
-            const existing = task.representativeIds || [];
-            task.representativeIds = [...existing, ...firstCreatedRepIds];
+            const existing = task.responsibleIds || [];
+            task.responsibleIds = [...existing, ...firstCreatedRepIds];
           }
 
           try {
@@ -855,10 +855,10 @@ export const TaskCreateForm = () => {
 
               // After first task, extract shared data for subsequent tasks
               if (i === 0) {
-                // Extract representative IDs
-                if (newRepresentatives.length > 0 && result.data?.representatives) {
-                  firstCreatedRepIds = result.data.representatives
-                    .filter((r: any) => newRepresentatives.some(nr => nr.name === r.name && nr.phone === r.phone))
+                // Extract responsible IDs
+                if (newResponsibles.length > 0 && result.data?.responsibles) {
+                  firstCreatedRepIds = result.data.responsibles
+                    .filter((r: any) => newResponsibles.some(nr => nr.name === r.name && nr.phone === r.phone))
                     .map((r: any) => r.id);
                 }
                 // Extract layout IDs from the created truck for shared layouts
@@ -904,7 +904,7 @@ export const TaskCreateForm = () => {
         isSubmittingRef.current = false;
       }
     },
-    [createAsync, representativeRows, customerIdValue, uploadedFileIds, baseFileIds, uploadedFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, artworkStatuses],
+    [createAsync, responsibleRows, customerIdValue, uploadedFileIds, baseFileIds, uploadedFiles, baseFiles, hasLayoutChanges, modifiedLayoutSides, currentLayoutStates, artworkStatuses],
   );
 
   // Get form state
@@ -1140,11 +1140,11 @@ export const TaskCreateForm = () => {
                   </Card>
                 </AccordionItem>
 
-                {/* 2. Representatives - COMMERCIAL/ADMIN only */}
-                {showRepresentatives && (
+                {/* 2. Responsibles - COMMERCIAL/ADMIN only */}
+                {showResponsibles && (
                   <AccordionItem
-                    value="representatives"
-                    id="accordion-item-representatives"
+                    value="responsibles"
+                    id="accordion-item-responsibles"
                     className="border border-border rounded-lg"
                   >
                     <Card className="border-0">
@@ -1152,16 +1152,16 @@ export const TaskCreateForm = () => {
                         <CardHeader className="flex-1 py-4">
                           <CardTitle className="flex items-center gap-2">
                             <IconUser className="h-5 w-5" />
-                            Representantes
+                            Responsáveis
                           </CardTitle>
                         </CardHeader>
                       </AccordionTrigger>
                       <AccordionContent>
                         <CardContent className="pt-0">
-                          <RepresentativeManager
-                            customerId={customerIdValue}
-                            value={representativeRows}
-                            onChange={handleRepresentativeRowsChange}
+                          <ResponsibleManager
+                            companyId={customerIdValue}
+                            value={responsibleRows}
+                            onChange={handleResponsibleRowsChange}
                             disabled={isSubmitting}
                             minRows={0}
                             maxRows={10}

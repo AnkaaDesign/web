@@ -447,7 +447,7 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
   const textColor = getBrightness(bgColor) > 128 ? '#000000' : '#ffffff';
 
   // Truncate task name to fit within truck height (accounting for rotation)
-  const maxChars = Math.max(3, Math.floor((height - 24) / 7));
+  const maxChars = Math.max(3, Math.floor((height - 24) / 10));
   const displayName = truck.taskName
     ? truck.taskName.length > maxChars
       ? truck.taskName.slice(0, maxChars - 2) + '..'
@@ -467,9 +467,9 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
 
   const progressBarData = showProgressBar ? (() => {
     const barMargin = 2;
-    const barH = 10;
+    const barH = 12;
     const barW = width - barMargin * 2;
-    const barY = showSerialNumber ? height - 24 : height - 14;
+    const barY = showSerialNumber ? height - 36 : height - 16;
 
     const completedCount = productionSOs.filter(so => so.status === 'COMPLETED').length;
     const waitingApproveCount = productionSOs.filter(so => so.status === 'WAITING_APPROVE').length;
@@ -527,7 +527,7 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
           textAnchor="middle"
           dominantBaseline="middle"
           fill={textColor}
-          fontSize={10}
+          fontSize={15}
           fontWeight="bold"
           fontFamily="system-ui, -apple-system, sans-serif"
           transform={`rotate(-90, ${width / 2}, ${height / 2})`}
@@ -538,10 +538,10 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
         {/* Length label at top - show original length */}
         <text
           x={width / 2}
-          y={12}
+          y={14}
           textAnchor="middle"
           fill={textColor}
-          fontSize={8}
+          fontSize={12}
           fontFamily="system-ui, -apple-system, sans-serif"
           style={{ pointerEvents: 'none' }}
         >
@@ -585,7 +585,7 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
               textAnchor="middle"
               dominantBaseline="central"
               fill="#ffffff"
-              fontSize={7}
+              fontSize={9}
               fontWeight="bold"
               fontFamily="system-ui, -apple-system, sans-serif"
               style={{ pointerEvents: 'none', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.8))' }}
@@ -598,10 +598,10 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
         {showSerialNumber && (
           <text
             x={width / 2}
-            y={height - 6}
+            y={height - 8}
             textAnchor="middle"
             fill={textColor}
-            fontSize={8}
+            fontSize={12}
             fontFamily="system-ui, -apple-system, sans-serif"
             style={{ pointerEvents: 'none' }}
           >
@@ -1785,7 +1785,11 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
       checkDate.setHours(0, 0, 0, 0);
 
       return trucksWithLocalPositions.filter(truck => {
-        // For calendar view, check if truck is within arrival date to term range
+        // Trucks with a garage spot always show — they're physically there
+        // regardless of dates until someone manually moves them out
+        if (truck.spot) return true;
+
+        // For patio trucks in calendar view, check if truck is within arrival date to term range
         // Use entryDate (actual arrival) if available, otherwise forecastDate (expected arrival)
         const arrivalDateStr = truck.entryDate || truck.forecastDate;
         if (arrivalDateStr) {

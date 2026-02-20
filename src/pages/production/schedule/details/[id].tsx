@@ -38,7 +38,7 @@ import { exportBudgetPdf } from "@/utils/budget-pdf-generator";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text-generators";
 import { getApiBaseUrl } from "@/utils/file";
 import { SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_DISPLAY_ORDER } from "../../../../constants";
-import { REPRESENTATIVE_ROLE_LABELS, RepresentativeRole } from "@/types/representative";
+import { RESPONSIBLE_ROLE_LABELS, ResponsibleRole } from "@/types/responsible";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import {
   AlertDialog,
@@ -755,7 +755,7 @@ const TASK_SECTIONS: SectionConfig[] = [
     defaultVisible: true,
     fields: [
       { id: "customer", label: "Cliente", sectionId: "overview", required: true },
-      { id: "representatives", label: "Representantes", sectionId: "overview" },
+      { id: "responsibles", label: "Responsáveis", sectionId: "overview" },
       { id: "sector", label: "Setor", sectionId: "overview" },
       { id: "commission", label: "Comissão", sectionId: "overview" },
       { id: "serialNumber", label: "Número de Série", sectionId: "overview" },
@@ -907,7 +907,7 @@ export const TaskDetailsPage = () => {
   // Check if user is from Production sector (for changelog visibility)
   const isProductionSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION;
 
-  // Check if user is from Designer sector (for representative filtering)
+  // Check if user is from Designer sector (for responsible filtering)
   const isDesignerSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
 
   // Check if user can view base files (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
@@ -927,7 +927,7 @@ export const TaskDetailsPage = () => {
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
   );
 
-  // Check if user can view restricted fields (forecastDate, representatives) - ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER only
+  // Check if user can view restricted fields (forecastDate, responsibles) - ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER only
   const canViewRestrictedFields = canViewArtworkBadges;
 
   // Get visible service order types based on user's sector privilege
@@ -969,8 +969,8 @@ export const TaskDetailsPage = () => {
   const COMMISSION_RESTRICTED_FIELDS = ['commission'];
 
   // Fields that should only be visible to privileged users (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER only)
-  // Includes: forecastDate, representatives
-  const PRIVILEGED_RESTRICTED_FIELDS = ['representatives', 'forecast'];
+  // Includes: forecastDate, responsibles
+  const PRIVILEGED_RESTRICTED_FIELDS = ['responsibles', 'forecast'];
 
   // Check if user can view layout section (ADMIN, LOGISTIC, or PRODUCTION team leaders only)
   const canViewLayoutSection = currentUser && (
@@ -1086,7 +1086,7 @@ export const TaskDetailsPage = () => {
         },
       },
       createdBy: true,
-      representatives: true,
+      responsibles: true,
       serviceOrders: {
         include: {
           assignedTo: true,
@@ -1648,15 +1648,15 @@ export const TaskDetailsPage = () => {
                   </div>
                 )}
 
-                {/* Representatives - Designers only see MARKETING reps (fallback to COMMERCIAL) */}
-                {sectionVisibility.isFieldVisible("representatives") && (() => {
-                  if (!task.representatives || task.representatives.length === 0) return null;
+                {/* Responsibles - Designers only see MARKETING reps (fallback to COMMERCIAL) */}
+                {sectionVisibility.isFieldVisible("responsibles") && (() => {
+                  if (!task.responsibles || task.responsibles.length === 0) return null;
                   const reps = isDesignerSector
                     ? (() => {
-                        const marketing = task.representatives.filter(r => r.role === RepresentativeRole.MARKETING);
-                        return marketing.length > 0 ? marketing : task.representatives.filter(r => r.role === RepresentativeRole.COMMERCIAL);
+                        const marketing = task.responsibles.filter(r => r.role === ResponsibleRole.MARKETING);
+                        return marketing.length > 0 ? marketing : task.responsibles.filter(r => r.role === ResponsibleRole.COMMERCIAL);
                       })()
-                    : task.representatives;
+                    : task.responsibles;
                   if (reps.length === 0) return null;
                   return reps.map((rep) => {
                       const cleanPhone = rep.phone.replace(/\D/g, "");
@@ -1671,13 +1671,13 @@ export const TaskDetailsPage = () => {
                         }
                         return phone;
                       };
-                      const roleLabel = REPRESENTATIVE_ROLE_LABELS[rep.role] || rep.role;
+                      const roleLabel = RESPONSIBLE_ROLE_LABELS[rep.role] || rep.role;
 
                       return (
                         <div key={rep.id} className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                           <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                             <IconUser className="h-4 w-4" />
-                            Representante {roleLabel}
+                            Responsável {roleLabel}
                           </span>
                           <div className="flex items-center gap-3">
                             <span className="text-sm font-semibold text-foreground">{rep.name}</span>

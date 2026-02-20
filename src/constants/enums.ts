@@ -1989,7 +1989,7 @@ export enum FAVORITE_PAGES {
   // Administration - List Pages
   ADMINISTRACAO_COMISSOES_LISTAR = "/administracao/comissoes",
   ADMINISTRACAO_CLIENTES_LISTAR = "/administracao/clientes",
-  ADMINISTRACAO_REPRESENTANTES_LISTAR = "/administracao/clientes/representantes",
+  ADMINISTRACAO_RESPONSAVEIS_LISTAR = "/administracao/clientes/responsaveis",
   ADMINISTRACAO_COLABORADORES_LISTAR = "/administracao/colaboradores",
   ADMINISTRACAO_ORCAMENTOS_LISTAR = "/administracao/orcamentos",
   ADMINISTRACAO_REGISTROS_ALTERACOES_LISTAR = "/administracao/registros-de-alteracoes",
@@ -2124,12 +2124,16 @@ export enum DISCOUNT_TYPE {
   FIXED_VALUE = "FIXED_VALUE",
 }
 
-export enum REPRESENTATIVE_ROLE {
+export enum RESPONSIBLE_ROLE {
   COMMERCIAL = "COMMERCIAL",
-  MARKETING = "MARKETING",
+  OWNER = "OWNER",
+  SELLER = "SELLER",
+  REPRESENTATIVE = "REPRESENTATIVE",
   COORDINATOR = "COORDINATOR",
+  MARKETING = "MARKETING",
   FINANCIAL = "FINANCIAL",
   FLEET_MANAGER = "FLEET_MANAGER",
+  DRIVER = "DRIVER",
 }
 
 // Payment condition enum - controls payment structure

@@ -198,101 +198,144 @@ export function GaragesPage() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    return tasksResponse.data
-      .filter((task) => {
-        // Must have a truck
-        if (!task.truck) return false;
+    // Status priority for deduplication: active tasks take precedence over completed/cancelled
+    const STATUS_PRIORITY: Record<string, number> = {
+      [TASK_STATUS.IN_PRODUCTION]: 1,
+      [TASK_STATUS.WAITING_PRODUCTION]: 2,
+      [TASK_STATUS.PREPARATION]: 3,
+      [TASK_STATUS.COMPLETED]: 4,
+      [TASK_STATUS.CANCELLED]: 5,
+    };
 
-        const truck = task.truck as any;
+    const filtered = tasksResponse.data.filter((task) => {
+      // Must have a truck
+      if (!task.truck) return false;
 
-        // If truck has a spot assigned in a garage, always include it
-        // (even if completed or without layout — use default length)
-        if (truck?.spot) {
-          return true;
+      const truck = task.truck as any;
+
+      // If truck has a spot assigned in a garage, always include it
+      // (even if completed or without layout — use default length)
+      if (truck?.spot) {
+        return true;
+      }
+
+      // For patio/unassigned trucks: must have a layout defined (for dimensions)
+      const layout = truck?.leftSideLayout || truck?.rightSideLayout;
+      const layoutSections = layout?.layoutSections || [];
+      if (layoutSections.length === 0) return false;
+
+      // For patio: only include if forecastDate <= today OR entryDate <= today, AND status is not COMPLETED
+      const forecastDate = (task as any).forecastDate;
+      const entryDate = (task as any).entryDate;
+      if (!forecastDate && !entryDate) return false;
+
+      // Must not have COMPLETED status for patio display
+      if (task.status === TASK_STATUS.COMPLETED) return false;
+
+      // Show if truck already arrived (entryDate) or is expected (forecastDate)
+      if (entryDate) {
+        const entry = new Date(entryDate);
+        entry.setHours(0, 0, 0, 0);
+        if (entry <= today) return true;
+      }
+
+      if (forecastDate) {
+        const forecast = new Date(forecastDate);
+        forecast.setHours(0, 0, 0, 0);
+        return forecast <= today;
+      }
+
+      return false;
+    });
+
+    // Deduplicate: when multiple trucks share the same spot (stale data from old logic),
+    // keep only the most active task and move others to patio (null spot)
+    const spotOwners = new Map<string, typeof filtered[0]>();
+    const demotedTaskIds = new Set<string>();
+
+    for (const task of filtered) {
+      const truck = task.truck as any;
+      const spot = truck?.spot;
+      if (!spot) continue;
+
+      const existing = spotOwners.get(spot);
+      if (!existing) {
+        spotOwners.set(spot, task);
+      } else {
+        // Compare priorities: lower number = higher priority (more active)
+        const existingPriority = STATUS_PRIORITY[existing.status] ?? 99;
+        const newPriority = STATUS_PRIORITY[task.status] ?? 99;
+        if (newPriority < existingPriority) {
+          // New task is more active - demote the existing one
+          demotedTaskIds.add(existing.id);
+          spotOwners.set(spot, task);
+        } else {
+          // Existing task is more active or same - demote the new one
+          demotedTaskIds.add(task.id);
         }
+      }
+    }
 
-        // For patio/unassigned trucks: must have a layout defined (for dimensions)
-        const layout = truck?.leftSideLayout || truck?.rightSideLayout;
-        const layoutSections = layout?.layoutSections || [];
-        if (layoutSections.length === 0) return false;
+    return filtered.map((task): GarageTruck => {
+      const truck = task.truck as any;
 
-        // For patio: only include if forecastDate <= today OR entryDate <= today, AND status is not COMPLETED
-        const forecastDate = (task as any).forecastDate;
-        const entryDate = (task as any).entryDate;
-        if (!forecastDate && !entryDate) return false;
+      // Get layout sections from leftSideLayout or rightSideLayout
+      const layout = truck?.leftSideLayout || truck?.rightSideLayout;
+      const layoutSections = layout?.layoutSections || [];
 
-        // Must not have COMPLETED status for patio display
-        if (task.status === TASK_STATUS.COMPLETED) return false;
+      // Calculate truck length from layout sections
+      const sectionsSum = layoutSections.reduce(
+        (sum: number, section: { width: number }) => sum + (section.width || 0),
+        0
+      );
 
-        // Show if truck already arrived (entryDate) or is expected (forecastDate)
-        if (entryDate) {
-          const entry = new Date(entryDate);
-          entry.setHours(0, 0, 0, 0);
-          if (entry <= today) return true;
+      // Add cabin if needed - two-tier system based on truck body length
+      // < 7m body: 2.0m cabin (small trucks)
+      // 7-10m body: 2.4m cabin (larger trucks)
+      // >= 10m body: no cabin (semi-trailers)
+      const CABIN_THRESHOLD_SMALL = 7;
+      const CABIN_THRESHOLD_LARGE = 10;
+      const CABIN_LENGTH_SMALL = 2.0;
+      const CABIN_LENGTH_LARGE = 2.4;
+      let truckLength = 10; // Default 10m if no sections
+      if (sectionsSum > 0) {
+        if (sectionsSum < CABIN_THRESHOLD_SMALL) {
+          truckLength = sectionsSum + CABIN_LENGTH_SMALL;
+        } else if (sectionsSum < CABIN_THRESHOLD_LARGE) {
+          truckLength = sectionsSum + CABIN_LENGTH_LARGE;
+        } else {
+          truckLength = sectionsSum;
         }
+      }
 
-        if (forecastDate) {
-          const forecast = new Date(forecastDate);
-          forecast.setHours(0, 0, 0, 0);
-          return forecast <= today;
-        }
+      // Check if there's a pending change for this truck
+      const pendingChange = pendingChanges.get(truck?.id);
+      // Demoted trucks (duplicates at same spot) lose their spot
+      const isDemoted = demotedTaskIds.has(task.id);
+      const currentSpot = pendingChange
+        ? pendingChange.newSpot
+        : isDemoted
+          ? null
+          : (truck?.spot || null);
 
-        return false;
-      })
-      .map((task): GarageTruck => {
-        const truck = task.truck as any;
-
-        // Get layout sections from leftSideLayout or rightSideLayout
-        const layout = truck?.leftSideLayout || truck?.rightSideLayout;
-        const layoutSections = layout?.layoutSections || [];
-
-        // Calculate truck length from layout sections
-        const sectionsSum = layoutSections.reduce(
-          (sum: number, section: { width: number }) => sum + (section.width || 0),
-          0
-        );
-
-        // Add cabin if needed - two-tier system based on truck body length
-        // < 7m body: 2.0m cabin (small trucks)
-        // 7-10m body: 2.4m cabin (larger trucks)
-        // >= 10m body: no cabin (semi-trailers)
-        const CABIN_THRESHOLD_SMALL = 7;
-        const CABIN_THRESHOLD_LARGE = 10;
-        const CABIN_LENGTH_SMALL = 2.0;
-        const CABIN_LENGTH_LARGE = 2.4;
-        let truckLength = 10; // Default 10m if no sections
-        if (sectionsSum > 0) {
-          if (sectionsSum < CABIN_THRESHOLD_SMALL) {
-            truckLength = sectionsSum + CABIN_LENGTH_SMALL;
-          } else if (sectionsSum < CABIN_THRESHOLD_LARGE) {
-            truckLength = sectionsSum + CABIN_LENGTH_LARGE;
-          } else {
-            truckLength = sectionsSum;
-          }
-        }
-
-        // Check if there's a pending change for this truck
-        const pendingChange = pendingChanges.get(truck?.id);
-        const currentSpot = pendingChange ? pendingChange.newSpot : (truck?.spot || null);
-
-        return {
-          id: task.id,
-          truckId: truck?.id,
-          spot: currentSpot,
-          taskName: task.name,
-          serialNumber: (task as any).serialNumber || null,
-          paintHex: (task.generalPainting as any)?.hex || null,
-          length: truckLength,
-          originalLength: sectionsSum > 0 ? sectionsSum : undefined, // Original length without cabin
-          entryDate: (task as any).entryDate || null,
-          term: (task as any).term || null,
-          forecastDate: (task as any).forecastDate || null,
-          finishedAt: (task as any).finishedAt || null,
-          layoutInfo: layoutSections.length > 0 ? `${layoutSections.length} seções` : null,
-          artworkInfo: null, // Can be enhanced later with artwork file count
-          serviceOrders: (task as any).serviceOrders || [],
-        };
-      });
+      return {
+        id: task.id,
+        truckId: truck?.id,
+        spot: currentSpot,
+        taskName: task.name,
+        serialNumber: (task as any).serialNumber || null,
+        paintHex: (task.generalPainting as any)?.hex || null,
+        length: truckLength,
+        originalLength: sectionsSum > 0 ? sectionsSum : undefined, // Original length without cabin
+        entryDate: (task as any).entryDate || null,
+        term: (task as any).term || null,
+        forecastDate: (task as any).forecastDate || null,
+        finishedAt: (task as any).finishedAt || null,
+        layoutInfo: layoutSections.length > 0 ? `${layoutSections.length} seções` : null,
+        artworkInfo: null, // Can be enhanced later with artwork file count
+        serviceOrders: (task as any).serviceOrders || [],
+      };
+    });
   }, [tasksResponse, pendingChanges]);
 
   // Handle truck movement (add to pending changes, don't save yet)
@@ -304,10 +347,17 @@ export function GaragesPage() {
 
       const truck = task.truck as any;
       const truckId = truck.id;
-      const oldSpot = truck.spot || null;
+      const originalSpot = truck.spot || null;
 
-      // Don't add if spot didn't change
-      if (oldSpot === newSpot) return;
+      // If moving back to original DB position, remove the pending change
+      if (originalSpot === newSpot) {
+        setPendingChanges((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(truckId);
+          return newMap;
+        });
+        return;
+      }
 
       // Add to pending changes
       setPendingChanges((prev) => {
@@ -315,7 +365,7 @@ export function GaragesPage() {
         newMap.set(truckId, {
           truckId,
           taskId,
-          oldSpot,
+          oldSpot: originalSpot,
           newSpot,
         });
         return newMap;

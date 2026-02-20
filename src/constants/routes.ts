@@ -94,13 +94,13 @@ export const routes = {
     root: "/administracao/clientes",
   },
 
-  // Representatives - Representantes - Customer Representatives Management
-  representatives: {
-    create: "/administracao/clientes/representantes/cadastrar",
-    details: (id: string) => `/administracao/clientes/representantes/detalhes/${id}`,
-    edit: (id: string) => `/administracao/clientes/representantes/editar/${id}`,
-    password: (id: string) => `/administracao/clientes/representantes/senha/${id}`,
-    root: "/administracao/clientes/representantes",
+  // Responsibles - Responsáveis - Customer Responsibles Management
+  responsibles: {
+    create: "/administracao/clientes/responsaveis/cadastrar",
+    details: (id: string) => `/administracao/clientes/responsaveis/detalhes/${id}`,
+    edit: (id: string) => `/administracao/clientes/responsaveis/editar/${id}`,
+    password: (id: string) => `/administracao/clientes/responsaveis/senha/${id}`,
+    root: "/administracao/clientes/responsaveis",
   },
 
   // Favorites - Favoritos - User Favorites

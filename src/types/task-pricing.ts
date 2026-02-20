@@ -1,5 +1,6 @@
 import type { BaseEntity } from './common';
 import type { File } from './file';
+import type { Responsible } from './responsible';
 
 export type TASK_PRICING_STATUS = 'DRAFT' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 export type DISCOUNT_TYPE = 'NONE' | 'PERCENTAGE' | 'FIXED_VALUE';
@@ -50,6 +51,10 @@ export interface TaskPricing extends BaseEntity {
   // Customer Signature (uploaded by customer on public page)
   customerSignatureId: string | null;
   customerSignature?: File;
+
+  // Budget responsible
+  responsibleId: string | null;
+  responsible?: Responsible;
 
   // New fields from migration
   simultaneousTasks: number | null; // Number of simultaneous tasks (1-100)

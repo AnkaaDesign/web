@@ -16,7 +16,7 @@ import type { Task } from "../../../../types";
 const DUPLICATE_TASK_INCLUDE = {
   sector: true,
   customer: true,
-  representatives: true,
+  responsibles: true,
   serviceOrders: {
     include: {
       assignedTo: true,
@@ -155,8 +155,8 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       sectorId: sourceTask.sectorId,
       commission: sourceTask.commission,
 
-      // Representatives (shared references)
-      representativeIds: sourceTask.representatives?.map((r: any) => r.id) || [],
+      // Responsibles (shared references)
+      responsibleIds: sourceTask.responsibles?.map((r: any) => r.id) || [],
 
       // Financial file relations (shared references)
       budgetIds: sourceTask.budgets?.map((b: any) => b.id) || [],

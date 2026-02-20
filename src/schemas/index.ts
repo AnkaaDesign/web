@@ -75,7 +75,7 @@ export {
 export * from "./paint";
 export * from "./position";
 export * from "./preferences";
-export * from "./representative";
+export * from "./responsible";
 export * from "./secullum";
 export * from "./warning";
 export * from "./sector";

@@ -194,23 +194,23 @@ export const customerKeys = {
 };
 
 // =====================================================
-// Representative Query Keys
+// Responsible Query Keys
 // =====================================================
 
-export const representativeKeys = {
-  all: ["representatives"] as const,
-  lists: () => ["representatives", "list"] as const,
-  list: (filters?: any) => (filters ? (["representatives", "list", filters] as const) : (["representatives", "list"] as const)),
-  details: () => ["representatives", "detail"] as const,
-  detail: (id: string, include?: any) => (include ? (["representatives", "detail", id, include] as const) : (["representatives", "detail", id] as const)),
-  byIds: (ids: string[]) => ["representatives", "byIds", ids] as const,
+export const responsibleKeys = {
+  all: ["responsibles"] as const,
+  lists: () => ["responsibles", "list"] as const,
+  list: (filters?: any) => (filters ? (["responsibles", "list", filters] as const) : (["responsibles", "list"] as const)),
+  details: () => ["responsibles", "detail"] as const,
+  detail: (id: string, include?: any) => (include ? (["responsibles", "detail", id, include] as const) : (["responsibles", "detail", id] as const)),
+  byIds: (ids: string[]) => ["responsibles", "byIds", ids] as const,
 
   // Specialized queries
-  byCustomer: (customerId: string, filters?: any) =>
-    filters ? (["representatives", "byCustomer", customerId, filters] as const) : (["representatives", "byCustomer", customerId] as const),
-  byCustomerAndRole: (customerId: string, role: string) =>
-    ["representatives", "byCustomerAndRole", customerId, role] as const,
-  statistics: () => ["representatives", "statistics"] as const,
+  byCompany: (companyId: string, filters?: any) =>
+    filters ? (["responsibles", "byCompany", companyId, filters] as const) : (["responsibles", "byCompany", companyId] as const),
+  byCompanyAndRole: (companyId: string, role: string) =>
+    ["responsibles", "byCompanyAndRole", companyId, role] as const,
+  statistics: () => ["responsibles", "statistics"] as const,
 };
 
 // =====================================================

@@ -30,7 +30,7 @@ interface PricingData extends TaskPricing {
     name?: string;
     serialNumber?: string;
     term?: Date;
-    representatives?: { id: string; name?: string; role?: string }[];
+    responsibles?: { id: string; name?: string; role?: string }[];
     customer?: {
       id: string;
       corporateName?: string;
@@ -166,8 +166,12 @@ export function PublicBudgetPage() {
 
   // Calculate derived data
   const corporateName = pricing.task?.customer?.corporateName || pricing.task?.customer?.fantasyName || "Cliente";
-  const commercialRep = pricing.task?.representatives?.find(r => r.role === "COMMERCIAL");
-  const contactName = commercialRep?.name || pricing.task?.representatives?.[0]?.name || "";
+  // Prefer the explicitly selected budget responsible from pricing
+  const commercialRep = pricing.task?.responsibles?.find(r => r.role === "COMMERCIAL");
+  const contactName = pricing.responsible?.name
+    || commercialRep?.name
+    || pricing.task?.responsibles?.[0]?.name
+    || "";
   // Format budget number with leading zeros (e.g., "0042")
   const budgetNumber = pricing.budgetNumber
     ? String(pricing.budgetNumber).padStart(4, '0')

@@ -752,7 +752,7 @@ const ChangelogTimelineItem = ({
     // Use parsedValue to ensure arrays/objects are properly formatted
     const result = formatFieldValue(parsedValue, field, entityType, metadata);
 
-    // Render arrays as stacked lines (e.g., representatives)
+    // Render arrays as stacked lines (e.g., responsibles)
     if (Array.isArray(result)) {
       return result.map((item, i) => (
         <div key={i}>{String(item)}</div>
@@ -2366,7 +2366,7 @@ export function ChangelogHistory({
         SECTOR_PRIVILEGES.PRODUCTION,
       ]);
 
-    // Check if user can view restricted fields (forecastDate, representatives)
+    // Check if user can view restricted fields (forecastDate, responsibles)
     // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER can see these
     const canViewRestrictedFields =
       user &&
@@ -2422,8 +2422,8 @@ export function ChangelogHistory({
     // Define restricted fields that should only be visible to privileged users (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER)
     const restrictedFields = [
       "forecastDate",
-      "representatives",
-      "representativeIds",
+      "responsibles",
+      "responsibleIds",
       "negotiatingWith",
     ]; // invoiceTo removed - has its own check
 
@@ -2468,7 +2468,7 @@ export function ChangelogHistory({
         return false;
       }
 
-      // Filter out restricted fields (forecastDate, representatives) for non-privileged users
+      // Filter out restricted fields (forecastDate, responsibles) for non-privileged users
       if (
         !canViewRestrictedFields &&
         restrictedFields.some((restricted) =>

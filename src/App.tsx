@@ -53,12 +53,12 @@ const Administration = lazy(() => import("@/pages/administration/root").then((mo
 
 const AdministrationCustomers = lazy(() => import("@/pages/administration/customers/list").then((module) => ({ default: module.CustomerListPage })));
 
-// Representatives
-const RepresentativesList = lazy(() => import("@/pages/representatives/index"));
-const RepresentativesNew = lazy(() => import("@/pages/representatives/new"));
-const RepresentativesDetails = lazy(() => import("@/pages/representatives/details/[id]"));
-const RepresentativesEdit = lazy(() => import("@/pages/representatives/[id]/edit"));
-const RepresentativesPassword = lazy(() => import("@/pages/representatives/[id]/password"));
+// Responsibles
+const ResponsiblesList = lazy(() => import("@/pages/responsibles/index"));
+const ResponsiblesNew = lazy(() => import("@/pages/responsibles/new"));
+const ResponsiblesDetails = lazy(() => import("@/pages/responsibles/details/[id]"));
+const ResponsiblesEdit = lazy(() => import("@/pages/responsibles/[id]/edit"));
+const ResponsiblesPassword = lazy(() => import("@/pages/responsibles/[id]/password"));
 
 // Financial
 const FinancialCustomersList = lazy(() => import("@/pages/financial/customers/list").then((module) => ({ default: module.FinancialCustomersListPage })));
@@ -684,44 +684,44 @@ function App() {
                   }
                 />
 
-                {/* Representatives Routes */}
+                {/* Responsibles Routes */}
                 <Route
-                  path={routes.representatives.root}
+                  path={routes.responsibles.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RepresentativesList />
+                      <ResponsiblesList />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.representatives.create}
+                  path={routes.responsibles.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RepresentativesNew />
+                      <ResponsiblesNew />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.representatives.details(":id")}
+                  path={routes.responsibles.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RepresentativesDetails />
+                      <ResponsiblesDetails />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.representatives.edit(":id")}
+                  path={routes.responsibles.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RepresentativesEdit />
+                      <ResponsiblesEdit />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.representatives.password(":id")}
+                  path={routes.responsibles.password(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <RepresentativesPassword />
+                      <ResponsiblesPassword />
                     </Suspense>
                   }
                 />
