@@ -22,7 +22,7 @@ export function CustomerCell({ control, index, initialCustomer }: CustomerCellPr
   );
 
   // Memoize callbacks
-  const getOptionLabel = useCallback((customer: Customer) => customer.fantasyName, []);
+  const getOptionLabel = useCallback((customer: Customer) => customer.corporateName || customer.fantasyName, []);
   const getOptionValue = useCallback((customer: Customer) => customer.id, []);
 
   // Search function for Combobox
@@ -77,12 +77,12 @@ export function CustomerCell({ control, index, initialCustomer }: CustomerCellPr
                 <div className="flex items-center gap-2">
                   <CustomerLogoDisplay
                     logo={customer.logo}
-                    customerName={customer.fantasyName}
+                    customerName={customer.corporateName || customer.fantasyName}
                     size="xs"
                     shape="rounded"
                   />
                   <div className="flex flex-col min-w-0 flex-1">
-                    <span className="font-medium truncate">{customer.fantasyName}</span>
+                    <span className="font-medium truncate">{customer.corporateName || customer.fantasyName}</span>
                     {customer.cnpj && (
                       <span className="text-xs text-foreground/60">{formatCNPJ(customer.cnpj)}</span>
                     )}

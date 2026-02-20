@@ -178,7 +178,7 @@ export function TaskNameAutocomplete({ control, disabled }: TaskNameAutocomplete
         <FormItem className="relative">
           <FormLabel className="flex items-center gap-2">
             <IconFileText className="h-4 w-4" />
-            Nome
+            Logomarca
           </FormLabel>
           <FormControl>
             <div className="relative">

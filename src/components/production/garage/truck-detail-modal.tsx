@@ -22,9 +22,11 @@ import {
   IconFiles,
   IconExternalLink,
   IconLayoutGrid,
+  IconListCheck,
 } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
-import { routes, SECTOR_PRIVILEGES } from '@/constants';
+import { routes, SECTOR_PRIVILEGES, SERVICE_ORDER_STATUS as SO_STATUS, SERVICE_ORDER_STATUS_LABELS, SERVICE_ORDER_TYPE } from '@/constants';
+import { getServiceOrderStatusColor } from '@/utils/serviceOrder';
 import { useNavigate } from 'react-router-dom';
 import { hasPrivilege } from '@/utils/user';
 import { getApiBaseUrl } from '@/config/api';
@@ -35,66 +37,6 @@ interface TruckDetailModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Generate SVG preview for layout
-function generateLayoutSVG(layout: any): string {
-  if (!layout || !layout.layoutSections || layout.layoutSections.length === 0) {
-    return '';
-  }
-
-  const height = layout.height * 100; // Convert to cm
-  const sections = layout.layoutSections;
-  const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-  const margin = 30;
-  const svgWidth = totalWidth + margin * 2;
-  const svgHeight = height + margin * 2 + 30; // Extra space for dimensions
-
-  let svg = `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
-
-  // Main container
-  svg += `<rect x="${margin}" y="${margin}" width="${totalWidth}" height="${height}" fill="none" stroke="currentColor" stroke-width="1"/>`;
-
-  // Add section dividers
-  let currentPos = 0;
-  sections.forEach((section: any, index: number) => {
-    const sectionWidth = section.width * 100;
-
-    if (index > 0) {
-      const prevSection = sections[index - 1];
-      if (!section.isDoor && !prevSection.isDoor) {
-        const lineX = margin + currentPos;
-        svg += `<line x1="${lineX}" y1="${margin}" x2="${lineX}" y2="${margin + height}" stroke="currentColor" stroke-width="0.5" opacity="0.5"/>`;
-      }
-    }
-
-    // Handle doors
-    if (section.isDoor && section.doorHeight !== null && section.doorHeight !== undefined) {
-      const doorHeightCm = section.doorHeight * 100;
-      const doorTopY = margin + (height - doorHeightCm);
-      const sectionX = margin + currentPos;
-
-      svg += `<line x1="${sectionX}" y1="${doorTopY}" x2="${sectionX}" y2="${margin + height}" stroke="currentColor" stroke-width="1"/>`;
-      svg += `<line x1="${sectionX + sectionWidth}" y1="${doorTopY}" x2="${sectionX + sectionWidth}" y2="${margin + height}" stroke="currentColor" stroke-width="1"/>`;
-      svg += `<line x1="${sectionX}" y1="${doorTopY}" x2="${sectionX + sectionWidth}" y2="${doorTopY}" stroke="currentColor" stroke-width="1"/>`;
-    }
-
-    currentPos += sectionWidth;
-  });
-
-  // Add dimension labels
-  currentPos = 0;
-  sections.forEach((section: any) => {
-    const sectionWidth = section.width * 100;
-    const startX = margin + currentPos;
-    const centerX = startX + sectionWidth / 2;
-    const dimY = margin + height + 15;
-
-    svg += `<text x="${centerX}" y="${dimY}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.7">${Math.round(sectionWidth)}</text>`;
-    currentPos += sectionWidth;
-  });
-
-  svg += '</svg>';
-  return svg;
-}
 
 export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModalProps) {
   const navigate = useNavigate();
@@ -104,9 +46,6 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
   const [previewFiles, setPreviewFiles] = useState<any[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-
-  // Layout side toggle state
-  const [layoutSide, setLayoutSide] = useState<'left' | 'right'>('left');
 
   const { data: taskResponse, isLoading } = useTaskDetail(taskId ?? '', {
     enabled: open && !!taskId,
@@ -131,6 +70,7 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
           file: true,
         },
       },
+      serviceOrders: true,
     },
   });
 
@@ -144,38 +84,21 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
   );
 
-  // Get layout data for both sides
-  const layoutsData = useMemo(() => {
+  // Get layout dimensions (both sides have the same measures)
+  const layoutDimensions = useMemo(() => {
     if (!task?.truck) return null;
     const truck = task.truck as any;
-
-    const buildLayoutData = (layout: any) => {
-      if (!layout || !layout.layoutSections || layout.layoutSections.length === 0) return null;
-      const sectionsSum = layout.layoutSections.reduce(
-        (sum: number, section: { width: number }) => sum + (section.width || 0),
-        0
-      );
-      return {
-        name: layout?.name || 'Layout',
-        sectionsCount: layout.layoutSections.length,
-        totalLength: sectionsSum,
-        height: layout.height,
-        layout: layout,
-        svg: generateLayoutSVG(layout),
-      };
+    const layout = truck?.leftSideLayout || truck?.rightSideLayout;
+    if (!layout || !layout.layoutSections || layout.layoutSections.length === 0) return null;
+    const totalLength = layout.layoutSections.reduce(
+      (sum: number, section: { width: number }) => sum + (section.width || 0),
+      0
+    );
+    return {
+      totalLength,
+      height: layout.height,
     };
-
-    const left = buildLayoutData(truck?.leftSideLayout);
-    const right = buildLayoutData(truck?.rightSideLayout);
-
-    if (!left && !right) return null;
-
-    return { left, right };
   }, [task]);
-
-  // Current layout based on selected side
-  const currentLayout = layoutsData ? (layoutSide === 'left' ? layoutsData.left : layoutsData.right) : null;
-  const hasMultipleSides = layoutsData?.left && layoutsData?.right;
 
   // Check if term is overdue
   const isOverdue = useMemo(() => {
@@ -308,6 +231,19 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
               </div>
             )}
 
+            {/* Layout dimensions */}
+            {layoutDimensions && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconLayoutGrid className="h-4 w-4" />
+                  Layout
+                </span>
+                <span className="text-sm font-semibold text-foreground">
+                  {Math.round(layoutDimensions.totalLength * 100)} x {Math.round(layoutDimensions.height * 100)} cm
+                </span>
+              </div>
+            )}
+
             {/* Term */}
             {task.term && (
               <div
@@ -338,6 +274,78 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
                 </span>
               </div>
             )}
+
+            {/* Service Orders (Production) */}
+            {task.serviceOrders && (() => {
+              const productionSOs = (task.serviceOrders as any[]).filter(
+                (so: any) => so.type === SERVICE_ORDER_TYPE.PRODUCTION
+              );
+              if (productionSOs.length === 0) return null;
+
+              const completedCount = productionSOs.filter((so: any) => so.status === SO_STATUS.COMPLETED).length;
+              const totalCount = productionSOs.length;
+
+              return (
+                <div className="bg-muted/50 rounded-lg px-4 py-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconListCheck className="h-4 w-4" />
+                      Ordens de Produção
+                    </span>
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      {completedCount}/{totalCount}
+                    </span>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="relative h-5 w-full bg-gray-200 dark:bg-gray-700 rounded overflow-hidden shadow-sm mb-2">
+                    {(() => {
+                      const completed = productionSOs.filter((so: any) => so.status === SO_STATUS.COMPLETED).length;
+                      const waitingApprove = productionSOs.filter((so: any) => so.status === SO_STATUS.WAITING_APPROVE).length;
+                      const inProgress = productionSOs.filter((so: any) => so.status === SO_STATUS.IN_PROGRESS).length;
+                      const pending = productionSOs.filter((so: any) => so.status === SO_STATUS.PENDING).length;
+                      const cancelled = productionSOs.filter((so: any) => so.status === SO_STATUS.CANCELLED).length;
+
+                      const pCompleted = (completed / totalCount) * 100;
+                      const pWaiting = (waitingApprove / totalCount) * 100;
+                      const pProgress = (inProgress / totalCount) * 100;
+                      const pPending = (pending / totalCount) * 100;
+                      const pCancelled = (cancelled / totalCount) * 100;
+
+                      return (
+                        <>
+                          {completed > 0 && <div className="absolute h-full bg-green-700 transition-all duration-300" style={{ left: '0%', width: `${pCompleted}%` }} />}
+                          {waitingApprove > 0 && <div className="absolute h-full bg-purple-600 transition-all duration-300" style={{ left: `${pCompleted}%`, width: `${pWaiting}%` }} />}
+                          {inProgress > 0 && <div className="absolute h-full bg-blue-700 transition-all duration-300" style={{ left: `${pCompleted + pWaiting}%`, width: `${pProgress}%` }} />}
+                          {pending > 0 && <div className="absolute h-full bg-neutral-500 transition-all duration-300" style={{ left: `${pCompleted + pWaiting + pProgress}%`, width: `${pPending}%` }} />}
+                          {cancelled > 0 && <div className="absolute h-full bg-red-700 transition-all duration-300" style={{ left: `${pCompleted + pWaiting + pProgress + pPending}%`, width: `${pCancelled}%` }} />}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                              {completedCount}/{totalCount}
+                            </span>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  {/* Service order list */}
+                  <div className="space-y-1.5">
+                    {productionSOs.map((so: any, index: number) => (
+                      <div key={so.id || index} className="flex items-center justify-between gap-2 py-1 border-b border-border/30 last:border-0">
+                        <span className="text-xs flex-1 break-words text-foreground">
+                          {so.description || <span className="text-muted-foreground italic">Sem descrição</span>}
+                        </span>
+                        <Badge
+                          variant={getServiceOrderStatusColor(so.status)}
+                          className="text-[10px] px-1.5 py-0 h-5 flex-shrink-0"
+                        >
+                          {SERVICE_ORDER_STATUS_LABELS[so.status as SO_STATUS]}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Artworks */}
             {filteredArtworks.length > 0 && (
@@ -378,64 +386,6 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
               </div>
             )}
 
-            {/* Layout Visual Preview - Last position with side toggle */}
-            {layoutsData && (
-              <div className="bg-muted/50 rounded-lg px-4 py-3">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconLayoutGrid className="h-4 w-4" />
-                    Layout
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {hasMultipleSides && (
-                      <div className="flex rounded-md border border-border overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => setLayoutSide('left')}
-                          className={cn(
-                            'px-2 py-0.5 text-xs transition-colors',
-                            layoutSide === 'left'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-background text-muted-foreground hover:bg-muted'
-                          )}
-                        >
-                          Esquerdo
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setLayoutSide('right')}
-                          className={cn(
-                            'px-2 py-0.5 text-xs transition-colors',
-                            layoutSide === 'right'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-background text-muted-foreground hover:bg-muted'
-                          )}
-                        >
-                          Direito
-                        </button>
-                      </div>
-                    )}
-                    {currentLayout && (
-                      <span className="text-xs text-muted-foreground">
-                        {Math.round(currentLayout.totalLength * 100)} x {Math.round(currentLayout.height * 100)} cm
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {currentLayout ? (
-                  <div className="bg-background rounded border p-3 flex items-center justify-center">
-                    <div
-                      dangerouslySetInnerHTML={{ __html: currentLayout.svg }}
-                      className="w-full max-w-full overflow-hidden [&>svg]:mx-auto [&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-full [&>svg]:max-h-[120px] text-foreground"
-                    />
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-sm text-muted-foreground">
-                    Layout {layoutSide === 'left' ? 'esquerdo' : 'direito'} não disponível
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         ) : (
           <div className="text-center py-8 text-muted-foreground">

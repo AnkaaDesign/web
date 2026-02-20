@@ -174,9 +174,9 @@ export const extractActiveFilters = (
       if (customer) {
         tags.push({
           key: "customerIds",
-          label: "Cliente",
+          label: "Razão Social",
           value: customerId,
-          displayValue: customer.fantasyName,
+          displayValue: customer.corporateName || customer.fantasyName,
           onRemove: () => onRemoveFilter("customerIds", customerId),
         });
       }

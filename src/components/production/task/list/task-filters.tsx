@@ -273,7 +273,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                       ) : null}
                     </TabsTrigger>
                     <TabsTrigger value="customers">
-                      Clientes
+                      Razão Social
                       {localFilters.customerIds?.length ? (
                         <Badge variant="secondary" className="ml-2 text-xs">
                           {localFilters.customerIds.length}
@@ -319,11 +319,11 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                             <Checkbox checked={localFilters.customerIds?.includes(customer.id) || false} onCheckedChange={() => handleCustomerToggle(customer.id)} />
                             <CustomerLogoDisplay
                               logo={customer.logo}
-                              customerName={customer.fantasyName}
+                              customerName={customer.corporateName || customer.fantasyName}
                               size="xs"
                               shape="rounded"
                             />
-                            <span className="text-sm truncate">{customer.fantasyName}</span>
+                            <span className="text-sm truncate">{customer.corporateName || customer.fantasyName}</span>
                           </label>
                         ))}
                       </div>

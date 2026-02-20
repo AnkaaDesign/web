@@ -1962,7 +1962,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 const context = {
                   entityType: 'cut',
                   entityId: task.id,
-                  customerName: task.customer?.fantasyName || task.customer?.corporateName || 'Sem-Nome',
+                  customerName: task.customer?.corporateName || task.customer?.fantasyName || 'Sem-Nome',
                   cutType: cut.type, // Send the actual enum value: 'VINYL' or 'STENCIL'
                 };
                 formData.append('_context', JSON.stringify(context));
@@ -3016,7 +3016,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                           <FormItem>
                             <FormLabel className="flex items-center gap-2">
                               <IconFileText className="h-4 w-4" />
-                              Nome da Tarefa
+                              Logomarca
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -3351,7 +3351,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                   <CardContent className="pt-0">
                     <RepresentativeManager
                       customerId={customerIdValue || undefined}
-                      customerName={task.customer?.fantasyName || task.customer?.corporateName || undefined}
+                      customerName={task.customer?.corporateName || task.customer?.fantasyName || undefined}
                       invoiceToCustomers={task.pricing?.invoicesToCustomers}
                       value={isDesignerUser
                         ? (() => {

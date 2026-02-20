@@ -337,7 +337,7 @@ export const createTaskHistoryColumns = (options?: {
   const allColumns: TaskColumn[] = [
   {
     id: "name",
-    header: "NOME",
+    header: "LOGOMARCA",
     accessorKey: "name",
     sortable: true,
     filterable: true,
@@ -347,8 +347,8 @@ export const createTaskHistoryColumns = (options?: {
   },
   {
     id: "customer.fantasyName",
-    header: "CLIENTE",
-    accessorFn: (row) => row.customer?.fantasyName || "",
+    header: "RAZÃO SOCIAL",
+    accessorFn: (row) => row.customer?.corporateName || row.customer?.fantasyName || "",
     sortable: true,
     filterable: true,
     defaultVisible: true,

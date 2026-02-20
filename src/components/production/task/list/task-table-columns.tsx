@@ -70,7 +70,7 @@ const renderDateWithIcon = (date: Date | null) => {
 export const createTaskColumns = (): TaskColumn[] => [
   {
     id: "name",
-    header: "NOME",
+    header: "LOGOMARCA",
     accessorKey: "name",
     sortable: true,
     filterable: true,
@@ -95,8 +95,8 @@ export const createTaskColumns = (): TaskColumn[] => [
   },
   {
     id: "customer.fantasyName",
-    header: "CLIENTE",
-    accessorFn: (row) => row.customer?.fantasyName || "",
+    header: "RAZÃO SOCIAL",
+    accessorFn: (row) => row.customer?.corporateName || row.customer?.fantasyName || "",
     sortable: true,
     filterable: true,
     defaultVisible: true,

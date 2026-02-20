@@ -1096,7 +1096,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
         // Get customer name from first task for file organization context
         const firstTaskForContext = currentTasks[0];
-        const customerName = firstTaskForContext?.customer?.fantasyName || firstTaskForContext?.customer?.corporateName;
+        const customerName = firstTaskForContext?.customer?.corporateName || firstTaskForContext?.customer?.fantasyName;
 
         // Add context for file organization
         if (customerName) {

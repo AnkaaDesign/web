@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconMapPin, IconHome, IconRoad, IconBuilding } from "@tabler/icons-react";
+import { IconMapPin, IconExternalLink } from "@tabler/icons-react";
 import type { Customer } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { formatCEP } from "../../../../utils";
@@ -11,17 +11,56 @@ interface AddressInfoCardProps {
 
 export function AddressInfoCard({ customer, className }: AddressInfoCardProps) {
   const hasAddress = customer.address || customer.city || customer.state || customer.zipCode;
-  const fullAddress = [
-    customer.address,
-    customer.addressNumber,
-    customer.addressComplement,
-    customer.neighborhood,
-    customer.city,
-    customer.state,
-    customer.zipCode ? formatCEP(customer.zipCode) : null,
-  ]
-    .filter(Boolean)
-    .join(", ");
+
+  const getFullAddress = () => {
+    const parts = [];
+
+    if (customer.address) {
+      let streetLine = customer.address;
+      if (customer.addressNumber) {
+        streetLine += `, ${customer.addressNumber}`;
+      }
+      parts.push(streetLine);
+    }
+
+    if (customer.addressComplement) {
+      parts.push(customer.addressComplement);
+    }
+
+    if (customer.neighborhood) {
+      parts.push(customer.neighborhood);
+    }
+
+    if (customer.city || customer.state) {
+      const cityState = [customer.city, customer.state].filter(Boolean).join(" - ");
+      parts.push(cityState);
+    }
+
+    if (customer.zipCode) {
+      parts.push(`CEP: ${formatCEP(customer.zipCode)}`);
+    }
+
+    return parts.join("\n");
+  };
+
+  const handleOpenMaps = () => {
+    const addressParts = [
+      customer.address,
+      customer.addressNumber,
+      customer.neighborhood,
+      customer.city,
+      customer.state,
+      customer.zipCode,
+    ].filter(Boolean);
+
+    const fullAddress = addressParts.join(", ");
+    if (!fullAddress) return;
+
+    const encodedAddress = encodeURIComponent(fullAddress);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, "_blank");
+  };
+
+  const fullAddress = getFullAddress();
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
@@ -32,80 +71,19 @@ export function AddressInfoCard({ customer, className }: AddressInfoCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0 flex-1">
-        {hasAddress ? (
-          <div className="space-y-4">
-            {/* Full Address Summary */}
-            {fullAddress && (
-              <div className="bg-muted/30 rounded-lg p-4">
-                <p className="text-sm text-muted-foreground mb-1 flex items-center gap-2">
-                  <IconMapPin className="h-4 w-4" />
-                  Endereço Completo
-                </p>
-                <p className="text-base text-foreground leading-relaxed">{fullAddress}</p>
-              </div>
-            )}
-
-            {/* Address Components */}
-            <div className="grid grid-cols-2 gap-3">
-              {customer.address && (
-                <div className="col-span-2 bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
-                    <IconRoad className="h-3.5 w-3.5" />
-                    Rua
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">{customer.address}</span>
-                </div>
-              )}
-
-              {customer.addressNumber && (
-                <div className="bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
-                    <IconHome className="h-3.5 w-3.5" />
-                    Número
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">{customer.addressNumber}</span>
-                </div>
-              )}
-
-              {customer.neighborhood && (
-                <div className="bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-xs font-medium text-muted-foreground mb-1 block">Bairro</span>
-                  <span className="text-sm font-semibold text-foreground">{customer.neighborhood}</span>
-                </div>
-              )}
-
-              {customer.city && (
-                <div className="bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-xs font-medium text-muted-foreground mb-1 block">Cidade</span>
-                  <span className="text-sm font-semibold text-foreground">{customer.city}</span>
-                </div>
-              )}
-
-              {customer.state && (
-                <div className="bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-xs font-medium text-muted-foreground mb-1 block">Estado</span>
-                  <span className="text-sm font-semibold text-foreground">{customer.state}</span>
-                </div>
-              )}
-
-              {customer.zipCode && (
-                <div className="bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-xs font-medium text-muted-foreground mb-1 block">CEP</span>
-                  <span className="text-sm font-semibold text-foreground font-mono">{formatCEP(customer.zipCode)}</span>
-                </div>
-              )}
-
-              {customer.addressComplement && (
-                <div className="col-span-2 bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 mb-1">
-                    <IconBuilding className="h-3.5 w-3.5" />
-                    Complemento
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">{customer.addressComplement}</span>
-                </div>
-              )}
+        {hasAddress && fullAddress ? (
+          <button
+            onClick={handleOpenMaps}
+            className="w-full text-left bg-muted/30 hover:bg-muted/50 transition-colors rounded-lg p-4 cursor-pointer border border-border"
+          >
+            <p className="text-sm font-semibold text-foreground leading-relaxed whitespace-pre-line">
+              {fullAddress}
+            </p>
+            <div className="flex items-center gap-1.5 mt-3">
+              <span className="text-sm font-medium text-primary">Abrir no Google Maps</span>
+              <IconExternalLink className="h-3.5 w-3.5 text-primary" />
             </div>
-          </div>
+          </button>
         ) : (
           <div className="text-center py-8">
             <div className="p-4 bg-muted/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">

@@ -1312,7 +1312,7 @@ export const TaskDetailsPage = () => {
   // Get display name with fallbacks
   const getTaskDisplayName = (task: any) => {
     if (task.name) return task.name;
-    if (task.customer?.fantasyName) return task.customer.fantasyName;
+    if (task.customer?.corporateName) return task.customer.corporateName;
     if (task.serialNumber) return `Série ${task.serialNumber}`;
     if (task.truck?.plate) return task.truck.plate;
     return "Sem nome";
@@ -1633,17 +1633,17 @@ export const TaskDetailsPage = () => {
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-1.5">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconBuilding className="h-4 w-4" />
-                  Cliente
+                  Razão Social
                     </span>
                     <div className="flex items-center gap-2">
                   <CustomerLogoDisplay
                     logo={task.customer.logo}
-                    customerName={task.customer.fantasyName}
+                    customerName={task.customer.corporateName || task.customer.fantasyName}
                     size="sm"
                     shape="rounded"
                     className="flex-shrink-0"
                   />
-                  <span className="text-sm font-semibold text-foreground text-right">{task.customer.fantasyName}</span>
+                  <span className="text-sm font-semibold text-foreground text-right">{task.customer.corporateName || task.customer.fantasyName}</span>
                     </div>
                   </div>
                 )}
@@ -1979,13 +1979,16 @@ export const TaskDetailsPage = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border dark:divide-border/30">
-                    {task.pricing.items.map((item, index) => (
+                    {task.pricing.items.map((item, index) => {
+                      const isOutrosWithObservation = item.description === 'Outros' && !!item.observation;
+                      const displayDescription = isOutrosWithObservation ? item.observation : item.description;
+                      return (
                   <tr key={item.id || index} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 text-sm">
                       <div className="flex items-center gap-2">
-                        <span>{item.description}</span>
+                        <span>{displayDescription}</span>
                         {/* Observation Indicator with HoverCard */}
-                        {item.observation && (
+                        {!isOutrosWithObservation && item.observation && (
                           <HoverCard openDelay={100} closeDelay={100}>
                             <HoverCardTrigger asChild>
                               <button className="relative flex items-center justify-center h-6 w-6 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
@@ -2014,7 +2017,8 @@ export const TaskDetailsPage = () => {
                       )}
                     </td>
                   </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
                   </div>
@@ -2216,14 +2220,17 @@ export const TaskDetailsPage = () => {
                         </div>
 
                         {/* Service Orders in this group */}
-                        {orders.map((serviceOrder) => (
+                        {orders.map((serviceOrder) => {
+                          const isOutrosWithObservation = serviceOrder.description === 'Outros' && !!serviceOrder.observation;
+                          const displayDescription = isOutrosWithObservation ? serviceOrder.observation : serviceOrder.description;
+                          return (
                       <div key={serviceOrder.id} className="bg-muted/50 rounded-lg px-3 py-2">
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex-1 space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-semibold">{serviceOrder.description}</h4>
+                          <h4 className="text-sm font-semibold">{displayDescription}</h4>
                           {/* Observation Indicator with HoverCard */}
-                          {serviceOrder.observation && (
+                          {!isOutrosWithObservation && serviceOrder.observation && (
                             <HoverCard openDelay={100} closeDelay={100}>
                               <HoverCardTrigger asChild>
                                 <button className="relative flex items-center justify-center h-6 w-6 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
@@ -2374,7 +2381,8 @@ export const TaskDetailsPage = () => {
                           </div>
                         </div>
                       </div>
-                        ))}
+                          );
+                        })}
                       </div>
                         );
                       })}

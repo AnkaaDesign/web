@@ -20,7 +20,7 @@ interface CustomerSelectorProps {
   placeholder?: string;
 }
 
-export function CustomerSelector({ control, disabled, required, initialCustomer, name = "customerId", label = "Cliente", placeholder = "Selecione um cliente" }: CustomerSelectorProps) {
+export function CustomerSelector({ control, disabled, required, initialCustomer, name = "customerId", label = "Razão Social", placeholder = "Selecione um cliente" }: CustomerSelectorProps) {
   const [isCreating, setIsCreating] = useState(false);
 
   // Watch customerId from form state - persists across accordion unmount/remount
@@ -60,7 +60,7 @@ export function CustomerSelector({ control, disabled, required, initialCustomer,
   }, [initialCustomer?.id, selectedCustomerData?.id]);
 
   // Memoize callbacks to prevent infinite loop
-  const getOptionLabel = useCallback((customer: Customer) => customer.fantasyName, []);
+  const getOptionLabel = useCallback((customer: Customer) => customer.corporateName || customer.fantasyName, []);
   const getOptionValue = useCallback((customer: Customer) => customer.id, []);
 
   // Search function for Combobox - let the combobox handle state internally
@@ -168,15 +168,15 @@ export function CustomerSelector({ control, disabled, required, initialCustomer,
                 <div className="flex items-center gap-3">
                   <CustomerLogoDisplay
                     logo={customer.logo}
-                    customerName={customer.fantasyName}
+                    customerName={customer.corporateName || customer.fantasyName}
                     size="sm"
                     shape="rounded"
                     className="flex-shrink-0"
                   />
                   <div className="flex flex-col gap-1 min-w-0 flex-1">
-                    <div className="font-medium truncate">{customer.fantasyName}</div>
+                    <div className="font-medium truncate">{customer.corporateName || customer.fantasyName}</div>
                     <div className="flex items-center gap-2 text-sm truncate group-hover:text-white transition-colors">
-                      {customer.corporateName && <span className="truncate">{customer.corporateName}</span>}
+                      {customer.fantasyName && <span className="truncate">{customer.fantasyName}</span>}
                       {customer.cnpj && (
                         <>
                           {customer.corporateName && <span className="opacity-50">•</span>}

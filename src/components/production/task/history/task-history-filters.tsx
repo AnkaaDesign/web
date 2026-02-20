@@ -189,7 +189,7 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <IconBuilding className="h-4 w-4" />
-              Clientes
+              Razão Social
             </Label>
             <Combobox
               mode="multiple"
@@ -203,7 +203,7 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
               options={
                 customersData?.data?.map((customer) => ({
                   value: customer.id,
-                  label: customer.fantasyName,
+                  label: customer.corporateName || customer.fantasyName,
                   logo: customer.logo,
                 })) || []
               }

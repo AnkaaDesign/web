@@ -114,6 +114,12 @@ export interface GarageTruck {
   finishedAt?: string | null; // Task completion date - null if not complete
   layoutInfo?: string | null; // Layout description
   artworkInfo?: string | null; // Artwork description
+  serviceOrders?: Array<{
+    id: string;
+    status: string;
+    type: string;
+    description?: string | null;
+  }>;
 }
 
 interface PositionedTruck extends GarageTruck {
@@ -419,6 +425,8 @@ interface TruckElementProps {
 }
 
 function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) {
+  // All coordinates are in pixels (no viewBox scaling).
+  // Meter values are multiplied by `scale` to get pixel values.
   const width = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW * scale;
   const height = truck.length * scale;
   const x = truck.xPosition * scale;
@@ -439,8 +447,7 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
   const textColor = getBrightness(bgColor) > 128 ? '#000000' : '#ffffff';
 
   // Truncate task name to fit within truck height (accounting for rotation)
-  // The rotated text width becomes the height constraint
-  const maxChars = Math.max(3, Math.floor((height - 24) / 7)); // Leave space for top/bottom labels
+  const maxChars = Math.max(3, Math.floor((height - 24) / 7));
   const displayName = truck.taskName
     ? truck.taskName.length > maxChars
       ? truck.taskName.slice(0, maxChars - 2) + '..'
@@ -450,8 +457,35 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
   // Display original length (without cabin) if available
   const displayLength = truck.originalLength ?? truck.length;
 
-  // Only show serial number if there's enough height
+  // Only show serial number if there's enough pixel height
   const showSerialNumber = height > 50 && truck.serialNumber;
+
+  // Production service order progress bar
+  const productionSOs = (truck.serviceOrders || []).filter(so => so.type === 'PRODUCTION');
+  const soTotal = productionSOs.length;
+  const showProgressBar = soTotal > 0 && height > 40;
+
+  const progressBarData = showProgressBar ? (() => {
+    const barMargin = 2;
+    const barH = 10;
+    const barW = width - barMargin * 2;
+    const barY = showSerialNumber ? height - 24 : height - 14;
+
+    const completedCount = productionSOs.filter(so => so.status === 'COMPLETED').length;
+    const waitingApproveCount = productionSOs.filter(so => so.status === 'WAITING_APPROVE').length;
+    const inProgressCount = productionSOs.filter(so => so.status === 'IN_PROGRESS').length;
+    const pendingCount = productionSOs.filter(so => so.status === 'PENDING').length;
+    const cancelledCount = productionSOs.filter(so => so.status === 'CANCELLED').length;
+
+    const segments: Array<{ w: number; color: string }> = [];
+    if (completedCount > 0) segments.push({ w: (completedCount / soTotal) * barW, color: '#15803d' });
+    if (waitingApproveCount > 0) segments.push({ w: (waitingApproveCount / soTotal) * barW, color: '#9333ea' });
+    if (inProgressCount > 0) segments.push({ w: (inProgressCount / soTotal) * barW, color: '#1d4ed8' });
+    if (pendingCount > 0) segments.push({ w: (pendingCount / soTotal) * barW, color: '#737373' });
+    if (cancelledCount > 0) segments.push({ w: (cancelledCount / soTotal) * barW, color: '#b91c1c' });
+
+    return { barMargin, barH, barW, barY, segments, completedCount };
+  })() : null;
 
   return (
     <g
@@ -482,7 +516,7 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
         {/* Corner flag: primary if entryDate exists, destructive if not — only for patio trucks */}
         {!truck.spot && (
           <polygon
-            points={`${width - 14},0 ${width},0 ${width},14`}
+            points={`${width - 14},0 ${width},0 ${width},${14}`}
             fill={truck.entryDate ? 'hsl(var(--primary))' : 'hsl(var(--destructive))'}
           />
         )}
@@ -495,6 +529,7 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
           fill={textColor}
           fontSize={10}
           fontWeight="bold"
+          fontFamily="system-ui, -apple-system, sans-serif"
           transform={`rotate(-90, ${width / 2}, ${height / 2})`}
           style={{ pointerEvents: 'none' }}
         >
@@ -507,10 +542,58 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
           textAnchor="middle"
           fill={textColor}
           fontSize={8}
+          fontFamily="system-ui, -apple-system, sans-serif"
           style={{ pointerEvents: 'none' }}
         >
           {displayLength.toFixed(1).replace('.', ',')}m
         </text>
+        {/* Production service order progress bar - above serial number */}
+        {progressBarData && (
+          <g>
+            {/* Background */}
+            <rect
+              x={progressBarData.barMargin}
+              y={progressBarData.barY}
+              width={progressBarData.barW}
+              height={progressBarData.barH}
+              fill="rgba(0,0,0,0.3)"
+              rx={2}
+            />
+            {/* Colored segments */}
+            {(() => {
+              let xOff = 0;
+              return progressBarData.segments.map((seg, i) => {
+                const el = (
+                  <rect
+                    key={i}
+                    x={progressBarData.barMargin + xOff}
+                    y={progressBarData.barY}
+                    width={seg.w}
+                    height={progressBarData.barH}
+                    fill={seg.color}
+                    rx={i === 0 && i === progressBarData.segments.length - 1 ? 2 : i === 0 ? 2 : 0}
+                  />
+                );
+                xOff += seg.w;
+                return el;
+              });
+            })()}
+            {/* Count label centered on bar */}
+            <text
+              x={progressBarData.barMargin + progressBarData.barW / 2}
+              y={progressBarData.barY + progressBarData.barH / 2}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fill="#ffffff"
+              fontSize={7}
+              fontWeight="bold"
+              fontFamily="system-ui, -apple-system, sans-serif"
+              style={{ pointerEvents: 'none', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.8))' }}
+            >
+              {progressBarData.completedCount}/{soTotal}
+            </text>
+          </g>
+        )}
         {/* Serial number label at bottom - only if enough space */}
         {showSerialNumber && (
           <text
@@ -519,6 +602,7 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
             textAnchor="middle"
             fill={textColor}
             fontSize={8}
+            fontFamily="system-ui, -apple-system, sans-serif"
             style={{ pointerEvents: 'none' }}
           >
             {truck.serialNumber}
@@ -579,7 +663,7 @@ function DraggableTruck({ truck, scale, disabled = false, onClick, onContextMenu
       ref={setNodeRef as any}
       {...(disabled ? {} : listeners)}
       {...attributes}
-      style={{ cursor: disabled ? 'default' : onClick ? 'pointer' : 'grab' }}
+      style={{ cursor: disabled ? 'default' : onClick ? 'pointer' : 'grab', outline: 'none' }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       onClick={handleClick}
@@ -629,7 +713,7 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
   const height = config.laneLength * scale;
 
   // Calculate where the dragged truck would be placed in this lane
-  // Support multiple previews for small trucks and swap indicators for occupied spots
+  // Preview positions are in meters (converted to pixels at render time)
   let previews: Array<{ y: number; height: number; color: 'green' | 'red' }> = [];
 
   if (isDragging && draggedTruckLength && trucks && draggedTruckId) {
@@ -894,7 +978,7 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
             {displayText && (
               <text
                 x={x + width / 2}
-                y={y + preview.y * scale + (preview.height * scale / 2)}
+                y={y + (preview.y + preview.height / 2) * scale}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fontSize={10}
@@ -943,9 +1027,10 @@ function DroppablePatio({ scale, width, height, columns, children }: DroppablePa
     data: { isPatio: true },
   });
 
-  const laneWidth = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW + 0.4;
-  const laneSpacing = PATIO_CONFIG.LANE_SPACING;
-  const padding = PATIO_CONFIG.PADDING;
+  // All coordinates in pixels
+  const laneWidth = (COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW + 0.4) * scale;
+  const laneSpacing = PATIO_CONFIG.LANE_SPACING * scale;
+  const padding = PATIO_CONFIG.PADDING * scale;
 
   return (
     <g ref={setNodeRef as any}>
@@ -953,8 +1038,8 @@ function DroppablePatio({ scale, width, height, columns, children }: DroppablePa
       <rect
         x={0}
         y={0}
-        width={width * scale}
-        height={height * scale}
+        width={width}
+        height={height}
         fill={isOver ? COLORS.LANE_HOVER : COLORS.GARAGE_FILL}
         stroke={COLORS.PATIO_STROKE}
         strokeWidth={2}
@@ -966,10 +1051,10 @@ function DroppablePatio({ scale, width, height, columns, children }: DroppablePa
         return (
           <rect
             key={i}
-            x={laneX * scale}
-            y={padding * scale}
-            width={laneWidth * scale}
-            height={(height - padding * 2) * scale}
+            x={laneX}
+            y={padding}
+            width={laneWidth}
+            height={height - padding * 2}
             fill={COLORS.LANE_FILL}
             stroke={COLORS.LANE_STROKE}
             strokeWidth={1.5}
@@ -1370,8 +1455,8 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
               </span>
             </div>
 
-            {/* SVG Rendering with uniform scale */}
-            <div className="drop-shadow-md border-2 border-border rounded-lg bg-card p-1.5">
+            {/* SVG Rendering with uniform scale — no viewBox, all coords in pixels */}
+            <div className="shadow-md border-2 border-border rounded-lg bg-card p-1.5">
               <svg
                 width={dim.width * uniformScale}
                 height={dim.height * uniformScale}
@@ -1382,8 +1467,8 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
                   // Patio rendering
                   <DroppablePatio
                     scale={uniformScale}
-                    width={dim.width}
-                    height={dim.height}
+                    width={dim.width * uniformScale}
+                    height={dim.height * uniformScale}
                     columns={patioColumns}
                   >
                     {layout.patioTrucks?.map((truck) => (
@@ -1407,7 +1492,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
                     ))}
                   </DroppablePatio>
                 ) : (
-                  // Garage rendering
+                  // Garage rendering — all coords in pixels
                   <>
                     <rect
                       x={0}
@@ -1700,13 +1785,15 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
       checkDate.setHours(0, 0, 0, 0);
 
       return trucksWithLocalPositions.filter(truck => {
-        // For calendar view, check if truck is within forecastDate to term range
-        if (truck.forecastDate) {
-          const forecastDate = new Date(truck.forecastDate);
-          forecastDate.setHours(0, 0, 0, 0);
+        // For calendar view, check if truck is within arrival date to term range
+        // Use entryDate (actual arrival) if available, otherwise forecastDate (expected arrival)
+        const arrivalDateStr = truck.entryDate || truck.forecastDate;
+        if (arrivalDateStr) {
+          const arrivalDate = new Date(arrivalDateStr);
+          arrivalDate.setHours(0, 0, 0, 0);
 
           // Truck must have arrived by the selected date
-          if (checkDate < forecastDate) return false;
+          if (checkDate < arrivalDate) return false;
 
           // If term exists, selected date must be before or on the term
           if (truck.term) {

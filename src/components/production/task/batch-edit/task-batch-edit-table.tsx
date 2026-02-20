@@ -240,14 +240,14 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                 <TableRow className="bg-muted hover:bg-muted even:bg-muted">
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-64">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                      <span className="truncate">Nome</span>
+                      <span className="truncate">Logomarca</span>
                     </div>
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-44">
                     <div className="px-3 py-2">Status</div>
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-72">
-                    <div className="px-3 py-2">Cliente</div>
+                    <div className="px-3 py-2">Razão Social</div>
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-48">
                     <div className="px-3 py-2">Setor</div>
@@ -301,7 +301,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                       >
                         <TableCell className="w-64 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <FormInput name={`tasks.${index}.data.name`} placeholder="Nome da tarefa" />
+                            <FormInput name={`tasks.${index}.data.name`} placeholder="Logomarca" />
                           </div>
                         </TableCell>
                         <TableCell className="w-44 p-0 !border-r-0">

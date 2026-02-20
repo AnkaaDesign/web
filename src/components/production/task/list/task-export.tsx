@@ -53,7 +53,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
               row[headerKey] = value ? formatDateTime(value) : "";
               break;
             case "customer.fantasyName":
-              row[headerKey] = task.customer?.fantasyName || "";
+              row[headerKey] = task.customer?.corporateName || task.customer?.fantasyName || "";
               break;
             case "sector.name":
               row[headerKey] = task.sector?.name || "";
@@ -166,7 +166,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
               row[headerKey] = value ? formatDateTime(value) : "";
               break;
             case "customer.fantasyName":
-              row[headerKey] = task.customer?.fantasyName || "";
+              row[headerKey] = task.customer?.corporateName || task.customer?.fantasyName || "";
               break;
             case "sector.name":
               row[headerKey] = task.sector?.name || "";

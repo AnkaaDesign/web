@@ -162,6 +162,10 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
 
             // Check if the item's size matches the user's size
             const userSize = userSizes[sizeField];
+
+            // If user has no size configured for this PPE type, show all items of this type
+            if (!userSize) return true;
+
             // Filter measures to only SIZE type
             const sizeMeasures = (item.measures || []).filter((m: any) => m.measureType === "SIZE");
             const itemSize = getPpeSizeFromMeasures(sizeMeasures);
@@ -170,7 +174,7 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
             if (!itemSize) return true;
 
             // Match user's size with item's size
-            return userSize && itemSize === userSize;
+            return itemSize === userSize;
           });
         }
 
@@ -182,9 +186,11 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
           const itemSize = getPpeSizeFromMeasures(sizeMeasures);
           const isMatchingSize = item.ppeType && userSizes[PPE_TYPE_TO_USER_SIZE_FIELD[item.ppeType]] === itemSize;
 
-          // Format label: name + size (if available)
+          // Format label: name + brand + size
           const displaySize = itemSize ? (itemSize.startsWith("SIZE_") ? itemSize.replace("SIZE_", "") : itemSize) : null;
-          const label = displaySize ? `${item.name} - ${displaySize}` : item.name;
+          const brandName = item.brand?.name || null;
+          const labelParts = [item.name, brandName, displaySize].filter(Boolean);
+          const label = labelParts.join(" - ");
 
           const typeOrder = item.ppeType ? PPE_TYPE_ORDER[item.ppeType as keyof typeof PPE_TYPE_ORDER] || 999 : 999;
           const sizeOrder = getSizeOrder(item.ppeType, itemSize);
@@ -260,7 +266,8 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
           const meta = option.metadata as any;
 
           const displaySize = meta.size ? (meta.size.startsWith("SIZE_") ? meta.size.replace("SIZE_", "") : meta.size) : null;
-          const label = displaySize ? `${meta.displayName} - ${displaySize}` : (meta.displayName || '');
+          const labelParts = [meta.displayName, meta.brandName, displaySize].filter(Boolean);
+          const label = labelParts.join(" - ") || '';
 
           return (
             <div className="flex items-center justify-between w-full gap-2">

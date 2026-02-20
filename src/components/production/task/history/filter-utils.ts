@@ -89,8 +89,8 @@ export function extractActiveFilters(
       const customer = customers.find((c) => c.id === id);
       activeFilters.push({
         key: `customerIds-${id}`,
-        label: "Cliente",
-        value: customer ? customer.fantasyName : `ID: ${id}`,  // Show ID if name not found
+        label: "Razão Social",
+        value: customer ? (customer.corporateName || customer.fantasyName) : `ID: ${id}`,  // Show ID if name not found
         iconType: "user",
         itemId: id,
         onRemove: () => onRemoveFilter("customerIds", id),

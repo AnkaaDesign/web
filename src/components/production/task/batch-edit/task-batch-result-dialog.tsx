@@ -25,7 +25,7 @@ export function TaskBatchResultDialog({ result, onClose }: TaskBatchResultDialog
       <div className="flex-1">
         <div className="font-medium">{task.name}</div>
         <div className="text-sm text-muted-foreground">
-          {task.customer?.fantasyName && <span>Cliente: {task.customer.fantasyName}</span>}
+          {task.customer?.corporateName && <span>Razão Social: {task.customer.corporateName}</span>}
           {task.serialNumber && <span className="ml-2">• Série: {task.serialNumber}</span>}
         </div>
         <div className="flex items-center gap-2 mt-1">
@@ -51,7 +51,7 @@ export function TaskBatchResultDialog({ result, onClose }: TaskBatchResultDialog
         <div className="flex-1">
           <div className="font-medium text-red-900">{error.data?.name || `Tarefa ${error.index + 1}`}</div>
           <div className="text-sm text-red-700 mt-1">{errorMessage}</div>
-          {error.data?.customer?.fantasyName && <div className="text-sm text-muted-foreground mt-1">Cliente: {error.data.customer.fantasyName}</div>}
+          {error.data?.customer?.corporateName && <div className="text-sm text-muted-foreground mt-1">Razão Social: {error.data.customer.corporateName}</div>}
         </div>
         <IconX className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
       </div>

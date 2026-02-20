@@ -122,7 +122,7 @@ interface TaskExportProps {
 const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   { id: "name", label: "Título", getValue: (task: Task) => task.name },
   { id: "status", label: "Status", getValue: (task: Task) => TASK_STATUS_LABELS[task.status] || task.status },
-  { id: "customer.fantasyName", label: "Cliente", getValue: (task: Task) => task.customer?.fantasyName || "" },
+  { id: "customer.fantasyName", label: "Razão Social", getValue: (task: Task) => task.customer?.corporateName || task.customer?.fantasyName || "" },
   { id: "identificador", label: "Identificador", getValue: (task: Task) => task.serialNumber || task.truck?.plate || "" },
   { id: "sector.name", label: "Setor", getValue: (task: Task) => task.sector?.name || "" },
   {
