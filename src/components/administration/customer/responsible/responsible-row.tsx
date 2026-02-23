@@ -1,4 +1,4 @@
-import { useCallback, useRef, useMemo, forwardRef } from 'react';
+import { useCallback, useMemo, forwardRef } from 'react';
 import { IconTrash } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,10 @@ interface ResponsibleRowProps {
 
 const CREATE_NEW_VALUE = '__CREATE_NEW__';
 
+// Module-level shared cache so all ResponsibleRow instances can look up responsibles
+// regardless of which instance's queryFn was called by React Query (query deduplication)
+const responsibleCache = new Map<string, Responsible>();
+
 export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
   ({
     companyId: _companyId,
@@ -38,9 +42,6 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     // Determine if we're in create mode based on the value
     const showCreateInputs = value.isEditing && value.id?.startsWith('temp-');
 
-    // Cache fetched responsibles for lookup on selection
-    const fetchedRepsRef = useRef<Map<string, Responsible>>(new Map());
-
     // Async query function for the Combobox
     const queryFn = useCallback(async (searchTerm: string, page?: number) => {
       const response = await responsibleService.getAll({
@@ -49,8 +50,8 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
         page: page || 1,
         pageSize: 20,
       });
-      // Cache fetched reps for lookup on selection
-      response.data.forEach(rep => fetchedRepsRef.current.set(rep.id, rep));
+      // Cache fetched reps in shared module-level cache
+      response.data.forEach(rep => responsibleCache.set(rep.id, rep));
       return {
         data: response.data,
         hasMore: response.meta.page < response.meta.pageCount,
@@ -64,7 +65,7 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     const initialOptions = useMemo(() => {
       if (value.id && !value.id.startsWith('temp-') && value.name) {
         const rep = { id: value.id, name: value.name, phone: value.phone || '', email: value.email || '', role: value.role, isActive: true } as Responsible;
-        fetchedRepsRef.current.set(rep.id, rep);
+        responsibleCache.set(rep.id, rep);
         return [rep];
       }
       return [];
@@ -117,14 +118,14 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
         });
       } else {
         // Select existing responsible from cache
-        const rep = fetchedRepsRef.current.get(selectedValue);
+        const rep = responsibleCache.get(selectedValue);
         if (rep) {
           onChange({
             id: rep.id,
             name: rep.name,
             phone: rep.phone,
             email: rep.email || '',
-            role: rep.role,
+            // Keep user's role selection instead of overwriting with DB role
             isActive: rep.isActive,
             isNew: false,
             isEditing: false,
@@ -186,72 +187,75 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     return (
       <div ref={ref} className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
-          {/* Role Selection - 3/12 width */}
-          <div className="sm:col-span-3 space-y-2">
-            {isFirstRow && <FormLabel>Função</FormLabel>}
-            <Combobox
-              value={value.role || ''}
-              onValueChange={handleRoleChange}
-              options={roleOptions}
-              placeholder="Selecione uma função"
-              emptyText="Nenhuma função encontrada"
-              disabled={disabled || readOnly}
-              searchable={false}
-            />
-          </div>
+          {showCreateInputs ? (
+            /* Inline Create Mode: Role + Name + Phone + Company */
+            <>
+              {/* Role Selection - only in create mode */}
+              <div className="sm:col-span-3 space-y-2">
+                {isFirstRow && <FormLabel>Função</FormLabel>}
+                <Combobox
+                  value={value.role || ''}
+                  onValueChange={handleRoleChange}
+                  options={roleOptions}
+                  placeholder="Selecione uma função"
+                  emptyText="Nenhuma função encontrada"
+                  disabled={disabled || readOnly}
+                  searchable={false}
+                />
+              </div>
 
-          {/* Responsible Selection OR Inline Inputs - 8/12 width */}
-          <div className="sm:col-span-8">
-            {showCreateInputs ? (
-              /* Inline Create Responsible Inputs */
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-2">
-                  {isFirstRow && <FormLabel>Nome do Responsável</FormLabel>}
-                  <Input
-                    type="text"
-                    value={value.name || ''}
-                    onChange={(newValue) => {
-                      const finalValue = typeof newValue === 'string' ? newValue : '';
-                      onChange({
-                        ...value,
-                        name: finalValue,
-                      });
-                    }}
-                    placeholder="Digite o nome"
-                    disabled={disabled || readOnly}
-                    className="bg-transparent"
-                    autoFocus
-                  />
-                </div>
+              <div className="sm:col-span-8">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-2">
+                    {isFirstRow && <FormLabel>Nome do Responsável</FormLabel>}
+                    <Input
+                      type="text"
+                      value={value.name || ''}
+                      onChange={(newValue) => {
+                        const finalValue = typeof newValue === 'string' ? newValue : '';
+                        onChange({
+                          ...value,
+                          name: finalValue,
+                        });
+                      }}
+                      placeholder="Digite o nome"
+                      disabled={disabled || readOnly}
+                      className="bg-transparent"
+                      autoFocus
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  {isFirstRow && <FormLabel>Telefone</FormLabel>}
-                  <BasePhoneInput
-                    value={value.phone || ''}
-                    onChange={(phoneValue) => {
-                      onChange({
-                        ...value,
-                        phone: phoneValue || '',
-                      });
-                    }}
-                    placeholder="(00) 00000-0000"
-                    disabled={disabled || readOnly}
-                    className="bg-transparent"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    {isFirstRow && <FormLabel>Telefone</FormLabel>}
+                    <BasePhoneInput
+                      value={value.phone || ''}
+                      onChange={(phoneValue) => {
+                        onChange({
+                          ...value,
+                          phone: phoneValue || '',
+                        });
+                      }}
+                      placeholder="(00) 00000-0000"
+                      disabled={disabled || readOnly}
+                      className="bg-transparent"
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  {isFirstRow && <FormLabel>Empresa</FormLabel>}
-                  <CustomerCombobox
-                    value={value.companyId || null}
-                    onValueChange={handleCustomerChange}
-                    disabled={disabled || readOnly}
-                    placeholder="Selecione a empresa"
-                  />
+                  <div className="space-y-2">
+                    {isFirstRow && <FormLabel>Empresa</FormLabel>}
+                    <CustomerCombobox
+                      value={value.companyId || null}
+                      onValueChange={handleCustomerChange}
+                      disabled={disabled || readOnly}
+                      placeholder="Selecione a empresa"
+                    />
+                  </div>
                 </div>
               </div>
-            ) : (
-              /* Responsible Selection */
+            </>
+          ) : (
+            /* Selection Mode: Just the Responsible combobox */
+            <div className="sm:col-span-11">
               <div className="space-y-2">
                 {isFirstRow && <FormLabel>Responsável</FormLabel>}
                 <Combobox<Responsible>
@@ -277,8 +281,8 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                   fixedTopContent={fixedTopContent}
                 />
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Remove Button - 1/12 width */}
           <div className="sm:col-span-1">
