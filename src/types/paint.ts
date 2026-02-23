@@ -91,7 +91,8 @@ export interface PaintFormula extends BaseEntity {
 
 export interface PaintFormulaComponent extends BaseEntity {
   ratio: number; // Percentage of this component in the formula (calculated from weightInGrams)
-  weight?: number; // Weight in grams used during formulation
+  weightInGrams?: number; // Weight in grams used during formulation
+  weight?: number; // @deprecated - use weightInGrams instead
   itemId: string;
   formulaPaintId: string;
 

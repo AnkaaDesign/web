@@ -274,12 +274,12 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
 
     if (mode === "create") {
       // Filter valid formulas to pass to the parent
-      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.weight && c.weight > 0));
+      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && (c.weightInGrams || c.weight) && (c.weightInGrams || c.weight || 0) > 0));
 
       await (props as CreateFormProps).onSubmit(data as PaintCreateFormData, validFormulas, colorPreviewFile);
     } else {
       // In update mode, also handle new formulas if any
-      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.weight && c.weight > 0));
+      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && (c.weightInGrams || c.weight) && (c.weightInGrams || c.weight || 0) > 0));
 
       await (props as UpdateFormProps).onSubmit(data as PaintUpdateFormData, validFormulas, colorPreviewFile);
     }

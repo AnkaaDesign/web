@@ -57,7 +57,8 @@ export function CatalogCreatePage() {
         for (const formula of formulas) {
           const validComponents =
             formula.components?.filter((c) => {
-              return c.itemId && c.weight && c.weight > 0;
+              const weight = c.weightInGrams || c.weight || 0;
+              return c.itemId && weight > 0;
             }) || [];
 
           if (validComponents.length === 0) {
@@ -71,7 +72,7 @@ export function CatalogCreatePage() {
             description: formula.description || "Fórmula Principal",
             components: validComponents.map((c) => ({
               itemId: c.itemId,
-              weightInGrams: c.weight!, // Backend will calculate ratio from weight
+              weightInGrams: c.weightInGrams || c.weight || 0,
             })),
           };
 

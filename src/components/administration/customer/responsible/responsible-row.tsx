@@ -1,4 +1,4 @@
-import { useCallback, useMemo, forwardRef } from 'react';
+import { useCallback, useMemo, useState, forwardRef } from 'react';
 import { IconTrash } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,9 @@ import { BasePhoneInput } from '@/components/ui/phone-input';
 import { Combobox } from '@/components/ui/combobox';
 import { FormLabel } from '@/components/ui/form';
 import { CustomerCombobox } from '@/components/ui/customer-combobox';
+import { cn } from '@/lib/utils';
 import { responsibleService } from '@/services/responsibleService';
+import { toBrazilianNameCase } from '@/utils/formatters';
 import type { Responsible, ResponsibleRole, ResponsibleRowData } from '@/types/responsible';
 import { RESPONSIBLE_ROLE_LABELS } from '@/types/responsible';
 
@@ -21,6 +23,7 @@ interface ResponsibleRowProps {
   isLastRow: boolean;
   value: ResponsibleRowData;
   onChange: (updates: Partial<ResponsibleRowData>) => void;
+  showErrors?: boolean;
 }
 
 const CREATE_NEW_VALUE = '__CREATE_NEW__';
@@ -38,9 +41,19 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     isFirstRow,
     value,
     onChange,
+    showErrors = false,
   }, ref) => {
     // Determine if we're in create mode based on the value
     const showCreateInputs = value.isEditing && value.id?.startsWith('temp-');
+
+    // Track which fields have been touched (blurred) for inline validation
+    const [touched, setTouched] = useState<{ name?: boolean; phone?: boolean }>({});
+
+    // Validation: name and phone are required when in create mode
+    const nameEmpty = showCreateInputs && !value.name?.trim();
+    const phoneEmpty = showCreateInputs && !value.phone?.trim();
+    const nameError = nameEmpty && (touched.name || showErrors);
+    const phoneError = phoneEmpty && (touched.phone || showErrors);
 
     // Async query function for the Combobox
     const queryFn = useCallback(async (searchTerm: string, page?: number) => {
@@ -109,7 +122,7 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
         onChange({
           ...value, // Preserve existing values, especially role
           id: `temp-${Date.now()}`,
-          name: searchTerm?.trim() || '',
+          name: toBrazilianNameCase(searchTerm || ''),
           phone: '',
           email: '',
           isNew: true,
@@ -176,7 +189,7 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
           }
         }}
       >
-        <span className="truncate font-medium">+ Cadastrar novo{searchTerm ? ` "${searchTerm}"` : ''}</span>
+        <span className="truncate font-medium">+ Cadastrar novo{searchTerm ? ` "${toBrazilianNameCase(searchTerm)}"` : ''}</span>
       </div>
     ), [handleResponsibleChange]);
 
@@ -184,13 +197,16 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     const currentResponsibleValue = value.id && !value.id.startsWith('temp-') ? value.id : '';
 
     return (
-      <div ref={ref} className="space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+      <div ref={ref} className={cn("space-y-3", (nameError || phoneError) && "pb-4")}>
+        <div className={cn(
+          "grid grid-cols-1 gap-2 items-end",
+          showCreateInputs ? "sm:grid-cols-[3fr_3fr_2fr_3fr_auto]" : "sm:grid-cols-[1fr_auto]"
+        )}>
           {showCreateInputs ? (
-            /* Inline Create Mode: Role + Name + Phone + Company */
+            /* Inline Create Mode: Role + Name + Phone + Company + Remove */
             <>
-              {/* Role Selection - only in create mode */}
-              <div className="sm:col-span-3 space-y-2">
+              {/* Role Selection */}
+              <div className="space-y-2">
                 {isFirstRow && <FormLabel>Função</FormLabel>}
                 <Combobox
                   value={value.role || ''}
@@ -203,88 +219,97 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
                 />
               </div>
 
-              <div className="sm:col-span-8">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-2">
-                    {isFirstRow && <FormLabel>Nome do Responsável</FormLabel>}
-                    <Input
-                      type="text"
-                      value={value.name || ''}
-                      onChange={(newValue) => {
-                        const finalValue = typeof newValue === 'string' ? newValue : '';
-                        onChange({
-                          ...value,
-                          name: finalValue,
-                        });
-                      }}
-                      placeholder="Digite o nome"
-                      disabled={disabled || readOnly}
-                      className="bg-transparent"
-                      autoFocus
-                    />
-                  </div>
+              {/* Name */}
+              <div className="relative space-y-2">
+                {isFirstRow && <FormLabel>Nome <span className="text-destructive">*</span></FormLabel>}
+                <Input
+                  type="text"
+                  value={value.name || ''}
+                  onChange={(newValue) => {
+                    const finalValue = typeof newValue === 'string' ? newValue : '';
+                    onChange({
+                      ...value,
+                      name: finalValue,
+                    });
+                  }}
+                  onBlur={() => {
+                    setTouched(prev => ({ ...prev, name: true }));
+                    if (value.name) {
+                      onChange({
+                        ...value,
+                        name: toBrazilianNameCase(value.name),
+                      });
+                    }
+                  }}
+                  placeholder="Digite o nome"
+                  disabled={disabled || readOnly}
+                  className={cn("bg-transparent", nameError && "border-destructive")}
+                  autoFocus
+                />
+                {nameError && <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">Nome é obrigatório</p>}
+              </div>
 
-                  <div className="space-y-2">
-                    {isFirstRow && <FormLabel>Telefone</FormLabel>}
-                    <BasePhoneInput
-                      value={value.phone || ''}
-                      onChange={(phoneValue) => {
-                        onChange({
-                          ...value,
-                          phone: phoneValue || '',
-                        });
-                      }}
-                      placeholder="(00) 00000-0000"
-                      disabled={disabled || readOnly}
-                      className="bg-transparent"
-                    />
-                  </div>
+              {/* Phone */}
+              <div className="relative space-y-2">
+                {isFirstRow && <FormLabel>Telefone <span className="text-destructive">*</span></FormLabel>}
+                <BasePhoneInput
+                  value={value.phone || ''}
+                  onChange={(phoneValue) => {
+                    onChange({
+                      ...value,
+                      phone: phoneValue || '',
+                    });
+                  }}
+                  onBlur={() => setTouched(prev => ({ ...prev, phone: true }))}
+                  placeholder="(00) 00000-0000"
+                  disabled={disabled || readOnly}
+                  className={cn("bg-transparent", phoneError && "border-destructive")}
+                />
+                {phoneError && <p className="absolute left-0 top-full mt-0.5 text-xs text-destructive whitespace-nowrap">Telefone é obrigatório</p>}
+              </div>
 
-                  <div className="space-y-2">
-                    {isFirstRow && <FormLabel>Empresa</FormLabel>}
-                    <CustomerCombobox
-                      value={value.companyId || null}
-                      onValueChange={handleCustomerChange}
-                      disabled={disabled || readOnly}
-                      placeholder="Selecione a empresa"
-                    />
-                  </div>
-                </div>
+              {/* Company */}
+              <div className="space-y-2">
+                {isFirstRow && <FormLabel>Empresa</FormLabel>}
+                <CustomerCombobox
+                  value={value.companyId || null}
+                  onValueChange={handleCustomerChange}
+                  disabled={disabled || readOnly}
+                  placeholder="Selecione a empresa"
+                />
               </div>
             </>
           ) : (
             /* Selection Mode: Just the Responsible combobox */
-            <div className="sm:col-span-11">
-              <div className="space-y-2">
-                {isFirstRow && <FormLabel>Responsável</FormLabel>}
-                <Combobox<Responsible>
-                  value={currentResponsibleValue || ''}
-                  onValueChange={(newValue) => {
-                    // Prevent deselection when clicking the same value
-                    if (newValue !== undefined) {
-                      handleResponsibleChange(newValue);
-                    }
-                  }}
-                  async
-                  queryKey={queryKey}
-                  queryFn={queryFn}
-                  initialOptions={initialOptions}
-                  minSearchLength={0}
-                  getOptionValue={getOptionValue}
-                  getOptionLabel={getOptionLabel}
-                  getOptionDescription={getOptionDescription}
-                  placeholder="Selecione ou cadastre novo"
-                  emptyText="Nenhum responsável encontrado"
-                  disabled={disabled || readOnly}
-                  searchable={true}
-                  fixedTopContent={fixedTopContent}
-                />
-              </div>
+            <div className="space-y-2">
+              {isFirstRow && <FormLabel>Responsável</FormLabel>}
+              <Combobox<Responsible>
+                value={currentResponsibleValue || ''}
+                onValueChange={(newValue) => {
+                  // Prevent deselection when clicking the same value
+                  if (newValue !== undefined) {
+                    handleResponsibleChange(newValue);
+                  }
+                }}
+                async
+                queryKey={queryKey}
+                queryFn={queryFn}
+                initialOptions={initialOptions}
+                minSearchLength={0}
+                getOptionValue={getOptionValue}
+                getOptionLabel={getOptionLabel}
+                getOptionDescription={getOptionDescription}
+                placeholder="Selecione ou cadastre novo"
+                emptyText="Nenhum responsável encontrado"
+                disabled={disabled || readOnly}
+                searchable={true}
+                fixedTopContent={fixedTopContent}
+              />
             </div>
           )}
 
-          {/* Remove Button - 1/12 width */}
-          <div className="sm:col-span-1">
+          {/* Remove Button */}
+          <div>
             {!readOnly && !disabled && (
               <Button
                 type="button"

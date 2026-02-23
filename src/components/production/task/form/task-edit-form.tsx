@@ -29,7 +29,7 @@ import { useTaskMutations, useCutsByTask } from "../../../../hooks";
 import { cutService } from "../../../../api-client/cut";
 import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole } from "@/types/responsible";
-import { ResponsibleManager } from "@/components/administration/customer/responsible";
+import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { useAuth } from "../../../../contexts/auth-context";
@@ -114,6 +114,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const { user } = useAuth();
   const taskMutations = useTaskMutations();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showResponsibleErrors, setShowResponsibleErrors] = useState(false);
 
   // Wrap updateAsync for debugging/logging
   const updateAsync = async (params: any) => {
@@ -857,6 +858,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       console.log('[TaskEditForm] Deleted pricing items tracked:', Array.from(deletedPricingItemDescriptionsRef.current));
 
       try {
+        // Validate responsible rows before submitting
+        if (!validateResponsibleRows(responsibleRows)) {
+          setShowResponsibleErrors(true);
+          toast.error("Preencha o nome e telefone dos responsáveis");
+          return;
+        }
+
         setIsSubmitting(true);
 
         console.log('[TaskEditForm] 📋 ========== FORM SUBMISSION START ==========');
@@ -2351,6 +2359,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
     // Update responsible rows state
     setResponsibleRows(rows);
+    if (showResponsibleErrors && validateResponsibleRows(rows)) {
+      setShowResponsibleErrors(false);
+    }
 
     // Update the form's responsibleIds with existing responsibles
     const existingRepIds = rows
@@ -2386,7 +2397,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         shouldValidate: true
       });
     }
-  }, [form, task.responsibles]);
+  }, [form, task.responsibles, showResponsibleErrors]);
 
   // Fetch historical PRODUCTION service order descriptions on mount
   useEffect(() => {
@@ -3367,6 +3378,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                       minRows={0}
                       maxRows={10}
                       control={form.control}
+                      showErrors={showResponsibleErrors}
                     />
                   </CardContent>
                 </AccordionContent>

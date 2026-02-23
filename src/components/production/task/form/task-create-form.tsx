@@ -49,7 +49,7 @@ import { PricingSelector, type PricingSelectorRef } from "../pricing/pricing-sel
 import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { LayoutForm } from "@/components/production/layout/layout-form";
-import { ResponsibleManager } from "@/components/administration/customer/responsible";
+import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { ArtworkFileUploadField } from "./artwork-file-upload-field";
 import type { ResponsibleRowData } from "@/types/responsible";
@@ -95,6 +95,7 @@ type TaskCreateFormSchemaType = z.infer<typeof taskCreateFormSchema>;
 export const TaskCreateForm = () => {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showResponsibleErrors, setShowResponsibleErrors] = useState(false);
 
   // Sector-based visibility
   const isCommercialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
@@ -197,7 +198,10 @@ export const TaskCreateForm = () => {
 
   const handleResponsibleRowsChange = useCallback((rows: ResponsibleRowData[]) => {
     setResponsibleRows(rows);
-  }, []);
+    if (showResponsibleErrors && validateResponsibleRows(rows)) {
+      setShowResponsibleErrors(false);
+    }
+  }, [showResponsibleErrors]);
 
   // Layout state
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
@@ -649,6 +653,13 @@ export const TaskCreateForm = () => {
   const handleSubmit = useCallback(
     async (data: TaskCreateFormSchemaType) => {
       try {
+        // Validate responsible rows before submitting
+        if (!validateResponsibleRows(responsibleRows)) {
+          setShowResponsibleErrors(true);
+          toast.error("Preencha o nome e telefone dos responsáveis");
+          return;
+        }
+
         setIsSubmitting(true);
         isSubmittingRef.current = true;
 
@@ -1166,6 +1177,7 @@ export const TaskCreateForm = () => {
                             minRows={0}
                             maxRows={10}
                             control={form.control}
+                            showErrors={showResponsibleErrors}
                           />
                         </CardContent>
                       </AccordionContent>

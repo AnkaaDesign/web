@@ -72,7 +72,7 @@ export default function CatalogEditPage() {
         for (const formula of newFormulas) {
           const validComponents =
             formula.components?.filter((c) => {
-              const weight = c.weight || 0;
+              const weight = c.weightInGrams || c.weight || 0;
               return c.itemId && weight > 0;
             }) ?? [];
 
@@ -87,7 +87,7 @@ export default function CatalogEditPage() {
             description: formula.description || "Fórmula Principal",
             components: validComponents.map((c) => ({
               itemId: c.itemId,
-              weightInGrams: c.weight || 0,
+              weightInGrams: c.weightInGrams || c.weight || 0,
             })),
           };
 

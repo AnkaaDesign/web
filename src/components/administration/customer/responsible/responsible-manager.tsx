@@ -9,6 +9,18 @@ import type {
 } from '@/types/responsible';
 import { ResponsibleRow } from './responsible-row';
 
+/**
+ * Validate responsible rows that are in inline-create mode.
+ * Returns true if all new rows have required fields filled.
+ */
+export function validateResponsibleRows(rows: ResponsibleRowData[]): boolean {
+  return rows.every(row => {
+    // Only validate rows in create mode (isNew + temp id)
+    if (!row.isNew || !row.isEditing || !row.id?.startsWith('temp-')) return true;
+    return !!row.name?.trim() && !!row.phone?.trim();
+  });
+}
+
 interface ResponsibleManagerProps {
   companyId?: string;
   value: ResponsibleRowData[];
@@ -22,6 +34,7 @@ interface ResponsibleManagerProps {
   minRows?: number;
   maxRows?: number;
   control?: any; // React Hook Form control for nested fields
+  showErrors?: boolean;
 }
 
 export const ResponsibleManager: React.FC<ResponsibleManagerProps> = ({
@@ -37,6 +50,7 @@ export const ResponsibleManager: React.FC<ResponsibleManagerProps> = ({
   minRows = 0, // No minimum required by default
   maxRows = 10,
   control,
+  showErrors = false,
 }) => {
   const { toast } = useToast();
 
@@ -138,6 +152,7 @@ export const ResponsibleManager: React.FC<ResponsibleManagerProps> = ({
             isLastRow={index === value.length - 1}
             value={row}
             onChange={(updates) => handleUpdateRow(index, updates)}
+            showErrors={showErrors}
           />
         ))}
       </div>

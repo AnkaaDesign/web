@@ -63,6 +63,7 @@ export function PhoneInput<T extends Record<string, any>>({
 interface BasePhoneInputProps {
   value?: string | null;
   onChange?: (value: string | null) => void;
+  onBlur?: () => void;
   onKeyPress?: (e: React.KeyboardEvent) => void;
   placeholder?: string;
   disabled?: boolean;
@@ -72,6 +73,7 @@ interface BasePhoneInputProps {
 export function BasePhoneInput({
   value,
   onChange,
+  onBlur,
   onKeyPress,
   placeholder = "(00) 00000-0000",
   disabled = false,
@@ -84,6 +86,7 @@ export function BasePhoneInput({
       onChange={(newValue) => {
         onChange?.(newValue === "" ? null : (newValue as string));
       }}
+      onBlur={onBlur}
       onKeyDown={onKeyPress as any}
       placeholder={placeholder}
       disabled={disabled}
