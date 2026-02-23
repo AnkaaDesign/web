@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconUser, IconMapPin, IconExternalLink } from "@tabler/icons-react";
+import { IconUser, IconExternalLink } from "@tabler/icons-react";
 import type { User } from "../../../../types";
 import { cn } from "@/lib/utils";
 

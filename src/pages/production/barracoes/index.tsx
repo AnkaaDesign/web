@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/ui/page-header';
 import { PrivilegeRoute } from '@/components/navigation/privilege-route';
@@ -6,12 +6,15 @@ import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, TASK_STATUS } from '@/consta
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { usePrivileges } from '@/hooks/common/use-privileges';
 import { useTasks } from '@/hooks/production/use-task';
-import { batchUpdateSpots } from '@/api-client';
-import { GarageView, TruckDetailModal } from '@/components/production/garage';
+import { batchUpdateSpots, requestMovement } from '@/api-client';
+import { getNextDaysForForecast } from '@/utils/business-days';
+import { GarageView, SingleGarageView, TruckDetailModal } from '@/components/production/garage';
 import type { GarageTruck } from '@/components/production/garage';
 import { IconDeviceFloppy, IconRestore } from '@tabler/icons-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/common/use-toast';
 
 // Type for pending changes
 interface PendingChange {
@@ -21,28 +24,19 @@ interface PendingChange {
   newSpot: string | null;
 }
 
-const DAY_NAMES = ['Domingo', 'Segunda-Feira', 'Terça-Feira', 'Quarta-Feira', 'Quinta-Feira', 'Sexta-Feira', 'Sábado'];
+const DAY_NAMES_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export function GaragesPage() {
   const [pendingChanges, setPendingChanges] = useState<Map<string, PendingChange>>(new Map());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const datePickerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [viewMode, setViewMode] = useState<'overview' | 'single-garage'>('overview');
+  const [selectedGarage, setSelectedGarage] = useState<'B1' | 'B2' | 'B3' | 'YARD_WAIT'>('B1');
   const queryClient = useQueryClient();
 
-  // Generate next 5 days for date picker
-  const next5Days = useMemo(() => {
-    const days: Date[] = [];
-    const today = new Date();
-    for (let i = 0; i < 5; i++) {
-      const day = new Date(today);
-      day.setDate(today.getDate() + i);
-      days.push(day);
-    }
-    return days;
-  }, []);
+  // Generate next 5 forecast days (today + 4 business days) — same as single view
+  const next5Days = useMemo(() => getNextDaysForForecast(new Date(), 5), []);
 
   const isToday = useCallback((date: Date) => {
     const today = new Date();
@@ -52,30 +46,7 @@ export function GaragesPage() {
     return check.getTime() === today.getTime();
   }, []);
 
-  // Format date as "Segunda-Feira - 24/08"
-  const formatDateFull = useCallback((date: Date) => {
-    const dayName = DAY_NAMES[date.getDay()];
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    return `${dayName} - ${day}/${month}`;
-  }, []);
 
-  // Format date for the header display - "Hoje - 19/02" or "Segunda-Feira - 24/08"
-  const formatDateForHeader = useCallback((date: Date) => {
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    if (isToday(date)) return `Hoje - ${day}/${month}`;
-    return formatDateFull(date);
-  }, [isToday, formatDateFull]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (datePickerTimeoutRef.current) {
-        clearTimeout(datePickerTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Track page access
   usePageTracker({
@@ -83,30 +54,50 @@ export function GaragesPage() {
     icon: 'warehouse',
   });
 
-  // Check privileges - only ADMIN, LOGISTIC, or team leaders can edit positions
+  // Check privileges
   const { isAdmin, isTeamLeader, canAccess } = usePrivileges();
-  const canEditGaragePositions = isAdmin || isTeamLeader || canAccess([SECTOR_PRIVILEGES.LOGISTIC]);
+  const { toast } = useToast();
+  const canDirectMove = isAdmin || isTeamLeader || canAccess([SECTOR_PRIVILEGES.LOGISTIC]);
+  const canRequestMovement = canAccess([SECTOR_PRIVILEGES.PRODUCTION]) && !canDirectMove;
+  const canEditGaragePositions = canDirectMove || canRequestMovement;
+
+  // Movement request state (for production managers)
+  const [movementRequest, setMovementRequest] = useState<{
+    taskId: string;
+    truckId: string;
+    taskName: string;
+    fromSpot: string | null;
+    toSpot: string | null;
+  } | null>(null);
 
   // Fetch tasks with trucks for garage display
-  // OR logic: include tasks where truck has a spot (any status), OR not completed with forecastDate <= today
+  // OR logic: include tasks where truck has a spot (any status), OR not completed with forecastDate <= maxCalendarDate
   const todayStr = useMemo(() => {
     const d = new Date();
     d.setHours(23, 59, 59, 999);
     return d.toISOString();
   }, []);
 
+  // Max calendar date: last day shown in the date tabs (for fetching future forecast trucks)
+  const maxCalendarDateStr = useMemo(() => {
+    const lastDay = next5Days[next5Days.length - 1];
+    const d = new Date(lastDay);
+    d.setHours(23, 59, 59, 999);
+    return d.toISOString();
+  }, [next5Days]);
+
   const { data: tasksResponse, isLoading, error, refetch } = useTasks({
     page: 1,
-    limit: 50,
+    limit: 200,
     where: {
       truck: { isNot: null },
       OR: [
         // Trucks with a garage spot assigned (any status, including completed)
         { truck: { spot: { not: null } } },
-        // Non-completed trucks with forecastDate <= today (for patio display)
+        // Non-completed trucks with forecastDate <= maxCalendarDate (for patio display including future forecast)
         {
           status: { in: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION] },
-          forecastDate: { lte: todayStr },
+          forecastDate: { lte: maxCalendarDateStr },
         },
         // Non-completed trucks that already arrived (have entryDate) but may not have forecastDate
         {
@@ -151,6 +142,12 @@ export function GaragesPage() {
       generalPainting: {
         select: {
           hex: true,
+        },
+      },
+      sector: {
+        select: {
+          id: true,
+          name: true,
         },
       },
       serviceOrders: {
@@ -207,42 +204,51 @@ export function GaragesPage() {
       [TASK_STATUS.CANCELLED]: 5,
     };
 
+    const isGarageSpot = (spot: string | null) =>
+      !!spot && /^B\d_F\d_V\d$/.test(spot);
+
     const filtered = tasksResponse.data.filter((task) => {
       // Must have a truck
       if (!task.truck) return false;
 
       const truck = task.truck as any;
+      const spot = truck?.spot as string | null;
 
-      // If truck has a spot assigned in a garage, always include it
+      // If truck has a garage spot (B1_F1_V1, etc.), always include it
       // (even if completed or without layout — use default length)
-      if (truck?.spot) {
+      if (isGarageSpot(spot)) {
         return true;
       }
 
-      // For patio/unassigned trucks: must have a layout defined (for dimensions)
-      const layout = truck?.leftSideLayout || truck?.rightSideLayout;
-      const layoutSections = layout?.layoutSections || [];
-      if (layoutSections.length === 0) return false;
+      // If truck already has a yard spot assigned, always include it
+      if (spot === 'YARD_WAIT' || spot === 'YARD_EXIT') {
+        // Still need date/status check below for yard trucks without entryDate
+      }
 
-      // For patio: only include if forecastDate <= today OR entryDate <= today, AND status is not COMPLETED
+      // Yard trucks: include if forecastDate <= maxCalendarDate OR entryDate <= today, AND status is not COMPLETED
+      // The GarageView calendar filter handles per-day visibility
       const forecastDate = (task as any).forecastDate;
       const entryDate = (task as any).entryDate;
       if (!forecastDate && !entryDate) return false;
 
-      // Must not have COMPLETED status for patio display
+      // Must not have COMPLETED status for yard display
       if (task.status === TASK_STATUS.COMPLETED) return false;
 
-      // Show if truck already arrived (entryDate) or is expected (forecastDate)
+      // Show if truck already arrived (entryDate)
       if (entryDate) {
         const entry = new Date(entryDate);
         entry.setHours(0, 0, 0, 0);
         if (entry <= today) return true;
       }
 
+      // Include trucks with forecastDate up to the max calendar day
+      // (calendar filter in GarageView will handle per-day display)
       if (forecastDate) {
         const forecast = new Date(forecastDate);
         forecast.setHours(0, 0, 0, 0);
-        return forecast <= today;
+        const maxDay = new Date(next5Days[next5Days.length - 1]);
+        maxDay.setHours(0, 0, 0, 0);
+        return forecast <= maxDay;
       }
 
       return false;
@@ -256,7 +262,8 @@ export function GaragesPage() {
     for (const task of filtered) {
       const truck = task.truck as any;
       const spot = truck?.spot;
-      if (!spot) continue;
+      // Skip deduplication for null spots and yard spots (multiple trucks allowed)
+      if (!spot || spot === 'YARD_WAIT' || spot === 'YARD_EXIT') continue;
 
       const existing = spotOwners.get(spot);
       if (!existing) {
@@ -310,13 +317,15 @@ export function GaragesPage() {
 
       // Check if there's a pending change for this truck
       const pendingChange = pendingChanges.get(truck?.id);
-      // Demoted trucks (duplicates at same spot) lose their spot
+      // Demoted trucks (duplicates at same spot) go to yard wait
       const isDemoted = demotedTaskIds.has(task.id);
+      // Trucks without a spot default to YARD_WAIT (arriving trucks)
+      const dbSpot = truck?.spot || 'YARD_WAIT';
       const currentSpot = pendingChange
         ? pendingChange.newSpot
         : isDemoted
-          ? null
-          : (truck?.spot || null);
+          ? 'YARD_WAIT'
+          : dbSpot;
 
       return {
         id: task.id,
@@ -333,6 +342,8 @@ export function GaragesPage() {
         finishedAt: (task as any).finishedAt || null,
         layoutInfo: layoutSections.length > 0 ? `${layoutSections.length} seções` : null,
         artworkInfo: null, // Can be enhanced later with artwork file count
+        sectorId: (task as any).sector?.id || null,
+        sectorName: (task as any).sector?.name || null,
         serviceOrders: (task as any).serviceOrders || [],
       };
     });
@@ -348,6 +359,18 @@ export function GaragesPage() {
       const truck = task.truck as any;
       const truckId = truck.id;
       const originalSpot = truck.spot || null;
+
+      // Production managers can only request movement, not directly move
+      if (canRequestMovement) {
+        setMovementRequest({
+          taskId,
+          truckId,
+          taskName: task.name || '',
+          fromSpot: originalSpot,
+          toSpot: newSpot,
+        });
+        return;
+      }
 
       // If moving back to original DB position, remove the pending change
       if (originalSpot === newSpot) {
@@ -371,7 +394,7 @@ export function GaragesPage() {
         return newMap;
       });
     },
-    [tasksResponse]
+    [tasksResponse, canRequestMovement]
   );
 
   // Handle truck swap (both trucks in a single state update)
@@ -434,11 +457,52 @@ export function GaragesPage() {
     setPendingChanges(new Map());
   }, []);
 
+  // Handle garage select (switch to single-garage view)
+  const handleGarageSelect = useCallback((garageId: 'B1' | 'B2' | 'B3' | 'YARD_WAIT' | 'YARD_EXIT') => {
+    // YARD_EXIT doesn't have a single view mode
+    if (garageId === 'YARD_EXIT') return;
+    setSelectedGarage(garageId as 'B1' | 'B2' | 'B3' | 'YARD_WAIT');
+    setViewMode('single-garage');
+  }, []);
+
+  // Handle back from single-garage view
+  const handleBackToOverview = useCallback(() => {
+    setViewMode('overview');
+  }, []);
+
   // Handle truck click to open detail modal
   const handleTruckClick = useCallback((taskId: string) => {
     setSelectedTaskId(taskId);
     setIsDetailModalOpen(true);
   }, []);
+
+  // Handle rejected move (sector-garage mismatch)
+  const handleMoveRejected = useCallback((reason: string) => {
+    toast({
+      title: 'Movimentação não permitida',
+      description: reason,
+      variant: 'warning',
+    });
+  }, [toast]);
+
+  // Handle movement request confirmation
+  const handleConfirmMovementRequest = useCallback(async () => {
+    if (!movementRequest) return;
+    try {
+      await requestMovement(movementRequest);
+      toast({
+        title: 'Solicitação enviada',
+        description: 'A equipe de logística foi notificada sobre a movimentação.',
+      });
+    } catch {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível enviar a solicitação.',
+        variant: 'error',
+      });
+    }
+    setMovementRequest(null);
+  }, [movementRequest, toast]);
 
   const hasPendingChanges = pendingChanges.size > 0;
   const isUpdating = updateTruckMutation.isPending;
@@ -512,62 +576,74 @@ export function GaragesPage() {
           ]}
           favoritePage={FAVORITE_PAGES.PRODUCAO_GARAGENS_LISTAR}
           actions={[
-            {
-              key: 'date-picker',
-              label: (
-                <div
-                  className="relative"
-                  onMouseEnter={() => {
-                    if (datePickerTimeoutRef.current) {
-                      clearTimeout(datePickerTimeoutRef.current);
-                      datePickerTimeoutRef.current = null;
-                    }
-                    setShowDatePicker(true);
-                  }}
-                  onMouseLeave={() => {
-                    datePickerTimeoutRef.current = setTimeout(() => {
-                      setShowDatePicker(false);
-                    }, 150);
-                  }}
-                >
-                  <button className="h-9 px-4 text-sm font-medium rounded-lg border border-border bg-transparent text-foreground hover:bg-muted/30 transition-colors">
-                    {formatDateForHeader(selectedDate)}
-                  </button>
-
-                  {showDatePicker && (
-                    <div
-                      className="absolute top-full right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[220px]"
-                      style={{ zIndex: 9999 }}
-                    >
-                      {next5Days.map((day, index) => {
-                        const selected = selectedDate.toDateString() === day.toDateString();
-                        return (
-                          <button
-                            key={index}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedDate(day);
-                              setShowDatePicker(false);
-                              if (datePickerTimeoutRef.current) {
-                                clearTimeout(datePickerTimeoutRef.current);
-                                datePickerTimeoutRef.current = null;
-                              }
-                            }}
-                            className={`w-full px-4 py-2 text-left text-sm transition-colors block ${
-                              selected
-                                ? 'bg-primary/10 text-primary font-medium'
-                                : 'text-foreground hover:bg-muted/30'
-                            }`}
-                          >
-                            {isToday(day) ? `Hoje - ${day.getDate().toString().padStart(2, '0')}/${(day.getMonth() + 1).toString().padStart(2, '0')}` : formatDateFull(day)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              ) as any,
-            },
+            // Garage selector tabs (single-garage mode)
+            ...(viewMode === 'single-garage'
+              ? [
+                  {
+                    key: 'garage-tabs',
+                    label: (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={handleBackToOverview}
+                          className="px-3 py-1.5 text-sm font-medium rounded-md transition-colors bg-muted/50 text-muted-foreground hover:bg-muted"
+                        >
+                          ← Geral
+                        </button>
+                        <div className="flex gap-1 ml-1">
+                          {([
+                            { id: 'YARD_WAIT', label: 'Espera' },
+                            { id: 'B1', label: 'B1' },
+                            { id: 'B2', label: 'B2' },
+                            { id: 'B3', label: 'B3' },
+                          ] as const).map(({ id, label }) => (
+                            <button
+                              key={id}
+                              onClick={() => setSelectedGarage(id)}
+                              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                selectedGarage === id
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) as any,
+                  },
+                ]
+              : []),
+            ...(viewMode === 'overview'
+              ? [
+                  {
+                    key: 'date-tabs',
+                    label: (
+                      <div className="flex gap-1">
+                        {next5Days.map((day, index) => {
+                          const selected = selectedDate.toDateString() === day.toDateString();
+                          const d = day.getDate().toString().padStart(2, '0');
+                          const m = (day.getMonth() + 1).toString().padStart(2, '0');
+                          const label = isToday(day) ? `Hoje` : `${DAY_NAMES_SHORT[day.getDay()]} ${d}/${m}`;
+                          return (
+                            <button
+                              key={index}
+                              onClick={() => setSelectedDate(day)}
+                              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                selected
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) as any,
+                  },
+                ]
+              : []),
             ...(hasPendingChanges
               ? [
                   {
@@ -595,16 +671,30 @@ export function GaragesPage() {
         <div className="flex-1 flex flex-col overflow-hidden pb-6">
           <div className="flex-1 mt-4">
             <div className="bg-card rounded-lg shadow-sm border border-border p-2 h-full">
-              <GarageView
-                trucks={garageTrucks}
-                onTruckMove={canEditGaragePositions ? handleTruckMove : undefined}
-                onTruckSwap={canEditGaragePositions ? handleTruckSwap : undefined}
-                onTruckClick={handleTruckClick}
-                className={isUpdating ? 'opacity-50 pointer-events-none' : ''}
-                readOnly={!canEditGaragePositions}
-                viewMode="week"
-                selectedDate={selectedDate}
-              />
+              {viewMode === 'overview' ? (
+                <GarageView
+                  trucks={garageTrucks}
+                  onTruckMove={canEditGaragePositions ? handleTruckMove : undefined}
+                  onTruckSwap={canEditGaragePositions ? handleTruckSwap : undefined}
+                  onTruckClick={handleTruckClick}
+                  onGarageSelect={handleGarageSelect}
+                  onMoveRejected={handleMoveRejected}
+                  className={isUpdating ? 'opacity-50 pointer-events-none' : ''}
+                  readOnly={!canEditGaragePositions}
+                  viewMode="week"
+                  selectedDate={selectedDate}
+                />
+              ) : (
+                <SingleGarageView
+                  garageId={selectedGarage}
+                  trucks={garageTrucks}
+                  onTruckMove={canEditGaragePositions ? handleTruckMove : undefined}
+                  onTruckSwap={canEditGaragePositions ? handleTruckSwap : undefined}
+                  onTruckClick={handleTruckClick}
+                  className={isUpdating ? 'opacity-50 pointer-events-none' : ''}
+                  readOnly={!canEditGaragePositions}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -615,6 +705,25 @@ export function GaragesPage() {
           open={isDetailModalOpen}
           onOpenChange={setIsDetailModalOpen}
         />
+
+        {/* Movement Request Confirmation Dialog */}
+        <AlertDialog open={!!movementRequest} onOpenChange={(open) => !open && setMovementRequest(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Solicitar Movimentação</AlertDialogTitle>
+              <AlertDialogDescription>
+                Deseja solicitar a movimentação do caminhão &quot;{movementRequest?.taskName}&quot;?
+                A equipe de logística será notificada.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmMovementRequest}>
+                Solicitar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </PrivilegeRoute>
   );

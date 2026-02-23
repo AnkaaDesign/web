@@ -90,7 +90,7 @@ export function extractActiveFilters(
       activeFilters.push({
         key: `customerIds-${id}`,
         label: "Razão Social",
-        value: customer ? (customer.corporateName || customer.fantasyName) : `ID: ${id}`,  // Show ID if name not found
+        value: customer ? ((customer as any).corporateName || customer.fantasyName) : `ID: ${id}`,  // Show ID if name not found
         iconType: "user",
         itemId: id,
         onRemove: () => onRemoveFilter("customerIds", id),

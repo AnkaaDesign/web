@@ -13,9 +13,9 @@ import {
 } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent, DragMoveEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
-import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { PositionedDropdownMenuContent } from '@/components/ui/positioned-dropdown-menu';
-import { IconHomeMove } from '@tabler/icons-react';
+import { IconHomeMove, IconTrash } from '@tabler/icons-react';
 
 // =====================
 // Constants
@@ -24,7 +24,7 @@ import { IconHomeMove } from '@tabler/icons-react';
 // Individual garage configurations with real measurements
 // All garages standardized to 20m × 35m for consistency with minimal waste
 // Lane lengths: B1=30m, B2=25m, B3=30m
-const GARAGE_CONFIGS = {
+export const GARAGE_CONFIGS = {
   B1: {
     width: 20, // meters (standardized)
     length: 35, // meters (standardized)
@@ -58,7 +58,7 @@ const GARAGE_CONFIGS = {
 } as const;
 
 // Common configuration for all garages
-const COMMON_CONFIG = {
+export const COMMON_CONFIG = {
   TRUCK_MIN_SPACING: 1, // meters minimum between trucks
   TRUCK_MARGIN_TOP: 0.2, // meters from lane top to first truck
   TRUCK_WIDTH_TOP_VIEW: 2.5,
@@ -67,17 +67,20 @@ const COMMON_CONFIG = {
 } as const;
 
 // Patio-specific configuration
-const PATIO_CONFIG = {
+// Yards should match garage dimensions (20m wide, 35m tall) as minimum
+export const PATIO_CONFIG = {
   PADDING: 1.5, // meters outer padding
   LANE_SPACING: 1.5, // meters between lanes
   TRUCK_MARGIN: 0.5, // margin inside lanes (top and bottom)
   MIN_LANES: 5, // minimum number of lanes in patio
   MIN_LANE_LENGTH: 25, // minimum lane length in meters
+  MIN_WIDTH: 20, // meters - match garage width
+  MIN_HEIGHT: 35, // meters - match garage height
 } as const;
 
 // Colors for the garage visualization
 // Using semi-transparent colors that work in both light and dark modes
-const COLORS = {
+export const COLORS = {
   LANE_FILL: 'rgba(251, 191, 36, 0.15)', // Amber with transparency
   LANE_STROKE: 'rgba(217, 119, 6, 0.6)', // Darker amber with transparency
   LANE_HOVER: 'rgba(251, 191, 36, 0.25)', // Hover amber with transparency
@@ -87,13 +90,18 @@ const COLORS = {
   PATIO_STROKE: 'rgba(2, 132, 199, 0.5)', // Blue border with transparency
 } as const;
 
-// All navigable areas: PATIO first, then B1, B2, B3
-const AREAS = ['PATIO', 'B1', 'B2', 'B3'] as const;
-const LANES = ['F1', 'F2', 'F3'] as const;
+// All navigable areas: YARD_WAIT first, then B1, B2, B3, then YARD_EXIT
+export const AREAS = ['YARD_WAIT', 'B1', 'B2', 'B3', 'YARD_EXIT'] as const;
+export const LANES = ['F1', 'F2', 'F3'] as const;
 
-type AreaId = (typeof AREAS)[number];
-type GarageId = 'B1' | 'B2' | 'B3';
-type LaneId = (typeof LANES)[number];
+export type AreaId = (typeof AREAS)[number];
+export type GarageId = 'B1' | 'B2' | 'B3';
+export type YardId = 'YARD_WAIT' | 'YARD_EXIT';
+
+export function isYardArea(areaId: AreaId): areaId is YardId {
+  return areaId === 'YARD_WAIT' || areaId === 'YARD_EXIT';
+}
+export type LaneId = (typeof LANES)[number];
 
 // =====================
 // Types
@@ -114,6 +122,8 @@ export interface GarageTruck {
   finishedAt?: string | null; // Task completion date - null if not complete
   layoutInfo?: string | null; // Layout description
   artworkInfo?: string | null; // Artwork description
+  sectorId?: string | null; // Task sector ID
+  sectorName?: string | null; // Task sector name
   serviceOrders?: Array<{
     id: string;
     status: string;
@@ -122,18 +132,27 @@ export interface GarageTruck {
   }>;
 }
 
-interface PositionedTruck extends GarageTruck {
+/**
+ * Get the garage ID for a sector name (e.g., "Producao 1" → "B1")
+ */
+function getGarageForSectorName(sectorName: string): GarageId | null {
+  const match = sectorName.match(/Produ[cç][aã]o\s*(\d)/i);
+  if (match) return `B${match[1]}` as GarageId;
+  return null;
+}
+
+export interface PositionedTruck extends GarageTruck {
   yPosition: number;
   xPosition: number;
 }
 
-interface LaneLayout {
+export interface LaneLayout {
   id: LaneId;
   xPosition: number;
   trucks: PositionedTruck[];
 }
 
-interface AreaLayout {
+export interface AreaLayout {
   id: AreaId;
   isPatio: boolean;
   lanes: LaneLayout[];
@@ -144,7 +163,7 @@ interface AreaLayout {
 // Utility Functions
 // =====================
 
-function parseSpot(spot: string): { garage: GarageId | null; lane: LaneId | null; spotNumber: number | null } {
+export function parseSpot(spot: string): { garage: GarageId | null; lane: LaneId | null; spotNumber: number | null } {
   const match = spot.match(/^B(\d)_F(\d)_V(\d)$/);
   if (!match) return { garage: null, lane: null, spotNumber: null };
   return {
@@ -271,13 +290,13 @@ function calculateLaneAvailability(
   return { canFit, availableSpace, requiredSpace };
 }
 
-function calculateAreaLayout(areaId: AreaId, trucks: GarageTruck[], patioColumns: number): AreaLayout {
-  const isPatio = areaId === 'PATIO';
+export function calculateAreaLayout(areaId: AreaId, trucks: GarageTruck[], patioColumns: number): AreaLayout {
+  const isPatio = isYardArea(areaId);
 
   if (isPatio) {
-    // Patio - show all trucks without a spot in a responsive grid
+    // Yard area - show trucks with matching yard spot in a responsive grid
     const patioTrucksList = trucks
-      .filter((t) => !t.spot)
+      .filter((t) => t.spot === areaId)
       .sort((a, b) => b.length - a.length); // Sort by length descending (longest first)
 
     const cols = patioColumns;
@@ -424,7 +443,7 @@ interface TruckElementProps {
   onClick?: () => void;
 }
 
-function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) {
+export function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) {
   // All coordinates are in pixels (no viewBox scaling).
   // Meter values are multiplied by `scale` to get pixel values.
   const width = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW * scale;
@@ -446,14 +465,6 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
   };
   const textColor = getBrightness(bgColor) > 128 ? '#000000' : '#ffffff';
 
-  // Truncate task name to fit within truck height (accounting for rotation)
-  const maxChars = Math.max(3, Math.floor((height - 24) / 10));
-  const displayName = truck.taskName
-    ? truck.taskName.length > maxChars
-      ? truck.taskName.slice(0, maxChars - 2) + '..'
-      : truck.taskName
-    : 'N/A';
-
   // Display original length (without cabin) if available
   const displayLength = truck.originalLength ?? truck.length;
 
@@ -465,11 +476,30 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
   const soTotal = productionSOs.length;
   const showProgressBar = soTotal > 0 && height > 40;
 
+  // Adaptive font sizes — continuous scaling clamped to min/max
+  const nameFontSize = Math.min(14, Math.max(8, height * 0.07));
+  const metaFontSize = Math.min(11, Math.max(6, height * 0.05));
+  const badgeFontSize = Math.min(9, Math.max(5.5, height * 0.04));
+
+  // Truncate task name to fit within the available vertical space (rotated text)
+  // Account for top label (~metaFontSize+6) and bottom elements (serial/progress ~20-30px)
+  const topReserved = metaFontSize + 6;
+  const bottomReserved = showSerialNumber ? 30 : showProgressBar ? 20 : 8;
+  const availableForName = height - topReserved - bottomReserved;
+  const charWidth = nameFontSize * 0.58; // average char width for bold sans-serif
+  const maxChars = Math.max(3, Math.floor(availableForName / charWidth));
+  const displayName = truck.taskName
+    ? truck.taskName.length > maxChars
+      ? truck.taskName.slice(0, maxChars - 2) + '..'
+      : truck.taskName
+    : 'N/A';
+
   const progressBarData = showProgressBar ? (() => {
     const barMargin = 2;
-    const barH = 12;
+    const barH = height < 60 ? 10 : 12;
     const barW = width - barMargin * 2;
-    const barY = showSerialNumber ? height - 36 : height - 16;
+    const serialOffset = showSerialNumber ? metaFontSize + 8 : 0;
+    const barY = height - barH - 4 - serialOffset;
 
     const completedCount = productionSOs.filter(so => so.status === 'COMPLETED').length;
     const waitingApproveCount = productionSOs.filter(so => so.status === 'WAITING_APPROVE').length;
@@ -527,7 +557,7 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
           textAnchor="middle"
           dominantBaseline="middle"
           fill={textColor}
-          fontSize={15}
+          fontSize={nameFontSize}
           fontWeight="bold"
           fontFamily="system-ui, -apple-system, sans-serif"
           transform={`rotate(-90, ${width / 2}, ${height / 2})`}
@@ -538,10 +568,10 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
         {/* Length label at top - show original length */}
         <text
           x={width / 2}
-          y={14}
+          y={metaFontSize + 2}
           textAnchor="middle"
           fill={textColor}
-          fontSize={12}
+          fontSize={metaFontSize}
           fontFamily="system-ui, -apple-system, sans-serif"
           style={{ pointerEvents: 'none' }}
         >
@@ -585,7 +615,7 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
               textAnchor="middle"
               dominantBaseline="central"
               fill="#ffffff"
-              fontSize={9}
+              fontSize={badgeFontSize}
               fontWeight="bold"
               fontFamily="system-ui, -apple-system, sans-serif"
               style={{ pointerEvents: 'none', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.8))' }}
@@ -598,10 +628,10 @@ function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) 
         {showSerialNumber && (
           <text
             x={width / 2}
-            y={height - 8}
+            y={height - (metaFontSize < 12 ? 6 : 8)}
             textAnchor="middle"
             fill={textColor}
-            fontSize={12}
+            fontSize={metaFontSize}
             fontFamily="system-ui, -apple-system, sans-serif"
             style={{ pointerEvents: 'none' }}
           >
@@ -1018,13 +1048,14 @@ interface DroppablePatioProps {
   width: number;
   height: number;
   columns: number;
+  yardId: YardId;
   children: React.ReactNode;
 }
 
-function DroppablePatio({ scale, width, height, columns, children }: DroppablePatioProps) {
+function DroppablePatio({ scale, width, height, columns, yardId, children }: DroppablePatioProps) {
   const { setNodeRef, isOver } = useDroppable({
-    id: 'PATIO',
-    data: { isPatio: true },
+    id: yardId,
+    data: { isPatio: true, yardId },
   });
 
   // All coordinates in pixels
@@ -1080,7 +1111,8 @@ function DroppablePatio({ scale, width, height, columns, children }: DroppablePa
 // =====================
 
 function getAreaTitle(areaId: AreaId) {
-  if (areaId === 'PATIO') return 'Pátio';
+  if (areaId === 'YARD_WAIT') return 'Pátio de Espera';
+  if (areaId === 'YARD_EXIT') return 'Pátio de Saída';
   return `Barracão ${areaId.slice(1)}`;
 }
 
@@ -1098,10 +1130,12 @@ interface AllGaragesViewProps {
   onTruckMove?: (truckId: string, newSpot: string | null) => void;
   onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string | null) => void;
   onTruckClick?: (taskId: string) => void;
+  onGarageSelect?: (garageId: 'B1' | 'B2' | 'B3' | 'YARD_WAIT' | 'YARD_EXIT') => void;
+  onMoveRejected?: (reason: string) => void;
   readOnly?: boolean;
 }
 
-function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts, viewMode = 'all', selectedDate, onTruckMove, onTruckSwap, onTruckClick, readOnly = false }: AllGaragesViewProps) {
+function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts, viewMode: _viewMode = 'all', selectedDate, onTruckMove, onTruckSwap, onTruckClick, onGarageSelect, onMoveRejected, readOnly = false }: AllGaragesViewProps) {
   // Right-click context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; truckId: string } | null>(null);
 
@@ -1112,13 +1146,16 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
     setContextMenu({ x: e.clientX, y: e.clientY, truckId });
   }, [trucks, onTruckMove]);
 
-  // Show all 4 areas (including PATIO/yard) in both Grade and Calendar views
+  // Show all 5 areas (YARD_WAIT, B1, B2, B3, YARD_EXIT) in both Grade and Calendar views
   const areasToShow = AREAS;
 
   // Calculate patio columns dynamically based on truck count (same logic as dimensions calculation)
   // Target: ~3-4 trucks per column for optimal layout
-  const patioTrucks = trucks.filter(t => !t.spot);
-  const patioColumns = Math.max(5, Math.ceil(patioTrucks.length / 3));
+  // Use the larger of the two yards for consistent column count
+  const yardWaitTrucks = trucks.filter(t => t.spot === 'YARD_WAIT');
+  const yardExitTrucks = trucks.filter(t => t.spot === 'YARD_EXIT');
+  const maxYardTrucks = Math.max(yardWaitTrucks.length, yardExitTrucks.length);
+  const patioColumns = Math.max(5, Math.ceil(maxYardTrucks / 3));
 
   // Drag-and-drop state
   const [activeTruck, setActiveTruck] = useState<PositionedTruck | null>(null);
@@ -1153,9 +1190,9 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
   const areaDimensions = useMemo(() => {
     return allAreaLayouts.map(({ areaId, layout }) => {
       if (layout.isPatio) {
-        const patioTrucks = trucks.filter(t => !t.spot);
-        const patioTrucksSorted = [...patioTrucks].sort((a, b) => b.length - a.length);
-        const columns = Math.max(5, Math.ceil(patioTrucks.length / 3));
+        const yardTrucks = trucks.filter(t => t.spot === areaId);
+        const patioTrucksSorted = [...yardTrucks].sort((a, b) => b.length - a.length);
+        const columns = Math.max(5, Math.ceil(yardTrucks.length / 3));
 
         // CORRECT PATIO WIDTH CALCULATION - must include lane spacing between columns!
         const laneWidth = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW + 0.4;
@@ -1176,14 +1213,19 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
         });
 
         // Get max column height (replace last spacing with bottom margin)
-        const maxContentHeight = patioTrucks.length > 0
+        const maxContentHeight = yardTrucks.length > 0
           ? Math.max(...columnContentHeights) - COMMON_CONFIG.TRUCK_MIN_SPACING + truckMargin
           : truckMargin * 2;
 
         // Apply minimum lane length and add padding
-        const height = Math.max(maxContentHeight, minLaneLength) + padding * 2;
+        const contentHeight = Math.max(maxContentHeight, minLaneLength) + padding * 2;
 
-        return { areaId, width, height };
+        // Enforce minimum dimensions matching garages
+        return {
+          areaId,
+          width: Math.max(width, PATIO_CONFIG.MIN_WIDTH),
+          height: Math.max(contentHeight, PATIO_CONFIG.MIN_HEIGHT),
+        };
       } else {
         const config = GARAGE_CONFIGS[areaId as GarageId];
         return { areaId, width: config.width, height: config.length };
@@ -1296,11 +1338,11 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
       const draggedTruck = trucks.find((t) => t.id === truckId);
       if (!draggedTruck) return;
 
-      const dropData = over.data.current as { garageId?: GarageId; laneId?: LaneId; isPatio?: boolean } | undefined;
+      const dropData = over.data.current as { garageId?: GarageId; laneId?: LaneId; isPatio?: boolean; yardId?: YardId } | undefined;
 
-      // Drop on patio
-      if (dropData?.isPatio) {
-        onTruckMove(truckId, null);
+      // Drop on yard area
+      if (dropData?.isPatio && dropData?.yardId) {
+        onTruckMove(truckId, dropData.yardId);
         return;
       }
 
@@ -1310,6 +1352,15 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
       const targetGarageId = dropData.garageId;
       const targetLaneId = dropData.laneId;
       const config = GARAGE_CONFIGS[targetGarageId];
+
+      // Validate sector-garage match
+      if (draggedTruck.sectorName) {
+        const expectedGarage = getGarageForSectorName(draggedTruck.sectorName);
+        if (expectedGarage && expectedGarage !== targetGarageId) {
+          onMoveRejected?.(`Este caminhão pertence ao setor ${draggedTruck.sectorName} e só pode ir no Barracão ${expectedGarage.slice(1)}`);
+          return;
+        }
+      }
 
       // Get dragged truck's current spot info
       const draggedTruckParsed = draggedTruck.spot ? parseSpot(draggedTruck.spot) : null;
@@ -1444,7 +1495,13 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
           <div key={areaId} className="flex flex-col items-center gap-3">
             {/* Area title with truck count */}
             <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold text-foreground">
+              <span
+                className={cn(
+                  'text-lg font-semibold text-foreground',
+                  onGarageSelect && areaId !== 'YARD_EXIT' && 'cursor-pointer hover:text-primary transition-colors',
+                )}
+                onClick={onGarageSelect && areaId !== 'YARD_EXIT' ? () => onGarageSelect(areaId as 'B1' | 'B2' | 'B3' | 'YARD_WAIT') : undefined}
+              >
                 {getAreaTitle(areaId)}
               </span>
               <span className={cn(
@@ -1470,6 +1527,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
                     width={dim.width * uniformScale}
                     height={dim.height * uniformScale}
                     columns={patioColumns}
+                    yardId={areaId as YardId}
                   >
                     {layout.patioTrucks?.map((truck) => (
                       enableDragDrop ? (
@@ -1581,26 +1639,59 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
     </div>
   );
 
+  const contextMenuTruck = contextMenu ? trucks.find(t => t.id === contextMenu.truckId) : null;
+
   const truckContextMenu = (
     <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
       <PositionedDropdownMenuContent
         position={contextMenu}
         isOpen={!!contextMenu}
-        className="w-48"
+        className="w-56"
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
-        <DropdownMenuItem
-          onClick={() => {
-            if (contextMenu && onTruckMove) {
-              onTruckMove(contextMenu.truckId, null);
-            }
-            setContextMenu(null);
-          }}
-          className="text-destructive"
-        >
-          <IconHomeMove className="mr-2 h-4 w-4" />
-          Colocar no pátio
-        </DropdownMenuItem>
+        {contextMenuTruck?.spot !== 'YARD_WAIT' && (
+          <DropdownMenuItem
+            onClick={() => {
+              if (contextMenu && onTruckMove) {
+                onTruckMove(contextMenu.truckId, 'YARD_WAIT');
+              }
+              setContextMenu(null);
+            }}
+          >
+            <IconHomeMove className="mr-2 h-4 w-4" />
+            Mover para Pátio de Espera
+          </DropdownMenuItem>
+        )}
+        {contextMenuTruck?.spot !== 'YARD_EXIT' && (
+          <DropdownMenuItem
+            onClick={() => {
+              if (contextMenu && onTruckMove) {
+                onTruckMove(contextMenu.truckId, 'YARD_EXIT');
+              }
+              setContextMenu(null);
+            }}
+          >
+            <IconHomeMove className="mr-2 h-4 w-4" />
+            Mover para Pátio de Saída
+          </DropdownMenuItem>
+        )}
+        {contextMenuTruck?.spot === 'YARD_EXIT' && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                if (contextMenu && onTruckMove) {
+                  onTruckMove(contextMenu.truckId, null);
+                }
+                setContextMenu(null);
+              }}
+              className="text-destructive"
+            >
+              <IconTrash className="mr-2 h-4 w-4" />
+              Remover do pátio
+            </DropdownMenuItem>
+          </>
+        )}
       </PositionedDropdownMenuContent>
     </DropdownMenu>
   );
@@ -1652,13 +1743,15 @@ interface GarageViewProps {
   onTruckMove?: (truckId: string, newSpot: string | null) => void;
   onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string | null) => void;
   onTruckClick?: (taskId: string) => void;
+  onGarageSelect?: (garageId: 'B1' | 'B2' | 'B3' | 'YARD_WAIT' | 'YARD_EXIT') => void;
+  onMoveRejected?: (reason: string) => void;
   className?: string;
   readOnly?: boolean;
   viewMode?: 'all' | 'week';
   selectedDate?: Date; // For week view - filter trucks by this date
 }
 
-export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, className, readOnly = false, viewMode = 'all', selectedDate }: GarageViewProps) {
+export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, onGarageSelect, onMoveRejected, className, readOnly = false, viewMode = 'all', selectedDate }: GarageViewProps) {
   const [containerSize, setContainerSize] = useState({ width: 400, height: 500 });
   const [movedTruckIds, setMovedTruckIds] = useState<Set<string>>(new Set());
   // Track current truck positions locally (for trucks that have been moved but not saved)
@@ -1785,27 +1878,33 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
       checkDate.setHours(0, 0, 0, 0);
 
       return trucksWithLocalPositions.filter(truck => {
-        // Trucks with a garage spot always show — they're physically there
-        // regardless of dates until someone manually moves them out
-        if (truck.spot) return true;
+        // Trucks with a garage spot are always shown (physically placed)
+        const isInGarage = truck.spot && /^B\d_F\d_V\d$/.test(truck.spot);
+        if (isInGarage) return true;
 
-        // For patio trucks in calendar view, check if truck is within arrival date to term range
-        // Use entryDate (actual arrival) if available, otherwise forecastDate (expected arrival)
+        // For yard/patio trucks: check arrival date range
+        // Truck shouldn't appear before its arrival/forecast date
         const arrivalDateStr = truck.entryDate || truck.forecastDate;
         if (arrivalDateStr) {
           const arrivalDate = new Date(arrivalDateStr);
           arrivalDate.setHours(0, 0, 0, 0);
-
-          // Truck must have arrived by the selected date
           if (checkDate < arrivalDate) return false;
-
-          // If term exists, selected date must be before or on the term
-          if (truck.term) {
-            const term = new Date(truck.term);
-            term.setHours(0, 0, 0, 0);
-            if (checkDate > term) return false;
-          }
         }
+
+        // If truck is already completed before selected date, don't show
+        if (truck.finishedAt) {
+          const finished = new Date(truck.finishedAt);
+          finished.setHours(0, 0, 0, 0);
+          if (finished < checkDate) return false;
+        }
+
+        // If term exists, selected date must be before or on the term
+        if (truck.term) {
+          const term = new Date(truck.term);
+          term.setHours(0, 0, 0, 0);
+          if (checkDate > term) return false;
+        }
+
         return true;
       });
     }
@@ -1818,11 +1917,11 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
 
   // Count trucks per garage based on displayed trucks (ensures counts match rendered trucks)
   const garageCounts = useMemo(() => {
-    const counts: Record<string, number> = { B1: 0, B2: 0, B3: 0, PATIO: 0 };
+    const counts: Record<string, number> = { YARD_WAIT: 0, B1: 0, B2: 0, B3: 0, YARD_EXIT: 0 };
     displayTrucks.forEach((t) => {
-      if (!t.spot) {
-        counts.PATIO++;
-      } else {
+      if (t.spot === 'YARD_WAIT' || t.spot === 'YARD_EXIT') {
+        counts[t.spot]++;
+      } else if (t.spot) {
         const parsed = parseSpot(t.spot);
         if (parsed.garage) {
           counts[parsed.garage]++;
@@ -1850,6 +1949,8 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, cla
           onTruckMove={onTruckMove}
           onTruckSwap={onTruckSwap}
           onTruckClick={onTruckClick}
+          onGarageSelect={onGarageSelect}
+          onMoveRejected={onMoveRejected}
           readOnly={readOnly}
         />
       </div>

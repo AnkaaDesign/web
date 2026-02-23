@@ -64,12 +64,12 @@ export class TaskService {
     // Create each new responsible
     for (const repData of newResponsibles) {
       try {
-        // Use repData.customerId if available, otherwise use the passed customerId
+        // Use repData.companyId if available, otherwise use the passed customerId
         // Pass undefined if empty string to let backend handle optional field
-        const effectiveCustomerId = repData.customerId || customerId || undefined;
+        const effectiveCompanyId = repData.companyId || customerId || undefined;
         const created = await responsibleService.create({
           ...repData,
-          customerId: effectiveCustomerId,
+          companyId: effectiveCompanyId,
         });
         createdResponsibleIds.push(created.id);
       } catch (error) {
@@ -119,9 +119,9 @@ export class TaskService {
     if (!(data instanceof FormData)) {
       // JSON payload - can directly access and modify properties
       if (data.newResponsibles && data.newResponsibles.length > 0) {
-        // Get customerId from data or from the first newResponsible (they all have the same customerId)
+        // Get customerId from data or from the first newResponsible's companyId (they all have the same companyId)
         // customerId is now optional - responsibles can be created without a customer
-        const customerId = data.customerId || data.newResponsibles[0]?.customerId;
+        const customerId = data.customerId || data.newResponsibles[0]?.companyId;
 
         try {
           // Create responsibles and get their IDs
@@ -160,9 +160,9 @@ export class TaskService {
 
       if (newResponsibles.length > 0) {
         try {
-          // Get customerId from FormData OR from the first newResponsible (they all have the same customerId)
+          // Get customerId from FormData OR from the first newResponsible's companyId (they all have the same companyId)
           const customerIdFromFormData = data.get('customerId') as string | null;
-          const customerId = customerIdFromFormData || newResponsibles[0]?.customerId || '';
+          const customerId = customerIdFromFormData || newResponsibles[0]?.companyId || '';
 
           // Get existing responsible IDs (also may be indexed)
           const existingRepIds: string[] = [];
@@ -222,9 +222,9 @@ export class TaskService {
     if (!(data instanceof FormData)) {
       // JSON payload - can directly access and modify properties
       if (data.newResponsibles && data.newResponsibles.length > 0) {
-        // Get customerId from data or from the first newResponsible (they all have the same customerId)
+        // Get customerId from data or from the first newResponsible's companyId (they all have the same companyId)
         // customerId is now optional - responsibles can be created without a customer
-        const customerId = data.customerId || data.newResponsibles[0]?.customerId;
+        const customerId = data.customerId || data.newResponsibles[0]?.companyId;
 
         try {
           // Create responsibles and get their IDs
@@ -263,9 +263,9 @@ export class TaskService {
 
       if (newResponsibles.length > 0) {
         try {
-          // Get customerId from FormData OR from the first newResponsible (they all have the same customerId)
+          // Get customerId from FormData OR from the first newResponsible's companyId (they all have the same companyId)
           const customerIdFromFormData = data.get('customerId') as string | null;
-          const customerId = customerIdFromFormData || newResponsibles[0]?.customerId || '';
+          const customerId = customerIdFromFormData || newResponsibles[0]?.companyId || '';
 
           // Get existing responsible IDs (also may be indexed)
           const existingRepIds: string[] = [];

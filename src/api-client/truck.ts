@@ -78,3 +78,25 @@ export const batchUpdateSpots = async (
   );
   return response.data;
 };
+
+// =====================
+// Movement Request
+// =====================
+
+export interface MovementRequestData {
+  taskId: string;
+  truckId: string;
+  taskName: string;
+  fromSpot: string | null;
+  toSpot: string | null;
+}
+
+export const requestMovement = async (
+  data: MovementRequestData,
+): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    `/trucks/request-movement`,
+    data,
+  );
+  return response.data;
+};

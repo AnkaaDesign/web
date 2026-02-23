@@ -147,7 +147,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
  * zIndex controls layering — API toasts use TOAST_Z_API, notification toasts use TOAST_Z_NOTIFICATION.
  */
 function renderCustomToast(
-  id: string | number,
+  _id: string | number,
   type: keyof typeof TOAST_STYLES,
   title: string,
   description?: string,

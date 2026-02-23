@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Combobox } from '@/components/ui/combobox';
 import { getCustomers, quickCreateCustomer } from '@/api-client/customer';
 import { CustomerLogoDisplay } from '@/components/ui/avatar-display';
@@ -108,8 +108,9 @@ export function CustomerCombobox({
     <Combobox<Customer>
       value={value || ''}
       onValueChange={(newValue) => {
-        onValueChange(newValue || null);
-        if (newValue) {
+        const stringValue = Array.isArray(newValue) ? newValue[0] : newValue;
+        onValueChange(stringValue || null);
+        if (stringValue) {
           resetCnpjState();
         }
       }}

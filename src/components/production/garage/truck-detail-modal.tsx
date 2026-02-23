@@ -18,7 +18,8 @@ import {
   IconCar,
   IconBuilding,
   IconCalendarTime,
-  IconCalendarEvent,
+  IconCalendarDue,
+  IconLogin,
   IconFiles,
   IconExternalLink,
   IconLayoutGrid,
@@ -218,6 +219,19 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
               </div>
             )}
 
+            {/* Entry Date */}
+            {(task as any).entryDate && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconLogin className="h-4 w-4" />
+                  Entrada
+                </span>
+                <span className="text-sm font-semibold text-foreground">
+                  {formatDateTime((task as any).entryDate)}
+                </span>
+              </div>
+            )}
+
             {/* Forecast Date */}
             {task.forecastDate && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
@@ -227,19 +241,6 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
                 </span>
                 <span className="text-sm font-semibold text-foreground">
                   {formatDateTime(task.forecastDate)}
-                </span>
-              </div>
-            )}
-
-            {/* Layout dimensions */}
-            {layoutDimensions && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <IconLayoutGrid className="h-4 w-4" />
-                  Layout
-                </span>
-                <span className="text-sm font-semibold text-foreground">
-                  {Math.round(layoutDimensions.totalLength * 100)} x {Math.round(layoutDimensions.height * 100)} cm
                 </span>
               </div>
             )}
@@ -260,7 +261,7 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
                     isOverdue ? 'text-red-700 dark:text-red-300' : 'text-muted-foreground'
                   )}
                 >
-                  <IconCalendarEvent className="h-4 w-4" />
+                  <IconCalendarDue className="h-4 w-4" />
                   Prazo
                 </span>
                 <span
@@ -271,6 +272,19 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
                 >
                   {formatDateTime(task.term)}
                   {isOverdue && ' (Atrasado)'}
+                </span>
+              </div>
+            )}
+
+            {/* Layout dimensions */}
+            {layoutDimensions && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconLayoutGrid className="h-4 w-4" />
+                  Medidas
+                </span>
+                <span className="text-sm font-semibold text-foreground">
+                  {Math.round(layoutDimensions.totalLength * 100)} x {Math.round(layoutDimensions.height * 100)} cm
                 </span>
               </div>
             )}

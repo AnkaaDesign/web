@@ -112,7 +112,7 @@ export function useNotificationSocket() {
         const colorClass = importanceColors[notification.importance || ''] || 'bg-background text-foreground border-border';
 
         toast.custom(
-          (id) => (
+          (_id) => (
             <div
               className={`cursor-pointer rounded-lg border p-4 shadow-sm relative overflow-hidden ${colorClass}`}
               style={{ zIndex: TOAST_Z_NOTIFICATION, width: 280, maxHeight: 128 }}

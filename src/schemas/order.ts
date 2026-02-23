@@ -1359,6 +1359,18 @@ export const orderCreateSchema = z
         },
       )
       .optional(),
+    // Temporary items for the form's useFieldArray (client-side only, not sent to API)
+    temporaryItems: z
+      .array(
+        z.object({
+          temporaryItemDescription: z.string().optional(),
+          orderedQuantity: z.number().positive("Quantidade deve ser positiva").optional(),
+          price: z.number().min(0, "Preço deve ser maior ou igual a 0").optional(),
+          icms: z.number().min(0).max(100).optional().default(0),
+          ipi: z.number().min(0).max(100).optional().default(0),
+        }),
+      )
+      .optional(),
   })
   .transform(toFormData);
 
@@ -1444,6 +1456,18 @@ export const orderUpdateSchema = z
         {
           message: "Lista não pode conter itens de estoque duplicados",
         },
+      )
+      .optional(),
+    // Temporary items for the form's useFieldArray (client-side only, not sent to API)
+    temporaryItems: z
+      .array(
+        z.object({
+          temporaryItemDescription: z.string().optional(),
+          orderedQuantity: z.number().positive("Quantidade deve ser positiva").optional(),
+          price: z.number().min(0, "Preço deve ser maior ou igual a 0").optional(),
+          icms: z.number().min(0).max(100).optional().default(0),
+          ipi: z.number().min(0).max(100).optional().default(0),
+        }),
       )
       .optional(),
   })

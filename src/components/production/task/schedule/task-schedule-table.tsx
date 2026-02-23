@@ -58,7 +58,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
   const [internalSelectedTaskIds, setInternalSelectedTaskIds] = useState<Set<string>>(new Set());
   const selectedTaskIds = externalSelectedTaskIds ?? internalSelectedTaskIds;
   const setSelectedTaskIds = onSelectedTaskIdsChange ?? setInternalSelectedTaskIds;
-  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [_duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [taskToDuplicate, setTaskToDuplicate] = useState<Task | null>(null);

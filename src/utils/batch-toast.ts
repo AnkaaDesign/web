@@ -68,8 +68,6 @@ export function showBatchOperationToast<T, U = unknown>(result: DetailedBatchRes
     }
   }
 
-  const fullMessage = mainMessage + detailsMessage;
-
   // Show appropriate toast
   if (isComplete) {
     toast.success(mainMessage, detailsMessage || undefined, {

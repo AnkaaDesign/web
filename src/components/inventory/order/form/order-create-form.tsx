@@ -649,7 +649,6 @@ export const OrderCreateForm = () => {
 
   // Watch form state to trigger validation when it changes
   const watchedDescription = form.watch("description");
-  const watchedItems = form.watch("items");
   const watchedTemporaryItems = form.watch("temporaryItems");
 
   // Compute if form is ready to submit (no useMemo - compute on every render)

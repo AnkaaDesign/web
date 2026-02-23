@@ -27,7 +27,7 @@ const CREATE_NEW_VALUE = '__CREATE_NEW__';
 
 export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
   ({
-    companyId,
+    companyId: _companyId,
     disabled,
     readOnly,
     onRemove,
