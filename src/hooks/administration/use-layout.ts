@@ -45,11 +45,11 @@ export const useLayoutsByTruck = (
   const includePhoto = options?.includePhoto ?? false;
 
   return useQuery({
-    queryKey: layoutQueryKeys.byTruck(truckId),
+    queryKey: [...layoutQueryKeys.byTruck(truckId), { includePhoto }],
     queryFn: async () => {
       // Single API call - backend now returns everything needed for previews
       // Only includes photo if explicitly requested
-      const response = await layoutService.getByTruckId(truckId);
+      const response = await layoutService.getByTruckId(truckId, { includePhoto });
       const layoutsData = response.data.data;
 
       // If backend already includes layoutSections (which it should after our fix),

@@ -62,7 +62,10 @@ export const layoutService = {
     apiClient.post<LayoutAssignResponse>(`/layout/${layoutId}/assign-to-truck`, data),
 
   // Get layouts by truck ID
-  getByTruckId: (truckId: string) => apiClient.get<LayoutsByTruckResponse>(`/layout/truck/${truckId}`),
+  getByTruckId: (truckId: string, options?: { includePhoto?: boolean }) =>
+    apiClient.get<LayoutsByTruckResponse>(`/layout/truck/${truckId}`, {
+      params: options?.includePhoto ? { includePhoto: 'true' } : undefined,
+    }),
 
   // Create layout
   create: (data: LayoutCreateFormData) => apiClient.post<LayoutCreateResponse>("/layout", data),

@@ -123,7 +123,7 @@ import type { File as CustomFile } from "@/types/file";
 
 // Component to display truck layout SVG preview
 const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?: string }) => {
-  const { data: layouts } = useLayoutsByTruck(truckId);
+  const { data: layouts } = useLayoutsByTruck(truckId, { includePhoto: true });
   const [selectedSide, setSelectedSide] = useState<'left' | 'right' | 'back'>('left');
 
   // Theme detection for SVG colors (matching mobile version)
@@ -574,8 +574,12 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
             size="sm"
             onClick={() => { setSelectedSide('back'); handleResetZoom(); }}
             disabled={!layouts.backSideLayout}
+            className="gap-1"
           >
             Traseira
+            {(layouts.backSideLayout as any)?.photo && (
+              <IconPhoto className="h-3.5 w-3.5" />
+            )}
           </Button>
         </div>
         {/* Dimensions */}
