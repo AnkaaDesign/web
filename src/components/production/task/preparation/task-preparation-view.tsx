@@ -353,10 +353,10 @@ export function TaskPreparationView({
     [canViewPrice, currentUser?.id, userSectorPrivilege]
   );
 
-  // Determine preparation exclusion flags based on user's sector privilege
-  // For filtering: use hasPrivilege() so admins can see all service order types
-  const isFinancialUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL);
-  const isLogisticUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC);
+  // Determine preparation exclusion flags based on user's EXACT sector privilege
+  // Only FINANCIAL users require FINANCIAL SOs — everyone else (ADMIN, LOGISTIC, etc.) excludes FINANCIAL
+  // LOGISTIC SOs are required for everyone except FINANCIAL users
+  const isFinancialUser = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
   const isDesignerUser = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
 
   // Prepare final query filters with preparation-specific logic
@@ -381,8 +381,9 @@ export function TaskPreparationView({
       if (!isFinancialUser) {
         result.preparationExcludeFinancial = true;
       }
-      // Only LOGISTIC users see LOGISTIC service order requirements
-      if (!isLogisticUser) {
+      // Only FINANCIAL users exclude LOGISTIC service order requirements
+      // Everyone else (ADMIN, LOGISTIC, PRODUCTION, etc.) requires LOGISTIC SOs
+      if (isFinancialUser) {
         result.preparationExcludeLogistic = true;
       }
     }
@@ -391,7 +392,7 @@ export function TaskPreparationView({
     delete result.status;
 
     return result;
-  }, [baseQueryFilters, isFinancialUser, isLogisticUser, isDesignerUser]);
+  }, [baseQueryFilters, isFinancialUser, isDesignerUser]);
 
   // Handle filter changes
   const handleFilterChange = useCallback(

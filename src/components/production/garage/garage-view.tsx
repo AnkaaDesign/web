@@ -1878,6 +1878,14 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, onG
       checkDate.setHours(0, 0, 0, 0);
 
       return trucksWithLocalPositions.filter(truck => {
+        // If term exists, selected date must be before or on the term
+        // This applies to ALL trucks (garage and patio) for forecasting
+        if (truck.term) {
+          const term = new Date(truck.term);
+          term.setHours(0, 0, 0, 0);
+          if (checkDate > term) return false;
+        }
+
         // Trucks with a garage spot are always shown (physically placed)
         const isInGarage = truck.spot && /^B\d_F\d_V\d$/.test(truck.spot);
         if (isInGarage) return true;
@@ -1896,13 +1904,6 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, onG
           const finished = new Date(truck.finishedAt);
           finished.setHours(0, 0, 0, 0);
           if (finished < checkDate) return false;
-        }
-
-        // If term exists, selected date must be before or on the term
-        if (truck.term) {
-          const term = new Date(truck.term);
-          term.setHours(0, 0, 0, 0);
-          if (checkDate > term) return false;
         }
 
         return true;

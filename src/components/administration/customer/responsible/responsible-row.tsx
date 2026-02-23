@@ -77,18 +77,17 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
       const roleValue = role as ResponsibleRole;
       onChange({
         role: roleValue,
-        // Reset responsible selection when role changes
         id: `temp-${Date.now()}`,
         name: '',
         phone: '',
         email: '',
         isNew: true,
-        isEditing: false, // Start with create mode OFF when changing role
+        isEditing: value.isEditing,
       });
-    }, [onChange]);
+    }, [onChange, value.isEditing]);
 
     // Handle responsible selection
-    const handleResponsibleChange = useCallback((selectedValue: string | string[] | null | undefined) => {
+    const handleResponsibleChange = useCallback((selectedValue: string | string[] | null | undefined, searchTerm?: string) => {
       // Handle array values (shouldn't happen in single mode, but handle defensively)
       if (Array.isArray(selectedValue)) return;
 
@@ -110,7 +109,7 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
         onChange({
           ...value, // Preserve existing values, especially role
           id: `temp-${Date.now()}`,
-          name: '',
+          name: searchTerm?.trim() || '',
           phone: '',
           email: '',
           isNew: true,
@@ -164,22 +163,22 @@ export const ResponsibleRow = forwardRef<HTMLDivElement, ResponsibleRowProps>(
     const getOptionDescription = useCallback((rep: Responsible) => rep.email || undefined, []);
 
     // Fixed top content for "Cadastrar novo" button (pinned between search and scrollable list)
-    const fixedTopContent = (
+    const fixedTopContent = useCallback((searchTerm: string) => (
       <div
         role="button"
         tabIndex={0}
         className="w-full flex items-center px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground border-b dark:border-border/30"
-        onClick={() => handleResponsibleChange(CREATE_NEW_VALUE)}
+        onClick={() => handleResponsibleChange(CREATE_NEW_VALUE, searchTerm)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            handleResponsibleChange(CREATE_NEW_VALUE);
+            handleResponsibleChange(CREATE_NEW_VALUE, searchTerm);
           }
         }}
       >
-        <span className="truncate font-medium">+ Cadastrar novo</span>
+        <span className="truncate font-medium">+ Cadastrar novo{searchTerm ? ` "${searchTerm}"` : ''}</span>
       </div>
-    );
+    ), [handleResponsibleChange]);
 
     // Determine the current responsible value
     const currentResponsibleValue = value.id && !value.id.startsWith('temp-') ? value.id : '';

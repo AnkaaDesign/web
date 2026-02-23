@@ -91,7 +91,7 @@ interface ComboboxProps<TData = ComboboxOption> {
   hideDefaultBadges?: boolean;
 
   // Fixed content rendered between search and scrollable list
-  fixedTopContent?: React.ReactNode;
+  fixedTopContent?: React.ReactNode | ((searchTerm: string) => React.ReactNode);
 }
 
 export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
@@ -748,7 +748,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
               </div>
             )}
 
-            {fixedTopContent}
+            {typeof fixedTopContent === 'function' ? fixedTopContent(search) : fixedTopContent}
 
             <div
               className="max-h-[15rem] overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100"
