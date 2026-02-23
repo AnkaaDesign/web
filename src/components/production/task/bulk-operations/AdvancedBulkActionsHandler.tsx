@@ -1036,10 +1036,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
             taskData.artworkIds = ids || [];
           }
 
-          // Add per-task baseFileIds if available
-          if (perTaskBaseFileIds) {
-            const baseIds = perTaskBaseFileIds[id];
-            taskData.baseFileIds = baseIds || [];
+          // Add per-task baseFileIds if available and this task has explicit IDs set
+          // Only send baseFileIds when the bulk action specifically targets base files
+          // to prevent accidental clearing
+          if (perTaskBaseFileIds && perTaskBaseFileIds[id] !== undefined) {
+            taskData.baseFileIds = perTaskBaseFileIds[id];
           }
 
           // Add per-task truck layout updates if available

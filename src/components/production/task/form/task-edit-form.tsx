@@ -1340,6 +1340,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             'cuts',
             'paintIds',
             'artworkIds',
+            'baseFileIds',
             'budgetIds',
             'invoiceIds',
             'receiptIds',
@@ -1434,7 +1435,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // Backend will replace all files with these IDs + newly uploaded files
           // FormData helper properly handles empty arrays (converts to `field[]` with empty string)
           dataForFormData.artworkIds = currentArtworkIds;
-          dataForFormData.baseFileIds = currentBaseFileIds;
+          // Only send baseFileIds if the user actually modified base files
+          // Sending it unconditionally causes accidental clearing when other sectors submit the form
+          if (hasBaseFileChanges || newBaseFiles.length > 0) {
+            dataForFormData.baseFileIds = currentBaseFileIds;
+          }
           dataForFormData.budgetIds = currentBudgetIds;
           dataForFormData.invoiceIds = currentInvoiceIds;
           dataForFormData.receiptIds = currentReceiptIds;
@@ -1768,15 +1773,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             (submitData as any).artworkStatuses = existingArtworkStatusesJson;
             console.log('[Task Update] ✅ Including artworkStatuses in JSON (UUID-keyed object):', existingArtworkStatusesJson);
           }
-          // CRITICAL FIX: Always send file IDs if the task originally had files OR if there are current files
-          // This ensures file removals are properly communicated to the backend (empty array = remove all)
-          const taskHadBaseFiles = task.baseFiles && task.baseFiles.length > 0;
+          // CRITICAL FIX: Only send file IDs when the user actually modified those files
+          // Sending them unconditionally causes accidental clearing when sectors submit unrelated changes
           const taskHadBudgets = task.budgets && task.budgets.length > 0;
           const taskHadInvoices = task.invoices && task.invoices.length > 0;
           const taskHadReceipts = task.receipts && task.receipts.length > 0;
           const taskHadBankSlips = task.bankSlips && task.bankSlips.length > 0;
 
-          if (currentBaseFileIds.length > 0 || taskHadBaseFiles) {
+          // Only send baseFileIds if the user actually modified base files
+          if (hasBaseFileChanges) {
             submitData.baseFileIds = [...currentBaseFileIds];
           }
           if (currentBudgetIds.length > 0 || taskHadBudgets) {
@@ -2066,6 +2071,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       "cuts",
       "paintIds",
       "artworkIds",
+      "baseFileIds",
       "budgetIds",
       "invoiceIds",
       "receiptIds",
