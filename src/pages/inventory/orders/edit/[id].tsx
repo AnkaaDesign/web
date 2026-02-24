@@ -36,6 +36,8 @@ export const EditOrderPage = () => {
       budgets: true,
       receipts: true,
       invoices: true,
+      paymentResponsible: true,
+      paymentAssignedBy: true,
     },
     enabled: !!id,
   });

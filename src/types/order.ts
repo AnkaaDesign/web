@@ -16,6 +16,7 @@ import type {
   YearlyScheduleConfigIncludes,
 } from "./ppe";
 import type { Activity, ActivityIncludes, ActivityOrderBy } from "./activity";
+import type { User } from "./user";
 
 // =====================
 // Order Schedule Interfaces
@@ -128,8 +129,12 @@ export interface Order extends BaseEntity {
   paymentMethod: PAYMENT_METHOD | null;
   paymentPix: string | null;
   paymentDueDays: number | null;
+  paymentResponsibleId: string | null;
+  paymentAssignedById: string | null;
 
   // Relations (optional, populated based on query)
+  paymentResponsible?: User;
+  paymentAssignedBy?: User;
   budgets?: File[];
   invoices?: File[];
   receipts?: File[];

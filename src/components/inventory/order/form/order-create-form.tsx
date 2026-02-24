@@ -6,7 +6,7 @@ import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, Ic
 import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useSuppliers } from "../../../../hooks";
-import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER } from "../../../../constants";
+import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, SECTOR_PRIVILEGES } from "../../../../constants";
 import { toast } from "sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
@@ -30,6 +30,7 @@ import { useOrderFormUrlState } from "@/hooks/inventory/use-order-form-url-state
 import { formatCurrency, formatDate, measureUtils, formatPixKey } from "../../../../utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
+import { AdminUserSelector } from "@/components/administration/user/form/user-selector";
 
 export const OrderCreateForm = () => {
   const navigate = useNavigate();
@@ -534,6 +535,7 @@ export const OrderCreateForm = () => {
       const currentPaymentMethod = form.getValues("paymentMethod");
       const currentPaymentPix = form.getValues("paymentPix");
       const currentPaymentDueDays = form.getValues("paymentDueDays");
+      const currentPaymentResponsibleId = form.getValues("paymentResponsibleId");
 
       // Prepare the complete form data
       const orderData: OrderCreateFormData = {
@@ -546,6 +548,7 @@ export const OrderCreateForm = () => {
         paymentMethod: currentPaymentMethod || undefined,
         paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
         paymentDueDays: currentPaymentMethod === "BANK_SLIP" ? currentPaymentDueDays || undefined : undefined,
+        paymentResponsibleId: currentPaymentResponsibleId || undefined,
       };
 
       // Set all form values at once
@@ -1250,6 +1253,17 @@ export const OrderCreateForm = () => {
                                 Método de Pagamento
                               </Label>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Payment Responsible */}
+                                <div className="space-y-2">
+                                  <AdminUserSelector
+                                    control={form.control}
+                                    name="paymentResponsibleId"
+                                    label="Responsável pelo Pagamento"
+                                    placeholder="Selecione o responsável"
+                                    includeSectorPrivileges={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}
+                                  />
+                                </div>
+
                                 {/* Payment Method Selector */}
                                 <div className="space-y-2">
                                   <Label className="text-sm text-muted-foreground">Forma de Pagamento</Label>
@@ -1279,7 +1293,7 @@ export const OrderCreateForm = () => {
 
                                 {/* PIX Key - Show only when PIX is selected */}
                                 {form.watch("paymentMethod") === "PIX" && (
-                                  <div className="space-y-2 md:col-span-2">
+                                  <div className="space-y-2">
                                     <Label className="text-sm text-muted-foreground">Chave Pix</Label>
                                     <Input
                                       placeholder={(() => {

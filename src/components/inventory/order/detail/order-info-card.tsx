@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { OrderStatusBadge } from "../common/order-status-badge";
 import { OrderTotalBadge } from "../common/order-total-calculator";
-import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFileInvoice, IconReceipt, IconFileText, IconId, IconCreditCard, IconCopy, IconQrcode } from "@tabler/icons-react";
+import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFileInvoice, IconReceipt, IconFileText, IconId, IconCreditCard, IconCopy, IconQrcode, IconUser } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime, formatCNPJ } from "../../../../utils";
 import type { Order } from "../../../../types";
@@ -155,19 +155,31 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
         </div>
 
         {/* Payment Information */}
-        {order.paymentMethod && (
+        {(order.paymentMethod || order.paymentResponsible) && (
           <>
             <Separator className="bg-border" />
             <div className="space-y-4">
               <h3 className="text-base font-semibold mb-4 text-foreground">Pagamento</h3>
               <div className="space-y-4">
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCreditCard className="h-4 w-4" />
-                    Método de Pagamento
-                  </span>
-                  <Badge variant="outline">{PAYMENT_METHOD_LABELS[order.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS]}</Badge>
-                </div>
+                {order.paymentResponsible && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconUser className="h-4 w-4" />
+                      Responsável pelo Pagamento
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{order.paymentResponsible.name}</span>
+                  </div>
+                )}
+
+                {order.paymentMethod && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconCreditCard className="h-4 w-4" />
+                      Método de Pagamento
+                    </span>
+                    <Badge variant="outline">{PAYMENT_METHOD_LABELS[order.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS]}</Badge>
+                  </div>
+                )}
 
                 {order.paymentMethod === "PIX" && order.paymentPix && (
                   <div className="bg-muted/50 rounded-lg px-4 py-3 space-y-2">
@@ -197,6 +209,16 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                     <span className="text-sm font-medium text-muted-foreground">Prazo de Vencimento</span>
                     <span className="text-sm font-semibold text-foreground">{order.paymentDueDays} dias</span>
+                  </div>
+                )}
+
+                {order.paymentAssignedBy && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconUser className="h-4 w-4" />
+                      Atribuído por
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{order.paymentAssignedBy.name}</span>
                   </div>
                 )}
               </div>

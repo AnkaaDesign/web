@@ -32,6 +32,8 @@ import { useSuppliers } from "../../../../hooks";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Separator } from "@/components/ui/separator";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
+import { AdminUserSelector } from "@/components/administration/user/form/user-selector";
+import { SECTOR_PRIVILEGES } from "../../../../constants";
 
 interface OrderEditFormProps {
   order: Order & {
@@ -245,6 +247,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       paymentMethod: order.paymentMethod || null,
       paymentPix: order.paymentPix || null,
       paymentDueDays: order.paymentDueDays || null,
+      paymentResponsibleId: order.paymentResponsibleId || undefined,
     };
   }, [
     order.description,
@@ -254,6 +257,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     order.paymentMethod,
     order.paymentPix,
     order.paymentDueDays,
+    order.paymentResponsibleId,
     hasTemporaryItems,
     initialSelectedItems,
     initialQuantities,
@@ -356,6 +360,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     paymentMethod: order.paymentMethod || null,
     paymentPix: order.paymentPix || null,
     paymentDueDays: order.paymentDueDays || null,
+    paymentResponsibleId: order.paymentResponsibleId || undefined,
   };
 
   const form = useForm<OrderUpdateFormData>({
@@ -598,6 +603,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   const watchedPaymentMethod = form.watch("paymentMethod");
   const watchedPaymentPix = form.watch("paymentPix");
   const watchedPaymentDueDays = form.watch("paymentDueDays");
+  const watchedPaymentResponsibleId = form.watch("paymentResponsibleId");
 
   // Detect if form has actual changes from original order
   const hasFormChanges = useMemo(() => {
@@ -610,6 +616,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     const paymentMethodChanged = (watchedPaymentMethod || null) !== (order.paymentMethod || null);
     const paymentPixChanged = (watchedPaymentPix || null) !== (order.paymentPix || null);
     const paymentDueDaysChanged = (watchedPaymentDueDays || null) !== (order.paymentDueDays || null);
+    const paymentResponsibleChanged = (watchedPaymentResponsibleId || null) !== (order.paymentResponsibleId || null);
 
     // Check if selected items have changed
     const originalItemIds = new Set(order.items.map(item => item.itemId));
@@ -630,9 +637,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       return currentPrice !== undefined && currentPrice !== item.price;
     });
 
-    const hasChanges = descriptionChanged || supplierChanged || forecastChanged || notesChanged || itemsChanged || quantitiesChanged || pricesChanged || hasFileChanges || paymentMethodChanged || paymentPixChanged || paymentDueDaysChanged;
+    const hasChanges = descriptionChanged || supplierChanged || forecastChanged || notesChanged || itemsChanged || quantitiesChanged || pricesChanged || hasFileChanges || paymentMethodChanged || paymentPixChanged || paymentDueDaysChanged || paymentResponsibleChanged;
     return hasChanges;
-  }, [description, supplierId, forecast, localNotes, selectedItems, quantities, prices, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays]);
+  }, [description, supplierId, forecast, localNotes, selectedItems, quantities, prices, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays, watchedPaymentResponsibleId]);
 
   // Stage validation
   const validateCurrentStep = useCallback((): boolean => {
@@ -747,6 +754,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const currentPaymentMethod = form.getValues("paymentMethod");
       const currentPaymentPix = form.getValues("paymentPix");
       const currentPaymentDueDays = form.getValues("paymentDueDays");
+      const currentPaymentResponsibleId = form.getValues("paymentResponsibleId");
 
       const data = {
         description: description!.trim(),
@@ -757,6 +765,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         paymentMethod: currentPaymentMethod || undefined,
         paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
         paymentDueDays: currentPaymentMethod === "BANK_SLIP" ? currentPaymentDueDays || undefined : undefined,
+        paymentResponsibleId: currentPaymentResponsibleId || null,
       };
 
       // Check if there are new files to upload (files without uploadedFileId)
@@ -1453,6 +1462,18 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               Método de Pagamento
                             </Label>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {/* Payment Responsible */}
+                              <div className="space-y-2">
+                                <AdminUserSelector
+                                  control={form.control}
+                                  name="paymentResponsibleId"
+                                  label="Responsável pelo Pagamento"
+                                  placeholder="Selecione o responsável"
+                                  initialUser={order?.paymentResponsible}
+                                  includeSectorPrivileges={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}
+                                />
+                              </div>
+
                               {/* Payment Method Selector */}
                               <div className="space-y-2">
                                 <Label className="text-sm text-muted-foreground">Forma de Pagamento</Label>
@@ -1482,7 +1503,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
                               {/* PIX Key - Show only when PIX is selected */}
                               {form.watch("paymentMethod") === "PIX" && (
-                                <div className="space-y-2 md:col-span-2">
+                                <div className="space-y-2">
                                   <Label className="text-sm text-muted-foreground">Chave Pix</Label>
                                   <Input
                                     placeholder={

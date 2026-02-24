@@ -68,6 +68,8 @@ const OrderDetailsPage = () => {
       receipts: true,
       reimbursements: true,
       invoiceReimbursements: true,
+      paymentResponsible: true,
+      paymentAssignedBy: true,
     },
     enabled: !!id,
   });

@@ -668,10 +668,11 @@ const ChangelogTimelineItem = ({
           return entityDetails.suppliers.get(value) || "Fornecedor";
         }
         if (
-          (field === "assignedToUserId" || field === "createdById" || field === "startedById" || field === "completedById" || field === "approvedById" || field === "assignedToId") &&
+          (field === "assignedToUserId" || field === "createdById" || field === "startedById" || field === "completedById" || field === "approvedById" || field === "assignedToId" || field === "paymentResponsibleId" || field === "paymentAssignedById") &&
           entityDetails.users.has(value)
         ) {
-          return entityDetails.users.get(value) || "Usuário";
+          const user = entityDetails.users.get(value);
+          return (typeof user === "object" && user !== null && "name" in user) ? user.name : user || "Usuário";
         }
         if ((field === "customerId" || field === "invoiceToId") && entityDetails.customers.has(value)) {
           return entityDetails.customers.get(value) || "Cliente";
@@ -712,7 +713,7 @@ const ChangelogTimelineItem = ({
       if (field === "categoryId") return "Categoria (carregando...)";
       if (field === "brandId") return "Marca (carregando...)";
       if (field === "supplierId") return "Fornecedor (carregando...)";
-      if (field === "assignedToUserId" || field === "createdById" || field === "startedById" || field === "completedById" || field === "approvedById" || field === "assignedToId")
+      if (field === "assignedToUserId" || field === "createdById" || field === "startedById" || field === "completedById" || field === "approvedById" || field === "assignedToId" || field === "paymentResponsibleId" || field === "paymentAssignedById")
         return "Usuário (carregando...)";
       if (field === "customerId" || field === "invoiceToId") return "Cliente (carregando...)";
       if (field === "sectorId") return "Setor (carregando...)";
@@ -2586,7 +2587,9 @@ export function ChangelogHistory({
           supplierIds.add(changelog.newValue);
       } else if (
         changelog.field === "assignedToUserId" ||
-        changelog.field === "createdById"
+        changelog.field === "createdById" ||
+        changelog.field === "paymentResponsibleId" ||
+        changelog.field === "paymentAssignedById"
       ) {
         if (changelog.oldValue && typeof changelog.oldValue === "string")
           userIds.add(changelog.oldValue);

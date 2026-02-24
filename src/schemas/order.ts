@@ -50,6 +50,8 @@ export const orderIncludeSchema = z
         }),
       ])
       .optional(),
+    paymentResponsible: z.boolean().optional(),
+    paymentAssignedBy: z.boolean().optional(),
     epiSchedule: z.boolean().optional(),
     items: z
       .union([
@@ -1304,6 +1306,7 @@ export const orderCreateSchema = z
       .positive("Prazo de vencimento deve ser positivo")
       .nullable()
       .optional(),
+    paymentResponsibleId: z.string().uuid({ message: "Responsável pelo pagamento inválido" }).nullable().optional(),
     // File arrays
     budgetIds: z.array(z.string().uuid("Orçamento inválido")).optional(),
     invoiceIds: z.array(z.string().uuid("NFe inválida")).optional(),
@@ -1402,6 +1405,7 @@ export const orderUpdateSchema = z
       .positive("Prazo de vencimento deve ser positivo")
       .nullable()
       .optional(),
+    paymentResponsibleId: z.string().uuid({ message: "Responsável pelo pagamento inválido" }).nullable().optional(),
     // File arrays
     budgetIds: z.array(z.string().uuid("Orçamento inválido")).optional(),
     invoiceIds: z.array(z.string().uuid("NFe inválida")).optional(),
@@ -1876,6 +1880,7 @@ export const mapOrderToFormData = createMapToFormDataHelper<Order, OrderUpdateFo
   reimbursementIds: order.reimbursements?.map((reimbursement) => reimbursement.id),
   reimbursementInvoiceIds: order.invoiceReimbursements?.map((reimbursementInvoice) => reimbursementInvoice.id),
   notes: order.notes || undefined,
+  paymentResponsibleId: order.paymentResponsibleId || undefined,
 }));
 
 export const mapOrderItemToFormData = createMapToFormDataHelper<OrderItem, OrderItemUpdateFormData>((orderItem) => ({

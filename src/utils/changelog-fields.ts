@@ -161,6 +161,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "budget.filename": "Nome do Orçamento",
     "nfe.filename": "Nome da NFe",
     "receipt.filename": "Nome do Recibo",
+    paymentResponsibleId: "Responsável pelo Pagamento",
+    paymentAssignedById: "Atribuído por",
   },
   [CHANGE_LOG_ENTITY_TYPE.ORDER_ITEM]: {
     orderId: "Pedido",
@@ -1081,10 +1083,14 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
         if (value.length > 0 && typeof value[0] === "object" && value[0].name) {
           const ROLE_LABELS: Record<string, string> = {
             COMMERCIAL: "Comercial",
+            OWNER: "Proprietário",
+            SELLER: "Vendedor",
+            REPRESENTATIVE: "Representante",
             MARKETING: "Marketing",
             COORDINATOR: "Coordenador",
             FINANCIAL: "Financeiro",
             FLEET_MANAGER: "Gestor de Frota",
+            DRIVER: "Motorista",
           };
           return value.map((rep: { name?: string; phone?: string; role?: string }) => {
             const name = rep.name || "Responsável";
@@ -1349,6 +1355,9 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     if (!value || value === "" || value === null) return "Pátio";
 
     if (typeof value === "string") {
+      if (value === "YARD_WAIT") return "Pátio de Espera";
+      if (value === "YARD_EXIT") return "Pátio de Saída";
+
       // Parse B1_F1_V1 format -> "Garagem 1 - Fila 1 - Vaga 1"
       const match = value.match(/B(\d)_F(\d)_V(\d)/);
       if (match) {
@@ -2170,6 +2179,45 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
         REPROVED: "Reprovado",
       };
       return statusLabel[data.status] || data.status || "Desconhecido";
+    }
+
+    // Handle individual truck layout fields
+    if (
+      (field === "truck.leftSideLayoutId" || field === "truck.rightSideLayoutId" || field === "truck.backSideLayoutId") &&
+      entityType === CHANGE_LOG_ENTITY_TYPE.TASK
+    ) {
+      const layout = value as any;
+      if (!layout) return "Nenhum";
+      if (typeof layout === "object" && layout !== null) {
+        const w = Math.round((layout.totalWidth || 0) * 100);
+        const h = Math.round((layout.height || 0) * 100);
+        const d = layout.doorCount || 0;
+        return `${w}cm × ${h}cm — ${d} porta${d !== 1 ? "s" : ""}`;
+      }
+      return "Definido";
+    }
+
+    // Handle layouts object (truck vehicle layouts) - format as readable summary
+    if (field === "layouts" && entityType === CHANGE_LOG_ENTITY_TYPE.TASK) {
+      const layoutSides = [
+        { key: "leftSideLayoutId", label: "Lado Motorista" },
+        { key: "rightSideLayoutId", label: "Lado Sapo" },
+        { key: "backSideLayoutId", label: "Traseira" },
+      ];
+      const layoutData = value as any;
+      const parts: string[] = [];
+      for (const { key, label } of layoutSides) {
+        const layoutId = layoutData[key];
+        if (layoutId && typeof layoutId === "object") {
+          const w = Math.round((layoutId.totalWidth || 0) * 100);
+          const h = Math.round((layoutId.height || 0) * 100);
+          const d = layoutId.doorCount || 0;
+          parts.push(`${label}: ${w}cm × ${h}cm — ${d} porta${d !== 1 ? "s" : ""}`);
+        } else if (layoutId) {
+          parts.push(`${label}: Definido`);
+        }
+      }
+      return parts.length > 0 ? parts.join("\n") : "Nenhum layout";
     }
 
     return JSON.stringify(value, null, 2);
