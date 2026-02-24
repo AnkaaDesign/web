@@ -715,7 +715,11 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                     <TableCell className="py-2 max-w-[250px]">
                       <div className="flex items-center gap-2">
                         <TruncatedTextWithTooltip
-                          text={item.temporaryItemDescription || (item.item ? (item.item.uniCode ? `${item.item.uniCode} - ${item.item.name}` : item.item.name) : "-")}
+                          text={
+                            item.temporaryItemDescription ||
+                            (item.item ? (item.item.uniCode ? `${item.item.uniCode} - ${item.item.name}` : item.item.name) : null) ||
+                            (!item.itemId ? (order.description || "Item temporário") : "-")
+                          }
                           className="font-medium text-sm"
                         />
                       </div>
@@ -723,7 +727,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                     <TableCell className="text-center py-2">
                       {item.item ? (
                         <StockStatusIndicator item={item.item} showQuantity={true} />
-                      ) : item.temporaryItemDescription ? (
+                      ) : !item.itemId ? (
                         <span className="text-sm text-muted-foreground">N/A</span>
                       ) : (
                         <span className="text-sm text-muted-foreground">-</span>

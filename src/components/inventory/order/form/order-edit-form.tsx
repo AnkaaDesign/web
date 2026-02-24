@@ -43,7 +43,8 @@ interface OrderEditFormProps {
   };
 }
 
-const steps = [
+// Steps are now dynamically generated based on orderItemMode
+const getSteps = (itemMode: "inventory" | "temporary") => [
   {
     id: 1,
     name: "Informações Básicas",
@@ -51,8 +52,8 @@ const steps = [
   },
   {
     id: 2,
-    name: "Seleção de Itens",
-    description: "Escolha os itens e quantidades",
+    name: itemMode === "temporary" ? "Itens Temporários" : "Estoque",
+    description: itemMode === "temporary" ? "Adicione itens temporários" : "Escolha os itens do estoque",
   },
   {
     id: 3,
@@ -81,9 +82,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   const [currentStep, setCurrentStep] = useState(getStepFromUrl(searchParams));
 
   // Detect order mode based on existing items
-  // If order has any temporary items (itemId is null), it's in temporary mode
+  // If order has any items without itemId, it's in temporary mode
+  // Note: itemId being null is the definitive indicator of a temporary item
   const hasTemporaryItems = useMemo(() =>
-    order.items.some(item => !item.itemId && item.temporaryItemDescription),
+    order.items.some(item => !item.itemId),
     [order.items]
   );
 
@@ -94,14 +96,15 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   );
 
   const temporaryItems = useMemo(() =>
-    order.items.filter(item => !item.itemId && item.temporaryItemDescription).map(item => ({
-      temporaryItemDescription: item.temporaryItemDescription!,
+    order.items.filter(item => !item.itemId).map(item => ({
+      // Use temporaryItemDescription if available, otherwise use order description as fallback
+      temporaryItemDescription: item.temporaryItemDescription || order.description || "Item temporário",
       orderedQuantity: item.orderedQuantity,
       price: item.price,
       icms: item.icms || 0,
       ipi: item.ipi || 0,
     })),
-    [order.items]
+    [order.items, order.description]
   );
 
   // Convert existing order data to initial state (only inventory items)
@@ -325,6 +328,16 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     });
   }, [selectedItems]);
 
+  // Force correct orderItemMode based on actual order data
+  // This overrides any cached URL state that might have wrong mode
+  useEffect(() => {
+    const correctMode = hasTemporaryItems ? "temporary" : "inventory";
+    if (orderItemMode !== correctMode) {
+      console.log('[OrderEditForm] Forcing orderItemMode from', orderItemMode, 'to', correctMode);
+      _setOrderItemMode(correctMode);
+    }
+  }, [hasTemporaryItems, orderItemMode, _setOrderItemMode]);
+
   // Form setup with default values from URL state
   const defaultValues: Partial<OrderUpdateFormData> = {
     description: description || order.description,
@@ -502,6 +515,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     }
   }, [searchParams]); // Removed currentStep to prevent circular dependency
 
+  // Dynamic steps based on orderItemMode
+  const steps = useMemo(() => getSteps(orderItemMode), [orderItemMode]);
+
   // Calculate total price based on mode
   const totalPrice = useMemo(() => {
     if (orderItemMode === "inventory") {
@@ -551,7 +567,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       // Use functional form to ensure we have the latest params
       setSearchParams((prevParams) => setStepInUrl(prevParams, newStep), { replace: true });
     }
-  }, [currentStep, setSearchParams]);
+  }, [currentStep, setSearchParams, steps.length]);
 
   const prevStep = useCallback(() => {
     if (currentStep > 1) {
@@ -1372,8 +1388,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                             </Label>
                             <RadioGroup
                               value={orderItemMode}
-                              disabled={true}
-                              className="flex flex-col gap-2 opacity-60 pointer-events-none"
+                              onValueChange={(value) => _setOrderItemMode(value as "inventory" | "temporary")}
+                              className="flex flex-col gap-2"
                             >
                               <div className="flex items-start space-x-3 space-y-0 rounded-md border border-border p-3 group">
                                 <RadioGroupItem value="inventory" id="edit-mode-inventory" className="mt-0.5" />
