@@ -146,6 +146,14 @@ export class ServerService {
         owner: string;
         group: string;
         remoteUrl?: string;
+        fileCount?: number;
+        folderCount?: number;
+        // Database file fields (when matched)
+        dbFileId?: string;
+        dbFilePath?: string;
+        dbThumbnailUrl?: string | null;
+        dbMimeType?: string;
+        dbFileSize?: number;
       }>;
       totalFiles: number;
       totalSize: string;

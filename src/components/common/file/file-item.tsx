@@ -30,7 +30,16 @@ const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" | "large" = "
   let apiUrl = getApiBaseUrl();
   apiUrl = apiUrl.replace(/\/+$/, '');
 
+  // Check if this is a remote storage file without a database record
+  // Files with database IDs (not starting with "remote-") can be served through the API endpoint
+  const isRemoteFile = file.id && file.id.startsWith("remote-");
+
   if (isPDFFile(file)) {
+    // For remote PDF files, we can't generate thumbnails via backend
+    // Return empty string to trigger fallback to file icon
+    if (isRemoteFile) {
+      return "";
+    }
     return getPDFThumbnailUrl(file, { size });
   }
 
@@ -41,6 +50,10 @@ const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" | "large" = "
     return `${apiUrl}/files/thumbnail/${file.id}?size=${size}`;
   }
   if (isImageFile(file)) {
+    // For remote images, use the path directly if it's a URL
+    if (isRemoteFile && file.path) {
+      return file.path;
+    }
     return `${apiUrl}/files/serve/${file.id}`;
   }
   return "";
@@ -168,7 +181,9 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
   const [isHovered, setIsHovered] = useState(false);
   const isImage = isImageFile(file);
   const isPdf = isPDFFile(file);
-  const hasThumbnail = file.thumbnailUrl || isImage || isPdf;
+  // Check if this is a remote file without database record (can't generate PDF thumbnails)
+  const isRemoteFile = file.id && file.id.startsWith("remote-");
+  const hasThumbnail = file.thumbnailUrl || isImage || (isPdf && !isRemoteFile);
 
   const fileViewer = React.useContext(FileViewerContext);
   const imgRef = React.useRef<HTMLImageElement>(null);
@@ -271,7 +286,9 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
   const [showThumbnail, setShowThumbnail] = useState(false);
   const isImage = isImageFile(file);
   const isPdf = isPDFFile(file);
-  const hasThumbnail = file.thumbnailUrl || isImage || isPdf;
+  // Check if this is a remote file without database record (can't generate PDF thumbnails)
+  const isRemoteFile = file.id && file.id.startsWith("remote-");
+  const hasThumbnail = file.thumbnailUrl || isImage || (isPdf && !isRemoteFile);
 
   const fileViewer = React.useContext(FileViewerContext);
   const imgRef = React.useRef<HTMLImageElement>(null);

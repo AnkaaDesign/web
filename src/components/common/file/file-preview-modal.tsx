@@ -555,6 +555,10 @@ export function FilePreviewModal({
   const isEPS = isEpsFile(currentFile);
   const isVideo = isVideoFile(currentFile);
   const isSVG = isSvgFile(currentFile);
+  // Check if this is a remote storage file without a database record (can't be loaded inline due to CORS)
+  // Files with database IDs (not starting with "remote-") can be served through the API endpoint
+  const isRemoteFile = currentFile.id && currentFile.id.startsWith("remote-");
+  const isRemotePDF = isPDF && isRemoteFile;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -784,21 +788,59 @@ export function FilePreviewModal({
           >
             {isCurrentFilePreviewable ? (
               isPDF ? (
-                // Custom PDF Viewer using pdfjs-dist for better styling
-                <div className="w-full h-full flex items-center justify-center">
-                  <InlinePdfViewer
-                    ref={pdfViewerRef}
-                    url={getFileUrl(currentFile, baseUrl)}
-                    filename={currentFile.filename}
-                    onLoadSuccess={handlePdfLoadSuccess}
-                    onLoadError={handlePdfLoadError}
-                    onFitScaleCalculated={handlePdfFitScaleCalculated}
-                    onDownload={handleDownload}
-                    scale={pdfScale}
-                    pageNumber={pdfPageNumber}
-                    maxHeight={isFullscreen ? "calc(100vh - 120px)" : "calc(100vh - 200px)"}
-                  />
-                </div>
+                isRemotePDF ? (
+                  // Remote PDFs can't be loaded inline due to CORS - offer to open in new tab
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="flex flex-col items-center justify-center gap-6 bg-white/10 backdrop-blur-sm rounded-xl p-12 max-w-md">
+                      <div className="w-24 h-24 rounded-2xl bg-red-500/20 flex items-center justify-center">
+                        <svg className="w-12 h-12 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+                          <path d="M8 12h8v2H8zm0 4h5v2H8z"/>
+                        </svg>
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-white text-xl font-semibold mb-2">{currentFile.filename}</h3>
+                        <p className="text-white/70 text-sm mb-6">
+                          Este PDF está em armazenamento remoto e será aberto em uma nova aba.
+                        </p>
+                        <div className="flex gap-3 justify-center">
+                          <Button
+                            variant="outline"
+                            onClick={() => window.open(getFileUrl(currentFile, baseUrl), "_blank")}
+                            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                          >
+                            <IconExternalLink className="h-4 w-4 mr-2" />
+                            Abrir PDF
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={handleDownload}
+                            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                          >
+                            <IconDownload className="h-4 w-4 mr-2" />
+                            Baixar
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Custom PDF Viewer using pdfjs-dist for better styling
+                  <div className="w-full h-full flex items-center justify-center">
+                    <InlinePdfViewer
+                      ref={pdfViewerRef}
+                      url={getFileUrl(currentFile, baseUrl)}
+                      filename={currentFile.filename}
+                      onLoadSuccess={handlePdfLoadSuccess}
+                      onLoadError={handlePdfLoadError}
+                      onFitScaleCalculated={handlePdfFitScaleCalculated}
+                      onDownload={handleDownload}
+                      scale={pdfScale}
+                      pageNumber={pdfPageNumber}
+                      maxHeight={isFullscreen ? "calc(100vh - 120px)" : "calc(100vh - 200px)"}
+                    />
+                  </div>
+                )
               ) : isVideo ? (
                 <div className="w-full max-w-5xl mx-auto" style={{ maxHeight: "80vh" }}>
                   <VideoPlayer

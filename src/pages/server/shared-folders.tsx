@@ -5,11 +5,8 @@ import {
   IconFolderShare,
   IconRefresh,
   IconFolder,
-  IconUsers,
-  IconEye,
   IconCalendar,
   IconDeviceDesktop,
-  IconExternalLink,
   IconPalette,
   IconFileText,
   IconCamera,
@@ -25,16 +22,23 @@ import {
   IconArchive,
   IconFolders,
   IconFiles,
-  IconArrowRight,
   IconChevronRight,
   IconList,
   IconLayoutGrid,
+  IconSearch,
+  IconUsers,
+  IconBuildingStore,
+  IconTruck,
+  IconDroplet,
+  IconMessage,
+  IconLayout,
 } from "@tabler/icons-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState, useMemo } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { PageHeader } from "@/components/ui/page-header";
 import { useSharedFolders, useSharedFolderContents } from "../../hooks";
@@ -48,7 +52,6 @@ import type { File as AnkaaFile } from "@/types";
 function parseRemoteSize(sizeStr: string): number {
   if (!sizeStr || sizeStr === "-" || sizeStr === "0") return 0;
 
-  // Match pattern like "1.2M", "500K", "1.5G", "100" (bytes)
   const match = sizeStr.match(/^(\d+\.?\d*)\s*([KMGT]?)B?$/i);
   if (!match) return 0;
 
@@ -56,11 +59,11 @@ function parseRemoteSize(sizeStr: string): number {
   const num = parseFloat(numStr);
 
   const multipliers: Record<string, number> = {
-    "": 1,           // Bytes
-    "K": 1024,       // Kilobytes
-    "M": 1024 * 1024, // Megabytes
-    "G": 1024 * 1024 * 1024, // Gigabytes
-    "T": 1024 * 1024 * 1024 * 1024, // Terabytes
+    "": 1,
+    "K": 1024,
+    "M": 1024 * 1024,
+    "G": 1024 * 1024 * 1024,
+    "T": 1024 * 1024 * 1024 * 1024,
   };
 
   return Math.floor(num * (multipliers[unit.toUpperCase()] || 1));
@@ -74,10 +77,15 @@ function convertRemoteItemToAnkaaFile(
     size: string;
     lastModified: Date;
     remoteUrl?: string;
+    // Database file fields (when matched)
+    dbFileId?: string;
+    dbFilePath?: string;
+    dbThumbnailUrl?: string | null;
+    dbMimeType?: string;
+    dbFileSize?: number;
   },
   folderPath: string
 ): AnkaaFile {
-  // Detect mime type from extension
   const extension = item.name.split(".").pop()?.toLowerCase() || "";
   let mimetype = "application/octet-stream";
 
@@ -93,21 +101,34 @@ function convertRemoteItemToAnkaaFile(
     mimetype = "application/vnd.ms-excel";
   }
 
-  // Use remoteUrl as thumbnailUrl for images
-  // For PDFs, set to remoteUrl too - it will fail to load as image and trigger error fallback to show PDF icon
   const isImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(extension);
   const isPdf = extension === "pdf";
 
+  // Use database file info when available (enables proper thumbnails and inline viewing)
+  if (item.dbFileId) {
+    return {
+      id: item.dbFileId,
+      filename: item.name,
+      originalName: item.name,
+      mimetype: item.dbMimeType || mimetype,
+      path: item.dbFilePath || item.remoteUrl || "",
+      size: item.dbFileSize || parseRemoteSize(item.size),
+      thumbnailUrl: item.dbThumbnailUrl || (isImage && item.remoteUrl ? item.remoteUrl : null),
+      createdAt: item.lastModified,
+      updatedAt: item.lastModified,
+    };
+  }
+
+  // Fallback for files without database records
   return {
     id: `remote-${folderPath}-${item.name}`,
     filename: item.name,
     originalName: item.name,
     mimetype,
     path: item.remoteUrl || "",
-    size: parseRemoteSize(item.size), // Parse remote size string to bytes
-    // Set thumbnailUrl to remoteUrl for images and PDFs
-    // For PDFs, the image load will fail (ORB) and FileItem will show icon as fallback
-    thumbnailUrl: (isImage || isPdf) && item.remoteUrl ? item.remoteUrl : null,
+    size: parseRemoteSize(item.size),
+    // Only set thumbnailUrl for images - PDFs from remote storage can't use backend thumbnail generator
+    thumbnailUrl: isImage && item.remoteUrl ? item.remoteUrl : null,
     createdAt: item.lastModified,
     updatedAt: item.lastModified,
   };
@@ -120,6 +141,7 @@ function FileContentsBrowser({
   currentSubPath,
   selectedFolder,
   fileDisplayMode,
+  searchQuery,
   handleNavigateToSubfolder,
 }: {
   folderContents: any;
@@ -127,22 +149,20 @@ function FileContentsBrowser({
   currentSubPath?: string;
   selectedFolder: string;
   fileDisplayMode: FileViewMode;
+  searchQuery: string;
   handleNavigateToSubfolder: (path: string) => void;
 }) {
   const fileViewer = useFileViewer();
 
   const handleFileClick = (file: AnkaaFile, _index: number) => {
-    // For remote files, use direct URL instead of API endpoints
     const remoteUrl = file.path;
-
-    // Check if it's a previewable file
     const extension = file.filename.split(".").pop()?.toLowerCase() || "";
     const isImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(extension);
     const isPdf = extension === "pdf";
     const isVideo = ["mp4", "webm", "ogg", "mov", "avi"].includes(extension);
 
     if (isImage) {
-      // For images, open in image modal with all images for gallery navigation
+      // For images, collect all image files in the current folder for navigation
       const allImageFiles = folderContents?.data?.files
         ?.filter((item: any) => {
           const ext = item.name.split(".").pop()?.toLowerCase() || "";
@@ -155,10 +175,10 @@ function FileContentsBrowser({
         fileViewer?.actions.viewFiles(allImageFiles, imageIndex);
       }
     } else if (isPdf || isVideo) {
-      // For PDFs and videos, open directly in new tab (remote storage doesn't support inline viewing)
-      window.open(remoteUrl, "_blank");
+      // Use the file viewer to open PDFs and videos in the inline modal
+      fileViewer?.actions.viewFile(file);
     } else {
-      // For other files, trigger download
+      // For other file types, download them
       const link = document.createElement("a");
       link.href = remoteUrl;
       link.download = file.filename;
@@ -175,7 +195,6 @@ function FileContentsBrowser({
   };
 
   const handleDownload = (file: AnkaaFile) => {
-    // Use remoteUrl directly for download
     const link = document.createElement("a");
     link.href = file.path;
     link.download = file.filename;
@@ -187,17 +206,17 @@ function FileContentsBrowser({
 
   if (isLoading) {
     return (
-      <div className={fileDisplayMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2"}>
+      <div className={fileDisplayMode === "grid" ? "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3" : "grid grid-cols-1 gap-2"}>
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} className="animate-pulse">
             {fileDisplayMode === "grid" ? (
-              <div className="w-[200px] h-[180px] bg-gray-200 rounded-lg"></div>
+              <div className="h-[180px] bg-muted rounded-lg"></div>
             ) : (
-              <div className="flex items-center gap-3 p-3 border rounded">
-                <div className="h-12 w-12 bg-gray-200 rounded"></div>
+              <div className="flex items-center gap-3 p-3 border border-border rounded">
+                <div className="h-12 w-12 bg-muted rounded"></div>
                 <div className="flex-1 space-y-1">
-                  <div className="h-4 bg-gray-200 rounded w-48"></div>
-                  <div className="h-3 bg-gray-200 rounded w-24"></div>
+                  <div className="h-4 bg-muted rounded w-48"></div>
+                  <div className="h-3 bg-muted rounded w-24"></div>
                 </div>
               </div>
             )}
@@ -217,32 +236,46 @@ function FileContentsBrowser({
     );
   }
 
-  // Separate directories and files
   const directories = folderContents.data.files.filter((item: any) => item.type === "directory");
   const files = folderContents.data.files.filter((item: any) => item.type !== "directory");
 
-  // Convert files to AnkaaFile format
-  const ankaaFiles = files.map((item: any) => convertRemoteItemToAnkaaFile(item, `${selectedFolder}/${currentSubPath || ""}`));
+  const filteredDirectories = searchQuery
+    ? directories.filter((dir: any) => dir.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : directories;
+  const filteredFiles = searchQuery
+    ? files.filter((file: any) => file.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : files;
+
+  const ankaaFiles = filteredFiles.map((item: any) => convertRemoteItemToAnkaaFile(item, `${selectedFolder}/${currentSubPath || ""}`));
+
+  if (filteredDirectories.length === 0 && ankaaFiles.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+        <IconSearch className="h-16 w-16 mb-4 opacity-20" />
+        <p className="text-lg font-medium">Nenhum resultado</p>
+        <p className="text-sm">Nenhum arquivo ou pasta corresponde à sua busca.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className={fileDisplayMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2"}>
-      {/* Render directories first */}
-      {directories.map((dir: any) => (
+    <div className={fileDisplayMode === "grid" ? "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3" : "grid grid-cols-1 gap-2"}>
+      {filteredDirectories.map((dir: any) => (
         <div
           key={dir.name}
           className={
             fileDisplayMode === "grid"
-              ? "group relative overflow-hidden transition-all duration-300 rounded-lg hover:shadow-sm cursor-pointer border border-border w-full max-w-[200px]"
-              : "flex items-center gap-3 p-3 border rounded hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer"
+              ? "group relative overflow-hidden transition-all duration-300 rounded-lg hover:shadow-sm cursor-pointer border border-border"
+              : "flex items-center gap-3 p-3 border border-border rounded hover:bg-muted/50 transition-colors cursor-pointer"
           }
           onClick={() => handleDirectoryClick(dir)}
         >
           {fileDisplayMode === "grid" ? (
             <>
-              <div className="flex items-center justify-center rounded-lg bg-muted/30" style={{ height: "8rem" }}>
+              <div className="flex items-center justify-center rounded-t-lg bg-muted/30" style={{ height: "8rem" }}>
                 <IconFolder className="h-16 w-16 text-blue-600" />
               </div>
-              <div className="p-3 border-t">
+              <div className="p-3 border-t border-border">
                 <p className="text-sm font-medium truncate" title={dir.name}>
                   {dir.name}
                 </p>
@@ -274,7 +307,6 @@ function FileContentsBrowser({
         </div>
       ))}
 
-      {/* Render files using FileItem component */}
       {ankaaFiles.map((file: AnkaaFile, index: number) => (
         <FileItem
           key={file.id}
@@ -295,7 +327,6 @@ export function ServerSharedFoldersPage() {
   const location = useLocation();
   const { success } = useToast();
 
-  // Parse the current path from URL and decode it to handle spaces and special characters
   const pathSegments = location.pathname
     .replace("/servidor/pastas-compartilhadas", "")
     .split("/")
@@ -305,50 +336,68 @@ export function ServerSharedFoldersPage() {
   const currentSubPath = pathSegments.slice(1).join("/") || undefined;
   const viewMode = selectedFolder ? "browse" : "folders";
 
-  const [fileDisplayMode, setFileDisplayMode] = useState<FileViewMode>("list");
+  const [fileDisplayMode, setFileDisplayMode] = useState<FileViewMode>("grid");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Check admin privileges
   const isAdmin = user?.sector?.privileges ? hasPrivilege(user as any, SECTOR_PRIVILEGES.ADMIN) : false;
 
-  // Track page access
   usePageTracker({
     title: "Pastas Compartilhadas",
     icon: "sharedFolders",
   });
 
-  // Fetch shared folders
   const { data: sharedFolders, isLoading, refetch } = useSharedFolders();
 
-  // Fetch folder contents when browsing
   const {
     data: folderContents,
     isLoading: isLoadingContents,
     refetch: refetchContents,
   } = useSharedFolderContents(selectedFolder ?? undefined, currentSubPath ?? undefined, { enabled: viewMode === "browse" && !!selectedFolder });
 
-  // Redirect if not admin
+  useEffect(() => {
+    setSearchQuery("");
+  }, [location.pathname]);
+
   useEffect(() => {
     if (!isAdmin) {
       navigate(routes.home);
     }
   }, [isAdmin, navigate]);
 
-  // Navigation handlers using actual routes
+  const filteredFolders = useMemo(() => {
+    if (!sharedFolders?.data) return [];
+    if (!searchQuery) return sharedFolders.data;
+    return sharedFolders.data.filter(folder =>
+      folder.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [sharedFolders?.data, searchQuery]);
+
+  const totals = useMemo(() => {
+    if (viewMode === "browse" && folderContents?.data) {
+      return {
+        files: folderContents.data.totalFiles || 0,
+        size: folderContents.data.totalSize || "0",
+      };
+    }
+    if (sharedFolders?.data) {
+      return {
+        count: sharedFolders.data.length,
+      };
+    }
+    return null;
+  }, [viewMode, folderContents?.data, sharedFolders?.data]);
+
   const handleBrowseFolder = (folderName: string) => {
     navigate(`/servidor/pastas-compartilhadas/${encodeURIComponent(folderName)}`);
   };
 
   const handleNavigateToSubfolder = (subPath: string) => {
-    // subPath already contains the full path from the root of the selected folder
     const fullPath = `${selectedFolder}/${subPath}`;
-    // Encode each segment separately to preserve the path structure
     const encodedPath = fullPath.split("/").map(seg => encodeURIComponent(seg)).join("/");
     navigate(`/servidor/pastas-compartilhadas/${encodedPath}`);
   };
 
-
   const formatFileSize = (size: string) => {
-    // Size comes as string like "1.2G", "500M", "2.5K"
     const match = size.match(/^(\d+\.?\d*)\s*([KMGT]?)B?$/i);
     if (!match) return size;
 
@@ -364,7 +413,6 @@ export function ServerSharedFoldersPage() {
     return `${sizeNum} ${unitMap[unit.toUpperCase()] || unit}`;
   };
 
-  // Helper functions for file type detection
   const getBreadcrumbs = () => {
     const breadcrumbs: Array<{ label: string; href: string; onClick: (e: React.MouseEvent) => void }> = [
       {
@@ -391,7 +439,6 @@ export function ServerSharedFoldersPage() {
         href: routes.server.sharedFolders,
         onClick: (e: React.MouseEvent) => {
           e.preventDefault();
-          // Already on the main page, just refresh if needed
           refetch();
         },
       });
@@ -419,14 +466,13 @@ export function ServerSharedFoldersPage() {
         const pathParts = currentSubPath.split("/");
         let accumulatedPath = selectedFolder;
 
-        pathParts.forEach((part, _index) => {
+        pathParts.forEach((part) => {
           accumulatedPath += `/${part}`;
-          // Encode each segment of the accumulated path for URLs
           const encodedPath = accumulatedPath.split("/").map(seg => encodeURIComponent(seg)).join("/");
           const routePath = `/servidor/pastas-compartilhadas/${encodedPath}`;
 
           breadcrumbs.push({
-            label: part, // Already decoded from pathSegments
+            label: part,
             href: routePath,
             onClick: (e: React.MouseEvent) => {
               e.preventDefault();
@@ -444,221 +490,174 @@ export function ServerSharedFoldersPage() {
     return null;
   }
 
-  const formatPermissions = (permissions: string) => {
-    // Convert numeric permissions like "755" to readable format
-    const numericMatch = permissions.match(/^(\d)(\d)(\d)$/);
-    if (numericMatch) {
-      const [, owner, group, others] = numericMatch;
-      const permMap: Record<string, string> = {
-        "0": "---",
-        "1": "--x",
-        "2": "-w-",
-        "3": "-wx",
-        "4": "r--",
-        "5": "r-x",
-        "6": "rw-",
-        "7": "rwx",
-      };
+  // Derive folder type from name when not provided
+  const deriveFolderType = (folderName: string, providedType?: string): string => {
+    if (providedType && providedType !== "other") return providedType;
 
-      return `${permMap[owner] || "???"}/${permMap[group] || "???"}/${permMap[others] || "???"}`;
-    }
+    const name = folderName.toLowerCase();
 
-    // If already in readable format, return as is
-    return permissions;
-  };
+    // Match folder names to types
+    if (name.includes("projeto") || name === "projetos") return "projects";
+    if (name.includes("orcamento") || name.includes("orçamento")) return "budgets";
+    if (name.includes("observa")) return "observations";
+    if (name.includes("nota") || name.includes("fiscal") || name.includes("invoice")) return "invoices";
+    if (name.includes("logo")) return "logos";
+    if (name.includes("plotter") || name.includes("corte")) return "plotter";
+    if (name.includes("imagem") || name.includes("imagens") || name.includes("fotos")) return "images";
+    if (name.includes("backup")) return "backup";
+    if (name.includes("lixeira") || name.includes("trash") || name.includes("excluido")) return "trash";
+    if (name.includes("recibo") || name.includes("comprovante")) return "receipts";
+    if (name.includes("rascunho") || name.includes("draft")) return "drafts";
+    if (name.includes("thumbnail") || name.includes("miniatura")) return "thumbnails";
+    if (name.includes("colaborador") || name.includes("funcionario") || name.includes("equipe")) return "team";
+    if (name.includes("cliente") || name.includes("customer")) return "customers";
+    if (name.includes("fornecedor") || name.includes("supplier")) return "suppliers";
+    if (name.includes("aerografia") || name.includes("airbrush")) return "artwork";
+    if (name.includes("pdf")) return "documents";
+    if (name.includes("outro") || name === "outros") return "misc";
+    if (name.includes("tinta") || name.includes("tintas") || name.includes("paint")) return "paints";
+    if (name.includes("mensagem") || name.includes("message") || name.includes("whatsapp") || name.includes("chat")) return "messages";
+    if (name.includes("layout") || name.includes("design") || name.includes("arte")) return "layouts";
 
-  const getPermissionLevel = (permissions: string): "read-only" | "read-write" | "full" | "restricted" => {
-    if (permissions.includes("drwxrwsr-x") || permissions.includes("drwxrwxr-x")) {
-      return "full";
-    } else if (permissions.includes("rw") || permissions.includes("w")) {
-      return "read-write";
-    } else if (permissions.includes("r")) {
-      return "read-only";
-    } else {
-      return "restricted";
-    }
-  };
-
-  const getPermissionBadgeVariant = (level: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (level) {
-      case "full":
-        return "default";
-      case "read-write":
-        return "secondary";
-      case "read-only":
-        return "outline";
-      case "restricted":
-        return "destructive";
-      default:
-        return "outline";
-    }
-  };
-
-  const getPermissionDescription = (permissions: string): string => {
-    const level = getPermissionLevel(permissions);
-    switch (level) {
-      case "full":
-        return "Acesso completo para proprietário e grupo";
-      case "read-write":
-        return "Leitura e escrita permitida";
-      case "read-only":
-        return "Apenas leitura permitida";
-      case "restricted":
-        return "Acesso restrito";
-      default:
-        return "Permissões desconhecidas";
-    }
+    return "general";
   };
 
   const getFolderIcon = (type?: string) => {
     switch (type) {
-      case "artwork":
-        return IconPalette;
-      case "general":
-        return IconFileText;
-      case "backup":
-        return IconArchive;
-      case "receipts":
-        return IconFileDescription;
-      case "images":
-        return IconCamera;
-      case "trash":
-        return IconTrash;
-      case "logos":
-        return IconBrandApple;
-      case "invoices":
-        return IconFileInvoice;
-      case "observations":
-        return IconNotes;
-      case "budgets":
-        return IconCalculator;
-      case "plotter":
-        return IconPrinter;
-      case "projects":
-        return IconBriefcase;
-      case "drafts":
-        return IconFileDescription;
-      case "thumbnails":
-        return IconPhoto;
-      default:
-        return IconFolder;
+      case "artwork": return IconPalette;
+      case "general": return IconFileText;
+      case "backup": return IconArchive;
+      case "receipts": return IconFileDescription;
+      case "images": return IconCamera;
+      case "trash": return IconTrash;
+      case "logos": return IconBrandApple;
+      case "invoices": return IconFileInvoice;
+      case "observations": return IconNotes;
+      case "budgets": return IconCalculator;
+      case "plotter": return IconPrinter;
+      case "projects": return IconBriefcase;
+      case "drafts": return IconFileDescription;
+      case "thumbnails": return IconPhoto;
+      case "team": return IconUsers;
+      case "customers": return IconBuildingStore;
+      case "suppliers": return IconTruck;
+      case "documents": return IconFileText;
+      case "misc": return IconFolders;
+      case "paints": return IconDroplet;
+      case "messages": return IconMessage;
+      case "layouts": return IconLayout;
+      default: return IconFolder;
     }
   };
 
-  const getFolderColor = (type?: string) => {
-    switch (type) {
-      case "artwork":
-        return "text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900";
-      case "general":
-        return "text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-900";
-      case "backup":
-        return "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900";
-      case "receipts":
-        return "text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900";
-      case "images":
-        return "text-pink-600 dark:text-pink-400 bg-pink-100 dark:bg-pink-900";
-      case "trash":
-        return "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900";
-      case "logos":
-        return "text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900";
-      case "invoices":
-        return "text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900";
-      case "observations":
-        return "text-cyan-600 dark:text-cyan-400 bg-cyan-100 dark:bg-cyan-900";
-      case "budgets":
-        return "text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900";
-      case "plotter":
-        return "text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900";
-      case "projects":
-        return "text-teal-600 dark:text-teal-400 bg-teal-100 dark:bg-teal-900";
-      case "drafts":
-        return "text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-900";
-      case "thumbnails":
-        return "text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-900";
-      default:
-        return "text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900";
-    }
+  // All main folders use the same color scheme - only icons are different
+  const getFolderColor = (_type?: string) => {
+    return "text-blue-600 dark:text-blue-400 bg-muted/50";
   };
+
+  // Toolbar JSX - inlined to prevent focus loss on re-render
+  const toolbarContent = (
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+      {/* Search Input */}
+      <div className="relative w-full sm:w-auto sm:min-w-[300px]">
+        <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder={viewMode === "browse" ? "Buscar arquivos e pastas..." : "Buscar pastas..."}
+          value={searchQuery}
+          onChange={(value) => setSearchQuery((value as string) || "")}
+          className="pl-9"
+        />
+      </div>
+
+      {/* Stats and View Toggle */}
+      <div className="flex items-center gap-3">
+        {/* Stats */}
+        {totals && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {viewMode === "browse" ? (
+              <>
+                <Badge variant="outline" className="font-normal">
+                  <IconFiles className="h-3 w-3 mr-1" />
+                  {totals.files} arquivos
+                </Badge>
+                <Badge variant="outline" className="font-normal">
+                  <IconDeviceDesktop className="h-3 w-3 mr-1" />
+                  {totals.size}
+                </Badge>
+              </>
+            ) : (
+              <Badge variant="outline" className="font-normal">
+                <IconFolders className="h-3 w-3 mr-1" />
+                {totals.count} pastas
+              </Badge>
+            )}
+          </div>
+        )}
+
+        {/* View Toggle */}
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+          <Button
+            variant={fileDisplayMode === "list" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setFileDisplayMode("list")}
+            className="h-8 px-3"
+          >
+            <IconList className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={fileDisplayMode === "grid" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setFileDisplayMode("grid")}
+            className="h-8 px-3"
+          >
+            <IconLayoutGrid className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 
   // Render folder browser or folder list based on view mode
   if (viewMode === "browse" && selectedFolder) {
     return (
       <FileViewerProvider baseUrl={apiClient.defaults.baseURL}>
         <div className="h-full flex flex-col px-4 pt-4">
-        {/* Fixed Header */}
-        <div className="flex-shrink-0">
-          <PageHeader
-            title={`Navegando: ${selectedFolder}`}
-            icon={IconFolder}
-            breadcrumbs={getBreadcrumbs()}
-            actions={[
-              {
-                key: "refresh",
-                label: "Atualizar",
-                icon: IconRefresh,
-                onClick: () => {
-                  refetchContents();
-                  success("Conteúdo atualizado");
+          <div className="flex-shrink-0">
+            <PageHeader
+              title={currentSubPath ? currentSubPath.split("/").pop() || selectedFolder : selectedFolder}
+              icon={IconFolder}
+              breadcrumbs={getBreadcrumbs()}
+              actions={[
+                {
+                  key: "refresh",
+                  label: "Atualizar",
+                  icon: IconRefresh,
+                  onClick: () => {
+                    refetchContents();
+                    success("Conteúdo atualizado");
+                  },
+                  variant: "outline" as const,
+                  disabled: isLoadingContents,
                 },
-                variant: "outline" as const,
-                disabled: isLoadingContents,
-              },
-            ]}
-          />
+              ]}
+            />
+          </div>
+
+          <Card className="flex-1 flex flex-col min-h-0 mt-4">
+            <CardContent className="flex-1 overflow-auto p-4 pb-6">
+              {toolbarContent}
+              <FileContentsBrowser
+                folderContents={folderContents}
+                isLoading={isLoadingContents}
+                currentSubPath={currentSubPath}
+                selectedFolder={selectedFolder || ""}
+                fileDisplayMode={fileDisplayMode}
+                searchQuery={searchQuery}
+                handleNavigateToSubfolder={handleNavigateToSubfolder}
+              />
+            </CardContent>
+          </Card>
         </div>
-
-        {/* Browser Content */}
-        <Card className="flex-1 flex flex-col min-h-0 mt-4">
-          <CardContent className="flex-1 overflow-auto p-4 space-y-4 pb-6">
-            {/* Navigation Controls - removed redundant section since breadcrumbs handle navigation */}
-
-            {/* Folder Contents */}
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-xl">Conteúdo da pasta</CardTitle>
-                  <div className="flex items-center gap-4">
-                    {/* View Mode Toggle */}
-                    <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-                      <Button variant={fileDisplayMode === "list" ? "default" : "ghost"} size="sm" onClick={() => setFileDisplayMode("list")} className="h-8 px-3">
-                        <IconList className="h-4 w-4" />
-                        <span className="ml-2 hidden sm:inline">Lista</span>
-                      </Button>
-                      <Button variant={fileDisplayMode === "grid" ? "default" : "ghost"} size="sm" onClick={() => setFileDisplayMode("grid")} className="h-8 px-3">
-                        <IconLayoutGrid className="h-4 w-4" />
-                        <span className="ml-2 hidden sm:inline">Grade</span>
-                      </Button>
-                    </div>
-
-                    {folderContents?.data && (
-                      <div className="flex gap-2 text-sm text-muted-foreground">
-                        <Badge variant="outline">
-                          <IconFiles className="h-3 w-3 mr-1" />
-                          {folderContents.data.totalFiles} arquivos
-                        </Badge>
-                        <Badge variant="outline">
-                          <IconDeviceDesktop className="h-3 w-3 mr-1" />
-                          {folderContents.data.totalSize}
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <FileContentsBrowser
-                  folderContents={folderContents}
-                  isLoading={isLoadingContents}
-                  currentSubPath={currentSubPath}
-                  selectedFolder={selectedFolder || ""}
-                  fileDisplayMode={fileDisplayMode}
-                  handleNavigateToSubfolder={handleNavigateToSubfolder}
-                />
-              </CardContent>
-            </Card>
-          </CardContent>
-        </Card>
-      </div>
       </FileViewerProvider>
     );
   }
@@ -667,183 +666,149 @@ export function ServerSharedFoldersPage() {
   return (
     <FileViewerProvider baseUrl={apiClient.defaults.baseURL}>
       <div className="h-full flex flex-col px-4 pt-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <PageHeader
-          title="Pastas Compartilhadas"
-          icon={IconFolderShare}
-          breadcrumbs={getBreadcrumbs()}
-          actions={[
-            {
-              key: "refresh",
-              label: "Atualizar",
-              icon: IconRefresh,
-              onClick: () => {
-                refetch();
-                success("Pastas atualizadas");
+        <div className="flex-shrink-0">
+          <PageHeader
+            title="Pastas Compartilhadas"
+            icon={IconFolderShare}
+            breadcrumbs={getBreadcrumbs()}
+            actions={[
+              {
+                key: "refresh",
+                label: "Atualizar",
+                icon: IconRefresh,
+                onClick: () => {
+                  refetch();
+                  success("Pastas atualizadas");
+                },
+                variant: "outline" as const,
+                disabled: isLoading,
               },
-              variant: "outline" as const,
-              disabled: isLoading,
-            },
-          ]}
-        />
+            ]}
+          />
+        </div>
+
+        <Card className="flex-1 flex flex-col min-h-0 mt-4">
+          <CardContent className="flex-1 overflow-auto p-4 pb-6">
+            {toolbarContent}
+
+            {isLoading ? (
+              <div className={fileDisplayMode === "grid" ? "grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4" : "space-y-3"}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="animate-pulse">
+                    {fileDisplayMode === "grid" ? (
+                      <div className="h-[200px] bg-muted rounded-lg"></div>
+                    ) : (
+                      <div className="flex items-center gap-4 p-4 border border-border rounded-lg">
+                        <div className="h-12 w-12 bg-muted rounded-lg"></div>
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 bg-muted rounded w-32"></div>
+                          <div className="h-3 bg-muted rounded w-48"></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : filteredFolders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                {searchQuery ? (
+                  <>
+                    <IconSearch className="h-16 w-16 mb-4 opacity-20" />
+                    <p className="text-lg font-medium">Nenhum resultado</p>
+                    <p className="text-sm">Nenhuma pasta corresponde à sua busca.</p>
+                  </>
+                ) : (
+                  <>
+                    <IconFolderShare className="h-16 w-16 mb-4 opacity-20" />
+                    <p className="text-lg font-medium">Nenhuma pasta compartilhada encontrada</p>
+                    <p className="text-sm">Não há pastas compartilhadas configuradas no momento.</p>
+                  </>
+                )}
+              </div>
+            ) : fileDisplayMode === "grid" ? (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
+                {filteredFolders.map((folder) => {
+                  const folderType = deriveFolderType(folder.name, folder.type);
+                  const FolderIcon = getFolderIcon(folderType);
+                  const colorClass = getFolderColor(folderType);
+
+                  return (
+                    <div
+                      key={folder.name}
+                      className="group relative overflow-hidden transition-all duration-300 rounded-lg hover:shadow-md cursor-pointer border border-border bg-card hover:border-primary/30"
+                      onClick={() => handleBrowseFolder(folder.name)}
+                    >
+                      <div className={`flex items-center justify-center h-32 ${colorClass.split(" ").slice(2).join(" ")}`}>
+                        <FolderIcon className={`h-16 w-16 ${colorClass.split(" ").slice(0, 2).join(" ")} transition-transform group-hover:scale-110`} />
+                      </div>
+
+                      <div className="p-3 border-t border-border">
+                        <h3 className="font-semibold text-sm truncate mb-1" title={folder.name}>{folder.name}</h3>
+
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{folder.fileCount ?? 0} arquivos</span>
+                          <span>•</span>
+                          <span>{formatFileSize(folder.size)}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                          <IconCalendar className="h-3 w-3" />
+                          <span>{new Date(folder.lastModified).toLocaleDateString("pt-BR")}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredFolders.map((folder) => {
+                  const folderType = deriveFolderType(folder.name, folder.type);
+                  const FolderIcon = getFolderIcon(folderType);
+                  const colorClass = getFolderColor(folderType);
+
+                  return (
+                    <div
+                      key={folder.name}
+                      className="flex items-center gap-4 p-4 border border-border rounded-lg hover:bg-muted/50 hover:border-primary/30 transition-colors cursor-pointer group"
+                      onClick={() => handleBrowseFolder(folder.name)}
+                    >
+                      <div className={`p-3 rounded-lg ${colorClass}`}>
+                        <FolderIcon className="h-6 w-6" />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold truncate mb-1">{folder.name}</h3>
+
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <IconFiles className="h-3.5 w-3.5" />
+                            {folder.fileCount ?? 0} arquivos
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <IconFolders className="h-3.5 w-3.5" />
+                            {folder.subdirCount ?? 0} pastas
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <IconDeviceDesktop className="h-3.5 w-3.5" />
+                            {formatFileSize(folder.size)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <IconCalendar className="h-3.5 w-3.5" />
+                            {new Date(folder.lastModified).toLocaleDateString("pt-BR")}
+                          </span>
+                        </div>
+                      </div>
+
+                      <IconChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-
-      {/* Content Card */}
-      <Card className="flex-1 flex flex-col min-h-0 mt-4">
-        <CardContent className="flex-1 overflow-auto p-4 space-y-4 pb-6">
-              {isLoading ? (
-                <div className="space-y-4">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="animate-pulse flex justify-between items-center p-4 border rounded">
-                      <div className="flex items-center space-x-3">
-                        <div className="h-10 w-10 bg-gray-200 rounded"></div>
-                        <div className="space-y-2">
-                          <div className="h-4 bg-gray-200 rounded w-32"></div>
-                          <div className="h-3 bg-gray-200 rounded w-48"></div>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="h-4 bg-gray-200 rounded w-20"></div>
-                        <div className="h-3 bg-gray-200 rounded w-16"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {sharedFolders?.data?.map((folder) => {
-                    const FolderIcon = getFolderIcon(folder.type);
-                    const colorClass = getFolderColor(folder.type);
-
-                    return (
-                      <div key={folder.name} className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors relative">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-start space-x-4 flex-1">
-                            {/* Folder Icon */}
-                            <div className={`p-3 rounded-lg ${colorClass}`}>
-                              <FolderIcon className="h-6 w-6" />
-                            </div>
-
-                            {/* Folder Details */}
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-3">
-                                <h3 className="text-lg font-semibold text-secondary-foreground">{folder.name}</h3>
-                                {folder.type && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {folder.type}
-                                  </Badge>
-                                )}
-                              </div>
-
-                              {/* Description */}
-                              {folder.description && <p className="text-sm text-muted-foreground italic">{folder.description}</p>}
-
-                              {/* Enhanced Statistics */}
-                              <div className="flex gap-4 my-2">
-                                <Badge variant="secondary">
-                                  <IconFiles className="h-3 w-3 mr-1" />
-                                  {folder.fileCount ?? 0} arquivos
-                                </Badge>
-                                <Badge variant="secondary">
-                                  <IconFolders className="h-3 w-3 mr-1" />
-                                  {folder.subdirCount ?? 0} pastas
-                                </Badge>
-                                <Badge variant="secondary">
-                                  <IconDeviceDesktop className="h-3 w-3 mr-1" />
-                                  {formatFileSize(folder.size)}
-                                </Badge>
-                              </div>
-
-                              {/* Modification Date - below folder info */}
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <IconCalendar className="h-4 w-4" />
-                                <span className="font-medium">Modificado:</span>
-                                <span>{new Date(folder.lastModified).toLocaleString("pt-BR")}</span>
-                              </div>
-
-                              <div className="text-sm text-muted-foreground space-y-1 pb-12">
-                                <div className="flex items-center gap-2">
-                                  <IconEye className="h-4 w-4" />
-                                  <span>Caminho: {folder.path}</span>
-                                </div>
-
-                                {/* Remote URL */}
-                                {folder.remotePath && (
-                                  <div className="flex items-center gap-2">
-                                    <IconExternalLink className="h-4 w-4" />
-                                    <span>Remoto: </span>
-                                    <a href={folder.remotePath} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline truncate">
-                                      {folder.remotePath}
-                                    </a>
-                                  </div>
-                                )}
-
-                                <div className="flex items-center gap-6 mt-3">
-                                  <div className="flex items-center gap-2">
-                                    <IconUsers className="h-4 w-4" />
-                                    <span className="font-medium">Proprietário:</span>
-                                    <Badge variant="outline">{folder.owner}</Badge>
-                                  </div>
-
-                                  <div className="flex items-center gap-2">
-                                    <IconUsers className="h-4 w-4" />
-                                    <span className="font-medium">Grupo:</span>
-                                    <Badge variant="outline">{folder.group}</Badge>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Permissions */}
-                          <div className="ml-4 space-y-2 min-w-[180px]">
-                            <div className="text-right space-y-2">
-                              <div className="text-xs text-muted-foreground mb-1">Permissões</div>
-
-                              {/* Permission Level Badge */}
-                              <Badge className="text-xs block w-full justify-center" variant={getPermissionBadgeVariant(getPermissionLevel(folder.permissions))}>
-                                {getPermissionLevel(folder.permissions).toUpperCase()}
-                              </Badge>
-
-                              {/* Raw Permissions */}
-                              <Badge className="font-mono text-xs block w-full justify-center" variant="outline">
-                                {formatPermissions(folder.permissions)}
-                              </Badge>
-
-                              {/* Permission Description */}
-                              <p className="text-xs text-muted-foreground text-center">{getPermissionDescription(folder.permissions)}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Navegar Button - Bottom Right */}
-                        <div className="absolute bottom-4 right-4">
-                          <Button onClick={() => handleBrowseFolder(folder.name)} variant="outline" size="sm">
-                            <IconArrowRight className="h-4 w-4 mr-2" />
-                            Navegar
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {(!sharedFolders?.data || sharedFolders.data.length === 0) && !isLoading && (
-                    <div className="text-center py-12">
-                      <IconFolderShare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-muted-foreground mb-2">Nenhuma pasta compartilhada encontrada</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Não há pastas compartilhadas configuradas no diretório /srv/samba/shares no momento.
-                        <br />
-                        Verifique se o serviço de compartilhamento de arquivos está ativo.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-        </CardContent>
-      </Card>
-    </div>
     </FileViewerProvider>
   );
 }

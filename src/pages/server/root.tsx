@@ -34,9 +34,8 @@ export function ServerRootPage() {
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Fixed Header */}
-      <div className="flex-shrink-0 bg-background">
-        <div className="px-4">
-          <PageHeader
+      <div className="flex-shrink-0 bg-background px-4 pt-4">
+        <PageHeader
             title="Gerenciamento do Servidor"
             icon={IconServer}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Servidor" }]}
@@ -55,7 +54,6 @@ export function ServerRootPage() {
               },
             ]}
           />
-        </div>
       </div>
 
       {/* Scrollable Content */}
