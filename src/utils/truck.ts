@@ -16,6 +16,9 @@ export function getTruckManufacturerLabel(manufacturer: TRUCK_MANUFACTURER): str
 export function formatTruckSpot(spot: string | null | undefined): string {
   if (!spot) return "-";
 
+  if (spot === "YARD_WAIT") return "Pátio de Espera";
+  if (spot === "YARD_EXIT") return "Pátio de Saída";
+
   // Parse the spot format: B{garage}_F{lane}_V{spot}
   const match = spot.match(/^B(\d+)_F(\d+)_V(\d+)$/);
 

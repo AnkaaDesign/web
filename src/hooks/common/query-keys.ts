@@ -867,10 +867,10 @@ export const serverKeys = {
   users: () => ["server", "users"] as const,
   userAction: (action: string, username: string) => ["server", "users", action, username] as const,
 
-  // Shared folders
-  sharedFolders: () => ["server", "shared-folders"] as const,
-  sharedFolderContents: (folderName?: string, subPath?: string) =>
-    subPath ? (["server", "shared-folders", folderName, "contents", subPath] as const) : (["server", "shared-folders", folderName, "contents"] as const),
+  // File Manager (shared folders)
+  fileManagerFolders: () => ["server", "file-manager"] as const,
+  fileManagerFolderContents: (folderName?: string, subPath?: string) =>
+    subPath ? (["server", "file-manager", folderName, "contents", subPath] as const) : (["server", "file-manager", folderName, "contents"] as const),
 };
 
 // =====================================================

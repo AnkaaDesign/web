@@ -518,7 +518,7 @@ export const routes = {
     metrics: "/servidor/metricas",
     root: "/servidor",
     services: "/servidor/servicos",
-    sharedFolders: "/servidor/pastas-compartilhadas",
+    fileManager: "/servidor/gerenciador-de-arquivos",
     users: {
       create: "/servidor/usuarios/cadastrar",
       root: "/servidor/usuarios",

@@ -360,7 +360,7 @@ export const TABLER_ICONS = {
   server: "IconServer",
   services: "IconSettings",
   systemUsers: "IconUserCog",
-  sharedFolders: "IconFolderShare",
+  fileManager: "IconFolderShare",
   systemMetrics: "IconChartLine",
   systemLogs: "IconFileText",
   rocket: "IconRocket",
@@ -962,6 +962,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
   },
   {
+    id: "gerenciador-de-arquivos",
+    title: "Gerenciador de Arquivos",
+    icon: "fileManager",
+    path: "/servidor/gerenciador-de-arquivos",
+    requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+  },
+  {
     id: "historico-commercial",
     title: "Histórico",
     icon: "history",
@@ -1388,6 +1395,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
     children: [
       { id: "servidor-backup", title: "Backup do Sistema", icon: "databaseImport", path: "/servidor/backup" },
+      { id: "servidor-gerenciador-de-arquivos", title: "Gerenciador de Arquivos", icon: "fileManager", path: "/servidor/gerenciador-de-arquivos" },
       {
         id: "servidor-implantacoes",
         title: "Implantações",
@@ -1400,7 +1408,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
       },
       { id: "servidor-logs", title: "Logs do Sistema", icon: "systemLogs", path: "/servidor/logs" },
       { id: "servidor-metricas", title: "Métricas do Sistema", icon: "systemMetrics", path: "/servidor/metricas" },
-      { id: "servidor-pastas-compartilhadas", title: "Pastas Compartilhadas", icon: "sharedFolders", path: "/servidor/pastas-compartilhadas" },
       {
         id: "servidor-registros-de-alteracoes",
         title: "Registros de Alterações",

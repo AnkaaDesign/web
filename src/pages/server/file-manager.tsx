@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/auth-context";
 import { SECTOR_PRIVILEGES, routes } from "../../constants";
-import { hasPrivilege } from "../../utils";
+import { hasAnyPrivilege } from "../../utils";
 import {
   IconFolderShare,
   IconRefresh,
@@ -41,7 +41,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { PageHeader } from "@/components/ui/page-header";
-import { useSharedFolders, useSharedFolderContents } from "../../hooks";
+import { useFileManagerFolders, useFileManagerFolderContents } from "../../hooks";
 import { useToast } from "@/hooks/common/use-toast";
 import { apiClient } from "@/api-client";
 import { FileViewerProvider, useFileViewer } from "@/components/common/file/file-viewer";
@@ -321,14 +321,14 @@ function FileContentsBrowser({
   );
 }
 
-export function ServerSharedFoldersPage() {
+export function ServerFileManagerPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { success } = useToast();
 
   const pathSegments = location.pathname
-    .replace("/servidor/pastas-compartilhadas", "")
+    .replace("/servidor/gerenciador-de-arquivos", "")
     .split("/")
     .filter(Boolean)
     .map(segment => decodeURIComponent(segment));
@@ -339,38 +339,38 @@ export function ServerSharedFoldersPage() {
   const [fileDisplayMode, setFileDisplayMode] = useState<FileViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const isAdmin = user?.sector?.privileges ? hasPrivilege(user as any, SECTOR_PRIVILEGES.ADMIN) : false;
+  const hasAccess = user?.sector?.privileges ? hasAnyPrivilege(user as any, [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL]) : false;
 
   usePageTracker({
-    title: "Pastas Compartilhadas",
-    icon: "sharedFolders",
+    title: "Gerenciador de Arquivos",
+    icon: "fileManager",
   });
 
-  const { data: sharedFolders, isLoading, refetch } = useSharedFolders();
+  const { data: folders, isLoading, refetch } = useFileManagerFolders();
 
   const {
     data: folderContents,
     isLoading: isLoadingContents,
     refetch: refetchContents,
-  } = useSharedFolderContents(selectedFolder ?? undefined, currentSubPath ?? undefined, { enabled: viewMode === "browse" && !!selectedFolder });
+  } = useFileManagerFolderContents(selectedFolder ?? undefined, currentSubPath ?? undefined, { enabled: viewMode === "browse" && !!selectedFolder });
 
   useEffect(() => {
     setSearchQuery("");
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!hasAccess) {
       navigate(routes.home);
     }
-  }, [isAdmin, navigate]);
+  }, [hasAccess, navigate]);
 
   const filteredFolders = useMemo(() => {
-    if (!sharedFolders?.data) return [];
-    if (!searchQuery) return sharedFolders.data;
-    return sharedFolders.data.filter(folder =>
+    if (!folders?.data) return [];
+    if (!searchQuery) return folders.data;
+    return folders.data.filter(folder =>
       folder.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [sharedFolders?.data, searchQuery]);
+  }, [folders?.data, searchQuery]);
 
   const totals = useMemo(() => {
     if (viewMode === "browse" && folderContents?.data) {
@@ -379,22 +379,22 @@ export function ServerSharedFoldersPage() {
         size: folderContents.data.totalSize || "0",
       };
     }
-    if (sharedFolders?.data) {
+    if (folders?.data) {
       return {
-        count: sharedFolders.data.length,
+        count: folders.data.length,
       };
     }
     return null;
-  }, [viewMode, folderContents?.data, sharedFolders?.data]);
+  }, [viewMode, folderContents?.data, folders?.data]);
 
   const handleBrowseFolder = (folderName: string) => {
-    navigate(`/servidor/pastas-compartilhadas/${encodeURIComponent(folderName)}`);
+    navigate(`/servidor/gerenciador-de-arquivos/${encodeURIComponent(folderName)}`);
   };
 
   const handleNavigateToSubfolder = (subPath: string) => {
     const fullPath = `${selectedFolder}/${subPath}`;
     const encodedPath = fullPath.split("/").map(seg => encodeURIComponent(seg)).join("/");
-    navigate(`/servidor/pastas-compartilhadas/${encodedPath}`);
+    navigate(`/servidor/gerenciador-de-arquivos/${encodedPath}`);
   };
 
   const formatFileSize = (size: string) => {
@@ -435,8 +435,8 @@ export function ServerSharedFoldersPage() {
 
     if (viewMode === "folders") {
       breadcrumbs.push({
-        label: "Pastas Compartilhadas",
-        href: routes.server.sharedFolders,
+        label: "Gerenciador de Arquivos",
+        href: routes.server.fileManager,
         onClick: (e: React.MouseEvent) => {
           e.preventDefault();
           refetch();
@@ -445,19 +445,19 @@ export function ServerSharedFoldersPage() {
     } else if (selectedFolder) {
       breadcrumbs.push(
         {
-          label: "Pastas Compartilhadas",
-          href: routes.server.sharedFolders,
+          label: "Gerenciador de Arquivos",
+          href: routes.server.fileManager,
           onClick: (e: React.MouseEvent) => {
             e.preventDefault();
-            navigate(routes.server.sharedFolders);
+            navigate(routes.server.fileManager);
           },
         },
         {
           label: selectedFolder,
-          href: `/servidor/pastas-compartilhadas/${encodeURIComponent(selectedFolder)}`,
+          href: `/servidor/gerenciador-de-arquivos/${encodeURIComponent(selectedFolder)}`,
           onClick: (e: React.MouseEvent) => {
             e.preventDefault();
-            navigate(`/servidor/pastas-compartilhadas/${encodeURIComponent(selectedFolder)}`);
+            navigate(`/servidor/gerenciador-de-arquivos/${encodeURIComponent(selectedFolder)}`);
           },
         },
       );
@@ -469,7 +469,7 @@ export function ServerSharedFoldersPage() {
         pathParts.forEach((part) => {
           accumulatedPath += `/${part}`;
           const encodedPath = accumulatedPath.split("/").map(seg => encodeURIComponent(seg)).join("/");
-          const routePath = `/servidor/pastas-compartilhadas/${encodedPath}`;
+          const routePath = `/servidor/gerenciador-de-arquivos/${encodedPath}`;
 
           breadcrumbs.push({
             label: part,
@@ -486,7 +486,7 @@ export function ServerSharedFoldersPage() {
     return breadcrumbs;
   };
 
-  if (!isAdmin) {
+  if (!hasAccess) {
     return null;
   }
 
@@ -668,7 +668,7 @@ export function ServerSharedFoldersPage() {
       <div className="h-full flex flex-col px-4 pt-4">
         <div className="flex-shrink-0">
           <PageHeader
-            title="Pastas Compartilhadas"
+            title="Gerenciador de Arquivos"
             icon={IconFolderShare}
             breadcrumbs={getBreadcrumbs()}
             actions={[
@@ -720,8 +720,8 @@ export function ServerSharedFoldersPage() {
                 ) : (
                   <>
                     <IconFolderShare className="h-16 w-16 mb-4 opacity-20" />
-                    <p className="text-lg font-medium">Nenhuma pasta compartilhada encontrada</p>
-                    <p className="text-sm">Não há pastas compartilhadas configuradas no momento.</p>
+                    <p className="text-lg font-medium">Nenhuma pasta encontrada</p>
+                    <p className="text-sm">Não há pastas configuradas no gerenciador de arquivos no momento.</p>
                   </>
                 )}
               </div>

@@ -191,20 +191,20 @@ export function useSetSystemUserPassword() {
 }
 
 // =====================================================
-// Shared Folders Hooks
+// File Manager Hooks
 // =====================================================
 
-export function useSharedFolders() {
+export function useFileManagerFolders() {
   return useQuery({
-    queryKey: serverKeys.sharedFolders(),
+    queryKey: serverKeys.fileManagerFolders(),
     queryFn: getSharedFolders,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
-export function useSharedFolderContents(folderName?: string, subPath?: string, options?: { enabled?: boolean }) {
+export function useFileManagerFolderContents(folderName?: string, subPath?: string, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: serverKeys.sharedFolderContents(folderName, subPath),
+    queryKey: serverKeys.fileManagerFolderContents(folderName, subPath),
     queryFn: () => (folderName ? getSharedFolderContents(folderName, subPath) : Promise.resolve(null)),
     staleTime: 1000 * 60 * 2, // 2 minutes
     enabled: (options?.enabled ?? true) && !!folderName,
@@ -222,7 +222,7 @@ export function useServerManagement() {
   const temperatureQuery = useCpuTemperature();
   const ssdHealthQuery = useSsdHealth();
   const usersQuery = useSystemUsers();
-  const sharedFoldersQuery = useSharedFolders();
+  const fileManagerFoldersQuery = useFileManagerFolders();
 
   const startService = useStartService();
   const stopService = useStopService();
@@ -239,7 +239,7 @@ export function useServerManagement() {
     temperature: temperatureQuery.data?.data,
     ssdHealth: ssdHealthQuery.data?.data || [],
     users: usersQuery.data?.data || [],
-    sharedFolders: sharedFoldersQuery.data?.data || [],
+    fileManagerFolders: fileManagerFoldersQuery.data?.data || [],
 
     // Loading states
     isLoading: servicesQuery.isLoading || metricsQuery.isLoading || statusQuery.isLoading,
@@ -248,7 +248,7 @@ export function useServerManagement() {
     isStatusLoading: statusQuery.isLoading,
     isSsdHealthLoading: ssdHealthQuery.isLoading,
     isUsersLoading: usersQuery.isLoading,
-    isSharedFoldersLoading: sharedFoldersQuery.isLoading,
+    isFileManagerFoldersLoading: fileManagerFoldersQuery.isLoading,
 
     // Error states
     servicesError: servicesQuery.error,
@@ -256,7 +256,7 @@ export function useServerManagement() {
     statusError: statusQuery.error,
     ssdHealthError: ssdHealthQuery.error,
     usersError: usersQuery.error,
-    sharedFoldersError: sharedFoldersQuery.error,
+    fileManagerFoldersError: fileManagerFoldersQuery.error,
 
     // Mutations
     startService: startService.mutate,
@@ -280,6 +280,6 @@ export function useServerManagement() {
     refetchStatus: statusQuery.refetch,
     refetchSsdHealth: ssdHealthQuery.refetch,
     refetchUsers: usersQuery.refetch,
-    refetchSharedFolders: sharedFoldersQuery.refetch,
+    refetchFileManagerFolders: fileManagerFoldersQuery.refetch,
   };
 }

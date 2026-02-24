@@ -326,7 +326,7 @@ const ServerDeploymentDetails = lazy(() => import("@/pages/server/deployments/[i
 const ServerLogs = lazy(() => import("@/pages/server/logs").then((module) => ({ default: module.ServerLogsPage })));
 const ServerMetrics = lazy(() => import("@/pages/server/metrics").then((module) => ({ default: module.ServerMetricsPage })));
 const ServerServices = lazy(() => import("@/pages/server/services").then((module) => ({ default: module.ServerServicesPage })));
-const ServerSharedFolders = lazy(() => import("@/pages/server/shared-folders").then((module) => ({ default: module.ServerSharedFoldersPage })));
+const ServerFileManager = lazy(() => import("@/pages/server/file-manager").then((module) => ({ default: module.ServerFileManagerPage })));
 const ServerUsers = lazy(() => import("@/pages/server/users").then((module) => ({ default: module.ServerUsersPage })));
 const ServerRateLimiting = lazy(() => import("@/pages/server/rate-limiting").then((module) => ({ default: module.RateLimitingPage })));
 
@@ -2349,18 +2349,18 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.server.sharedFolders}
+                  path={routes.server.fileManager}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <ServerSharedFolders />
+                      <ServerFileManager />
                     </Suspense>
                   }
                 />
                 <Route
-                  path="/servidor/pastas-compartilhadas/*"
+                  path="/servidor/gerenciador-de-arquivos/*"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <ServerSharedFolders />
+                      <ServerFileManager />
                     </Suspense>
                   }
                 />

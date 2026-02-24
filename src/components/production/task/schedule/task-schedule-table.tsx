@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Task } from "../../../../types";
 import { routes, TASK_STATUS } from "../../../../constants";
-import { formatDate, getHoursBetween, isDateInPast, calculateTaskMeasures, formatTaskMeasures } from "../../../../utils";
+import { formatDate, getHoursBetween, isDateInPast, calculateTaskMeasures, formatTaskMeasures, formatTruckSpot } from "../../../../utils";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -730,7 +730,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
                     {column.id === "serialNumberOrPlate" && <span className="truncate block">{task.serialNumber || task.truck?.plate || "-"}</span>}
                     {column.id === "spot" && (
                       task.truck?.spot ? (
-                        <Badge variant="default" className="font-mono">{task.truck.spot.replace(/_/g, "-")}</Badge>
+                        <Badge variant="default" className="font-mono">{formatTruckSpot(task.truck.spot)}</Badge>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )

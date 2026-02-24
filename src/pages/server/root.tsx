@@ -24,7 +24,7 @@ export function ServerRootPage() {
   const serverQuickAccess = [
     { title: "Serviços do Sistema", icon: IconSettings, path: routes.server.services, color: "bg-blue-500", description: "Gerenciar serviços do sistema" },
     { title: "Usuários do Sistema", icon: IconUserCog, path: routes.server.users.root, color: "bg-green-600", description: "Gerenciar usuários do sistema" },
-    { title: "Pastas Compartilhadas", icon: IconFolders, path: routes.server.sharedFolders, color: "bg-purple-500", description: "Gerenciar pastas compartilhadas" },
+    { title: "Gerenciador de Arquivos", icon: IconFolders, path: routes.server.fileManager, color: "bg-purple-500", description: "Gerenciar arquivos do servidor" },
     { title: "Sincronização de BD", icon: IconDatabase, path: routes.server.databaseSync, color: "bg-teal-500", description: "Sincronizar banco de dados Produção → Teste" },
     { title: "Métricas do Sistema", icon: IconChartLine, path: routes.server.metrics, color: "bg-orange-500", description: "Visualizar métricas do servidor" },
     { title: "Logs do Sistema", icon: IconFileText, path: routes.server.logs, color: "bg-red-600", description: "Visualizar logs do sistema" },

@@ -1719,7 +1719,7 @@ const BackupManagementPage = () => {
               {(newSchedule.type === "files" || newSchedule.type === "full") && (
                 <div className="space-y-4 border-t pt-4">
                   <Label>Pastas para Backup</Label>
-                  <p className="text-sm text-muted-foreground">Selecione as pastas compartilhadas ou deixe vazio para backup completo</p>
+                  <p className="text-sm text-muted-foreground">Selecione as pastas do gerenciador de arquivos ou deixe vazio para backup completo</p>
                   <Combobox
                     value={newSchedule.sharedFolders}
                     onValueChange={(value) => {
@@ -1783,8 +1783,8 @@ const BackupManagementPage = () => {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <Label>Pastas compartilhadas para Backup</Label>
-                      <p className="text-sm text-muted-foreground">Selecione as pastas compartilhadas para backup</p>
+                      <Label>Pastas do Gerenciador de Arquivos para Backup</Label>
+                      <p className="text-sm text-muted-foreground">Selecione as pastas do gerenciador de arquivos para backup</p>
                       <Combobox
                         value={newSchedule.sharedFolders}
                         onValueChange={(value) => {

@@ -25,6 +25,9 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   [routes.responsibles.edit(":id")]: ["ADMIN", "COMMERCIAL"],
   [routes.responsibles.password(":id")]: ["ADMIN", "COMMERCIAL"],
 
+  // Servidor - Server management routes (mostly admin, file manager also accessible to commercial)
+  "/servidor/gerenciador-de-arquivos": ["ADMIN", "COMMERCIAL"],
+
   "/administracao/registros-de-alteracoes": "ADMIN",
   "/administracao/arquivos": "ADMIN",
   "/administracao/notificacoes": "ADMIN",
