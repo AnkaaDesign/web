@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
@@ -12,6 +12,19 @@ import { IconColumns, IconSearch, IconRefresh, IconGripVertical } from "@tabler/
 import { getDefaultVisibleColumns } from "./task-history-columns";
 import { getHeaderText } from "@/components/ui/column-visibility-utils";
 import type { TaskColumn } from "../list/types";
+
+// Reconcile an order array with current columns:
+// - Keep IDs that exist in columns, in their stored order
+// - Append any new column IDs that weren't in the order
+function reconcileOrder(order: string[], cols: TaskColumn[]): string[] {
+  const colIds = new Set(cols.map((c) => c.id));
+  // Keep only IDs that exist in columns, preserving order
+  const kept = order.filter((id) => colIds.has(id));
+  // Find new IDs not in order and append them
+  const keptSet = new Set(kept);
+  const newIds = cols.map((c) => c.id).filter((id) => !keptSet.has(id));
+  return [...kept, ...newIds];
+}
 
 interface ColumnVisibilityManagerProps {
   columns: TaskColumn[];
@@ -91,11 +104,34 @@ export function ColumnVisibilityManager({
   const [localVisible, setLocalVisible] = useState(visibleColumns);
   const [localOrder, setLocalOrder] = useState<string[]>(columnOrder ?? columns.map((c) => c.id));
 
+  // Track previous columns to detect when new columns are added
+  const prevColumnsRef = useRef<string[]>(columns.map((c) => c.id));
+
+  // Keep localOrder in sync when columns change (e.g., permission-based columns added after user data loads)
+  useEffect(() => {
+    const currentColIds = columns.map((c) => c.id);
+    const prevColIds = prevColumnsRef.current;
+
+    // Check if new columns were added
+    const prevSet = new Set(prevColIds);
+    const hasNewColumns = currentColIds.some((id) => !prevSet.has(id));
+
+    if (hasNewColumns) {
+      // Reconcile localOrder to include new columns
+      setLocalOrder((prev) => reconcileOrder(prev, columns));
+    }
+
+    prevColumnsRef.current = currentColIds;
+  }, [columns]);
+
   // Sync local state when popover opens
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen) {
       setLocalVisible(visibleColumns);
-      setLocalOrder(columnOrder ?? columns.map((c) => c.id));
+      // Reconcile columnOrder with current columns to handle cases where
+      // columns were added after the order was saved (e.g., permission-based columns)
+      const baseOrder = columnOrder ?? columns.map((c) => c.id);
+      setLocalOrder(reconcileOrder(baseOrder, columns));
       setSearchQuery("");
     }
     setOpen(newOpen);

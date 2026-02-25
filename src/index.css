@@ -1,3 +1,6 @@
+/* Import self-hosted Inter font for offline support */
+@import "@fontsource-variable/inter";
+
 /* Import enhanced scrollbar utilities */
 @import "./styles/scrollbar.css";
 
