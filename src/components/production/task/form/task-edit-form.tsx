@@ -301,6 +301,54 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   // Track if base files have been modified by the user
   const [hasBaseFileChanges, setHasBaseFileChanges] = useState(false);
 
+  // Initialize project files from existing task data
+  const [projectFiles, setProjectFiles] = useState<FileWithPreview[]>(
+    ((task as any).projectFiles || []).map((file: any) => ({
+      id: file.id,
+      name: file.filename || file.name || 'project file',
+      size: file.size || 0,
+      type: file.mimetype || file.type || 'application/octet-stream',
+      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview))
+  );
+  const [hasProjectFileChanges, setHasProjectFileChanges] = useState(false);
+
+  // Initialize checkin files from existing task data
+  const [checkinFiles, setCheckinFiles] = useState<FileWithPreview[]>(
+    ((task as any).checkinFiles || []).map((file: any) => ({
+      id: file.id,
+      name: file.filename || file.name || 'checkin file',
+      size: file.size || 0,
+      type: file.mimetype || file.type || 'application/octet-stream',
+      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview))
+  );
+  const [hasCheckinFileChanges, setHasCheckinFileChanges] = useState(false);
+
+  // Initialize checkout files from existing task data
+  const [checkoutFiles, setCheckoutFiles] = useState<FileWithPreview[]>(
+    ((task as any).checkoutFiles || []).map((file: any) => ({
+      id: file.id,
+      name: file.filename || file.name || 'checkout file',
+      size: file.size || 0,
+      type: file.mimetype || file.type || 'application/octet-stream',
+      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview))
+  );
+  const [hasCheckoutFileChanges, setHasCheckoutFileChanges] = useState(false);
+
   // Sync baseFiles when task.baseFiles changes (after successful update or initial load)
   useEffect(() => {
     // Skip sync if user has made changes that haven't been submitted yet
@@ -1223,6 +1271,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         const newBankSlipFiles = bankSlipFile.filter(f => !f.uploaded);
         const newArtworkFiles = uploadedFiles.filter(f => !f.uploaded);
         const newBaseFiles = baseFiles.filter(f => !f.uploaded);
+        const newProjectFiles = projectFiles.filter(f => !f.uploaded);
+        const newCheckinFiles = checkinFiles.filter(f => !f.uploaded);
+        const newCheckoutFiles = checkoutFiles.filter(f => !f.uploaded);
         const newObservationFiles = observationFiles.filter(f => !f.uploaded);
         const newPricingLayoutFiles = pricingLayoutFiles.filter(f => !f.uploaded);
 
@@ -1240,7 +1291,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
         const hasNewFiles = newBudgetFiles.length > 0 || newInvoiceFiles.length > 0 ||
                            newReceiptFiles.length > 0 || newBankSlipFiles.length > 0 || newArtworkFiles.length > 0 ||
-                           newBaseFiles.length > 0 || hasCutFiles || hasAirbrushingFiles ||
+                           newBaseFiles.length > 0 || newProjectFiles.length > 0 || newCheckinFiles.length > 0 ||
+                           newCheckoutFiles.length > 0 || hasCutFiles || hasAirbrushingFiles ||
                            newObservationFiles.length > 0 || layoutPhotoFiles.length > 0 ||
                            newPricingLayoutFiles.length > 0;
 
@@ -1273,6 +1325,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           }
           if (newBaseFiles.length > 0) {
             files.baseFiles = newBaseFiles.filter(f => f instanceof File) as File[];
+          }
+          if (newProjectFiles.length > 0) {
+            files.projectFiles = newProjectFiles.filter(f => f instanceof File) as File[];
+          }
+          if (newCheckinFiles.length > 0) {
+            files.checkinFiles = newCheckinFiles.filter(f => f instanceof File) as File[];
+          }
+          if (newCheckoutFiles.length > 0) {
+            files.checkoutFiles = newCheckoutFiles.filter(f => f instanceof File) as File[];
           }
           if (newObservationFiles.length > 0) {
 
@@ -1417,6 +1478,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           });
 
           const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentProjectFileIds = projectFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentCheckinFileIds = checkinFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentCheckoutFileIds = checkoutFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentInvoiceIds = invoiceFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
@@ -1439,6 +1503,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // Sending it unconditionally causes accidental clearing when other sectors submit the form
           if (hasBaseFileChanges || newBaseFiles.length > 0) {
             dataForFormData.baseFileIds = currentBaseFileIds;
+          }
+          if (hasProjectFileChanges || newProjectFiles.length > 0) {
+            dataForFormData.projectFileIds = currentProjectFileIds;
+          }
+          if (hasCheckinFileChanges || newCheckinFiles.length > 0) {
+            dataForFormData.checkinFileIds = currentCheckinFileIds;
+          }
+          if (hasCheckoutFileChanges || newCheckoutFiles.length > 0) {
+            dataForFormData.checkoutFileIds = currentCheckoutFileIds;
           }
           dataForFormData.budgetIds = currentBudgetIds;
           dataForFormData.invoiceIds = currentInvoiceIds;
@@ -1657,6 +1730,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 bankSlips: true,
                 artworks: true,
                 baseFiles: true,
+                projectFiles: true,
+                checkinFiles: true,
+                checkoutFiles: true,
               },
             },
           });
@@ -1711,6 +1787,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // Extract IDs of uploaded (existing) files
           const currentArtworkIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentProjectFileIds = projectFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentCheckinFileIds = checkinFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentCheckoutFileIds = checkoutFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentInvoiceIds = invoiceFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
@@ -1783,6 +1862,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // Only send baseFileIds if the user actually modified base files
           if (hasBaseFileChanges) {
             submitData.baseFileIds = [...currentBaseFileIds];
+          }
+          if (hasProjectFileChanges) {
+            (submitData as any).projectFileIds = [...currentProjectFileIds];
+          }
+          if (hasCheckinFileChanges) {
+            (submitData as any).checkinFileIds = [...currentCheckinFileIds];
+          }
+          if (hasCheckoutFileChanges) {
+            (submitData as any).checkoutFileIds = [...currentCheckoutFileIds];
           }
           if (currentBudgetIds.length > 0 || taskHadBudgets) {
             submitData.budgetIds = [...currentBudgetIds];
@@ -1928,6 +2016,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 bankSlips: true,
                 artworks: true,
                 baseFiles: true,
+                projectFiles: true,
+                checkinFiles: true,
+                checkoutFiles: true,
               },
             },
           });
@@ -2030,6 +2121,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           if (hasBaseFileChanges) {
             setHasBaseFileChanges(false);
           }
+          if (hasProjectFileChanges) {
+            setHasProjectFileChanges(false);
+          }
+          if (hasCheckinFileChanges) {
+            setHasCheckinFileChanges(false);
+          }
+          if (hasCheckoutFileChanges) {
+            setHasCheckoutFileChanges(false);
+          }
 
           await new Promise(resolve => setTimeout(resolve, 100));
           // Redirect to task details after successful update
@@ -2049,7 +2149,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         }, 100);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, budgetFile, invoiceFile, receiptFile, bankSlipFile, uploadedFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, budgetFile, invoiceFile, receiptFile, bankSlipFile, uploadedFiles, baseFiles, projectFiles, checkinFiles, checkoutFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -2152,6 +2252,27 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     setHasFileChanges(true);
     setHasBaseFileChanges(true);
     // Files will be submitted with the form, not uploaded separately
+  };
+
+  // Handle project files change
+  const handleProjectFilesChange = (files: FileWithPreview[]) => {
+    setProjectFiles(files);
+    setHasFileChanges(true);
+    setHasProjectFileChanges(true);
+  };
+
+  // Handle checkin files change
+  const handleCheckinFilesChange = (files: FileWithPreview[]) => {
+    setCheckinFiles(files);
+    setHasFileChanges(true);
+    setHasCheckinFileChanges(true);
+  };
+
+  // Handle checkout files change
+  const handleCheckoutFilesChange = (files: FileWithPreview[]) => {
+    setCheckoutFiles(files);
+    setHasFileChanges(true);
+    setHasCheckoutFileChanges(true);
   };
 
   // Handle observation files change
@@ -3002,7 +3123,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           Submit
         </button>
 
-        <div className={openAccordion === 'base-files' || openAccordion === 'artworks' ? 'pb-64' : ''}>
+        <div className={openAccordion === 'base-files' || openAccordion === 'artworks' || openAccordion === 'project-files' || openAccordion === 'checkin-files' || openAccordion === 'checkout-files' ? 'pb-64' : ''}>
           <Accordion
             type="single"
             collapsible
@@ -3882,6 +4003,228 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
+                {/* Base Files Card (optional) - EDITABLE for Designer, Commercial, and Logistic, Hidden for Warehouse and Financial users */}
+                {!isWarehouseUser && !isFinancialUser && (
+          <AccordionItem
+            value="base-files"
+            id="accordion-item-base-files"
+            className="border border-border rounded-lg"
+          >
+                <Card className="border-0">
+                  <AccordionTrigger className="px-0 hover:no-underline">
+                    <CardHeader className="flex-1 py-4">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFile className="h-5 w-5" />
+                        Arquivos do Cliente
+                      </CardTitle>
+                    </CardHeader>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <CardContent className="pt-0">
+                      <FileUploadField
+                        onFilesChange={handleBaseFilesChange}
+                        maxFiles={30}
+                        maxSize={500 * 1024 * 1024}
+                        disabled={isSubmitting}
+                        showPreview={true}
+                        existingFiles={baseFiles}
+                        variant="compact"
+                        placeholder="Adicione arquivos do cliente (vídeos, imagens, PDFs)"
+                        label="Arquivos do cliente anexados"
+                        acceptedFileTypes={{
+                          "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
+                          "application/pdf": [".pdf"],
+                          "video/mp4": [".mp4"],
+                          "video/quicktime": [".mov"],
+                          "video/webm": [".webm"],
+                          "video/x-msvideo": [".avi"],
+                          "video/x-matroska": [".mkv"],
+                          "application/postscript": [".eps", ".ai"],
+                        }}
+                      />
+                    </CardContent>
+                  </AccordionContent>
+                </Card>
+          </AccordionItem>
+                )}
+
+                {/* Artworks Card (optional) - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
+                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
+          <AccordionItem
+            value="artworks"
+            id="accordion-item-artworks"
+            className="border border-border rounded-lg"
+          >
+                <Card className="border-0">
+                  <AccordionTrigger className="px-0 hover:no-underline">
+                    <CardHeader className="flex-1 py-4">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFile className="h-5 w-5" />
+                        Layouts
+                      </CardTitle>
+                    </CardHeader>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <CardContent className="pt-0">
+                      <ArtworkFileUploadField
+                        onFilesChange={handleFilesChange}
+                        onStatusChange={(fileId, status) => {
+                          console.log('[Task Update] 🎨 Status changed:', { fileId, status, hasArtworkStatusChanges });
+                          setArtworkStatuses(prev => {
+                            const newStatuses = {
+                              ...prev,
+                              [fileId]: status,
+                            };
+                            console.log('[Task Update] 🎨 New artworkStatuses:', newStatuses);
+                            return newStatuses;
+                          });
+                          setHasArtworkStatusChanges(true);
+                          console.log('[Task Update] 🎨 Set hasArtworkStatusChanges to true');
+                        }}
+                        maxFiles={5}
+                        disabled={isSubmitting}
+                        showPreview={true}
+                        existingFiles={uploadedFiles}
+                        placeholder="Adicione layouts relacionados à tarefa"
+                        label="Layouts anexados"
+                      />
+                    </CardContent>
+                  </AccordionContent>
+                </Card>
+          </AccordionItem>
+          )}
+
+                {/* Project Files Card - visible to ALL except Warehouse and Financial users */}
+                {!isWarehouseUser && !isFinancialUser && (
+          <AccordionItem
+            value="project-files"
+            id="accordion-item-project-files"
+            className="border border-border rounded-lg"
+          >
+                <Card className="border-0">
+                  <AccordionTrigger className="px-0 hover:no-underline">
+                    <CardHeader className="flex-1 py-4">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFile className="h-5 w-5" />
+                        Projetos
+                      </CardTitle>
+                    </CardHeader>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <CardContent className="pt-0">
+                      <FileUploadField
+                        onFilesChange={handleProjectFilesChange}
+                        maxFiles={30}
+                        maxSize={500 * 1024 * 1024}
+                        disabled={isSubmitting}
+                        showPreview={true}
+                        existingFiles={projectFiles}
+                        variant="compact"
+                        placeholder="Adicione arquivos de projeto (vídeos, imagens, PDFs)"
+                        label="Projetos anexados"
+                        acceptedFileTypes={{
+                          "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
+                          "application/pdf": [".pdf"],
+                          "video/mp4": [".mp4"],
+                          "video/quicktime": [".mov"],
+                          "video/webm": [".webm"],
+                          "video/x-msvideo": [".avi"],
+                          "video/x-matroska": [".mkv"],
+                          "application/postscript": [".eps", ".ai"],
+                        }}
+                      />
+                    </CardContent>
+                  </AccordionContent>
+                </Card>
+          </AccordionItem>
+                )}
+
+                {/* Check-in Files Card - hidden from Warehouse, Designer, and Financial users */}
+                {!isWarehouseUser && !isDesignerUser && !isFinancialUser && (
+          <AccordionItem
+            value="checkin-files"
+            id="accordion-item-checkin-files"
+            className="border border-border rounded-lg"
+          >
+                <Card className="border-0">
+                  <AccordionTrigger className="px-0 hover:no-underline">
+                    <CardHeader className="flex-1 py-4">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFile className="h-5 w-5" />
+                        Check-in
+                      </CardTitle>
+                    </CardHeader>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <CardContent className="pt-0">
+                      <FileUploadField
+                        onFilesChange={handleCheckinFilesChange}
+                        maxFiles={20}
+                        maxSize={500 * 1024 * 1024}
+                        disabled={isSubmitting}
+                        showPreview={true}
+                        existingFiles={checkinFiles}
+                        variant="compact"
+                        placeholder="Adicione fotos de check-in"
+                        label="Fotos de check-in anexadas"
+                        acceptedFileTypes={{
+                          "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
+                          "video/mp4": [".mp4"],
+                          "video/quicktime": [".mov"],
+                          "video/webm": [".webm"],
+                          "video/x-msvideo": [".avi"],
+                          "video/x-matroska": [".mkv"],
+                        }}
+                      />
+                    </CardContent>
+                  </AccordionContent>
+                </Card>
+          </AccordionItem>
+                )}
+
+                {/* Check-out Files Card - hidden from Warehouse, Designer, and Financial users */}
+                {!isWarehouseUser && !isDesignerUser && !isFinancialUser && (
+          <AccordionItem
+            value="checkout-files"
+            id="accordion-item-checkout-files"
+            className="border border-border rounded-lg"
+          >
+                <Card className="border-0">
+                  <AccordionTrigger className="px-0 hover:no-underline">
+                    <CardHeader className="flex-1 py-4">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFile className="h-5 w-5" />
+                        Check-out
+                      </CardTitle>
+                    </CardHeader>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <CardContent className="pt-0">
+                      <FileUploadField
+                        onFilesChange={handleCheckoutFilesChange}
+                        maxFiles={20}
+                        maxSize={500 * 1024 * 1024}
+                        disabled={isSubmitting}
+                        showPreview={true}
+                        existingFiles={checkoutFiles}
+                        variant="compact"
+                        placeholder="Adicione fotos de check-out"
+                        label="Fotos de check-out anexadas"
+                        acceptedFileTypes={{
+                          "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
+                          "video/mp4": [".mp4"],
+                          "video/quicktime": [".mov"],
+                          "video/webm": [".webm"],
+                          "video/x-msvideo": [".avi"],
+                          "video/x-matroska": [".mkv"],
+                        }}
+                      />
+                    </CardContent>
+                  </AccordionContent>
+                </Card>
+          </AccordionItem>
+                )}
+
                 {/* Financial Information Card - Only visible to ADMIN and FINANCIAL users */}
                 {canViewFinancialSections && (
           <AccordionItem
@@ -4060,97 +4403,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 </Card>
           </AccordionItem>
                 )}
-
-                {/* Base Files Card (optional) - EDITABLE for Designer, Commercial, and Logistic, Hidden for Warehouse and Financial users */}
-                {!isWarehouseUser && !isFinancialUser && (
-          <AccordionItem
-            value="base-files"
-            id="accordion-item-base-files"
-            className="border border-border rounded-lg"
-          >
-                <Card className="border-0">
-                  <AccordionTrigger className="px-0 hover:no-underline">
-                    <CardHeader className="flex-1 py-4">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconFile className="h-5 w-5" />
-                        Arquivos Base
-                      </CardTitle>
-                    </CardHeader>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <CardContent className="pt-0">
-                      <FileUploadField
-                        onFilesChange={handleBaseFilesChange}
-                        maxFiles={30}
-                        maxSize={500 * 1024 * 1024}
-                        disabled={isSubmitting}
-                        showPreview={true}
-                        existingFiles={baseFiles}
-                        variant="compact"
-                        placeholder="Adicione arquivos base para a tarefa (vídeos, imagens, PDFs)"
-                        label="Arquivos base anexados"
-                        acceptedFileTypes={{
-                          "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
-                          "application/pdf": [".pdf"],
-                          "video/mp4": [".mp4"],
-                          "video/quicktime": [".mov"],
-                          "video/webm": [".webm"],
-                          "video/x-msvideo": [".avi"],
-                          "video/x-matroska": [".mkv"],
-                          "application/postscript": [".eps", ".ai"],
-                        }}
-                      />
-                    </CardContent>
-                  </AccordionContent>
-                </Card>
-          </AccordionItem>
-                )}
-
-                {/* Artworks Card (optional) - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
-                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
-          <AccordionItem
-            value="artworks"
-            id="accordion-item-artworks"
-            className="border border-border rounded-lg"
-          >
-                <Card className="border-0">
-                  <AccordionTrigger className="px-0 hover:no-underline">
-                    <CardHeader className="flex-1 py-4">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconFile className="h-5 w-5" />
-                        Artes
-                      </CardTitle>
-                    </CardHeader>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <CardContent className="pt-0">
-                      <ArtworkFileUploadField
-                        onFilesChange={handleFilesChange}
-                        onStatusChange={(fileId, status) => {
-                          console.log('[Task Update] 🎨 Status changed:', { fileId, status, hasArtworkStatusChanges });
-                          setArtworkStatuses(prev => {
-                            const newStatuses = {
-                              ...prev,
-                              [fileId]: status,
-                            };
-                            console.log('[Task Update] 🎨 New artworkStatuses:', newStatuses);
-                            return newStatuses;
-                          });
-                          setHasArtworkStatusChanges(true);
-                          console.log('[Task Update] 🎨 Set hasArtworkStatusChanges to true');
-                        }}
-                        maxFiles={5}
-                        disabled={isSubmitting}
-                        showPreview={true}
-                        existingFiles={uploadedFiles}
-                        placeholder="Adicione artes relacionadas à tarefa"
-                        label="Artes anexadas"
-                      />
-                    </CardContent>
-                  </AccordionContent>
-                </Card>
-          </AccordionItem>
-          )}
         </Accordion>
         </div>
       </form>

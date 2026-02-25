@@ -273,7 +273,11 @@ function FileContentsBrowser({
           {fileDisplayMode === "grid" ? (
             <>
               <div className="flex items-center justify-center rounded-t-lg bg-muted/30" style={{ height: "8rem" }}>
-                <IconFolder className="h-16 w-16 text-blue-600" />
+                {dir.logoUrl ? (
+                  <img src={dir.logoUrl} alt={dir.name} className="h-16 w-16 rounded-lg object-cover" />
+                ) : (
+                  <IconFolder className="h-16 w-16 text-blue-600" />
+                )}
               </div>
               <div className="p-3 border-t border-border">
                 <p className="text-sm font-medium truncate" title={dir.name}>
@@ -289,7 +293,11 @@ function FileContentsBrowser({
           ) : (
             <>
               <div className="flex-shrink-0">
-                <IconFolder className="h-6 w-6 text-blue-600" />
+                {dir.logoUrl ? (
+                  <img src={dir.logoUrl} alt={dir.name} className="h-6 w-6 rounded-md object-cover" />
+                ) : (
+                  <IconFolder className="h-6 w-6 text-blue-600" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

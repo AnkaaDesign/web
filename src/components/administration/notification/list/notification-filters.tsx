@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
+import { UserSelector } from "@/components/ui/user-selector";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Switch } from "@/components/ui/switch";
 import type { NotificationGetManyFormData } from "@/schemas";
@@ -26,8 +27,10 @@ import type { DateRange } from "react-day-picker";
 interface NotificationFiltersProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  filters: Partial<NotificationGetManyFormData>;
-  onFilterChange: (filters: Partial<NotificationGetManyFormData>) => void;
+  filters: Partial<NotificationGetManyFormData> & { status?: string; userId?: string };
+  onFilterChange: (filters: Partial<NotificationGetManyFormData> & { status?: string; userId?: string }) => void;
+  onUserSelect?: (user: { id: string; name: string } | null) => void;
+  selectedUser?: { id: string; name: string } | null;
 }
 
 export function NotificationFilters({
@@ -35,6 +38,8 @@ export function NotificationFilters({
   onOpenChange,
   filters,
   onFilterChange,
+  onUserSelect,
+  selectedUser,
 }: NotificationFiltersProps) {
   const handleTypeChange = (value: string | string[] | null | undefined) => {
     const types = Array.isArray(value) ? value : [];
@@ -53,15 +58,16 @@ export function NotificationFilters({
 
   const handleStatusChange = (value: string | string[] | null | undefined) => {
     const statusValue = Array.isArray(value) ? value[0] : value;
-    // Use the 'status' parameter that the admin API expects
-    // instead of 'sentAt' which is used by the standard CRUD API
     const status = statusValue || undefined;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onFilterChange({ ...filters, status } as any);
+    onFilterChange({ ...filters, status });
   };
 
   const handleUnreadChange = (checked: boolean) => {
     onFilterChange({ ...filters, unread: checked || undefined });
+  };
+
+  const handleUserChange = (userId: string | null) => {
+    onFilterChange({ ...filters, userId: userId || undefined });
   };
 
   const handleDateRangeChange = (dateRange: DateRange | undefined) => {
@@ -83,12 +89,11 @@ export function NotificationFilters({
     onFilterChange({
       searchingFor: filters.searchingFor,
     });
+    onUserSelect?.(null);
   };
 
   const getStatusValue = () => {
-    // Read from the 'status' parameter used by admin API
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const status = (filters as any).status;
+    const status = filters.status;
     if (status === "sent") return "sent";
     if (status === "pending") return "pending";
     return "";
@@ -106,9 +111,9 @@ export function NotificationFilters({
     (filters.types?.length || 0) > 0 ||
     (filters.importance?.length || 0) > 0 ||
     (filters.channels?.length || 0) > 0 ||
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (filters as any).status !== undefined ||
+    filters.status !== undefined ||
     filters.unread !== undefined ||
+    filters.userId !== undefined ||
     filters.createdAt !== undefined;
 
   return (
@@ -173,6 +178,22 @@ export function NotificationFilters({
               placeholder="Selecione os canais"
               searchable={false}
               clearable
+            />
+          </div>
+
+          {/* Target User Filter */}
+          <div className="space-y-2">
+            <Label>Destinatário</Label>
+            <UserSelector
+              value={filters.userId || ""}
+              onChange={(userId) => {
+                handleUserChange(userId);
+                if (!userId) {
+                  onUserSelect?.(null);
+                }
+              }}
+              placeholder="Buscar usuário"
+              initialUser={selectedUser || undefined}
             />
           </div>
 

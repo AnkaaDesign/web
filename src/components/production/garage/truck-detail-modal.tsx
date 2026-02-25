@@ -24,11 +24,11 @@ import {
   IconExternalLink,
   IconLayoutGrid,
   IconListCheck,
+  IconX,
 } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
 import { routes, SECTOR_PRIVILEGES, SERVICE_ORDER_STATUS as SO_STATUS, SERVICE_ORDER_STATUS_LABELS, SERVICE_ORDER_TYPE } from '@/constants';
 import { getServiceOrderStatusColor } from '@/utils/serviceOrder';
-import { useNavigate } from 'react-router-dom';
 import { hasPrivilege } from '@/utils/user';
 import { getApiBaseUrl } from '@/config/api';
 
@@ -40,7 +40,6 @@ interface TruckDetailModalProps {
 
 
 export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModalProps) {
-  const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
 
   // File preview state
@@ -121,8 +120,7 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
 
   const handleOpenTaskDetail = () => {
     if (taskId) {
-      navigate(routes.production.schedule.details(taskId));
-      onOpenChange(false);
+      window.open(routes.production.schedule.details(taskId), '_blank');
     }
   };
 
@@ -142,22 +140,33 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader className="pr-8">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" hideClose>
+        <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>{task?.name || 'Detalhes da Tarefa'}</span>
-            {task && (
+            <div className="flex items-center gap-1">
+              {task && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleOpenTaskDetail}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <IconExternalLink className="h-4 w-4 mr-1" />
+                  Abrir
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleOpenTaskDetail}
-                className="text-muted-foreground hover:text-foreground -mr-2"
+                onClick={() => onOpenChange(false)}
+                className="text-muted-foreground hover:text-foreground"
               >
-                <IconExternalLink className="h-4 w-4 mr-1" />
-                Abrir
+                <IconX className="h-4 w-4" />
               </Button>
-            )}
+            </div>
           </DialogTitle>
         </DialogHeader>
 
@@ -366,7 +375,7 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
               <div className="flex justify-between items-start bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm font-medium text-muted-foreground flex items-center gap-2 pt-1">
                   <IconFiles className="h-4 w-4" />
-                  Artes
+                  Layouts
                 </span>
                 <div className="flex flex-wrap gap-2 justify-end">
                   {filteredArtworks.map((artwork: any, index: number) => {
@@ -407,14 +416,15 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
           </div>
         )}
       </DialogContent>
-
-      {/* File Preview Modal */}
-      <FilePreviewModal
-        files={previewFiles}
-        initialFileIndex={previewIndex}
-        open={isPreviewOpen}
-        onOpenChange={setIsPreviewOpen}
-      />
     </Dialog>
+
+    {/* File Preview Modal - outside parent Dialog to avoid z-index stacking issues */}
+    <FilePreviewModal
+      files={previewFiles}
+      initialFileIndex={previewIndex}
+      open={isPreviewOpen}
+      onOpenChange={setIsPreviewOpen}
+    />
+    </>
   );
 }

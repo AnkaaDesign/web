@@ -543,8 +543,8 @@ export function TruckElement({ truck, scale, isDragging, onClick }: TruckElement
 
       {/* Content group with clipping */}
       <g clipPath={`url(#${clipId})`}>
-        {/* Corner flag: primary if entryDate exists, destructive if not — only for patio trucks */}
-        {!truck.spot && (
+        {/* Corner flag: primary if entryDate exists, destructive if not — only for yard wait trucks */}
+        {truck.spot === 'YARD_WAIT' && (
           <polygon
             points={`${width - 14},0 ${width},0 ${width},${14}`}
             fill={truck.entryDate ? 'hsl(var(--primary))' : 'hsl(var(--destructive))'}

@@ -818,19 +818,22 @@ const TASK_SECTIONS: SectionConfig[] = [
     ],
   },
   {
-    id: "baseFiles",
-    label: "Arquivos Base",
+    id: "artworks",
+    label: "Layouts",
     defaultVisible: true,
     fields: [
-      { id: "baseFileFiles", label: "Arquivos Base", sectionId: "baseFiles" },
+      { id: "artworkFiles", label: "Arquivos de Layout", sectionId: "artworks" },
     ],
   },
   {
-    id: "artworks",
-    label: "Artes",
+    id: "files",
+    label: "Arquivos",
     defaultVisible: true,
     fields: [
-      { id: "artworkFiles", label: "Arquivos de Arte", sectionId: "artworks" },
+      { id: "baseFileFiles", label: "Arquivos do Cliente", sectionId: "files" },
+      { id: "projectFileFiles", label: "Projetos", sectionId: "files" },
+      { id: "checkinFileFiles", label: "Check-in", sectionId: "files" },
+      { id: "checkoutFileFiles", label: "Check-out", sectionId: "files" },
     ],
   },
   {
@@ -893,9 +896,9 @@ export const TaskDetailsPage = () => {
   const [serviceOrderCompletionDialogOpen, setServiceOrderCompletionDialogOpen] = useState(false);
   const [pendingServiceOrder, setPendingServiceOrder] = useState<any>(null);
   const [nextServiceOrderToStart, setNextServiceOrderToStart] = useState<any>(null);
-  const [baseFilesViewMode, setBaseFilesViewMode] = useState<FileViewMode>("list");
-  const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("list");
-  const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("list");
+  const [filesViewMode, setFilesViewMode] = useState<FileViewMode>("grid");
+  const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("grid");
+  const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("grid");
   // Get user's sector privilege for service order permissions
   const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
 
@@ -917,6 +920,28 @@ export const TaskDetailsPage = () => {
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
+  );
+
+  // Check if user can view project files (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
+  const canViewProjectFiles = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
+  );
+  // Check if user can view checkin files (ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC only)
+  const canViewCheckinFiles = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC)
+  );
+  // Check if user can view checkout files (ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC only)
+  const canViewCheckoutFiles = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC)
   );
 
   // Check if user can view artwork badges and non-approved artworks (ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER only)
@@ -988,8 +1013,8 @@ export const TaskDetailsPage = () => {
         if (section.id === 'pricing' && !canViewPricingSection) return false;
         // Hide documents section for users without permission (ADMIN, FINANCIAL, COMMERCIAL only)
         if (section.id === 'documents' && !canViewDocumentsSection) return false;
-        // Hide baseFiles section for users without permission (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
-        if (section.id === 'baseFiles' && !canViewBaseFiles) return false;
+        // Hide files section if user can't view any file type
+        if (section.id === 'files' && !canViewBaseFiles && !canViewProjectFiles && !canViewCheckinFiles && !canViewCheckoutFiles) return false;
         // Hide cuts section for financial users
         if (section.id === 'cuts' && isFinancialSector) return false;
         // Hide layout section for users without permission (ADMIN, LOGISTIC, PRODUCTION team leaders only)
@@ -1017,7 +1042,7 @@ export const TaskDetailsPage = () => {
         }
         return section;
       });
-  }, [canViewPricingSection, canViewDocumentsSection, canViewBaseFiles, canViewLayoutSection, isWarehouseSector, isProductionSector, currentUser, canViewCommissionField, canViewRestrictedFields]);
+  }, [canViewPricingSection, canViewDocumentsSection, canViewBaseFiles, canViewProjectFiles, canViewCheckinFiles, canViewCheckoutFiles, canViewLayoutSection, isWarehouseSector, isProductionSector, currentUser, canViewCommissionField, canViewRestrictedFields]);
 
   // Initialize section visibility hook with filtered sections
   const sectionVisibility = useSectionVisibility(
@@ -1045,6 +1070,30 @@ export const TaskDetailsPage = () => {
     const baseFilesList = task?.baseFiles || [];
     const index = baseFilesList.findIndex(f => f.id === file.id);
     fileViewerContext.actions.viewFiles(baseFilesList, index);
+  };
+
+  // Handler for projectFiles collection viewing
+  const handleProjectFileClick = (file: any) => {
+    if (!fileViewerContext) return;
+    const projectFilesList = task?.projectFiles || [];
+    const index = projectFilesList.findIndex(f => f.id === file.id);
+    fileViewerContext.actions.viewFiles(projectFilesList, index);
+  };
+
+  // Handler for checkinFiles collection viewing
+  const handleCheckinFileClick = (file: any) => {
+    if (!fileViewerContext) return;
+    const checkinFilesList = task?.checkinFiles || [];
+    const index = checkinFilesList.findIndex(f => f.id === file.id);
+    fileViewerContext.actions.viewFiles(checkinFilesList, index);
+  };
+
+  // Handler for checkoutFiles collection viewing
+  const handleCheckoutFileClick = (file: any) => {
+    if (!fileViewerContext) return;
+    const checkoutFilesList = task?.checkoutFiles || [];
+    const index = checkoutFilesList.findIndex(f => f.id === file.id);
+    fileViewerContext.actions.viewFiles(checkoutFilesList, index);
   };
 
   // Handler for artworks collection viewing
@@ -1094,6 +1143,9 @@ export const TaskDetailsPage = () => {
         },
       },
       baseFiles: true,
+      projectFiles: true,
+      checkinFiles: true,
+      checkoutFiles: true,
       artworks: {
         include: {
           file: true,
@@ -2134,21 +2186,6 @@ export const TaskDetailsPage = () => {
                 );
               })()}
 
-              {/* Truck Layout Card - Only show if truck has at least one layout */}
-              {sectionVisibility.isSectionVisible("layout") && task.truck && (task.truck.leftSideLayout || task.truck.rightSideLayout || task.truck.backSideLayout) && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-850">
-                  <CardHeader className="pb-6">
-                    <CardTitle className="flex items-center gap-2">
-                      <IconLayoutGrid className="h-5 w-5 text-muted-foreground" />
-                      Layout do Caminhão
-                    </CardTitle>
-                  </CardHeader>
-              <CardContent className="pt-0">
-                <TruckLayoutPreview truckId={task.truck.id} taskName={taskDisplayName} />
-              </CardContent>
-                </Card>
-              )}
-
               {/* Service Orders Card - Visibility based on sector privilege and service order type */}
               {sectionVisibility.isSectionVisible("serviceOrders") && hasVisibleServiceOrders && filteredServiceOrders.length > 0 && (() => {
                 // Group service orders by type
@@ -2363,6 +2400,110 @@ export const TaskDetailsPage = () => {
                 );
               })()}
 
+              {/* Truck Layout Card - Only show if truck has at least one layout */}
+              {sectionVisibility.isSectionVisible("layout") && task.truck && (task.truck.leftSideLayout || task.truck.rightSideLayout || task.truck.backSideLayout) && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-850">
+                  <CardHeader className="pb-6">
+                    <CardTitle className="flex items-center gap-2">
+                      <IconLayoutGrid className="h-5 w-5 text-muted-foreground" />
+                      Layout do Caminhão
+                    </CardTitle>
+                  </CardHeader>
+              <CardContent className="pt-0">
+                <TruckLayoutPreview truckId={task.truck.id} taskName={taskDisplayName} />
+              </CardContent>
+                </Card>
+              )}
+
+              {/* Artworks Card - Visible to ALL users, content filtered by approval status */}
+              {sectionVisibility.isSectionVisible("artworks") && filteredArtworks.length > 0 && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1">
+                  <CardHeader className="pb-6">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFiles className="h-5 w-5 text-muted-foreground" />
+                        Layouts
+                        <Badge variant="secondary" className="ml-2">
+                          {filteredArtworks.length}
+                        </Badge>
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        {filteredArtworks.length > 1 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              const apiUrl = getApiBaseUrl();
+                              for (let i = 0; i < filteredArtworks.length; i++) {
+                                const artwork = filteredArtworks[i];
+                                const fileId = (artwork as any)?.file?.id || (artwork as any)?.id;
+                                if (fileId) {
+                                  const downloadUrl = `${apiUrl}/files/${fileId}/download`;
+                                  window.open(downloadUrl, "_blank");
+                                }
+                                if (i < filteredArtworks.length - 1) {
+                                  await new Promise((resolve) => setTimeout(resolve, 200));
+                                }
+                              }
+                            }}
+                            className="text-xs"
+                          >
+                            <IconDownload className="h-3 w-3 mr-1" />
+                            Baixar Todos
+                          </Button>
+                        )}
+                        <div className="flex gap-1">
+                          <Button
+                            variant={artworksViewMode === "list" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setArtworksViewMode("list")}
+                            className="h-7 w-7 p-0"
+                          >
+                            <IconList className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant={artworksViewMode === "grid" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setArtworksViewMode("grid")}
+                            className="h-7 w-7 p-0"
+                          >
+                            <IconLayoutGrid className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0 flex-1">
+                    <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                      {filteredArtworks.map((artwork) => {
+                        const fileData = artwork.file || artwork;
+                        return (
+                          <div key={artwork.id} className="relative">
+                            <FileItem
+                              file={fileData as any}
+                              viewMode={artworksViewMode}
+                              onPreview={handleArtworkFileClick}
+                              onDownload={handleDownload}
+                              showActions
+                            />
+                            {canViewArtworkBadges && (artwork as any).status && (
+                              <div className="absolute top-2 right-2">
+                                <Badge
+                                  variant={(artwork as any).status === 'APPROVED' ? 'approved' : (artwork as any).status === 'REPROVED' ? 'rejected' : 'secondary'}
+                                  className="text-xs"
+                                >
+                                  {(artwork as any).status === 'APPROVED' ? 'Aprovado' : (artwork as any).status === 'REPROVED' ? 'Reprovado' : 'Rascunho'}
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Cuts Card - Hidden for Financial sector users */}
               {sectionVisibility.isSectionVisible("cuts") && !isFinancialSector && cuts.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-950 lg:col-span-1">
@@ -2438,170 +2579,145 @@ export const TaskDetailsPage = () => {
                 </Card>
               )}
 
-              {/* Base Files Card - 1/2 width - Only for ADMIN, COMMERCIAL, LOGISTIC, DESIGNER */}
-              {sectionVisibility.isSectionVisible("baseFiles") && canViewBaseFiles && task.baseFiles && task.baseFiles.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1">
-                  <CardHeader className="pb-6">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconFiles className="h-5 w-5 text-muted-foreground" />
-                        Arquivos Base
-                        <Badge variant="secondary" className="ml-2">
-                          {task.baseFiles?.length ?? 0}
-                        </Badge>
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        {(task.baseFiles?.length ?? 0) > 1 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={async () => {
-                              const apiUrl = getApiBaseUrl();
-                              for (let i = 0; i < (task.baseFiles?.length ?? 0); i++) {
-                                const file = task.baseFiles?.[i];
-                                if (file) {
-                                  const downloadUrl = `${apiUrl}/files/${file.id}/download`;
-                                  window.open(downloadUrl, "_blank");
-                                }
-                                if (i < (task.baseFiles?.length ?? 0) - 1) {
-                                  await new Promise((resolve) => setTimeout(resolve, 200));
-                                }
-                              }
-                            }}
-                            className="text-xs"
-                          >
-                            <IconDownload className="h-3 w-3 mr-1" />
-                            Baixar Todos
-                          </Button>
-                        )}
-                        <div className="flex gap-1">
-                          <Button
-                            variant={baseFilesViewMode === "list" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setBaseFilesViewMode("list")}
-                            className="h-7 w-7 p-0"
-                          >
-                            <IconList className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant={baseFilesViewMode === "grid" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setBaseFilesViewMode("grid")}
-                            className="h-7 w-7 p-0"
-                          >
-                            <IconLayoutGrid className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0 flex-1">
-                    <div className={cn(baseFilesViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                      {task.baseFiles?.map((file) => (
-                        <FileItem
-                          key={file.id}
-                          file={file}
-                          viewMode={baseFilesViewMode}
-                          onPreview={handleBaseFileClick}
-                          onDownload={handleDownload}
-                          showActions
-                        />
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Files Card - Unified section for base files, projects, check-in, check-out */}
+              {sectionVisibility.isSectionVisible("files") && (() => {
+                const hasBaseFiles = canViewBaseFiles && task.baseFiles && task.baseFiles.length > 0;
+                const hasProjectFiles = canViewProjectFiles && task.projectFiles && task.projectFiles.length > 0;
+                const hasCheckinFiles = canViewCheckinFiles && task.checkinFiles && task.checkinFiles.length > 0;
+                const hasCheckoutFiles = canViewCheckoutFiles && task.checkoutFiles && task.checkoutFiles.length > 0;
+                const totalFiles = (hasBaseFiles ? task.baseFiles!.length : 0) + (hasProjectFiles ? task.projectFiles!.length : 0) + (hasCheckinFiles ? task.checkinFiles!.length : 0) + (hasCheckoutFiles ? task.checkoutFiles!.length : 0);
 
-              {/* Artworks Card - 1/2 width - Visible to ALL users, content filtered by approval status */}
-              {sectionVisibility.isSectionVisible("artworks") && filteredArtworks.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1">
-                  <CardHeader className="pb-6">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconFiles className="h-5 w-5 text-muted-foreground" />
-                        Artes
-                        <Badge variant="secondary" className="ml-2">
-                          {filteredArtworks.length}
-                        </Badge>
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        {filteredArtworks.length > 1 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={async () => {
-                              const apiUrl = getApiBaseUrl();
-                              for (let i = 0; i < filteredArtworks.length; i++) {
-                                const artwork = filteredArtworks[i];
-                                // File data can be nested in .file or directly on artwork
-                                const fileId = (artwork as any)?.file?.id || (artwork as any)?.id;
-                                if (fileId) {
-                                  const downloadUrl = `${apiUrl}/files/${fileId}/download`;
-                                  window.open(downloadUrl, "_blank");
-                                }
-                                if (i < filteredArtworks.length - 1) {
-                                  await new Promise((resolve) => setTimeout(resolve, 200));
-                                }
-                              }
-                            }}
-                            className="text-xs"
-                          >
-                            <IconDownload className="h-3 w-3 mr-1" />
-                            Baixar Todos
-                          </Button>
-                        )}
+                if (totalFiles === 0) return null;
+
+                return (
+                  <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1">
+                    <CardHeader className="pb-6">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                          <IconFiles className="h-5 w-5 text-muted-foreground" />
+                          Arquivos
+                          <Badge variant="secondary" className="ml-2">
+                            {totalFiles}
+                          </Badge>
+                        </CardTitle>
                         <div className="flex gap-1">
                           <Button
-                            variant={artworksViewMode === "list" ? "default" : "outline"}
+                            variant={filesViewMode === "list" ? "default" : "outline"}
                             size="sm"
-                            onClick={() => setArtworksViewMode("list")}
+                            onClick={() => setFilesViewMode("list")}
                             className="h-7 w-7 p-0"
                           >
                             <IconList className="h-3.5 w-3.5" />
                           </Button>
                           <Button
-                            variant={artworksViewMode === "grid" ? "default" : "outline"}
+                            variant={filesViewMode === "grid" ? "default" : "outline"}
                             size="sm"
-                            onClick={() => setArtworksViewMode("grid")}
+                            onClick={() => setFilesViewMode("grid")}
                             className="h-7 w-7 p-0"
                           >
                             <IconLayoutGrid className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </div>
-                    </div>
-                  </CardHeader>
-              <CardContent className="pt-0 flex-1">
-                <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                  {filteredArtworks.map((artwork) => {
-                    // File data can be nested in .file or directly on artwork
-                    const fileData = artwork.file || artwork;
-                    return (
-                    <div key={artwork.id} className="relative">
-                      <FileItem
-                        file={fileData as any}
-                        viewMode={artworksViewMode}
-                        onPreview={handleArtworkFileClick}
-                        onDownload={handleDownload}
-                        showActions
-                      />
-                      {canViewArtworkBadges && (artwork as any).status && (
-                        <div className="absolute top-2 right-2">
-                          <Badge
-                            variant={(artwork as any).status === 'APPROVED' ? 'approved' : (artwork as any).status === 'REPROVED' ? 'rejected' : 'secondary'}
-                            className="text-xs"
-                          >
-                            {(artwork as any).status === 'APPROVED' ? 'Aprovado' : (artwork as any).status === 'REPROVED' ? 'Reprovado' : 'Rascunho'}
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-                </Card>
-              )}
+                    </CardHeader>
+                    <CardContent className="pt-0 flex-1">
+                      <div className="space-y-6">
+                        {/* Base Files - Arquivos do Cliente */}
+                        {hasBaseFiles && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-3">
+                              <IconFile className="h-4 w-4 text-muted-foreground" />
+                              <h4 className="text-sm font-semibold">Arquivos do Cliente</h4>
+                              <Badge variant="outline" className="text-xs">{task.baseFiles!.length}</Badge>
+                            </div>
+                            <div className={cn(filesViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                              {task.baseFiles!.map((file) => (
+                                <FileItem
+                                  key={file.id}
+                                  file={file}
+                                  viewMode={filesViewMode}
+                                  onPreview={handleBaseFileClick}
+                                  onDownload={handleDownload}
+                                  showActions
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Project Files - Projetos */}
+                        {hasProjectFiles && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-3">
+                              <IconFile className="h-4 w-4 text-muted-foreground" />
+                              <h4 className="text-sm font-semibold">Projetos</h4>
+                              <Badge variant="outline" className="text-xs">{task.projectFiles!.length}</Badge>
+                            </div>
+                            <div className={cn(filesViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                              {task.projectFiles!.map((file) => (
+                                <FileItem
+                                  key={file.id}
+                                  file={file}
+                                  viewMode={filesViewMode}
+                                  onPreview={handleProjectFileClick}
+                                  onDownload={handleDownload}
+                                  showActions
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Check-in Files */}
+                        {hasCheckinFiles && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-3">
+                              <IconFile className="h-4 w-4 text-muted-foreground" />
+                              <h4 className="text-sm font-semibold">Check-in</h4>
+                              <Badge variant="outline" className="text-xs">{task.checkinFiles!.length}</Badge>
+                            </div>
+                            <div className={cn(filesViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                              {task.checkinFiles!.map((file) => (
+                                <FileItem
+                                  key={file.id}
+                                  file={file}
+                                  viewMode={filesViewMode}
+                                  onPreview={handleCheckinFileClick}
+                                  onDownload={handleDownload}
+                                  showActions
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Check-out Files */}
+                        {hasCheckoutFiles && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-3">
+                              <IconFile className="h-4 w-4 text-muted-foreground" />
+                              <h4 className="text-sm font-semibold">Check-out</h4>
+                              <Badge variant="outline" className="text-xs">{task.checkoutFiles!.length}</Badge>
+                            </div>
+                            <div className={cn(filesViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                              {task.checkoutFiles!.map((file) => (
+                                <FileItem
+                                  key={file.id}
+                                  file={file}
+                                  viewMode={filesViewMode}
+                                  onPreview={handleCheckoutFileClick}
+                                  onDownload={handleDownload}
+                                  showActions
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
               {/* Documents Card - Budget, NFE, Receipt - Only visible to ADMIN, FINANCIAL, and COMMERCIAL sectors */}
               {sectionVisibility.isSectionVisible("documents") && canViewDocumentsSection && ((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0) || (task.bankSlips && task.bankSlips.length > 0)) && (

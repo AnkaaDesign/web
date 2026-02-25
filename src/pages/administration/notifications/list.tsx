@@ -3,25 +3,28 @@
  *
  * Table-based view for managing notifications with:
  * - Searchable table with sorting
+ * - URL-persisted filters
  * - Filter drawer for advanced filtering
+ * - Clickable filter badges (matching item list pattern)
  * - Bulk actions support via context menu
  */
 
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { FAVORITE_PAGES, routes } from "../../../constants";
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { TableSearchInput } from "@/components/ui/table-search-input";
+import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { NotificationTable } from "@/components/administration/notification/list/notification-table";
 import { NotificationFilters } from "@/components/administration/notification/list/notification-filters";
+import { extractActiveFilters, createFilterRemover } from "@/components/administration/notification/list/filter-utils";
+import { useTableFilters } from "@/hooks/common/use-table-filters";
 import {
   IconPlus,
   IconFilter,
-  IconX,
   IconQrcode,
   IconBrandWhatsapp,
   IconPlugConnected,
@@ -31,6 +34,7 @@ import {
 } from "@tabler/icons-react";
 import type { NotificationGetManyFormData } from "@/schemas";
 import type { Notification } from "@/types";
+import { useUser } from "@/hooks";
 import { whatsAppService, type WhatsAppStatus } from "@/api-client/services/notification.service";
 import { useCurrentUser } from "@/hooks/common/use-auth";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -43,29 +47,17 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
-// Filter indicator component
-function FilterIndicator({
-  label,
-  value,
-  onRemove,
-}: {
-  label: string;
-  value: string;
-  onRemove: () => void;
-}) {
-  return (
-    <Badge variant="secondary" className="flex items-center gap-1 px-2 py-1">
-      <span className="text-xs text-muted-foreground">{label}:</span>
-      <span className="text-xs font-medium">{value}</span>
-      <button
-        onClick={onRemove}
-        className="ml-1 hover:bg-muted rounded-full p-0.5"
-      >
-        <IconX className="h-3 w-3" />
-      </button>
-    </Badge>
-  );
+// Notification page filter type
+interface NotificationPageFilters {
+  types?: string[];
+  importance?: string[];
+  channels?: string[];
+  status?: string;
+  unread?: boolean;
+  userId?: string;
+  createdAt?: { gte?: Date; lte?: Date };
 }
 
 // WhatsApp QR Code Component
@@ -90,15 +82,12 @@ const WhatsAppQRCard = () => {
     refetchInterval: (query) => {
       const actualData = query?.state?.data;
       const status = actualData?.data?.status;
-      // Poll every 2 seconds when CONNECTING to detect when QR becomes available
-      // Poll every 30 seconds when QR_READY to refresh the QR before it expires
       if (status === "CONNECTING") return 2000;
       if (status === "QR_READY") return 30000;
       return false;
     },
   });
 
-  // Determine if we should fetch QR code
   const shouldFetchQR = statusData?.data?.status === "QR_READY" || statusData?.data?.status === "CONNECTING";
 
   const {
@@ -112,13 +101,10 @@ const WhatsAppQRCard = () => {
       return response.data;
     },
     enabled: shouldFetchQR,
-    // Poll for QR code every 3 seconds when connecting (until QR is available)
     refetchInterval: (query) => {
       const status = statusData?.data?.status;
       const hasQR = query?.state?.data?.data?.qr;
-      // Keep polling if we're connecting and don't have a QR code yet
       if (status === "CONNECTING" && !hasQR) return 3000;
-      // Stop polling once we have the QR code
       return false;
     },
   });
@@ -266,114 +252,190 @@ const WhatsAppQRCard = () => {
 export const NotificationListPage = () => {
   const navigate = useNavigate();
 
-  // State
-  const [searchInput, setSearchInput] = useState("");
-  const [searchingFor, setSearchingFor] = useState("");
+  // Local UI state
   const [showFilters, setShowFilters] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
-  const [filters, setFilters] = useState<Partial<NotificationGetManyFormData>>({});
   const [, setTableData] = useState<{ items: Notification[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });
 
-  const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  // Cache for selected user data (for filter badge display)
+  const usersCacheRef = useRef<Map<string, { id: string; name: string }>>(new Map());
+  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string } | null>(null);
 
-  // Debounced search
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchInput(value);
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    searchTimeoutRef.current = setTimeout(() => {
-      setSearchingFor(value);
-    }, 300);
+  // We'll initialize useTableFilters first, then use the userId from filters below
+
+  // Custom serializer for notification filters to URL params
+  const serializeFilters = useCallback((filters: Partial<NotificationPageFilters>): Record<string, string> => {
+    const params: Record<string, string> = {};
+
+    if (filters.types?.length) params.types = JSON.stringify(filters.types);
+    if (filters.importance?.length) params.importance = JSON.stringify(filters.importance);
+    if (filters.channels?.length) params.channels = JSON.stringify(filters.channels);
+    if (filters.status) params.status = filters.status;
+    if (filters.unread) params.unread = "true";
+    if (filters.userId) params.userId = filters.userId;
+    if (filters.createdAt?.gte) params.createdAfter = filters.createdAt.gte.toISOString();
+    if (filters.createdAt?.lte) params.createdBefore = filters.createdAt.lte.toISOString();
+
+    return params;
   }, []);
 
-  // Handle filter changes
-  const handleFilterChange = useCallback((newFilters: Partial<NotificationGetManyFormData>) => {
-    setFilters(newFilters);
+  // Custom deserializer from URL params to notification filters
+  const deserializeFilters = useCallback((params: URLSearchParams): Partial<NotificationPageFilters> => {
+    const filters: Partial<NotificationPageFilters> = {};
+
+    const types = params.get("types");
+    if (types) {
+      try {
+        const parsed = JSON.parse(types);
+        if (Array.isArray(parsed) && parsed.length > 0) filters.types = parsed;
+      } catch { /* ignore */ }
+    }
+
+    const importance = params.get("importance");
+    if (importance) {
+      try {
+        const parsed = JSON.parse(importance);
+        if (Array.isArray(parsed) && parsed.length > 0) filters.importance = parsed;
+      } catch { /* ignore */ }
+    }
+
+    const channels = params.get("channels");
+    if (channels) {
+      try {
+        const parsed = JSON.parse(channels);
+        if (Array.isArray(parsed) && parsed.length > 0) filters.channels = parsed;
+      } catch { /* ignore */ }
+    }
+
+    const status = params.get("status");
+    if (status === "sent" || status === "pending") filters.status = status;
+
+    const unread = params.get("unread");
+    if (unread === "true") filters.unread = true;
+
+    const userId = params.get("userId");
+    if (userId) filters.userId = userId;
+
+    const createdAfter = params.get("createdAfter");
+    const createdBefore = params.get("createdBefore");
+    if (createdAfter || createdBefore) {
+      filters.createdAt = {
+        ...(createdAfter && { gte: new Date(createdAfter) }),
+        ...(createdBefore && { lte: new Date(createdBefore) }),
+      };
+    }
+
+    return filters;
   }, []);
 
-  // Compute query filters
-  const queryFilters = useMemo(() => ({
-    ...filters,
-    searchingFor: searchingFor || undefined,
-  }), [filters, searchingFor]);
+  // Use the unified table filters hook with URL persistence
+  const {
+    filters,
+    setFilters,
+    searchingFor,
+    displaySearchText,
+    setSearch,
+    clearAllFilters: clearAllFiltersBase,
+    queryFilters: baseQueryFilters,
+    hasActiveFilters,
+  } = useTableFilters<NotificationPageFilters>({
+    searchDebounceMs: 300,
+    searchParamName: "search",
+    serializeToUrl: serializeFilters,
+    deserializeFromUrl: deserializeFilters,
+    excludeFromUrl: ["limit", "orderBy"],
+  });
 
-  // Extract active filters for indicators
-  const activeFilters = useMemo(() => {
-    const indicators: { label: string; value: string; onRemove: () => void }[] = [];
+  // Fetch user data when userId is in filters (e.g. from URL) but not yet cached
+  const { data: userData } = useUser(filters.userId || "", {
+    enabled: !!filters.userId && !usersCacheRef.current.has(filters.userId),
+  });
 
-    if (searchingFor) {
-      indicators.push({
-        label: "Busca",
-        value: searchingFor,
-        onRemove: () => {
-          setSearchInput("");
-          setSearchingFor("");
-        },
-      });
+  // Update cache and selectedUser when user data arrives
+  useEffect(() => {
+    if (userData?.data && filters.userId) {
+      const user = { id: userData.data.id, name: userData.data.name };
+      usersCacheRef.current.set(user.id, user);
+      setSelectedUser(user);
     }
+  }, [userData?.data, filters.userId]);
 
-    if (filters.types?.length) {
-      indicators.push({
-        label: "Tipo",
-        value: `${filters.types.length} selecionado(s)`,
-        onRemove: () => setFilters((prev) => ({ ...prev, types: [] })),
-      });
+  // Handle filter changes from the sheet
+  const handleFilterChange = useCallback(
+    (newFilters: Partial<NotificationPageFilters>) => {
+      setFilters(newFilters);
+    },
+    [setFilters],
+  );
+
+  // Handle user selection from the filter sheet (cache name for badge)
+  const handleUserSelect = useCallback((user: { id: string; name: string } | null) => {
+    if (user) {
+      usersCacheRef.current.set(user.id, user);
+      setSelectedUser(user);
+    } else {
+      setSelectedUser(null);
     }
+  }, []);
 
-    if (filters.importance?.length) {
-      indicators.push({
-        label: "Importância",
-        value: `${filters.importance.length} selecionado(s)`,
-        onRemove: () => setFilters((prev) => ({ ...prev, importance: [] })),
-      });
-    }
+  // Handle filter removal
+  const baseOnRemoveFilter = createFilterRemover(filters, handleFilterChange);
 
-    if (filters.channels?.length) {
-      indicators.push({
-        label: "Canal",
-        value: `${filters.channels.length} selecionado(s)`,
-        onRemove: () => setFilters((prev) => ({ ...prev, channels: [] })),
-      });
-    }
+  const onRemoveFilter = useCallback(
+    (key: string, value?: any) => {
+      if (key === "searchingFor") {
+        setSearch("");
+      } else if (key === "userId") {
+        setSelectedUser(null);
+        baseOnRemoveFilter(key, value);
+      } else {
+        baseOnRemoveFilter(key, value);
+      }
+    },
+    [baseOnRemoveFilter, setSearch],
+  );
 
-    if ((filters as any).status) {
-      indicators.push({
-        label: "Status",
-        value: (filters as any).status === "sent" ? "Enviadas" : "Pendentes",
-        onRemove: () => setFilters((prev) => ({ ...prev, status: undefined } as any)),
-      });
-    }
-
-    if (filters.unread) {
-      indicators.push({
-        label: "Leitura",
-        value: "Não lidas",
-        onRemove: () => setFilters((prev) => ({ ...prev, unread: undefined })),
-      });
-    }
-
-    if (filters.createdAt) {
-      indicators.push({
-        label: "Período",
-        value: "Filtrado",
-        onRemove: () => setFilters((prev) => ({ ...prev, createdAt: undefined })),
-      });
-    }
-
-    return indicators;
-  }, [searchingFor, filters]);
-
+  // Clear all filters
   const clearAllFilters = useCallback(() => {
-    setSearchInput("");
-    setSearchingFor("");
-    setFilters({});
-  }, []);
+    clearAllFiltersBase();
+    setSelectedUser(null);
+  }, [clearAllFiltersBase]);
 
-  const hasActiveFilters = activeFilters.length > 0;
+  // Build the users list for filter badge display from cache
+  const usersForBadges = useMemo(() => {
+    return Array.from(usersCacheRef.current.values());
+  }, [filters.userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Extract active filters for badge display
+  const activeFilters = useMemo(() => {
+    const filtersWithSearch = {
+      ...filters,
+      searchingFor: searchingFor || undefined,
+    };
+
+    return extractActiveFilters(filtersWithSearch, onRemoveFilter, {
+      users: usersForBadges,
+    });
+  }, [filters, searchingFor, onRemoveFilter, usersForBadges]);
+
+  // Stable query filters ref for the table
+  const queryFiltersRef = useRef<Partial<NotificationPageFilters>>({});
+  const queryFiltersStringRef = useRef("");
+
+  const queryFilters = useMemo(() => {
+    const result = { ...baseQueryFilters };
+
+    const currentString = JSON.stringify(result);
+    if (currentString !== queryFiltersStringRef.current) {
+      queryFiltersStringRef.current = currentString;
+      queryFiltersRef.current = result;
+    }
+
+    return queryFiltersRef.current;
+  }, [baseQueryFilters]);
 
   return (
     <PrivilegeRoute>
@@ -412,10 +474,12 @@ export const NotificationListPage = () => {
               {/* Search and Filter Controls */}
               <div className="flex flex-col gap-3 sm:flex-row">
                 <TableSearchInput
-                  value={searchInput}
-                  onChange={handleSearchChange}
+                  value={displaySearchText}
+                  onChange={(value) => {
+                    setSearch(value);
+                  }}
                   placeholder="Buscar por título, mensagem..."
-                  isPending={searchInput !== searchingFor}
+                  isPending={displaySearchText !== searchingFor}
                   className="flex-1"
                 />
                 <div className="flex gap-2">
@@ -423,39 +487,28 @@ export const NotificationListPage = () => {
                     variant={hasActiveFilters ? "default" : "outline"}
                     onClick={() => setShowFilters(true)}
                   >
-                    <IconFilter className="h-4 w-4 mr-2" />
-                    Filtros
-                    {hasActiveFilters && ` (${activeFilters.length})`}
+                    <IconFilter className="h-4 w-4" />
+                    <span>
+                      Filtros
+                      {hasActiveFilters ? ` (${activeFilters.length})` : ""}
+                    </span>
                   </Button>
                 </div>
               </div>
 
-              {/* Active Filter Indicators */}
+              {/* Active Filter Indicators - using shared component, no border separator */}
               {activeFilters.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-3 border-t">
-                  {activeFilters.map((filter, index) => (
-                    <FilterIndicator
-                      key={index}
-                      label={filter.label}
-                      value={filter.value}
-                      onRemove={filter.onRemove}
-                    />
-                  ))}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearAllFilters}
-                    className="h-6 px-2 text-xs"
-                  >
-                    Limpar todos
-                  </Button>
-                </div>
+                <FilterIndicators
+                  filters={activeFilters}
+                  onClearAll={clearAllFilters}
+                  className="px-1 py-1"
+                />
               )}
 
               {/* Table */}
               <div className="flex-1 min-h-0 overflow-auto">
                 <NotificationTable
-                  filters={queryFilters}
+                  filters={queryFilters as Partial<NotificationGetManyFormData>}
                   onDataChange={(data) => {
                     setTableData({
                       items: data.items as any,
@@ -474,8 +527,10 @@ export const NotificationListPage = () => {
       <NotificationFilters
         open={showFilters}
         onOpenChange={setShowFilters}
-        filters={filters}
-        onFilterChange={handleFilterChange}
+        filters={filters as any}
+        onFilterChange={handleFilterChange as any}
+        onUserSelect={handleUserSelect}
+        selectedUser={selectedUser}
       />
 
       {/* WhatsApp QR Code Modal */}

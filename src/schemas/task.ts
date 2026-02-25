@@ -143,6 +143,9 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
           }),
         ])
         .optional(),
+      projectFiles: z.boolean().optional(),
+      checkinFiles: z.boolean().optional(),
+      checkoutFiles: z.boolean().optional(),
       logoPaints: z.boolean().optional(),
       paints: z
         .union([
@@ -1257,6 +1260,9 @@ export const taskCreateSchema = z
     reimbursementInvoiceIds: z.array(z.string().uuid("Reimbursement invoice inválida")).optional(),
     artworkIds: z.array(z.string().uuid("Arquivo inválido")).optional(), // Maps to artworks
     baseFileIds: z.array(z.string().uuid("Arquivo base inválido")).optional(), // Maps to baseFiles
+    projectFileIds: z.array(z.string().uuid("Arquivo de projeto inválido")).optional(),
+    checkinFileIds: z.array(z.string().uuid("Arquivo de checkin inválido")).optional(),
+    checkoutFileIds: z.array(z.string().uuid("Arquivo de checkout inválido")).optional(),
     paintIds: z.array(z.string().uuid("Paint inválida")).optional(), // Maps to logoPaints
     observation: taskObservationCreateSchema.nullable().optional(),
     serviceOrders: taskServiceOrdersArraySchema, // Uses preprocessing to filter empty items
@@ -1382,6 +1388,9 @@ export const taskUpdateSchema = z
     reimbursementInvoiceIds: z.array(z.string().uuid("Reimbursement invoice inválida")).optional(),
     artworkIds: z.array(z.string().uuid("Arquivo inválido")).optional(), // Maps to artworks
     baseFileIds: z.array(z.string().uuid("Arquivo base inválido")).optional(), // Maps to baseFiles
+    projectFileIds: z.array(z.string().uuid("Arquivo de projeto inválido")).optional(),
+    checkinFileIds: z.array(z.string().uuid("Arquivo de checkin inválido")).optional(),
+    checkoutFileIds: z.array(z.string().uuid("Arquivo de checkout inválido")).optional(),
     paintIds: z.array(z.string().uuid("Paint inválida")).optional(), // Maps to logoPaints
     observation: taskObservationCreateSchema.nullable().optional(),
     serviceOrders: taskServiceOrdersArraySchema, // Uses preprocessing to filter empty items
@@ -1545,6 +1554,9 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
   artworkIds: task.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id),
   baseFileIds: task.baseFiles?.map((baseFile) => baseFile.id),
+  projectFileIds: task.projectFiles?.map((f: any) => f.id),
+  checkinFileIds: task.checkinFiles?.map((f: any) => f.id),
+  checkoutFileIds: task.checkoutFiles?.map((f: any) => f.id),
   paintIds: task.logoPaints?.map((paint) => paint.id),
   // Complex relations need to be handled separately
 }));

@@ -13,6 +13,8 @@ import {
   Shield,
   Factory,
   Users,
+  Search,
+  X,
 } from "lucide-react";
 import {
   notificationUserPreferenceService,
@@ -22,6 +24,7 @@ import {
 } from "@/api-client";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -265,6 +268,7 @@ export function NotificationPreferencesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
   const [openAccordions, setOpenAccordions] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // =====================
   // Load Configurations
@@ -400,17 +404,47 @@ export function NotificationPreferencesPage() {
   const groupedSections = useMemo(() => {
     if (!configurations || !Array.isArray(configurations)) return [];
 
+    const normalizedSearch = searchQuery.toLowerCase().trim();
+
     // API returns array: [{ notificationType, configurations: [...] }, ...]
     return configurations
       .filter((group) => group?.configurations && Array.isArray(group.configurations) && group.configurations.length > 0)
-      .map((group) => ({
-        type: group.notificationType,
-        title: TYPE_LABELS[group.notificationType]?.title || group.notificationType,
-        icon: TYPE_LABELS[group.notificationType]?.icon || Bell,
-        configs: group.configurations,
-      }))
+      .map((group) => {
+        // Sort configs alphabetically by name within each group
+        const sortedConfigs = [...group.configurations].sort((a, b) => {
+          const nameA = (a.name || a.configKey).toLowerCase();
+          const nameB = (b.name || b.configKey).toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+
+        // Filter by search query if present
+        const filteredConfigs = normalizedSearch
+          ? sortedConfigs.filter((config) => {
+              const name = (config.name || config.configKey).toLowerCase();
+              const description = (config.description || "").toLowerCase();
+              return name.includes(normalizedSearch) || description.includes(normalizedSearch);
+            })
+          : sortedConfigs;
+
+        return {
+          type: group.notificationType,
+          title: TYPE_LABELS[group.notificationType]?.title || group.notificationType,
+          icon: TYPE_LABELS[group.notificationType]?.icon || Bell,
+          configs: filteredConfigs,
+        };
+      })
+      // Hide groups with no matching configs when searching
+      .filter((section) => section.configs.length > 0)
       .sort((a, b) => a.title.localeCompare(b.title));
-  }, [configurations]);
+  }, [configurations, searchQuery]);
+
+  // Auto-expand all accordions when searching
+  const effectiveOpenAccordions = useMemo(() => {
+    if (searchQuery.trim()) {
+      return groupedSections.map((s) => s.type);
+    }
+    return openAccordions;
+  }, [searchQuery, groupedSections, openAccordions]);
 
   // =====================
   // Render
@@ -503,11 +537,34 @@ export function NotificationPreferencesPage() {
         </div>
       </div>
 
+      {/* Search Input */}
+      <div className="flex-shrink-0 relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Buscar notificação..."
+          className={cn(
+            "w-full h-10 pl-9 pr-9 rounded-lg border border-border bg-background text-sm",
+            "placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+          )}
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
       {/* Scrollable Accordion Sections */}
       <div className="flex-1 min-h-0 overflow-auto pb-8">
         <Accordion
             type="multiple"
-            value={openAccordions}
+            value={effectiveOpenAccordions}
             onValueChange={setOpenAccordions}
             className="space-y-2"
           >
@@ -550,6 +607,16 @@ export function NotificationPreferencesPage() {
               );
             })}
           </Accordion>
+
+          {/* Empty search results */}
+          {searchQuery.trim() && groupedSections.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Search className="w-10 h-10 text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">
+                Nenhuma notificação encontrada para "{searchQuery}"
+              </p>
+            </div>
+          )}
       </div>
     </div>
   );

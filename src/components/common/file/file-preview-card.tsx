@@ -95,13 +95,8 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
       return;
     }
 
-    if (file.mimetype === "application/pdf") {
-      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.12:3030";
-      window.open(`${apiUrl}/files/serve/${file.id}`, "_blank");
-    } else if (isImage || category === "video") {
-      if (onPreview) {
-        onPreview(file, index);
-      }
+    if (canPreview && onPreview) {
+      onPreview(file, index);
     } else if (onDownload) {
       onDownload(file);
     } else {
