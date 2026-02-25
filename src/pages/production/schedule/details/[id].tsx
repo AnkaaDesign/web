@@ -34,7 +34,6 @@ import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { canViewPricing } from "@/utils/permissions/pricing-permissions";
 import { PricingStatusBadge } from "@/components/production/task/pricing/pricing-status-badge";
-import { exportBudgetPdf } from "@/utils/budget-pdf-generator";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text-generators";
 import { getApiBaseUrl } from "@/utils/file";
 import { SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_DISPLAY_ORDER } from "../../../../constants";
@@ -897,8 +896,6 @@ export const TaskDetailsPage = () => {
   const [baseFilesViewMode, setBaseFilesViewMode] = useState<FileViewMode>("list");
   const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("list");
   const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("list");
-  const [isExportingPdf, setIsExportingPdf] = useState(false);
-
   // Get user's sector privilege for service order permissions
   const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
 
@@ -1329,26 +1326,6 @@ export const TaskDetailsPage = () => {
     title: task ? `Tarefa: ${taskDisplayName}` : "Detalhes da Tarefa",
     icon: source === 'historico' ? "history" : "clipboard-list",
   });
-
-  // Budget PDF export handler
-  const handleBudgetPdfExport = async () => {
-    if (!task) return;
-
-    setIsExportingPdf(true);
-    try {
-      await exportBudgetPdf({ task });
-      toast.success("Orçamento exportado com sucesso!");
-    } catch (error) {
-      console.error("Error exporting budget PDF:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Erro ao exportar o orçamento. Tente novamente."
-      );
-    } finally {
-      setIsExportingPdf(false);
-    }
-  };
 
   // Status change handlers
   const handleStatusChange = (newStatus: TASK_STATUS) => {
@@ -1928,16 +1905,6 @@ export const TaskDetailsPage = () => {
           Precificação Detalhada
         </CardTitle>
                         <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleBudgetPdfExport}
-                            disabled={isExportingPdf}
-                            className="gap-2"
-                          >
-                            <IconDownload className="h-4 w-4" />
-                            {isExportingPdf ? "Exportando..." : "Exportar PDF"}
-                          </Button>
                           <Button
                             variant="outline"
                             size="sm"

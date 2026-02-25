@@ -145,8 +145,10 @@ function sortBySerialNumber(tasks: Task[]): Task[] {
 }
 
 /**
- * Group tasks with similar names regardless of serial number distance
- * Returns an array of TaskGroup objects that can be rendered
+ * Group tasks with similar names, but only when they are consecutive in the sorted list.
+ * This ensures grouping respects the current sort order — tasks that are separated
+ * by a different task in the sorted results will NOT be grouped together.
+ * Returns an array of TaskGroup objects that can be rendered.
  */
 export function groupSequentialTasks(
   tasks: Task[],
@@ -156,30 +158,27 @@ export function groupSequentialTasks(
   if (tasks.length === 0) return [];
 
   const result: TaskGroup[] = [];
-  const usedIndices = new Set<number>();
 
-  // Process tasks in original order, but find ALL similar tasks for each
-  for (let i = 0; i < tasks.length; i++) {
-    if (usedIndices.has(i)) continue;
+  // Build runs of consecutive tasks with similar names
+  let runStart = 0;
 
-    const currentTask = tasks[i];
+  while (runStart < tasks.length) {
+    // Extend the run as long as consecutive tasks are similar to the first task in the run
+    let runEnd = runStart + 1;
+    while (runEnd < tasks.length && shouldGroupTasks(tasks[runStart], tasks[runEnd], similarityThreshold)) {
+      runEnd++;
+    }
 
-    // Find all tasks similar to this one (including itself)
-    const similarTasks = findSimilarTasks(currentTask, tasks, usedIndices, similarityThreshold);
+    const runLength = runEnd - runStart;
+    const runTasks = tasks.slice(runStart, runEnd);
 
-    // Mark all found tasks as used
-    similarTasks.forEach(({ index }) => usedIndices.add(index));
-
-    // Sort the group by serial number
-    const groupTasks = sortBySerialNumber(similarTasks.map(s => s.task));
-
-    // If we found a group of minGroupSize or more, create a collapsible group
-    if (groupTasks.length >= minGroupSize) {
+    if (runLength >= minGroupSize) {
+      // Sort the group by serial number for display
+      const groupTasks = sortBySerialNumber(runTasks);
       const firstTask = groupTasks[0];
-      const restTasks = groupTasks.slice(1); // All tasks except the first
+      const restTasks = groupTasks.slice(1);
       const groupId = `group-${firstTask.id}`;
 
-      // First task
       result.push({
         type: 'group-first',
         task: firstTask,
@@ -187,7 +186,6 @@ export function groupSequentialTasks(
         totalCount: groupTasks.length,
       });
 
-      // Collapsed row representing all remaining tasks (no separate "last" row)
       result.push({
         type: 'group-collapsed',
         groupId,
@@ -195,14 +193,16 @@ export function groupSequentialTasks(
         totalCount: groupTasks.length,
       });
     } else {
-      // Not enough tasks to form a group, add them individually
-      for (const task of groupTasks) {
+      // Not enough consecutive tasks to form a group, add individually
+      for (const task of runTasks) {
         result.push({
           type: 'single',
           task,
         });
       }
     }
+
+    runStart = runEnd;
   }
 
   return result;

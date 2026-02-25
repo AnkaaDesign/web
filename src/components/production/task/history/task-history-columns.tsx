@@ -564,6 +564,26 @@ export const createTaskHistoryColumns = (options?: {
     formatter: (value: Date | null) => renderDate(value),
   },
   {
+    id: "createdAt",
+    header: "CRIADO EM",
+    accessorKey: "createdAt",
+    sortable: true,
+    filterable: true,
+    defaultVisible: false,
+    width: "140px",
+    formatter: (value: Date | null) => {
+      if (!value) return <span className="text-muted-foreground">-</span>;
+      const d = new Date(value);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = String(d.getFullYear()).slice(-2);
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const formatted = `${day}/${month}/${year} - ${hours}:${minutes}`;
+      return <span className="truncate">{formatted}</span>;
+    },
+  },
+  {
     id: "duration",
     header: "DURAÇÃO",
     accessorFn: (row) => {

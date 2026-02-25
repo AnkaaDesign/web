@@ -4,10 +4,12 @@ import { taskPricingService } from "@/api-client/task-pricing";
 import { formatCurrency, formatDate, toTitleCase } from "@/utils";
 import { getApiBaseUrl } from "@/utils/file";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text-generators";
+import { exportBudgetPdfFromData } from "@/utils/budget-pdf-generator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { IconUpload, IconCheck, IconAlertCircle, IconLoader2 } from "@tabler/icons-react";
+import { IconUpload, IconCheck, IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconDotsVertical, IconCopy, IconFileTypePdf } from "@tabler/icons-react";
 import type { TaskPricing } from "@/types/task-pricing";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 
@@ -51,6 +53,7 @@ export function PublicBudgetPage() {
   const [uploading, setUploading] = useState(false);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Fetch pricing data
   const fetchPricing = useCallback(async () => {
@@ -197,16 +200,69 @@ export function PublicBudgetPage() {
   // Use serve endpoint for signature to preserve PNG transparency
   const signatureImageUrl = pricing.customerSignature?.id ? getFileServeUrl(pricing.customerSignature) : null;
 
+  // Copy URL to clipboard
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Link copiado!");
+    } catch {
+      toast.error("Não foi possível copiar o link.");
+    }
+  };
+
+  // WhatsApp share: compose message with budget title + URL
+  const handleWhatsAppShare = () => {
+    const message = `Orçamento Nº ${budgetNumber} - ${COMPANY.name}\n${window.location.href}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+  };
+
+  // Export as PDF (same output as task detail page)
+  const handleExportPdf = async () => {
+    try {
+      toast.info("Gerando PDF...");
+      await exportBudgetPdfFromData({
+        corporateName,
+        contactName,
+        currentDate: formatDate(pricing.createdAt),
+        validityDays,
+        budgetNumber,
+        items: pricing.items || [],
+        subtotal: pricing.subtotal,
+        discountType: pricing.discountType,
+        discountValue: pricing.discountValue,
+        total: pricing.total,
+        termDate,
+        customDeliveryDays,
+        paymentText,
+        guaranteeText,
+        layoutImageUrl,
+        customerSignatureUrl: signatureImageUrl,
+        serialNumber: pricing.task?.serialNumber || null,
+        plate: pricing.task?.truck?.plate || null,
+        chassisNumber: pricing.task?.truck?.chassisNumber || null,
+        invoicesToCustomers: pricing.invoicesToCustomers,
+        simultaneousTasks: pricing.simultaneousTasks || null,
+        discountReference: pricing.discountReference || null,
+      });
+      toast.success("PDF exportado!");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao exportar PDF."
+      );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Single Page Budget */}
-        <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div className="bg-white shadow-lg rounded-lg overflow-hidden relative">
           <div className="p-6 md:p-8">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
               <img src="/logo.png" alt="Ankaa Design" className="h-16 md:h-20" />
-              <div className="text-right">
+              <div className="flex items-start gap-2">
+                <div className="text-right">
                 <h1 className="text-xl md:text-2xl font-bold text-gray-900">
                   Orçamento Nº {budgetNumber}
                 </h1>
@@ -216,6 +272,41 @@ export function PublicBudgetPage() {
                 <p className="text-sm text-gray-600">
                   <span className="font-semibold">Validade:</span> {validityDays} dias
                 </p>
+                </div>
+                <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                    >
+                      <IconDotsVertical className="h-5 w-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" sideOffset={4} className="w-48 p-1">
+                    <button
+                      onClick={() => { setMenuOpen(false); handleCopyLink(); }}
+                      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-gray-100 transition-colors"
+                    >
+                      <IconCopy className="h-4 w-4 text-gray-500" />
+                      Copiar link
+                    </button>
+                    <button
+                      onClick={() => { setMenuOpen(false); handleWhatsAppShare(); }}
+                      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-gray-100 transition-colors"
+                    >
+                      <IconBrandWhatsapp className="h-4 w-4 text-green-600" />
+                      WhatsApp
+                    </button>
+                    <button
+                      onClick={() => { setMenuOpen(false); handleExportPdf(); }}
+                      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-gray-100 transition-colors"
+                    >
+                      <IconFileTypePdf className="h-4 w-4 text-red-500" />
+                      PDF
+                    </button>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 

@@ -415,7 +415,7 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
   };
 }
 
-interface BudgetHtmlData {
+export interface BudgetHtmlData {
   corporateName: string;
   contactName: string;
   currentDate: string;
@@ -440,6 +440,30 @@ interface BudgetHtmlData {
   invoicesToCustomers?: Array<{ corporateName?: string; fantasyName?: string }>;
   simultaneousTasks?: number | null;
   discountReference?: string | null;
+}
+
+/**
+ * Opens a print window with the budget PDF HTML and triggers print dialog.
+ * Used by the public budget page which already has all derived data.
+ */
+export async function exportBudgetPdfFromData(data: BudgetHtmlData): Promise<void> {
+  const htmlContent = generateBudgetHtml(data);
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    throw new Error("Não foi possível abrir a janela de impressão. Verifique se o bloqueador de pop-ups está desativado.");
+  }
+
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+
+  printWindow.onload = () => {
+    printWindow.focus();
+    printWindow.print();
+    printWindow.onafterprint = () => {
+      printWindow.close();
+    };
+  };
 }
 
 /**

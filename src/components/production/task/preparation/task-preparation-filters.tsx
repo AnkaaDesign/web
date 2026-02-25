@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { IconFilter, IconX, IconChecklist, IconCalendar, IconBuilding, IconTruck } from "@tabler/icons-react";
+import { IconFilter, IconX, IconCalendar, IconBuilding, IconTruck, IconTable } from "@tabler/icons-react";
 import {
   Sheet,
   SheetContent,
@@ -12,9 +12,15 @@ import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { TASK_STATUS_LABELS, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
+import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { getCustomers } from "@/api-client/customer";
+
+const TABLE_VISIBILITY_OPTIONS = [
+  { value: "preparation", label: "Em Preparação" },
+  { value: "production", label: "Em Produção" },
+  { value: "completed", label: "Concluído" },
+];
 
 interface TaskPreparationFiltersProps {
   open: boolean;
@@ -22,9 +28,11 @@ interface TaskPreparationFiltersProps {
   filters: Partial<TaskGetManyFormData>;
   onFilterChange: (filters: Partial<TaskGetManyFormData>) => void;
   onCustomerNamesChange?: (names: Record<string, string>) => void;
+  visibleTables: string[];
+  onVisibleTablesChange: (tables: string[]) => void;
 }
 
-export function TaskPreparationFilters({ open, onOpenChange, filters, onFilterChange, onCustomerNamesChange }: TaskPreparationFiltersProps) {
+export function TaskPreparationFilters({ open, onOpenChange, filters, onFilterChange, onCustomerNamesChange, visibleTables, onVisibleTablesChange }: TaskPreparationFiltersProps) {
   // Local state for filters
   const [localFilters, setLocalFilters] = useState<Partial<TaskGetManyFormData>>({
     ...filters,
@@ -92,12 +100,6 @@ export function TaskPreparationFilters({ open, onOpenChange, filters, onFilterCh
     setLocalFilters({});
   };
 
-  // Status options
-  const statusOptions = Object.entries(TASK_STATUS_LABELS).map(([value, label]) => ({
-    value,
-    label,
-  }));
-
   // Truck category options
   const truckCategoryOptions = Object.entries(TRUCK_CATEGORY_LABELS).map(([value, label]) => ({
     value,
@@ -119,7 +121,7 @@ export function TaskPreparationFilters({ open, onOpenChange, filters, onFilterCh
             Filtros da Preparação
           </SheetTitle>
           <SheetDescription>
-            Filtre as tarefas por previsão, prazo, cliente, status e mais
+            Filtre as tarefas por previsão, prazo, cliente e mais
           </SheetDescription>
         </SheetHeader>
 
@@ -278,22 +280,22 @@ export function TaskPreparationFilters({ open, onOpenChange, filters, onFilterCh
             />
           </div>
 
-          {/* Status Filter */}
+          {/* Table Visibility */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
-              <IconChecklist className="h-4 w-4" />
-              Status das Tarefas
+              <IconTable className="h-4 w-4" />
+              Tabelas Visíveis
             </Label>
             <Combobox
               mode="multiple"
-              options={statusOptions}
-              value={localFilters.status || []}
+              options={TABLE_VISIBILITY_OPTIONS}
+              value={visibleTables}
               onValueChange={(value) => {
                 const arr = Array.isArray(value) ? value : (value ? [value] : []);
-                setLocalFilters({ ...localFilters, status: arr.length > 0 ? arr : undefined });
+                onVisibleTablesChange(arr);
               }}
-              placeholder="Selecione os status"
-              searchable={true}
+              placeholder="Selecione as tabelas"
+              searchable={false}
               minSearchLength={0}
             />
           </div>
