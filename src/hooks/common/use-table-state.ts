@@ -54,6 +54,11 @@ export interface UseTableStateOptions {
    * Default sort configuration to apply when no sort is set in URL
    */
   defaultSort?: Array<{ column: string; direction: "asc" | "desc" }>;
+  /**
+   * localStorage key for persisting sort. When set, sort is saved to/loaded from localStorage.
+   * URL always takes precedence over localStorage (supports URL sharing).
+   */
+  sortStorageKey?: string;
 }
 
 /**
@@ -165,7 +170,7 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
  * Hook for managing table state (pagination, selection, sorting) in URL
  */
 export function useTableState(options: UseTableStateOptions = {}) {
-  const { defaultPageSize = 40, resetSelectionOnPageChange = false, defaultSort = [] } = options;
+  const { defaultPageSize = 40, resetSelectionOnPageChange = false, defaultSort = [], sortStorageKey } = options;
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -217,13 +222,30 @@ export function useTableState(options: UseTableStateOptions = {}) {
         // Ignore parsing errors
       }
       // If sort parameter exists in URL (even if empty array), don't apply defaults
-    } else if (!searchParams.has("sort") && defaultSort.length > 0) {
-      // Only apply default sort if the sort parameter has never been set
-      sortConfigs = defaultSort;
+    } else if (!searchParams.has("sort")) {
+      // URL has no sort param — try localStorage, then fall back to defaultSort
+      if (sortStorageKey) {
+        try {
+          const stored = localStorage.getItem(sortStorageKey);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              sortConfigs = parsed.filter((config: any) => config && typeof config.column === "string" && (config.direction === "asc" || config.direction === "desc"));
+            }
+          }
+        } catch {
+          // Ignore parsing errors
+        }
+      }
+      // If localStorage didn't provide sort configs, use defaults
+      if (sortConfigs.length === 0 && defaultSort.length > 0) {
+        sortConfigs = defaultSort;
+      }
     }
 
     return { sortConfigs };
-  }, [searchParams, defaultSort]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, defaultSort, sortStorageKey]);
 
   const filterState = useMemo(() => {
     const showSelectedOnlyValue = searchParams.get("showSelectedOnly");
@@ -435,8 +457,20 @@ export function useTableState(options: UseTableStateOptions = {}) {
           params.set("sort", serialized);
         }
       });
+      // Persist to localStorage if sortStorageKey is set
+      if (sortStorageKey) {
+        try {
+          if (sortConfigs.length > 0) {
+            localStorage.setItem(sortStorageKey, JSON.stringify(sortConfigs));
+          } else {
+            localStorage.removeItem(sortStorageKey);
+          }
+        } catch {
+          // Ignore storage errors
+        }
+      }
     },
-    [updateUrl],
+    [updateUrl, sortStorageKey],
   );
 
   const addSort = useCallback(
@@ -482,7 +516,10 @@ export function useTableState(options: UseTableStateOptions = {}) {
 
   const clearSort = useCallback(() => {
     setSortConfigs([]);
-  }, [setSortConfigs]);
+    if (sortStorageKey) {
+      try { localStorage.removeItem(sortStorageKey); } catch { /* ignore */ }
+    }
+  }, [setSortConfigs, sortStorageKey]);
 
   // Helper methods
   const getSortDirection = useCallback(
@@ -541,7 +578,10 @@ export function useTableState(options: UseTableStateOptions = {}) {
     updateUrl((params) => {
       params.delete("sort");
     });
-  }, [updateUrl]);
+    if (sortStorageKey) {
+      try { localStorage.removeItem(sortStorageKey); } catch { /* ignore */ }
+    }
+  }, [updateUrl, sortStorageKey]);
 
   const resetAll = useCallback(() => {
     updateUrl((params) => {

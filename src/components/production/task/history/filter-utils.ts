@@ -1,6 +1,6 @@
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { formatDate, formatCurrency } from "../../../../utils";
-import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
 
 export interface FilterIndicator {
   key: string;
@@ -163,6 +163,50 @@ export function extractActiveFilters(
       value: parts.join(" "),
       iconType: "calendar",
       onRemove: () => onRemoveFilter("startedDateRange"),
+    });
+  }
+
+  if ((filters as any).forecastDateRange?.from || (filters as any).forecastDateRange?.to) {
+    const forecastRange = (filters as any).forecastDateRange;
+    const parts = [];
+    if (forecastRange.from) parts.push(`De: ${formatDate(forecastRange.from)}`);
+    if (forecastRange.to) parts.push(`Até: ${formatDate(forecastRange.to)}`);
+    activeFilters.push({
+      key: "forecastDateRange",
+      label: "Previsão",
+      value: parts.join(" "),
+      iconType: "calendar",
+      onRemove: () => onRemoveFilter("forecastDateRange"),
+    });
+  }
+
+  // Truck category filter (individual badges)
+  if ((filters as any).truckCategories && Array.isArray((filters as any).truckCategories) && (filters as any).truckCategories.length > 0) {
+    (filters as any).truckCategories.forEach((category: string) => {
+      const label = (TRUCK_CATEGORY_LABELS as any)[category];
+      activeFilters.push({
+        key: `truckCategories-${category}`,
+        label: "Categoria",
+        value: label || category,
+        iconType: "truck",
+        itemId: category,
+        onRemove: () => onRemoveFilter("truckCategories", category),
+      });
+    });
+  }
+
+  // Implement type filter (individual badges)
+  if ((filters as any).implementTypes && Array.isArray((filters as any).implementTypes) && (filters as any).implementTypes.length > 0) {
+    (filters as any).implementTypes.forEach((type: string) => {
+      const label = (IMPLEMENT_TYPE_LABELS as any)[type];
+      activeFilters.push({
+        key: `implementTypes-${type}`,
+        label: "Implemento",
+        value: label || type,
+        iconType: "truck",
+        itemId: type,
+        onRemove: () => onRemoveFilter("implementTypes", type),
+      });
     });
   }
 
@@ -350,6 +394,33 @@ export function createFilterRemover(currentFilters: Partial<TaskGetManyFormData>
         break;
       case "startedDateRange":
         delete newFilters.startedDateRange;
+        break;
+      case "forecastDateRange":
+        delete (newFilters as any).forecastDateRange;
+        break;
+      case "truckCategories":
+        if (itemId && Array.isArray((newFilters as any).truckCategories)) {
+          const filtered = (newFilters as any).truckCategories.filter((c: string) => c !== itemId);
+          if (filtered.length > 0) {
+            (newFilters as any).truckCategories = filtered;
+          } else {
+            delete (newFilters as any).truckCategories;
+          }
+        } else {
+          delete (newFilters as any).truckCategories;
+        }
+        break;
+      case "implementTypes":
+        if (itemId && Array.isArray((newFilters as any).implementTypes)) {
+          const filtered = (newFilters as any).implementTypes.filter((t: string) => t !== itemId);
+          if (filtered.length > 0) {
+            (newFilters as any).implementTypes = filtered;
+          } else {
+            delete (newFilters as any).implementTypes;
+          }
+        } else {
+          delete (newFilters as any).implementTypes;
+        }
         break;
       case "priceRange":
         delete newFilters.priceRange;

@@ -1,11 +1,14 @@
 import { useState, useMemo } from "react";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
+import { IconColumns, IconSearch, IconRefresh, IconGripVertical } from "@tabler/icons-react";
 import { getDefaultVisibleColumns } from "./task-history-columns";
 import { getHeaderText } from "@/components/ui/column-visibility-utils";
 import type { TaskColumn } from "../list/types";
@@ -16,22 +19,122 @@ interface ColumnVisibilityManagerProps {
   onVisibilityChange: (columns: Set<string>) => void;
   /** Custom default columns to use for reset. If not provided, uses column definitions' defaultVisible property */
   defaultColumns?: Set<string>;
+  /** Current column order (array of column IDs) */
+  columnOrder?: string[];
+  /** Callback when column order changes */
+  onColumnOrderChange?: (order: string[]) => void;
+  /** Callback to reset column order to defaults */
+  onColumnOrderReset?: () => void;
+  /** Callback to reset column widths to defaults */
+  onColumnWidthsReset?: () => void;
 }
 
-export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityChange, defaultColumns }: ColumnVisibilityManagerProps) {
+function SortableColumnItem({
+  column,
+  isVisible,
+  onToggle,
+  isDragDisabled,
+}: {
+  column: TaskColumn;
+  isVisible: boolean;
+  onToggle: (checked: boolean | undefined) => void;
+  isDragDisabled: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: column.id,
+    disabled: isDragDisabled,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center justify-between space-x-2 p-2 hover:bg-accent hover:text-accent-foreground rounded-md"
+    >
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div
+          {...attributes}
+          {...listeners}
+          className={isDragDisabled ? "text-muted-foreground/30" : "cursor-grab active:cursor-grabbing text-muted-foreground"}
+        >
+          <IconGripVertical className="h-4 w-4" />
+        </div>
+        <span className="text-sm truncate">{column.header}</span>
+      </div>
+      <Switch
+        id={`column-${column.id}`}
+        checked={isVisible}
+        onCheckedChange={onToggle}
+      />
+    </div>
+  );
+}
+
+export function ColumnVisibilityManager({
+  columns,
+  visibleColumns,
+  onVisibilityChange,
+  defaultColumns,
+  columnOrder,
+  onColumnOrderChange,
+  onColumnOrderReset,
+  onColumnWidthsReset,
+}: ColumnVisibilityManagerProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [localVisible, setLocalVisible] = useState(visibleColumns);
+  const [localOrder, setLocalOrder] = useState<string[]>(columnOrder ?? columns.map((c) => c.id));
+
+  // Sync local state when popover opens
+  const handleOpenChange = (newOpen: boolean) => {
+    if (newOpen) {
+      setLocalVisible(visibleColumns);
+      setLocalOrder(columnOrder ?? columns.map((c) => c.id));
+      setSearchQuery("");
+    }
+    setOpen(newOpen);
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  // Sort columns by localOrder for display
+  const orderedColumns = useMemo(() => {
+    const orderMap = new Map(localOrder.map((id, idx) => [id, idx]));
+    return [...columns].sort((a, b) => (orderMap.get(a.id) ?? Infinity) - (orderMap.get(b.id) ?? Infinity));
+  }, [columns, localOrder]);
 
   const filteredColumns = useMemo(() => {
-    if (!searchQuery) return columns;
-    return columns.filter((col) => getHeaderText(col.header).toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [columns, searchQuery]);
+    if (!searchQuery) return orderedColumns;
+    return orderedColumns.filter((col) => getHeaderText(col.header).toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [orderedColumns, searchQuery]);
+
+  const isDragDisabled = searchQuery.length > 0;
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = localOrder.indexOf(String(active.id));
+    const newIndex = localOrder.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    setLocalOrder(arrayMove(localOrder, oldIndex, newIndex));
+  };
 
   const handleToggle = (columnKey: string, checked: boolean | undefined) => {
     const newVisible = new Set(localVisible);
-    const isChecked = checked === true;
-    if (isChecked) {
+    if (checked === true) {
       newVisible.add(columnKey);
     } else {
       newVisible.delete(columnKey);
@@ -48,17 +151,22 @@ export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityC
   };
 
   const handleReset = () => {
-    // Use custom defaults if provided, otherwise use column definitions' defaultVisible property
     setLocalVisible(defaultColumns || getDefaultVisibleColumns(columns));
+    setLocalOrder(columns.map((c) => c.id));
+    if (onColumnWidthsReset) onColumnWidthsReset();
   };
 
   const handleApply = () => {
     onVisibilityChange(localVisible);
+    if (onColumnOrderChange) {
+      onColumnOrderChange(localOrder);
+    }
     setOpen(false);
   };
 
   const handleClose = () => {
-    setLocalVisible(visibleColumns); // Reset to original state
+    setLocalVisible(visibleColumns);
+    setLocalOrder(columnOrder ?? columns.map((c) => c.id));
     setOpen(false);
   };
 
@@ -66,7 +174,7 @@ export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityC
   const totalCount = columns.length;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="default" className="gap-2">
           <IconColumns className="h-4 w-4" />
@@ -100,16 +208,19 @@ export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityC
 
         <ScrollArea className="h-[300px]">
           <div className="space-y-1 p-2">
-            {filteredColumns.map((column) => (
-              <Label
-                key={column.id}
-                className="flex items-center justify-between space-x-3 p-2 hover:bg-accent hover:text-accent-foreground rounded-md cursor-pointer"
-                htmlFor={`column-${column.id}`}
-              >
-                <span className="text-sm">{column.header}</span>
-                <Switch id={`column-${column.id}`} checked={localVisible.has(column.id)} onCheckedChange={(checked) => handleToggle(column.id, checked)} />
-              </Label>
-            ))}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={filteredColumns.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+                {filteredColumns.map((column) => (
+                  <SortableColumnItem
+                    key={column.id}
+                    column={column}
+                    isVisible={localVisible.has(column.id)}
+                    onToggle={(checked) => handleToggle(column.id, checked)}
+                    isDragDisabled={isDragDisabled}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           </div>
         </ScrollArea>
 

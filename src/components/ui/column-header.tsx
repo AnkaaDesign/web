@@ -127,11 +127,15 @@ export function ColumnHeader({
   const startXRef = useRef(0); // Cursor X position when drag started
   const startWidthRef = useRef(0); // Column width when drag started
   const onResizeRef = useRef(onResize);
+  const widthRef = useRef(width);
 
-  // Keep onResize ref up to date
+  // Keep refs up to date
   useEffect(() => {
     onResizeRef.current = onResize;
   }, [onResize]);
+  useEffect(() => {
+    widthRef.current = width;
+  }, [width]);
 
   const headerRef = useRef<HTMLTableCellElement>(null);
   const resizeHandleRef = useRef<HTMLDivElement>(null);
@@ -214,9 +218,13 @@ export function ColumnHeader({
     e.stopPropagation();
 
     // Store initial cursor position and column width
-    // This allows us to calculate relative movement, keeping cursor aligned with divider
+    // Use the prop width (the stored/controlled value) instead of offsetWidth.
+    // With table-fixed + w-full, the browser distributes extra space proportionally,
+    // so offsetWidth can be larger than the stored width, causing a "jump" on first move.
     startXRef.current = e.clientX;
-    startWidthRef.current = headerRef.current?.offsetWidth || 0;
+    startWidthRef.current = typeof widthRef.current === 'number'
+      ? widthRef.current
+      : (headerRef.current?.offsetWidth || 0);
 
     isResizingRef.current = true;
     setIsResizing(true);

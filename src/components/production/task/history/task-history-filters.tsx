@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { IconFilter, IconX, IconChecklist, IconCalendar, IconBuilding } from "@tabler/icons-react";
 import {
   Sheet,
@@ -12,12 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
-import { useSectors, useCustomers } from "../../../../hooks";
+import { useSectors } from "../../../../hooks";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { TASK_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { formatDate } from "../../../../utils";
 import { getBonusPeriodStart, getBonusPeriodEnd } from "../../../../utils/bonus";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
+import { getCustomers } from "@/api-client/customer";
 
 interface TaskHistoryFiltersProps {
   open: boolean;
@@ -35,7 +36,30 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
     orderBy: { name: "asc" },
     privilege: SECTOR_PRIVILEGES.PRODUCTION
   });
-  const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" }, include: { logo: true } });
+
+  // Async customer search function
+  const searchCustomers = useCallback(
+    async (search?: string, page: number = 1): Promise<{ data: any[]; hasMore: boolean }> => {
+      const params: any = {
+        orderBy: { fantasyName: "asc" },
+        page,
+        take: 50,
+        include: { logo: true },
+      };
+      if (search && search.trim()) {
+        params.searchingFor = search.trim();
+      }
+      try {
+        const response = await getCustomers(params);
+        const customers = response.data || [];
+        const hasMore = response.meta?.hasNextPage || false;
+        return { data: customers, hasMore };
+      } catch {
+        return { data: [], hasMore: false };
+      }
+    },
+    [],
+  );
 
   // Local state for filters
   const [localFilters, setLocalFilters] = useState<Partial<TaskGetManyFormData>>({
@@ -191,7 +215,7 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
               <IconBuilding className="h-4 w-4" />
               Razão Social
             </Label>
-            <Combobox
+            <Combobox<any>
               mode="multiple"
               placeholder="Selecione os clientes"
               emptyText="Nenhum cliente encontrado"
@@ -200,24 +224,23 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
                 const arr = Array.isArray(value) ? value : (value ? [value] : []);
                 setLocalFilters({ ...localFilters, customerIds: arr });
               }}
-              options={
-                customersData?.data?.map((customer) => ({
-                  value: customer.id,
-                  label: customer.corporateName || customer.fantasyName,
-                  logo: customer.logo,
-                })) || []
-              }
-              renderOption={(option, _isSelected) => (
+              async={true}
+              queryKey={["customers-filter"]}
+              queryFn={searchCustomers}
+              minSearchLength={0}
+              getOptionValue={(customer: any) => customer.id}
+              getOptionLabel={(customer: any) => customer.corporateName || customer.fantasyName}
+              renderOption={(customer: any, _isSelected) => (
                 <div className="flex items-center gap-3 w-full">
                   <CustomerLogoDisplay
-                    logo={(option as any).logo}
-                    customerName={option.label}
+                    logo={customer.logo}
+                    customerName={customer.fantasyName || customer.corporateName}
                     size="sm"
                     shape="rounded"
                     className="flex-shrink-0"
                   />
                   <div className="flex flex-col gap-1 min-w-0 flex-1">
-                    <div className="font-medium truncate">{option.label}</div>
+                    <div className="font-medium truncate">{customer.corporateName || customer.fantasyName}</div>
                   </div>
                 </div>
               )}

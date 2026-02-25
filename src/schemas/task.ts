@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, createNameSchema, createDescriptionSchema, nullableDate } from "./common";
 import type { Task } from "../types";
-import { TASK_STATUS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../constants";
+import { TASK_STATUS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, TRUCK_CATEGORY, IMPLEMENT_TYPE } from "../constants";
 import { cutCreateNestedSchema } from "./cut";
 import { airbrushingCreateNestedSchema } from "./airbrushing";
 import { taskPricingCreateNestedSchema } from "./task-pricing";
@@ -1001,6 +1001,26 @@ export const taskGetManySchema = z
         },
       )
       .optional(),
+    forecastDateRange: z
+      .object({
+        from: z.coerce.date().optional(),
+        to: z.coerce.date().optional(),
+      })
+      .refine(
+        (data) => {
+          if (data.from && data.to) {
+            return data.to >= data.from;
+          }
+          return true;
+        },
+        {
+          message: "Data final deve ser posterior ou igual à data inicial",
+          path: ["to"],
+        },
+      )
+      .optional(),
+    truckCategories: z.array(z.nativeEnum(TRUCK_CATEGORY)).optional(),
+    implementTypes: z.array(z.nativeEnum(IMPLEMENT_TYPE)).optional(),
     createdAtRange: z
       .object({
         from: z.coerce.date().optional(),

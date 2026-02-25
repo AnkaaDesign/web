@@ -27,6 +27,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
 
   // Servidor - Server management routes (mostly admin, file manager also accessible to commercial)
   "/servidor/gerenciador-de-arquivos": ["ADMIN", "COMMERCIAL"],
+  "/servidor/gerenciador-de-arquivos/*": ["ADMIN", "COMMERCIAL"],
 
   "/administracao/registros-de-alteracoes": "ADMIN",
   "/administracao/arquivos": "ADMIN",

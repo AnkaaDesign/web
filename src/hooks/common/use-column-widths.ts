@@ -145,7 +145,7 @@ export const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   // Checkbox column
   checkbox: 48,
 
-  // Name/text columns
+  // Name/text columns — values act as proportional weights with table-fixed
   name: 200,
   "customer.fantasyName": 180,
   "responsibles": 150,

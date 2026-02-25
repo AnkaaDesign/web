@@ -134,9 +134,39 @@ export function CollapsedGroupRow({
   const collapsedTaskCount = collapsedTasks.length;
   const hasPartialSelection = selectedCount > 0 && selectedCount < totalCount;
 
-  // Find service order columns that are visible
-  const visibleServiceOrderColumns = columns.filter(col => SERVICE_ORDER_COLUMN_IDS.includes(col.id));
-  const nonServiceOrderColumns = columns.filter(col => !SERVICE_ORDER_COLUMN_IDS.includes(col.id));
+  // Build cell groups that respect column order.
+  // Consecutive non-SO columns are merged into a single colSpan cell.
+  // The first such group carries the group info content; others are empty.
+  const cellGroups = useMemo(() => {
+    const groups: Array<
+      | { type: 'so'; column: TaskColumn }
+      | { type: 'info'; colSpan: number }
+      | { type: 'empty'; colSpan: number }
+    > = [];
+
+    let infoRendered = false;
+    let nonSOCount = 0;
+
+    for (const col of columns) {
+      if (SERVICE_ORDER_COLUMN_IDS.includes(col.id)) {
+        // Flush accumulated non-SO columns as a colSpan cell
+        if (nonSOCount > 0) {
+          groups.push(infoRendered ? { type: 'empty', colSpan: nonSOCount } : { type: 'info', colSpan: nonSOCount });
+          if (!infoRendered) infoRendered = true;
+          nonSOCount = 0;
+        }
+        groups.push({ type: 'so', column: col });
+      } else {
+        nonSOCount++;
+      }
+    }
+    // Flush remaining non-SO columns
+    if (nonSOCount > 0) {
+      groups.push(infoRendered ? { type: 'empty', colSpan: nonSOCount } : { type: 'info', colSpan: nonSOCount });
+    }
+
+    return groups;
+  }, [columns]);
 
   // Render service order cell with progress bar
   const renderServiceOrderCell = (columnId: string) => {
@@ -244,51 +274,65 @@ export function CollapsedGroupRow({
         </TableCell>
       )}
 
-      {/* First cell with collapse info (spans non-service-order columns) */}
-      <TableCell
-        colSpan={nonServiceOrderColumns.length}
-        className="p-0 !border-r-0"
-      >
-        <div className="flex items-center gap-3 px-4 py-2">
-          {/* Expand/collapse icon */}
-          <div className="flex-shrink-0">
-            <IconChevronRight
-              className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform duration-200",
-                isExpanded && "rotate-90"
-              )}
+      {/* Cells rendered in column order */}
+      {cellGroups.map((group, idx) => {
+        if (group.type === 'info') {
+          return (
+            <TableCell
+              key={`info-${idx}`}
+              colSpan={group.colSpan}
+              className="p-0 !border-r-0"
+            >
+              <div className="flex items-center gap-3 px-4 py-2">
+                <div className="flex-shrink-0">
+                  <IconChevronRight
+                    className={cn(
+                      "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                      isExpanded && "rotate-90"
+                    )}
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="text-sm text-muted-foreground font-medium">
+                    {collapsedTaskCount} {collapsedTaskCount === 1 ? 'tarefa oculta' : 'tarefas ocultas'}
+                  </span>
+                  {selectedCount > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {selectedCount} selecionada{selectedCount !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                  Clique para expandir
+                </span>
+              </div>
+            </TableCell>
+          );
+        }
+
+        if (group.type === 'empty') {
+          return (
+            <TableCell
+              key={`empty-${idx}`}
+              colSpan={group.colSpan}
+              className="p-0 !border-r-0"
             />
-          </div>
+          );
+        }
 
-          {/* Group info text */}
-          <div className="flex items-center gap-2 flex-1">
-            <span className="text-sm text-muted-foreground font-medium">
-              {collapsedTaskCount} {collapsedTaskCount === 1 ? 'tarefa oculta' : 'tarefas ocultas'}
-            </span>
+        // group.type === 'so'
+        return (
+          <TableCell
+            key={group.column.id}
+            className={cn("overflow-hidden", group.column.cellClassName, group.column.className, "px-4 py-1")}
+          >
+            <div className="truncate">
+              {renderServiceOrderCell(group.column.id)}
+            </div>
+          </TableCell>
+        );
+      })}
 
-            {/* Selection badge */}
-            {selectedCount > 0 && (
-              <Badge variant="secondary" className="text-xs">
-                {selectedCount} selecionada{selectedCount !== 1 ? 's' : ''}
-              </Badge>
-            )}
-          </div>
-
-          {/* Expand hint */}
-          <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-            Clique para expandir
-          </span>
-        </div>
-      </TableCell>
-
-      {/* Service order columns with sums */}
-      {visibleServiceOrderColumns.map((column) => (
-        <TableCell key={column.id} className={cn("overflow-hidden", column.cellClassName, column.className, "px-4 py-1")}>
-          <div className="truncate">
-            {renderServiceOrderCell(column.id)}
-          </div>
-        </TableCell>
-      ))}
     </TableRow>
   );
 }

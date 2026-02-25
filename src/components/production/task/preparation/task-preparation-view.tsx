@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Task } from "@/types";
 import type { TaskGetManyFormData } from "@/schemas";
-import { useSectors, useCustomers, useUsers, useCurrentUser, taskKeys } from "@/hooks";
+import { useSectors, useUsers, useCurrentUser, taskKeys } from "@/hooks";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "@/constants";
 import { taskService } from "@/api-client/task";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { TaskPreparationTable } from "./task-preparation-table";
-import { TaskHistoryFilters } from "../history/task-history-filters";
+import { TaskPreparationFilters } from "./task-preparation-filters";
 import { TaskExport } from "../history/task-export";
 import { ColumnVisibilityManager } from "../history/column-visibility-manager";
 import { createTaskHistoryColumns } from "../history/task-history-columns";
@@ -24,6 +24,8 @@ import type { CopyableTaskField } from "@/types/task-copy";
 import { IconFilter, IconHandClick, IconX, IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
+import { useColumnOrder } from "@/hooks/common/use-column-order";
+import { useColumnWidths, DEFAULT_COLUMN_WIDTHS } from "@/hooks/common/use-column-widths";
 import { hasPrivilege } from "@/utils";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { toast } from "sonner";
@@ -59,8 +61,25 @@ export function TaskPreparationView({
 
   // Load entity data for filter labels
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" } });
-  const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" } });
   const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
+
+  // Customer names cache for filter indicator display (async-loaded customers)
+  const [customerNamesMap, setCustomerNamesMap] = useState<Record<string, string>>(() => {
+    try {
+      const stored = localStorage.getItem("task-preparation-customer-names");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const handleCustomerNamesChange = useCallback((names: Record<string, string>) => {
+    setCustomerNamesMap((prev) => {
+      const merged = { ...prev, ...names };
+      localStorage.setItem("task-preparation-customer-names", JSON.stringify(merged));
+      return merged;
+    });
+  }, []);
   const { data: currentUser } = useCurrentUser();
 
   // Check if user can view price (Admin or Financial only)
@@ -127,8 +146,8 @@ export function TaskPreparationView({
   // Copy from task state
   const [copyFromTaskState, setCopyFromTaskState] = useState<CopyFromTaskState>(initialCopyFromTaskState);
 
-  // Custom deserializer for task filters
-  const deserializeTaskFilters = useCallback(
+  // Parse filter params from URLSearchParams (shared between URL and localStorage)
+  const parseFilterParams = useCallback(
     (params: URLSearchParams): Partial<TaskGetManyFormData> => {
       const filters: Partial<TaskGetManyFormData> = {};
 
@@ -149,21 +168,12 @@ export function TaskPreparationView({
       }
 
       // Date ranges
-      const finishedFrom = params.get("finishedFrom");
-      const finishedTo = params.get("finishedTo");
-      if (finishedFrom || finishedTo) {
-        filters.finishedDateRange = {
-          ...(finishedFrom && { from: new Date(finishedFrom) }),
-          ...(finishedTo && { to: new Date(finishedTo) }),
-        };
-      }
-
-      const entryFrom = params.get("entryFrom");
-      const entryTo = params.get("entryTo");
-      if (entryFrom || entryTo) {
-        filters.entryDateRange = {
-          ...(entryFrom && { from: new Date(entryFrom) }),
-          ...(entryTo && { to: new Date(entryTo) }),
+      const forecastFrom = params.get("forecastFrom");
+      const forecastTo = params.get("forecastTo");
+      if (forecastFrom || forecastTo) {
+        (filters as any).forecastDateRange = {
+          ...(forecastFrom && { from: new Date(forecastFrom) }),
+          ...(forecastTo && { to: new Date(forecastTo) }),
         };
       }
 
@@ -176,39 +186,42 @@ export function TaskPreparationView({
         };
       }
 
-      const startedFrom = params.get("startedFrom");
-      const startedTo = params.get("startedTo");
-      if (startedFrom || startedTo) {
-        filters.startedDateRange = {
-          ...(startedFrom && { from: new Date(startedFrom) }),
-          ...(startedTo && { to: new Date(startedTo) }),
-        };
-      }
+      // Truck category and implement type
+      const truckCategories = params.get("truckCategories");
+      if (truckCategories) (filters as any).truckCategories = truckCategories.split(",");
 
-      // Price range
-      const priceMin = params.get("priceMin");
-      const priceMax = params.get("priceMax");
-      if (priceMin || priceMax) {
-        filters.priceRange = {
-          ...(priceMin && { from: Number(priceMin) }),
-          ...(priceMax && { to: Number(priceMax) }),
-        };
-      }
-
-      // Boolean filters
-      if (params.get("hasCustomer") === "true") filters.hasCustomer = true;
-      if (params.get("hasSector") === "true") filters.hasSector = true;
-      if (params.get("hasAssignee") === "true") filters.hasAssignee = true;
-      if (params.get("hasTruck") === "true") filters.hasTruck = true;
-      if (params.get("hasObservation") === "true") filters.hasObservation = true;
-      if (params.get("hasArtworks") === "true") filters.hasArtworks = true;
-      if (params.get("hasPaints") === "true") filters.hasPaints = true;
-      if (params.get("hasCommissions") === "true") filters.hasCommissions = true;
-      if (params.get("hasServiceOrders") === "true") filters.hasServiceOrders = true;
+      const implementTypes = params.get("implementTypes");
+      if (implementTypes) (filters as any).implementTypes = implementTypes.split(",");
 
       return filters;
     },
     [],
+  );
+
+  // Custom deserializer: URL params first, localStorage as fallback
+  const deserializeTaskFilters = useCallback(
+    (params: URLSearchParams): Partial<TaskGetManyFormData> => {
+      const urlFilters = parseFilterParams(params);
+
+      // If URL has filter params, use them
+      if (Object.keys(urlFilters).length > 0) {
+        return urlFilters;
+      }
+
+      // Fallback to localStorage
+      try {
+        const stored = localStorage.getItem("task-preparation-filters");
+        if (stored) {
+          const storedParams = new URLSearchParams(stored);
+          return parseFilterParams(storedParams);
+        }
+      } catch {
+        // ignore
+      }
+
+      return urlFilters;
+    },
+    [parseFilterParams],
   );
 
   // Custom serializer for task filters
@@ -226,29 +239,14 @@ export function TaskPreparationView({
     }
 
     // Date filters
-    if (filters.finishedDateRange?.from) params.finishedFrom = filters.finishedDateRange.from.toISOString();
-    if (filters.finishedDateRange?.to) params.finishedTo = filters.finishedDateRange.to.toISOString();
-    if (filters.entryDateRange?.from) params.entryFrom = filters.entryDateRange.from.toISOString();
-    if (filters.entryDateRange?.to) params.entryTo = filters.entryDateRange.to.toISOString();
+    if ((filters as any).forecastDateRange?.from) params.forecastFrom = (filters as any).forecastDateRange.from.toISOString();
+    if ((filters as any).forecastDateRange?.to) params.forecastTo = (filters as any).forecastDateRange.to.toISOString();
     if (filters.termRange?.from) params.termFrom = filters.termRange.from.toISOString();
     if (filters.termRange?.to) params.termTo = filters.termRange.to.toISOString();
-    if (filters.startedDateRange?.from) params.startedFrom = filters.startedDateRange.from.toISOString();
-    if (filters.startedDateRange?.to) params.startedTo = filters.startedDateRange.to.toISOString();
 
-    // Price range
-    if (filters.priceRange?.from !== undefined) params.priceMin = String(filters.priceRange.from);
-    if (filters.priceRange?.to !== undefined) params.priceMax = String(filters.priceRange.to);
-
-    // Boolean filters
-    if (filters.hasCustomer) params.hasCustomer = "true";
-    if (filters.hasSector) params.hasSector = "true";
-    if (filters.hasAssignee) params.hasAssignee = "true";
-    if (filters.hasTruck) params.hasTruck = "true";
-    if (filters.hasObservation) params.hasObservation = "true";
-    if (filters.hasArtworks) params.hasArtworks = "true";
-    if (filters.hasPaints) params.hasPaints = "true";
-    if (filters.hasCommissions) params.hasCommissions = "true";
-    if (filters.hasServiceOrders) params.hasServiceOrders = "true";
+    // Truck category and implement type
+    if ((filters as any).truckCategories?.length) params.truckCategories = (filters as any).truckCategories.join(",");
+    if ((filters as any).implementTypes?.length) params.implementTypes = (filters as any).implementTypes.join(",");
 
     return params;
   }, []);
@@ -263,15 +261,37 @@ export function TaskPreparationView({
     clearAllFilters,
     queryFilters: baseQueryFilters,
   } = useTableFilters<TaskGetManyFormData>({
-    defaultFilters: {
-      status: [TASK_STATUS.PREPARATION],
-    },
+    defaultFilters: {},
     searchDebounceMs: 500,
     searchParamName: "search",
     serializeToUrl: serializeTaskFilters,
     deserializeFromUrl: deserializeTaskFilters,
     excludeFromUrl: ["limit", "orderBy", "status"],
   });
+
+  // Persist filters to localStorage whenever they change
+  useEffect(() => {
+    try {
+      const serialized = serializeTaskFilters(filters);
+      const params = new URLSearchParams(serialized);
+      const paramString = params.toString();
+      if (paramString) {
+        localStorage.setItem("task-preparation-filters", paramString);
+      } else {
+        localStorage.removeItem("task-preparation-filters");
+      }
+    } catch {
+      // ignore
+    }
+  }, [filters, serializeTaskFilters]);
+
+  // Wrap clearAllFilters to also clear localStorage
+  const handleClearAllFilters = useCallback(() => {
+    localStorage.removeItem("task-preparation-filters");
+    localStorage.removeItem("task-preparation-customer-names");
+    setCustomerNamesMap({});
+    clearAllFilters();
+  }, [clearAllFilters]);
 
   // Get user's sector privilege for default columns
   const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
@@ -353,6 +373,16 @@ export function TaskPreparationView({
     [canViewPrice, currentUser?.id, userSectorPrivilege]
   );
 
+  // Column order state with localStorage persistence (must be after allColumns)
+  const allColumnIds = useMemo(() => allColumns.map((c) => c.id), [allColumns]);
+  const { columnOrder, setColumnOrder, resetColumnOrder } = useColumnOrder("task-preparation-column-order", allColumnIds);
+
+  // Shared column widths (lifted here so all 3 tables resize together)
+  const { getColumnWidth, setColumnWidth, resetToDefaults: resetColumnWidths } = useColumnWidths({
+    storageKey: "task-preparation-column-widths",
+    defaultWidths: DEFAULT_COLUMN_WIDTHS,
+  });
+
   // Determine preparation exclusion flags based on user's EXACT sector privilege
   // Only FINANCIAL users require FINANCIAL SOs — everyone else (ADMIN, LOGISTIC, etc.) excludes FINANCIAL
   // LOGISTIC SOs are required for everyone except FINANCIAL users
@@ -425,13 +455,19 @@ export function TaskPreparationView({
       search: searchingFor || undefined,
     };
 
+    // Build customer lookup from cached names
+    const customerLookup = Object.entries(customerNamesMap).map(([id, name]) => ({
+      id,
+      fantasyName: name,
+    }));
+
     return extractActiveFilters(filtersWithSearch, onRemoveFilter, {
       sectors: sectorsData?.data || [],
-      customers: customersData?.data || [],
+      customers: customerLookup,
       users: usersData?.data || [],
       hideStatusTags: true, // Hide status tags in preparation view
     });
-  }, [filters, searchingFor, sectorsData?.data, customersData?.data, usersData?.data, onRemoveFilter]);
+  }, [filters, searchingFor, sectorsData?.data, usersData?.data, customerNamesMap, onRemoveFilter]);
 
   // Handlers for table data changes
   const handlePreparationTableDataChange = useCallback((data: { items: Task[]; totalRecords: number }) => {
@@ -655,7 +691,16 @@ export function TaskPreparationView({
               <IconFilter className="h-4 w-4" />
               <span>Filtros{activeFilters.length > 0 ? ` (${activeFilters.length})` : ''}</span>
             </Button>
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} defaultColumns={defaultVisibleColumns} />
+            <ColumnVisibilityManager
+              columns={allColumns}
+              visibleColumns={visibleColumns}
+              onVisibilityChange={setVisibleColumns}
+              defaultColumns={defaultVisibleColumns}
+              columnOrder={columnOrder}
+              onColumnOrderChange={setColumnOrder}
+              onColumnOrderReset={resetColumnOrder}
+              onColumnWidthsReset={resetColumnWidths}
+            />
             {currentUser?.sector?.privileges !== SECTOR_PRIVILEGES.WAREHOUSE && (
               <TaskExport filters={queryFilters} currentItems={allTableData} totalRecords={allTableData.length} visibleColumns={visibleColumns} />
             )}
@@ -663,7 +708,7 @@ export function TaskPreparationView({
         </div>
 
         {/* Active Filter Indicators */}
-        {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
+        {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={handleClearAllFilters} className="px-1 py-1" />}
 
         {/* Source selection mode indicator */}
         {copyFromTaskState.step === "selecting_source" && (
@@ -694,6 +739,9 @@ export function TaskPreparationView({
                   limit: 1000,
                 }}
                 visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
+                getColumnWidth={getColumnWidth}
+                setColumnWidth={setColumnWidth}
                 onDataChange={handleCompletedTableDataChange}
                 advancedActionsRef={advancedActionsRef}
                 onStartCopyFromTask={handleStartCopyFromTask}
@@ -719,6 +767,9 @@ export function TaskPreparationView({
                   limit: 1000,
                 }}
                 visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
+                getColumnWidth={getColumnWidth}
+                setColumnWidth={setColumnWidth}
                 onDataChange={handleProductionTableDataChange}
                 advancedActionsRef={advancedActionsRef}
                 onStartCopyFromTask={handleStartCopyFromTask}
@@ -744,6 +795,9 @@ export function TaskPreparationView({
                   limit: 1000,
                 }}
                 visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
+                getColumnWidth={getColumnWidth}
+                setColumnWidth={setColumnWidth}
                 onDataChange={handlePreparationTableDataChange}
                 advancedActionsRef={advancedActionsRef}
                 onStartCopyFromTask={handleStartCopyFromTask}
@@ -771,6 +825,9 @@ export function TaskPreparationView({
                   limit: 1000,
                 }}
                 visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
+                getColumnWidth={getColumnWidth}
+                setColumnWidth={setColumnWidth}
                 onDataChange={handleProductionTableDataChange}
                 advancedActionsRef={advancedActionsRef}
                 onStartCopyFromTask={handleStartCopyFromTask}
@@ -796,6 +853,9 @@ export function TaskPreparationView({
                   limit: 1000,
                 }}
                 visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
+                getColumnWidth={getColumnWidth}
+                setColumnWidth={setColumnWidth}
                 onDataChange={handlePreparationTableDataChange}
                 advancedActionsRef={advancedActionsRef}
                 onStartCopyFromTask={handleStartCopyFromTask}
@@ -821,6 +881,9 @@ export function TaskPreparationView({
                   limit: 1000,
                 }}
                 visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
+                getColumnWidth={getColumnWidth}
+                setColumnWidth={setColumnWidth}
                 onDataChange={handleCompletedTableDataChange}
                 advancedActionsRef={advancedActionsRef}
                 onStartCopyFromTask={handleStartCopyFromTask}
@@ -840,13 +903,12 @@ export function TaskPreparationView({
         )}
 
         {/* Filter Modal */}
-        <TaskHistoryFilters
+        <TaskPreparationFilters
           open={showFilterModal}
           onOpenChange={setShowFilterModal}
           filters={filters}
           onFilterChange={handleFilterChange}
-          canViewPrice={canViewPrice}
-          canViewStatusFilter={false}
+          onCustomerNamesChange={handleCustomerNamesChange}
         />
 
         {/* Advanced Bulk Actions Handler */}

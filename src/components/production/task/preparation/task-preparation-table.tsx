@@ -18,11 +18,12 @@ import { routes } from "@/constants";
 import { groupSequentialTasks } from "../history/task-grouping-utils";
 import { CollapsedGroupRow } from "../history/collapsed-group-row";
 import { ColumnHeader } from "@/components/ui/column-header";
-import { useColumnWidths, DEFAULT_COLUMN_WIDTHS, COLUMN_WIDTH_CONSTRAINTS } from "@/hooks/common/use-column-widths";
+import { COLUMN_WIDTH_CONSTRAINTS } from "@/hooks/common/use-column-widths";
 import { IconAlertTriangle } from "@tabler/icons-react";
 
 interface TaskPreparationTableProps {
   visibleColumns: Set<string>;
+  columnOrder?: string[];
   className?: string;
   filters?: Partial<TaskGetManyFormData>;
   onDataChange?: (data: { items: Task[]; totalRecords: number }) => void;
@@ -38,10 +39,15 @@ interface TaskPreparationTableProps {
   onOrderedTaskIdsChange?: (orderedIds: string[]) => void;
   showSelectedOnly?: boolean;
   allOrderedTaskIds?: string[];
+  /** Shared column width getter (lifted from parent so all tables resize together) */
+  getColumnWidth: (columnId: string) => number;
+  /** Shared column width setter */
+  setColumnWidth: (columnId: string, width: number) => void;
 }
 
 export function TaskPreparationTable({
   visibleColumns,
+  columnOrder,
   className,
   filters = {},
   onDataChange,
@@ -57,6 +63,8 @@ export function TaskPreparationTable({
   onOrderedTaskIdsChange,
   showSelectedOnly = false,
   allOrderedTaskIds,
+  getColumnWidth,
+  setColumnWidth,
 }: TaskPreparationTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -65,13 +73,6 @@ export function TaskPreparationTable({
 
   const userSectorPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
   const canViewPrice = !!user && (hasPrivilege(user as any, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(user as any, SECTOR_PRIVILEGES.FINANCIAL));
-
-  // Column widths
-  const storageKey = `task-preparation-column-widths`;
-  const { getColumnWidth, setColumnWidth } = useColumnWidths({
-    storageKey,
-    defaultWidths: DEFAULT_COLUMN_WIDTHS,
-  });
 
   // Table state - NO PAGINATION for preparation
   const tableState = useTableState({
@@ -82,6 +83,7 @@ export function TaskPreparationTable({
       { column: 'identificador', direction: 'asc' },
     ],
     resetSelectionOnPageChange: false,
+    sortStorageKey: 'task-preparation-sort',
   });
 
   const {
@@ -186,8 +188,11 @@ export function TaskPreparationTable({
   );
 
   const columns = useMemo(() => {
-    return allColumns.filter(col => visibleColumns.has(col.id));
-  }, [allColumns, visibleColumns]);
+    const visible = allColumns.filter(col => visibleColumns.has(col.id));
+    if (!columnOrder?.length) return visible;
+    const orderMap = new Map(columnOrder.map((id, idx) => [id, idx]));
+    return [...visible].sort((a, b) => (orderMap.get(a.id) ?? Infinity) - (orderMap.get(b.id) ?? Infinity));
+  }, [allColumns, visibleColumns, columnOrder]);
 
   // Context menu handlers
   const handleContextMenuClose = useCallback(() => {
@@ -353,6 +358,7 @@ export function TaskPreparationTable({
                 {column.header}
               </ColumnHeader>
             ))}
+
           </TableRow>
         </TableHeader>
 
