@@ -102,12 +102,25 @@ function filterTrucksForDate(trucks: GarageTruck[], areaId: AreaId, date: Date):
       if (parsed.garage !== areaId) return false;
     }
 
-    // For today, show all trucks in this area
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (isSameDay(checkDate, today)) return true;
+    // YARD_EXIT trucks are physically in the exit yard — always show
+    // (even when completed, until physically removed)
+    if (areaId === 'YARD_EXIT') return true;
 
-    // For future dates, check arrival/departure range
+    // Term check: if term has passed, don't show
+    if (truck.term) {
+      const term = new Date(truck.term);
+      term.setHours(0, 0, 0, 0);
+      if (checkDate > term) return false;
+    }
+
+    // Garage trucks are physically placed — always show (after term check)
+    if (!isYard) return true;
+
+    // --- Yard trucks (YARD_WAIT) below ---
+
+    // Arrival date check: don't show before forecast/entry date
+    // (trucks without explicit DB spots are defaulted to YARD_WAIT and
+    // should only appear from their forecast/entry date onwards)
     const arrivalDateStr = truck.entryDate || truck.forecastDate;
     if (arrivalDateStr) {
       const arrivalDate = new Date(arrivalDateStr);
@@ -115,18 +128,11 @@ function filterTrucksForDate(trucks: GarageTruck[], areaId: AreaId, date: Date):
       if (checkDate < arrivalDate) return false;
     }
 
-    // If truck is already completed (finishedAt before the date), don't show
+    // Completed check: if finished before this date, don't show
     if (truck.finishedAt) {
       const finished = new Date(truck.finishedAt);
       finished.setHours(0, 0, 0, 0);
       if (finished < checkDate) return false;
-    }
-
-    // If term exists, show until the term date
-    if (truck.term) {
-      const term = new Date(truck.term);
-      term.setHours(0, 0, 0, 0);
-      if (checkDate > term) return false;
     }
 
     return true;
@@ -218,6 +224,7 @@ function DayColumn({
   areaId,
   date,
   trucks,
+  patioColumns: patioColumnsProp,
   scale,
   svgWidth,
   svgHeight,
@@ -231,6 +238,7 @@ function DayColumn({
   areaId: AreaId;
   date: Date;
   trucks: GarageTruck[];
+  patioColumns?: number;
   scale: number;
   svgWidth: number;
   svgHeight: number;
@@ -242,9 +250,9 @@ function DayColumn({
   dimmed: boolean;
 }) {
   const isPatio = isYardArea(areaId);
-  const patioColumns = isPatio
+  const patioColumns = patioColumnsProp || (isPatio
     ? Math.max(PATIO_CONFIG.MIN_LANES, Math.ceil(trucks.filter(t => t.spot === areaId).length / 3))
-    : 0;
+    : 0);
   const layout = useMemo(
     () => calculateAreaLayout(areaId, trucks, patioColumns),
     [areaId, trucks, patioColumns],
@@ -473,25 +481,75 @@ export function SingleGarageView({
     }));
   }, [forecastDays, trucks, garageId, today]);
 
-  // Calculate area dimensions (same logic as overview)
+  // Calculate area dimensions — optimized for single-garage view
+  // Finds the column count that maximizes rendering scale by balancing
+  // total width (5 day columns side-by-side) against height
   const areaDimensions = useMemo(() => {
     if (isYard) {
-      // Use the max truck count across all days for consistent column count
-      const maxTrucks = Math.max(...trucksPerDay.map(d => d.trucks.filter(t => t.spot === garageId).length), 1);
-      const columns = Math.max(PATIO_CONFIG.MIN_LANES, Math.ceil(maxTrucks / 3));
       const laneWidth = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW + 0.4;
       const laneSpacing = PATIO_CONFIG.LANE_SPACING;
       const padding = PATIO_CONFIG.PADDING;
-      const width = padding * 2 + columns * laneWidth + (columns - 1) * laneSpacing;
+      const truckMargin = PATIO_CONFIG.TRUCK_MARGIN;
+
+      // Sorted truck lists per day (for height calculation)
+      const dayTruckLists = trucksPerDay.map(d =>
+        d.trucks.filter(t => t.spot === garageId).sort((a, b) => b.length - a.length)
+      );
+      const maxTrucks = Math.max(...dayTruckLists.map(d => d.length), 1);
+
+      const calcWidth = (cols: number) =>
+        padding * 2 + cols * laneWidth + (cols - 1) * laneSpacing;
+
+      const calcHeight = (cols: number) => {
+        let maxH = 0;
+        for (const dayTrucks of dayTruckLists) {
+          if (dayTrucks.length === 0) continue;
+          const colHeights: number[] = Array(cols).fill(truckMargin);
+          dayTrucks.forEach((truck, i) => {
+            colHeights[i % cols] += truck.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
+          });
+          const tallest = Math.max(...colHeights) - COMMON_CONFIG.TRUCK_MIN_SPACING + truckMargin;
+          if (tallest > maxH) maxH = tallest;
+        }
+        return Math.max(maxH, PATIO_CONFIG.MIN_LANE_LENGTH) + padding * 2;
+      };
+
+      // Find column count that maximizes scale = min(scaleX, scaleY)
+      const OUTER_PADDING = 48;
+      const GAP = 24;
+      const availW = Math.max(1, containerSize.width - OUTER_PADDING - 4 * GAP);
+      const availH = Math.max(1, containerSize.height - OUTER_PADDING - 60);
+
+      let bestCols = Math.max(3, Math.ceil(maxTrucks / 4));
+      let bestScale = 0;
+      const minCols = 2;
+      const maxCols = Math.min(maxTrucks, 12);
+      for (let cols = minCols; cols <= maxCols; cols++) {
+        const w = Math.max(calcWidth(cols), PATIO_CONFIG.MIN_WIDTH);
+        const h = Math.max(calcHeight(cols), PATIO_CONFIG.MIN_HEIGHT);
+        const sX = availW / (5 * w);
+        const sY = availH / h;
+        const s = Math.min(sX, sY);
+        if (s > bestScale) {
+          bestScale = s;
+          bestCols = cols;
+        }
+      }
+
+      const columns = bestCols;
+      const width = calcWidth(columns);
+      const contentHeight = calcHeight(columns);
+
       return {
+        columns,
         width: Math.max(width, PATIO_CONFIG.MIN_WIDTH),
-        height: PATIO_CONFIG.MIN_HEIGHT,
+        height: Math.max(contentHeight, PATIO_CONFIG.MIN_HEIGHT),
       };
     } else {
       const config = GARAGE_CONFIGS[garageId as GarageId];
-      return { width: config.width, height: config.length };
+      return { columns: 0, width: config.width, height: config.length };
     }
-  }, [isYard, garageId, trucksPerDay]);
+  }, [isYard, garageId, trucksPerDay, containerSize.width, containerSize.height]);
 
   // Calculate scale to fit 5 areas horizontally
   const PADDING = 48;
@@ -638,6 +696,7 @@ export function SingleGarageView({
             areaId={garageId as AreaId}
             date={date}
             trucks={dayTrucks}
+            patioColumns={areaDimensions.columns}
             scale={scale}
             svgWidth={svgWidth}
             svgHeight={svgHeight}

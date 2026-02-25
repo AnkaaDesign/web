@@ -220,10 +220,14 @@ export function GaragesPage() {
         return true;
       }
 
-      // If truck already has a yard spot assigned, always include it
-      if (spot === 'YARD_WAIT' || spot === 'YARD_EXIT') {
-        // Still need date/status check below for yard trucks without entryDate
+      // YARD_EXIT trucks are physically in the exit yard — always include
+      // (show regardless of status or dates, until physically removed)
+      if (spot === 'YARD_EXIT') {
+        return true;
       }
+
+      // YARD_WAIT trucks still need date/status checks below
+      // (trucks without dates or completed trucks should not clutter the yard)
 
       // Yard trucks: include if forecastDate <= maxCalendarDate OR entryDate <= today, AND status is not COMPLETED
       // The GarageView calendar filter handles per-day visibility

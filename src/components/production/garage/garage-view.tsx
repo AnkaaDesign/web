@@ -1149,13 +1149,12 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
   // Show all 5 areas (YARD_WAIT, B1, B2, B3, YARD_EXIT) in both Grade and Calendar views
   const areasToShow = AREAS;
 
-  // Calculate patio columns dynamically based on truck count (same logic as dimensions calculation)
-  // Target: ~3-4 trucks per column for optimal layout
-  // Use the larger of the two yards for consistent column count
+  // Calculate patio columns — cap at 5 lanes, let height grow to fit
+  // Fewer wider lanes make trucks more readable and use vertical space better
   const yardWaitTrucks = trucks.filter(t => t.spot === 'YARD_WAIT');
   const yardExitTrucks = trucks.filter(t => t.spot === 'YARD_EXIT');
   const maxYardTrucks = Math.max(yardWaitTrucks.length, yardExitTrucks.length);
-  const patioColumns = Math.max(5, Math.ceil(maxYardTrucks / 3));
+  const patioColumns = Math.min(5, Math.max(2, maxYardTrucks));
 
   // Drag-and-drop state
   const [activeTruck, setActiveTruck] = useState<PositionedTruck | null>(null);
@@ -1192,7 +1191,8 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
       if (layout.isPatio) {
         const yardTrucks = trucks.filter(t => t.spot === areaId);
         const patioTrucksSorted = [...yardTrucks].sort((a, b) => b.length - a.length);
-        const columns = Math.max(5, Math.ceil(yardTrucks.length / 3));
+        // Use same patioColumns as layout (capped at 5) for consistency
+        const columns = patioColumns;
 
         // CORRECT PATIO WIDTH CALCULATION - must include lane spacing between columns!
         const laneWidth = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW + 0.4;
@@ -1231,7 +1231,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
         return { areaId, width: config.width, height: config.length };
       }
     });
-  }, [allAreaLayouts, trucks]);
+  }, [allAreaLayouts, trucks, patioColumns]);
 
   // Calculate uniform scale for all areas
   // The AllGaragesView container has:
@@ -1485,7 +1485,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
 
   const content = (
     <div className="w-full h-full overflow-auto p-6">
-      <div className="min-w-max min-h-max flex items-center justify-center gap-10">
+      <div className="min-w-max min-h-max flex items-start justify-center gap-10">
         {allAreaLayouts.map(({ areaId, layout }, index) => {
         const dim = areaDimensions[index];
         const count = garageCounts[areaId];
@@ -1878,6 +1878,10 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, onG
       checkDate.setHours(0, 0, 0, 0);
 
       return trucksWithLocalPositions.filter(truck => {
+        // YARD_EXIT trucks are physically in the exit yard — always show
+        // (even when completed, until physically removed)
+        if (truck.spot === 'YARD_EXIT') return true;
+
         // If term exists, selected date must be before or on the term
         // This applies to ALL trucks (garage and patio) for forecasting
         if (truck.term) {
@@ -1938,7 +1942,7 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, onG
       {/* Main container - fills available space */}
       <div
         ref={containerRef}
-        className="flex-1 relative flex items-center justify-center min-h-0"
+        className="flex-1 relative flex items-start justify-center min-h-0"
       >
         <AllGaragesView
           trucks={displayTrucks}
