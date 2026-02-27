@@ -113,6 +113,8 @@ export interface GarageTruck {
   spot: string | null;
   taskName?: string;
   serialNumber?: string | null;
+  plate?: string | null;
+  chassisNumber?: string | null;
   paintHex?: string | null;
   length: number; // Total length (with cabin if applicable)
   originalLength?: number; // Original length without cabin (for display)
@@ -472,8 +474,11 @@ export function TruckElement({ truck, scale, isDragging, onClick }: TruckElement
   // Display original length (without cabin) if available
   const displayLength = truck.originalLength ?? truck.length;
 
-  // Only show serial number if there's enough pixel height
-  const showSerialNumber = height > 50 && truck.serialNumber;
+  // Bottom label: serialNumber → plate → last 5 chars of chassisNumber
+  const truckBottomLabel = truck.serialNumber
+    || truck.plate
+    || (truck.chassisNumber ? truck.chassisNumber.slice(-5) : null);
+  const showSerialNumber = height > 50 && truckBottomLabel;
 
   // Production service order progress bar
   const productionSOs = (truck.serviceOrders || []).filter(so => so.type === 'PRODUCTION');
@@ -628,20 +633,27 @@ export function TruckElement({ truck, scale, isDragging, onClick }: TruckElement
             </text>
           </g>
         )}
-        {/* Serial number label at bottom - only if enough space */}
-        {showSerialNumber && (
-          <text
-            x={width / 2}
-            y={height - (metaFontSize < 12 ? 6 : 8)}
-            textAnchor="middle"
-            fill={textColor}
-            fontSize={metaFontSize}
-            fontFamily="system-ui, -apple-system, sans-serif"
-            style={{ pointerEvents: 'none' }}
-          >
-            {truck.serialNumber}
-          </text>
-        )}
+        {/* Bottom label (serial / plate / chassi) - only if enough space */}
+        {showSerialNumber && (() => {
+          const labelLen = truckBottomLabel!.length;
+          const charW = metaFontSize * 0.62;
+          const availW = width - 4;
+          const fitsDefault = labelLen * charW <= availW;
+          const labelFontSize = fitsDefault ? metaFontSize : Math.max(5, availW / (labelLen * 0.62));
+          return (
+            <text
+              x={width / 2}
+              y={height - (labelFontSize < 12 ? 6 : 8)}
+              textAnchor="middle"
+              fill={textColor}
+              fontSize={labelFontSize}
+              fontFamily="system-ui, -apple-system, sans-serif"
+              style={{ pointerEvents: 'none' }}
+            >
+              {truckBottomLabel}
+            </text>
+          );
+        })()}
       </g>
 
     </g>

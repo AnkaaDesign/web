@@ -119,6 +119,8 @@ export function GaragesPage() {
         select: {
           id: true,
           spot: true,
+          plate: true,
+          chassisNumber: true,
           leftSideLayout: {
             select: {
               layoutSections: {
@@ -337,6 +339,8 @@ export function GaragesPage() {
         spot: currentSpot,
         taskName: task.name,
         serialNumber: (task as any).serialNumber || null,
+        plate: truck?.plate || null,
+        chassisNumber: truck?.chassisNumber || null,
         paintHex: (task.generalPainting as any)?.hex || null,
         length: truckLength,
         originalLength: sectionsSum > 0 ? sectionsSum : undefined, // Original length without cabin
@@ -673,8 +677,8 @@ export function GaragesPage() {
 
         {/* Scrollable Content - flex container to fill remaining space */}
         <div className="flex-1 flex flex-col overflow-hidden pb-6">
-          <div className="flex-1 mt-4">
-            <div className="bg-card rounded-lg shadow-sm border border-border p-2 h-full">
+          <div className="flex-1 mt-4 min-h-0">
+            <div className="bg-card rounded-lg shadow-sm border border-border p-2 h-full overflow-hidden">
               {viewMode === 'overview' ? (
                 <GarageView
                   trucks={garageTrucks}

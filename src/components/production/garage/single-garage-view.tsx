@@ -272,7 +272,7 @@ function DayColumn({
     : trucks.filter(t => { if (!t.spot) return false; const p = parseSpot(t.spot); return p.garage === areaId; }).length;
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-2 shrink-0">
       {/* Day header */}
       <div className="flex flex-col items-center">
         <span className={cn(
@@ -529,7 +529,8 @@ export function SingleGarageView({
       // Find column count that maximizes scale = min(scaleX, scaleY)
       const OUTER_PADDING = 48;
       const GAP = 24;
-      const availW = Math.max(1, containerSize.width - OUTER_PADDING - 4 * GAP);
+      const COL_OVERHEAD = 16; // p-1.5 (12px) + border-2 (4px) per column
+      const availW = Math.max(1, containerSize.width - OUTER_PADDING - 4 * GAP - 5 * COL_OVERHEAD);
       const availH = Math.max(1, containerSize.height - OUTER_PADDING - 60);
 
       let bestCols = Math.max(3, Math.ceil(maxTrucks / 4));
@@ -564,11 +565,15 @@ export function SingleGarageView({
   }, [isYard, garageId, trucksPerDay, containerSize.width, containerSize.height]);
 
   // Calculate scale to fit 5 areas horizontally
-  const PADDING = 48;
+  // Account for: outer padding (p-6 = 24px each side), gaps (gap-6 = 24px × 4),
+  // and per-column overhead (p-1.5 = 12px + border-2 = 4px = 16px each)
+  const OUTER_PADDING = 48; // p-6 on both sides
   const GAP = 24;
+  const COLUMN_OVERHEAD = 16; // p-1.5 (12px) + border-2 (4px) per column
   const totalGaps = 4 * GAP;
-  const availableWidth = Math.max(0, containerSize.width - PADDING - totalGaps);
-  const availableHeight = Math.max(0, containerSize.height - PADDING - 60);
+  const totalColumnOverhead = 5 * COLUMN_OVERHEAD;
+  const availableWidth = Math.max(0, containerSize.width - OUTER_PADDING - totalGaps - totalColumnOverhead);
+  const availableHeight = Math.max(0, containerSize.height - OUTER_PADDING - 60);
   const scaleX = availableWidth / (5 * areaDimensions.width);
   const scaleY = availableHeight / areaDimensions.height;
   const scale = Math.max(1, Math.min(scaleX, scaleY));
@@ -699,28 +704,25 @@ export function SingleGarageView({
   );
 
   const content = (
-    <div className="w-full h-full overflow-auto">
-      {/* 5 day columns */}
-      <div className="flex items-start justify-center gap-6 p-6">
-        {trucksPerDay.map(({ date, trucks: dayTrucks, isToday: isDayToday }) => (
-          <DayColumn
-            key={date.toISOString()}
-            areaId={garageId as AreaId}
-            date={date}
-            trucks={dayTrucks}
-            patioColumns={areaDimensions.columns}
-            scale={scale}
-            svgWidth={svgWidth}
-            svgHeight={svgHeight}
-            isToday={isDayToday}
-            enableDragDrop={isDayToday && enableDragDrop}
-            onTruckClick={onTruckClick}
-            activeTruck={activeTruck}
-            laneAvailability={isDayToday ? laneAvailability : null}
-            dimmed={!isDayToday}
-          />
-        ))}
-      </div>
+    <div className="flex items-start justify-center gap-6 p-6">
+      {trucksPerDay.map(({ date, trucks: dayTrucks, isToday: isDayToday }) => (
+        <DayColumn
+          key={date.toISOString()}
+          areaId={garageId as AreaId}
+          date={date}
+          trucks={dayTrucks}
+          patioColumns={areaDimensions.columns}
+          scale={scale}
+          svgWidth={svgWidth}
+          svgHeight={svgHeight}
+          isToday={isDayToday}
+          enableDragDrop={isDayToday && enableDragDrop}
+          onTruckClick={onTruckClick}
+          activeTruck={activeTruck}
+          laneAvailability={isDayToday ? laneAvailability : null}
+          dimmed={!isDayToday}
+        />
+      ))}
     </div>
   );
 

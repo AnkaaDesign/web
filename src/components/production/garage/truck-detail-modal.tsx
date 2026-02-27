@@ -16,7 +16,9 @@ import { FilePreviewModal } from '@/components/common/file';
 import {
   IconHash,
   IconCar,
+  IconBarcode,
   IconBuilding,
+  IconBuildingFactory2,
   IconCalendarTime,
   IconCalendarDue,
   IconLogin,
@@ -50,7 +52,11 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
   const { data: taskResponse, isLoading } = useTaskDetail(taskId ?? '', {
     enabled: open && !!taskId,
     include: {
-      customer: true,
+      customer: {
+        include: {
+          logo: true,
+        },
+      },
       truck: {
         include: {
           leftSideLayout: {
@@ -65,6 +71,7 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
           },
         },
       },
+      sector: true,
       artworks: {
         include: {
           file: true,
@@ -224,6 +231,32 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
                 </span>
                 <span className="text-sm font-semibold text-foreground uppercase">
                   {(task.truck as any).plate}
+                </span>
+              </div>
+            )}
+
+            {/* Chassis Number */}
+            {(task.truck as any)?.chassisNumber && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconBarcode className="h-4 w-4" />
+                  Chassi
+                </span>
+                <span className="text-sm font-semibold text-foreground uppercase">
+                  {(task.truck as any).chassisNumber.slice(-5)}
+                </span>
+              </div>
+            )}
+
+            {/* Sector */}
+            {(task as any).sector?.name && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconBuildingFactory2 className="h-4 w-4" />
+                  Setor
+                </span>
+                <span className="text-sm font-semibold text-foreground">
+                  {(task as any).sector.name}
                 </span>
               </div>
             )}
