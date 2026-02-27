@@ -233,7 +233,7 @@ export function CopyFromTaskModal({
     'Informações Gerais',
     'Datas',
     'Comercial',
-    'Pintura e Artes',
+    'Pintura e Layouts',
     'Produção',
     'Veículo',
   ];

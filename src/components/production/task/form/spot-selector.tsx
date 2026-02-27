@@ -328,12 +328,6 @@ export function SpotSelector({
         </div>
       )}
 
-      {/* Current spot display */}
-      {currentSpot && (
-        <p className="text-xs text-muted-foreground">
-          Local atual: {currentSpot.replace(/_/g, '-')}
-        </p>
-      )}
     </div>
   );
 }

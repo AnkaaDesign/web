@@ -33,6 +33,7 @@ export interface ArtworkFileUploadFieldProps {
   showPreview?: boolean;
   placeholder?: string;
   label?: string;
+  children?: React.ReactNode;
 }
 
 const defaultAcceptedTypes = {
@@ -96,6 +97,7 @@ export function ArtworkFileUploadField({
   showPreview = true,
   placeholder,
   label,
+  children,
 }: ArtworkFileUploadFieldProps) {
   const [files, setFiles] = useState<FileWithPreview[]>(existingFiles);
   const [thumbnailErrors, setThumbnailErrors] = useState<Record<string, boolean>>({});
@@ -224,6 +226,9 @@ export function ArtworkFileUploadField({
           </Badge>
         )}
       </div>
+
+      {/* Slot for content between upload area and file list (e.g. file suggestions) */}
+      {children}
 
       {/* File List with Status Controls */}
       {files.length > 0 && (

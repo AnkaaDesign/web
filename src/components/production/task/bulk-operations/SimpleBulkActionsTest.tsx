@@ -42,7 +42,7 @@ export const SimpleBulkActionsTest = forwardRef<
   const getModalTitle = () => {
     if (!operationType) return "";
     const titles: Record<BulkOperationType, string> = {
-      arts: "Adicionar Artes",
+      arts: "Adicionar Layouts",
       documents: "Adicionar Documentos",
       paints: "Adicionar Tintas",
       cuttingPlans: "Adicionar Plano de Corte",

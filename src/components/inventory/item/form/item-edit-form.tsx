@@ -56,8 +56,11 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
   const initialBrand = React.useMemo(() => item.brand, [item.brand]);
   const initialCategory = React.useMemo(() => item.category, [item.category]);
 
-  // Track original values to determine what changed (only set once on mount)
+  // Track original values to determine what changed
   const originalValuesRef = React.useRef(defaultValues);
+  React.useEffect(() => {
+    originalValuesRef.current = defaultValues;
+  }, [defaultValues]);
 
   const handleSubmit = async (data: ItemUpdateFormData) => {
     // Compare with original values to find changed fields

@@ -421,7 +421,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                   <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                     <FormLabel className="flex items-center gap-2">
                       <IconPhoto className="h-4 w-4" />
-                      Artes
+                      Layouts
                     </FormLabel>
                     <FileUploadField
                       onFilesChange={(files) => handleArtworkFilesChange(airbrushing.id, files)}
@@ -429,7 +429,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       maxFiles={20}
                       showPreview={true}
                       variant="compact"
-                      placeholder="Adicione artes"
+                      placeholder="Adicione layouts"
                       acceptedFileTypes={{ 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'] }}
                       disabled={disabled || airbrushing.uploading}
                     />

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Sun, ArrowDownRight } from "lucide-react";
+import { Plus, Trash2, Sun, ArrowDownRight, Eclipse } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
 
 // =====================
@@ -23,10 +23,12 @@ export type LightType = "BEAM" | "LINEAR";
 export interface LightSource {
   id: string;
   type: LightType;
-  color: string; // Light color (default white)
-  position: number; // 0-100 diagonal position
-  intensity: number; // 0-100 brightness
-  spread: number; // 0-100 how wide the light spreads (aperture)
+  color: string; // Color determines behavior: light colors → screen (brighten), dark colors → multiply (darken)
+  positionX: number; // 0-100 horizontal position
+  positionY: number; // 0-100 vertical position
+  rotation: number; // 0-360 degrees — angle of LINEAR band (0=horizontal, 90=vertical, 45=diagonal)
+  intensity: number; // 0-100 strength
+  spread: number; // 0-100 how wide the source spreads (aperture)
 }
 
 export interface PaintPreviewSettings {
@@ -67,7 +69,9 @@ const createDefaultLight = (id: string, type: LightType = "BEAM"): LightSource =
   id,
   type,
   color: "#ffffff",
-  position: 50,
+  positionX: 50,
+  positionY: 50,
+  rotation: 45, // Default diagonal (matches original behavior)
   intensity: 70,
   spread: 50,
 });
@@ -75,7 +79,7 @@ const createDefaultLight = (id: string, type: LightType = "BEAM"): LightSource =
 const DEFAULT_SETTINGS: PaintPreviewSettings = {
   baseColor: "#3498db",
   finish: "SOLID",
-  lights: [createDefaultLight("light-1", "BEAM")],
+  lights: [],
   effectIntensity: 60, // Separate from light intensity
   flakeColor: "#c0c0c0", // Silver default
   flipColor: "#ffd700",
@@ -103,6 +107,20 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
         b: parseInt(result[3], 16),
       }
     : { r: 0, g: 0, b: 0 };
+}
+
+/**
+ * Perceived brightness (0-1). Uses standard luminance weights.
+ * > 0.5 = light color → screen blend (brightens)
+ * ≤ 0.5 = dark color → multiply blend (darkens)
+ */
+function getColorLuminance(hex: string): number {
+  const rgb = hexToRgb(hex);
+  return (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+}
+
+function isLightColor(hex: string): boolean {
+  return getColorLuminance(hex) > 0.5;
 }
 
 function rgbToHsl(
@@ -286,15 +304,12 @@ function applyNormalMapLighting(
 }
 
 // =====================
-// Light Rendering Helpers
+// Light Rendering (screen blend — brightens)
 // =====================
 
 /**
- * BEAM Light (Focal/Point Light)
- * - Renders as a visible colored ball/circle
- * - Center: Full light color with high opacity
- * - Edges: Fades to transparent based on spread (aperture)
- * - Position: Moves diagonally from top-left (0) to bottom-right (100)
+ * BEAM Light (Focal/Point)
+ * Uses screen composite — light colors brighten the surface.
  */
 function renderBeamLight(
   ctx: CanvasRenderingContext2D,
@@ -302,53 +317,76 @@ function renderBeamLight(
   height: number,
   light: LightSource
 ): void {
-  const position = light.position / 100;
   const intensity = light.intensity / 100;
   const spread = light.spread / 100;
   const lightRgb = hexToRgb(light.color);
 
   if (intensity <= 0) return;
 
-  // Position: diagonal from top-left (0,0) to bottom-right (width, height)
-  const centerX = width * position;
-  const centerY = height * position;
+  const centerX = width * (light.positionX / 100);
+  const centerY = height * (light.positionY / 100);
 
-  // Radius based on spread: small spread = small tight ball, large spread = big soft glow
   const minRadius = Math.min(width, height) * 0.1;
   const maxRadius = Math.max(width, height) * 0.7;
   const radius = minRadius + spread * (maxRadius - minRadius);
 
-  // Create radial gradient - actual light color!
   const beamGradient = ctx.createRadialGradient(
     centerX, centerY, 0,
     centerX, centerY, radius
   );
 
-  // Smooth Gaussian-like falloff with many stops to avoid banding
   const coreAlpha = Math.min(1, 0.95 * intensity);
   const steps = 16;
   for (let i = 0; i <= steps; i++) {
-    const t = i / steps; // 0 to 1
-    // Gaussian falloff: exp(-k * t^2), adjusted by spread for tighter/wider beam
-    const k = 3.0 + (1 - spread) * 5.0; // tighter beam when spread is low
+    const t = i / steps;
+    const k = 3.0 + (1 - spread) * 5.0;
     const falloff = Math.exp(-k * t * t);
     const alpha = coreAlpha * falloff;
     beamGradient.addColorStop(t, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${alpha})`);
   }
 
   ctx.save();
-  ctx.globalCompositeOperation = "screen"; // Additive blending for light
+  ctx.globalCompositeOperation = "screen";
   ctx.fillStyle = beamGradient;
   ctx.fillRect(0, 0, width, height);
   ctx.restore();
 }
 
 /**
- * LINEAR Light (Strip/Band Light)
- * - Renders as a visible colored stripe going diagonally
- * - Peak: Full light color at the position line
- * - Edges: Gradient to transparent based on spread (aperture)
- * - Position: Moves the stripe along the diagonal
+ * Compute linear gradient endpoints from rotation angle.
+ * The gradient runs perpendicular to the band direction.
+ * positionX/positionY offset the band center on the canvas.
+ * rotation: 0=horizontal band, 90=vertical band, 45=diagonal.
+ */
+function getLinearGradientEndpoints(
+  width: number,
+  height: number,
+  light: LightSource
+): { x1: number; y1: number; x2: number; y2: number; peakT: number } {
+  const angleRad = (light.rotation * Math.PI) / 180;
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+
+  // Center the band at the positionX/positionY point
+  const cx = width * (light.positionX / 100);
+  const cy = height * (light.positionY / 100);
+
+  // Extend gradient long enough to cover the full canvas
+  const diag = Math.sqrt(width * width + height * height);
+  const halfLen = diag / 2;
+
+  return {
+    x1: cx - cos * halfLen,
+    y1: cy - sin * halfLen,
+    x2: cx + cos * halfLen,
+    y2: cy + sin * halfLen,
+    peakT: 0.5, // Band peak is always at the center of our gradient
+  };
+}
+
+/**
+ * LINEAR Light (Strip/Band)
+ * Uses screen composite — light colors brighten along a rotatable band.
  */
 function renderLinearLight(
   ctx: CanvasRenderingContext2D,
@@ -356,35 +394,123 @@ function renderLinearLight(
   height: number,
   light: LightSource
 ): void {
-  const position = light.position / 100;
   const intensity = light.intensity / 100;
   const spread = light.spread / 100;
   const lightRgb = hexToRgb(light.color);
 
   if (intensity <= 0) return;
 
-  // Stripe half-width based on spread
-  const halfWidth = 0.04 + spread * 0.25; // 4% to 29% each side
-
+  const halfWidth = 0.04 + spread * 0.25;
   const peakAlpha = Math.min(1, 0.95 * intensity);
 
-  // Linear gradient across diagonal (top-left to bottom-right)
-  const linearGradient = ctx.createLinearGradient(0, 0, width, height);
+  const { x1, y1, x2, y2, peakT } = getLinearGradientEndpoints(width, height, light);
+  const linearGradient = ctx.createLinearGradient(x1, y1, x2, y2);
 
-  // Smooth Gaussian-like falloff with many stops to avoid hard center
   const steps = 20;
-  const k = 3.0 + (1 - spread) * 5.0; // tighter when spread is low
+  const k = 3.0 + (1 - spread) * 5.0;
   for (let i = 0; i <= steps; i++) {
-    const t = i / steps; // 0 to 1 across full diagonal
-    // Distance from center position, normalized by halfWidth
-    const dist = (t - position) / halfWidth;
+    const t = i / steps;
+    const dist = (t - peakT) / halfWidth;
     const falloff = Math.exp(-k * dist * dist);
     const alpha = peakAlpha * falloff;
     linearGradient.addColorStop(t, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${alpha})`);
   }
 
   ctx.save();
-  ctx.globalCompositeOperation = "screen"; // Additive blending for light
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = linearGradient;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+}
+
+// =====================
+// Shadow Rendering (multiply blend — darkens)
+// =====================
+
+/**
+ * BEAM Shadow (Focal/Point)
+ * Uses multiply composite — dark colors darken the surface.
+ */
+function renderBeamShadow(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  light: LightSource
+): void {
+  const intensity = light.intensity / 100;
+  const spread = light.spread / 100;
+  const shadowRgb = hexToRgb(light.color);
+
+  if (intensity <= 0) return;
+
+  const centerX = width * (light.positionX / 100);
+  const centerY = height * (light.positionY / 100);
+
+  const minRadius = Math.min(width, height) * 0.1;
+  const maxRadius = Math.max(width, height) * 0.7;
+  const radius = minRadius + spread * (maxRadius - minRadius);
+
+  const beamGradient = ctx.createRadialGradient(
+    centerX, centerY, 0,
+    centerX, centerY, radius
+  );
+
+  // For multiply: interpolate from shadow color (dark) at center to white (no effect) at edges
+  const steps = 16;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const k = 3.0 + (1 - spread) * 5.0;
+    const falloff = Math.exp(-k * t * t);
+    const factor = falloff * intensity;
+    const r = Math.round(255 - (255 - shadowRgb.r) * factor);
+    const g = Math.round(255 - (255 - shadowRgb.g) * factor);
+    const b = Math.round(255 - (255 - shadowRgb.b) * factor);
+    beamGradient.addColorStop(t, `rgb(${r},${g},${b})`);
+  }
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = beamGradient;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+}
+
+/**
+ * LINEAR Shadow (Strip/Band)
+ * Uses multiply composite — dark colors darken along a rotatable band.
+ */
+function renderLinearShadow(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  light: LightSource
+): void {
+  const intensity = light.intensity / 100;
+  const spread = light.spread / 100;
+  const shadowRgb = hexToRgb(light.color);
+
+  if (intensity <= 0) return;
+
+  const halfWidth = 0.04 + spread * 0.25;
+
+  const { x1, y1, x2, y2, peakT } = getLinearGradientEndpoints(width, height, light);
+  const linearGradient = ctx.createLinearGradient(x1, y1, x2, y2);
+
+  const steps = 20;
+  const k = 3.0 + (1 - spread) * 5.0;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const dist = (t - peakT) / halfWidth;
+    const falloff = Math.exp(-k * dist * dist);
+    const factor = falloff * intensity;
+    const r = Math.round(255 - (255 - shadowRgb.r) * factor);
+    const g = Math.round(255 - (255 - shadowRgb.g) * factor);
+    const b = Math.round(255 - (255 - shadowRgb.b) * factor);
+    linearGradient.addColorStop(t, `rgb(${r},${g},${b})`);
+  }
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
   ctx.fillStyle = linearGradient;
   ctx.fillRect(0, 0, width, height);
   ctx.restore();
@@ -399,7 +525,7 @@ function renderLinearLight(
  * 1. Metallic/Pearl texture from normal map (base layer with texture)
  * 2. Base color tinted over the texture
  * 3. Flakes/Interference color overlay (controlled by effectIntensity)
- * 4. Lights - visible light sources ON TOP
+ * 4. Light & Shadow sources — blend mode auto-detected from color brightness
  * 5. Clearcoat - subtle highlight
  */
 function renderToCanvas(
@@ -521,31 +647,35 @@ function renderToCanvas(
   }
 
   // ========================================
-  // LAYER 4: Light Sources (ON TOP, clearly visible)
+  // LAYER 4: Light & Shadow Sources
+  // Blend mode is auto-detected from color brightness:
+  //   Light color (luminance > 50%) → screen (brightens)
+  //   Dark color (luminance ≤ 50%) → multiply (darkens)
   // ========================================
   for (const light of settings.lights) {
-    if (light.type === "BEAM") {
-      renderBeamLight(ctx, width, height, light);
+    if (isLightColor(light.color)) {
+      if (light.type === "BEAM") renderBeamLight(ctx, width, height, light);
+      else renderLinearLight(ctx, width, height, light);
     } else {
-      renderLinearLight(ctx, width, height, light);
+      if (light.type === "BEAM") renderBeamShadow(ctx, width, height, light);
+      else renderLinearShadow(ctx, width, height, light);
     }
   }
 
   // ========================================
-  // LAYER 5: Clearcoat Highlight
+  // LAYER 5: Clearcoat Highlight (based on first light-colored source)
   // ========================================
-  if (settings.lights.length > 0) {
-    const primaryLight = settings.lights[0];
-    const primaryPosition = primaryLight.position / 100;
+  const primaryLight = settings.lights.find((l) => isLightColor(l.color));
+  if (primaryLight) {
     const primaryIntensity = primaryLight.intensity / 100;
 
     if (primaryIntensity > 0) {
       const clearcoatGrad = ctx.createRadialGradient(
-        width * primaryPosition,
-        height * primaryPosition,
+        width * (primaryLight.positionX / 100),
+        height * (primaryLight.positionY / 100),
         0,
-        width * primaryPosition,
-        height * primaryPosition,
+        width * (primaryLight.positionX / 100),
+        height * (primaryLight.positionY / 100),
         width * 0.6
       );
       clearcoatGrad.addColorStop(0, `rgba(255,255,255,${0.15 * primaryIntensity})`);
@@ -582,12 +712,24 @@ export const PaintPreviewGenerator = forwardRef<
     pearlNormal: null,
   });
 
-  const [settings, setSettings] = useState<PaintPreviewSettings>(() => ({
-    ...DEFAULT_SETTINGS,
-    baseColor,
-    finish,
-    ...initialSettings,
-  }));
+  const [settings, setSettings] = useState<PaintPreviewSettings>(() => {
+    const merged = {
+      ...DEFAULT_SETTINGS,
+      baseColor,
+      finish,
+      ...initialSettings,
+    };
+    // Backward compatibility: migrate old fields
+    if (merged.lights) {
+      merged.lights = merged.lights.map((light: any) => ({
+        ...light,
+        positionX: light.positionX ?? light.position ?? 50,
+        positionY: light.positionY ?? light.position ?? 50,
+        rotation: light.rotation ?? 45,
+      }));
+    }
+    return merged;
+  });
 
   // Load textures on mount
   useEffect(() => {
@@ -712,12 +854,12 @@ export const PaintPreviewGenerator = forwardRef<
           <Card>
             <CardHeader className="py-3">
               <div className="flex items-center justify-between">
-                <span className="text-base font-semibold">Fontes de Luz</span>
+                <span className="text-base font-semibold">Fontes de Luz / Sombra</span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={addLight}
-                  title="Adicionar luz"
+                  title="Adicionar fonte"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -726,21 +868,27 @@ export const PaintPreviewGenerator = forwardRef<
             <CardContent className="space-y-4">
               {settings.lights.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-2">
-                  Nenhuma luz configurada. Adicione uma luz acima.
+                  Nenhuma fonte configurada. Adicione uma acima.
                 </p>
               )}
 
-              {settings.lights.map((light, index) => (
+              {settings.lights.map((light, index) => {
+                const lightIsLight = isLightColor(light.color);
+                return (
                 <div key={light.id} className="border border-border rounded-lg p-3 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      {light.type === "BEAM" ? (
-                        <Sun className="h-4 w-4 text-yellow-500" />
+                      {lightIsLight ? (
+                        light.type === "BEAM" ? (
+                          <Sun className="h-4 w-4 text-yellow-500" />
+                        ) : (
+                          <ArrowDownRight className="h-4 w-4 text-blue-500" />
+                        )
                       ) : (
-                        <ArrowDownRight className="h-4 w-4 text-blue-500" />
+                        <Eclipse className="h-4 w-4 text-purple-500" />
                       )}
                       <span className="text-sm font-medium">
-                        Luz {index + 1}
+                        {lightIsLight ? "Luz" : "Sombra"} {index + 1}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -756,43 +904,76 @@ export const PaintPreviewGenerator = forwardRef<
                         triggerClassName="h-8 text-xs"
                       />
 
-                      {/* Light Color */}
+                      {/* Source Color — light colors brighten, dark colors darken */}
                       <input
                         type="color"
                         value={light.color}
                         onChange={(e) => updateLight(light.id, "color", e.target.value)}
                         className="w-8 h-8 rounded cursor-pointer bg-transparent border-0"
-                        title="Cor da luz"
+                        title={lightIsLight ? "Cor clara = luz" : "Cor escura = sombra"}
                       />
 
                       {/* Remove button */}
-                      {settings.lights.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeLight(light.id)}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeLight(light.id)}
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
 
-                  {/* Position */}
+                  {/* Horizontal Position */}
                   <div className="space-y-1">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs">Posição</Label>
-                      <span className="text-xs text-muted-foreground">{light.position}</span>
+                      <Label className="text-xs">Horizontal</Label>
+                      <span className="text-xs text-muted-foreground">{light.positionX}</span>
                     </div>
                     <Slider
-                      value={[light.position]}
-                      onValueChange={([v]) => updateLight(light.id, "position", v)}
+                      value={[light.positionX]}
+                      onValueChange={([v]) => updateLight(light.id, "positionX", v)}
                       min={0}
                       max={100}
                       step={1}
                     />
                   </div>
+
+                  {/* Vertical Position */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Vertical</Label>
+                      <span className="text-xs text-muted-foreground">{light.positionY}</span>
+                    </div>
+                    <Slider
+                      value={[light.positionY]}
+                      onValueChange={([v]) => updateLight(light.id, "positionY", v)}
+                      min={0}
+                      max={100}
+                      step={1}
+                    />
+                  </div>
+
+                  {/* Rotation — only for LINEAR type */}
+                  {light.type === "LINEAR" && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Rotação</Label>
+                        <span className="text-xs text-muted-foreground">{light.rotation}°</span>
+                      </div>
+                      <Slider
+                        value={[light.rotation]}
+                        onValueChange={([v]) => updateLight(light.id, "rotation", v)}
+                        min={0}
+                        max={360}
+                        step={1}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        0° horizontal · 90° vertical · 45° diagonal
+                      </p>
+                    </div>
+                  )}
 
                   {/* Intensity */}
                   <div className="space-y-1">
@@ -824,7 +1005,8 @@ export const PaintPreviewGenerator = forwardRef<
                     />
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
 

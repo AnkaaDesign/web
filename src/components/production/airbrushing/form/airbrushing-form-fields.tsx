@@ -153,7 +153,7 @@ export function AirbrushingFormFields({
         <FormItem className="flex flex-col">
           <FormLabel className="flex items-center gap-2">
             <IconPhoto className="h-4 w-4" />
-            Artes da Aerografia
+            Layouts da Aerografia
           </FormLabel>
           <FormControl>
             <ArtworkFileUploadField
@@ -162,8 +162,8 @@ export function AirbrushingFormFields({
               existingFiles={artworkFiles}
               maxFiles={20}
               showPreview={true}
-              placeholder="Adicione as artes da aerografia"
-              label="Artes anexadas"
+              placeholder="Adicione os layouts da aerografia"
+              label="Layouts anexados"
             />
           </FormControl>
         </FormItem>

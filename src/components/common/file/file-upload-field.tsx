@@ -37,6 +37,7 @@ export interface FileUploadFieldProps {
   placeholder?: string;
   label?: string;
   showFiles?: boolean;
+  children?: React.ReactNode;
 }
 
 const defaultAcceptedTypes = {
@@ -127,6 +128,7 @@ export function FileUploadField({
   placeholder,
   label,
   showFiles = true,
+  children,
 }: FileUploadFieldProps) {
   const [files, setFiles] = useState<FileWithPreview[]>(existingFiles);
   const [thumbnailErrors, setThumbnailErrors] = useState<Record<string, boolean>>({});
@@ -313,6 +315,9 @@ export function FileUploadField({
           )}
         </div>
 
+        {/* Slot for content between upload area and file list (e.g. file suggestions) */}
+        {children}
+
         {/* Compact File List */}
         {showFiles && files.length > 0 && (
           <div className="space-y-2 w-full">
@@ -442,6 +447,9 @@ export function FileUploadField({
           )}
         </div>
       </div>
+
+      {/* Slot for content between upload area and file list (e.g. file suggestions) */}
+      {children}
 
       {/* File Grid */}
       {showFiles && files.length > 0 && (

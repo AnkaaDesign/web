@@ -212,7 +212,7 @@ export const extractActiveFilters = (
     { key: "hasCustomer", label: "Com cliente" },
     { key: "hasTruck", label: "Com caminhão" },
     { key: "hasObservation", label: "Com observação" },
-    { key: "hasArtworks", label: "Com artes" },
+    { key: "hasArtworks", label: "Com layouts" },
     { key: "hasPaints", label: "Com tintas" },
     { key: "hasCommissions", label: "Com comissões" },
     { key: "hasServices", label: "Com serviços" },

@@ -177,12 +177,12 @@ export function CustomerForm(props: CustomerFormProps) {
     return () => subscription.unsubscribe();
   }, [form, lookupCnpj]);
 
-  // Initialize form only once for update mode
+  // Reset form when customer data changes (e.g., navigating between different customers)
   useEffect(() => {
     if (mode === "update" && defaultValues) {
       form.reset(defaultValues);
     }
-  }, [mode]); // Only depend on mode, not defaultValues to avoid re-initialization
+  }, [mode, defaultValues]);
 
   // Track dirty state without triggering validation
   useEffect(() => {

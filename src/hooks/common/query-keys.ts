@@ -348,6 +348,8 @@ export const fileKeys = {
   // Specialized queries
   orphaned: (filters?: Partial<FileGetManyFormData>) => (filters ? (["files", "orphaned", filters] as const) : (["files", "orphaned"] as const)),
   byEntity: (entityType: string, entityId: string) => ["files", "byEntity", entityType, entityId] as const,
+  suggestions: (customerId: string, fileContext: string, excludeIds?: string[]) =>
+    ["files", "suggestions", customerId, fileContext, excludeIds] as const,
 };
 
 // Alias for artworks (task files are now called artworks)

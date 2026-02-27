@@ -38,8 +38,11 @@ export function CustomerEditForm({ customer, onSubmit, isSubmitting, onDirtyChan
     [customer],
   );
 
-  // Track original values to determine what changed (only set once on mount)
+  // Track original values to determine what changed
   const originalValuesRef = React.useRef(defaultValues);
+  React.useEffect(() => {
+    originalValuesRef.current = defaultValues;
+  }, [defaultValues]);
 
   const handleSubmit = async (data: CustomerUpdateFormData | FormData) => {
     console.log('[CustomerEditForm] handleSubmit called', {

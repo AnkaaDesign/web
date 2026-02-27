@@ -54,6 +54,9 @@ export function EpiEditForm({ item, onSubmit, isSubmitting }: EpiEditFormProps) 
 
   // Track original values to determine what changed
   const originalValues = React.useRef(getDefaultValues());
+  React.useEffect(() => {
+    originalValues.current = getDefaultValues();
+  }, [getDefaultValues]);
 
   const handleSubmit = async (data: ItemUpdateFormData) => {
     // Compare with original values to find changed fields

@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { FileUploadField, type FileWithPreview } from "@/components/common/file";
+import { FileUploadField, type FileWithPreview, FileSuggestions } from "@/components/common/file";
 import { ArtworkFileUploadField } from "../form/artwork-file-upload-field";
 import { GeneralPaintingSelector } from "../form/general-painting-selector";
 import { LogoPaintsSelector } from "../form/logo-paints-selector";
@@ -1128,11 +1128,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
   const getModalTitle = () => {
     if (!operationType) return "";
     const titles: Record<BulkOperationType, string> = {
-      arts: "Adicionar Artes",
+      arts: "Adicionar Layouts",
       baseFiles: "Arquivos Base",
       paints: "Adicionar Tintas",
       cuttingPlans: "Adicionar Plano de Corte",
-      layout: "Aplicar Layout",
+      layout: "Aplicar Medidas do Caminhão",
       serviceOrder: "Ordem de Servico",
     };
     return titles[operationType];
@@ -1151,6 +1151,12 @@ export const AdvancedBulkActionsHandler = forwardRef<
     return icons[operationType];
   };
 
+  // Compute common customer ID for file suggestions (only if all tasks share the same customer)
+  const commonCustomerId = currentTasks.length > 0 &&
+    currentTasks.every(t => t.customerId === currentTasks[0].customerId)
+    ? currentTasks[0].customerId ?? undefined
+    : undefined;
+
   const renderOperationContent = () => {
     if (!operationType) return null;
 
@@ -1167,9 +1173,31 @@ export const AdvancedBulkActionsHandler = forwardRef<
               disabled={isSubmitting}
               showPreview={true}
               existingFiles={artworkFiles}
-              placeholder="Selecione artes para as tarefas"
-              label="Artes"
-            />
+              placeholder="Selecione layouts para as tarefas"
+              label="Layouts"
+            >
+              <FileSuggestions
+                customerId={commonCustomerId}
+                fileContext="tasksArtworks"
+                excludeFileIds={artworkFiles.map(f => f.uploadedFileId || f.id).filter(Boolean)}
+                onSelect={(newFile) => {
+                  const fileWithPreview: FileWithPreview = {
+                    id: newFile.id,
+                    name: newFile.filename || newFile.originalName || 'artwork',
+                    size: newFile.size || 0,
+                    type: newFile.mimetype || 'application/octet-stream',
+                    lastModified: Date.now(),
+                    uploaded: true,
+                    uploadProgress: 100,
+                    uploadedFileId: newFile.id,
+                    thumbnailUrl: newFile.thumbnailUrl || undefined,
+                    status: 'DRAFT',
+                  } as FileWithPreview;
+                  setArtworkFiles(prev => [...prev, fileWithPreview]);
+                }}
+                disabled={isSubmitting}
+              />
+            </ArtworkFileUploadField>
           </div>
         );
 
@@ -1185,10 +1213,31 @@ export const AdvancedBulkActionsHandler = forwardRef<
               variant="compact"
               placeholder="Selecione arquivos base para as tarefas"
               label="Arquivos Base"
-            />
+            >
+              <FileSuggestions
+                customerId={commonCustomerId}
+                fileContext="taskBaseFiles"
+                excludeFileIds={baseFiles.map(f => f.uploadedFileId || f.id).filter(Boolean)}
+                onSelect={(newFile) => {
+                  const fileWithPreview: FileWithPreview = {
+                    id: newFile.id,
+                    name: newFile.filename || newFile.originalName || 'file',
+                    size: newFile.size || 0,
+                    type: newFile.mimetype || 'application/octet-stream',
+                    lastModified: Date.now(),
+                    uploaded: true,
+                    uploadProgress: 100,
+                    uploadedFileId: newFile.id,
+                    thumbnailUrl: newFile.thumbnailUrl || undefined,
+                  } as FileWithPreview;
+                  setBaseFiles(prev => [...prev, fileWithPreview]);
+                }}
+                disabled={isSubmitting}
+              />
+            </FileUploadField>
             <Alert>
               <AlertDescription>
-                Arquivos base são usados como referência para criação das artes. Eles serão compartilhados entre todas as {currentTaskIds.length} tarefas selecionadas.
+                Arquivos base são usados como referência para criação dos layouts. Eles serão compartilhados entre todas as {currentTaskIds.length} tarefas selecionadas.
               </AlertDescription>
             </Alert>
           </div>

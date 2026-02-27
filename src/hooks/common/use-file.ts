@@ -1,9 +1,9 @@
 // packages/hooks/src/useFile.ts
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import { fileKeys, taskKeys, customerKeys, supplierKeys, userKeys, activityKeys, itemKeys } from "./query-keys";
-import { getFiles, getFileById, createFile, updateFile, deleteFile, batchCreateFiles, batchUpdateFiles, batchDeleteFiles, fileService } from "../../api-client";
+import { getFiles, getFileById, createFile, updateFile, deleteFile, batchCreateFiles, batchUpdateFiles, batchDeleteFiles, fileService, getFileSuggestions, createFileFromExisting } from "../../api-client";
 // uploadSingleFile is deprecated - files should be submitted with forms using FormData
 import type { FileUploadOptions as ApiFileUploadOptions, FileUploadProgress as ApiFileUploadProgress } from "../../api-client";
 import type { FileGetManyFormData, FileCreateFormData, FileUpdateFormData, FileBatchCreateFormData, FileBatchUpdateFormData, FileBatchDeleteFormData } from "../../schemas";
@@ -698,6 +698,42 @@ export const useFileValidation = () => {
     validateFile,
     validateFiles,
   };
+};
+
+// =====================================================
+// File Suggestions Hooks
+// =====================================================
+
+export const useFileSuggestions = (params: {
+  customerId?: string;
+  fileContext: string;
+  excludeIds?: string[];
+  enabled?: boolean;
+}) => {
+  const { customerId, fileContext, excludeIds, enabled = true } = params;
+
+  return useQuery({
+    queryKey: fileKeys.suggestions(customerId || '', fileContext, excludeIds),
+    queryFn: () => getFileSuggestions({
+      customerId: customerId!,
+      fileContext,
+      excludeIds,
+    }),
+    enabled: enabled && !!customerId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    select: (data) => data.data,
+  });
+};
+
+export const useCreateFileFromExisting = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sourceFileId: string) => createFileFromExisting(sourceFileId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files", "suggestions"] });
+    },
+  });
 };
 
 // =====================================================

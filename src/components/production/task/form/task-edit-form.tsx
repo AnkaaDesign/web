@@ -22,6 +22,10 @@ import {
   IconStatusChange,
   IconMapPin,
   IconUser,
+  IconCamera,
+  IconCameraCheck,
+  IconFolderOpen,
+  IconPhoto,
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
@@ -52,7 +56,7 @@ import { GeneralPaintingSelector } from "./general-painting-selector";
 import type { ServiceOrderData } from "./designar-service-order-dialog";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
-import { FileUploadField, type FileWithPreview } from "@/components/common/file";
+import { FileUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import { ArtworkFileUploadField } from "./artwork-file-upload-field";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -3669,48 +3673,61 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
-                {/* Paint Selection (Tintas) - Hidden for Warehouse, Financial, and Logistic users, Disabled for Designer */}
-                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
+                {/* Pricing Card - Visible to ADMIN, FINANCIAL, and COMMERCIAL users */}
+                {canViewPricingSections && (
           <AccordionItem
-            value="paint"
-            id="accordion-item-paint"
+            value="pricing"
+            id="accordion-item-pricing"
             className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
-                        <IconPalette className="h-5 w-5" />
-                        Tintas
+                        <IconFileInvoice className="h-5 w-5" />
+                        Precificação
+                        {pricingItemCount > 0 && (
+                          <Badge variant="secondary" className="ml-2">
+                            {pricingItemCount}
+                          </Badge>
+                        )}
                       </CardTitle>
                     </CardHeader>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <CardContent className="space-y-6 pt-0">
-                    {/* General Painting Selector */}
-                    <GeneralPaintingSelector
-                      control={form.control}
-                      disabled={isSubmitting || isWarehouseUser || isDesignerUser}
-                      initialPaint={task.generalPainting}
-                      onDesignarServiceOrder={handleDesignarServiceOrder}
-                      userPrivilege={user?.sector?.privileges}
-                    />
-
-                    {/* Logo Paints Multi-selector - Hidden for Commercial users */}
-                    {!isCommercialUser && (
-                      <LogoPaintsSelector
+                    <CardContent className="pt-0">
+                      <PricingSelector
+                        ref={pricingSelectorRef}
                         control={form.control}
-                        disabled={isSubmitting || isWarehouseUser || isDesignerUser}
-                        initialPaints={task.logoPaints}
+                        disabled={isSubmitting}
+                        userRole={user?.sector?.privileges}
+                        onItemCountChange={setPricingItemCount}
+                        layoutFiles={pricingLayoutFiles}
+                        onLayoutFilesChange={setPricingLayoutFiles}
+                        onItemDeleted={handlePricingItemDeleted}
+                        initialInvoiceToCustomers={task?.pricing?.invoicesToCustomers}
+                        taskResponsibles={task?.responsibles}
+                        artworks={(task.artworks || []).map((artwork: any) => {
+                          const file = artwork.file || artwork;
+                          return {
+                            id: file.id,
+                            artworkId: artwork.artworkId || artwork.id,
+                            filename: file.filename,
+                            originalName: file.originalName,
+                            thumbnailUrl: file.thumbnailUrl,
+                            status: artwork.status,
+                            mimetype: file.mimetype,
+                            size: file.size,
+                          };
+                        })}
                       />
-                    )}
                     </CardContent>
                   </AccordionContent>
                 </Card>
           </AccordionItem>
                 )}
 
-                {/* Layout Section - Only visible to ADMIN, LOGISTIC, and PRODUCTION team leaders */}
+                {/* Medidas do Caminhão - Only visible to ADMIN, LOGISTIC, and PRODUCTION team leaders */}
                 {(isAdminUser || isLogisticUser || (isProductionUser && isTeamLeader)) && (
           <AccordionItem
             value="layout"
@@ -3722,7 +3739,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
                         <IconRuler className="h-5 w-5" />
-                        Layout do Caminhão
+                        Medidas do Caminhão
                       </CardTitle>
                     </CardHeader>
                   </AccordionTrigger>
@@ -3763,7 +3780,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             <span className="text-sm text-muted-foreground">Comprimento Total: </span>
                             <span className="text-sm font-semibold text-foreground">
                               {(() => {
-                                // Use current editing state if available, otherwise use saved data
                                 const currentState = currentLayoutStates[selectedLayoutSide];
                                 const savedLayout = selectedLayoutSide === "left"
                                   ? layoutsData?.leftSideLayout
@@ -3787,27 +3803,20 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         <LayoutForm
                           selectedSide={selectedLayoutSide}
                           layout={(() => {
-                            // CRITICAL FIX: Use currentLayoutStates when the side has been modified
-                            // This preserves user edits when accordion collapses and reopens
                             const savedLayout = selectedLayoutSide === "left"
                               ? layoutsData?.leftSideLayout
                               : selectedLayoutSide === "right"
                                 ? layoutsData?.rightSideLayout
                                 : layoutsData?.backSideLayout;
 
-                            // If user has modified this side, use the edited state
-                            // This ensures user edits are not lost when accordion collapses
                             if (modifiedLayoutSides.has(selectedLayoutSide) && currentLayoutStates[selectedLayoutSide]) {
                               return currentLayoutStates[selectedLayoutSide];
                             }
 
-                            // Otherwise use the saved layout from backend
                             return savedLayout;
                           })()}
                           validationError={layoutWidthError}
                           onChange={(side, layoutData) => {
-                            // Check if this is an initial state emission (not a real user change)
-                            // Initial emission happens when LayoutForm mounts without saved data
                             const savedLayout = side === "left"
                               ? layoutsData?.leftSideLayout
                               : side === "right"
@@ -3817,45 +3826,32 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             const hasSavedLayout = savedLayout?.layoutSections && savedLayout.layoutSections.length > 0;
                             const isFirstEmitForSide = !initialLayoutStateEmittedRef.current.has(side);
 
-                            // If no saved layout and this is the first emit, it's just initial state - don't mark as modified
                             if (!hasSavedLayout && isFirstEmitForSide) {
                               initialLayoutStateEmittedRef.current.add(side);
-                              // Still track the state for display purposes, but don't mark as modified
                               setCurrentLayoutStates(prev => ({
                                 ...prev,
                                 [side]: layoutData,
                               }));
-                              return; // Don't mark as modified or enable submit
+                              return;
                             }
 
-                            // Mark this side's initial state as emitted
                             initialLayoutStateEmittedRef.current.add(side);
 
-                            // Mark this side as modified (actual user change)
                             setModifiedLayoutSides(prev => {
                               const newSet = new Set(prev);
                               newSet.add(side);
                               return newSet;
                             });
 
-                            // Mark as having layout changes to enable submit button
                             setHasLayoutChanges(true);
 
-                            // Track current editing state for real-time updates
-                            setCurrentLayoutStates(prev => {
-                              const newState = {
-                                ...prev,
-                                [side]: layoutData,
-                              };
-
-                              return newState;
-                            });
+                            setCurrentLayoutStates(prev => ({
+                              ...prev,
+                              [side]: layoutData,
+                            }));
                           }}
                           onSave={async (layoutData) => {
                             if (layoutData) {
-
-                              // Mark layout changes to enable submit button
-                              // Layout will be saved when user submits the task form
                               setHasLayoutChanges(true);
                             }
                           }}
@@ -3869,7 +3865,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
-                {/* Truck Spot Selector - Only visible to ADMIN and LOGISTIC users */}
+                {/* Truck Spot - Only visible to ADMIN and LOGISTIC users */}
                 {truckId && (isAdminUser || isLogisticUser) && (
           <AccordionItem
             value="spot"
@@ -3902,41 +3898,39 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
-                {/* Pricing Card - Visible to ADMIN, FINANCIAL, and COMMERCIAL users */}
-                {canViewPricingSections && (
+                {/* Paint Selection (Tintas) - Hidden for Warehouse, Financial, and Logistic users, Disabled for Designer */}
+                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
           <AccordionItem
-            value="pricing"
-            id="accordion-item-pricing"
+            value="paint"
+            id="accordion-item-paint"
             className="border border-border rounded-lg"
           >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
-                        <IconFileInvoice className="h-5 w-5" />
-                        Precificação
-                        {pricingItemCount > 0 && (
-                          <Badge variant="secondary" className="ml-2">
-                            {pricingItemCount}
-                          </Badge>
-                        )}
+                        <IconPalette className="h-5 w-5" />
+                        Tintas
                       </CardTitle>
                     </CardHeader>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <CardContent className="pt-0">
-                      <PricingSelector
-                        ref={pricingSelectorRef}
+                    <CardContent className="space-y-6 pt-0">
+                    <GeneralPaintingSelector
+                      control={form.control}
+                      disabled={isSubmitting || isWarehouseUser || isDesignerUser}
+                      initialPaint={task.generalPainting}
+                      onDesignarServiceOrder={handleDesignarServiceOrder}
+                      userPrivilege={user?.sector?.privileges}
+                    />
+
+                    {!isCommercialUser && (
+                      <LogoPaintsSelector
                         control={form.control}
-                        disabled={isSubmitting}
-                        userRole={user?.sector?.privileges}
-                        onItemCountChange={setPricingItemCount}
-                        layoutFiles={pricingLayoutFiles}
-                        onLayoutFilesChange={setPricingLayoutFiles}
-                        onItemDeleted={handlePricingItemDeleted}
-                        initialInvoiceToCustomers={task?.pricing?.invoicesToCustomers}
-                        taskResponsibles={task?.responsibles}
+                        disabled={isSubmitting || isWarehouseUser || isDesignerUser}
+                        initialPaints={task.logoPaints}
                       />
+                    )}
                     </CardContent>
                   </AccordionContent>
                 </Card>
@@ -4014,8 +4008,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
-                        <IconFile className="h-5 w-5" />
-                        Arquivos do Cliente
+                        <IconFileText className="h-5 w-5" />
+                        Arquivos Base
                       </CardTitle>
                     </CardHeader>
                   </AccordionTrigger>
@@ -4029,8 +4023,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         showPreview={true}
                         existingFiles={baseFiles}
                         variant="compact"
-                        placeholder="Adicione arquivos do cliente (vídeos, imagens, PDFs)"
-                        label="Arquivos do cliente anexados"
+                        placeholder="Adicione arquivos base (vídeos, imagens, PDFs)"
+                        label="Arquivos base anexados"
                         acceptedFileTypes={{
                           "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
                           "application/pdf": [".pdf"],
@@ -4041,58 +4035,35 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                           "video/x-matroska": [".mkv"],
                           "application/postscript": [".eps", ".ai"],
                         }}
-                      />
+                      >
+                        <FileSuggestions
+                          customerId={task.customerId}
+                          fileContext="taskBaseFiles"
+                          excludeFileIds={baseFiles.map(f => f.uploadedFileId || f.id).filter(Boolean)}
+                          onSelect={(newFile) => {
+                            const fileWithPreview: FileWithPreview = {
+                              id: newFile.id,
+                              name: newFile.filename || newFile.originalName || 'file',
+                              size: newFile.size || 0,
+                              type: newFile.mimetype || 'application/octet-stream',
+                              lastModified: Date.now(),
+                              uploaded: true,
+                              uploadProgress: 100,
+                              uploadedFileId: newFile.id,
+                              thumbnailUrl: newFile.thumbnailUrl || undefined,
+                            } as FileWithPreview;
+                            setBaseFiles(prev => [...prev, fileWithPreview]);
+                            setHasBaseFileChanges(true);
+                            setHasFileChanges(true);
+                          }}
+                          disabled={isSubmitting}
+                        />
+                      </FileUploadField>
                     </CardContent>
                   </AccordionContent>
                 </Card>
           </AccordionItem>
                 )}
-
-                {/* Artworks Card (optional) - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
-                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
-          <AccordionItem
-            value="artworks"
-            id="accordion-item-artworks"
-            className="border border-border rounded-lg"
-          >
-                <Card className="border-0">
-                  <AccordionTrigger className="px-0 hover:no-underline">
-                    <CardHeader className="flex-1 py-4">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconFile className="h-5 w-5" />
-                        Layouts
-                      </CardTitle>
-                    </CardHeader>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <CardContent className="pt-0">
-                      <ArtworkFileUploadField
-                        onFilesChange={handleFilesChange}
-                        onStatusChange={(fileId, status) => {
-                          console.log('[Task Update] 🎨 Status changed:', { fileId, status, hasArtworkStatusChanges });
-                          setArtworkStatuses(prev => {
-                            const newStatuses = {
-                              ...prev,
-                              [fileId]: status,
-                            };
-                            console.log('[Task Update] 🎨 New artworkStatuses:', newStatuses);
-                            return newStatuses;
-                          });
-                          setHasArtworkStatusChanges(true);
-                          console.log('[Task Update] 🎨 Set hasArtworkStatusChanges to true');
-                        }}
-                        maxFiles={5}
-                        disabled={isSubmitting}
-                        showPreview={true}
-                        existingFiles={uploadedFiles}
-                        placeholder="Adicione layouts relacionados à tarefa"
-                        label="Layouts anexados"
-                      />
-                    </CardContent>
-                  </AccordionContent>
-                </Card>
-          </AccordionItem>
-          )}
 
                 {/* Project Files Card - visible to ALL except Warehouse and Financial users */}
                 {!isWarehouseUser && !isFinancialUser && (
@@ -4105,7 +4076,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
-                        <IconFile className="h-5 w-5" />
+                        <IconFolderOpen className="h-5 w-5" />
                         Projetos
                       </CardTitle>
                     </CardHeader>
@@ -4132,15 +4103,38 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                           "video/x-matroska": [".mkv"],
                           "application/postscript": [".eps", ".ai"],
                         }}
-                      />
+                      >
+                        <FileSuggestions
+                          customerId={task.customerId}
+                          fileContext="taskProjectFiles"
+                          excludeFileIds={projectFiles.map(f => f.uploadedFileId || f.id).filter(Boolean)}
+                          onSelect={(newFile) => {
+                            const fileWithPreview: FileWithPreview = {
+                              id: newFile.id,
+                              name: newFile.filename || newFile.originalName || 'project file',
+                              size: newFile.size || 0,
+                              type: newFile.mimetype || 'application/octet-stream',
+                              lastModified: Date.now(),
+                              uploaded: true,
+                              uploadProgress: 100,
+                              uploadedFileId: newFile.id,
+                              thumbnailUrl: newFile.thumbnailUrl || undefined,
+                            } as FileWithPreview;
+                            setProjectFiles(prev => [...prev, fileWithPreview]);
+                            setHasProjectFileChanges(true);
+                            setHasFileChanges(true);
+                          }}
+                          disabled={isSubmitting}
+                        />
+                      </FileUploadField>
                     </CardContent>
                   </AccordionContent>
                 </Card>
           </AccordionItem>
                 )}
 
-                {/* Check-in Files Card - hidden from Warehouse, Designer, and Financial users */}
-                {!isWarehouseUser && !isDesignerUser && !isFinancialUser && (
+                {/* Check-in Files Card - only visible for Logistic and Admin users */}
+                {(isLogisticUser || isAdminUser) && (
           <AccordionItem
             value="checkin-files"
             id="accordion-item-checkin-files"
@@ -4150,7 +4144,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
-                        <IconFile className="h-5 w-5" />
+                        <IconCamera className="h-5 w-5" />
                         Check-in
                       </CardTitle>
                     </CardHeader>
@@ -4182,8 +4176,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
-                {/* Check-out Files Card - hidden from Warehouse, Designer, and Financial users */}
-                {!isWarehouseUser && !isDesignerUser && !isFinancialUser && (
+                {/* Check-out Files Card - only visible for Logistic and Admin users; only for completed tasks */}
+                {(isLogisticUser || isAdminUser) && task.status === TASK_STATUS.COMPLETED && (
           <AccordionItem
             value="checkout-files"
             id="accordion-item-checkout-files"
@@ -4193,7 +4187,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
-                        <IconFile className="h-5 w-5" />
+                        <IconCameraCheck className="h-5 w-5" />
                         Check-out
                       </CardTitle>
                     </CardHeader>
@@ -4225,8 +4219,157 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
-                {/* Financial Information Card - Only visible to ADMIN and FINANCIAL users */}
-                {canViewFinancialSections && (
+                {/* Artworks/Layouts Card - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
+                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
+          <AccordionItem
+            value="artworks"
+            id="accordion-item-artworks"
+            className="border border-border rounded-lg"
+          >
+                <Card className="border-0">
+                  <AccordionTrigger className="px-0 hover:no-underline">
+                    <CardHeader className="flex-1 py-4">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconPhoto className="h-5 w-5" />
+                        Layouts
+                      </CardTitle>
+                    </CardHeader>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <CardContent className="pt-0">
+                      <ArtworkFileUploadField
+                        onFilesChange={handleFilesChange}
+                        onStatusChange={(fileId, status) => {
+                          console.log('[Task Update] 🎨 Status changed:', { fileId, status, hasArtworkStatusChanges });
+                          setArtworkStatuses(prev => {
+                            const newStatuses = {
+                              ...prev,
+                              [fileId]: status,
+                            };
+                            console.log('[Task Update] 🎨 New artworkStatuses:', newStatuses);
+                            return newStatuses;
+                          });
+                          setHasArtworkStatusChanges(true);
+                          console.log('[Task Update] 🎨 Set hasArtworkStatusChanges to true');
+                        }}
+                        maxFiles={5}
+                        disabled={isSubmitting}
+                        showPreview={true}
+                        existingFiles={uploadedFiles}
+                        placeholder="Adicione layouts relacionados à tarefa"
+                        label="Layouts anexados"
+                      >
+                        <FileSuggestions
+                          customerId={task.customerId}
+                          fileContext="tasksArtworks"
+                          excludeFileIds={uploadedFiles.map(f => f.uploadedFileId || f.id).filter(Boolean)}
+                          onSelect={(newFile) => {
+                            const fileWithPreview: FileWithPreview = {
+                              id: newFile.id,
+                              name: newFile.filename || newFile.originalName || 'artwork',
+                              size: newFile.size || 0,
+                              type: newFile.mimetype || 'application/octet-stream',
+                              lastModified: Date.now(),
+                              uploaded: true,
+                              uploadProgress: 100,
+                              uploadedFileId: newFile.id,
+                              thumbnailUrl: newFile.thumbnailUrl || undefined,
+                              status: 'DRAFT',
+                            } as FileWithPreview;
+                            setUploadedFiles(prev => [...prev, fileWithPreview]);
+                            setHasArtworkFileChanges(true);
+                            setHasFileChanges(true);
+                          }}
+                          disabled={isSubmitting}
+                        />
+                      </ArtworkFileUploadField>
+                    </CardContent>
+                  </AccordionContent>
+                </Card>
+          </AccordionItem>
+          )}
+
+                {/* Observation Section - only for completed tasks */}
+                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && !isCommercialUser && task.status === TASK_STATUS.COMPLETED && (
+          <AccordionItem
+            value="observation"
+            id="accordion-item-observation"
+            className="border border-border rounded-lg"
+          >
+                <Card className="border-0">
+                  <AccordionTrigger className="px-0 hover:no-underline">
+                    <CardHeader className="flex-1 py-4">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconNotes className="h-5 w-5" />
+                        Observação
+                      </CardTitle>
+                    </CardHeader>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <CardContent className="pt-0">
+                      <div className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="observation"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2">
+                                <IconNotes className="h-4 w-4" />
+                                Descrição da Observação
+                              </FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  value={field.value?.description || ""}
+                                  onChange={(e) => {
+                                    const description = e.target.value;
+                                    field.onChange({
+                                      ...field.value,
+                                      description
+                                    });
+                                  }}
+                                  placeholder="Descreva problemas ou observações sobre a tarefa..."
+                                  rows={4}
+                                  disabled={isSubmitting}
+                                  className="bg-transparent"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Observation Files */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium flex items-center gap-2">
+                            <IconFile className="h-4 w-4 text-muted-foreground" />
+                            Arquivos de Evidência <span className="text-destructive">*</span>
+                          </Label>
+                          <FileUploadField
+                            onFilesChange={handleObservationFilesChange}
+                            maxFiles={10}
+                            disabled={isSubmitting}
+                            showPreview={true}
+                            existingFiles={observationFiles}
+                            variant="compact"
+                            placeholder="Adicione fotos, documentos ou outros arquivos"
+                            label="Arquivos anexados"
+                          />
+                        </div>
+
+                        {hasIncompleteObservation && (
+                          <Alert variant="destructive">
+                            <AlertDescription>A observação está incompleta. Preencha a descrição e adicione pelo menos um arquivo antes de enviar o formulário.</AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                    </CardContent>
+                  </AccordionContent>
+                </Card>
+          </AccordionItem>
+                )}
+
+                {/* Financial Information Card - FINANCIAL always, ADMIN only when COMPLETED */}
+                {(isFinancialUser || (isAdminUser && task.status === TASK_STATUS.COMPLETED)) && (
           <AccordionItem
             value="financial"
             id="accordion-item-financial"
@@ -4317,86 +4460,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             />
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </AccordionContent>
-                </Card>
-          </AccordionItem>
-                )}
-
-                {/* Observation Section - Hidden for Warehouse, Financial, Designer, Logistic, and Commercial users */}
-                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && !isCommercialUser && (
-          <AccordionItem
-            value="observation"
-            id="accordion-item-observation"
-            className="border border-border rounded-lg"
-          >
-                <Card className="border-0">
-                  <AccordionTrigger className="px-0 hover:no-underline">
-                    <CardHeader className="flex-1 py-4">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconFile className="h-5 w-5" />
-                        Observação
-                      </CardTitle>
-                    </CardHeader>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <CardContent className="pt-0">
-                      <div className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="observation"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="flex items-center gap-2">
-                                <IconNotes className="h-4 w-4" />
-                                Descrição da Observação
-                              </FormLabel>
-                              <FormControl>
-                                <Textarea
-                                  value={field.value?.description || ""}
-                                  onChange={(e) => {
-                                    const description = e.target.value;
-                                    // Always preserve the observation object structure to avoid losing fileIds
-                                    field.onChange({
-                                      ...field.value,
-                                      description
-                                    });
-                                  }}
-                                  placeholder="Descreva problemas ou observações sobre a tarefa..."
-                                  rows={4}
-                                  disabled={isSubmitting}
-                                  className="bg-transparent"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        {/* Observation Files */}
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium flex items-center gap-2">
-                            <IconFile className="h-4 w-4 text-muted-foreground" />
-                            Arquivos de Evidência <span className="text-destructive">*</span>
-                          </Label>
-                          <FileUploadField
-                            onFilesChange={handleObservationFilesChange}
-                            maxFiles={10}
-                            disabled={isSubmitting}
-                            showPreview={true}
-                            existingFiles={observationFiles}
-                            variant="compact"
-                            placeholder="Adicione fotos, documentos ou outros arquivos"
-                            label="Arquivos anexados"
-                          />
-                        </div>
-
-                        {hasIncompleteObservation && (
-                          <Alert variant="destructive">
-                            <AlertDescription>A observação está incompleta. Preencha a descrição e adicione pelo menos um arquivo antes de enviar o formulário.</AlertDescription>
-                          </Alert>
-                        )}
                       </div>
                     </CardContent>
                   </AccordionContent>

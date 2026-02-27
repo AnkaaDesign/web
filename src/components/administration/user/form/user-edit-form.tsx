@@ -89,8 +89,11 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
     [user],
   );
 
-  // Track original values to determine what changed (only set once on mount)
+  // Track original values to determine what changed
   const originalValuesRef = React.useRef(defaultValues);
+  React.useEffect(() => {
+    originalValuesRef.current = defaultValues;
+  }, [defaultValues]);
 
   const handleSubmit = async (data: UserUpdateFormData) => {
     // Compare with original values to find changed fields

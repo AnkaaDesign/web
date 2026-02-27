@@ -759,7 +759,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                     { key: "hasCustomer", label: "Tem cliente" },
                     { key: "hasTruck", label: "Tem caminhão" },
                     { key: "hasObservation", label: "Tem observação" },
-                    { key: "hasArtworks", label: "Tem artes" },
+                    { key: "hasArtworks", label: "Tem layouts" },
                     { key: "hasPaints", label: "Tem tintas" },
                     { key: "hasCommissions", label: "Tem comissões" },
                     { key: "hasServices", label: "Tem serviços" },

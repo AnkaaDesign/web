@@ -12,6 +12,7 @@ export { InlinePdfViewer } from "./inline-pdf-viewer";
 export { FileList } from "./file-list";
 export { FileViewerProvider, FileViewerContext, useFileViewer, useFileViewerStandalone, FileViewerButton } from "./file-viewer";
 export { FileViewerCard, detectFileType, getFileTypeIcon, generateThumbnailUrl, formatFileSize, getFileTypeLabel, canPreviewFile } from "./file-viewer-card";
+export { FileSuggestions } from "./file-suggestions";
 
 export type { FilePreviewCardProps } from "./file-preview-card";
 export type { FilePreviewGridProps } from "./file-preview-grid";
@@ -26,3 +27,4 @@ export type { FileViewerProps, FileViewerState, FileViewerButtonProps } from "./
 export type { PDFViewerProps } from "./pdf-viewer";
 export type { InlinePdfViewerProps } from "./inline-pdf-viewer";
 export type { FileViewerCardProps, FileType } from "./file-viewer-card";
+export type { FileSuggestionsProps } from "./file-suggestions";

@@ -618,6 +618,31 @@ export const getMimeTypeFromExtension = (extension: string) => fileService.getMi
 export const getUploadErrorMessage = (error: any) => fileService.getUploadErrorMessage(error);
 
 // =====================
+// File Suggestions Exports
+// =====================
+
+export const getFileSuggestions = (params: {
+  customerId: string;
+  fileContext: string;
+  limit?: number;
+  excludeIds?: string[];
+}): Promise<{ success: boolean; data: File[] }> => {
+  const queryParams: Record<string, string> = {
+    customerId: params.customerId,
+    fileContext: params.fileContext,
+  };
+  if (params.limit) queryParams.limit = String(params.limit);
+  if (params.excludeIds?.length) queryParams.excludeIds = params.excludeIds.join(',');
+  return apiClient.get("/files/suggestions", { params: queryParams }).then(res => res.data);
+};
+
+export const createFileFromExisting = (
+  sourceFileId: string,
+): Promise<{ success: boolean; data: File }> => {
+  return apiClient.post("/files/create-from-existing", { sourceFileId }).then(res => res.data);
+};
+
+// =====================
 // Batch Operations Exports
 // =====================
 

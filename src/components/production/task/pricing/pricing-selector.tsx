@@ -23,6 +23,7 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Combobox } from "@/components/ui/combobox";
 import { FileUploadField } from "@/components/common/file/file-upload-field";
+import { useFileViewer } from "@/components/common/file/file-viewer";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -40,8 +41,20 @@ import { RESPONSIBLE_ROLE_LABELS } from "@/types/responsible";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { ServiceAutocomplete } from "../form/service-autocomplete";
 import { getCustomers } from "../../../../api-client";
+import { getApiBaseUrl } from "@/config/api";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
-import { IconX } from "@tabler/icons-react";
+import { IconX, IconFileSearch, IconUpload, IconArrowLeft } from "@tabler/icons-react";
+
+interface ArtworkOption {
+  id: string; // File ID (flattened)
+  artworkId?: string; // Artwork entity ID
+  filename?: string;
+  originalName?: string;
+  thumbnailUrl?: string | null;
+  status?: string;
+  mimetype?: string;
+  size?: number;
+}
 
 interface PricingSelectorProps {
   control: any;
@@ -54,6 +67,8 @@ interface PricingSelectorProps {
   onItemDeleted?: (description: string) => void;
   initialInvoiceToCustomers?: Array<{ id: string; fantasyName?: string; corporateName?: string; cnpj?: string }>;
   taskResponsibles?: Array<{ id: string; name: string; role: string }>;
+  /** Task artworks available for selection as pricing layout */
+  artworks?: ArtworkOption[];
 }
 
 export interface PricingSelectorRef {
@@ -92,11 +107,13 @@ const VALIDITY_DAYS_OPTIONS = Array.from({ length: 30 }, (_, i) => ({
 export const PricingSelector = forwardRef<
   PricingSelectorRef,
   PricingSelectorProps
->(({ control, disabled, userRole, readOnly, onItemCountChange, layoutFiles: externalLayoutFiles, onLayoutFilesChange, onItemDeleted, initialInvoiceToCustomers, taskResponsibles }, ref) => {
+>(({ control, disabled, userRole, readOnly, onItemCountChange, layoutFiles: externalLayoutFiles, onLayoutFilesChange, onItemDeleted, initialInvoiceToCustomers, taskResponsibles, artworks }, ref) => {
   const [initialized, setInitialized] = useState(false);
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
   const [showCustomPayment, setShowCustomPayment] = useState(false);
   const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
+  const [showLayoutUploadMode, setShowLayoutUploadMode] = useState(false);
+  const fileViewer = useFileViewer();
   // Use external layout files if provided, otherwise use local state
   const [localLayoutFiles, setLocalLayoutFiles] = useState<FileWithPreview[]>([]);
   const layoutFiles = externalLayoutFiles ?? localLayoutFiles;
@@ -146,7 +163,7 @@ export const PricingSelector = forwardRef<
   // which passes the actual file data from the API including correct size information.
   // The layoutFileId is only used for tracking changes, not for creating placeholder files.
 
-  // Handle layout file change
+  // Handle layout file change (from file upload)
   const handleLayoutFileChange = useCallback((files: FileWithPreview[]) => {
     setLayoutFiles(files);
     if (files.length > 0 && files[0].uploadedFileId) {
@@ -155,6 +172,95 @@ export const PricingSelector = forwardRef<
       setValue("pricing.layoutFileId", null);
     }
   }, [setValue, setLayoutFiles]);
+
+  // Handle artwork selection as layout file
+  const handleArtworkSelect = useCallback((value: string | string[] | null | undefined) => {
+    const fileId = typeof value === "string" ? value : null;
+    if (fileId === "__UPLOAD_NEW__") {
+      setShowLayoutUploadMode(true);
+      return;
+    }
+    if (fileId) {
+      const artwork = artworks?.find(a => a.id === fileId);
+      if (artwork) {
+        const filePreview: FileWithPreview = {
+          id: artwork.id,
+          name: artwork.originalName || artwork.filename || "artwork",
+          size: artwork.size || 0,
+          type: artwork.mimetype || "image/png",
+          lastModified: Date.now(),
+          uploaded: true,
+          uploadProgress: 100,
+          uploadedFileId: artwork.id,
+          thumbnailUrl: artwork.thumbnailUrl,
+        } as FileWithPreview;
+        setLayoutFiles([filePreview]);
+        setValue("pricing.layoutFileId", artwork.id);
+        setShowLayoutUploadMode(false);
+      }
+    } else {
+      setLayoutFiles([]);
+      setValue("pricing.layoutFileId", null);
+    }
+  }, [artworks, setValue, setLayoutFiles]);
+
+  // Artwork options for the combobox (image artworks + "upload new" action)
+  const UPLOAD_NEW_SENTINEL = "__UPLOAD_NEW__";
+  const artworkOptions = useMemo(() => {
+    if (!artworks || artworks.length === 0) return [];
+    const imageArtworks = artworks.filter(a => {
+      const mime = a.mimetype || "";
+      return mime.startsWith("image/");
+    });
+    if (imageArtworks.length === 0) return [];
+    // Add "Enviar novo arquivo" as the last option
+    return [
+      ...imageArtworks,
+      { id: UPLOAD_NEW_SENTINEL, filename: "Enviar novo arquivo" } as ArtworkOption,
+    ];
+  }, [artworks]);
+
+  // Render artwork option with thumbnail (or upload action for sentinel)
+  const renderArtworkOption = useCallback((artwork: ArtworkOption) => {
+    if (artwork.id === UPLOAD_NEW_SENTINEL) {
+      return (
+        <div className="flex items-center gap-3 w-full py-1 text-muted-foreground">
+          <div className="w-12 h-12 rounded-md border border-dashed border-border overflow-hidden shrink-0 bg-muted/50 flex items-center justify-center">
+            <IconUpload className="h-5 w-5" />
+          </div>
+          <p className="text-sm">Enviar novo arquivo</p>
+        </div>
+      );
+    }
+    const thumbnailSrc = artwork.thumbnailUrl
+      ? artwork.thumbnailUrl
+      : `${getApiBaseUrl()}/files/thumbnail/${artwork.id}`;
+    return (
+      <div className="flex items-center gap-3 w-full py-1">
+        <div className="w-12 h-12 rounded-md border border-border overflow-hidden shrink-0 bg-muted">
+          <img
+            src={thumbnailSrc}
+            alt={artwork.originalName || artwork.filename || "artwork"}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm truncate">{artwork.originalName || artwork.filename || "Arquivo"}</p>
+          {artwork.status && (
+            <p className="text-xs text-muted-foreground">
+              {artwork.status === "APPROVED" ? "Aprovado" : artwork.status === "REPROVED" ? "Reprovado" : "Rascunho"}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }, []);
+
+  // Current layoutFileId to track selected artwork
+  const currentLayoutFileId = useWatch({ control, name: "pricing.layoutFileId" });
 
   // Customers cache for invoice-to multi-select
   const customersCache = useRef<Map<string, any>>(new Map());
@@ -984,26 +1090,102 @@ export const PricingSelector = forwardRef<
         </div>
       )}
 
-      {/* Layout File Upload */}
+      {/* Layout File - Artwork Selector or Upload */}
       {hasPricingItems && (
         <div className="space-y-3">
           <h4 className="font-medium text-sm flex items-center gap-2">
             <IconPhoto className="h-4 w-4" />
             Layout Aprovado
           </h4>
-          <FileUploadField
-            onFilesChange={handleLayoutFileChange}
-            existingFiles={layoutFiles}
-            maxFiles={1}
-            maxSize={10 * 1024 * 1024}
-            acceptedFileTypes={{
-              "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],
-            }}
-            disabled={disabled || readOnly}
-            variant="compact"
-            placeholder="Arraste ou clique para selecionar o layout"
-            showPreview={true}
-          />
+
+          {/* Artwork selector mode (default when artworks exist) */}
+          {artworkOptions.length > 0 && !showLayoutUploadMode && (
+            <>
+              <Combobox<ArtworkOption>
+                value={currentLayoutFileId || ""}
+                onValueChange={handleArtworkSelect}
+                options={artworkOptions}
+                getOptionValue={(a) => a.id}
+                getOptionLabel={(a) => a.originalName || a.filename || "Arquivo"}
+                renderOption={renderArtworkOption}
+                placeholder="Selecionar uma arte existente..."
+                emptyText="Nenhuma arte de imagem encontrada"
+                disabled={disabled || readOnly}
+                clearable
+                searchable
+              />
+
+              {/* Selected artwork full image preview */}
+              {currentLayoutFileId && artworkOptions.some(a => a.id === currentLayoutFileId) && (
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs text-muted-foreground">
+                      {artworkOptions.find(a => a.id === currentLayoutFileId)?.originalName
+                        || artworkOptions.find(a => a.id === currentLayoutFileId)?.filename
+                        || "Layout selecionado"}
+                    </span>
+                    {!(disabled || readOnly) && (
+                      <button
+                        type="button"
+                        onClick={() => handleArtworkSelect(null)}
+                        className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded-md hover:bg-muted"
+                      >
+                        <IconX className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex justify-start">
+                    <img
+                      src={`${getApiBaseUrl()}/files/thumbnail/${currentLayoutFileId}`}
+                      alt="Layout aprovado"
+                      className="max-h-48 rounded-lg shadow-sm object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => {
+                        const selectedArtwork = artworkOptions.find(a => a.id === currentLayoutFileId);
+                        if (selectedArtwork) {
+                          fileViewer.actions.viewFile({
+                            id: selectedArtwork.id,
+                            filename: selectedArtwork.filename,
+                            originalName: selectedArtwork.originalName,
+                            mimetype: selectedArtwork.mimetype || "image/png",
+                            size: selectedArtwork.size,
+                          } as any);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* File upload mode (default when no artworks, or toggled via "Enviar novo") */}
+          {(artworkOptions.length === 0 || showLayoutUploadMode) && (
+            <>
+              {artworkOptions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowLayoutUploadMode(false)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
+                >
+                  <IconArrowLeft className="h-3.5 w-3.5" />
+                  Voltar para seleção de layouts
+                </button>
+              )}
+              <FileUploadField
+                onFilesChange={handleLayoutFileChange}
+                existingFiles={layoutFiles}
+                maxFiles={1}
+                maxSize={10 * 1024 * 1024}
+                acceptedFileTypes={{
+                  "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],
+                }}
+                disabled={disabled || readOnly}
+                variant="compact"
+                placeholder="Arraste ou clique para selecionar o layout"
+                showPreview={true}
+              />
+            </>
+          )}
         </div>
       )}
 

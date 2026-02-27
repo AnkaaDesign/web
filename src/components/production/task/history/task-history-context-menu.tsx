@@ -655,7 +655,7 @@ export function TaskHistoryContextMenu({
                 {canAccessArtworks && (
                   <DropdownMenuItem onClick={handleBulkArts}>
                     <IconPhoto className="mr-2 h-4 w-4" />
-                    <span className="truncate">Adicionar Artes</span>
+                    <span className="truncate">Adicionar Layouts</span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={handleBulkBaseFiles}>
@@ -680,7 +680,7 @@ export function TaskHistoryContextMenu({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleBulkLayout}>
                   <IconLayout className="mr-2 h-4 w-4" />
-                  <span className="truncate">Layout</span>
+                  <span className="truncate">Medidas do Caminhão</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleCopyFromTask}>

@@ -177,7 +177,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
   const getModalTitle = () => {
     if (!operationType) return "";
     const titles: Record<BulkOperationType, string> = {
-      arts: "Adicionar Artes",
+      arts: "Adicionar Layouts",
       documents: "Adicionar Documentos",
       paints: "Adicionar Tintas",
       cuttingPlans: "Adicionar Plano de Corte",
@@ -204,7 +204,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
         return (
           <div className="space-y-4">
             <div>
-              <Label>Selecionar Artes Existentes</Label>
+              <Label>Selecionar Layouts Existentes</Label>
               <Combobox
                 mode="multiple"
                 value={selectedArtIds}

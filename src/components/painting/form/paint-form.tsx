@@ -91,8 +91,12 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     mode === "update" ? (defaultValues?.colorPreview as string | null) || null : null
   );
 
-  // Preview settings state - persisted across step changes
-  const [previewSettings, setPreviewSettings] = useState<Partial<PaintPreviewSettings> | undefined>(undefined);
+  // Preview settings state - persisted across step changes, restored from DB in edit mode
+  const [previewSettings, setPreviewSettings] = useState<Partial<PaintPreviewSettings> | undefined>(
+    mode === "update" && defaultValues?.previewConfig
+      ? defaultValues.previewConfig as Partial<PaintPreviewSettings>
+      : undefined
+  );
 
   // Initialize state from URL parameters (for both create and update modes)
   const initialUrlState = deserializeUrlParamsToForm(searchParams);
@@ -268,6 +272,21 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
 
     // Don't send base64 in data - we'll send the file separately
     delete data.colorPreview;
+
+    // Include previewConfig from the generator settings (exclude baseColor and finish)
+    if (previewGeneratorRef.current) {
+      const generatorSettings = previewGeneratorRef.current.getSettings();
+      (data as any).previewConfig = {
+        lights: generatorSettings.lights,
+        effectIntensity: generatorSettings.effectIntensity,
+        flakeColor: generatorSettings.flakeColor,
+        flipColor: generatorSettings.flipColor,
+      };
+    } else if (previewSettings) {
+      // Fallback to stored settings if generator is not mounted
+      const { baseColor, finish, ...configWithoutFormFields } = previewSettings as any;
+      (data as any).previewConfig = configWithoutFormFields;
+    }
 
     // For create mode, we'll handle formulas separately after paint creation
     // For update mode, formulas are already created and managed through the formula API

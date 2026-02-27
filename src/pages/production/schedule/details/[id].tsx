@@ -794,7 +794,7 @@ const TASK_SECTIONS: SectionConfig[] = [
   },
   {
     id: "layout",
-    label: "Layout do Caminhão",
+    label: "Medidas do Caminhão",
     defaultVisible: true,
     fields: [
       { id: "layoutPreview", label: "Visualização", sectionId: "layout" },
@@ -829,7 +829,7 @@ const TASK_SECTIONS: SectionConfig[] = [
     label: "Arquivos",
     defaultVisible: true,
     fields: [
-      { id: "baseFileFiles", label: "Arquivos do Cliente", sectionId: "files" },
+      { id: "baseFileFiles", label: "Arquivos Base", sectionId: "files" },
       { id: "projectFileFiles", label: "Projetos", sectionId: "files" },
       { id: "checkinFileFiles", label: "Check-in", sectionId: "files" },
       { id: "checkoutFileFiles", label: "Check-out", sectionId: "files" },
@@ -2405,7 +2405,7 @@ export const TaskDetailsPage = () => {
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
                       <IconLayoutGrid className="h-5 w-5 text-muted-foreground" />
-                      Layout do Caminhão
+                      Medidas do Caminhão
                     </CardTitle>
                   </CardHeader>
               <CardContent className="pt-0">
@@ -2621,12 +2621,12 @@ export const TaskDetailsPage = () => {
                     </CardHeader>
                     <CardContent className="pt-0 flex-1">
                       <div className="space-y-6">
-                        {/* Base Files - Arquivos do Cliente */}
+                        {/* Base Files - Arquivos Base */}
                         {hasBaseFiles && (
                           <div>
                             <div className="flex items-center gap-2 mb-3">
                               <IconFile className="h-4 w-4 text-muted-foreground" />
-                              <h4 className="text-sm font-semibold">Arquivos do Cliente</h4>
+                              <h4 className="text-sm font-semibold">Arquivos Base</h4>
                               <Badge variant="outline" className="text-xs">{task.baseFiles!.length}</Badge>
                             </div>
                             <div className={cn(filesViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>

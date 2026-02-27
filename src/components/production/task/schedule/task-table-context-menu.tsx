@@ -122,7 +122,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
             <DropdownMenuSubContent>
               <DropdownMenuItem onClick={() => handleAction("bulkArts")}>
                 <IconPhoto className="mr-2 h-4 w-4" />
-                Adicionar Artes
+                Adicionar Layouts
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleAction("bulkBaseFiles")}>
                 <IconFileText className="mr-2 h-4 w-4" />
@@ -142,7 +142,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleAction("bulkLayout")}>
                 <IconLayout className="mr-2 h-4 w-4" />
-                Layout
+                Medidas do Caminhão
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleAction("copyFromTask")}>

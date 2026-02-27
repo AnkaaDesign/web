@@ -12,6 +12,8 @@ import {
   IconBox,
   IconPalette,
   IconFile,
+  IconFileText,
+  IconPhoto,
   IconRuler,
   IconFileInvoice,
   IconUser,
@@ -1225,154 +1227,7 @@ export const TaskCreateForm = () => {
                   </Card>
                 </AccordionItem>
 
-                {/* 4. Paint - COMMERCIAL/ADMIN */}
-                {showPaint && (
-                  <AccordionItem
-                    value="paint"
-                    id="accordion-item-paint"
-                    className="border border-border rounded-lg"
-                  >
-                    <Card className="border-0">
-                      <AccordionTrigger className="px-0 hover:no-underline">
-                        <CardHeader className="flex-1 py-4">
-                          <CardTitle className="flex items-center gap-2">
-                            <IconPalette className="h-5 w-5" />
-                            Tintas
-                          </CardTitle>
-                        </CardHeader>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <CardContent className="space-y-6 pt-0">
-                          <GeneralPaintingSelector
-                            control={form.control}
-                            disabled={isSubmitting}
-                            userPrivilege={user?.sector?.privileges}
-                          />
-
-                          {/* Logo Paints - ADMIN only */}
-                          {showLogoPaints && (
-                            <LogoPaintsSelector
-                              control={form.control}
-                              disabled={isSubmitting}
-                            />
-                          )}
-                        </CardContent>
-                      </AccordionContent>
-                    </Card>
-                  </AccordionItem>
-                )}
-
-                {/* 5. Layout - LOGISTIC/ADMIN */}
-                {showLayout && (
-                  <AccordionItem
-                    value="layout"
-                    id="accordion-item-layout"
-                    className="border border-border rounded-lg"
-                  >
-                    <Card className="border-0">
-                      <AccordionTrigger className="px-0 hover:no-underline">
-                        <CardHeader className="flex-1 py-4">
-                          <CardTitle className="flex items-center gap-2">
-                            <IconRuler className="h-5 w-5" />
-                            Layout do Caminhão
-                          </CardTitle>
-                        </CardHeader>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <CardContent className="pt-0">
-                          <div className="space-y-4">
-                            {/* Layout Side Selector */}
-                            <div className="flex justify-between items-center">
-                              <div className="flex gap-2">
-                                <Button
-                                  type="button"
-                                  variant={selectedLayoutSide === "left" ? "default" : "outline"}
-                                  size="sm"
-                                  onClick={() => setSelectedLayoutSide("left")}
-                                >
-                                  Motorista
-                                  {modifiedLayoutSides.has("left") && (
-                                    <Badge variant="success" className="ml-2">Modificado</Badge>
-                                  )}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant={selectedLayoutSide === "right" ? "default" : "outline"}
-                                  size="sm"
-                                  onClick={() => setSelectedLayoutSide("right")}
-                                >
-                                  Sapo
-                                  {modifiedLayoutSides.has("right") && (
-                                    <Badge variant="success" className="ml-2">Modificado</Badge>
-                                  )}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant={selectedLayoutSide === "back" ? "default" : "outline"}
-                                  size="sm"
-                                  onClick={() => setSelectedLayoutSide("back")}
-                                >
-                                  Traseira
-                                  {modifiedLayoutSides.has("back") && (
-                                    <Badge variant="success" className="ml-2">Modificado</Badge>
-                                  )}
-                                </Button>
-                              </div>
-
-                              {/* Total Length Display */}
-                              <div className="px-3 py-1 bg-primary/10 rounded-md">
-                                <span className="text-sm text-muted-foreground">Comprimento Total: </span>
-                                <span className="text-sm font-semibold text-foreground">
-                                  {(() => {
-                                    const currentLayout = currentLayoutStates[selectedLayoutSide];
-                                    const sections = currentLayout?.layoutSections;
-                                    if (!sections || sections.length === 0) return "0cm";
-                                    const totalWidthMeters = sections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
-                                    const totalWidthCm = Math.round(totalWidthMeters * 100);
-                                    return totalWidthCm + "cm";
-                                  })()}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Layout Form */}
-                            <LayoutForm
-                              selectedSide={selectedLayoutSide}
-                              layout={currentLayoutStates[selectedLayoutSide]}
-                              validationError={layoutWidthError}
-                              onChange={(side, layoutData) => {
-                                // In the create form, LayoutForm never emits initial state
-                                // because we pass a layout prop with layoutSections.
-                                // Every onChange call is a real user change.
-                                setModifiedLayoutSides(prev => {
-                                  const newSet = new Set(prev);
-                                  newSet.add(side);
-                                  return newSet;
-                                });
-
-                                setHasLayoutChanges(true);
-
-                                setCurrentLayoutStates(prev => ({
-                                  ...prev,
-                                  [side]: layoutData,
-                                }));
-                              }}
-                              onSave={async (layoutData) => {
-                                if (layoutData) {
-                                  setHasLayoutChanges(true);
-                                }
-                              }}
-                              showPhoto={selectedLayoutSide === "back"}
-                              disabled={isSubmitting}
-                            />
-                          </div>
-                        </CardContent>
-                      </AccordionContent>
-                    </Card>
-                  </AccordionItem>
-                )}
-
-                {/* 6. Pricing - COMMERCIAL/ADMIN */}
+                {/* Pricing - COMMERCIAL/ADMIN */}
                 {showPricing && (
                   <AccordionItem
                     value="pricing"
@@ -1404,6 +1259,17 @@ export const TaskCreateForm = () => {
                             layoutFiles={pricingLayoutFiles}
                             onLayoutFilesChange={setPricingLayoutFiles}
                             onItemDeleted={handlePricingItemDeleted}
+                            artworks={uploadedFiles
+                              .filter(f => f.uploaded && f.uploadedFileId)
+                              .map(f => ({
+                                id: f.uploadedFileId!,
+                                filename: f.name,
+                                originalName: f.name,
+                                thumbnailUrl: (f as any).thumbnailUrl,
+                                status: (f as any).status,
+                                mimetype: f.type,
+                                size: f.size,
+                              }))}
                           />
                         </CardContent>
                       </AccordionContent>
@@ -1411,7 +1277,110 @@ export const TaskCreateForm = () => {
                   </AccordionItem>
                 )}
 
-                {/* 7. Base Files - All users */}
+                {/* Medidas do Caminhão - LOGISTIC/ADMIN */}
+                {showLayout && (
+                  <AccordionItem
+                    value="layout"
+                    id="accordion-item-layout"
+                    className="border border-border rounded-lg"
+                  >
+                    <Card className="border-0">
+                      <AccordionTrigger className="px-0 hover:no-underline">
+                        <CardHeader className="flex-1 py-4">
+                          <CardTitle className="flex items-center gap-2">
+                            <IconRuler className="h-5 w-5" />
+                            Medidas do Caminhão
+                          </CardTitle>
+                        </CardHeader>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <CardContent className="pt-0">
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <div className="flex gap-2">
+                                <Button type="button" variant={selectedLayoutSide === "left" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("left")}>
+                                  Motorista
+                                  {modifiedLayoutSides.has("left") && (<Badge variant="success" className="ml-2">Modificado</Badge>)}
+                                </Button>
+                                <Button type="button" variant={selectedLayoutSide === "right" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("right")}>
+                                  Sapo
+                                  {modifiedLayoutSides.has("right") && (<Badge variant="success" className="ml-2">Modificado</Badge>)}
+                                </Button>
+                                <Button type="button" variant={selectedLayoutSide === "back" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("back")}>
+                                  Traseira
+                                  {modifiedLayoutSides.has("back") && (<Badge variant="success" className="ml-2">Modificado</Badge>)}
+                                </Button>
+                              </div>
+                              <div className="px-3 py-1 bg-primary/10 rounded-md">
+                                <span className="text-sm text-muted-foreground">Comprimento Total: </span>
+                                <span className="text-sm font-semibold text-foreground">
+                                  {(() => {
+                                    const currentLayout = currentLayoutStates[selectedLayoutSide];
+                                    const sections = currentLayout?.layoutSections;
+                                    if (!sections || sections.length === 0) return "0cm";
+                                    const totalWidthMeters = sections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
+                                    const totalWidthCm = Math.round(totalWidthMeters * 100);
+                                    return totalWidthCm + "cm";
+                                  })()}
+                                </span>
+                              </div>
+                            </div>
+                            <LayoutForm
+                              selectedSide={selectedLayoutSide}
+                              layout={currentLayoutStates[selectedLayoutSide]}
+                              validationError={layoutWidthError}
+                              onChange={(side, layoutData) => {
+                                setModifiedLayoutSides(prev => { const newSet = new Set(prev); newSet.add(side); return newSet; });
+                                setHasLayoutChanges(true);
+                                setCurrentLayoutStates(prev => ({ ...prev, [side]: layoutData }));
+                              }}
+                              onSave={async (layoutData) => { if (layoutData) { setHasLayoutChanges(true); } }}
+                              showPhoto={selectedLayoutSide === "back"}
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                        </CardContent>
+                      </AccordionContent>
+                    </Card>
+                  </AccordionItem>
+                )}
+
+                {/* Paint - COMMERCIAL/ADMIN */}
+                {showPaint && (
+                  <AccordionItem
+                    value="paint"
+                    id="accordion-item-paint"
+                    className="border border-border rounded-lg"
+                  >
+                    <Card className="border-0">
+                      <AccordionTrigger className="px-0 hover:no-underline">
+                        <CardHeader className="flex-1 py-4">
+                          <CardTitle className="flex items-center gap-2">
+                            <IconPalette className="h-5 w-5" />
+                            Tintas
+                          </CardTitle>
+                        </CardHeader>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <CardContent className="space-y-6 pt-0">
+                          <GeneralPaintingSelector
+                            control={form.control}
+                            disabled={isSubmitting}
+                            userPrivilege={user?.sector?.privileges}
+                          />
+                          {showLogoPaints && (
+                            <LogoPaintsSelector
+                              control={form.control}
+                              disabled={isSubmitting}
+                            />
+                          )}
+                        </CardContent>
+                      </AccordionContent>
+                    </Card>
+                  </AccordionItem>
+                )}
+
+                {/* Base Files - All users */}
                 <AccordionItem
                   value="base-files"
                   id="accordion-item-base-files"
@@ -1421,7 +1390,7 @@ export const TaskCreateForm = () => {
                     <AccordionTrigger className="px-0 hover:no-underline">
                       <CardHeader className="flex-1 py-4">
                         <CardTitle className="flex items-center gap-2">
-                          <IconFile className="h-5 w-5" />
+                          <IconFileText className="h-5 w-5" />
                           Arquivos Base
                         </CardTitle>
                       </CardHeader>
@@ -1454,7 +1423,7 @@ export const TaskCreateForm = () => {
                   </Card>
                 </AccordionItem>
 
-                {/* 8. Artworks - COMMERCIAL/ADMIN */}
+                {/* Artworks/Layouts - COMMERCIAL/ADMIN */}
                 {showArtworks && (
                   <AccordionItem
                     value="artworks"
@@ -1465,8 +1434,8 @@ export const TaskCreateForm = () => {
                       <AccordionTrigger className="px-0 hover:no-underline">
                         <CardHeader className="flex-1 py-4">
                           <CardTitle className="flex items-center gap-2">
-                            <IconFile className="h-5 w-5" />
-                            Artes
+                            <IconPhoto className="h-5 w-5" />
+                            Layouts
                           </CardTitle>
                         </CardHeader>
                       </AccordionTrigger>
@@ -1484,8 +1453,8 @@ export const TaskCreateForm = () => {
                             disabled={isSubmitting}
                             showPreview={true}
                             existingFiles={uploadedFiles}
-                            placeholder="Adicione artes relacionadas à tarefa"
-                            label="Artes anexadas"
+                            placeholder="Adicione layouts relacionados à tarefa"
+                            label="Layouts anexados"
                           />
                         </CardContent>
                       </AccordionContent>
