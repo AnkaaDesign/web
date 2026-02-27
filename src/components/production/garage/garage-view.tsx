@@ -1877,21 +1877,30 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, onG
       const checkDate = new Date(selectedDate);
       checkDate.setHours(0, 0, 0, 0);
 
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isToday = checkDate.getTime() === today.getTime();
+
       return trucksWithLocalPositions.filter(truck => {
         // YARD_EXIT trucks are physically in the exit yard — always show
         // (even when completed, until physically removed)
         if (truck.spot === 'YARD_EXIT') return true;
 
+        const isInGarage = truck.spot && /^B\d_F\d_V\d$/.test(truck.spot);
+
+        // Garage trucks on TODAY are always shown (physically placed)
+        // even if their term has passed
+        if (isInGarage && isToday) return true;
+
         // If term exists, selected date must be before or on the term
-        // This applies to ALL trucks (garage and patio) for forecasting
+        // For future dates, this applies to ALL trucks (garage and yard)
         if (truck.term) {
           const term = new Date(truck.term);
           term.setHours(0, 0, 0, 0);
           if (checkDate > term) return false;
         }
 
-        // Trucks with a garage spot are always shown (physically placed)
-        const isInGarage = truck.spot && /^B\d_F\d_V\d$/.test(truck.spot);
+        // Garage trucks on future dates pass term check, show them
         if (isInGarage) return true;
 
         // For yard/patio trucks: check arrival date range

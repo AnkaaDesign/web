@@ -248,13 +248,13 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     const sections = layout.layoutSections;
     const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
 
-    // For export: convert to mm (multiply by 10)
-    const margin = forExport ? 500 : 50;
-    const extraSpace = forExport ? 1000 : 50;
-    const scaleFactor = forExport ? 10 : 1;
-    const strokeWidth = forExport ? 10 : 1;
-    const fontSize = forExport ? 120 : 12;
-    const arrowSize = forExport ? 50 : 5;
+    // For export: use cm values as mm (no scaling - 840cm becomes 840mm in SVG)
+    const margin = forExport ? 50 : 50;
+    const extraSpace = forExport ? 100 : 50;
+    const scaleFactor = 1; // No scaling - cm values used directly as mm
+    const strokeWidth = forExport ? 1 : 1;
+    const fontSize = forExport ? 12 : 12;
+    const arrowSize = forExport ? 5 : 5;
 
     const scaledWidth = totalWidth * scaleFactor;
     const scaledHeight = height * scaleFactor;
@@ -264,7 +264,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     let svg = forExport
       ? `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${svgWidth}mm" height="${svgHeight}mm" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
-  <text x="${margin}" y="${forExport ? 250 : 25}" font-family="Arial, sans-serif" font-size="${forExport ? 140 : 14}" font-weight="bold" fill="${colors.stroke}">${getSideLabel(side)}</text>`
+  <text x="${margin}" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${colors.stroke}">${getSideLabel(side)}</text>`
       : `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
 
     svg += `
@@ -323,7 +323,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
       const startX = margin + currentPos;
       const endX = margin + currentPos + sectionWidth;
       const centerX = startX + sectionWidth / 2;
-      const dimY = margin + scaledHeight + (forExport ? 200 : 20);
+      const dimY = margin + scaledHeight + 20;
       svg += `
   <path d="M${startX},${dimY} L${endX},${dimY}" fill="none" stroke="${colors.dimension}" stroke-width="${strokeWidth}"/>
   <path d="M${startX},${dimY} L${startX + arrowSize},${dimY - arrowSize * 0.6} L${startX + arrowSize},${dimY + arrowSize * 0.6} Z" fill="${colors.dimension}" stroke="none"/>
@@ -333,7 +333,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     });
 
     // Height dimension using path (no transform)
-    const dimX = margin - (forExport ? 200 : 20);
+    const dimX = margin - 20;
     svg += `
   <path d="M${dimX},${margin} L${dimX},${margin + scaledHeight}" fill="none" stroke="${colors.dimension}" stroke-width="${strokeWidth}"/>
   <path d="M${dimX},${margin} L${dimX - arrowSize * 0.6},${margin + arrowSize} L${dimX + arrowSize * 0.6},${margin + arrowSize} Z" fill="${colors.dimension}" stroke="none"/>
@@ -346,7 +346,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
 
   // Generate a single SVG element for one layout (used in combined SVG for export)
   // Uses <path> instead of <line> and avoids transforms to prevent CorelDRAW locking
-  // All values in mm (scaled by 10 from cm)
+  // All values use cm values as mm (no scaling - 840cm becomes 840mm)
   const generateLayoutElement = (layout: any, side: string, offsetX: number, offsetY: number) => {
     const getSideLabel = (s: string) => {
       switch (s) {
@@ -357,15 +357,14 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
       }
     };
 
-    // Export uses mm (multiply by 10)
-    const scaleFactor = 10;
-    const height = layout.height * 100 * scaleFactor;
+    // Export uses cm values as mm (no scaling)
+    const height = layout.height * 100;
     const sections = layout.layoutSections;
-    const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0) * scaleFactor;
-    const margin = 500; // 50mm margin
-    const strokeWidth = 10;
-    const fontSize = 120;
-    const arrowSize = 50;
+    const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+    const margin = 50; // 50mm margin
+    const strokeWidth = 1;
+    const fontSize = 12;
+    const arrowSize = 5;
 
     const ox = offsetX;
     const oy = offsetY;
@@ -378,13 +377,13 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     };
 
     let svg = `
-  <text x="${ox + margin}" y="${oy + 250}" font-family="Arial, sans-serif" font-size="140" font-weight="bold" fill="${colors.stroke}">${getSideLabel(side)}</text>
+  <text x="${ox + margin}" y="${oy + 25}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${colors.stroke}">${getSideLabel(side)}</text>
   <rect x="${ox + margin}" y="${oy + margin}" width="${totalWidth}" height="${height}" fill="none" stroke="${colors.stroke}" stroke-width="${strokeWidth}"/>`;
 
     // Add section dividers using path
     let currentPos = 0;
     sections.forEach((section: any, index: number) => {
-      const sectionWidth = section.width * 100 * scaleFactor;
+      const sectionWidth = section.width * 100;
       if (index > 0) {
         const prevSection = sections[index - 1];
         if (!section.isDoor && !prevSection.isDoor) {
@@ -399,10 +398,10 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     // Add doors using path
     currentPos = 0;
     sections.forEach((section: any) => {
-      const sectionWidth = section.width * 100 * scaleFactor;
+      const sectionWidth = section.width * 100;
       const sectionX = ox + margin + currentPos;
       if (section.isDoor && section.doorHeight !== null && section.doorHeight !== undefined) {
-        const doorHeightMm = section.doorHeight * 100 * scaleFactor;
+        const doorHeightMm = section.doorHeight * 100;
         const doorTopY = oy + margin + (height - doorHeightMm);
         const doorBottomY = oy + margin + height;
         svg += `
@@ -416,11 +415,11 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     // Add width dimensions using path (labels show cm values)
     currentPos = 0;
     sections.forEach((section: any) => {
-      const sectionWidthMm = section.width * 100 * scaleFactor;
+      const sectionWidthMm = section.width * 100;
       const startX = ox + margin + currentPos;
       const endX = ox + margin + currentPos + sectionWidthMm;
       const centerX = startX + sectionWidthMm / 2;
-      const dimY = oy + margin + height + 200;
+      const dimY = oy + margin + height + 20;
       svg += `
   <path d="M${startX},${dimY} L${endX},${dimY}" fill="none" stroke="${colors.dimension}" stroke-width="${strokeWidth}"/>
   <path d="M${startX},${dimY} L${startX + arrowSize},${dimY - arrowSize * 0.6} L${startX + arrowSize},${dimY + arrowSize * 0.6} Z" fill="${colors.dimension}" stroke="none"/>
@@ -430,7 +429,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     });
 
     // Height dimension using path (label shows cm value)
-    const dimX = ox + margin - 200;
+    const dimX = ox + margin - 20;
     const dimTopY = oy + margin;
     const dimBottomY = oy + margin + height;
     svg += `
@@ -443,23 +442,23 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
   };
 
   // Calculate dimensions for a layout element (in mm for export)
+  // Uses cm values as mm (no scaling - 840cm becomes 840mm)
   const getLayoutDimensions = (layout: any) => {
-    const scaleFactor = 10; // cm to mm
-    const height = layout.height * 100 * scaleFactor;
+    const height = layout.height * 100;
     const sections = layout.layoutSections;
-    const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0) * scaleFactor;
-    const margin = 500; // 50mm margin
-    const extraSpace = 500; // Space for dimensions
+    const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+    const margin = 50; // 50mm margin
+    const extraSpace = 50; // Space for dimensions
     return {
       width: totalWidth + margin * 2 + extraSpace,
       height: height + margin * 2 + extraSpace
     };
   };
 
-  // Generate combined SVG with all layouts (in mm for export)
+  // Generate combined SVG with all layouts (uses cm values as mm)
   const generateCombinedSVG = () => {
-    const gap = 500; // 50mm gap between layouts
-    const margin = 300; // 30mm overall margin
+    const gap = 50; // 50mm gap between layouts
+    const margin = 30; // 30mm overall margin
 
     // Calculate dimensions for each layout
     const leftDims = layouts.leftSideLayout ? getLayoutDimensions(layouts.leftSideLayout) : null;
@@ -525,8 +524,8 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     const taskPrefix = taskName ? `${taskName}-` : '';
     const sections = currentLayout.layoutSections;
     const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-    // Filename shows mm (multiply by 10)
-    link.download = `${taskPrefix}layout-${getSideLabel(selectedSide)}-${Math.round(totalWidth * 10)}mm.svg`;
+    // Filename shows mm (cm values used directly as mm)
+    link.download = `${taskPrefix}layout-${getSideLabel(selectedSide)}-${Math.round(totalWidth)}mm.svg`;
 
     document.body.appendChild(link);
     link.click();

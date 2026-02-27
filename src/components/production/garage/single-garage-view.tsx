@@ -89,6 +89,10 @@ function filterTrucksForDate(trucks: GarageTruck[], areaId: AreaId, date: Date):
   const checkDate = new Date(date);
   checkDate.setHours(0, 0, 0, 0);
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isToday = checkDate.getTime() === today.getTime();
+
   const isYard = isYardArea(areaId);
 
   return trucks.filter((truck) => {
@@ -106,14 +110,19 @@ function filterTrucksForDate(trucks: GarageTruck[], areaId: AreaId, date: Date):
     // (even when completed, until physically removed)
     if (areaId === 'YARD_EXIT') return true;
 
+    // Garage trucks on TODAY are always shown (physically placed)
+    // even if their term has passed
+    if (!isYard && isToday) return true;
+
     // Term check: if term has passed, don't show
+    // For future dates, this applies to ALL trucks (garage and yard)
     if (truck.term) {
       const term = new Date(truck.term);
       term.setHours(0, 0, 0, 0);
       if (checkDate > term) return false;
     }
 
-    // Garage trucks are physically placed — always show (after term check)
+    // Garage trucks on future dates pass term check, show them
     if (!isYard) return true;
 
     // --- Yard trucks (YARD_WAIT) below ---

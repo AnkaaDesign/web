@@ -212,15 +212,6 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
                   </div>
                 )}
 
-                {order.paymentAssignedBy && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconUser className="h-4 w-4" />
-                      Atribuído por
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">{order.paymentAssignedBy.name}</span>
-                  </div>
-                )}
               </div>
             </div>
           </>
