@@ -303,22 +303,25 @@ function DayColumn({
           {isPatio ? (
             // Patio rendering — blue background with truck columns
             <>
+              {/* Patio background — inset by 1px so the 2px stroke isn't clipped by SVG viewport */}
               <rect
-                x={0} y={0}
-                width={svgWidth} height={svgHeight}
+                x={1} y={1}
+                width={svgWidth - 2} height={svgHeight - 2}
                 fill={COLORS.PATIO_FILL}
                 stroke={COLORS.PATIO_STROKE}
                 strokeWidth={2}
                 rx={3}
               />
-              {/* Patio lanes (columns) */}
+              {/* Patio lanes (columns) — centered */}
               {(() => {
                 const laneWidth = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW + 0.4;
                 const laneSpacing = PATIO_CONFIG.LANE_SPACING;
                 const padding = PATIO_CONFIG.PADDING;
                 const cols = patioColumns;
+                const totalLanesWidth = (cols * laneWidth + (cols - 1) * laneSpacing) * scale;
+                const startX = (svgWidth - totalLanesWidth) / 2;
                 return Array.from({ length: cols }).map((_, col) => {
-                  const x = (padding + col * (laneWidth + laneSpacing)) * scale;
+                  const x = startX + col * (laneWidth + laneSpacing) * scale;
                   const y = padding * scale;
                   const w = laneWidth * scale;
                   const h = svgHeight - padding * 2 * scale;
@@ -696,9 +699,9 @@ export function SingleGarageView({
   );
 
   const content = (
-    <div className="w-full h-full overflow-auto p-6">
+    <div className="w-full h-full overflow-auto">
       {/* 5 day columns */}
-      <div className="flex items-start justify-center gap-6">
+      <div className="flex items-start justify-center gap-6 p-6">
         {trucksPerDay.map(({ date, trucks: dayTrucks, isToday: isDayToday }) => (
           <DayColumn
             key={date.toISOString()}

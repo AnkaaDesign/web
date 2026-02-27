@@ -332,8 +332,12 @@ export function calculateAreaLayout(areaId: AreaId, trucks: GarageTruck[], patio
         yPos += patioTrucksList[i].length + COMMON_CONFIG.TRUCK_MIN_SPACING;
       }
 
-      // X position centered in lane
-      const laneX = padding + col * (laneWidth + laneSpacing);
+      // X position centered in lane — center lanes within actual patio width
+      const naturalWidth = padding * 2 + cols * laneWidth + (cols - 1) * laneSpacing;
+      const actualWidth = Math.max(naturalWidth, PATIO_CONFIG.MIN_WIDTH);
+      const totalLanesWidth = cols * laneWidth + (cols - 1) * laneSpacing;
+      const startX = (actualWidth - totalLanesWidth) / 2;
+      const laneX = startX + col * (laneWidth + laneSpacing);
       const xPos = laneX + truckOffset;
 
 
@@ -1065,20 +1069,22 @@ function DroppablePatio({ scale, width, height, columns, yardId, children }: Dro
 
   return (
     <g ref={setNodeRef as any}>
-      {/* Patio background */}
+      {/* Patio background — inset by 1px so the 2px stroke isn't clipped by SVG viewport */}
       <rect
-        x={0}
-        y={0}
-        width={width}
-        height={height}
+        x={1}
+        y={1}
+        width={width - 2}
+        height={height - 2}
         fill={isOver ? COLORS.LANE_HOVER : COLORS.GARAGE_FILL}
         stroke={COLORS.PATIO_STROKE}
         strokeWidth={2}
         rx={4}
       />
-      {/* Visual lane columns - yellow like garage lanes */}
+      {/* Visual lane columns - yellow like garage lanes, centered */}
       {Array.from({ length: columns }).map((_, i) => {
-        const laneX = padding + i * (laneWidth + laneSpacing);
+        const totalLanesWidth = columns * laneWidth + (columns - 1) * laneSpacing;
+        const startX = (width - totalLanesWidth) / 2;
+        const laneX = startX + i * (laneWidth + laneSpacing);
         return (
           <rect
             key={i}
@@ -1235,8 +1241,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
 
   // Calculate uniform scale for all areas
   // The AllGaragesView container has:
-  // - Outer div: p-6 (24px padding on all sides)
-  // - Inner div: gap-10 (40px gap between garages)
+  // - Inner div: p-6 (24px padding on all sides) + gap-10 (40px gap between garages)
   // - Each SVG: +10px extra space (+5px on each side from translate)
 
   const SVG_EXTRA_SPACE = 10; // Extra 10px per SVG (5px padding on each side)
@@ -1484,8 +1489,8 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
   );
 
   const content = (
-    <div className="w-full h-full overflow-auto p-6">
-      <div className="min-w-max min-h-max flex items-start justify-center gap-10">
+    <div className="w-full h-full overflow-auto">
+      <div className="min-w-max min-h-max flex items-start justify-center gap-10 p-6">
         {allAreaLayouts.map(({ areaId, layout }, index) => {
         const dim = areaDimensions[index];
         const count = garageCounts[areaId];
