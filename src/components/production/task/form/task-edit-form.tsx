@@ -1499,10 +1499,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             artworkStatuses: Object.keys(artworkStatuses).length > 0 ? artworkStatuses : 'empty',
           });
 
-          // Always send file IDs arrays when any file operation occurs
-          // Backend will replace all files with these IDs + newly uploaded files
-          // FormData helper properly handles empty arrays (converts to `field[]` with empty string)
-          dataForFormData.artworkIds = currentArtworkIds;
+          // Only send artworkIds if the user actually modified artworks
+          // Sending it unconditionally causes accidental clearing when sectors without artwork access submit the form
+          // Financial users cannot see/edit artworks (section is hidden), so they should never send artworkIds
+          // This matches the pattern used for baseFileIds and other file types
+          if (!isFinancialUser && (hasArtworkFileChanges || newArtworkFiles.length > 0 || hasArtworkStatusChanges)) {
+            dataForFormData.artworkIds = currentArtworkIds;
+          }
           // Only send baseFileIds if the user actually modified base files
           // Sending it unconditionally causes accidental clearing when other sectors submit the form
           if (hasBaseFileChanges || newBaseFiles.length > 0) {
@@ -1511,16 +1514,21 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           if (hasProjectFileChanges || newProjectFiles.length > 0) {
             dataForFormData.projectFileIds = currentProjectFileIds;
           }
-          if (hasCheckinFileChanges || newCheckinFiles.length > 0) {
+          // Checkin/checkout files are managed by Logistic, not Commercial
+          if (!isCommercialUser && (hasCheckinFileChanges || newCheckinFiles.length > 0)) {
             dataForFormData.checkinFileIds = currentCheckinFileIds;
           }
-          if (hasCheckoutFileChanges || newCheckoutFiles.length > 0) {
+          if (!isCommercialUser && (hasCheckoutFileChanges || newCheckoutFiles.length > 0)) {
             dataForFormData.checkoutFileIds = currentCheckoutFileIds;
           }
-          dataForFormData.budgetIds = currentBudgetIds;
-          dataForFormData.invoiceIds = currentInvoiceIds;
-          dataForFormData.receiptIds = currentReceiptIds;
-          dataForFormData.bankSlipIds = currentBankSlipIds;
+          // Only send financial document IDs if the user has permission to modify them
+          // Commercial Sector users cannot modify budgets, invoices, receipts, or bank slips
+          if (!isCommercialUser) {
+            dataForFormData.budgetIds = currentBudgetIds;
+            dataForFormData.invoiceIds = currentInvoiceIds;
+            dataForFormData.receiptIds = currentReceiptIds;
+            dataForFormData.bankSlipIds = currentBankSlipIds;
+          }
 
           // Note: artworkStatuses will be added later (around line 1125) after processing
           // This ensures we use the state variable directly, not a rebuilt version
@@ -1870,23 +1878,28 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           if (hasProjectFileChanges) {
             (submitData as any).projectFileIds = [...currentProjectFileIds];
           }
-          if (hasCheckinFileChanges) {
+          // Checkin/checkout files are managed by Logistic, not Commercial
+          if (!isCommercialUser && hasCheckinFileChanges) {
             (submitData as any).checkinFileIds = [...currentCheckinFileIds];
           }
-          if (hasCheckoutFileChanges) {
+          if (!isCommercialUser && hasCheckoutFileChanges) {
             (submitData as any).checkoutFileIds = [...currentCheckoutFileIds];
           }
-          if (currentBudgetIds.length > 0 || taskHadBudgets) {
-            submitData.budgetIds = [...currentBudgetIds];
-          }
-          if (currentInvoiceIds.length > 0 || taskHadInvoices) {
-            submitData.invoiceIds = [...currentInvoiceIds];
-          }
-          if (currentReceiptIds.length > 0 || taskHadReceipts) {
-            submitData.receiptIds = [...currentReceiptIds];
-          }
-          if (currentBankSlipIds.length > 0 || taskHadBankSlips) {
-            submitData.bankSlipIds = [...currentBankSlipIds];
+          // Only send financial document IDs if the user has permission to modify them
+          // Commercial Sector users cannot modify budgets, invoices, receipts, or bank slips
+          if (!isCommercialUser) {
+            if (currentBudgetIds.length > 0 || taskHadBudgets) {
+              submitData.budgetIds = [...currentBudgetIds];
+            }
+            if (currentInvoiceIds.length > 0 || taskHadInvoices) {
+              submitData.invoiceIds = [...currentInvoiceIds];
+            }
+            if (currentReceiptIds.length > 0 || taskHadReceipts) {
+              submitData.receiptIds = [...currentReceiptIds];
+            }
+            if (currentBankSlipIds.length > 0 || taskHadBankSlips) {
+              submitData.bankSlipIds = [...currentBankSlipIds];
+            }
           }
 
           // CRITICAL: Clean up malformed data before sending

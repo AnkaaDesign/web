@@ -139,10 +139,10 @@ export function PublicBudgetPage() {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <IconLoader2 className="h-12 w-12 animate-spin text-[#1a8b3d] mx-auto mb-4" />
-          <p className="text-gray-600">Carregando orçamento...</p>
+          <p className="text-gray-600 dark:text-gray-300">Carregando orçamento...</p>
         </div>
       </div>
     );
@@ -151,14 +151,14 @@ export function PublicBudgetPage() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardContent className="pt-6 text-center">
-            <IconAlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h1 className="text-xl font-bold text-gray-900 mb-2">
+            <IconAlertCircle className="h-16 w-16 text-red-500 dark:text-red-400 mx-auto mb-4" />
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
               Orçamento Indisponível
             </h1>
-            <p className="text-gray-600">{error}</p>
+            <p className="text-gray-600 dark:text-gray-300">{error}</p>
           </CardContent>
         </Card>
       </div>
