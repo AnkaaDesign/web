@@ -568,3 +568,75 @@ export interface UnifiedDashboardResponse {
   message: string;
   data?: UnifiedDashboardData;
 }
+
+// Home Dashboard Types
+export interface HomeDashboardTask {
+  id: string;
+  name: string | null;
+  serialNumber: string | null;
+  plate: string | null;
+  status: string;
+  term: string | null;
+  forecastDate: string | null;
+  customerName: string | null;
+  sectorName: string | null;
+}
+
+export interface HomeDashboardServiceOrder {
+  id: string;
+  description: string;
+  type: string;
+  status: string;
+  taskId: string;
+  taskName: string | null;
+  taskSerialNumber: string | null;
+  taskForecastDate: string | null;
+  assignedToName: string | null;
+  createdAt: string;
+}
+
+export interface HomeDashboardLowStockItem {
+  id: string;
+  name: string;
+  quantity: number;
+  reorderPoint: number;
+  maxQuantity: number | null;
+  brandName: string | null;
+  monthlyConsumption: number;
+}
+
+export interface HomeDashboardMessage {
+  id: string;
+  title: string;
+  content: any;
+  createdAt: string;
+  publishedAt: string | null;
+  viewedAt: string | null;
+}
+
+export interface HomeDashboardData {
+  sector: string;
+  tasksCloseDeadline?: HomeDashboardTask[];
+  tasksCloseForecast?: HomeDashboardTask[];
+  openServiceOrders?: HomeDashboardServiceOrder[];
+  lowStockItems?: HomeDashboardLowStockItem[];
+  completedTasks?: HomeDashboardTask[];
+  openFinancialSOs?: HomeDashboardServiceOrder[];
+  recentMessages?: HomeDashboardMessage[];
+  counts: {
+    tasksCloseDeadline?: number;
+    tasksCloseForecast?: number;
+    openServiceOrders?: number;
+    lowStockItems?: number;
+    completedTasks?: number;
+    openFinancialSOs?: number;
+    recentMessages?: number;
+    unreadMessages?: number;
+  };
+}
+
+export interface HomeDashboardResponse {
+  success: boolean;
+  message: string;
+  data?: HomeDashboardData;
+}

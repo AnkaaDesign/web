@@ -625,6 +625,7 @@ export function TaskHistoryList({
         {/* Single table */}
         <div className="flex-1 min-h-0 overflow-hidden">
           <TaskHistoryTable
+            refetchOnWindowFocus="always"
             filters={queryFilters}
             visibleColumns={visibleColumns}
             onDataChange={handleTableDataChange}

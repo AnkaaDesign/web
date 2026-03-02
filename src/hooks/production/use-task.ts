@@ -40,6 +40,7 @@ import { layoutSectionQueryKeys } from "../administration/use-layout-section";
 // -------------------------------------
 interface UseTasksParams extends Partial<TaskGetManyFormData> {
   enabled?: boolean;
+  refetchOnWindowFocus?: boolean | 'always';
 }
 
 interface UseTaskDetailParams {
@@ -89,7 +90,7 @@ export const useTasksInfinite = (params?: Partial<TaskGetManyFormData>) => {
 // -------------------------------------
 export function useTasks(params?: UseTasksParams) {
   const queryClient = useQueryClient();
-  const { enabled = true, ...restParams } = params ?? {};
+  const { enabled = true, refetchOnWindowFocus, ...restParams } = params ?? {};
 
   // Include pagination in query key for proper pagination support
   // Each page should be a separate cached query
@@ -106,6 +107,7 @@ export function useTasks(params?: UseTasksParams) {
     enabled,
     staleTime: 1000 * 60 * 5, // 5 minutes
     retry: 2,
+    refetchOnWindowFocus,
   });
 
   const refresh = () => {

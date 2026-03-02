@@ -88,9 +88,11 @@ export function SectionVisibilityManager({
                       <div className="text-sm font-semibold">
                         {section.label}
                       </div>
-                      <p className="text-xs text-muted-foreground group-hover:text-accent-foreground/90 mt-0.5 transition-colors">
-                        {visibleFieldsInSection}/{section.fields.length} campos
-                      </p>
+                      {section.fields.length > 0 && (
+                        <p className="text-xs text-muted-foreground group-hover:text-accent-foreground/90 mt-0.5 transition-colors">
+                          {visibleFieldsInSection}/{section.fields.length} campos
+                        </p>
+                      )}
                     </div>
                     <Switch
                       id={`section-${section.id}`}

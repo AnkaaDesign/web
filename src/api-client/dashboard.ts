@@ -6,6 +6,7 @@ import type {
   PaintDashboardResponse,
   ProductionDashboardResponse,
   UnifiedDashboardResponse,
+  HomeDashboardResponse,
 } from "../types";
 import type {
   InventoryDashboardQueryFormData,
@@ -14,6 +15,7 @@ import type {
   PaintDashboardQueryFormData,
   ProductionDashboardQueryFormData,
   UnifiedDashboardQueryFormData,
+  HomeDashboardQueryFormData,
 } from "../schemas";
 
 export const dashboardService = {
@@ -63,6 +65,14 @@ export const dashboardService = {
   getUnifiedDashboard: (params?: UnifiedDashboardQueryFormData) =>
     apiClient
       .get<UnifiedDashboardResponse>("/dashboards/unified", {
+        params,
+      })
+      .then((res) => res.data),
+
+  // Home Dashboard
+  getHomeDashboard: (params?: HomeDashboardQueryFormData) =>
+    apiClient
+      .get<HomeDashboardResponse>("/dashboards/home", {
         params,
       })
       .then((res) => res.data),

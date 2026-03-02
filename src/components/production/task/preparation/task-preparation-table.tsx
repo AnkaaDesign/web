@@ -43,6 +43,8 @@ interface TaskPreparationTableProps {
   getColumnWidth: (columnId: string) => number;
   /** Shared column width setter */
   setColumnWidth: (columnId: string, width: number) => void;
+  /** Override refetchOnWindowFocus for the underlying query */
+  refetchOnWindowFocus?: boolean | 'always';
 }
 
 export function TaskPreparationTable({
@@ -65,6 +67,7 @@ export function TaskPreparationTable({
   allOrderedTaskIds,
   getColumnWidth,
   setColumnWidth,
+  refetchOnWindowFocus,
 }: TaskPreparationTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -131,7 +134,7 @@ export function TaskPreparationTable({
   }, [filters, sortConfigs, showSelectedOnly, selectedIds]);
 
   // Fetch tasks
-  const { data, isLoading, error } = useTasks(queryParams);
+  const { data, isLoading, error } = useTasks({ ...queryParams, refetchOnWindowFocus });
   const tasks = data?.data || [];
   const totalRecords = data?.meta?.totalRecords || 0;
 

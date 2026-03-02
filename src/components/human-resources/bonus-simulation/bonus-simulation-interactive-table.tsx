@@ -387,8 +387,17 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   }, [filteredUsers, sortColumn, sortDirection]);
 
   // Calculate metrics
-  // For simulation: ALL filtered users are considered "eligible"
-  const eligibleUserCount = filteredUsers.length;
+  const hasManualFilters =
+    filters.sectorIds.length > 0 ||
+    filters.positionIds.length > 0 ||
+    filters.includeUserIds.length > 0 ||
+    filters.excludeUserIds.length > 0;
+
+  // Use backend eligible count (accurate, queries all users without limit) when no manual filters are applied
+  // Falls back to filtered users count when manual filters are active or backend data isn't available
+  const eligibleUserCount = !hasManualFilters && liveTaskInfo?.eligibleUsers
+    ? liveTaskInfo.eligibleUsers
+    : filteredUsers.length;
 
   // Average is calculated using eligible users (not included users)
   // This matches how the backend calculates: total tasks / total eligible users
@@ -574,12 +583,6 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
       return user;
     }));
   };
-
-  const hasManualFilters =
-    filters.sectorIds.length > 0 ||
-    filters.positionIds.length > 0 ||
-    filters.includeUserIds.length > 0 ||
-    filters.excludeUserIds.length > 0;
 
   const hasActiveFilters =
     hasManualFilters ||

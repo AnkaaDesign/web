@@ -1,0 +1,68 @@
+import type { HomeDashboardData } from "../../types";
+import { SECTOR_PRIVILEGES } from "../../constants";
+import { TaskDeadlineList } from "./task-deadline-list";
+import { ServiceOrderList } from "./service-order-list";
+import { LowStockList } from "./low-stock-list";
+import { CompletedTasksList } from "./completed-tasks-list";
+
+interface HomeDashboardSectionProps {
+  data: HomeDashboardData;
+  sector?: string;
+  isSectionVisible?: (sectionId: string) => boolean;
+}
+
+export function HomeDashboardSection({ data, sector, isSectionVisible }: HomeDashboardSectionProps) {
+  const isVisible = (id: string) => !isSectionVisible || isSectionVisible(id);
+
+  const hasContent =
+    (data.tasksCloseDeadline && data.tasksCloseDeadline.length > 0) ||
+    (data.openServiceOrders && data.openServiceOrders.length > 0) ||
+    (data.tasksCloseForecast && data.tasksCloseForecast.length > 0) ||
+    (data.lowStockItems && data.lowStockItems.length > 0) ||
+    (data.completedTasks && data.completedTasks.length > 0) ||
+    (data.openFinancialSOs && data.openFinancialSOs.length > 0);
+
+  if (!hasContent) return null;
+
+  const deadlineViewAllLink = sector === SECTOR_PRIVILEGES.PRODUCTION
+    ? "/producao/cronograma"
+    : "/producao/agenda";
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {isVisible("tasksCloseDeadline") && data.tasksCloseDeadline && data.tasksCloseDeadline.length > 0 && (
+        <TaskDeadlineList
+          tasks={data.tasksCloseDeadline}
+          title="Tarefas com Prazo Hoje"
+          variant="deadline"
+          viewAllLink={deadlineViewAllLink}
+        />
+      )}
+
+      {isVisible("openServiceOrders") && data.openServiceOrders && data.openServiceOrders.length > 0 && (
+        <ServiceOrderList orders={data.openServiceOrders} title="Ordens de Serviço Abertas" />
+      )}
+
+      {isVisible("tasksCloseForecast") && data.tasksCloseForecast && data.tasksCloseForecast.length > 0 && (
+        <TaskDeadlineList
+          tasks={data.tasksCloseForecast}
+          title="Tarefas com Liberação Próxima"
+          variant="forecast"
+          viewAllLink="/producao/agenda"
+        />
+      )}
+
+      {isVisible("lowStockItems") && data.lowStockItems && data.lowStockItems.length > 0 && (
+        <LowStockList items={data.lowStockItems} totalCount={data.counts.lowStockItems} />
+      )}
+
+      {isVisible("completedTasks") && data.completedTasks && data.completedTasks.length > 0 && (
+        <CompletedTasksList tasks={data.completedTasks} />
+      )}
+
+      {isVisible("openFinancialSOs") && data.openFinancialSOs && data.openFinancialSOs.length > 0 && (
+        <ServiceOrderList orders={data.openFinancialSOs} title="OS Financeiras Pendentes" />
+      )}
+    </div>
+  );
+}

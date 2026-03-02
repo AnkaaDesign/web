@@ -41,6 +41,8 @@ interface TaskHistoryTableProps {
   onExpandedGroupsChange?: (expandedGroups: Set<string>) => void;
   /** Callback to report group IDs to parent */
   onGroupsDetected?: (groupIds: string[], hasGroups: boolean) => void;
+  /** Override refetchOnWindowFocus for the underlying query */
+  refetchOnWindowFocus?: boolean | 'always';
 }
 
 export function TaskHistoryTable({
@@ -58,6 +60,7 @@ export function TaskHistoryTable({
   externalExpandedGroups: _externalExpandedGroups,
   onExpandedGroupsChange: _onExpandedGroupsChange,
   onGroupsDetected,
+  refetchOnWindowFocus,
 }: TaskHistoryTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -236,7 +239,7 @@ export function TaskHistoryTable({
   }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds]);
 
   // Fetch data
-  const { data: response, isLoading, error } = useTasks(queryParams);
+  const { data: response, isLoading, error } = useTasks({ ...queryParams, refetchOnWindowFocus });
 
   const tasks = response?.data || [];
   const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;

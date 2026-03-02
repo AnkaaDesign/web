@@ -8,6 +8,7 @@ import type {
   PaintDashboardResponse,
   ProductionDashboardResponse,
   UnifiedDashboardResponse,
+  HomeDashboardResponse,
 } from "../../types";
 import type {
   InventoryDashboardQueryFormData,
@@ -16,6 +17,7 @@ import type {
   PaintDashboardQueryFormData,
   ProductionDashboardQueryFormData,
   UnifiedDashboardQueryFormData,
+  HomeDashboardQueryFormData,
 } from "../../schemas";
 
 // Query keys
@@ -27,6 +29,7 @@ export const dashboardQueryKeys = {
   paint: (params?: PaintDashboardQueryFormData) => [...dashboardQueryKeys.all, "paint", params] as const,
   production: (params?: ProductionDashboardQueryFormData) => [...dashboardQueryKeys.all, "production", params] as const,
   unified: (params?: UnifiedDashboardQueryFormData) => [...dashboardQueryKeys.all, "unified", params] as const,
+  home: (params?: HomeDashboardQueryFormData) => [...dashboardQueryKeys.all, "home", params] as const,
 };
 
 // Inventory Dashboard Hook
@@ -104,6 +107,18 @@ export const useUnifiedDashboard = (params?: UnifiedDashboardQueryFormData, opti
   });
 };
 
+// Home Dashboard Hook
+export const useHomeDashboard = (params?: HomeDashboardQueryFormData, options?: Omit<UseQueryOptions<HomeDashboardResponse, Error>, "queryKey" | "queryFn">) => {
+  return useQuery({
+    queryKey: dashboardQueryKeys.home(params),
+    queryFn: async () => {
+      return await dashboardService.getHomeDashboard(params);
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    ...options,
+  });
+};
+
 // Export all dashboard hooks
 export const dashboardHooks = {
   useInventoryDashboard,
@@ -112,4 +127,5 @@ export const dashboardHooks = {
   usePaintDashboard,
   useProductionDashboard,
   useUnifiedDashboard,
+  useHomeDashboard,
 };

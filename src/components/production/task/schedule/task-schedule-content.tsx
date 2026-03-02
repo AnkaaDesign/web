@@ -102,6 +102,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   // Load tasks data with filters applied
   const { data: tasksData, isLoading } = useTasks({
     ...filters,
+    refetchOnWindowFocus: 'always',
     include: {
       sector: true,
       customer: true,

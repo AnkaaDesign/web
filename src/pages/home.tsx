@@ -1,11 +1,17 @@
 import { useAuth } from "../contexts/auth-context";
 import { useFavorites } from "../contexts/favorites-context";
 import { SECTOR_PRIVILEGES } from "../constants";
-import { getMostAccessedPages, getRecentPages, getIconInfoByPath } from "../utils";
-import { IconStar, IconClock, IconFlame } from "@tabler/icons-react";
+import { getIconInfoByPath } from "../utils";
+import { IconStar } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePageTracker } from "../hooks/common/use-page-tracker";
+import { useHomeDashboard } from "../hooks/common/use-dashboard";
+import { usePrivileges } from "../hooks/common/use-privileges";
+import { useSectionVisibility } from "../hooks/common/use-section-visibility";
+import type { SectionConfig } from "../hooks/common/use-section-visibility";
+import { SectionVisibilityManager } from "../components/ui/section-visibility-manager";
+import { HomeDashboardSection, HomeDashboardSkeleton, TimeEntriesCard, RecentMessagesList } from "../components/home-dashboard";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -14,12 +20,23 @@ function getGreeting(): string {
   return "Boa noite";
 }
 
+/** All possible home dashboard sections — filtered at runtime based on user data */
+const ALL_HOME_SECTIONS: Record<string, SectionConfig> = {
+  favorites: { id: "favorites", label: "Favoritos", defaultVisible: true, fields: [] },
+  tasksCloseDeadline: { id: "tasksCloseDeadline", label: "Tarefas com Prazo Hoje", defaultVisible: true, fields: [] },
+  openServiceOrders: { id: "openServiceOrders", label: "Ordens de Serviço Abertas", defaultVisible: true, fields: [] },
+  tasksCloseForecast: { id: "tasksCloseForecast", label: "Tarefas com Liberação Próxima", defaultVisible: true, fields: [] },
+  lowStockItems: { id: "lowStockItems", label: "Estoque Baixo", defaultVisible: true, fields: [] },
+  completedTasks: { id: "completedTasks", label: "Tarefas Concluídas", defaultVisible: true, fields: [] },
+  openFinancialSOs: { id: "openFinancialSOs", label: "OS Financeiras Pendentes", defaultVisible: true, fields: [] },
+  timeEntries: { id: "timeEntries", label: "Ponto da Semana", defaultVisible: true, fields: [] },
+  recentMessages: { id: "recentMessages", label: "Mensagens Recentes", defaultVisible: true, fields: [] },
+};
+
 export function HomePage() {
   const { user } = useAuth();
   const { favorites } = useFavorites();
   const navigate = useNavigate();
-  const [mostAccessedPages, setMostAccessedPages] = useState(getMostAccessedPages(12));
-  const [recentPages, setRecentPages] = useState(getRecentPages(12));
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -29,21 +46,64 @@ export function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Track page access
   usePageTracker({
     title: "Página Inicial",
     icon: "home",
   });
 
-  useEffect(() => {
-    // Update most accessed and recent pages when component mounts
-    setMostAccessedPages(getMostAccessedPages(12));
-    setRecentPages(getRecentPages(12));
-  }, []);
+  const { data: dashboardResponse, isLoading: isDashboardLoading } = useHomeDashboard({ platform: "web" });
+  const { currentPrivilege } = usePrivileges();
+  const isAdmin = currentPrivilege === SECTOR_PRIVILEGES.ADMIN;
+  const needsTimeEntries = currentPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
+    currentPrivilege === SECTOR_PRIVILEGES.DESIGNER ||
+    currentPrivilege === SECTOR_PRIVILEGES.PRODUCTION ||
+    currentPrivilege === SECTOR_PRIVILEGES.WAREHOUSE;
+
+  const dashboardData = dashboardResponse?.data;
+
+  // Build available sections based on what data the API returned for this user
+  const availableSections = useMemo(() => {
+    const sections: SectionConfig[] = [];
+
+    // Favorites only when user has some
+    if (favorites.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.favorites);
+    }
+
+    if (dashboardData?.tasksCloseDeadline && dashboardData.tasksCloseDeadline.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.tasksCloseDeadline);
+    }
+    if (dashboardData?.openServiceOrders && dashboardData.openServiceOrders.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.openServiceOrders);
+    }
+    if (dashboardData?.tasksCloseForecast && dashboardData.tasksCloseForecast.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.tasksCloseForecast);
+    }
+    if (dashboardData?.lowStockItems && dashboardData.lowStockItems.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.lowStockItems);
+    }
+    if (dashboardData?.completedTasks && dashboardData.completedTasks.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.completedTasks);
+    }
+    if (dashboardData?.openFinancialSOs && dashboardData.openFinancialSOs.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.openFinancialSOs);
+    }
+    if (needsTimeEntries) {
+      sections.push(ALL_HOME_SECTIONS.timeEntries);
+    }
+    if (dashboardData?.recentMessages && dashboardData.recentMessages.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.recentMessages);
+    }
+
+    return sections;
+  }, [dashboardData, needsTimeEntries, favorites.length]);
+
+  const sectionVisibility = useSectionVisibility("home-dashboard-visibility", availableSections);
+
+  const isVisible = (id: string) => !isAdmin || sectionVisibility.isSectionVisible(id);
 
   const hasBasicPrivilegeOnly = user?.sector?.privileges === SECTOR_PRIVILEGES.BASIC || !user?.sector;
 
-  // Welcome screen for users with only basic privilegess
   if (hasBasicPrivilegeOnly) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
@@ -56,9 +116,8 @@ export function HomePage() {
     );
   }
 
-  // Regular home page content
   return (
-    <div className="m-4 p-4 rounded-xl flex flex-col gap-4 bg-card border border-border shadow-sm min-h-[calc(100vh-6rem)]">
+    <div className="m-4 p-4 rounded-xl flex flex-col gap-5 bg-card border border-border shadow-sm min-h-[calc(100vh-6rem)]">
       {/* Welcome Header */}
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -74,30 +133,41 @@ export function HomePage() {
             })}
           </p>
         </div>
-        <span className="text-sm sm:text-base md:text-lg text-secondary-foreground">
-          {currentTime.toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })}
-        </span>
+        <div className="flex items-center gap-2">
+          {isAdmin && !isDashboardLoading && availableSections.length > 0 && (
+            <SectionVisibilityManager
+              sections={availableSections}
+              visibilityState={sectionVisibility.visibilityState}
+              onToggleSection={sectionVisibility.toggleSection}
+              onToggleField={sectionVisibility.toggleField}
+              onReset={sectionVisibility.resetToDefaults}
+            />
+          )}
+          <span className="text-sm sm:text-base md:text-lg text-secondary-foreground tabular-nums w-[5.5em] text-right">
+            {currentTime.toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+          </span>
+        </div>
       </div>
 
-      {/* Favoritos - horizontal scroll */}
-      <div className="space-y-2">
-        <h2 className="text-lg font-semibold text-secondary-foreground flex items-center gap-2">
-          <IconStar className="h-5 w-5 text-yellow-500" />
-          Favoritos
-        </h2>
-        {favorites.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto pb-2">
+      {/* Favoritos - FIRST (hidden when empty) */}
+      {isVisible("favorites") && favorites.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <IconStar className="h-4 w-4 text-yellow-500" />
+            <h3 className="text-base font-semibold text-secondary-foreground">Favoritos</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
             {favorites.map((fav) => {
               const iconInfo = getIconInfoByPath(fav.path);
               const IconComponent = iconInfo.icon;
               return (
                 <div
                   key={fav.id}
-                  className="cursor-pointer hover:shadow-sm transition-shadow duration-200 rounded-lg bg-secondary border border-border flex-shrink-0 w-36 p-4"
+                  className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] rounded-lg bg-secondary border border-border p-4"
                   onClick={() => navigate(fav.path)}
                 >
                   <div className={`${iconInfo.color} text-white p-3 rounded-lg inline-block mb-2`}>
@@ -108,73 +178,30 @@ export function HomePage() {
               );
             })}
           </div>
-        ) : (
-          <p className="text-muted-foreground text-sm py-4">Marque páginas como favoritas para acessá-las rapidamente.</p>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Recentes - 2 rows */}
-      <div className="space-y-2">
-        <h2 className="text-lg font-semibold text-secondary-foreground flex items-center gap-2">
-          <IconClock className="h-5 w-5 text-blue-500" />
-          Recentes
-        </h2>
-        {recentPages.length > 0 ? (
-          <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-            {recentPages.map((page) => {
-              const iconInfo = getIconInfoByPath(page.path);
-              const IconComponent = iconInfo.icon;
-              return (
-                <div
-                  key={page.path}
-                  className="cursor-pointer hover:shadow-sm transition-shadow duration-200 rounded-lg bg-secondary border border-border p-4"
-                  onClick={() => navigate(page.path)}
-                >
-                  <div className={`${iconInfo.color} text-white p-3 rounded-lg inline-block mb-2`}>
-                    <IconComponent className="h-6 w-6" />
-                  </div>
-                  <h3 className="font-semibold text-sm text-secondary-foreground">{page.title}</h3>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-muted-foreground text-sm py-4">Navegue pelo sistema para ver suas páginas recentes aqui.</p>
-        )}
-      </div>
+      {/* Dashboard Section (tables grid) */}
+      {isDashboardLoading ? (
+        <HomeDashboardSkeleton />
+      ) : (
+        dashboardData && (
+          <HomeDashboardSection
+            data={dashboardData}
+            sector={currentPrivilege || undefined}
+            isSectionVisible={isAdmin ? sectionVisibility.isSectionVisible : undefined}
+          />
+        )
+      )}
+      {isVisible("timeEntries") && needsTimeEntries && <TimeEntriesCard />}
 
-      {/* Mais Acessadas - 2 rows */}
-      <div className="space-y-2">
-        <h2 className="text-lg font-semibold text-secondary-foreground flex items-center gap-2">
-          <IconFlame className="h-5 w-5 text-orange-500" />
-          Mais Acessadas
-        </h2>
-        {mostAccessedPages.length > 0 ? (
-          <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-            {mostAccessedPages.map((page) => {
-              const iconInfo = getIconInfoByPath(page.path);
-              const IconComponent = iconInfo.icon;
-              return (
-                <div
-                  key={page.path}
-                  className="cursor-pointer hover:shadow-sm transition-shadow duration-200 rounded-lg bg-secondary border border-border p-4"
-                  onClick={() => navigate(page.path)}
-                >
-                  <div className={`${iconInfo.color} text-white p-3 rounded-lg inline-block mb-2`}>
-                    <IconComponent className="h-6 w-6" />
-                  </div>
-                  <h3 className="font-semibold text-sm text-secondary-foreground">{page.title}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {page.count} {page.count === 1 ? "acesso" : "acessos"}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-muted-foreground text-sm py-4">Navegue pelo sistema para ver suas páginas mais acessadas aqui.</p>
-        )}
-      </div>
+      {/* Recent Messages - card layout */}
+      {isVisible("recentMessages") && dashboardData?.recentMessages && dashboardData.recentMessages.length > 0 && (
+        <RecentMessagesList
+          messages={dashboardData.recentMessages}
+          unreadCount={dashboardData.counts.unreadMessages}
+        />
+      )}
     </div>
   );
 }

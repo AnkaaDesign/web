@@ -767,6 +767,7 @@ export function TaskPreparationView({
             {visibleTables.includes("completed") && (
               <div>
                 <TaskPreparationTable
+                  refetchOnWindowFocus="always"
                   filters={{
                     ...queryFilters,
                     status: [TASK_STATUS.COMPLETED],
@@ -797,6 +798,7 @@ export function TaskPreparationView({
             {visibleTables.includes("production") && (
               <div>
                 <TaskPreparationTable
+                  refetchOnWindowFocus="always"
                   filters={{
                     ...queryFilters,
                     status: [TASK_STATUS.IN_PRODUCTION],
@@ -827,6 +829,7 @@ export function TaskPreparationView({
             {visibleTables.includes("preparation") && (
               <div>
                 <TaskPreparationTable
+                  refetchOnWindowFocus="always"
                   filters={{
                     ...queryFilters,
                     status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION],
@@ -859,6 +862,7 @@ export function TaskPreparationView({
             {visibleTables.includes("production") && (
               <div>
                 <TaskPreparationTable
+                  refetchOnWindowFocus="always"
                   filters={{
                     ...queryFilters,
                     status: [TASK_STATUS.IN_PRODUCTION],
@@ -889,6 +893,7 @@ export function TaskPreparationView({
             {visibleTables.includes("preparation") && (
               <div>
                 <TaskPreparationTable
+                  refetchOnWindowFocus="always"
                   filters={{
                     ...queryFilters,
                     status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION],
@@ -919,6 +924,7 @@ export function TaskPreparationView({
             {visibleTables.includes("completed") && (
               <div>
                 <TaskPreparationTable
+                  refetchOnWindowFocus="always"
                   filters={{
                     ...queryFilters,
                     status: [TASK_STATUS.COMPLETED],
