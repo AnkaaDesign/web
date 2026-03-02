@@ -243,7 +243,7 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
                   Chassi
                 </span>
                 <span className="text-sm font-semibold text-foreground uppercase">
-                  {(task.truck as any).chassisNumber.slice(-5)}
+                  {(task.truck as any).chassisNumber}
                 </span>
               </div>
             )}

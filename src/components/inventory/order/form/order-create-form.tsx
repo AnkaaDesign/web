@@ -418,21 +418,21 @@ export const OrderCreateForm = () => {
   }, [setShowInactive, setCategoryIds, setBrandIds, setSupplierIds]);
 
   // Handle file changes
+  // Note: We don't set budgetIds/receiptIds/invoiceIds here because:
+  // 1. Files are tracked in separate state (budgetFiles, receiptFiles, invoiceFiles)
+  // 2. Setting ["pending"] would fail UUID validation in the schema
+  // 3. The actual file IDs are set by the backend after upload
   const handleBudgetFilesChange = useCallback((files: FileWithPreview[]) => {
     setBudgetFiles(files);
-    // Mark form as dirty to enable submit
-    form.setValue("budgetIds", files.length > 0 ? ["pending"] : undefined, { shouldDirty: true, shouldTouch: true });
-  }, [form]);
+  }, []);
 
   const handleReceiptFilesChange = useCallback((files: FileWithPreview[]) => {
     setReceiptFiles(files);
-    form.setValue("receiptIds", files.length > 0 ? ["pending"] : undefined, { shouldDirty: true, shouldTouch: true });
-  }, [form]);
+  }, []);
 
   const handleInvoiceFilesChange = useCallback((files: FileWithPreview[]) => {
     setInvoiceFiles(files);
-    form.setValue("invoiceIds", files.length > 0 ? ["pending"] : undefined, { shouldDirty: true, shouldTouch: true });
-  }, [form]);
+  }, []);
 
   // Handle item selection
   const handleSelectItem = useCallback(
@@ -565,9 +565,24 @@ export const OrderCreateForm = () => {
         }
         if (errors.description) {
           toast.error(errors.description.message || "Erro na descrição");
+        } else if (errors.items) {
+          toast.error("Erro nos itens do pedido");
+        } else if (errors.temporaryItems) {
+          toast.error("Erro nos itens temporários");
         } else if (errors.paymentPix) {
           toast.error(errors.paymentPix.message || "Erro na chave Pix");
+        } else if (errors.budgetIds) {
+          toast.error("Erro nos arquivos de orçamento");
+        } else if (errors.receiptIds) {
+          toast.error("Erro nos arquivos de recibo");
+        } else if (errors.invoiceIds) {
+          toast.error("Erro nos arquivos de nota fiscal");
         } else {
+          // Log all error keys for debugging
+          const errorKeys = Object.keys(errors);
+          if (process.env.NODE_ENV !== "production") {
+            console.error("Unknown form errors on fields:", errorKeys);
+          }
           toast.error("Por favor, corrija os erros no formulário");
         }
         return;

@@ -8,6 +8,62 @@ interface InlineContentProps {
 }
 
 /**
+ * Parses markdown-style formatting from a plain string into InlineFormat array.
+ * Supports:
+ * - **bold** or __bold__
+ * - *italic* or _italic_
+ * - [text](url) links
+ */
+const parseMarkdownText = (text: string): InlineFormat[] => {
+  const result: InlineFormat[] = [];
+
+  // Regex to match **bold**, *italic*, and [text](url)
+  // Order matters: check bold (**) before italic (*) to avoid conflicts
+  const pattern = /(\*\*(.+?)\*\*)|(__(.+?)__)|(\*(.+?)\*)|(_(.+?)_)|(\[(.+?)\]\((.+?)\))/g;
+
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(text)) !== null) {
+    // Add any text before this match
+    if (match.index > lastIndex) {
+      result.push({ type: 'text', content: text.slice(lastIndex, match.index) });
+    }
+
+    if (match[2]) {
+      // **bold**
+      result.push({ type: 'bold', content: match[2] });
+    } else if (match[4]) {
+      // __bold__
+      result.push({ type: 'bold', content: match[4] });
+    } else if (match[6]) {
+      // *italic*
+      result.push({ type: 'italic', content: match[6] });
+    } else if (match[8]) {
+      // _italic_
+      result.push({ type: 'italic', content: match[8] });
+    } else if (match[10] && match[11]) {
+      // [text](url)
+      result.push({ type: 'link', content: match[10], url: match[11] });
+    }
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  // Add any remaining text after the last match
+  if (lastIndex < text.length) {
+    result.push({ type: 'text', content: text.slice(lastIndex) });
+  }
+
+  // If no matches were found, return the original text
+  if (result.length === 0) {
+    result.push({ type: 'text', content: text });
+  }
+
+  return result;
+};
+
+/**
  * Renders text content with newlines converted to <br /> elements
  */
 const renderTextWithLineBreaks = (text: string): React.ReactNode => {
@@ -30,9 +86,17 @@ const renderTextWithLineBreaks = (text: string): React.ReactNode => {
  * Preserves line breaks by converting \n to <br /> elements.
  */
 export const InlineContent = React.memo<InlineContentProps>(({ content, className }) => {
+  // Parse markdown in text content and flatten the result
+  const parsedContent = content.flatMap((format) => {
+    if (format.type === 'text') {
+      return parseMarkdownText(format.content);
+    }
+    return [format];
+  });
+
   return (
     <span className={cn("inline", className)}>
-      {content.map((format, index) => {
+      {parsedContent.map((format, index) => {
         const key = `inline-${index}`;
 
         switch (format.type) {
