@@ -427,9 +427,28 @@ export function TaskPreparationView({
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
     const result: Record<string, any> = {
       ...filterWithoutOrderBy,
-      // Include serviceOrders for progress bar display
+      // Include serviceOrders for progress bar display and truck layouts for measures column
       include: {
         serviceOrders: true,
+        truck: {
+          include: {
+            leftSideLayout: {
+              include: {
+                layoutSections: true,
+              },
+            },
+            rightSideLayout: {
+              include: {
+                layoutSections: true,
+              },
+            },
+            backSideLayout: {
+              include: {
+                layoutSections: true,
+              },
+            },
+          },
+        },
       },
     };
 

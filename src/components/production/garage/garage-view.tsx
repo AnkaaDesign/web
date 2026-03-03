@@ -512,24 +512,26 @@ export function TruckElement({ truck, scale, isDragging, onClick }: TruckElement
   const badgeFontSize = Math.min(9, Math.max(5.5, height * 0.04));
 
   // Truncate task name to fit within the available vertical space (rotated text)
-  // Account for top label (~metaFontSize+6) and bottom elements (serial/progress ~20-30px)
+  // Account for top label and bottom elements (progress bar + serial number)
   const topReserved = metaFontSize + 6;
-  const bottomReserved = showSerialNumber ? 30 : showProgressBar ? 20 : 8;
+  const bottomReserved = (showSerialNumber && showProgressBar) ? 24 : showSerialNumber ? 14 : showProgressBar ? 16 : 4;
   const availableForName = height - topReserved - bottomReserved;
-  const charWidth = nameFontSize * 0.58; // average char width for bold sans-serif
+  const charWidth = nameFontSize * 0.55; // average char width for bold sans-serif
   const maxChars = Math.max(3, Math.floor(availableForName / charWidth));
   const displayName = truck.taskName
     ? truck.taskName.length > maxChars
       ? truck.taskName.slice(0, maxChars - 2) + '..'
       : truck.taskName
     : 'N/A';
+  // Center name text in the available area (between top label and bottom elements)
+  const nameCenterY = topReserved + availableForName / 2;
 
   const progressBarData = showProgressBar ? (() => {
     const barMargin = 2;
     const barH = height < 60 ? 10 : 12;
     const barW = width - barMargin * 2;
-    const serialOffset = showSerialNumber ? metaFontSize + 8 : 0;
-    const barY = height - barH - 4 - serialOffset;
+    const serialOffset = showSerialNumber ? metaFontSize + 2 : 0;
+    const barY = height - barH - 2 - serialOffset;
 
     const completedCount = productionSOs.filter(so => so.status === 'COMPLETED').length;
     const waitingApproveCount = productionSOs.filter(so => so.status === 'WAITING_APPROVE').length;
@@ -580,17 +582,17 @@ export function TruckElement({ truck, scale, isDragging, onClick }: TruckElement
             fill={truck.entryDate ? 'hsl(var(--primary))' : 'hsl(var(--destructive))'}
           />
         )}
-        {/* Task name (rotated 90deg) */}
+        {/* Task name (rotated 90deg, centered in available area) */}
         <text
           x={width / 2}
-          y={height / 2}
+          y={nameCenterY}
           textAnchor="middle"
           dominantBaseline="middle"
           fill={textColor}
           fontSize={nameFontSize}
           fontWeight="bold"
           fontFamily="system-ui, -apple-system, sans-serif"
-          transform={`rotate(-90, ${width / 2}, ${height / 2})`}
+          transform={`rotate(-90, ${width / 2}, ${nameCenterY})`}
           style={{ pointerEvents: 'none' }}
         >
           {displayName}
@@ -664,7 +666,7 @@ export function TruckElement({ truck, scale, isDragging, onClick }: TruckElement
           return (
             <text
               x={width / 2}
-              y={height - (labelFontSize < 12 ? 6 : 8)}
+              y={height - (labelFontSize < 12 ? 4 : 5)}
               textAnchor="middle"
               fill={textColor}
               fontSize={labelFontSize}
