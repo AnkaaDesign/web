@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Camera, Trash2, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { uploadPhoto, deletePhoto } from "@/api-client";
 import type { User } from "@/types";
 import { getFileUrl } from "@/utils/file";

@@ -8,7 +8,7 @@ import type { Order, OrderItem } from "../../../../types";
 import { orderUpdateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems } from "../../../../hooks";
 import { routes } from "../../../../constants";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

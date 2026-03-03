@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";

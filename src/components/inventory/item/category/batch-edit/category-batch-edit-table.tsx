@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Combobox } from "@/components/ui/combobox";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { routes, ITEM_CATEGORY_TYPE, ITEM_CATEGORY_TYPE_LABELS } from "../../../../../constants";
 import { IconLoader, IconDeviceFloppy, IconX, IconShield } from "@tabler/icons-react";

@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import type { PaintFormula, Item } from "../../../types";
 import { formatCurrency, formatNumberWithDecimals } from "../../../utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useItems } from "../../../hooks";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";

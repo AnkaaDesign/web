@@ -1,5 +1,5 @@
 import { BaseExportPopover, type ExportColumn, type ExportFormat } from "@/components/ui/export-popover";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { formatDate, formatDateTime } from "../../../utils";
 import { userService } from "../../../api-client";
 import { USER_STATUS_LABELS, USER_STATUS } from "../../../constants";

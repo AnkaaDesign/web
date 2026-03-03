@@ -18,7 +18,7 @@ import { IconSpray, IconFileInvoice, IconClipboardList, IconPhoto, IconUser, Ico
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { formatCurrency, formatDate } from "../../../../utils";
 import type { FileWithPreview } from "@/components/common/file";
 import { createAirbrushingFormData } from "@/utils/form-data-helper";

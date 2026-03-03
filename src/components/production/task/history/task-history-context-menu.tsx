@@ -6,7 +6,7 @@ import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, Ic
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { SetStatusModal } from "../schedule/set-status-modal";
 import { SetSectorModal } from "../schedule/set-sector-modal";
 import { TaskDuplicateModal } from "../modals/task-duplicate-modal";

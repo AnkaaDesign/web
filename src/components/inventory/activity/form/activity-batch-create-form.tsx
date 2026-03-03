@@ -5,7 +5,7 @@ import type { ActivityCreateFormData, ItemGetManyFormData } from "../../../../sc
 import { ACTIVITY_OPERATION, ACTIVITY_REASON, ACTIVITY_REASON_LABELS } from "../../../../constants";
 import { useActivityBatchMutations, useUsers } from "../../../../hooks";
 import { routes, FAVORITE_PAGES } from "../../../../constants";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";

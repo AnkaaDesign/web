@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { bonusService, type BonusCalculationResult } from "../../api-client";
 import { bonusKeys, userKeys } from "../common/query-keys";
 import { createEntityHooks } from "../common/create-entity-hooks";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 // Import proper types from packages
 import type {

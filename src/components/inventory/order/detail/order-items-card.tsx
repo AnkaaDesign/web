@@ -22,7 +22,7 @@ import { formatCurrency, formatDate, measureUtils } from "../../../../utils";
 import type { Order, OrderItem } from "../../../../types";
 import { ORDER_STATUS, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, MEASURE_TYPE } from "../../../../constants";
 import { useOrderItemBatchMutations, useOrderItemSpecializedBatchMutations } from "../../../../hooks";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { StockStatusIndicator } from "../../item/list/stock-status-indicator";
 

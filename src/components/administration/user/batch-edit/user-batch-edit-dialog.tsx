@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { IconLoader2, IconDeviceFloppy, IconTrash, IconX, IconAlertTriangle, IconEdit, IconUser, IconCheck } from "@tabler/icons-react";
 import {
   AlertDialog,

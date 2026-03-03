@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useExternalWithdrawalFormUrlState } from "@/hooks/inventory/use-external-withdrawal-form-url-state";
 import type { ExternalWithdrawalFormStage } from "@/hooks/inventory/use-external-withdrawal-form-url-state";
 import { routes, EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";

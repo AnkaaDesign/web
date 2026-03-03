@@ -24,7 +24,7 @@ import type {
   ExportConfig
 } from "../../utils";
 import { exportStatistics } from "@/utils/data-export";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 interface ExportButtonProps {
   /**

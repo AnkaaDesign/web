@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/sonner';
 import {
   NOTIFICATION_TYPE,
   NOTIFICATION_CHANNEL,

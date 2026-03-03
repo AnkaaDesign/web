@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { cn } from "@/lib/utils";
 import { useBatchUpdateExternalWithdrawalItems } from "../../../../hooks";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 
 interface ExternalWithdrawalItemsCardProps {

@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconLoader2, IconCheck, IconPackage, IconArrowLeft } from "@tabler/icons-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { borrowCreateSchema, type BorrowCreateFormData } from "../../../../schemas";
 import { useBorrowMutations, useItem } from "../../../../hooks";

@@ -647,18 +647,10 @@ export function SingleGarageView({
         isDroppedInTopHalf = dropY < laneCenterY;
       }
 
-      const preferredSpotNum = isDroppedInTopHalf ? 1 : 2;
+      let preferredSpotNum = isDroppedInTopHalf ? 1 : 2;
 
       const draggedTruckParsed = draggedTruck.spot ? parseSpot(draggedTruck.spot) : null;
       const draggedTruckCurrentSpot = draggedTruck.spot;
-
-      if (
-        draggedTruckParsed?.garage === garageId &&
-        draggedTruckParsed?.lane === targetLaneId &&
-        draggedTruckParsed?.spotNumber === preferredSpotNum
-      ) {
-        return;
-      }
 
       const todayTrucks = filterTrucksForDate(trucks, garageId as AreaId, today);
       const spotToTruck = new Map<number, GarageTruck>();
@@ -669,6 +661,115 @@ export function SingleGarageView({
           spotToTruck.set(parsed.spotNumber, t);
         }
       });
+
+      // V3 ADD: Use three-zone detection when room for 3 trucks
+      const truckAtV1 = spotToTruck.get(1);
+      const truckAtV2 = spotToTruck.get(2);
+      const truckAtV3 = spotToTruck.get(3);
+
+      // V1-only lane + room for V3: three-zone detection only for small trucks
+      if (truckAtV1 && !truckAtV2 && !truckAtV3) {
+        const singleConfig = GARAGE_CONFIGS[garageId as GarageId];
+        const usedWithV2 = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP + truckAtV1.length + draggedTruck.length + 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
+        if (usedWithV2 < singleConfig.laneLength) {
+          // Check if both V2+V3 indicators fit (same condition as preview)
+          const v1WithSpacing = COMMON_CONFIG.TRUCK_MARGIN_TOP + truckAtV1.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
+          const laneBottom = singleConfig.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP;
+          const v3ZoneTop = laneBottom - draggedTruck.length;
+          const canShowBothIndicators = (v3ZoneTop - v1WithSpacing) >= draggedTruck.length;
+
+          if (canShowBothIndicators) {
+            // Small truck: three-zone (V1 swap top, V2 middle, V3 bottom)
+            let dropFraction = 0.5;
+            if (activeRect && overRect) {
+              const truckCenterY = activeRect.top + activeRect.height / 2;
+              dropFraction = (truckCenterY - overRect.top) / overRect.height;
+            } else if (lastPosition && overRect) {
+              dropFraction = (lastPosition.y - overRect.top) / overRect.height;
+            }
+
+            if (dropFraction > 2 / 3) {
+              // Bottom third → V3
+              const isAlreadyAtV3 = draggedTruckParsed?.garage === garageId &&
+                draggedTruckParsed?.lane === targetLaneId && draggedTruckParsed?.spotNumber === 3;
+              if (isAlreadyAtV3) return;
+              onTruckMove(truckId, `${garageId}_${targetLaneId}_V3`);
+              return;
+            }
+            // Middle third → V2, Top third → V1 swap
+            preferredSpotNum = dropFraction < 1 / 3 ? 1 : 2;
+          }
+          // Large truck: fall through to two-zone detection (top=V1 swap, bottom=V2)
+        }
+      }
+
+      // V1+V3 occupied (V2 being dragged): allow V2↔V3 swap via bottom drop
+      if (truckAtV1 && !truckAtV2 && truckAtV3) {
+        let dropFraction = 0.5;
+        if (activeRect && overRect) {
+          const truckCenterY = activeRect.top + activeRect.height / 2;
+          dropFraction = (truckCenterY - overRect.top) / overRect.height;
+        } else if (lastPosition && overRect) {
+          dropFraction = (lastPosition.y - overRect.top) / overRect.height;
+        }
+
+        if (dropFraction > 2 / 3) {
+          // Bottom third → swap with V3
+          preferredSpotNum = 3;
+        } else if (dropFraction < 1 / 3) {
+          // Top third → swap with V1
+          preferredSpotNum = 1;
+        }
+        // Middle third → V2 (default from two-zone), falls through
+      }
+
+      // V1+V2 both occupied: three-zone detection
+      if (truckAtV1 && truckAtV2 && !truckAtV3) {
+        const todayTrucksForCheck = filterTrucksForDate(trucks, garageId as AreaId, today);
+        const v3Availability = calculateLaneAvailability(
+          garageId as GarageId, targetLaneId, todayTrucksForCheck, draggedTruck.length, truckId
+        );
+        if (v3Availability.canFit) {
+          // V3 feasible: split lane into thirds (top=V1 swap, middle=V2 swap, bottom=V3 add)
+          let dropFraction = 0.5;
+          if (activeRect && overRect) {
+            const truckCenterY = activeRect.top + activeRect.height / 2;
+            dropFraction = (truckCenterY - overRect.top) / overRect.height;
+          } else if (lastPosition && overRect) {
+            dropFraction = (lastPosition.y - overRect.top) / overRect.height;
+          }
+
+          if (dropFraction > 2 / 3) {
+            // Bottom third - add/stay at V3
+            const isAlreadyAtV3 = draggedTruckParsed?.garage === garageId &&
+              draggedTruckParsed?.lane === targetLaneId && draggedTruckParsed?.spotNumber === 3;
+            if (isAlreadyAtV3) return;
+            onTruckMove(truckId, `${garageId}_${targetLaneId}_V3`);
+            return;
+          } else if (dropFraction > 1 / 3) {
+            // Middle third - push: dragged truck → V2, existing V2 → V3
+            const newSpotForDragged = `${garageId}_${targetLaneId}_V2`;
+            const newSpotForV2Truck = `${garageId}_${targetLaneId}_V3`;
+            if (onTruckSwap) {
+              onTruckSwap(truckId, newSpotForDragged, truckAtV2.id, newSpotForV2Truck);
+            } else {
+              onTruckMove(truckId, newSpotForDragged);
+              onTruckMove(truckAtV2.id, newSpotForV2Truck);
+            }
+            return;
+          }
+          // Top third - swap with V1, fall through
+          preferredSpotNum = 1;
+        }
+      }
+
+      if (
+        draggedTruckParsed?.garage === garageId &&
+        draggedTruckParsed?.lane === targetLaneId &&
+        draggedTruckParsed?.spotNumber === preferredSpotNum
+      ) {
+        return;
+      }
 
       const truckAtPreferredSpot = spotToTruck.get(preferredSpotNum);
 
@@ -684,6 +785,20 @@ export function SingleGarageView({
         );
 
         if (!canSwap.canFit) return;
+
+        // Reverse validation: check if swapped truck fits in dragged truck's original lane
+        if (draggedTruckParsed && (draggedTruckParsed.garage !== garageId || draggedTruckParsed.lane !== targetLaneId)) {
+          const origConfig = GARAGE_CONFIGS[draggedTruckParsed.garage as keyof typeof GARAGE_CONFIGS];
+          if (origConfig) {
+            const reverseCheck = calculateLaneAvailability(
+              draggedTruckParsed.garage as GarageId,
+              draggedTruckParsed.lane as LaneId,
+              todayTrucks.filter((t) => t.id !== truckId && t.id !== truckAtPreferredSpot.id),
+              truckAtPreferredSpot.length,
+            );
+            if (!reverseCheck.canFit) return;
+          }
+        }
 
         if (onTruckSwap) {
           onTruckSwap(truckId, newSpotForDragged, truckAtPreferredSpot.id, swapTargetSpot);

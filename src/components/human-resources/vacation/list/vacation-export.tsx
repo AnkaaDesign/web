@@ -1,5 +1,5 @@
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { vacationService } from "../../../../api-client";
 import { formatDate } from "../../../../utils";
 import { VACATION_STATUS_LABELS, VACATION_TYPE_LABELS } from "../../../../constants";

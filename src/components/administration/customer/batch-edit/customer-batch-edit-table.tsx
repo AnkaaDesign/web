@@ -14,7 +14,7 @@ import { FormStateSelector } from "@/components/ui/form-state-selector";
 import { TagsInput } from "../form/tags-input";
 import { CpfCnpjCell } from "./cells/cpf-cnpj-cell";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";

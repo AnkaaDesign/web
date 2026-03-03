@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { IconChevronUp, IconChevronDown, IconSelector, IconAlertTriangle, IconEdit, IconTrash, IconCategory } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useItemCategoryMutations, useItemCategoryBatchMutations, useItemCategories } from "../../../../../hooks";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { ItemCategoryGetManyFormData } from "../../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";

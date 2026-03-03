@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { IconDownload, IconTrash, IconPlus, IconCopy, IconFlipHorizontal, IconCamera, IconZoomIn, IconZoomOut, IconZoomReset } from "@tabler/icons-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";

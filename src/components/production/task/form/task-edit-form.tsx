@@ -60,7 +60,7 @@ import { FileUploadField, FileSuggestions, type FileWithPreview } from "@/compon
 import { ArtworkFileUploadField } from "./artwork-file-upload-field";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { toTitleCase } from "../../../../utils";
 import {
   getPricingItemsToAddFromServiceOrders,
@@ -446,6 +446,77 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
   // Accordion state - track which section is open (only one at a time)
   const [openAccordion, setOpenAccordion] = useState<string | undefined>("basic-information");
+
+  // Map form field names to their accordion section IDs
+  const fieldToSectionMap: Record<string, string> = useMemo(() => ({
+    // Basic Information
+    name: "basic-information",
+    customerId: "basic-information",
+    "truck.category": "basic-information",
+    "truck.implementType": "basic-information",
+    serialNumber: "basic-information",
+    "truck.plate": "basic-information",
+    "truck.chassisNumber": "basic-information",
+    sectorId: "basic-information",
+    status: "basic-information",
+    commission: "basic-information",
+    details: "basic-information",
+    truck: "basic-information",
+    // Responsibles
+    responsibles: "responsibles",
+    // Dates
+    forecastDate: "dates",
+    entryDate: "dates",
+    term: "dates",
+    startedAt: "dates",
+    finishedAt: "dates",
+    // Services
+    serviceOrders: "serviceOrders",
+    // Pricing
+    pricing: "pricing",
+    // Layout
+    leftSideLayout: "layout",
+    rightSideLayout: "layout",
+    backSideLayout: "layout",
+    // Spot
+    spot: "spot",
+    // Paint
+    paintIds: "paint",
+    logoPaintIds: "paint",
+    // Cuts
+    cuts: "cuts",
+    // Airbrushing
+    airbrushings: "airbrushing",
+    // Files
+    baseFileIds: "base-files",
+    projectFileIds: "project-files",
+    checkinFileIds: "checkin-files",
+    checkoutFileIds: "checkout-files",
+    artworkIds: "artworks",
+    // Observation
+    observation: "observation",
+    // Financial
+    budgetIds: "financial",
+    invoiceIds: "financial",
+    receiptIds: "financial",
+    bankSlipIds: "financial",
+  }), []);
+
+  // Find the accordion section that contains the first validation error
+  const openSectionWithError = useCallback((errors: Record<string, any>) => {
+    const errorKeys = Object.keys(errors);
+    if (errorKeys.length === 0) return;
+
+    for (const key of errorKeys) {
+      const section = fieldToSectionMap[key];
+      if (section) {
+        setOpenAccordion(section);
+        return;
+      }
+    }
+    // Fallback: open the first section if no mapping found
+    setOpenAccordion("basic-information");
+  }, [fieldToSectionMap]);
 
   // Track current layout state during editing (not saved yet)
   // Initialize with default values to support validation before user edits
@@ -3126,7 +3197,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           console.log('[TaskEditForm] Form onSubmit triggered');
           console.log('[TaskEditForm] Form isValid:', form.formState.isValid);
           console.log('[TaskEditForm] Form errors:', form.formState.errors);
-          return handleSubmitChanges()(e);
+          return handleSubmitChanges(undefined, (errors) => {
+            console.log('[TaskEditForm] Validation errors:', errors);
+            openSectionWithError(errors);
+            toast.error("Existem erros no formulário. Verifique os campos destacados.");
+          })(e);
         }}
       >
         {/* Hidden submit button for programmatic form submission */}

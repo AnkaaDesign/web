@@ -1,6 +1,6 @@
 import React from "react";
 import { IconStar } from "@tabler/icons-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Button } from "./button";
 import { useFavorites } from "@/contexts/favorites-context";
 import { FAVORITE_PAGES, FAVORITE_PAGES_LABELS } from "../../constants";

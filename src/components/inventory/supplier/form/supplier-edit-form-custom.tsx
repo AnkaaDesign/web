@@ -3,7 +3,7 @@ import { type Supplier } from "../../../../types";
 import { type SupplierUpdateFormData } from "../../../../schemas";
 import { SupplierForm } from "./supplier-form-custom";
 import { cleanCNPJ } from "../../../../utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 interface SupplierEditFormProps {
   supplier: Supplier;

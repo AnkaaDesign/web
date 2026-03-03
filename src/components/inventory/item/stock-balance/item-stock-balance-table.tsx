@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { routes } from "../../../../constants";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";

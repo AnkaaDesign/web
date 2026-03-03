@@ -22,7 +22,7 @@ import { SetSectorModal } from "./set-sector-modal";
 import { SetStatusModal } from "./set-status-modal";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";

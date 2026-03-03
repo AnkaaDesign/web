@@ -1,7 +1,7 @@
 // packages/hooks/src/useLayout.ts
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { layoutService } from "../../api-client";
 import type { LayoutCreateFormData, LayoutUpdateFormData } from "../../schemas";
 

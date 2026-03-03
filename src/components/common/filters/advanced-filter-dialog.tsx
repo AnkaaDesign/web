@@ -25,7 +25,7 @@ import {
   IconAlertCircle,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import type {
   FilterDefinition,
   FilterCondition,

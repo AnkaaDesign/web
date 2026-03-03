@@ -326,7 +326,7 @@ export function CollapsedGroupRow({
             key={group.column.id}
             className={cn("overflow-hidden", group.column.cellClassName, group.column.className, "px-4 py-1")}
           >
-            <div className="truncate">
+            <div className="truncate flex items-center">
               {renderServiceOrderCell(group.column.id)}
             </div>
           </TableCell>

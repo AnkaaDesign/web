@@ -1,5 +1,5 @@
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatDate, formatDateTime } from "../../../../../utils";

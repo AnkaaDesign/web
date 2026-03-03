@@ -47,7 +47,7 @@ import {
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/sonner';
 import { ChartHeader } from './ChartHeader';
 
 export interface ExportData {

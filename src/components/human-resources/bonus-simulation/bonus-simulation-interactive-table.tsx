@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 import { USER_STATUS } from "../../../constants";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { BonusSimulationFilters } from "./bonus-simulation-filters";
 
 // Position levels mapping

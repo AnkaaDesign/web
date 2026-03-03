@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconCheck, IconLoader2, IconX, IconAlertTriangle } from "@tabler/icons-react";
 import { z } from "zod";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 

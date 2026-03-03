@@ -11,7 +11,7 @@ import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, Icon
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useSuppliers, useSupplierMutations, useSupplierBatchMutations } from "../../../../hooks";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { SupplierGetManyFormData } from "../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";

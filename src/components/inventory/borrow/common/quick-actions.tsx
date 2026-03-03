@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { IconPackageExport, IconCalendarTime, IconSearch, IconPlus, IconQrcode, IconLoader2, IconHistory, IconAlertCircle } from "@tabler/icons-react";
 import { BORROW_STATUS, routes } from "../../../../constants";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useBorrowMutations, usePrivileges } from "../../../../hooks";
 import { useNavigate } from "react-router-dom";
 import type { Borrow } from "../../../../types";
@@ -40,7 +40,7 @@ export function QuickActions({ selectedBorrows = [], className, size = "default"
 
   const handleScanReturn = () => {
     // This could open a QR/barcode scanner dialog
-    toast.info("Scanner não disponível", { description: "A funcionalidade de scanner será implementada em breve." });
+    toast.info("Scanner não disponível", "A funcionalidade de scanner será implementada em breve.");
   };
 
   const handleViewHistory = () => {

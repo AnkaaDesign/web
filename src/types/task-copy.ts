@@ -16,6 +16,7 @@ export type CopyableTaskField =
   | 'paintId'
   | 'artworkIds'
   | 'baseFileIds'
+  | 'projectFileIds'
   | 'logoPaintIds'
   | 'cuts'
   | 'airbrushings'
@@ -29,8 +30,6 @@ export interface CopyableFieldMetadata {
   label: string;
   description: string;
   category: string;
-  isShared: boolean;
-  createNewInstances: boolean;
 }
 
 export const COPYABLE_TASK_FIELDS: CopyableTaskField[] = [
@@ -47,6 +46,7 @@ export const COPYABLE_TASK_FIELDS: CopyableTaskField[] = [
   'paintId',
   'artworkIds',
   'baseFileIds',
+  'projectFileIds',
   'logoPaintIds',
   'cuts',
   'airbrushings',
@@ -78,13 +78,20 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
   // Pricing - only visible to ADMIN, FINANCIAL, COMMERCIAL (canViewPricingSections)
   pricingId: ['ADMIN', 'FINANCIAL', 'COMMERCIAL'],
 
-  // Paint/Artworks - hidden for Warehouse, Financial, Logistic (different rules)
+  // Paint - editable by most sectors except Warehouse, Financial, Logistic
   paintId: ['ADMIN', 'COMMERCIAL', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+
+  // Logo paints (Cores da Logomarca) - hidden for Commercial users
+  logoPaintIds: ['ADMIN', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+
+  // Artworks (Layouts files) - hidden for Warehouse, Financial, Logistic
   artworkIds: ['ADMIN', 'COMMERCIAL', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+
+  // Base files - accessible by most sectors
   baseFileIds: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
-  // Logo paints - hidden for Commercial users
-  logoPaintIds: ['ADMIN', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  // Project files (Projetos) - editable by ADMIN, COMMERCIAL, LOGISTIC
+  projectFileIds: ['ADMIN', 'COMMERCIAL', 'LOGISTIC'],
 
   // Cuts - hidden for Financial, Logistic, Commercial
   cuts: ['ADMIN', 'DESIGNER', 'WAREHOUSE', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
@@ -99,7 +106,7 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
   implementType: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
   category: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
-  // Layouts - hidden for Warehouse, Financial, Designer, Commercial
+  // Medidas do Caminhão - hidden for Warehouse, Financial, Designer, Commercial
   layouts: ['ADMIN', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Observation - hidden for Warehouse, Financial, Designer, Logistic, Commercial
@@ -152,147 +159,110 @@ export const COPYABLE_FIELD_METADATA: Record<CopyableTaskField, CopyableFieldMet
     label: 'COPIAR TUDO',
     description: 'Copia todos os campos que você tem permissão para editar',
     category: 'Ações Rápidas',
-    isShared: false,
-    createNewInstances: false,
   },
   name: {
     label: 'Nome',
     description: 'Nome da tarefa',
     category: 'Informações Gerais',
-    isShared: false,
-    createNewInstances: false,
   },
   details: {
     label: 'Detalhes',
     description: 'Descrição e detalhes da tarefa',
     category: 'Informações Gerais',
-    isShared: false,
-    createNewInstances: false,
   },
   entryDate: {
     label: 'Data de Entrada',
     description: 'Data de entrada da tarefa',
     category: 'Datas',
-    isShared: false,
-    createNewInstances: false,
   },
   term: {
     label: 'Prazo',
     description: 'Data limite para conclusão',
     category: 'Datas',
-    isShared: false,
-    createNewInstances: false,
   },
   forecastDate: {
     label: 'Previsão',
     description: 'Data prevista para conclusão',
     category: 'Datas',
-    isShared: false,
-    createNewInstances: false,
   },
   commission: {
     label: 'Comissão',
     description: 'Informações de comissão',
     category: 'Comercial',
-    isShared: false,
-    createNewInstances: false,
   },
   responsibles: {
     label: 'Responsáveis',
     description: 'Responsáveis associados à tarefa',
     category: 'Comercial',
-    isShared: true,
-    createNewInstances: false,
   },
   customerId: {
     label: 'Cliente',
     description: 'Cliente associado à tarefa',
     category: 'Comercial',
-    isShared: true,
-    createNewInstances: false,
   },
   pricingId: {
     label: 'Precificação',
     description: 'Cópia independente da tabela de preços e itens',
     category: 'Comercial',
-    isShared: false,
-    createNewInstances: true,
   },
   paintId: {
     label: 'Pintura Geral',
     description: 'Configuração de pintura geral',
-    category: 'Pintura e Layouts',
-    isShared: true,
-    createNewInstances: false,
+    category: 'Pintura',
+  },
+  logoPaintIds: {
+    label: 'Cores da Logomarca',
+    description: 'Configurações de cores da logomarca',
+    category: 'Pintura',
   },
   artworkIds: {
     label: 'Layouts',
     description: 'Arquivos de layout',
-    category: 'Pintura e Layouts',
-    isShared: true,
-    createNewInstances: false,
+    category: 'Arquivos',
   },
   baseFileIds: {
     label: 'Arquivos Base',
     description: 'Arquivos base para criação de layouts',
-    category: 'Pintura e Layouts',
-    isShared: true,
-    createNewInstances: false,
+    category: 'Arquivos',
   },
-  logoPaintIds: {
-    label: 'Pinturas de Logo',
-    description: 'Configurações de pintura de logos',
-    category: 'Pintura e Layouts',
-    isShared: true,
-    createNewInstances: false,
+  projectFileIds: {
+    label: 'Projetos',
+    description: 'Arquivos de projetos anexados à tarefa',
+    category: 'Arquivos',
   },
   cuts: {
     label: 'Recortes',
     description: 'Recortes de vinil/adesivo',
     category: 'Produção',
-    isShared: false,
-    createNewInstances: true,
   },
   airbrushings: {
     label: 'Aerografias',
     description: 'Trabalhos de aerografia',
     category: 'Produção',
-    isShared: false,
-    createNewInstances: true,
   },
   serviceOrders: {
     label: 'Ordens de Serviço',
     description: 'Ordens de serviço vinculadas',
     category: 'Produção',
-    isShared: false,
-    createNewInstances: true,
   },
   implementType: {
     label: 'Implemento',
     description: 'Tipo de implemento do veículo',
     category: 'Veículo',
-    isShared: true,
-    createNewInstances: false,
   },
   category: {
     label: 'Categoria',
     description: 'Categoria do veículo',
     category: 'Veículo',
-    isShared: true,
-    createNewInstances: false,
   },
   layouts: {
-    label: 'Layouts',
-    description: 'Layouts do veículo (esquerdo, direito, traseiro)',
+    label: 'Medidas',
+    description: 'Medidas do caminhão (esquerdo, direito, traseiro)',
     category: 'Veículo',
-    isShared: true,
-    createNewInstances: false,
   },
   observation: {
     label: 'Observações',
     description: 'Observações e notas da tarefa',
     category: 'Informações Gerais',
-    isShared: false,
-    createNewInstances: true,
   },
 };

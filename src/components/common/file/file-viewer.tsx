@@ -5,7 +5,7 @@ import type { FileViewerConfig } from "../../../utils/file-viewer";
 import { FilePreview } from "./file-preview-modal";
 import { VideoPlayer } from "./video-player";
 import { PDFViewer } from "./pdf-viewer";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 export interface FileViewerState {
   isImageModalOpen: boolean;

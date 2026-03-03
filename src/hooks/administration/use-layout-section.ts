@@ -1,7 +1,7 @@
 // packages/hooks/src/useLayoutSection.ts
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { layoutSectionService } from "../../api-client";
 import type { LayoutSectionCreateInput, LayoutSectionUpdateInput } from "../../types";
 

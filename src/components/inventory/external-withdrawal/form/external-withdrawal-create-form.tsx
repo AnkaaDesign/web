@@ -7,7 +7,7 @@ import type { ExternalWithdrawalCreateFormData, ItemGetManyFormData } from "../.
 import { externalWithdrawalCreateSchema } from "../../../../schemas";
 import { useExternalWithdrawalMutations, useItems } from "../../../../hooks";
 import { routes, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

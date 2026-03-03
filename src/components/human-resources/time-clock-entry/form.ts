@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import type { TimeClockEntryBatchUpdateFormData, TimeClockJustificationFormData } from "../../../schemas";
 import { timeClockEntryBatchUpdateSchema, timeClockJustificationSchema } from "../../../schemas";
 import type { SecullumTimeEntry } from "@/types/time-clock";

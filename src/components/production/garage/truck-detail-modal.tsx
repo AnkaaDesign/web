@@ -29,7 +29,7 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
-import { routes, SECTOR_PRIVILEGES, SERVICE_ORDER_STATUS as SO_STATUS, SERVICE_ORDER_STATUS_LABELS, SERVICE_ORDER_TYPE } from '@/constants';
+import { routes, SECTOR_PRIVILEGES, SERVICE_ORDER_STATUS as SO_STATUS, SERVICE_ORDER_STATUS_LABELS, SERVICE_ORDER_TYPE, TASK_STATUS } from '@/constants';
 import { getServiceOrderStatusColor } from '@/utils/serviceOrder';
 import { hasPrivilege } from '@/utils/user';
 import { getApiBaseUrl } from '@/config/api';
@@ -107,9 +107,10 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
     };
   }, [task]);
 
-  // Check if term is overdue
+  // Check if term is overdue (only for active tasks)
   const isOverdue = useMemo(() => {
     if (!task?.term) return false;
+    if (task.status === TASK_STATUS.COMPLETED || task.status === TASK_STATUS.CANCELLED) return false;
     return new Date(task.term) < new Date();
   }, [task]);
 

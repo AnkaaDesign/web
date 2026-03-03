@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { secullumService } from "../../api-client";
 import type { SecullumAuthCredentials } from "../../api-client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 // Query keys
 export const secullumKeys = {

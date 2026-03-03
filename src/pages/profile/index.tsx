@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Loader2, Camera, Trash2, User as UserIcon, MapPin, Ruler } from "lucide-react";
 import { IconUser, IconBell, IconRefresh, IconDeviceFloppy } from "@tabler/icons-react";
 import { getProfile, updateProfile, uploadPhoto, deletePhoto } from "@/api-client";

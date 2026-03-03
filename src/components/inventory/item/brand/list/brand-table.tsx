@@ -11,7 +11,7 @@ import { IconSelector, IconChevronUp, IconChevronDown, IconAlertTriangle, IconTa
 import { cn } from "@/lib/utils";
 import { convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { useItemBrandMutations, useItemBrandBatchMutations, useItemBrands } from "../../../../../hooks";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { ItemBrandGetManyFormData } from "../../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";

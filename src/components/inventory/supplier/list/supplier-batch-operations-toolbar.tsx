@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { SupplierBatchEditDialog } from "../batch-edit";
 import { useBatchDeleteSuppliers } from "../../../../hooks";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 interface SupplierBatchOperationsToolbarProps {
   selectedSuppliers: Supplier[];

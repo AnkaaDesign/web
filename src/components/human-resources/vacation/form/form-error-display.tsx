@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { FieldErrors } from "react-hook-form";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { IconAlertCircle } from "@tabler/icons-react";
 

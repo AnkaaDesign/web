@@ -45,8 +45,10 @@ import {
   AIRBRUSHING_STATUS_LABELS,
   PAINT_FINISH_LABELS,
   TRUCK_MANUFACTURER_LABELS,
+  TASK_PRICING_STATUS_LABELS,
+  PAYMENT_CONDITION_LABELS,
 } from "../../constants/enum-labels";
-import { ENTITY_BADGE_CONFIG, PAINT_FINISH } from "../../constants";
+import { ENTITY_BADGE_CONFIG, PAINT_FINISH, TASK_PRICING_STATUS, PAYMENT_CONDITION } from "../../constants";
 import {
   formatRelativeTime,
   formatDateTime,
@@ -930,6 +932,91 @@ const ChangelogTimelineItem = ({
                         ),
                       )}
                   </div>
+                )}
+
+                {/* Task Pricing Details */}
+                {entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING && (
+                  <>
+                    {createdEntityData.budgetNumber && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Orçamento: </span>
+                        <span className="text-foreground font-medium">
+                          #{createdEntityData.budgetNumber}
+                        </span>
+                      </div>
+                    )}
+                    {createdEntityData.status && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Status: </span>
+                        <span className="text-foreground font-medium">
+                          {TASK_PRICING_STATUS_LABELS[createdEntityData.status as TASK_PRICING_STATUS] || createdEntityData.status}
+                        </span>
+                      </div>
+                    )}
+                    {(createdEntityData.total !== null && createdEntityData.total !== undefined) && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Total: </span>
+                        <span className="text-foreground font-medium">
+                          {formatCurrency(Number(createdEntityData.total))}
+                        </span>
+                      </div>
+                    )}
+                    {createdEntityData.paymentCondition && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Condição de Pagamento: </span>
+                        <span className="text-foreground font-medium">
+                          {PAYMENT_CONDITION_LABELS[createdEntityData.paymentCondition as PAYMENT_CONDITION] || createdEntityData.paymentCondition}
+                        </span>
+                      </div>
+                    )}
+                    {Array.isArray(createdEntityData.items) && createdEntityData.items.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-border/40">
+                        <span className="text-xs text-muted-foreground font-medium">Itens:</span>
+                        <div className="flex flex-col gap-1 mt-1">
+                          {createdEntityData.items.map((item: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between text-xs">
+                              <span className="text-foreground">{item.description}</span>
+                              {item.amount !== null && item.amount !== undefined && (
+                                <span className="text-muted-foreground font-medium">
+                                  {formatCurrency(Number(item.amount))}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Task Pricing Item Details (per-item CREATE/ADD) */}
+                {entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM && (
+                  <>
+                    {createdEntityData.description && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Item: </span>
+                        <span className="text-foreground font-medium">
+                          {createdEntityData.description}
+                        </span>
+                      </div>
+                    )}
+                    {(createdEntityData.amount !== null && createdEntityData.amount !== undefined) && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Valor: </span>
+                        <span className="text-foreground font-medium">
+                          {formatCurrency(Number(createdEntityData.amount))}
+                        </span>
+                      </div>
+                    )}
+                    {createdEntityData.observation && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Observação: </span>
+                        <span className="text-foreground font-medium">
+                          {createdEntityData.observation}
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -2883,12 +2970,72 @@ export function TaskWithServiceOrdersChangelog({
       ...pricingItemLogs,
     ];
 
+    // Deduplicate: Remove LAYOUT CREATE entries when a TASK UPDATE on "layouts" field
+    // exists within 1 second (they show the same dimension info redundantly)
+    const taskLayoutUpdates = taskLogs.filter(
+      (log) =>
+        log.entityType === CHANGE_LOG_ENTITY_TYPE.TASK &&
+        log.action === CHANGE_LOG_ACTION.UPDATE &&
+        log.field === "layouts",
+    );
+    const filteredLogs = allLogs.filter((log) => {
+      if (
+        log.entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT &&
+        log.action === CHANGE_LOG_ACTION.CREATE
+      ) {
+        const logTime = new Date(log.createdAt).getTime();
+        // If there's a TASK UPDATE on "layouts" within 1 second, skip this LAYOUT CREATE
+        return !taskLayoutUpdates.some(
+          (taskUpdate) =>
+            Math.abs(new Date(taskUpdate.createdAt).getTime() - logTime) < 2000,
+        );
+      }
+      return true;
+    });
+
+    // Filter out no-op UPDATE entries where old and new values are effectively identical
+    // (e.g., artwork/file arrays that didn't actually change)
+    const deduplicatedLogs = filteredLogs.filter((log) => {
+      if (log.action !== CHANGE_LOG_ACTION.UPDATE) return true;
+      if (log.oldValue === undefined || log.newValue === undefined) return true;
+      if (log.oldValue === null || log.newValue === null) return true;
+
+      // For array fields (artworks, layouts as files, etc.), compare serialized values
+      const arrayFields = [
+        "artworks", "artworkIds", "baseFileIds", "baseFiles",
+        "budgets", "invoices", "receipts",
+      ];
+      if (log.field && arrayFields.includes(log.field)) {
+        try {
+          const parseVal = (v: any) => {
+            if (Array.isArray(v)) return v;
+            if (typeof v === "string") return JSON.parse(v);
+            return v;
+          };
+          const oldArr = parseVal(log.oldValue);
+          const newArr = parseVal(log.newValue);
+          if (Array.isArray(oldArr) && Array.isArray(newArr)) {
+            // Compare by extracting IDs (handles different object shapes)
+            const getId = (item: any) =>
+              typeof item === "string" ? item : item?.id || item?.fileId || JSON.stringify(item);
+            const oldIds = oldArr.map(getId).sort().join(",");
+            const newIds = newArr.map(getId).sort().join(",");
+            if (oldIds === newIds) return false;
+          }
+        } catch {
+          // If parsing fails, keep the entry
+        }
+      }
+
+      return true;
+    });
+
     // Sort by createdAt descending (newest first)
-    allLogs.sort((a, b) => {
+    deduplicatedLogs.sort((a, b) => {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
-    return allLogs;
+    return deduplicatedLogs;
   }, [
     taskChangelogsResponse,
     serviceOrderChangelogsResponse,

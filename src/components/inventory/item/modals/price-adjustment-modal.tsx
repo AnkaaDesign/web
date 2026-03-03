@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Form } from "@/components/ui/form";
 import { FormInput } from "@/components/ui/form-input";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { adjustItemPrices } from "../../../../api-client";
 import { formatCurrency } from "../../../../utils";
 import { IconPercentage, IconAlertTriangle } from "@tabler/icons-react";

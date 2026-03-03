@@ -6,7 +6,7 @@ import { useSecullumHolidays } from "../../../../../hooks";
 import type { SecullumHolidayData } from "../../../../../schemas";
 import { debounce } from "../../../../../utils";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

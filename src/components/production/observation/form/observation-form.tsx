@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { IconAlertCircle, IconX, IconFile, IconUser, IconBuildingFactory, IconHash, IconCheck } from "@tabler/icons-react";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { cn, backendFileToFileWithPreview } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { createObservationFormData } from "@/utils/form-data-helper";
 
 // Helper function for file size formatting

@@ -58,7 +58,7 @@ import type { ResponsibleRowData } from "@/types/responsible";
 import { ResponsibleRole } from "@/types/responsible";
 import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { getUniqueDescriptions } from "../../../../api-client/serviceOrder";
 import { uploadSingleFile } from "../../../../api-client/file";
 import {
@@ -737,7 +737,7 @@ export const TaskCreateForm = () => {
             customerId: customerIdValue || undefined,
           }));
 
-        // Build layout section data from modified sides (for first task only - creates new layout records)
+        // Build layout section data from modified sides (each task creates its own layout records)
         const buildLayoutSectionData = () => {
           if (!hasLayoutChanges || modifiedLayoutSides.size === 0) return {};
           const layoutData: any = {};
@@ -788,33 +788,20 @@ export const TaskCreateForm = () => {
           return taskData;
         };
 
-        // Build truck object with layout data (sections for first task, IDs for subsequent tasks)
-        const buildTruckData = (plate?: string, sharedLayoutIds?: any) => {
+        // Build truck object with layout data (each task gets its own individual layout)
+        const buildTruckData = (plate?: string) => {
           const layoutSectionData = buildLayoutSectionData();
           const hasTruckFields = plate || category || implementType || hasLayoutChanges;
           if (!hasTruckFields) return {};
 
-          if (sharedLayoutIds) {
-            // Subsequent tasks: connect to shared layouts by ID
-            return {
-              truck: {
-                ...(plate && { plate }),
-                category: category || undefined,
-                implementType: implementType || undefined,
-                ...sharedLayoutIds,
-              },
-            };
-          } else {
-            // First task: create new layout records with section data
-            return {
-              truck: {
-                ...(plate && { plate }),
-                category: category || undefined,
-                implementType: implementType || undefined,
-                ...layoutSectionData,
-              },
-            };
-          }
+          return {
+            truck: {
+              ...(plate && { plate }),
+              category: category || undefined,
+              implementType: implementType || undefined,
+              ...layoutSectionData,
+            },
+          };
         };
 
         // Build the list of plate + serial number combinations
@@ -838,15 +825,14 @@ export const TaskCreateForm = () => {
         }
 
         // Create all tasks sequentially
-        // First task creates layout records; subsequent tasks share them by ID
+        // Each task gets its own individual layout instance
         let successCount = 0;
         let errorCount = 0;
         let firstCreatedRepIds: string[] | undefined;
-        let sharedLayoutIds: any = null;
 
         for (let i = 0; i < combinations.length; i++) {
           const { plate, serialNumber } = combinations[i];
-          const truckData = buildTruckData(plate, i > 0 ? sharedLayoutIds : null);
+          const truckData = buildTruckData(plate);
           const task = buildTaskData({
             ...(serialNumber && { serialNumber }),
             ...truckData,
@@ -866,24 +852,12 @@ export const TaskCreateForm = () => {
             if (result?.success) {
               successCount++;
 
-              // After first task, extract shared data for subsequent tasks
+              // After first task, extract responsible IDs for subsequent tasks
               if (i === 0) {
-                // Extract responsible IDs
                 if (newResponsibles.length > 0 && result.data?.responsibles) {
                   firstCreatedRepIds = result.data.responsibles
                     .filter((r: any) => newResponsibles.some(nr => nr.name === r.name && nr.phone === r.phone))
                     .map((r: any) => r.id);
-                }
-                // Extract layout IDs from the created truck for shared layouts
-                if (hasLayoutChanges && result.data?.truck) {
-                  const truck = result.data.truck;
-                  const ids: any = {};
-                  if (truck.leftSideLayoutId) ids.leftSideLayoutId = truck.leftSideLayoutId;
-                  if (truck.rightSideLayoutId) ids.rightSideLayoutId = truck.rightSideLayoutId;
-                  if (truck.backSideLayoutId) ids.backSideLayoutId = truck.backSideLayoutId;
-                  if (Object.keys(ids).length > 0) {
-                    sharedLayoutIds = ids;
-                  }
                 }
               }
             } else {

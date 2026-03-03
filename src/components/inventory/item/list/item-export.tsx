@@ -1,5 +1,5 @@
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import type { Item } from "../../../../types";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { formatCurrency, formatDate, formatDateTime, itemUtils } from "../../../../utils";

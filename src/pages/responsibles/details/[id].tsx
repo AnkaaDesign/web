@@ -12,7 +12,7 @@ import { BasicInfoCard, ContactDetailsCard, ResponsibleDetailSkeleton } from "@/
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const ResponsibleDetailsPage = () => {

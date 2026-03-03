@@ -25,17 +25,22 @@ import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-no
 import { ServiceOrderCell } from "./service-order-cell";
 import { IconCheck, IconAlertTriangle } from "@tabler/icons-react";
 
-// Helper function to render date without icon
+// Helper function to render date in 2-line format: dd/mm on top, hh:mm below
 const renderDate = (date: Date | null) => {
   if (!date) return <span className="text-muted-foreground">-</span>;
 
-  const formatted = formatDate(date);
-  const dateTime = formatDateTime(date);
+  const d = new Date(date);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const fullFormatted = formatDateTime(date);
 
   return (
-    <span className="truncate" title={dateTime}>
-      {formatted}
-    </span>
+    <div className="flex flex-col leading-tight" title={fullFormatted}>
+      <span>{day}/{month}</span>
+      <span className="text-xs text-muted-foreground">{hours}:{minutes}</span>
+    </div>
   );
 };
 
@@ -132,6 +137,14 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
   const dateTime = formatDateTime(date);
   const forecastDate = new Date(date);
 
+  // 2-line format: dd/mm on top, hh:mm below
+  const day = String(forecastDate.getDate()).padStart(2, '0');
+  const month = String(forecastDate.getMonth() + 1).padStart(2, '0');
+  const hours = String(forecastDate.getHours()).padStart(2, '0');
+  const minutes = String(forecastDate.getMinutes()).padStart(2, '0');
+  const dateLine = `${day}/${month}`;
+  const timeLine = `${hours}:${minutes}`;
+
   // Only show indicators for preparation route
   const showIndicators = navigationRoute === 'preparation';
 
@@ -170,9 +183,10 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
       {showIndicators && hasEntryDate ? (
         <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
-            <span className="truncate text-green-500 font-medium cursor-help">
-              {formatted}
-            </span>
+            <div className="flex flex-col leading-tight text-green-500 font-medium cursor-help" title={dateTime}>
+              <span>{dateLine}</span>
+              <span className="text-xs">{timeLine}</span>
+            </div>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-xs">
             <div className="text-sm">
@@ -184,9 +198,10 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
       ) : showIndicators && isForecastToday ? (
         <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
-            <span className="truncate text-blue-500 font-medium cursor-help">
-              {formatted}
-            </span>
+            <div className="flex flex-col leading-tight text-blue-500 font-medium cursor-help" title={dateTime}>
+              <span>{dateLine}</span>
+              <span className="text-xs">{timeLine}</span>
+            </div>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-xs">
             <div className="text-sm">
@@ -196,9 +211,10 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
           </TooltipContent>
         </Tooltip>
       ) : (
-        <span className="truncate" title={dateTime}>
-          {formatted}
-        </span>
+        <div className="flex flex-col leading-tight" title={dateTime}>
+          <span>{dateLine}</span>
+          <span className="text-xs text-muted-foreground">{timeLine}</span>
+        </div>
       )}
 
       {/* Red indicator for today with incomplete/missing orders (blue font already indicates "today") */}
@@ -576,11 +592,15 @@ export const createTaskHistoryColumns = (options?: {
       const d = new Date(value);
       const day = String(d.getDate()).padStart(2, '0');
       const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = String(d.getFullYear()).slice(-2);
       const hours = String(d.getHours()).padStart(2, '0');
       const minutes = String(d.getMinutes()).padStart(2, '0');
-      const formatted = `${day}/${month}/${year} - ${hours}:${minutes}`;
-      return <span className="truncate">{formatted}</span>;
+      const fullFormatted = formatDateTime(value);
+      return (
+        <div className="flex flex-col leading-tight" title={fullFormatted}>
+          <span>{day}/{month}</span>
+          <span className="text-xs text-muted-foreground">{hours}:{minutes}</span>
+        </div>
+      );
     },
   },
   {

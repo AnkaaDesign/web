@@ -11,7 +11,7 @@ import type { Order } from "../../../../types";
 import { PAYMENT_METHOD_LABELS } from "../../../../constants";
 import { FilePreviewCard } from "@/components/common/file";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 interface OrderInfoCardProps {
   order: Order;

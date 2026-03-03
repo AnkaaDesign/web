@@ -7,7 +7,7 @@ import { activityUpdateSchema } from "../../../../schemas";
 import { ACTIVITY_OPERATION, ACTIVITY_OPERATION_LABELS, ACTIVITY_REASON, ACTIVITY_REASON_LABELS } from "../../../../constants";
 import { useActivityMutations, useUsers, useEditForm, useItem } from "../../../../hooks";
 import { routes } from "../../../../constants";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";

@@ -10,7 +10,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
 import { WarningBatchEditTable } from "@/components/human-resources/warning/batch-edit";
 import { Card, CardContent } from "@/components/ui/card";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const WarningBatchEditPage = () => {

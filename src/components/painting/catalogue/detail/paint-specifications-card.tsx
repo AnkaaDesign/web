@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { IconInfoCircle, IconCopy, IconPalette } from "@tabler/icons-react";
 
 import type { Paint } from "../../../../types";

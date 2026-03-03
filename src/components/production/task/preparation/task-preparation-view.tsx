@@ -28,7 +28,7 @@ import { useColumnOrder } from "@/hooks/common/use-column-order";
 import { useColumnWidths, DEFAULT_COLUMN_WIDTHS } from "@/hooks/common/use-column-widths";
 import { hasPrivilege } from "@/utils";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 // Copy from task state type
 interface CopyFromTaskState {

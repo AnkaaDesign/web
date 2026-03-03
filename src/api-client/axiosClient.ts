@@ -754,10 +754,12 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         // Skip notifications for notification-related endpoints - these are background operations
         // that would create confusing duplicate toasts when marking notifications as read
         const isNotificationEndpoint = config.url?.includes("/notifications") || config.url?.includes("/seen-notifications");
+        // Skip notifications for copy-from operations - they're handled by the calling component
+        const isCopyFromOperation = config.url?.includes("/copy-from");
         // Only show success if the response indicates success
         const isSuccess = (response.data?.success as boolean | undefined) !== false; // Show success unless explicitly false
 
-        if (!isBatchOperation && !isMarkViewed && !isNotificationEndpoint && isSuccess) {
+        if (!isBatchOperation && !isMarkViewed && !isNotificationEndpoint && !isCopyFromOperation && isSuccess) {
           const message = response.data?.message || getSuccessMessage(config.method);
           notify.success("Sucesso", message);
         }

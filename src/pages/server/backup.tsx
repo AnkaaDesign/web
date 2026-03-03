@@ -44,7 +44,7 @@ import {
   IconArchive,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { BACKUP_PRESET_PATH_OPTIONS } from "@/config/backup-paths";
 import type { BackupMetadata, ScheduledBackupJob } from "../../api-client/backup";
 import { backupApi } from "../../api-client/backup";

@@ -1,7 +1,7 @@
 import { useState, forwardRef, useImperativeHandle } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 type BulkOperationType = "arts" | "documents" | "paints" | "cuttingPlans";
 

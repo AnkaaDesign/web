@@ -25,7 +25,7 @@ import { IconFilter, IconHandClick, IconX, IconChevronDown, IconChevronRight } f
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { hasPrivilege } from "@/utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { canViewCancelledTasks } from "@/utils/permissions/entity-permissions";
 

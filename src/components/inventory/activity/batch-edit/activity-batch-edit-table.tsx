@@ -8,7 +8,7 @@ import { useActivityBatchMutations } from "../../../../hooks";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form } from "@/components/ui/form";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { routes } from "../../../../constants";
 import { QuantityCell } from "./cells/quantity-cell";

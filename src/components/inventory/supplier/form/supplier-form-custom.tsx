@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { BRAZILIAN_STATES } from "../../../../constants";
 import { cleanCNPJ, formatCNPJ } from "../../../../utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 interface BaseSupplierFormProps {
   isSubmitting?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;

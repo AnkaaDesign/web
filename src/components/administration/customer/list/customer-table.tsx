@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { useCustomers, useCustomerMutations, useCustomerBatchMutations } from "../../../../hooks";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { CustomerGetManyFormData } from "../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";

@@ -6,7 +6,7 @@ import { PpeScheduleInfoCard, PpeScheduleItemsCard, PpeScheduleDeliveriesCard } 
 import { PageHeader } from "@/components/ui/page-header";
 import { IconEdit, IconRefresh, IconTrash, IconPlayerPlay, IconPlayerPause, IconAlertTriangle } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import {
   AlertDialog,
   AlertDialogAction,

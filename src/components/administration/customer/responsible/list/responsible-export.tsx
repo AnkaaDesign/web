@@ -1,5 +1,5 @@
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import type { Responsible } from "@/types/responsible";
 import type { ResponsibleGetManyFormData } from "@/types/responsible";
 import { RESPONSIBLE_ROLE_LABELS } from "@/types/responsible";

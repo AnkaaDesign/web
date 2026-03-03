@@ -10,7 +10,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { SectorBatchEditTable } from "@/components/administration/sector/batch-edit";
 import { Card, CardContent } from "@/components/ui/card";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export const SectorBatchEditPage = () => {

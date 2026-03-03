@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { type Borrow, type Item, type User } from "../../../../types";
 import { BORROW_STATUS } from "../../../../constants";
 import { isBefore, isToday, isTomorrow } from "../../../../utils";

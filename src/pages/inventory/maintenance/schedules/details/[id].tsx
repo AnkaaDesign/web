@@ -23,7 +23,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ItemsNeededList } from "@/components/inventory/maintenance/common/items-needed-list";
 import { MaintenanceHistoryTable } from "@/components/inventory/maintenance/common/maintenance-history-table";

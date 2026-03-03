@@ -1,5 +1,5 @@
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import type { Customer } from "../../../../types";
 import type { CustomerGetManyFormData } from "../../../../schemas";
 import { formatCNPJ, formatCPF, formatPhone, formatDate, formatDateTime } from "../../../../utils";

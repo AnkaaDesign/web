@@ -8,7 +8,7 @@ import { IconCalendar, IconX, IconCheck, IconLoader2 } from "@tabler/icons-react
 import type { PpeDeliveryScheduleCreateFormData } from "../../../../schemas";
 import type { PpeDeliveryScheduleCreateResponse } from "../../../../types";
 import { PpeScheduleForm } from "@/components/inventory/epi/schedule/ppe-schedule-form";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 export const PPEScheduleCreatePage = () => {
   const navigate = useNavigate();

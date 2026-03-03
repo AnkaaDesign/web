@@ -7,7 +7,7 @@ import type { OrderCreateFormData, OrderBatchCreateFormData } from "../../../../
 import { orderCreateSchema } from "../../../../schemas";
 import { useOrderBatchMutations, useSuppliers, useItems } from "../../../../hooks";
 import { routes, ORDER_STATUS, MEASURE_UNIT_LABELS } from "../../../../constants";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";

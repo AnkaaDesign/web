@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PpeDeliveryTable } from "./ppe-delivery-table";
 import { IconSearch, IconFilter } from "@tabler/icons-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { PpeDeliveryFilters } from "./ppe-delivery-filters";
 import { FilterIndicators } from "./filter-indicators";
 import { extractActiveFilters, createFilterRemover } from "./filter-utils";

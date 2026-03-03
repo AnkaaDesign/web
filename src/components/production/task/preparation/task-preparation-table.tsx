@@ -489,7 +489,7 @@ export function TaskPreparationTable({
                           maxWidth: COLUMN_WIDTH_CONSTRAINTS.maxWidth,
                         }}
                       >
-                        <div className="truncate">
+                        <div className="truncate flex items-center">
                           {column.formatter
                             ? column.formatter(
                                 column.accessorFn
@@ -650,7 +650,7 @@ export function TaskPreparationTable({
                       maxWidth: COLUMN_WIDTH_CONSTRAINTS.maxWidth,
                     }}
                   >
-                    <div className="truncate">
+                    <div className="truncate flex items-center">
                       {column.formatter
                         ? column.formatter(
                             column.accessorFn

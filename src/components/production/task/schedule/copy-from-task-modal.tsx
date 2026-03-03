@@ -4,15 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   IconArrowRight,
   IconCheck,
   IconClipboardCopy,
   IconArrowDown,
-  IconInfoCircle,
-  IconCopy,
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import {
@@ -166,20 +163,6 @@ function FieldSelectionItem({
         />
         <span className="text-sm font-medium">{metadata.label}</span>
       </div>
-      <div className="flex items-center gap-2">
-        {metadata.isShared && (
-          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
-            <IconInfoCircle className="h-3 w-3 mr-1" />
-            Compartilhado
-          </Badge>
-        )}
-        {metadata.createNewInstances && (
-          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800">
-            <IconCopy className="h-3 w-3 mr-1" />
-            Nova instância
-          </Badge>
-        )}
-      </div>
     </div>
   );
 }
@@ -233,7 +216,8 @@ export function CopyFromTaskModal({
     'Informações Gerais',
     'Datas',
     'Comercial',
-    'Pintura e Layouts',
+    'Pintura',
+    'Arquivos',
     'Produção',
     'Veículo',
   ];
@@ -410,24 +394,10 @@ export function CopyFromTaskModal({
                       return (
                         <div
                           key={field}
-                          className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-accent/50"
+                          className="flex items-center gap-3 p-2.5 rounded-lg bg-accent/50"
                         >
-                          <div className="flex items-center gap-3">
-                            <IconCheck className="h-4 w-4 text-green-600 flex-shrink-0" />
-                            <span className="text-sm font-medium">{metadata.label}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {metadata.isShared && (
-                              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
-                                Compartilhado
-                              </Badge>
-                            )}
-                            {metadata.createNewInstances && (
-                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800">
-                                Nova instância
-                              </Badge>
-                            )}
-                          </div>
+                          <IconCheck className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          <span className="text-sm font-medium">{metadata.label}</span>
                         </div>
                       );
                     })

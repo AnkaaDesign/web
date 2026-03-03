@@ -30,7 +30,7 @@ import {
 } from "@tabler/icons-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../../ui/dropdown-menu";
 import { secullumService } from "../../../api-client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useTimeClockStateManager } from "./state";
 import type { LocationData, PendingJustification } from "./types";
 

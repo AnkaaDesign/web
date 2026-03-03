@@ -8,7 +8,7 @@ import { exportBudgetPdfFromData } from "@/utils/budget-pdf-generator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { IconUpload, IconCheck, IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconDotsVertical, IconCopy, IconFileTypePdf } from "@tabler/icons-react";
 import type { TaskPricing } from "@/types/task-pricing";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";

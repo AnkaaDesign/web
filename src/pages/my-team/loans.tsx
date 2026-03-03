@@ -9,7 +9,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BorrowStatusBadge } from "@/components/inventory/borrow/common/borrow-status-badge";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate, formatDateTime } from "../../utils";
 import type { BorrowGetManyFormData } from "../../schemas";

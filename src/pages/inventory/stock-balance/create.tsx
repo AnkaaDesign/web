@@ -5,7 +5,7 @@ import type { ItemGetManyFormData } from "../../../schemas";
 import { ACTIVITY_OPERATION, ACTIVITY_REASON } from "../../../constants";
 import { useActivityBatchMutations } from "../../../hooks";
 import { routes, FAVORITE_PAGES } from "../../../constants";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";

@@ -9,7 +9,7 @@ import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import type { ComboboxOption } from "@/components/ui/combobox";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import {
   SECTOR_PRIVILEGES,
   routes,

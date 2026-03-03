@@ -2,7 +2,7 @@ import type { UseFormReturn } from "react-hook-form";
 import type { TimeClockEntry } from "@/types/time-clock";
 import type { TimeClockEntryBatchUpdateFormData } from "../../../schemas";
 import type { TimeClockStateManager } from "./state";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 export type TimeField = "entry1" | "exit1" | "entry2" | "exit2" | "entry3" | "exit3" | "entry4" | "exit4" | "entry5" | "exit5";
 

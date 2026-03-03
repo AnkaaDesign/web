@@ -7,7 +7,7 @@ import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useSuppliers } from "../../../../hooks";
 import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER, SECTOR_PRIVILEGES } from "../../../../constants";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Button } from "@/components/ui/button";

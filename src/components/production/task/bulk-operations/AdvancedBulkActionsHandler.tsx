@@ -478,8 +478,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
             // Cuts are handled by form.reset above
             setCutsCount(computed.cuts.length);
           } else if (type === 'layout') {
-            // Pre-load existing common layouts from trucks
-            // Check if all tasks share the same layout per side (by layoutId)
+            // Pre-load existing layouts from the first task's truck
+            // Since layouts are individual (each task has its own layout record),
+            // we compare layout content (height + sections) to determine if all tasks
+            // share the same measurements per side
             const tasksWithTrucks = tasks.filter((t: any) => t.truck);
 
             if (tasksWithTrucks.length > 0) {
@@ -499,30 +501,42 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 };
               };
 
+              // Compare two layouts by their measurements (not by ID)
+              const layoutsMatch = (a: any, b: any): boolean => {
+                if (!a && !b) return true;
+                if (!a || !b) return false;
+                if (a.height !== b.height) return false;
+                const aSections = a.layoutSections || [];
+                const bSections = b.layoutSections || [];
+                if (aSections.length !== bSections.length) return false;
+                const aSorted = [...aSections].sort((x: any, y: any) => (x.position ?? 0) - (y.position ?? 0));
+                const bSorted = [...bSections].sort((x: any, y: any) => (x.position ?? 0) - (y.position ?? 0));
+                return aSorted.every((s: any, i: number) =>
+                  s.width === bSorted[i].width && s.isDoor === bSorted[i].isDoor && s.doorHeight === bSorted[i].doorHeight
+                );
+              };
+
               const firstTaskWithTruck = tasksWithTrucks[0];
               if (firstTaskWithTruck?.truck) {
-                // Check left side
-                const firstLeftId = firstTaskWithTruck.truck.leftSideLayoutId;
-                const allShareLeft = firstLeftId && tasksWithTrucks.every(
-                  (t: any) => t.truck?.leftSideLayoutId === firstLeftId
-                );
+                const firstLeft = firstTaskWithTruck.truck.leftSideLayout;
+                const firstRight = firstTaskWithTruck.truck.rightSideLayout;
+                const firstBack = firstTaskWithTruck.truck.backSideLayout;
 
-                // Check right side
-                const firstRightId = firstTaskWithTruck.truck.rightSideLayoutId;
-                const allShareRight = firstRightId && tasksWithTrucks.every(
-                  (t: any) => t.truck?.rightSideLayoutId === firstRightId
+                // Check if all tasks share the same layout content per side
+                const allShareLeft = firstLeft && tasksWithTrucks.every(
+                  (t: any) => layoutsMatch(t.truck?.leftSideLayout, firstLeft)
                 );
-
-                // Check back side
-                const firstBackId = firstTaskWithTruck.truck.backSideLayoutId;
-                const allShareBack = firstBackId && tasksWithTrucks.every(
-                  (t: any) => t.truck?.backSideLayoutId === firstBackId
+                const allShareRight = firstRight && tasksWithTrucks.every(
+                  (t: any) => layoutsMatch(t.truck?.rightSideLayout, firstRight)
+                );
+                const allShareBack = firstBack && tasksWithTrucks.every(
+                  (t: any) => layoutsMatch(t.truck?.backSideLayout, firstBack)
                 );
 
                 const preloadedLayouts = {
-                  left: allShareLeft ? convertLayoutToFormState(firstTaskWithTruck.truck.leftSideLayout) : null,
-                  right: allShareRight ? convertLayoutToFormState(firstTaskWithTruck.truck.rightSideLayout) : null,
-                  back: allShareBack ? convertLayoutToFormState(firstTaskWithTruck.truck.backSideLayout) : null,
+                  left: allShareLeft ? convertLayoutToFormState(firstLeft) : null,
+                  right: allShareRight ? convertLayoutToFormState(firstRight) : null,
+                  back: allShareBack ? convertLayoutToFormState(firstBack) : null,
                 };
 
                 setLayoutStates(preloadedLayouts);
@@ -1379,9 +1393,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
               layoutStates.right?.layoutSections?.length > 0 ||
               layoutStates.back?.layoutSections?.length > 0) && (
               <Alert className="mt-2">
-                <IconLayout className="h-4 w-4" />
                 <AlertDescription>
-                  O layout configurado sera aplicado a todos os caminhoes das {currentTaskIds.length} tarefas selecionadas.
+                  As medidas configuradas serão aplicadas a todos os caminhões das {currentTaskIds.length} tarefas selecionadas.
                 </AlertDescription>
               </Alert>
             )}

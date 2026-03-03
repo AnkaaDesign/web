@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taskPricingService } from '@/api-client/task-pricing';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/sonner';
 
 export const taskPricingKeys = {
   all: ['task-pricings'] as const,

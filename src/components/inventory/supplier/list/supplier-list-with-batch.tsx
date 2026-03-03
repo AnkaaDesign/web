@@ -14,7 +14,7 @@ import { createSupplierColumns } from "./supplier-table-columns";
 import { useSupplierFilters } from "@/hooks/inventory/use-supplier-filters";
 import { useNavigate } from "react-router-dom";
 import { routes } from "../../../../constants";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { SupplierBatchEditTable } from "../batch-edit";
 
 interface SupplierListWithBatchProps {

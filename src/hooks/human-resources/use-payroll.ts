@@ -3,7 +3,7 @@
 import { createEntityHooks } from "../common/create-entity-hooks";
 import { payrollService, discountService } from "../../api-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { payrollKeys, bonusKeys } from "../common/query-keys";
 import type {
   PayrollGetManyParams,

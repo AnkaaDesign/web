@@ -1,5 +1,5 @@
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import type { PaintProduction } from "../../../../types";
 import type { PaintProductionGetManyFormData } from "../../../../schemas";
 import { formatDate, formatDateTime } from "../../../../utils";

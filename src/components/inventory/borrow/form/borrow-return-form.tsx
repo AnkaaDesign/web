@@ -8,7 +8,7 @@ import { IconAlertTriangle, IconPackage, IconUser, IconCalendar, IconArrowLeft, 
 import { type Borrow } from "../../../../types";
 import { BORROW_STATUS, routes, USER_STATUS } from "../../../../constants";
 import { formatDateTime, formatRelativeTime } from "../../../../utils";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { useBorrowMutations } from "../../../../hooks";
 import {
   AlertDialog,

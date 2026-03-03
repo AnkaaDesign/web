@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateTime } from "../../utils";
 import { IconDownload, IconFileTypeCsv, IconFileTypeXls, IconFilter, IconX, IconUser, IconRefresh, IconClock, IconChevronLeft, IconChevronRight } from "@tabler/icons-react";

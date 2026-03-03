@@ -406,7 +406,7 @@ export function calculateAreaLayout(areaId: AreaId, trucks: GarageTruck[], patio
         // V3: Always bottom aligned
         yPosition = config.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - truck.length;
       } else {
-        // V2: Bottom aligned when alone, middle when V3 exists
+        // V2: Middle when V3 exists or room for V3, otherwise bottom aligned
         if (v3Truck) {
           // V2 with V3: position in the middle
           const v1Bottom = v1Truck
@@ -415,8 +415,29 @@ export function calculateAreaLayout(areaId: AreaId, trucks: GarageTruck[], patio
           const v3Top = config.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - v3Truck.length - COMMON_CONFIG.TRUCK_MIN_SPACING;
           // Center V2 between V1's bottom and V3's top
           yPosition = v1Bottom + (v3Top - v1Bottom - truck.length) / 2;
+        } else if (v1Truck) {
+          // V2 without V3: check if there's room for a future V3
+          const usedWithV2 = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP + v1Truck.length + truck.length + 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
+          if (usedWithV2 < config.laneLength) {
+            // Room for V3 physically — but only position V2 in middle if visually fits
+            const v1WithSpacing = COMMON_CONFIG.TRUCK_MARGIN_TOP + v1Truck.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
+            const laneBottom = config.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP;
+            const v3ZoneTop = laneBottom - truck.length;
+            const gapForV2 = v3ZoneTop - v1WithSpacing;
+
+            if (gapForV2 >= truck.length) {
+              // Small truck: V2 in middle with clear space for V3
+              yPosition = v1WithSpacing + (gapForV2 - truck.length) / 2;
+            } else {
+              // Large truck: V2 at bottom (not enough visual room for middle)
+              yPosition = config.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - truck.length;
+            }
+          } else {
+            // No room for V3: bottom aligned
+            yPosition = config.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - truck.length;
+          }
         } else {
-          // V2 alone: bottom aligned (same logic as V3)
+          // V2 alone (no V1): bottom aligned
           yPosition = config.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - truck.length;
         }
       }
@@ -888,11 +909,47 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
             height: draggedTruckLength,
             color: swapColor,
           });
-          previews.push({
-            y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
-            height: draggedTruckLength,
-            color: addPreviewColor,
-          });
+
+          // Check if V3 could fit later (V1 + V2 + margins + 2 gaps < laneLength)
+          const usedWithV2 = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP + existingTruck.length + draggedTruckLength + 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
+          const hasRoomForV3 = usedWithV2 < laneLength;
+
+          if (hasRoomForV3) {
+            const v1WithSpacing = COMMON_CONFIG.TRUCK_MARGIN_TOP + existingTruck.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
+            const laneBottom = laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP;
+            const v3Y = laneBottom - draggedTruckLength;
+            const gapForV2 = v3Y - v1WithSpacing;
+
+            if (gapForV2 >= draggedTruckLength) {
+              // Both V2 and V3 indicators fit without overlapping
+              const v2Y = v1WithSpacing + (gapForV2 - draggedTruckLength) / 2;
+              previews.push({
+                y: v2Y,
+                height: draggedTruckLength,
+                color: addPreviewColor,
+              });
+              // V3 at bottom
+              previews.push({
+                y: v3Y,
+                height: draggedTruckLength,
+                color: addPreviewColor,
+              });
+            } else {
+              // Not enough visual room for both - show V2 at bottom (matches where truck renders)
+              previews.push({
+                y: laneBottom - draggedTruckLength,
+                height: draggedTruckLength,
+                color: addPreviewColor,
+              });
+            }
+          } else {
+            // No room for V3 - show V2 at bottom as usual
+            previews.push({
+              y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
+              height: draggedTruckLength,
+              color: addPreviewColor,
+            });
+          }
         } else {
           // V2 or V3 exists - show add indicator on V1 and swap indicator on occupied spot
           previews.push({
@@ -937,8 +994,18 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
               height: draggedTruckLength,
               color: getSwapColor(v2Truck),
             });
+          } else if (v1Truck && canFit !== false) {
+            // V1+V2 occupied, V3 empty, truck CAN fit: show V2 at MIDDLE (push indicator)
+            // Green because dropping here pushes V2→V3 (always valid when canFit)
+            const v1Bottom = COMMON_CONFIG.TRUCK_MARGIN_TOP + v1Truck.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
+            const futureV3Top = laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength - COMMON_CONFIG.TRUCK_MIN_SPACING;
+            previews.push({
+              y: v1Bottom + (futureV3Top - v1Bottom - draggedTruckLength) / 2,
+              height: draggedTruckLength,
+              color: addPreviewColor,
+            });
           } else {
-            // V2 is at BOTTOM when no V3
+            // V2 at BOTTOM (original, unchanged)
             previews.push({
               y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
               height: draggedTruckLength,
@@ -977,9 +1044,14 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
             });
           }
         }
-        // NOTE: V3 add indicator is intentionally NOT shown when V1+V2 are occupied.
-        // V2 is at the bottom (same position as V3 would be), so the V3 add indicator
-        // would overlap the V2 swap indicator, hiding its green/red color.
+        // V3 ADD indicator: when V1+V2 occupied and truck can fit as V3
+        if (v1Truck && v2Truck && !spotNumbers.includes(3) && canFit !== false) {
+          previews.push({
+            y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
+            height: draggedTruckLength,
+            color: addPreviewColor,
+          });
+        }
       }
     }
   }
@@ -1419,12 +1491,110 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
       // Determine preferred spot based on drop position
       // V1 = top, V2 = bottom - user's drop position determines their intent
       // If the spot is occupied, we'll handle swapping later (don't auto-fallback here!)
-      const preferredSpotNum = isDroppedInTopHalf ? 1 : 2;
+      let preferredSpotNum = isDroppedInTopHalf ? 1 : 2;
 
       // Check if dragged truck is already at the target lane
       const isAlreadyInTargetLane =
         draggedTruckParsed?.garage === targetGarageId &&
         draggedTruckParsed?.lane === targetLaneId;
+
+      // V3 ADD: Use three-zone detection when room for 3 trucks
+      const truckAtV1 = spotToTruck.get(1);
+      const truckAtV2 = spotToTruck.get(2);
+      const truckAtV3 = spotToTruck.get(3);
+
+      // V1-only lane + room for V3: three-zone detection only for small trucks
+      if (truckAtV1 && !truckAtV2 && !truckAtV3) {
+        const usedWithV2 = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP + truckAtV1.length + draggedTruck.length + 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
+        if (usedWithV2 < config.laneLength) {
+          // Check if both V2+V3 indicators fit (same condition as preview)
+          const v1WithSpacing = COMMON_CONFIG.TRUCK_MARGIN_TOP + truckAtV1.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
+          const laneBottom = config.laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP;
+          const v3ZoneTop = laneBottom - draggedTruck.length;
+          const canShowBothIndicators = (v3ZoneTop - v1WithSpacing) >= draggedTruck.length;
+
+          if (canShowBothIndicators) {
+            // Small truck: three-zone (V1 swap top, V2 middle, V3 bottom)
+            let dropFraction = 0.5;
+            if (activeRect && overRect) {
+              const truckCenterY = activeRect.top + activeRect.height / 2;
+              dropFraction = (truckCenterY - overRect.top) / overRect.height;
+            } else if (lastPosition && overRect) {
+              dropFraction = (lastPosition.y - overRect.top) / overRect.height;
+            }
+
+            if (dropFraction > 2 / 3) {
+              // Bottom third → V3
+              if (isAlreadyInTargetLane && draggedTruckParsed?.spotNumber === 3) return;
+              onTruckMove(truckId, `${targetGarageId}_${targetLaneId}_V3`);
+              return;
+            }
+            // Middle third → V2, Top third → V1 swap
+            preferredSpotNum = dropFraction < 1 / 3 ? 1 : 2;
+          }
+          // Large truck: fall through to two-zone detection (top=V1 swap, bottom=V2)
+        }
+      }
+
+      // V1+V3 occupied (V2 being dragged): allow V2↔V3 swap via bottom drop
+      if (truckAtV1 && !truckAtV2 && truckAtV3) {
+        let dropFraction = 0.5;
+        if (activeRect && overRect) {
+          const truckCenterY = activeRect.top + activeRect.height / 2;
+          dropFraction = (truckCenterY - overRect.top) / overRect.height;
+        } else if (lastPosition && overRect) {
+          dropFraction = (lastPosition.y - overRect.top) / overRect.height;
+        }
+
+        if (dropFraction > 2 / 3) {
+          // Bottom third → swap with V3
+          preferredSpotNum = 3;
+        } else if (dropFraction < 1 / 3) {
+          // Top third → swap with V1
+          preferredSpotNum = 1;
+        }
+        // Middle third → V2 (default from two-zone), falls through
+      }
+
+      // V1+V2 both occupied and V3 empty: three-zone detection
+      if (truckAtV1 && truckAtV2 && !truckAtV3) {
+        const v3Availability = calculateLaneAvailability(
+          targetGarageId, targetLaneId, trucks, draggedTruck.length, truckId
+        );
+
+        if (v3Availability.canFit) {
+          // V3 feasible: split lane into thirds (top=V1 swap, middle=V2 push, bottom=V3 add)
+          let dropFraction = 0.5;
+          if (activeRect && overRect) {
+            const truckCenterY = activeRect.top + activeRect.height / 2;
+            dropFraction = (truckCenterY - overRect.top) / overRect.height;
+          } else if (lastPosition && overRect) {
+            dropFraction = (lastPosition.y - overRect.top) / overRect.height;
+          }
+
+          if (dropFraction > 2 / 3) {
+            // Bottom third - add/stay at V3
+            if (isAlreadyInTargetLane && draggedTruckParsed?.spotNumber === 3) return;
+            const newSpot = `${targetGarageId}_${targetLaneId}_V3`;
+            onTruckMove(truckId, newSpot);
+            return;
+          } else if (dropFraction > 1 / 3) {
+            // Middle third - push: dragged truck → V2, existing V2 → V3
+            const newSpotForDragged = `${targetGarageId}_${targetLaneId}_V2`;
+            const newSpotForV2Truck = `${targetGarageId}_${targetLaneId}_V3`;
+            if (onTruckSwap) {
+              onTruckSwap(truckId, newSpotForDragged, truckAtV2.id, newSpotForV2Truck);
+            } else {
+              onTruckMove(truckId, newSpotForDragged);
+              onTruckMove(truckAtV2.id, newSpotForV2Truck);
+            }
+            return;
+          }
+          // Top third - swap with V1, fall through
+          preferredSpotNum = 1;
+        }
+        // If doesn't fit, fall through to swap logic with original preferredSpotNum
+      }
 
       // If already in target lane at preferred spot, no action needed
       if (isAlreadyInTargetLane && draggedTruckParsed?.spotNumber === preferredSpotNum) {
@@ -1464,8 +1634,29 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
         const canFitInTargetLane = totalRequiredSpace <= config.laneLength && trucksInTargetLane.length < 3;
 
         if (!canFitInTargetLane) {
-          
+
           return;
+        }
+
+        // Reverse validation: check if swapped truck fits in dragged truck's original lane
+        if (draggedTruckParsed && (draggedTruckParsed.garage !== targetGarageId || draggedTruckParsed.lane !== targetLaneId)) {
+          const origConfig = GARAGE_CONFIGS[draggedTruckParsed.garage as keyof typeof GARAGE_CONFIGS];
+          if (origConfig) {
+            const trucksInOrigLane = trucks.filter(t => {
+              if (t.id === truckId || t.id === truckAtPreferredSpot.id) return false;
+              if (!t.spot) return false;
+              const parsed = parseSpot(t.spot);
+              return parsed.garage === draggedTruckParsed!.garage && parsed.lane === draggedTruckParsed!.lane;
+            });
+            const origLengths = trucksInOrigLane.reduce((sum, t) => sum + t.length, 0);
+            const origTruckCount = trucksInOrigLane.length + 1;
+            let origGaps = 0;
+            if (origTruckCount === 3) origGaps = 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
+            const origRequired = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP + origLengths + truckAtPreferredSpot.length + origGaps;
+            if (origRequired > origConfig.laneLength || trucksInOrigLane.length >= 3) {
+              return;
+            }
+          }
         }
 
         // Swap is valid

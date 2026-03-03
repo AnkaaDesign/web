@@ -18,7 +18,7 @@ import type { OrderScheduleCreateFormData } from "../../../../schemas";
 import { orderScheduleCreateSchema } from "../../../../schemas";
 import { useOrderScheduleMutations } from "../../../../hooks";
 import { routes, FAVORITE_PAGES, SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, WEEK_DAY_LABELS, MONTH_LABELS, WEEK_DAY, MONTH } from "../../../../constants";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { PageHeader } from "@/components/ui/page-header";
