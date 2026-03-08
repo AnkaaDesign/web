@@ -68,8 +68,8 @@ export default function MyTeamPage() {
     return <Navigate to={routes.authentication.login} replace />;
   }
 
-  // Only team leaders (users with managedSector) can access this page
-  if (!user.managedSector) {
+  // Only team leaders (users with ledSector) can access this page
+  if (!user.ledSector) {
     return <Navigate to={routes.home} replace />;
   }
 

@@ -24,6 +24,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { ServiceOrderCell } from "./service-order-cell";
 import { IconCheck, IconAlertTriangle } from "@tabler/icons-react";
+import { BillingStatusBadge } from "../billing/billing-status-badge";
 
 // Helper function to render date in single-line format: dd/mm/yy hh:mm
 const renderDate = (date: Date | null) => {
@@ -703,28 +704,6 @@ export const createTaskHistoryColumns = (options?: {
     formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} navigationRoute={navigationRoute} />,
   },
   {
-    id: "serviceOrders.financial",
-    header: (
-      <Tooltip delayDuration={500}>
-        <TooltipTrigger asChild>
-          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.FINANCIAL]}</span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
-          <div className="text-sm">
-            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.FINANCIAL].toLowerCase()}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    ),
-    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.FINANCIAL).length || 0,
-    sortable: true,
-    filterable: false,
-    defaultVisible: false,
-    width: "120px",
-    cellClassName: "relative",
-    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} navigationRoute={navigationRoute} />,
-  },
-  {
     id: "price",
     header: "VALOR TOTAL",
     accessorKey: "price",
@@ -810,6 +789,36 @@ export const createTaskHistoryColumns = (options?: {
     },
   },
   {
+    id: "invoiceToCustomers",
+    header: "FATURAR PARA",
+    accessorFn: (row) => {
+      const configs = (row as any).pricing?.customerConfigs;
+      if (!configs || configs.length === 0) return "";
+      return configs.map((c: any) => c.customer?.corporateName || c.customer?.fantasyName || "").filter(Boolean).join(", ");
+    },
+    sortable: false,
+    filterable: false,
+    defaultVisible: false,
+    width: "200px",
+    formatter: (value: string) => {
+      if (!value) return <span className="text-muted-foreground">-</span>;
+      return <TruncatedTextWithTooltip text={value} className="text-sm" />;
+    },
+  },
+  {
+    id: "paymentStatus",
+    header: "STATUS PGTO",
+    accessorKey: "paymentStatus",
+    sortable: true,
+    filterable: true,
+    defaultVisible: false,
+    width: "140px",
+    formatter: (value: string | null) => {
+      if (!value) return <span className="text-muted-foreground">-</span>;
+      return <BillingStatusBadge status={value} size="sm" />;
+    },
+  },
+  {
     id: "observation",
     header: "OBSERVAÇÃO",
     accessorFn: (row) => row.observation?.description || "",
@@ -833,10 +842,10 @@ export const createTaskHistoryColumns = (options?: {
   // Filter service order columns based on sector privilege
   // Each sector has specific visibility for each service order type:
   // - ADMIN: sees all
-  // - COMMERCIAL: sees PRODUCTION + FINANCIAL + COMMERCIAL
+  // - COMMERCIAL: sees PRODUCTION + COMMERCIAL + LOGISTIC + ARTWORK
   // - DESIGNER: sees PRODUCTION + ARTWORK (view only)
-  // - FINANCIAL: sees PRODUCTION + FINANCIAL only
-  // - LOGISTIC: sees PRODUCTION + LOGISTIC only
+  // - FINANCIAL: sees COMMERCIAL + LOGISTIC only
+  // - LOGISTIC: sees PRODUCTION + LOGISTIC + COMMERCIAL + ARTWORK
   // - PRODUCTION/WAREHOUSE/BASIC/EXTERNAL/MAINTENANCE: sees PRODUCTION only
   // - HR: sees none
   if (sectorPrivilege) {
@@ -844,9 +853,6 @@ export const createTaskHistoryColumns = (options?: {
       // Check service order columns
       if (col.id === 'serviceOrders.production') {
         return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.PRODUCTION);
-      }
-      if (col.id === 'serviceOrders.financial') {
-        return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.FINANCIAL);
       }
       if (col.id === 'serviceOrders.commercial') {
         return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.COMMERCIAL);
@@ -865,6 +871,18 @@ export const createTaskHistoryColumns = (options?: {
   // Filter out price column if user doesn't have permission
   if (!canViewPrice) {
     filteredColumns = filteredColumns.filter(col => col.id !== 'price');
+  }
+
+  // Filter invoiceToCustomers and paymentStatus columns — only ADMIN, FINANCIAL, COMMERCIAL
+  const canViewFinancialColumns = sectorPrivilege && (
+    sectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+    sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
+    sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL
+  );
+  if (!canViewFinancialColumns) {
+    filteredColumns = filteredColumns.filter(col =>
+      col.id !== 'invoiceToCustomers' && col.id !== 'paymentStatus'
+    );
   }
 
   // Define privileged sectors that can view restricted fields (responsibles, forecastDate)

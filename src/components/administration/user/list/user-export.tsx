@@ -33,7 +33,7 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
   { id: "performanceLevel", label: "Nível de Performance", getValue: (user: User) => user.performanceLevel?.toString() || "0" },
   { id: "verified", label: "Verificado", getValue: (user: User) => (user.verified ? "Sim" : "Não") },
   { id: "lastLoginAt", label: "Último Login", getValue: (user: User) => (user.lastLoginAt ? formatDateTime(new Date(user.lastLoginAt)) : "") },
-  { id: "managedSector.name", label: "Setor Gerenciado", getValue: (user: User) => user.managedSector?.name || "" },
+  { id: "ledSector.name", label: "Setor Liderado", getValue: (user: User) => user.ledSector?.name || "" },
   { id: "city", label: "Cidade", getValue: (user: User) => user.city || "" },
   { id: "state", label: "Estado", getValue: (user: User) => user.state || "" },
   { id: "zipCode", label: "CEP", getValue: (user: User) => user.zipCode || "" },
@@ -72,7 +72,7 @@ export function UserExport({ className, filters, currentUsers = [], totalRecords
           include: {
             position: true,
             sector: true,
-            managedSector: true,
+            ledSector: true,
             _count: {
               select: {
                 createdTasks: true,
@@ -337,7 +337,7 @@ export function UserExport({ className, filters, currentUsers = [], totalRecords
                   break;
                 case "position.hierarchy":
                 case "sector.name":
-                case "managedSector.name":
+                case "ledSector.name":
                   width = "130px";
                   break;
                 case "tasksCount":

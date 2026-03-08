@@ -218,27 +218,6 @@ export const createTaskColumns = (): TaskColumn[] => [
     formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} />,
   },
   {
-    id: "serviceOrders.financial",
-    header: (
-      <Tooltip delayDuration={0}>
-        <TooltipTrigger asChild>
-          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.FINANCIAL]}</span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
-          <div className="text-sm">
-            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.FINANCIAL].toLowerCase()}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    ),
-    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.FINANCIAL).length || 0,
-    sortable: true,
-    filterable: false,
-    defaultVisible: true,
-    width: "120px",
-    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} />,
-  },
-  {
     id: "serviceOrders.commercial",
     header: (
       <Tooltip delayDuration={0}>

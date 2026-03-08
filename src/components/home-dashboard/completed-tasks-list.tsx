@@ -44,7 +44,7 @@ export function CompletedTasksList({ tasks }: CompletedTasksListProps) {
         <div
           key={task.id}
           className={`grid grid-cols-[1.5fr_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-x-3 items-center px-4 py-2 hover:bg-secondary/50 cursor-pointer border-b border-border last:border-b-0 transition-colors ${index % 2 === 1 ? "bg-muted/30" : ""}`}
-          onClick={() => navigate(`/producao/tarefas/${task.id}`)}
+          onClick={() => navigate(`/producao/agenda/detalhes/${task.id}`)}
         >
           <span className="text-sm text-foreground truncate">
             {task.name || "Tarefa Sem Nome"}

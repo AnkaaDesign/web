@@ -2,7 +2,7 @@
  * Service Order Description Enums by Type
  *
  * These enums define the standardized service descriptions for each service order type.
- * Used for both ServiceOrder and TaskPricingItem descriptions.
+ * Used for both ServiceOrder and TaskPricingService descriptions.
  * All descriptions are in Title Case with Portuguese prepositions lowercase.
  */
 
@@ -155,54 +155,6 @@ export const COMMERCIAL_SERVICE_DESCRIPTIONS = [
 ] as const;
 
 // =====================
-// FINANCIAL - Billing Actions
-// =====================
-export const FINANCIAL_SERVICE_DESCRIPTIONS = [
-  'Acordo Pagamento',
-  'Ajustar Vencimento Boleto',
-  'Atualizar Dados Financeiros',
-  'Baixar Título',
-  'Boleto Avulso',
-  'Boleto Entrada',
-  'Boleto Parcela',
-  'Boleto Saldo',
-  'Cadastrar Cliente Financeiro',
-  'Cancelar Boleto',
-  'Cancelar Nota Fiscal',
-  'Carta Correção NF',
-  'Cobrar Cliente',
-  'Compensar Cheque',
-  'Confirmar Pagamento',
-  'Consultar Crédito Cliente',
-  'Emitir NF Complementar',
-  'Emitir NF Serviço',
-  'Emitir Nota Fiscal',
-  'Enviar Boleto',
-  'Enviar Comprovante',
-  'Enviar Lembrete Pagamento',
-  'Enviar Nota Fiscal',
-  'Enviar Whatsapp Cobrança',
-  'Estornar Pagamento',
-  'Gerar Boleto',
-  'Gerar Recibo',
-  'Gerar Segunda Via Boleto',
-  'Ligar Cobrança',
-  'Negociar Dívida',
-  'Parcelar Débito',
-  'Reenviar Boleto',
-  'Registrar Dados Bancários',
-  'Registrar Pagamento',
-  'Registrar Pagamento Cartão',
-  'Registrar Pagamento Cheque',
-  'Registrar Pagamento Dinheiro',
-  'Registrar Pagamento Parcial',
-  'Registrar Pagamento Pix',
-  'Renegociar Prazo',
-  'Validar Cnpj Cliente',
-  'Outros',
-] as const;
-
-// =====================
 // ARTWORK - Design Actions (6 items)
 // =====================
 export const ARTWORK_SERVICE_DESCRIPTIONS = [
@@ -266,8 +218,6 @@ export type ProductionServiceDescription =
   (typeof PRODUCTION_SERVICE_DESCRIPTIONS)[number];
 export type CommercialServiceDescription =
   (typeof COMMERCIAL_SERVICE_DESCRIPTIONS)[number];
-export type FinancialServiceDescription =
-  (typeof FINANCIAL_SERVICE_DESCRIPTIONS)[number];
 export type ArtworkServiceDescription =
   (typeof ARTWORK_SERVICE_DESCRIPTIONS)[number];
 export type LogisticServiceDescription =
@@ -282,7 +232,6 @@ export const SERVICE_DESCRIPTIONS_BY_TYPE: Record<
 > = {
   [SERVICE_ORDER_TYPE.PRODUCTION]: PRODUCTION_SERVICE_DESCRIPTIONS,
   [SERVICE_ORDER_TYPE.COMMERCIAL]: COMMERCIAL_SERVICE_DESCRIPTIONS,
-  [SERVICE_ORDER_TYPE.FINANCIAL]: FINANCIAL_SERVICE_DESCRIPTIONS,
   [SERVICE_ORDER_TYPE.ARTWORK]: ARTWORK_SERVICE_DESCRIPTIONS,
   [SERVICE_ORDER_TYPE.LOGISTIC]: LOGISTIC_SERVICE_DESCRIPTIONS,
 };

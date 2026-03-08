@@ -37,7 +37,6 @@ const BASE_TASK_SCHEDULE_COLUMNS: TaskScheduleColumn[] = [
 // Service order columns
 const SERVICE_ORDER_COLUMNS: TaskScheduleColumn[] = [
   { id: "serviceOrders.production", header: "OS PRODUÇÃO", sortable: true, width: "w-[120px]" },
-  { id: "serviceOrders.financial", header: "OS FINANCEIRO", sortable: true, width: "w-[120px]" },
   { id: "serviceOrders.commercial", header: "OS COMERCIAL", sortable: true, width: "w-[120px]" },
   { id: "serviceOrders.logistic", header: "OS LOGÍSTICA", sortable: true, width: "w-[120px]" },
   { id: "serviceOrders.artwork", header: "OS ARTE", sortable: true, width: "w-[120px]" },

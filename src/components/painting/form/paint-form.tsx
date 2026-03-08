@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FormSteps, type FormStep } from "@/components/ui/form-steps";
 import { paintCreateSchema, paintUpdateSchema, type PaintCreateFormData, type PaintUpdateFormData } from "../../../schemas";
 import type { PaintFormula, Paint } from "../../../types";
-import { useAvailableComponents, usePaintType } from "../../../hooks";
+import { useAvailableComponents, usePaintType, usePaintBrandsForSelection, usePaintTypes } from "../../../hooks";
 import { serializeFormToUrlParams, deserializeUrlParamsToForm, debounce } from "@/utils/url-form-state";
 
 // Import form field components
@@ -113,18 +113,18 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
   }, [props.currentStep]);
 
   // Default values for create mode - merge URL params with defaults
-  const createDefaults: PaintCreateFormData = {
+  const createDefaults = {
     name: "",
     hex: "#000000",
     finish: "SOLID",
-    paintBrandId: null,
+    paintBrandId: "",
     manufacturer: null,
     tags: [],
     paintTypeId: "",
     groundIds: [],
     ...defaultValues,
     ...(mode === "create" ? initialUrlState.formData : {}),
-  };
+  } as PaintCreateFormData;
 
   const form = useForm<PaintCreateFormData | PaintUpdateFormData>({
     resolver: zodResolver(mode === "create" ? paintCreateSchema : paintUpdateSchema),
@@ -180,6 +180,29 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
       return () => subscription.unsubscribe();
     }
   }, [form, formulas, currentStep, debouncedUpdateUrl, mode]);
+
+  // Fetch paint types and brands for auto-defaults (create mode only)
+  const { data: paintTypesData } = usePaintTypes({ orderBy: { name: "asc" } });
+  const { data: paintBrandsData } = usePaintBrandsForSelection({ enabled: true });
+
+  // Auto-default "Laca" for paint type and "Farben" for paint brand in create mode
+  useEffect(() => {
+    if (mode !== "create") return;
+    const currentTypeId = form.getValues("paintTypeId");
+    if (!currentTypeId && paintTypesData?.data) {
+      const laca = paintTypesData.data.find((t) => t.name.toLowerCase() === "laca");
+      if (laca) form.setValue("paintTypeId", laca.id);
+    }
+  }, [paintTypesData?.data, mode, form]);
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    const currentBrandId = form.getValues("paintBrandId");
+    if (!currentBrandId && paintBrandsData?.data) {
+      const farben = paintBrandsData.data.find((b) => b.name.toLowerCase() === "farben");
+      if (farben) form.setValue("paintBrandId", farben.id);
+    }
+  }, [paintBrandsData?.data, mode, form]);
 
   // Watch paint type and paint brand selection for dual filtering
   const paintTypeId = form.watch("paintTypeId");
@@ -389,7 +412,7 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
 
       // Immediately update URL with new step
       if (mode === "create") {
-        const params = serializeFormToUrlParams(form.getValues(), formulas, newStep);
+        const params = serializeFormToUrlParams(form.getValues() as Partial<PaintCreateFormData>, formulas, newStep);
         setSearchParams(params, { replace: true });
       } else if (mode === "update") {
         const params = new URLSearchParams(searchParams);
@@ -408,7 +431,7 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
 
       // Immediately update URL with new step
       if (mode === "create") {
-        const params = serializeFormToUrlParams(form.getValues(), formulas, newStep);
+        const params = serializeFormToUrlParams(form.getValues() as Partial<PaintCreateFormData>, formulas, newStep);
         setSearchParams(params, { replace: true });
       } else if (mode === "update") {
         const params = new URLSearchParams(searchParams);
@@ -561,7 +584,7 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
                     setFormulas(newFormulas);
                     // Immediately update URL when formulas change
                     if (mode === "create") {
-                      const params = serializeFormToUrlParams(form.getValues(), newFormulas, currentStep);
+                      const params = serializeFormToUrlParams(form.getValues() as Partial<PaintCreateFormData>, newFormulas, currentStep);
                       setSearchParams(params, { replace: true });
                     }
                     // In update mode, we don't need to sync formulas to URL since they're new formulas being added

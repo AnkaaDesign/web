@@ -22,7 +22,7 @@ const EditCollaboratorPage = () => {
       },
     },
     sector: true,
-    managedSector: true,
+    ledSector: true,
     ppeSize: true, // CRITICAL: Include PPE sizes for form
     tasks: {
       orderBy: { createdAt: "desc" },
@@ -103,7 +103,7 @@ const EditCollaboratorPage = () => {
       positionId: user.positionId ?? null,
       performanceLevel: user.performanceLevel,
       sectorId: user.sectorId ?? null,
-      isSectorLeader: Boolean(user.managedSector?.id),
+      isSectorLeader: Boolean(user.ledSector?.id),
       status: user.status,
       currentStatus: user.status, // Store current status for validation
       verified: user.verified,

@@ -28,12 +28,12 @@ export default function MyTeamVacationsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Check if user is a team leader (based on managedSector relationship)
+  // Check if user is a team leader (based on ledSector relationship)
   if (!user || !isTeamLeader(user)) {
     return <Navigate to={routes.home} replace />;
   }
 
-  // Fetch users from the team leader's managed sector using secure endpoint
+  // Fetch users from the team leader's led sector using secure endpoint
   const { data: usersResponse } = useTeamStaffUsers({
     include: {
       position: {
@@ -82,7 +82,7 @@ export default function MyTeamVacationsPage() {
     return baseFilters;
   }, [selectedUserId, currentPage, pageSize]);
 
-  // Fetch vacations using secure team-staff endpoint (automatically filtered by managed sector)
+  // Fetch vacations using secure team-staff endpoint (automatically filtered by led sector)
   const { data: vacationsResponse, isLoading, refetch } = useTeamStaffVacations(vacationFilters);
   const vacations = vacationsResponse?.data || [];
   const totalRecords = vacationsResponse?.meta?.totalRecords || 0;

@@ -64,7 +64,7 @@ export const userIncludeSchema = z
         }),
       ])
       .optional(),
-    managedSector: z
+    ledSector: z
       .union([
         z.boolean(),
         z.object({
@@ -233,7 +233,7 @@ export const userOrderBySchema = z.union([
         })
         .optional(),
 
-      managedSector: z
+      ledSector: z
         .object({
           id: orderByWithNullsSchema.optional(),
           name: orderByWithNullsSchema.optional(),
@@ -292,7 +292,7 @@ export const userOrderBySchema = z.union([
           })
           .optional(),
 
-        managedSector: z
+        ledSector: z
           .object({
             id: orderByWithNullsSchema.optional(),
             name: orderByWithNullsSchema.optional(),
@@ -1105,7 +1105,7 @@ export const userCreateSchema = z
     // Required for changelog tracking
     userId: z.string().optional(),
     // Sector leader flag - when true, sets this user as manager of their sector
-    // The backend will update Sector.managerId accordingly
+    // The backend will update Sector.leaderId accordingly
     isSectorLeader: z.boolean().default(false),
   })
   .refine((data) => data.email || data.phone, {
@@ -1216,7 +1216,7 @@ export const userUpdateSchema = z
     // Store current status for validation (used by backend)
     currentStatus: z.nativeEnum(USER_STATUS).optional(),
     // Sector leader flag - when true, sets this user as manager of their sector
-    // The backend will update Sector.managerId accordingly
+    // The backend will update Sector.leaderId accordingly
     isSectorLeader: z.boolean().optional(),
   })
   .refine(

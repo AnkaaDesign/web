@@ -331,6 +331,19 @@ export function TaskPreparationView({
 
   // Default visible columns for preparation view
   const defaultVisibleColumns = useMemo(() => {
+    // Financial sector gets a focused view with financial-specific columns
+    if (userSectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
+      return new Set([
+        "name",
+        "customer.fantasyName",
+        "identificador",
+        "chassisNumber",
+        "finishedAt",
+        "invoiceToCustomers",
+        "paymentStatus",
+      ]);
+    }
+
     const baseColumns = ["name", "customer.fantasyName", "identificador"];
     const visibleServiceOrderTypes = getVisibleServiceOrderTypes(userSectorPrivilege);
     const serviceOrderColumns = visibleServiceOrderTypes.map(type => `serviceOrders.${type.toLowerCase()}`);
@@ -452,22 +465,25 @@ export function TaskPreparationView({
       },
     };
 
-    // DESIGNER users have special display logic: only show tasks with incomplete artwork SOs or no artwork SOs
-    if (isDesignerUser) {
+    // FINANCIAL users: single table with COMPLETED tasks filtered by paymentStatus != SETTLED
+    if (isFinancialUser) {
+      // Include pricing with customerConfigs for the invoiceToCustomers column
+      result.include.pricing = {
+        include: {
+          customerConfigs: {
+            include: {
+              customer: true,
+            },
+          },
+        },
+      };
+      // No shouldDisplayInPreparation — financial uses direct status + paymentStatus filter
+    } else if (isDesignerUser) {
+      // DESIGNER users have special display logic: only show tasks with incomplete artwork SOs or no artwork SOs
       result.shouldDisplayForDesigner = true;
     } else {
-      // Non-designer users use the standard preparation display logic
+      // Non-designer, non-financial users use the standard preparation display logic
       result.shouldDisplayInPreparation = true;
-
-      // Only FINANCIAL users see FINANCIAL service order requirements
-      if (!isFinancialUser) {
-        result.preparationExcludeFinancial = true;
-      }
-      // Only FINANCIAL users exclude LOGISTIC service order requirements
-      // Everyone else (ADMIN, LOGISTIC, PRODUCTION, etc.) requires LOGISTIC SOs
-      if (isFinancialUser) {
-        result.preparationExcludeLogistic = true;
-      }
     }
 
     // Remove status filter to allow any status (except CANCELLED and fully completed)
@@ -778,102 +794,37 @@ export function TaskPreparationView({
           </div>
         )}
 
-        {/* Three tables grouped by status */}
-        {/* For FINANCIAL users: Show Completed first, then In Production, then Preparation */}
+        {/* Tables grouped by status */}
+        {/* For FINANCIAL users: Single table with completed tasks not yet settled */}
         {useFinancialTableOrder ? (
           <div className="space-y-8 pb-8">
-            {/* Table 1: Concluído - First for financial */}
-            {visibleTables.includes("completed") && (
-              <div>
-                <TaskPreparationTable
-                  refetchOnWindowFocus="always"
-                  filters={{
-                    ...queryFilters,
-                    status: [TASK_STATUS.COMPLETED],
-                    limit: 1000,
-                  }}
-                  visibleColumns={visibleColumns}
-                  columnOrder={columnOrder}
-                  getColumnWidth={getColumnWidth}
-                  setColumnWidth={setColumnWidth}
-                  onDataChange={handleCompletedTableDataChange}
-                  advancedActionsRef={advancedActionsRef}
-                  onStartCopyFromTask={handleStartCopyFromTask}
-                  isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
-                  onSourceTaskSelect={handleSourceTaskSelected}
-                  onShiftClickSelect={handleShiftClickSelect}
-                  onSingleClickSelect={handleSingleClickSelect}
-                  externalExpandedGroups={expandedGroups}
-                  onExpandedGroupsChange={setExpandedGroups}
-                  onGroupsDetected={handleGroupsDetected}
-                  onOrderedTaskIdsChange={handleCompletedOrderedIdsChange}
-                  showSelectedOnly={showSelectedOnly}
-                  allOrderedTaskIds={allOrderedTaskIds}
-                />
-              </div>
-            )}
-
-            {/* Table 2: Em Produção */}
-            {visibleTables.includes("production") && (
-              <div>
-                <TaskPreparationTable
-                  refetchOnWindowFocus="always"
-                  filters={{
-                    ...queryFilters,
-                    status: [TASK_STATUS.IN_PRODUCTION],
-                    limit: 1000,
-                  }}
-                  visibleColumns={visibleColumns}
-                  columnOrder={columnOrder}
-                  getColumnWidth={getColumnWidth}
-                  setColumnWidth={setColumnWidth}
-                  onDataChange={handleProductionTableDataChange}
-                  advancedActionsRef={advancedActionsRef}
-                  onStartCopyFromTask={handleStartCopyFromTask}
-                  isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
-                  onSourceTaskSelect={handleSourceTaskSelected}
-                  onShiftClickSelect={handleShiftClickSelect}
-                  onSingleClickSelect={handleSingleClickSelect}
-                  externalExpandedGroups={expandedGroups}
-                  onExpandedGroupsChange={setExpandedGroups}
-                  onGroupsDetected={handleGroupsDetected}
-                  onOrderedTaskIdsChange={handleProductionOrderedIdsChange}
-                  showSelectedOnly={showSelectedOnly}
-                  allOrderedTaskIds={allOrderedTaskIds}
-                />
-              </div>
-            )}
-
-            {/* Table 3: Em Preparação + Aguardando Produção */}
-            {visibleTables.includes("preparation") && (
-              <div>
-                <TaskPreparationTable
-                  refetchOnWindowFocus="always"
-                  filters={{
-                    ...queryFilters,
-                    status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION],
-                    limit: 1000,
-                  }}
-                  visibleColumns={visibleColumns}
-                  columnOrder={columnOrder}
-                  getColumnWidth={getColumnWidth}
-                  setColumnWidth={setColumnWidth}
-                  onDataChange={handlePreparationTableDataChange}
-                  advancedActionsRef={advancedActionsRef}
-                  onStartCopyFromTask={handleStartCopyFromTask}
-                  isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
-                  onSourceTaskSelect={handleSourceTaskSelected}
-                  onShiftClickSelect={handleShiftClickSelect}
-                  onSingleClickSelect={handleSingleClickSelect}
-                  externalExpandedGroups={expandedGroups}
-                  onExpandedGroupsChange={setExpandedGroups}
-                  onGroupsDetected={handleGroupsDetected}
-                  onOrderedTaskIdsChange={handlePreparationOrderedIdsChange}
-                  showSelectedOnly={showSelectedOnly}
-                  allOrderedTaskIds={allOrderedTaskIds}
-                />
-              </div>
-            )}
+            <div>
+              <TaskPreparationTable
+                refetchOnWindowFocus="always"
+                filters={{
+                  ...queryFilters,
+                  status: [TASK_STATUS.COMPLETED],
+                  limit: 1000,
+                }}
+                visibleColumns={visibleColumns}
+                columnOrder={columnOrder}
+                getColumnWidth={getColumnWidth}
+                setColumnWidth={setColumnWidth}
+                onDataChange={handleCompletedTableDataChange}
+                advancedActionsRef={advancedActionsRef}
+                onStartCopyFromTask={handleStartCopyFromTask}
+                isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+                onSourceTaskSelect={handleSourceTaskSelected}
+                onShiftClickSelect={handleShiftClickSelect}
+                onSingleClickSelect={handleSingleClickSelect}
+                externalExpandedGroups={expandedGroups}
+                onExpandedGroupsChange={setExpandedGroups}
+                onGroupsDetected={handleGroupsDetected}
+                onOrderedTaskIdsChange={handleCompletedOrderedIdsChange}
+                showSelectedOnly={showSelectedOnly}
+                allOrderedTaskIds={allOrderedTaskIds}
+              />
+            </div>
           </div>
         ) : (
           <div className="space-y-8 pb-8">

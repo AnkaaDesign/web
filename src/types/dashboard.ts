@@ -576,6 +576,7 @@ export interface HomeDashboardTask {
   serialNumber: string | null;
   plate: string | null;
   status: string;
+  paymentStatus?: string | null;
   term: string | null;
   forecastDate: string | null;
   customerName: string | null;
@@ -621,7 +622,7 @@ export interface HomeDashboardData {
   openServiceOrders?: HomeDashboardServiceOrder[];
   lowStockItems?: HomeDashboardLowStockItem[];
   completedTasks?: HomeDashboardTask[];
-  openFinancialSOs?: HomeDashboardServiceOrder[];
+  tasksAwaitingPaymentApproval?: HomeDashboardTask[];
   recentMessages?: HomeDashboardMessage[];
   counts: {
     tasksCloseDeadline?: number;
@@ -629,7 +630,7 @@ export interface HomeDashboardData {
     openServiceOrders?: number;
     lowStockItems?: number;
     completedTasks?: number;
-    openFinancialSOs?: number;
+    tasksAwaitingPaymentApproval?: number;
     recentMessages?: number;
     unreadMessages?: number;
   };

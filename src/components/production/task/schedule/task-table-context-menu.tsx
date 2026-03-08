@@ -4,7 +4,7 @@ import { IconPlayerPlay, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, Ic
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
 import { useAuth } from "@/contexts/auth-context";
-import { canEditTasks, canDeleteTasks, canLeaderManageTask } from "@/utils/permissions/entity-permissions";
+import { canEditTasks, canDeleteTasks, canLeaderManageTask, canFinishTask } from "@/utils/permissions/entity-permissions";
 import { isTeamLeader } from "@/utils/user";
 
 interface TaskTableContextMenuProps {
@@ -37,10 +37,11 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
   const canEdit = canEditTasks(user); // ADMIN, DESIGNER, FINANCIAL, LOGISTIC
   const canDelete = canDeleteTasks(user); // ADMIN only
 
-  // Team leaders can only manage tasks in their managed sector or tasks without sector
-  // Team leadership is now determined by managedSector relationship
+  // Team leaders can only manage tasks in their led sector or tasks without sector
+  // Team leadership is now determined by ledSector relationship
   const canLeaderManageTheseTasks = isTeamLeaderUser && tasks.every((t) => canLeaderManageTask(user, t.sectorId));
   const canManageStatus = isAdmin || canLeaderManageTheseTasks;
+  const canFinish = canFinishTask(user);
 
   // No context menu if user has no permissions at all
   if (!canEdit && !canManageStatus) {
@@ -70,7 +71,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           </DropdownMenuItem>
         )}
 
-        {canManageStatus && hasInProgressTasks && (
+        {canFinish && hasInProgressTasks && (
           <DropdownMenuItem onClick={() => handleAction("finish")} className="text-green-700 hover:text-white">
             <IconCheck className="mr-2 h-4 w-4" />
             Finalizar
@@ -78,7 +79,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         )}
 
         {/* Separator if we have status actions */}
-        {canManageStatus && (hasWaitingProductionTasks || hasPreparationTasks || hasInProgressTasks) && <DropdownMenuSeparator />}
+        {((canManageStatus && (hasWaitingProductionTasks || hasPreparationTasks)) || (canFinish && hasInProgressTasks)) && <DropdownMenuSeparator />}
 
         {/* Edit action - ADMIN, DESIGNER, FINANCIAL, LOGISTIC */}
         {canEdit && (

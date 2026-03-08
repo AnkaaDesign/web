@@ -11,7 +11,7 @@ import { SetStatusModal } from "../schedule/set-status-modal";
 import { SetSectorModal } from "../schedule/set-sector-modal";
 import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { useAuth } from "@/contexts/auth-context";
-import { canDeleteTasks } from "@/utils/permissions/entity-permissions";
+import { canDeleteTasks, canFinishTask } from "@/utils/permissions/entity-permissions";
 import { isTeamLeader } from "@/utils/user";
 import { canLeaderManageTask } from "@/utils/permissions/entity-permissions";
 import {
@@ -75,9 +75,10 @@ export function TaskHistoryContextMenu({
   const isTeamLeaderUser = user ? isTeamLeader(user as any) : false;
   const canDelete = canDeleteTasks(user as any);
 
-  // Team leaders can only manage tasks in their managed sector or tasks without sector
+  // Team leaders can only manage tasks in their led sector or tasks without sector
   const canLeaderManageTheseTasks = isTeamLeaderUser && tasks.every((t) => canLeaderManageTask(user as any, t.sectorId));
   const canManageStatus = isAdmin || canLeaderManageTheseTasks;
+  const canFinish = canFinishTask(user as any);
 
   // FINANCIAL users should only see View and Edit options
   const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
@@ -588,7 +589,7 @@ export function TaskHistoryContextMenu({
             </DropdownMenuItem>
           )}
 
-          {canManageStatus && hasInProgressTasks && (
+          {canFinish && hasInProgressTasks && (
             <DropdownMenuItem onClick={handleFinish} className="text-green-700 hover:text-white">
               <IconCheck className="mr-2 h-4 w-4" />
               <span className="truncate">Finalizar</span>
@@ -596,7 +597,7 @@ export function TaskHistoryContextMenu({
           )}
 
           {/* Separator if we have status actions */}
-          {(hasPreparationTasks || (canManageStatus && (hasInProgressTasks || hasPreparationTasks || hasWaitingProductionTasks))) && <DropdownMenuSeparator />}
+          {(hasPreparationTasks || (canManageStatus && (hasPreparationTasks || hasWaitingProductionTasks)) || (canFinish && hasInProgressTasks)) && <DropdownMenuSeparator />}
 
           {/* View action - single selection only */}
           {!isBulk && task && (

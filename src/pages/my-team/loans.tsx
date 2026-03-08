@@ -38,12 +38,12 @@ export const TeamLoansPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Check if user is a team leader (based on managedSector relationship)
+  // Check if user is a team leader (based on ledSector relationship)
   if (!currentUser || !isTeamLeader(currentUser)) {
     return <Navigate to={routes.home} replace />;
   }
 
-  // Fetch users from the team leader's managed sector using secure endpoint
+  // Fetch users from the team leader's led sector using secure endpoint
   const { data: usersResponse } = useTeamStaffUsers({
     include: {
       position: {
@@ -104,7 +104,7 @@ export const TeamLoansPage = () => {
     return baseFilters;
   }, [selectedUserId, selectedStatus, debouncedSearchTerm, currentPage, pageSize]);
 
-  // Fetch borrows using secure team-staff endpoint (automatically filtered by managed sector)
+  // Fetch borrows using secure team-staff endpoint (automatically filtered by led sector)
   const { data: borrowsResponse, isLoading, refetch } = useTeamStaffBorrows(borrowFilters);
   const borrows = borrowsResponse?.data || [];
   const totalRecords = borrowsResponse?.meta?.totalRecords || 0;
@@ -151,7 +151,7 @@ export const TeamLoansPage = () => {
     const excelContent = [
       ["Relatório de Empréstimos da Equipe"],
       [`Data: ${formatDateTime(new Date())}`],
-      [`Setor: ${currentUser?.sector?.name || currentUser?.managedSector?.name || "N/A"}`],
+      [`Setor: ${currentUser?.sector?.name || currentUser?.ledSector?.name || "N/A"}`],
       [],
       ["Colaborador", "E-mail", "Cargo", "Item", "Código", "Quantidade", "Status", "Data Empréstimo", "Data Devolução", "Dias Emprestado"],
       ...borrows.map((borrow) => {
@@ -182,7 +182,7 @@ export const TeamLoansPage = () => {
     link.download = `emprestimos_equipe_${new Date().toISOString().split("T")[0]}.xls`;
     link.click();
     toast.success("Arquivo Excel exportado com sucesso!");
-  }, [borrows, currentUser?.sector?.name, currentUser?.managedSector?.name]);
+  }, [borrows, currentUser?.sector?.name, currentUser?.ledSector?.name]);
 
   // Clear filters
   const clearFilters = () => {

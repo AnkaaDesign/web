@@ -188,6 +188,7 @@ export const CustomerLogoDisplay: React.FC<CustomerLogoDisplayProps> = ({
   bordered = true,
 }) => {
   const initials = React.useMemo(() => {
+    if (!customerName) return '??';
     const words = customerName.trim().split(/\s+/);
     if (words.length >= 2) {
       return `${words[0][0]}${words[1][0]}`.toUpperCase();

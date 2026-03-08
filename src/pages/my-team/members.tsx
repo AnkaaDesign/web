@@ -32,7 +32,7 @@ export const TeamMembersPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  if (!currentUser || !currentUser.managedSector) {
+  if (!currentUser || !currentUser.ledSector) {
     return <Navigate to={routes.home} replace />;
   }
 
@@ -98,7 +98,7 @@ export const TeamMembersPage = () => {
     const excelContent = [
       ["Relatório de Membros da Equipe"],
       [`Data: ${formatDate(new Date())}`],
-      [`Setor: ${currentUser?.managedSector?.name || "N/A"}`],
+      [`Setor: ${currentUser?.ledSector?.name || "N/A"}`],
       [],
       ["Nome", "E-mail", "Cargo", "Setor", "Admissão", "Status"],
       ...users.map((user) => [
@@ -119,7 +119,7 @@ export const TeamMembersPage = () => {
     link.download = `membros_equipe_${new Date().toISOString().split("T")[0]}.xls`;
     link.click();
     toast.success("Arquivo Excel exportado com sucesso!");
-  }, [users, currentUser?.managedSector?.name]);
+  }, [users, currentUser?.ledSector?.name]);
 
   const clearFilters = () => {
     setSearchTerm("");

@@ -35,6 +35,7 @@ export const PaintEffectsShowcase: React.FC = () => {
     paintTypeId: "sample-type",
     paintBrandId: null,
     colorPreview: null,
+    previewConfig: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     paintType: {

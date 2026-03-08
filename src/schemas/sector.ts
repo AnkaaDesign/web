@@ -22,7 +22,7 @@ export const sectorIncludeSchema = z
               preference: z.boolean().optional(),
               position: z.boolean().optional(),
               sector: z.boolean().optional(),
-              managedSector: z.boolean().optional(),
+              ledSector: z.boolean().optional(),
               activities: z.boolean().optional(),
               borrows: z.boolean().optional(),
               notifications: z.boolean().optional(),
@@ -34,7 +34,7 @@ export const sectorIncludeSchema = z
         }),
       ])
       .optional(),
-    managedByUsers: z
+    leader: z
       .union([
         z.boolean(),
         z.object({
@@ -44,7 +44,7 @@ export const sectorIncludeSchema = z
               preference: z.boolean().optional(),
               position: z.boolean().optional(),
               sector: z.boolean().optional(),
-              managedSector: z.boolean().optional(),
+              ledSector: z.boolean().optional(),
               activities: z.boolean().optional(),
               borrows: z.boolean().optional(),
               notifications: z.boolean().optional(),
@@ -229,11 +229,10 @@ export const sectorWhereSchema: z.ZodSchema = z.lazy(() =>
         })
         .optional(),
 
-      managedByUsers: z
+      leader: z
         .object({
-          some: z.object({}).optional(),
-          every: z.object({}).optional(),
-          none: z.object({}).optional(),
+          is: z.object({}).optional(),
+          isNot: z.object({}).optional(),
         })
         .optional(),
 

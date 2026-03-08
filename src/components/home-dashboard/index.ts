@@ -5,5 +5,6 @@ export { TaskDeadlineList } from "./task-deadline-list";
 export { ServiceOrderList } from "./service-order-list";
 export { LowStockList } from "./low-stock-list";
 export { CompletedTasksList } from "./completed-tasks-list";
+export { AwaitingApprovalTasksList } from "./awaiting-approval-tasks-list";
 export { RecentMessagesList } from "./recent-messages-list";
 export { TimeEntriesCard } from "./time-entries-card";

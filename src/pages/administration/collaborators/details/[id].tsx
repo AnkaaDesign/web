@@ -29,7 +29,7 @@ const CollaboratorDetailsPage = () => {
     include: {
       position: true,
       sector: true,
-      managedSector: true,
+      ledSector: true,
       ppeSize: true,
       avatar: true,
       activities: {

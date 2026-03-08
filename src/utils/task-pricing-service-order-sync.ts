@@ -2,18 +2,17 @@
  * Task Pricing and Production Service Order Bidirectional Synchronization Utilities
  *
  * This module provides synchronization logic for the frontend form between
- * TaskPricingItems and Production Service Orders. The sync happens in real-time
+ * TaskPricingServices and Production Service Orders. The sync happens in real-time
  * as the user edits the form.
  *
- * Sync Rules:
- * 1. Service Order (PRODUCTION) → Task Pricing Item:
- *    - description + " " + observation → pricing item description
+ * Sync Rules (1:1 mapping):
+ * 1. Service Order (PRODUCTION) → Task Pricing Service:
+ *    - description → description, observation → observation (separately)
  *    - Amount defaults to 0
  *
- * 2. Task Pricing Item → Service Order (PRODUCTION):
- *    - Find existing SO description that matches the start of pricing item
- *    - If found: SO.description = matched part, SO.observation = rest
- *    - If not found: SO.description = full text, no observation
+ * 2. Task Pricing Service → Service Order (PRODUCTION):
+ *    - description → description, observation → observation (separately)
+ *    - Match is based on description only
  */
 
 import { SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from '../constants';
@@ -29,33 +28,12 @@ export interface SyncServiceOrder {
   shouldSync?: boolean; // When false, this item should not participate in sync
 }
 
-export interface SyncPricingItem {
+export interface SyncPricingService {
   id?: string;
   description: string;
   observation?: string | null;
   amount?: number | null;
-  shouldSync?: boolean; // When false, this item should not participate in sync
-}
-
-/**
- * Combines service order description and observation into a single pricing item description.
- */
-export function combineServiceOrderToPricingDescription(
-  description: string | null | undefined,
-  observation?: string | null,
-): string {
-  const trimmedDescription = (description || '').trim();
-  const trimmedObservation = (observation || '').trim();
-
-  if (!trimmedDescription) {
-    return trimmedObservation;
-  }
-
-  if (!trimmedObservation) {
-    return trimmedDescription;
-  }
-
-  return `${trimmedDescription} ${trimmedObservation}`;
+  shouldSync?: boolean; // When false, this service should not participate in sync
 }
 
 /**
@@ -74,122 +52,27 @@ export function areDescriptionsEqual(desc1: string | null | undefined, desc2: st
 }
 
 /**
- * Splits a pricing item description back into service order description and observation.
+ * Gets the pricing services that should be created/exist based on PRODUCTION service orders.
+ * Returns services that need to be added to pricing.
  *
- * Algorithm:
- * 1. Look through BOTH existing service orders AND historical descriptions
- * 2. Find the longest description that matches the START of the pricing item
- * 3. Use that as the SO description, rest as observation
- * 4. If no match found, use full pricing item description as SO description
- *
- * @param pricingDescription - The pricing item description to split
- * @param existingServiceOrders - Current task's service orders
- * @param historicalDescriptions - Historical service order descriptions from database (optional)
- */
-export function splitPricingToServiceOrderDescription(
-  pricingDescription: string,
-  existingServiceOrders: SyncServiceOrder[],
-  historicalDescriptions: string[] = [],
-): { description: string; observation: string | null } {
-  const trimmedPricing = pricingDescription.trim();
-
-  if (!trimmedPricing) {
-    return { description: '', observation: null };
-  }
-
-  // Collect unique descriptions from multiple sources
-  const uniqueDescriptions = new Map<string, string>();
-
-  // 1. Add historical descriptions (from database) - these take priority
-  for (const desc of historicalDescriptions) {
-    const trimmedDesc = (desc || '').trim();
-    if (trimmedDesc) {
-      const lowerDesc = trimmedDesc.toLowerCase();
-      if (!uniqueDescriptions.has(lowerDesc)) {
-        uniqueDescriptions.set(lowerDesc, trimmedDesc);
-      }
-    }
-  }
-
-  // 2. Add descriptions from current task's PRODUCTION service orders
-  const productionOrders = existingServiceOrders.filter(
-    so => so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.description
-  );
-
-  for (const so of productionOrders) {
-    const desc = (so.description || '').trim();
-    if (desc) {
-      const lowerDesc = desc.toLowerCase();
-      if (!uniqueDescriptions.has(lowerDesc)) {
-        uniqueDescriptions.set(lowerDesc, desc);
-      }
-    }
-  }
-
-  // Sort by length (longest first) to find the best match
-  const sortedDescriptions = Array.from(uniqueDescriptions.values())
-    .sort((a, b) => b.length - a.length);
-
-  const pricingLower = trimmedPricing.toLowerCase();
-
-  for (const soDescription of sortedDescriptions) {
-    const soLower = soDescription.toLowerCase();
-
-    // Check if pricing description starts with this SO description
-    // Also ensure there's a space after the match (to avoid partial word matches)
-    if (pricingLower.startsWith(soLower)) {
-      const rest = trimmedPricing.substring(soDescription.length).trim();
-
-      // Only split if the rest starts with a space in the original (word boundary)
-      // This prevents "PINTURA" from matching "PINTURA GERAL" incorrectly
-      const charAfterMatch = trimmedPricing.charAt(soDescription.length);
-      const isWordBoundary = !charAfterMatch || charAfterMatch === ' ';
-
-      if (isWordBoundary) {
-        if (rest) {
-          return {
-            description: soDescription,
-            observation: rest,
-          };
-        } else {
-          return {
-            description: soDescription,
-            observation: null,
-          };
-        }
-      }
-    }
-  }
-
-  // No matching prefix found - use full description
-  return {
-    description: trimmedPricing,
-    observation: null,
-  };
-}
-
-/**
- * Gets the pricing items that should be created/exist based on PRODUCTION service orders.
- * Returns items that need to be added to pricing.
- *
- * NEW APPROACH: Since TaskPricingItem now has its own observation field,
+ * NEW APPROACH: Since TaskPricingService now has its own observation field,
  * we sync description → description and observation → observation separately.
  * Match is based on description only (not combined).
  */
-export function getPricingItemsToAddFromServiceOrders(
+export function getPricingServicesToAddFromServiceOrders(
   serviceOrders: SyncServiceOrder[],
-  existingPricingItems: SyncPricingItem[],
-): SyncPricingItem[] {
-  const itemsToAdd: SyncPricingItem[] = [];
+  existingPricingServices: SyncPricingService[],
+): SyncPricingService[] {
+  const servicesToAdd: SyncPricingService[] = [];
   // Match based on description only (not combined with observation)
   const existingDescriptions = new Set(
-    existingPricingItems.map(item => normalizeDescription(item.description))
+    existingPricingServices.map(item => normalizeDescription(item.description))
   );
 
-  // CRITICAL: Also track descriptions of pricing items with shouldSync = false
+  // CRITICAL: Also track descriptions of pricing services with shouldSync = false
   // These should never be recreated by sync
   const noSyncDescriptions = new Set(
-    existingPricingItems
+    existingPricingServices
       .filter(item => item.shouldSync === false)
       .map(item => normalizeDescription(item.description))
   );
@@ -203,10 +86,10 @@ export function getPricingItemsToAddFromServiceOrders(
 
     const normalizedDesc = normalizeDescription(so.description);
 
-    // Check if this pricing item already exists (by description only)
+    // Check if this pricing service already exists (by description only)
     // OR if it was previously deleted (shouldSync = false)
     if (!existingDescriptions.has(normalizedDesc) && !noSyncDescriptions.has(normalizedDesc)) {
-      itemsToAdd.push({
+      servicesToAdd.push({
         description: so.description.trim(),
         observation: so.observation || null, // Sync observation separately
         amount: 0,
@@ -216,23 +99,23 @@ export function getPricingItemsToAddFromServiceOrders(
     }
   }
 
-  return itemsToAdd;
+  return servicesToAdd;
 }
 
 /**
- * Gets the service orders that should be created/exist based on pricing items.
- * Returns items that need to be added to service orders.
+ * Gets the service orders that should be created/exist based on pricing services.
+ * Returns services that need to be added to service orders.
  *
- * NEW APPROACH: Since TaskPricingItem now has its own observation field,
+ * NEW APPROACH: Since TaskPricingService now has its own observation field,
  * we sync description → description and observation → observation separately.
  * Match is based on description only (not combined).
  *
- * @param pricingItems - Current pricing items
+ * @param pricingServices - Current pricing services
  * @param existingServiceOrders - Current task's service orders
  * @param historicalDescriptions - Historical service order descriptions from database (optional, no longer used)
  */
-export function getServiceOrdersToAddFromPricingItems(
-  pricingItems: SyncPricingItem[],
+export function getServiceOrdersToAddFromPricingServices(
+  pricingServices: SyncPricingService[],
   existingServiceOrders: SyncServiceOrder[],
   _historicalDescriptions: string[] = [],
 ): SyncServiceOrder[] {
@@ -253,9 +136,9 @@ export function getServiceOrdersToAddFromPricingItems(
       .map(so => normalizeDescription(so.description))
   );
 
-  for (const item of pricingItems) {
+  for (const item of pricingServices) {
     if (!item.description || item.description.trim().length < 3) continue;
-    // CRITICAL: Skip pricing items with shouldSync = false
+    // CRITICAL: Skip pricing services with shouldSync = false
     if (item.shouldSync === false) continue;
 
     const normalizedItemDesc = normalizeDescription(item.description);
@@ -282,31 +165,31 @@ export function getServiceOrdersToAddFromPricingItems(
 }
 
 /**
- * Checks if a service order matches a pricing item (by description only).
+ * Checks if a service order matches a pricing service (by description only).
  * NEW APPROACH: Match based on description only since observation is now a separate field.
  */
-export function isServiceOrderMatchingPricingItem(
+export function isServiceOrderMatchingPricingService(
   serviceOrder: SyncServiceOrder,
-  pricingItem: SyncPricingItem,
+  pricingService: SyncPricingService,
 ): boolean {
   if (serviceOrder.type !== SERVICE_ORDER_TYPE.PRODUCTION) {
     return false;
   }
 
-  return areDescriptionsEqual(serviceOrder.description, pricingItem.description);
+  return areDescriptionsEqual(serviceOrder.description, pricingService.description);
 }
 
 /**
- * Syncs observations from service orders to matching pricing items.
- * Returns updated pricing items array with observations synced.
+ * Syncs observations from service orders to matching pricing services.
+ * Returns updated pricing services array with observations synced.
  *
  * This function propagates both set and cleared observations.
- * If the service order's observation is empty/null, it will clear the pricing item's observation.
+ * If the service order's observation is empty/null, it will clear the pricing service's observation.
  */
 export function syncObservationsFromServiceOrdersToPricing(
   serviceOrders: SyncServiceOrder[],
-  pricingItems: SyncPricingItem[],
-): SyncPricingItem[] {
+  pricingServices: SyncPricingService[],
+): SyncPricingService[] {
   // Create a map of normalized description -> observation from service orders
   // Include ALL matched descriptions, even with empty observations
   const soObservationMap = new Map<string, string | null>();
@@ -319,8 +202,8 @@ export function syncObservationsFromServiceOrdersToPricing(
     soObservationMap.set(normalizedDesc, observationValue);
   }
 
-  // Update pricing items with matching observations
-  return pricingItems.map(item => {
+  // Update pricing services with matching observations
+  return pricingServices.map(item => {
     if (!item.description || item.description.trim().length < 3) return item;
     const normalizedDesc = normalizeDescription(item.description);
     if (soObservationMap.has(normalizedDesc)) {
@@ -336,20 +219,20 @@ export function syncObservationsFromServiceOrdersToPricing(
 }
 
 /**
- * Syncs observations from pricing items to matching service orders.
+ * Syncs observations from pricing services to matching service orders.
  * Returns updated service orders array with observations synced.
  *
  * This function propagates both set and cleared observations.
- * If the pricing item's observation is empty/null, it will clear the service order's observation.
+ * If the pricing service's observation is empty/null, it will clear the service order's observation.
  */
 export function syncObservationsFromPricingToServiceOrders(
-  pricingItems: SyncPricingItem[],
+  pricingServices: SyncPricingService[],
   serviceOrders: SyncServiceOrder[],
 ): SyncServiceOrder[] {
-  // Create a map of normalized description -> observation from pricing items
+  // Create a map of normalized description -> observation from pricing services
   // Include ALL matched descriptions, even with empty observations
   const pricingObservationMap = new Map<string, string | null>();
-  for (const item of pricingItems) {
+  for (const item of pricingServices) {
     if (!item.description || item.description.trim().length < 3) continue;
     const normalizedDesc = normalizeDescription(item.description);
     // Store the observation value (or null if empty)

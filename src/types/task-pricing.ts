@@ -1,41 +1,47 @@
 import type { BaseEntity } from './common';
 import type { File } from './file';
-import type { Responsible } from './responsible';
+import type { Installment } from './invoice';
 
-export type TASK_PRICING_STATUS = 'DRAFT' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+export type TASK_PRICING_STATUS = 'PENDING' | 'BUDGET_APPROVED' | 'VERIFIED' | 'INTERNAL_APPROVED' | 'UPCOMING' | 'PARTIAL' | 'SETTLED';
 export type DISCOUNT_TYPE = 'NONE' | 'PERCENTAGE' | 'FIXED_VALUE';
-export type PAYMENT_CONDITION =
-  | 'CASH'           // Single payment
-  | 'INSTALLMENTS_2' // Down payment + 1 installment (20 days)
-  | 'INSTALLMENTS_3' // Down payment + 2 installments (20/40 days)
-  | 'INSTALLMENTS_4' // Down payment + 3 installments (20/40/60 days)
-  | 'INSTALLMENTS_5' // Down payment + 4 installments (20/40/60/80 days)
-  | 'INSTALLMENTS_6' // Down payment + 5 installments (20/40/60/80/100 days)
-  | 'INSTALLMENTS_7' // Down payment + 6 installments (20/40/60/80/100/120 days)
-  | 'CUSTOM';        // Custom payment terms
 
-export interface TaskPricingItem extends BaseEntity {
+export interface TaskPricingService extends BaseEntity {
   description: string;
   observation?: string | null;
   amount: number;
   pricingId: string;
   shouldSync: boolean; // Controls bidirectional sync with ServiceOrder
+  invoiceToCustomerId?: string | null;
+  invoiceToCustomer?: { id: string; corporateName?: string; fantasyName: string; cnpj?: string | null };
   pricing?: TaskPricing;
 }
 
-export interface TaskPricing extends BaseEntity {
-  budgetNumber: number; // Auto-generated sequential number for display
+export interface TaskPricingCustomerConfig extends BaseEntity {
+  pricingId: string;
+  customerId: string;
   subtotal: number;
   discountType: DISCOUNT_TYPE;
   discountValue: number | null;
   total: number;
+  customPaymentText: string | null;
+  responsibleId?: string | null;
+  discountReference?: string | null;
+  paymentCondition?: string | null;
+  downPaymentDate?: Date | null;
+  customerSignatureId?: string | null;
+  customerSignature?: File;
+  customer?: { id: string; corporateName?: string; fantasyName: string; cnpj?: string | null };
+  responsible?: { id: string; name: string; role: string };
+  installments?: Installment[];
+}
+
+export interface TaskPricing extends BaseEntity {
+  budgetNumber: number; // Auto-generated sequential number for display
+  subtotal: number; // Aggregate: sum of config subtotals
+  total: number; // Aggregate: sum of config totals
   expiresAt: Date;
   status: TASK_PRICING_STATUS;
-
-  // Payment Terms (simplified)
-  paymentCondition: PAYMENT_CONDITION | null;
-  downPaymentDate: Date | null;
-  customPaymentText: string | null;
+  statusOrder: number;
 
   // Guarantee Terms
   guaranteeYears: number | null;
@@ -48,24 +54,9 @@ export interface TaskPricing extends BaseEntity {
   layoutFileId: string | null;
   layoutFile?: File;
 
-  // Customer Signature (uploaded by customer on public page)
-  customerSignatureId: string | null;
-  customerSignature?: File;
-
-  // Budget responsible
-  responsibleId: string | null;
-  responsible?: Responsible;
-
-  // New fields from migration
   simultaneousTasks: number | null; // Number of simultaneous tasks (1-100)
-  discountReference: string | null; // Reference/justification for discount
-  invoicesToCustomerIds?: string[]; // IDs of customers to invoice
-  invoicesToCustomers?: Array<{ // Full customer objects for display
-    id: string;
-    corporateName?: string;
-    fantasyName?: string;
-  }>;
 
   task?: any;  // One-to-one relationship with task
-  items?: TaskPricingItem[];
+  services?: TaskPricingService[];
+  customerConfigs?: TaskPricingCustomerConfig[];
 }

@@ -167,16 +167,16 @@ export function formatTaskSummary(task: Task): string {
 }
 
 /**
- * Calculate task price from pricing total (only APPROVED pricing)
+ * Calculate task price from pricing total (only BUDGET_APPROVED or later pricing)
  */
 export function calculateTaskPrice(task: Task): number {
   if (!task.pricing) return 0;
-  if (task.pricing.status !== 'APPROVED') return 0;
+  if (task.pricing.status === 'PENDING') return 0;
   return task.pricing.total || 0;
 }
 
 /**
- * Get task price from APPROVED pricing (alias for calculateTaskPrice)
+ * Get task price from approved pricing (alias for calculateTaskPrice)
  */
 export function getTaskPrice(task: Task): number {
   return calculateTaskPrice(task);
@@ -394,11 +394,14 @@ export function isPricingExpired(pricing: TaskPricing): boolean {
  * Get pricing status label in Portuguese
  */
 export function getPricingStatusLabel(status: string): string {
-  const labels = {
-    DRAFT: 'Rascunho',
-    APPROVED: 'Aprovado',
-    REJECTED: 'Rejeitado',
-    CANCELLED: 'Cancelado',
+  const labels: Record<string, string> = {
+    PENDING: 'Pendente',
+    BUDGET_APPROVED: 'Orçamento Aprovado',
+    VERIFIED: 'Verificado',
+    INTERNAL_APPROVED: 'Aprovado Internamente',
+    UPCOMING: 'A Vencer',
+    PARTIAL: 'Parcial',
+    SETTLED: 'Liquidado',
   };
-  return labels[status as keyof typeof labels] || status;
+  return labels[status] || status;
 }

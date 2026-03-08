@@ -20,7 +20,7 @@ import { CpfCell } from "./cells/cpf-cell";
 import { PhoneCell } from "./cells/phone-cell";
 import { PositionCell } from "./cells/position-cell";
 import { SectorCell } from "./cells/sector-cell";
-import { ManagedSectorCell } from "./cells/managed-sector-cell";
+import { LedSectorCell } from "./cells/led-sector-cell";
 
 // Schema for batch edit form - matches UserBatchEditFormData type
 const userBatchEditSchema = z.object({
@@ -38,7 +38,7 @@ const userBatchEditSchema = z.object({
           // Relationships
           positionId: z.string().uuid("ID do cargo inválido").nullable().optional(),
           sectorId: z.string().uuid("ID do setor inválido").nullable().optional(),
-          managedSectorId: z.string().uuid("ID do setor gerenciado inválido").nullable().optional(),
+          ledSectorId: z.string().uuid("ID do setor liderado inválido").nullable().optional(),
 
           // Status - use enum type that matches UserBatchEditFormData
           status: z.nativeEnum(USER_STATUS).optional(),
@@ -74,7 +74,7 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
           cpf: user.cpf,
           positionId: user.positionId,
           sectorId: user.sectorId,
-          managedSectorId: user.managedSector?.id ?? null,
+          ledSectorId: user.ledSector?.id ?? null,
           status: user.status,
         },
       })),
@@ -99,7 +99,7 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
         user.data.cpf !== originalUser.cpf ||
         user.data.positionId !== originalUser.positionId ||
         user.data.sectorId !== originalUser.sectorId ||
-        user.data.managedSectorId !== (originalUser.managedSector?.id ?? null) ||
+        user.data.ledSectorId !== (originalUser.ledSector?.id ?? null) ||
         user.data.status !== originalUser.status;
 
       return hasChanges;
@@ -226,7 +226,7 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-56">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                      <span className="truncate">Setor Gerenciado</span>
+                      <span className="truncate">Setor Liderado</span>
                     </div>
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-40">
@@ -336,10 +336,10 @@ export function UserBatchEditTable({ users, onCancel: _onCancel }: UserBatchEdit
                         </div>
                       </TableCell>
 
-                      {/* Setor Gerenciado */}
+                      {/* Setor Liderado */}
                       <TableCell className="w-56 p-0 !border-r-0">
                         <div className="px-4 py-2">
-                          <ManagedSectorCell control={form.control} index={index} />
+                          <LedSectorCell control={form.control} index={index} />
                         </div>
                       </TableCell>
 

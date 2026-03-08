@@ -36,7 +36,7 @@ export function FavoriteButton({ page, pageKey, pageTitle, className, variant = 
       favoritePage: favoritePage,
     });
 
-    toast(isFav ? "Removido dos favoritos" : "Adicionado aos favoritos", {
+    toast.info(isFav ? "Removido dos favoritos" : "Adicionado aos favoritos", {
       description: isFav ? `${title} foi removido dos seus favoritos` : `${title} foi adicionado aos seus favoritos`,
     });
   };

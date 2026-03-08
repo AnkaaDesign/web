@@ -14,7 +14,7 @@ interface NavigationUser {
       privileges?: SECTOR_PRIVILEGES;
     };
   };
-  managedSector?: {
+  ledSector?: {
     id?: string;
   } | null;
 }
@@ -30,7 +30,7 @@ export function getFilteredMenuForUser(menuItems: MenuItem[], user: NavigationUs
 
   // Apply privilege and team leader filtering
   const userPrivilege = user?.sector?.privileges || user?.position?.sector?.privileges;
-  const isTeamLeader = Boolean(user?.managedSector?.id);
+  const isTeamLeader = Boolean(user?.ledSector?.id);
 
   filteredMenu = filterMenuByPrivilegesAndTeamLeader(filteredMenu, userPrivilege as SECTOR_PRIVILEGES | undefined, isTeamLeader);
 
@@ -57,7 +57,7 @@ export function getIconoirIcon(iconKey: string): string {
 /**
  * Check if user has access to menu item based on privilege requirements and team leader status
  * Uses exact matching for navigation (not hierarchical)
- * TEAM_LEADER is a virtual privilege - checked via user.managedSector relationship
+ * TEAM_LEADER is a virtual privilege - checked via user.ledSector relationship
  */
 function hasMenuItemAccess(item: MenuItem, userPrivilege?: SECTOR_PRIVILEGES, isTeamLeader: boolean = false): boolean {
   // If no privilege required, show to all

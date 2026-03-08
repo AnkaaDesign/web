@@ -84,30 +84,30 @@ export { useUserBatchMutations as useUserBatchOperations };
 // =====================================================
 
 /**
- * Hook to get users by managed sector (team members for a leader)
+ * Hook to get users by led sector (team members for a leader)
  */
-export function useTeamMembers(managedSectorId?: string | null) {
+export function useTeamMembers(ledSectorId?: string | null) {
   return useUsers({
-    where: managedSectorId ? { sectorId: managedSectorId } : undefined,
+    where: ledSectorId ? { sectorId: ledSectorId } : undefined,
     orderBy: { name: "asc" },
     include: {
       position: true,
       sector: true,
-      managedSector: true,
+      ledSector: true,
     },
   });
 }
 
 /**
- * Hook to get team leaders (users with managedSectorId)
+ * Hook to get team leaders (users with ledSectorId)
  */
 export function useTeamLeaders() {
   return useUsers({
-    where: { hasManagedSector: true },
+    where: { hasLedSector: true },
     orderBy: { name: "asc" },
     include: {
       sector: true,
-      managedSector: true,
+      ledSector: true,
       position: true,
     },
   });
@@ -123,7 +123,7 @@ export function useSectorUsers(sectorId?: string | null) {
     include: {
       position: true,
       sector: true,
-      managedSector: true,
+      ledSector: true,
     },
   });
 }

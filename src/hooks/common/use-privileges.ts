@@ -65,7 +65,7 @@ export function usePrivileges() {
    * Common privilege shortcuts
    */
   const isAdmin = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.ADMIN) : false;
-  const isTeamLeader = user ? user.managedSector !== null : false; // Team leader determined by managedSector relation
+  const isTeamLeader = user ? user.ledSector !== null : false; // Team leader determined by ledSector relation
   const isHR = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.HUMAN_RESOURCES) : false;
   const isWarehouse = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.WAREHOUSE) : false;
   const isProduction = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.PRODUCTION) : false;
@@ -195,7 +195,7 @@ export const privilegeUtils = {
     PRODUCTION_MANAGEMENT: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.ADMIN],
     HR_MANAGEMENT: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
     PPE_MANAGEMENT: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
-    STATISTICS_ACCESS: [SECTOR_PRIVILEGES.ADMIN], // Team leaders checked via managedSector
+    STATISTICS_ACCESS: [SECTOR_PRIVILEGES.ADMIN], // Team leaders checked via ledSector
     TASK_CREATION: [SECTOR_PRIVILEGES.ADMIN], // Only ADMIN can create tasks
   } as const,
 };

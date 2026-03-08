@@ -4,6 +4,7 @@ import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreate
 import type { ORDER_BY_DIRECTION, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../constants";
 import type { Task, TaskIncludes, TaskOrderBy } from "./task";
 import type { User, UserIncludes, UserOrderBy } from "./user";
+import type { File } from "./file";
 
 // =====================
 // ServiceOrder Interface
@@ -24,7 +25,11 @@ export interface ServiceOrder extends BaseEntity {
   startedAt: Date | null;
   approvedAt: Date | null;
   finishedAt: Date | null;
-  shouldSync: boolean; // Controls bidirectional sync with TaskPricingItem
+  shouldSync: boolean; // Controls bidirectional sync with TaskPricingService
+
+  // File IDs for create/update
+  checkinFileIds?: string[];
+  checkoutFileIds?: string[];
 
   // Relations
   task?: Task;
@@ -36,6 +41,8 @@ export interface ServiceOrder extends BaseEntity {
   service?: {
     name: string;
   };
+  checkinFiles?: File[];
+  checkoutFiles?: File[];
 }
 
 // =====================
@@ -73,6 +80,8 @@ export interface ServiceOrderIncludes {
     | {
         include?: UserIncludes;
       };
+  checkinFiles?: boolean;
+  checkoutFiles?: boolean;
 }
 
 // =====================

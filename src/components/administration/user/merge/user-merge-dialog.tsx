@@ -51,7 +51,7 @@ export function UserMergeDialog({ open, onOpenChange, users, onMerge }: UserMerg
       { field: "status", label: "Status", type: "single" as const },
       { field: "positionId", label: "Cargo", type: "single" as const },
       { field: "sectorId", label: "Setor", type: "single" as const },
-      { field: "managedSectorId", label: "Setor Gerenciado", type: "single" as const },
+      { field: "ledSectorId", label: "Setor Liderado", type: "single" as const },
       { field: "address", label: "Endereço", type: "single" as const },
       { field: "addressNumber", label: "Número", type: "single" as const },
       { field: "addressComplement", label: "Complemento", type: "single" as const },

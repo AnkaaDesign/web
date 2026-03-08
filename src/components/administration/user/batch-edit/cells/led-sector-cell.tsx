@@ -2,7 +2,7 @@ import { FormField, FormItem, FormControl, FormMessage, FormLabel } from "@/comp
 import { Switch } from "@/components/ui/switch";
 import { useWatch } from "react-hook-form";
 
-interface ManagedSectorCellProps {
+interface LedSectorCellProps {
   control: any;
   index: number;
   disabled?: boolean;
@@ -15,7 +15,7 @@ interface ManagedSectorCellProps {
  * This component shows a switch to toggle whether the user is the leader
  * of their currently assigned sector.
  */
-export function ManagedSectorCell({ control, index, disabled }: ManagedSectorCellProps) {
+export function LedSectorCell({ control, index, disabled }: LedSectorCellProps) {
   // Watch the sectorId to know if a sector is selected
   const sectorId = useWatch({
     control,

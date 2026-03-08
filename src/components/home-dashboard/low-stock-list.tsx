@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { IconPackage, IconAlertTriangleFilled } from "@tabler/icons-react";
 import { DashboardCardList, DashboardPagination } from "./dashboard-card-list";
 import { determineStockLevel, getStockLevelTextColor } from "../../utils/stock-level";
-import { STOCK_LEVEL, STOCK_LEVEL_LABELS } from "../../constants";
+import { STOCK_LEVEL, STOCK_LEVEL_LABELS, routes } from "../../constants";
 import type { HomeDashboardLowStockItem } from "../../types";
 
 const PAGE_SIZE = 20;
@@ -23,11 +23,10 @@ interface LowStockListProps {
   totalCount?: number;
 }
 
-export function LowStockList({ items, totalCount }: LowStockListProps) {
+export function LowStockList({ items }: LowStockListProps) {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
 
-  const totalPages = Math.ceil(items.length / PAGE_SIZE);
   const pagedItems = items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   return (
@@ -68,7 +67,7 @@ export function LowStockList({ items, totalCount }: LowStockListProps) {
           <div
             key={item.id}
             className={`grid grid-cols-[1.5fr_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.8fr)] gap-x-3 items-center px-4 py-2 hover:bg-secondary/50 cursor-pointer border-b border-border last:border-b-0 transition-colors ${index % 2 === 1 ? "bg-muted/30" : ""}`}
-            onClick={() => navigate(`/estoque/itens/${item.id}`)}
+            onClick={() => navigate(routes.inventory.products.details(item.id))}
           >
             <span className="text-sm text-foreground truncate">{item.name}</span>
             <span className="text-sm text-foreground truncate">

@@ -41,13 +41,13 @@ export const SectorDetailPage = () => {
         include: {
           position: true,
           sector: true,
-          managedSector: true,
+          ledSector: true,
         },
         orderBy: {
           name: "asc",
         },
       },
-      managedByUsers: true,
+      leader: true,
       changelogs: {
         include: {
           user: true,

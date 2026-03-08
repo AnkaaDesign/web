@@ -60,7 +60,7 @@ const baseHooks = createEntityHooks<
   PaintBatchDeleteResponse
 >({
   queryKeys: paintKeys,
-  service: paintService,
+  service: paintService as any,
   staleTime: 1000 * 60 * 10, // 10 minutes - paints don't change often
   relatedQueryKeys: [taskKeys, paintFormulaKeys, paintProductionKeys, changeLogKeys], // Invalidate related entities
 });

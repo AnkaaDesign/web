@@ -15,9 +15,9 @@ export interface UserFilters {
   status?: string[];
   positionId?: string[];
   sectorId?: string[];
-  managedSectorId?: string[];
+  ledSectorId?: string[];
   hasCommissions?: boolean;
-  hasManagedSector?: boolean;
+  hasLedSector?: boolean;
   birth?: {
     gte?: Date;
     lte?: Date;

@@ -15,6 +15,8 @@ import type { ServiceOrder, ServiceOrderIncludes } from "./serviceOrder";
 import type { Airbrushing, AirbrushingIncludes } from "./airbrushing";
 import type { Cut, CutIncludes } from "./cut";
 import type { Truck, TruckIncludes } from "./truck";
+import type { Bonus } from "./bonus";
+import type { BonusDiscount } from "./bonusDiscount";
 import type { TaskPricing } from "./task-pricing";
 import type { Responsible } from "./responsible";
 
@@ -40,27 +42,26 @@ export interface Task extends BaseEntity {
   sectorId: string | null;
   responsibles?: Responsible[];
   responsibleIds?: string[];
-  budgetIds?: string[];
-  invoiceIds?: string[];
-  receiptIds?: string[];
-  bankSlipIds?: string[];
   reimbursementIds?: string[];
   reimbursementInvoiceIds?: string[];
   baseFileIds?: string[];
+  projectFileIds?: string[];
+  checkinFileIds?: string[];
+  checkoutFileIds?: string[];
   createdById: string | null;
+  bonusDiscountId?: string | null;
 
   // Relations
   sector?: Sector;
   customer?: Customer;
-  budgets?: File[]; // Many-to-many relation (budget files)
   pricingId?: string | null; // Foreign key to TaskPricing
   pricing?: TaskPricing; // Task pricing (one-to-one: each task has its own unique pricing)
-  invoices?: File[]; // Many-to-many relation
-  receipts?: File[]; // Many-to-many relation
-  bankSlips?: File[]; // Many-to-many relation
   reimbursements?: File[]; // Many-to-many relation
   reimbursementInvoices?: File[]; // Many-to-many relation
   baseFiles?: File[]; // Files used as base for artwork design
+  projectFiles?: File[]; // Project files
+  checkinFiles?: File[]; // Check-in files
+  checkoutFiles?: File[]; // Check-out files
   observation?: Observation;
   generalPainting?: Paint;
   createdBy?: User;
@@ -72,6 +73,10 @@ export interface Task extends BaseEntity {
   truck?: Truck;
   relatedTasks?: Task[];
   relatedTo?: Task[];
+
+  // Bonus relations
+  bonuses?: Bonus[];
+  bonusDiscount?: BonusDiscount;
 }
 
 // =====================
@@ -89,11 +94,7 @@ export interface TaskIncludes {
     | {
         include?: CustomerIncludes;
       };
-  budgets?: boolean; // Many-to-many relation (budget files)
-  pricing?: boolean | { include?: { items?: boolean; layoutFile?: boolean; customerSignature?: boolean } }; // Task pricing (one-to-one: each task has its own unique pricing)
-  invoices?: boolean; // Many-to-many relation
-  receipts?: boolean; // Many-to-many relation
-  bankSlips?: boolean; // Many-to-many relation
+  pricing?: boolean | { include?: { services?: boolean; layoutFile?: boolean; customerSignature?: boolean; customerConfigs?: boolean; responsible?: boolean } }; // Task pricing (one-to-one: each task has its own unique pricing)
   reimbursements?: boolean; // Many-to-many relation
   reimbursementInvoices?: boolean; // Many-to-many relation
   observation?:
@@ -117,6 +118,21 @@ export interface TaskIncludes {
         include?: FileIncludes;
       };
   baseFiles?:
+    | boolean
+    | {
+        include?: FileIncludes;
+      };
+  projectFiles?:
+    | boolean
+    | {
+        include?: FileIncludes;
+      };
+  checkinFiles?:
+    | boolean
+    | {
+        include?: FileIncludes;
+      };
+  checkoutFiles?:
     | boolean
     | {
         include?: FileIncludes;

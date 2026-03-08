@@ -79,7 +79,12 @@ export const TaskEditPage = () => {
     include: {
       customer: true,
       sector: true,
-      serviceOrders: true,
+      serviceOrders: {
+        include: {
+          checkinFiles: true,
+          checkoutFiles: true,
+        },
+      },
       generalPainting: true,
       artworks: true,
       budget: true,

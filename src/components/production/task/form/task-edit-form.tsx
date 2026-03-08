@@ -11,8 +11,6 @@ import {
   IconSparkles,
   IconScissors,
   IconCurrencyReal,
-  IconReceipt,
-  IconFileBarcode,
   IconFileInvoice,
   IconFileText,
   IconHash,
@@ -37,6 +35,7 @@ import { ResponsibleManager, validateResponsibleRows } from "@/components/admini
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { useAuth } from "../../../../contexts/auth-context";
+import { useTaskPermissions } from '@/hooks/common/use-task-permissions';
 import { useAccordionScroll } from "@/lib/scroll-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,16 +57,18 @@ import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
 import { FileUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import { ArtworkFileUploadField } from "./artwork-file-upload-field";
+import { uploadFiles } from "../../../../api-client/file";
+import { getApiBaseUrl } from "@/config/api";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/components/ui/sonner";
 import { toTitleCase } from "../../../../utils";
 import {
-  getPricingItemsToAddFromServiceOrders,
-  getServiceOrdersToAddFromPricingItems,
+  getPricingServicesToAddFromServiceOrders,
+  getServiceOrdersToAddFromPricingServices,
   normalizeDescription,
   type SyncServiceOrder,
-  type SyncPricingItem,
+  type SyncPricingService,
 } from "../../../../utils/task-pricing-service-order-sync";
 import { getUniqueDescriptions } from "../../../../api-client/serviceOrder";
 import { LayoutForm } from "@/components/production/layout/layout-form";
@@ -130,29 +131,24 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     return result;
   };
 
-  // Check if the current user is from the Financial, Warehouse, Designer, Logistic, Plotting, Production, or Commercial sector
-  const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
-  const isWarehouseUser = user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
-  const isDesignerUser = user?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
-  const isLogisticUser = user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC;
-  const isPlottingUser = user?.sector?.privileges === SECTOR_PRIVILEGES.PLOTTING;
-  const isCommercialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
-  const isAdminUser = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
-  const isProductionUser = user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION;
-  // Check if user is a team leader (manages a sector)
-  const isTeamLeader = Boolean(user?.managedSector?.id);
+  const {
+    privilege, isTeamLeader,
+    canViewPricing: canViewPricingSections,
+    canViewRestrictedFields,
+    canViewCommission: canViewCommissionField,
+    canViewDates, canViewServices, canViewLayout, canViewTruckSpot,
+    canViewPaint, canViewLogoPaint, canViewCuts,
+    canViewAirbrushing, canViewBaseFiles, canViewProjectFiles,
+    canViewCheckinCheckout, canViewReimbursement, canViewObservation,
+    canEditIdentity, canEditSector, canEditCommission,
+    canEditDates, canEditResponsibles, canEditServices,
+    canEditLayout, canEditPaint,
+  } = useTaskPermissions();
 
-  // Financial sections should only be visible to ADMIN and FINANCIAL users (not Commercial)
-  const canViewFinancialSections = isAdminUser || isFinancialUser;
-
-  // Pricing sections should be visible to ADMIN, FINANCIAL, and COMMERCIAL users
-  const canViewPricingSections = isAdminUser || isFinancialUser || isCommercialUser;
-
-  // Restricted fields (forecastDate, responsibles) visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER only
-  const canViewRestrictedFields = isAdminUser || isFinancialUser || isCommercialUser || isLogisticUser || isDesignerUser;
-
-  // Commission field visible to ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION
-  const canViewCommissionField = isAdminUser || isFinancialUser || isCommercialUser || isProductionUser;
+  // Sector-specific business logic (not permission checks)
+  const isFinancialUser = privilege === SECTOR_PRIVILEGES.FINANCIAL;
+  const isCommercialUser = privilege === SECTOR_PRIVILEGES.COMMERCIAL;
+  const isDesignerUser = privilege === SECTOR_PRIVILEGES.DESIGNER;
 
   // Fetch cuts separately using useCutsByTask hook (same approach as detail page)
   const { data: cutsData } = useCutsByTask({
@@ -321,11 +317,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   );
   const [hasProjectFileChanges, setHasProjectFileChanges] = useState(false);
 
-  // Initialize checkin files from existing task data
-  const [checkinFiles, setCheckinFiles] = useState<FileWithPreview[]>(
-    ((task as any).checkinFiles || []).map((file: any) => ({
+  // Initialize checkin/checkout files per service order from existing task data
+  const mapFilesToPreview = (files: any[]): FileWithPreview[] =>
+    (files || []).map((file: any) => ({
       id: file.id,
-      name: file.filename || file.name || 'checkin file',
+      name: file.filename || file.name || 'file',
       size: file.size || 0,
       type: file.mimetype || file.type || 'application/octet-stream',
       lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
@@ -333,24 +329,31 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       uploadProgress: 100,
       uploadedFileId: file.id,
       thumbnailUrl: file.thumbnailUrl,
-    } as FileWithPreview))
-  );
-  const [hasCheckinFileChanges, setHasCheckinFileChanges] = useState(false);
+    } as FileWithPreview));
 
-  // Initialize checkout files from existing task data
-  const [checkoutFiles, setCheckoutFiles] = useState<FileWithPreview[]>(
-    ((task as any).checkoutFiles || []).map((file: any) => ({
-      id: file.id,
-      name: file.filename || file.name || 'checkout file',
-      size: file.size || 0,
-      type: file.mimetype || file.type || 'application/octet-stream',
-      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
-      uploaded: true,
-      uploadProgress: 100,
-      uploadedFileId: file.id,
-      thumbnailUrl: file.thumbnailUrl,
-    } as FileWithPreview))
-  );
+  const [checkinFilesByServiceOrder, setCheckinFilesByServiceOrder] = useState<Record<string, FileWithPreview[]>>(() => {
+    const map: Record<string, FileWithPreview[]> = {};
+    if (task.serviceOrders) {
+      for (const so of task.serviceOrders) {
+        if (so.id) {
+          map[so.id] = mapFilesToPreview((so as any).checkinFiles);
+        }
+      }
+    }
+    return map;
+  });
+  const [checkoutFilesByServiceOrder, setCheckoutFilesByServiceOrder] = useState<Record<string, FileWithPreview[]>>(() => {
+    const map: Record<string, FileWithPreview[]> = {};
+    if (task.serviceOrders) {
+      for (const so of task.serviceOrders) {
+        if (so.id) {
+          map[so.id] = mapFilesToPreview((so as any).checkoutFiles);
+        }
+      }
+    }
+    return map;
+  });
+  const [hasCheckinFileChanges, setHasCheckinFileChanges] = useState(false);
   const [hasCheckoutFileChanges, setHasCheckoutFileChanges] = useState(false);
 
   // Sync baseFiles when task.baseFiles changes (after successful update or initial load)
@@ -378,20 +381,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     }
   }, [task.baseFiles, task.id, hasBaseFileChanges]);
 
-  // Initialize document files from existing task data
-  // Handle both singular and plural field names for backward compatibility
-  const [budgetFile, setBudgetFile] = useState<FileWithPreview[]>(
-    convertToFileWithPreview((task as any).budgets)
-  );
-  const [invoiceFile, setInvoiceFile] = useState<FileWithPreview[]>(
-    convertToFileWithPreview((task as any).invoices)
-  );
-  const [receiptFile, setReceiptFile] = useState<FileWithPreview[]>(
-    convertToFileWithPreview((task as any).receipts)
-  );
-  const [bankSlipFile, setBankSlipFile] = useState<FileWithPreview[]>(
-    convertToFileWithPreview((task as any).bankSlips)
-  );
 
   const multiCutSelectorRef = useRef<MultiCutSelectorRef>(null);
   const [cutsCount, setCutsCount] = useState(0);
@@ -495,11 +484,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     artworkIds: "artworks",
     // Observation
     observation: "observation",
-    // Financial
-    budgetIds: "financial",
-    invoiceIds: "financial",
-    receiptIds: "financial",
-    bankSlipIds: "financial",
   }), []);
 
   // Find the accordion section that contains the first validation error
@@ -776,15 +760,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           date.setHours(23, 59, 59, 999);
           return date;
         })(),
-        status: taskData.pricing.status || 'DRAFT',
+        status: taskData.pricing.status || 'PENDING',
         subtotal: taskData.pricing.subtotal || 0,
-        discountType: taskData.pricing.discountType || 'NONE',
-        discountValue: taskData.pricing.discountValue || null,
         total: taskData.pricing.total || 0,
-        // Payment Terms (simplified)
-        paymentCondition: taskData.pricing.paymentCondition || null,
-        downPaymentDate: taskData.pricing.downPaymentDate ? new Date(taskData.pricing.downPaymentDate) : null,
-        customPaymentText: taskData.pricing.customPaymentText || null,
         // Guarantee Terms
         guaranteeYears: taskData.pricing.guaranteeYears || null,
         customGuaranteeText: taskData.pricing.customGuaranteeText || null,
@@ -792,29 +770,44 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         customForecastDays: taskData.pricing.customForecastDays || null,
         // Layout File
         layoutFileId: taskData.pricing.layoutFileId || null,
-        // Invoice To Customers (extract IDs from full customer objects returned by API)
-        invoicesToCustomerIds: taskData.pricing.invoicesToCustomers?.map((c: any) => c.id) || taskData.pricing.invoicesToCustomerIds || [],
-        // Budget Responsible
-        responsibleId: taskData.pricing.responsibleId || null,
+        // Customer Configs (map full objects with per-customer payment fields)
+        customerConfigs: taskData.pricing.customerConfigs?.map((c: any) => ({
+          customerId: c.customerId || c.id,
+          subtotal: c.subtotal ?? 0,
+          discountType: c.discountType || 'NONE',
+          discountValue: c.discountValue ?? null,
+          total: c.total ?? 0,
+          paymentCondition: c.paymentCondition || null,
+          downPaymentDate: c.downPaymentDate ? new Date(c.downPaymentDate) : null,
+          customPaymentText: c.customPaymentText || null,
+          responsibleId: c.responsibleId || null,
+          discountReference: c.discountReference || null,
+          // Preserve existing installments so they're not lost on save
+          installments: c.installments?.map((inst: any) => ({
+            number: inst.number,
+            dueDate: inst.dueDate ? new Date(inst.dueDate) : new Date(),
+            amount: typeof inst.amount === 'number' ? inst.amount : Number(inst.amount) || 0,
+          })) || [],
+        })) || [],
         // New Fields
         simultaneousTasks: taskData.pricing.simultaneousTasks || null,
-        discountReference: taskData.pricing.discountReference || null,
-        items: (() => {
-          if (taskData.pricing.items && taskData.pricing.items.length > 0) {
+        services: (() => {
+          if (taskData.pricing.services && taskData.pricing.services.length > 0) {
             // Log raw API values for debugging
             console.log('[TaskEditForm] 📥 RAW pricing items from API:');
-            taskData.pricing.items.forEach((item: any, index: number) => {
+            taskData.pricing.services.forEach((item: any, index: number) => {
               console.log(`  [${index}] "${item.description}" - shouldSync from API: ${item.shouldSync} (type: ${typeof item.shouldSync})`);
             });
-            return taskData.pricing.items.map((item) => ({
+            return taskData.pricing.services.map((item) => ({
               id: item.id,
               description: item.description || "",
               observation: item.observation || null,
               amount: typeof item.amount === 'number' ? item.amount : (item.amount ? Number(item.amount) : 0),
               shouldSync: item.shouldSync !== false, // Include shouldSync flag (default true)
+              invoiceToCustomerId: item.invoiceToCustomerId || null,
             }));
           }
-          return [{ description: "", amount: null, observation: null, shouldSync: true }]; // Default empty row
+          return [{ description: "", amount: null, observation: null, shouldSync: true, invoiceToCustomerId: null }]; // Default empty row
         })()
       } : {
         // Default pricing structure when no pricing exists
@@ -824,15 +817,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           date.setHours(23, 59, 59, 999);
           return date;
         })(),
-        status: 'DRAFT',
+        status: 'PENDING',
         subtotal: 0,
-        discountType: 'NONE',
-        discountValue: null,
         total: 0,
-        // Payment Terms (simplified defaults)
-        paymentCondition: null,
-        downPaymentDate: null,
-        customPaymentText: null,
         // Guarantee Terms (defaults)
         guaranteeYears: null,
         customGuaranteeText: null,
@@ -840,14 +827,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         customForecastDays: null,
         // Layout File (defaults)
         layoutFileId: null,
-        // Invoice To Customers (defaults)
-        invoicesToCustomerIds: [],
-        // Budget Responsible (defaults)
-        responsibleId: null,
+        // Customer Configs (defaults)
+        customerConfigs: [],
         // New Fields (defaults)
         simultaneousTasks: null,
-        discountReference: null,
-        items: [{ description: "", amount: null, observation: null }], // Default empty row
+        services: [{ description: "", amount: null, observation: null }], // Default empty row
       },
       // Initialize serviceOrders with default row - part of initial state
       // Maintain creation order (sorted by createdAt ASC) to preserve user's intended order
@@ -945,7 +929,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         description: taskData.observation.description || "",
         fileIds: taskData.observation.files?.map((f: any) => f.id) || [],
       } : null,
-    } as TaskUpdateFormData;
+    } as unknown as TaskUpdateFormData;
   }, [cutsData]); // Depend on cutsData to re-run when cuts are fetched
 
   // Handle form submission with only changed fields
@@ -1043,16 +1027,21 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         if (changedData.pricing) {
           const pricing = changedData.pricing as any;
 
-          // Convert discountValue string to number
-          if (pricing.discountValue !== undefined) {
-            pricing.discountValue = ensureNumber(pricing.discountValue);
-          }
-
           // Ensure items is an array
-          if (pricing.items) {
-            pricing.items = ensureArray(pricing.items).map((item: any) => ({
+          if (pricing.services) {
+            pricing.services = ensureArray(pricing.services).map((item: any) => ({
               ...item,
               amount: ensureNumber(item.amount) ?? 0,
+            }));
+          }
+
+          // Normalize customerConfigs: ensure it's an array and coerce numeric fields
+          if (pricing.customerConfigs) {
+            pricing.customerConfigs = ensureArray(pricing.customerConfigs).map((config: any) => ({
+              ...config,
+              subtotal: ensureNumber(config.subtotal) ?? 0,
+              discountValue: ensureNumber(config.discountValue),
+              total: ensureNumber(config.total) ?? 0,
             }));
           }
         }
@@ -1127,11 +1116,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
         // Filter and validate pricing (if it exists in changedData)
         // Empty items (no description) are filtered out
-        if (changedData.pricing && changedData.pricing.items && changedData.pricing.items.length > 0) {
-          console.log('[TaskEditForm] 🔍 Pricing items BEFORE filtering:', JSON.stringify(changedData.pricing.items, null, 2));
+        if (changedData.pricing && changedData.pricing.services && changedData.pricing.services.length > 0) {
+          console.log('[TaskEditForm] 🔍 Pricing items BEFORE filtering:', JSON.stringify(changedData.pricing.services, null, 2));
 
           // Filter out items without description (empty items)
-          const validItems = changedData.pricing.items.filter((item: any) => {
+          const validItems = changedData.pricing.services.filter((item: any) => {
             const hasDescription = item.description && item.description.trim() !== "";
             console.log(`[TaskEditForm] Item "${item.description}" has description? ${hasDescription}`);
             return hasDescription;
@@ -1150,7 +1139,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             // Normalize amounts - empty/null becomes 0 (courtesy)
             changedData.pricing = {
               ...changedData.pricing,
-              items: validItems.map((item: any) => ({
+              services: validItems.map((item: any) => ({
                 ...item,
                 amount: item.amount ?? 0,
               })),
@@ -1340,15 +1329,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
         // Check if we have new files that need to be uploaded
         
-        const newBudgetFiles = budgetFile.filter(f => !f.uploaded);
-        const newInvoiceFiles = invoiceFile.filter(f => !f.uploaded);
-        const newReceiptFiles = receiptFile.filter(f => !f.uploaded);
-        const newBankSlipFiles = bankSlipFile.filter(f => !f.uploaded);
         const newArtworkFiles = uploadedFiles.filter(f => !f.uploaded);
         const newBaseFiles = baseFiles.filter(f => !f.uploaded);
         const newProjectFiles = projectFiles.filter(f => !f.uploaded);
-        const newCheckinFiles = checkinFiles.filter(f => !f.uploaded);
-        const newCheckoutFiles = checkoutFiles.filter(f => !f.uploaded);
         const newObservationFiles = observationFiles.filter(f => !f.uploaded);
         const newPricingLayoutFiles = pricingLayoutFiles.filter(f => !f.uploaded);
 
@@ -1364,10 +1347,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           (a.artworkFiles && a.artworkFiles.some((f: any) => f instanceof File))
         );
 
-        const hasNewFiles = newBudgetFiles.length > 0 || newInvoiceFiles.length > 0 ||
-                           newReceiptFiles.length > 0 || newBankSlipFiles.length > 0 || newArtworkFiles.length > 0 ||
-                           newBaseFiles.length > 0 || newProjectFiles.length > 0 || newCheckinFiles.length > 0 ||
-                           newCheckoutFiles.length > 0 || hasCutFiles || hasAirbrushingFiles ||
+        // Note: checkin/checkout files are pre-uploaded per SO, their IDs are injected into serviceOrders data
+        // They should NOT trigger the FormData path since no binary files need to be sent
+        const hasNewFiles = newArtworkFiles.length > 0 ||
+                           newBaseFiles.length > 0 || newProjectFiles.length > 0 ||
+                           hasCutFiles || hasAirbrushingFiles ||
                            newObservationFiles.length > 0 || layoutPhotoFiles.length > 0 ||
                            newPricingLayoutFiles.length > 0;
 
@@ -1383,18 +1367,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // Prepare files object for the helper
           const files: Record<string, File[]> = {};
 
-          if (newBudgetFiles.length > 0) {
-            files.budgets = newBudgetFiles.filter(f => f instanceof File) as File[];
-          }
-          if (newInvoiceFiles.length > 0) {
-            files.invoices = newInvoiceFiles.filter(f => f instanceof File) as File[];
-          }
-          if (newReceiptFiles.length > 0) {
-            files.receipts = newReceiptFiles.filter(f => f instanceof File) as File[];
-          }
-          if (newBankSlipFiles.length > 0) {
-            files.bankSlips = newBankSlipFiles.filter(f => f instanceof File) as File[];
-          }
           if (newArtworkFiles.length > 0) {
             files.artworks = newArtworkFiles.filter(f => f instanceof File) as File[];
           }
@@ -1404,12 +1376,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           if (newProjectFiles.length > 0) {
             files.projectFiles = newProjectFiles.filter(f => f instanceof File) as File[];
           }
-          if (newCheckinFiles.length > 0) {
-            files.checkinFiles = newCheckinFiles.filter(f => f instanceof File) as File[];
-          }
-          if (newCheckoutFiles.length > 0) {
-            files.checkoutFiles = newCheckoutFiles.filter(f => f instanceof File) as File[];
-          }
+          // Note: checkin/checkout files are pre-uploaded per service order, not sent as task-level multipart
           if (newObservationFiles.length > 0) {
 
             files.observationFiles = newObservationFiles.filter(f => f instanceof File) as File[];
@@ -1477,9 +1444,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             'paintIds',
             'artworkIds',
             'baseFileIds',
-            'budgetIds',
-            'invoiceIds',
-            'receiptIds',
             'reimbursementIds',
             'reimbursementInvoiceIds',
             'responsibleIds', // Handled separately below
@@ -1554,13 +1518,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
           const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentProjectFileIds = projectFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentCheckinFileIds = checkinFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentCheckoutFileIds = checkoutFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentInvoiceIds = invoiceFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentBankSlipIds = bankSlipFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-
           console.log('[Task Update] 📦 FormData - File IDs being sent:', {
             hasArtworkStatusChanges,
             hasArtworkFileChanges,
@@ -1585,27 +1542,32 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           if (hasProjectFileChanges || newProjectFiles.length > 0) {
             dataForFormData.projectFileIds = currentProjectFileIds;
           }
-          // Checkin/checkout files are managed by Logistic, not Commercial
-          if (!isCommercialUser && (hasCheckinFileChanges || newCheckinFiles.length > 0)) {
-            dataForFormData.checkinFileIds = currentCheckinFileIds;
+          // Inject checkin/checkout file IDs into service orders data (per service order)
+          if (!isCommercialUser && (hasCheckinFileChanges || hasCheckoutFileChanges)) {
+            // Ensure serviceOrders is present — it may not be in changedData if only files changed
+            if (!dataForFormData.serviceOrders) {
+              const formSOs = form.getValues("serviceOrders") || [];
+              dataForFormData.serviceOrders = ensureArray(formSOs).filter((so: any) => so.id);
+            }
+            const serviceOrders = dataForFormData.serviceOrders as any[] || [];
+            for (const so of serviceOrders) {
+              if (so.id) {
+                if (hasCheckinFileChanges) {
+                  const soCheckinFiles = checkinFilesByServiceOrder[so.id] || [];
+                  so.checkinFileIds = soCheckinFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
+                }
+                if (hasCheckoutFileChanges) {
+                  const soCheckoutFiles = checkoutFilesByServiceOrder[so.id] || [];
+                  so.checkoutFileIds = soCheckoutFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
+                }
+              }
+            }
           }
-          if (!isCommercialUser && (hasCheckoutFileChanges || newCheckoutFiles.length > 0)) {
-            dataForFormData.checkoutFileIds = currentCheckoutFileIds;
-          }
-          // Only send financial document IDs if the user has permission to modify them
-          // Commercial Sector users cannot modify budgets, invoices, receipts, or bank slips
-          if (!isCommercialUser) {
-            dataForFormData.budgetIds = currentBudgetIds;
-            dataForFormData.invoiceIds = currentInvoiceIds;
-            dataForFormData.receiptIds = currentReceiptIds;
-            dataForFormData.bankSlipIds = currentBankSlipIds;
-          }
-
           // Note: artworkStatuses will be added later (around line 1125) after processing
           // This ensures we use the state variable directly, not a rebuilt version
 
           // CRITICAL: Clean up malformed data before creating FormData
-          const fileIdFields = ['artworkIds', 'baseFileIds', 'budgetIds', 'invoiceIds', 'receiptIds', 'bankSlipIds'];
+          const fileIdFields = ['artworkIds', 'baseFileIds'];
           const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate'];
 
           for (const field of fileIdFields) {
@@ -1807,15 +1769,17 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             data: formData as any,
             query: {
               include: {
-                budgets: true,
-                invoices: true,
-                receipts: true,
-                bankSlips: true,
                 artworks: true,
                 baseFiles: true,
                 projectFiles: true,
                 checkinFiles: true,
                 checkoutFiles: true,
+                serviceOrders: {
+                  include: {
+                    checkinFiles: true,
+                    checkoutFiles: true,
+                  },
+                },
               },
             },
           });
@@ -1871,13 +1835,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           const currentArtworkIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentProjectFileIds = projectFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentCheckinFileIds = checkinFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentCheckoutFileIds = checkoutFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentInvoiceIds = invoiceFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          const currentBankSlipIds = bankSlipFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-
           // Send file IDs arrays when files exist
           // Backend uses these to replace all files via 'set' operation
           // CRITICAL: Always send artworkIds when artworkStatuses is present to prevent removal
@@ -1935,13 +1892,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             (submitData as any).artworkStatuses = existingArtworkStatusesJson;
             console.log('[Task Update] ✅ Including artworkStatuses in JSON (UUID-keyed object):', existingArtworkStatusesJson);
           }
-          // CRITICAL FIX: Only send file IDs when the user actually modified those files
-          // Sending them unconditionally causes accidental clearing when sectors submit unrelated changes
-          const taskHadBudgets = task.budgets && task.budgets.length > 0;
-          const taskHadInvoices = task.invoices && task.invoices.length > 0;
-          const taskHadReceipts = task.receipts && task.receipts.length > 0;
-          const taskHadBankSlips = task.bankSlips && task.bankSlips.length > 0;
-
           // Only send baseFileIds if the user actually modified base files
           if (hasBaseFileChanges) {
             submitData.baseFileIds = [...currentBaseFileIds];
@@ -1949,33 +1899,31 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           if (hasProjectFileChanges) {
             (submitData as any).projectFileIds = [...currentProjectFileIds];
           }
-          // Checkin/checkout files are managed by Logistic, not Commercial
-          if (!isCommercialUser && hasCheckinFileChanges) {
-            (submitData as any).checkinFileIds = [...currentCheckinFileIds];
-          }
-          if (!isCommercialUser && hasCheckoutFileChanges) {
-            (submitData as any).checkoutFileIds = [...currentCheckoutFileIds];
-          }
-          // Only send financial document IDs if the user has permission to modify them
-          // Commercial Sector users cannot modify budgets, invoices, receipts, or bank slips
-          if (!isCommercialUser) {
-            if (currentBudgetIds.length > 0 || taskHadBudgets) {
-              submitData.budgetIds = [...currentBudgetIds];
+          // Inject checkin/checkout file IDs into service orders data (per service order)
+          if (!isCommercialUser && (hasCheckinFileChanges || hasCheckoutFileChanges)) {
+            // Ensure serviceOrders is present — it may not be in changedData if only files changed
+            if (!(submitData as any).serviceOrders) {
+              const formSOs = form.getValues("serviceOrders") || [];
+              (submitData as any).serviceOrders = ensureArray(formSOs).filter((so: any) => so.id);
             }
-            if (currentInvoiceIds.length > 0 || taskHadInvoices) {
-              submitData.invoiceIds = [...currentInvoiceIds];
-            }
-            if (currentReceiptIds.length > 0 || taskHadReceipts) {
-              submitData.receiptIds = [...currentReceiptIds];
-            }
-            if (currentBankSlipIds.length > 0 || taskHadBankSlips) {
-              submitData.bankSlipIds = [...currentBankSlipIds];
+            const serviceOrders = (submitData as any).serviceOrders as any[] || [];
+            for (const so of serviceOrders) {
+              if (so.id) {
+                if (hasCheckinFileChanges) {
+                  const soCheckinFiles = checkinFilesByServiceOrder[so.id] || [];
+                  so.checkinFileIds = soCheckinFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
+                }
+                if (hasCheckoutFileChanges) {
+                  const soCheckoutFiles = checkoutFilesByServiceOrder[so.id] || [];
+                  so.checkoutFileIds = soCheckoutFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
+                }
+              }
             }
           }
 
           // CRITICAL: Clean up malformed data before sending
           // Remove empty objects that should be arrays or dates
-          const fileIdFields = ['artworkIds', 'baseFileIds', 'budgetIds', 'invoiceIds', 'receiptIds', 'bankSlipIds'];
+          const fileIdFields = ['artworkIds', 'baseFileIds'];
           const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate'];
 
           for (const field of fileIdFields) {
@@ -2098,15 +2046,17 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             data: submitData,
             query: {
               include: {
-                budgets: true,
-                invoices: true,
-                receipts: true,
-                bankSlips: true,
                 artworks: true,
                 baseFiles: true,
                 projectFiles: true,
                 checkinFiles: true,
                 checkoutFiles: true,
+                serviceOrders: {
+                  include: {
+                    checkinFiles: true,
+                    checkoutFiles: true,
+                  },
+                },
               },
             },
           });
@@ -2237,7 +2187,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         }, 100);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, budgetFile, invoiceFile, receiptFile, bankSlipFile, uploadedFiles, baseFiles, projectFiles, checkinFiles, checkoutFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, uploadedFiles, baseFiles, projectFiles, checkinFilesByServiceOrder, checkoutFilesByServiceOrder, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -2260,10 +2210,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       "paintIds",
       "artworkIds",
       "baseFileIds",
-      "budgetIds",
-      "invoiceIds",
-      "receiptIds",
-      "bankSlipIds",
       "reimbursementIds",
       "reimbursementInvoiceIds",
     ],
@@ -2280,33 +2226,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   //     return f;
   //   });
   // };
-
-  // Handle budget file change (no longer uploads immediately)
-  const handleBudgetFileChange = (files: FileWithPreview[]) => {
-    setBudgetFile(files);
-    setHasFileChanges(true);
-    // Files will be submitted with the form, not uploaded separately
-  };
-
-  // Handle invoice file change (no longer uploads immediately)
-  const handleInvoiceFileChange = (files: FileWithPreview[]) => {
-    setInvoiceFile(files);
-    setHasFileChanges(true);
-    // Files will be submitted with the form, not uploaded separately
-  };
-
-  // Handle receipt file change (no longer uploads immediately)
-  const handleReceiptFileChange = (files: FileWithPreview[]) => {
-    setReceiptFile(files);
-    setHasFileChanges(true);
-    // Files will be submitted with the form, not uploaded separately
-  };
-
-  // Handle bank slip file change
-  const handleBankSlipFileChange = (files: FileWithPreview[]) => {
-    setBankSlipFile(files);
-    setHasFileChanges(true);
-  };
 
   // Handle artwork files change (no longer uploads immediately)
   const handleFilesChange = (files: FileWithPreview[]) => {
@@ -2349,19 +2268,73 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     setHasProjectFileChanges(true);
   };
 
-  // Handle checkin files change
-  const handleCheckinFilesChange = (files: FileWithPreview[]) => {
-    setCheckinFiles(files);
+  // Pre-upload new files and return updated file list with uploaded IDs
+  const preUploadNewFiles = useCallback(async (
+    allFiles: FileWithPreview[],
+    fileContext: string,
+  ): Promise<FileWithPreview[]> => {
+    const newFiles = allFiles.filter(f => !f.uploaded && !f.error && f instanceof File);
+    if (newFiles.length === 0) return allFiles;
+
+    try {
+      const result = await uploadFiles(newFiles, {
+        fileContext,
+        entityId: task.id,
+        entityType: 'TASK',
+      });
+
+      if (result?.data) {
+        // BatchFileUploadResponse.data has { successful: File[], failed: [...] }
+        const uploadedRecords = result.data.successful || (Array.isArray(result.data) ? result.data : [result.data]);
+        // Map uploaded records back to files by matching order
+        let uploadIdx = 0;
+        return allFiles.map(f => {
+          if (!f.uploaded && !f.error && f instanceof File && uploadIdx < uploadedRecords.length) {
+            const record = uploadedRecords[uploadIdx++];
+            return Object.assign(f, {
+              uploaded: true,
+              uploadProgress: 100,
+              uploadedFileId: record.id,
+              thumbnailUrl: record.thumbnailUrl,
+            });
+          }
+          return f;
+        });
+      }
+    } catch (err) {
+      console.error('[TaskEditForm] Pre-upload failed:', err);
+      toast.error('Erro ao enviar arquivo. Tente novamente.');
+    }
+    return allFiles;
+  }, [task.id]);
+
+  // Handle checkin files change per service order (with pre-upload)
+  const handleCheckinFilesChange = useCallback(async (serviceOrderId: string, files: FileWithPreview[]) => {
+    // Immediately update state (optimistic)
+    setCheckinFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: files }));
     setHasFileChanges(true);
     setHasCheckinFileChanges(true);
-  };
 
-  // Handle checkout files change
-  const handleCheckoutFilesChange = (files: FileWithPreview[]) => {
-    setCheckoutFiles(files);
+    // Pre-upload new files
+    const uploaded = await preUploadNewFiles(files, 'serviceOrderCheckinFiles');
+    if (uploaded !== files) {
+      setCheckinFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: uploaded }));
+    }
+  }, [preUploadNewFiles]);
+
+  // Handle checkout files change per service order (with pre-upload)
+  const handleCheckoutFilesChange = useCallback(async (serviceOrderId: string, files: FileWithPreview[]) => {
+    // Immediately update state (optimistic)
+    setCheckoutFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: files }));
     setHasFileChanges(true);
     setHasCheckoutFileChanges(true);
-  };
+
+    // Pre-upload new files
+    const uploaded = await preUploadNewFiles(files, 'serviceOrderCheckoutFiles');
+    if (uploaded !== files) {
+      setCheckoutFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: uploaded }));
+    }
+  }, [preUploadNewFiles]);
 
   // Handle observation files change
   const handleObservationFilesChange = (files: FileWithPreview[]) => {
@@ -2514,7 +2487,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
   // Reorder synced pricing items to match PRODUCTION service order reorder
   const handleProductionReorder = useCallback((descriptions: string[]) => {
-    const currentPricingItems = ((form.getValues('pricing') as any)?.items as any[]) || [];
+    const currentPricingItems = ((form.getValues('pricing') as any)?.services as any[]) || [];
     if (currentPricingItems.length === 0) return;
 
     // Build a map: normalized description → target order index
@@ -2554,7 +2527,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     if (pricingSelectorRef.current) {
       pricingSelectorRef.current.replaceItems(newItems);
     } else {
-      form.setValue('pricing.items', newItems, { shouldDirty: true });
+      form.setValue('pricing.services', newItems, { shouldDirty: true });
     }
   }, [form]);
 
@@ -2634,7 +2607,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   useEffect(() => {
     if (!isFormInitializedRef.current) {
       const currentServiceOrders = (servicesValues as any[]) || [];
-      const currentPricingItems = ((pricingValues as any)?.items as any[]) || [];
+      const currentPricingItems = ((pricingValues as any)?.services as any[]) || [];
 
       // Count only PRODUCTION service orders with valid descriptions
       const validServiceOrders = currentServiceOrders.filter(
@@ -2695,7 +2668,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       }
 
       const currentServiceOrders = (servicesValues as any[]) || [];
-      const currentPricingItems = ((pricingValues as any)?.items as any[]) || [];
+      const currentPricingItems = ((pricingValues as any)?.services as any[]) || [];
 
       // Get valid (complete) items only - must have description >= 3 chars
       const validServiceOrders = currentServiceOrders.filter(
@@ -2728,7 +2701,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           shouldSync: so.shouldSync !== false,
         }));
 
-        const syncPricingItems: SyncPricingItem[] = validPricingItems.map((item: any) => ({
+        const syncPricingServices: SyncPricingService[] = validPricingItems.map((item: any) => ({
           id: item.id,
           description: item.description || '',
           observation: item.observation || null,
@@ -2737,7 +2710,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         }));
 
         // Helper to filter empty pricing items
-        const filterEmptyPricingItems = (items: any[]) => items.filter((item: any) => {
+        const filterEmptyPricingServices = (items: any[]) => items.filter((item: any) => {
           const hasDescription = item.description && item.description.trim() !== "";
           const hasAmount = item.amount !== null && item.amount !== undefined && item.amount > 0;
           return hasDescription || hasAmount;
@@ -2765,7 +2738,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         }
 
         const currentPIObsMap = new Map<string, string | null>();
-        for (const item of syncPricingItems) {
+        for (const item of syncPricingServices) {
           const normalizedDesc = normalizeDescription(item.description);
           if (normalizedDesc) {
             currentPIObsMap.set(normalizedDesc, item.observation || null);
@@ -2842,7 +2815,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         // SYNC 1: Service Orders → Pricing Items (NEW ITEMS)
         // =====================================================================
         const pricingItemsToAddRaw = serviceOrdersAdded
-          ? getPricingItemsToAddFromServiceOrders(syncServiceOrders, syncPricingItems)
+          ? getPricingServicesToAddFromServiceOrders(syncServiceOrders, syncPricingServices)
           : [];
 
         // Filter out items that were deleted during this editing session
@@ -2854,7 +2827,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         // Update pricing if new items added OR observations changed
         if (pricingItemsToAdd.length > 0 || pricingObservationsUpdated) {
           const basePricingItems = pricingItemsToAdd.length > 0
-            ? filterEmptyPricingItems(pricingItemsWithSyncedObs)
+            ? filterEmptyPricingServices(pricingItemsWithSyncedObs)
             : pricingItemsWithSyncedObs;
           const finalPricingItems = [...basePricingItems, ...pricingItemsToAdd];
 
@@ -2866,7 +2839,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           if (pricingSelectorRef.current) {
             pricingSelectorRef.current.replaceItems(finalPricingItems);
           } else {
-            form.setValue('pricing.items', finalPricingItems, {
+            form.setValue('pricing.services', finalPricingItems, {
               shouldDirty: true,
               shouldTouch: true,
             });
@@ -2877,7 +2850,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         // SYNC 2: Pricing Items → Service Orders (NEW ITEMS)
         // =====================================================================
         const serviceOrdersToAddRaw = pricingItemsAdded
-          ? getServiceOrdersToAddFromPricingItems(syncPricingItems, syncServiceOrders, historicalDescriptionsRef.current)
+          ? getServiceOrdersToAddFromPricingServices(syncPricingServices, syncServiceOrders, historicalDescriptionsRef.current)
           : [];
 
         // Filter out items that were deleted during this editing session
@@ -3040,7 +3013,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
   const hasIncompletePricing = useMemo(() => {
     const pricing = pricingValues as any;
-    if (!pricing || !pricing.items || pricing.items.length === 0) return false;
+    if (!pricing || !pricing.services || pricing.services.length === 0) return false;
 
     // Only validate pricing if it's being changed (in formFieldChanges)
     // This prevents existing incomplete pricing from blocking unrelated edits
@@ -3048,7 +3021,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     if (!isPricingBeingChanged) return false;
 
     // Filter to only items with descriptions (empty items will be filtered out on submit)
-    const itemsWithDescription = pricing.items.filter((item: any) =>
+    const itemsWithDescription = pricing.services.filter((item: any) =>
       item.description && item.description.trim() !== ""
     );
 
@@ -3269,7 +3242,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                 }}
                                 ref={field.ref}
                                 placeholder="Ex: Pintura completa do caminhão"
-                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser}
+                                disabled={isSubmitting || !canEditIdentity}
                                 className="bg-transparent"
                               />
                             </FormControl>
@@ -3279,7 +3252,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                       />
 
                       {/* Customer */}
-                      <CustomerSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} initialCustomer={task.customer} />
+                      <CustomerSelector control={form.control} disabled={isSubmitting || !canEditIdentity} initialCustomer={task.customer} />
                     </div>
 
                     {/* Truck Category and Implement Type - Side by Side */}
@@ -3304,7 +3277,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                               placeholder="Selecione a categoria"
                               searchPlaceholder="Buscar categoria..."
                               emptyText="Nenhuma categoria encontrada"
-                              disabled={isSubmitting || isWarehouseUser || isDesignerUser || isFinancialUser}
+                              disabled={isSubmitting || !canEditIdentity}
                             />
                             <FormMessage />
                           </FormItem>
@@ -3331,7 +3304,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                               placeholder="Selecione o tipo de implemento"
                               searchPlaceholder="Buscar tipo de implemento..."
                               emptyText="Nenhum tipo de implemento encontrado"
-                              disabled={isSubmitting || isWarehouseUser || isDesignerUser || isFinancialUser}
+                              disabled={isSubmitting || !canEditIdentity}
                             />
                             <FormMessage />
                           </FormItem>
@@ -3359,7 +3332,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                 className="uppercase bg-transparent"
                                 onChange={(value: string | number | null) => field.onChange(typeof value === "string" ? value.toUpperCase() : "")}
                                 onBlur={field.onBlur}
-                                disabled={isSubmitting || isWarehouseUser || isDesignerUser || isFinancialUser}
+                                disabled={isSubmitting || !canEditIdentity}
                               />
                             </FormControl>
                             <FormMessage />
@@ -3413,7 +3386,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                     const limitedValue = cleanValue.slice(0, 7);
                                     field.onChange(limitedValue);
                                   }}
-                                  disabled={isSubmitting || isWarehouseUser || isDesignerUser || isFinancialUser}
+                                  disabled={isSubmitting || !canEditIdentity}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -3459,7 +3432,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                     const limitedValue = cleanValue.slice(0, 17);
                                     field.onChange(limitedValue);
                                   }}
-                                  disabled={isSubmitting || isWarehouseUser || isDesignerUser || isFinancialUser}
+                                  disabled={isSubmitting || !canEditIdentity}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -3472,7 +3445,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     {/* Sector, Status and Commission in a row */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Sector */}
-                      <SectorSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isCommercialUser} productionOnly />
+                      <SectorSelector control={form.control} disabled={isSubmitting || !canEditSector} productionOnly />
 
                       {/* Status Field (edit-specific) */}
                       <FormField
@@ -3488,7 +3461,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                               <Combobox
                                 value={field.value}
                                 onValueChange={field.onChange}
-                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isCommercialUser}
+                                disabled={isSubmitting || !canEditSector}
                                 options={[
                                   TASK_STATUS.PREPARATION,
                                   TASK_STATUS.WAITING_PRODUCTION,
@@ -3524,7 +3497,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                               <Combobox
                                 value={field.value || ""}
                                 onValueChange={(value) => field.onChange(value || null)}
-                                disabled={isSubmitting || isFinancialUser || isDesignerUser || isLogisticUser || isWarehouseUser}
+                                disabled={isSubmitting || !canEditCommission}
                                 options={[
                                   { value: "", label: "Não definido" },
                                   ...Object.values(COMMISSION_STATUS).map((status) => ({
@@ -3541,6 +3514,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         )}
                       />
                       )}
+
                     </div>
 
                     {/* Details */}
@@ -3554,7 +3528,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             Detalhes
                           </FormLabel>
                           <FormControl>
-                            <Textarea {...field} value={field.value || ""} placeholder="Detalhes adicionais sobre a tarefa..." rows={4} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} className="bg-transparent" />
+                            <Textarea {...field} value={field.value || ""} placeholder="Detalhes adicionais sobre a tarefa..." rows={4} disabled={isSubmitting || !canEditIdentity} className="bg-transparent" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -3592,8 +3566,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                           })()
                         : responsibleRows}
                       onChange={handleResponsibleRowsChange}
-                      disabled={isSubmitting || isFinancialUser || isDesignerUser || isLogisticUser}
-                      readOnly={isFinancialUser || isDesignerUser || isLogisticUser}
+                      disabled={isSubmitting || !canEditResponsibles}
+                      readOnly={!canEditResponsibles}
                       minRows={0}
                       maxRows={10}
                       control={form.control}
@@ -3606,7 +3580,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           )}
 
                 {/* Dates Card - Hidden for Warehouse users, Disabled for Financial and Designer users */}
-                {!isWarehouseUser && (
+                {canViewDates && (
           <AccordionItem
             value="dates"
             id="accordion-item-dates"
@@ -3640,7 +3614,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             mode: "datetime",
                             context: "start",
                             label: "Data de Previsão de Liberação",
-                            disabled: isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser,
+                            disabled: isSubmitting || !canEditDates,
                             allowManualInput: true,
                           } as any}
                         />
@@ -3654,7 +3628,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                       <FormField
                         control={form.control}
                         name="entryDate"
-                        render={({ field }) => <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "date", context: "start", label: "Data de Entrada", disabled: isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser, allowManualInput: true } as any} />}
+                        render={({ field }) => <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "date", context: "start", label: "Data de Entrada", disabled: isSubmitting || !canEditDates, allowManualInput: true } as any} />}
                       />
 
                       {/* Deadline - DateTime - DISABLED for Financial and Designer users */}
@@ -3662,7 +3636,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         control={form.control}
                         name="term"
                         render={({ field }) => (
-                          <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "datetime", context: "due", label: "Prazo de Entrega", disabled: isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser, allowManualInput: true } as any} />
+                          <DateTimeInput {...{ field: { onChange: (value: Date | null) => field.onChange(value), onBlur: () => field.onBlur(), value: field.value ?? null, name: field.name }, mode: "datetime", context: "due", label: "Prazo de Entrega", disabled: isSubmitting || !canEditDates, allowManualInput: true } as any} />
                         )}
                       />
                     </div>
@@ -3680,7 +3654,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                               mode: "datetime",
                               context: "start",
                               label: "Data de Início",
-                              disabled: isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser,
+                              disabled: isSubmitting || !canEditDates,
                               constraints: {
                                 maxDate: new Date(), // Cannot start in the future
                               },
@@ -3701,7 +3675,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                               mode: "datetime",
                               context: "end",
                               label: "Data de Conclusão",
-                              disabled: isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser,
+                              disabled: isSubmitting || !canEditDates,
                               constraints: {
                                 maxDate: new Date(), // Cannot finish in the future
                                 minDate: form.watch("startedAt") || new Date("1900-01-01"), // Cannot finish before started
@@ -3719,7 +3693,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 )}
 
                 {/* Services Card - Visible for Admin, Financial, Designer, Commercial, and Logistic users */}
-                {!isWarehouseUser && !isPlottingUser && (
+                {canViewServices && (
           <AccordionItem
             value="serviceOrders"
             id="accordion-item-serviceOrders"
@@ -3743,9 +3717,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         <FormItem>
                           <ServiceSelectorAutoGrouped
                             control={form.control}
-                            disabled={isSubmitting || isWarehouseUser}
+                            disabled={isSubmitting || !canEditServices}
                             currentUserId={user?.id}
-                            userPrivilege={user?.sector?.privileges}
+                            userPrivilege={privilege}
                             isTeamLeader={isTeamLeader}
                             onItemDeleted={handleServiceOrderDeleted}
                             isAccordionOpen={openAccordion === "serviceOrders"}
@@ -3788,12 +3762,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         ref={pricingSelectorRef}
                         control={form.control}
                         disabled={isSubmitting}
-                        userRole={user?.sector?.privileges}
+                        userRole={privilege}
                         onItemCountChange={setPricingItemCount}
                         layoutFiles={pricingLayoutFiles}
                         onLayoutFilesChange={setPricingLayoutFiles}
                         onItemDeleted={handlePricingItemDeleted}
-                        initialInvoiceToCustomers={task?.pricing?.invoicesToCustomers}
+                        initialCustomerConfigs={task?.pricing?.customerConfigs?.map((c: any) => c.customer).filter(Boolean)}
                         taskResponsibles={task?.responsibles}
                         artworks={(task.artworks || []).map((artwork: any) => {
                           const file = artwork.file || artwork;
@@ -3816,7 +3790,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 )}
 
                 {/* Medidas do Caminhão - Only visible to ADMIN, LOGISTIC, and PRODUCTION team leaders */}
-                {(isAdminUser || isLogisticUser || (isProductionUser && isTeamLeader)) && (
+                {canViewLayout && (
           <AccordionItem
             value="layout"
             id="accordion-item-layout"
@@ -3944,7 +3918,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             }
                           }}
                           showPhoto={selectedLayoutSide === "back"}
-                          disabled={isSubmitting || isFinancialUser || isDesignerUser}
+                          disabled={isSubmitting || !canEditLayout}
                         />
                       </div>
                     </CardContent>
@@ -3954,7 +3928,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 )}
 
                 {/* Truck Spot - Only visible to ADMIN and LOGISTIC users */}
-                {truckId && (isAdminUser || isLogisticUser) && (
+                {truckId && canViewTruckSpot && (
           <AccordionItem
             value="spot"
             id="accordion-item-spot"
@@ -3978,7 +3952,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         onSpotChange={(spot) => {
                           form.setValue("truck.spot", spot, { shouldDirty: true });
                         }}
-                        disabled={isSubmitting || isWarehouseUser}
+                        disabled={isSubmitting || !canEditServices}
                       />
                       </CardContent>
                     </AccordionContent>
@@ -3987,7 +3961,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 )}
 
                 {/* Paint Selection (Tintas) - Hidden for Warehouse, Financial, and Logistic users, Disabled for Designer */}
-                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
+                {canViewPaint && (
           <AccordionItem
             value="paint"
             id="accordion-item-paint"
@@ -4006,16 +3980,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     <CardContent className="space-y-6 pt-0">
                     <GeneralPaintingSelector
                       control={form.control}
-                      disabled={isSubmitting || isWarehouseUser || isDesignerUser}
+                      disabled={isSubmitting || !canEditPaint}
                       initialPaint={task.generalPainting}
                       onDesignarServiceOrder={handleDesignarServiceOrder}
-                      userPrivilege={user?.sector?.privileges}
+                      userPrivilege={privilege}
                     />
 
-                    {!isCommercialUser && (
+                    {canViewLogoPaint && (
                       <LogoPaintsSelector
                         control={form.control}
-                        disabled={isSubmitting || isWarehouseUser || isDesignerUser}
+                        disabled={isSubmitting || !canEditPaint}
                         initialPaints={task.logoPaints}
                       />
                     )}
@@ -4026,7 +4000,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 )}
 
                 {/* Cut Plans Section - Multiple Cuts Support - EDITABLE for Designer, Hidden for Financial, Logistic, and Commercial users */}
-                {!isFinancialUser && !isLogisticUser && !isCommercialUser && (
+                {canViewCuts && (
           <AccordionItem
             value="cuts"
             id="accordion-item-cuts"
@@ -4056,7 +4030,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 )}
 
                 {/* Airbrushing Section - Multiple Airbrushings Support - Hidden for Warehouse, Financial, Designer, Logistic, and Commercial users */}
-                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && !isCommercialUser && (
+                {canViewAirbrushing && (
           <AccordionItem
             value="airbrushing"
             id="accordion-item-airbrushing"
@@ -4086,7 +4060,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 )}
 
                 {/* Base Files Card (optional) - EDITABLE for Designer, Commercial, and Logistic, Hidden for Warehouse and Financial users */}
-                {!isWarehouseUser && !isFinancialUser && (
+                {canViewBaseFiles && (
           <AccordionItem
             value="base-files"
             id="accordion-item-base-files"
@@ -4125,7 +4099,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         }}
                       >
                         <FileSuggestions
-                          customerId={task.customerId}
+                          customerId={task.customerId ?? undefined}
                           fileContext="taskBaseFiles"
                           excludeFileIds={baseFiles.map(f => f.uploadedFileId || f.id).filter(Boolean)}
                           onSelect={(newFile) => {
@@ -4154,7 +4128,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 )}
 
                 {/* Project Files Card - visible to ALL except Warehouse and Financial users */}
-                {!isWarehouseUser && !isFinancialUser && (
+                {canViewProjectFiles && (
           <AccordionItem
             value="project-files"
             id="accordion-item-project-files"
@@ -4193,7 +4167,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         }}
                       >
                         <FileSuggestions
-                          customerId={task.customerId}
+                          customerId={task.customerId ?? undefined}
                           fileContext="taskProjectFiles"
                           excludeFileIds={projectFiles.map(f => f.uploadedFileId || f.id).filter(Boolean)}
                           onSelect={(newFile) => {
@@ -4221,8 +4195,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
-                {/* Check-in Files Card - only visible for Logistic and Admin users */}
-                {(isLogisticUser || isAdminUser) && (
+                {/* Check-in Files Card - grouped by service order, compact with FileUploadField */}
+                {canViewCheckinCheckout && task.serviceOrders && task.serviceOrders.filter(so => so.id && so.status !== SERVICE_ORDER_STATUS.CANCELLED).length > 0 && (
           <AccordionItem
             value="checkin-files"
             id="accordion-item-checkin-files"
@@ -4238,34 +4212,47 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     </CardHeader>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <CardContent className="pt-0">
-                      <FileUploadField
-                        onFilesChange={handleCheckinFilesChange}
-                        maxFiles={20}
-                        maxSize={500 * 1024 * 1024}
-                        disabled={isSubmitting}
-                        showPreview={true}
-                        existingFiles={checkinFiles}
-                        variant="compact"
-                        placeholder="Adicione fotos de check-in"
-                        label="Fotos de check-in anexadas"
-                        acceptedFileTypes={{
-                          "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
-                          "video/mp4": [".mp4"],
-                          "video/quicktime": [".mov"],
-                          "video/webm": [".webm"],
-                          "video/x-msvideo": [".avi"],
-                          "video/x-matroska": [".mkv"],
-                        }}
-                      />
+                    <CardContent className="pt-0 space-y-3">
+                      {task.serviceOrders
+                        .filter(so => so.id && so.status !== SERVICE_ORDER_STATUS.CANCELLED)
+                        .map((so) => {
+                          const soFiles = checkinFilesByServiceOrder[so.id!] || [];
+                          return (
+                            <div key={`checkin-${so.id}`} className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs font-medium">{so.description}</Label>
+                                <span className="text-xs text-muted-foreground">{soFiles.filter(f => f.uploaded).length} foto(s)</span>
+                              </div>
+                              <FileUploadField
+                                onFilesChange={(files) => handleCheckinFilesChange(so.id!, files)}
+                                maxFiles={20}
+                                maxSize={500 * 1024 * 1024}
+                                disabled={isSubmitting}
+                                showPreview={true}
+                                existingFiles={soFiles}
+                                variant="mini"
+                                placeholder="Clique ou arraste fotos"
+                                showFiles={true}
+                                acceptedFileTypes={{
+                                  "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
+                                  "video/mp4": [".mp4"],
+                                  "video/quicktime": [".mov"],
+                                  "video/webm": [".webm"],
+                                  "video/x-msvideo": [".avi"],
+                                  "video/x-matroska": [".mkv"],
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
                     </CardContent>
                   </AccordionContent>
                 </Card>
           </AccordionItem>
                 )}
 
-                {/* Check-out Files Card - only visible for Logistic and Admin users; only for completed tasks */}
-                {(isLogisticUser || isAdminUser) && task.status === TASK_STATUS.COMPLETED && (
+                {/* Check-out Files Card - grouped by service order, shows checkin reference above */}
+                {canViewCheckinCheckout && task.status === TASK_STATUS.COMPLETED && task.serviceOrders && task.serviceOrders.filter(so => so.id && so.status !== SERVICE_ORDER_STATUS.CANCELLED).length > 0 && (
           <AccordionItem
             value="checkout-files"
             id="accordion-item-checkout-files"
@@ -4281,26 +4268,80 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     </CardHeader>
                   </AccordionTrigger>
                   <AccordionContent>
-                    <CardContent className="pt-0">
-                      <FileUploadField
-                        onFilesChange={handleCheckoutFilesChange}
-                        maxFiles={20}
-                        maxSize={500 * 1024 * 1024}
-                        disabled={isSubmitting}
-                        showPreview={true}
-                        existingFiles={checkoutFiles}
-                        variant="compact"
-                        placeholder="Adicione fotos de check-out"
-                        label="Fotos de check-out anexadas"
-                        acceptedFileTypes={{
-                          "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
-                          "video/mp4": [".mp4"],
-                          "video/quicktime": [".mov"],
-                          "video/webm": [".webm"],
-                          "video/x-msvideo": [".avi"],
-                          "video/x-matroska": [".mkv"],
-                        }}
-                      />
+                    <CardContent className="pt-0 space-y-4">
+                      {task.serviceOrders
+                        .filter(so => so.id && so.status !== SERVICE_ORDER_STATUS.CANCELLED)
+                        .map((so) => {
+                          const soCheckinFiles = checkinFilesByServiceOrder[so.id!] || [];
+                          const soCheckoutFiles = checkoutFilesByServiceOrder[so.id!] || [];
+                          const checkinCount = soCheckinFiles.filter(f => f.uploaded).length;
+                          const checkoutCount = soCheckoutFiles.filter(f => f.uploaded).length;
+                          const needsMore = checkinCount > 0 && checkoutCount < checkinCount;
+                          return (
+                            <div key={`checkout-${so.id}`} className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs font-medium">{so.description}</Label>
+                                {needsMore && (
+                                  <span className="text-xs text-amber-600">
+                                    falta {checkinCount - checkoutCount}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Checkin reference images - small horizontal row */}
+                              {soCheckinFiles.length > 0 && (
+                                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                                  {soCheckinFiles.filter(f => f.uploaded).map((file) => {
+                                    const apiBase = getApiBaseUrl();
+                                    const src = file.thumbnailUrl
+                                      ? (file.thumbnailUrl.startsWith("/api") ? `${apiBase}${file.thumbnailUrl}` : file.thumbnailUrl)
+                                      : file.preview
+                                        ? file.preview
+                                        : file.uploadedFileId
+                                          ? `${apiBase}/files/thumbnail/${file.uploadedFileId}`
+                                          : "";
+                                    return (
+                                      <div
+                                        key={file.id}
+                                        className="relative flex-shrink-0 w-10 h-10 rounded overflow-hidden border border-border/50 bg-muted opacity-60"
+                                      >
+                                        {src ? (
+                                          <img
+                                            src={src}
+                                            alt={file.name}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-center">
+                                            <IconCamera className="h-3 w-3 text-muted-foreground" />
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              <FileUploadField
+                                onFilesChange={(files) => handleCheckoutFilesChange(so.id!, files)}
+                                maxFiles={20}
+                                maxSize={500 * 1024 * 1024}
+                                disabled={isSubmitting}
+                                showPreview={true}
+                                existingFiles={soCheckoutFiles}
+                                variant="mini"
+                                placeholder="Clique ou arraste fotos"
+                                showFiles={true}
+                                acceptedFileTypes={{
+                                  "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp", ".svg"],
+                                  "video/mp4": [".mp4"],
+                                  "video/quicktime": [".mov"],
+                                  "video/webm": [".webm"],
+                                  "video/x-msvideo": [".avi"],
+                                  "video/x-matroska": [".mkv"],
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
                     </CardContent>
                   </AccordionContent>
                 </Card>
@@ -4308,7 +4349,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 )}
 
                 {/* Artworks/Layouts Card - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
-                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
+                {canViewReimbursement && (
           <AccordionItem
             value="artworks"
             id="accordion-item-artworks"
@@ -4348,7 +4389,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         label="Layouts anexados"
                       >
                         <FileSuggestions
-                          customerId={task.customerId}
+                          customerId={task.customerId ?? undefined}
                           fileContext="tasksArtworks"
                           excludeFileIds={uploadedFiles.map(f => f.uploadedFileId || f.id).filter(Boolean)}
                           onSelect={(newFile) => {
@@ -4378,7 +4419,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           )}
 
                 {/* Observation Section - only for completed tasks */}
-                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && !isCommercialUser && task.status === TASK_STATUS.COMPLETED && (
+                {canViewObservation && task.status === TASK_STATUS.COMPLETED && (
           <AccordionItem
             value="observation"
             id="accordion-item-observation"
@@ -4456,104 +4497,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
-                {/* Financial Information Card - FINANCIAL always, ADMIN only when COMPLETED */}
-                {(isFinancialUser || (isAdminUser && task.status === TASK_STATUS.COMPLETED)) && (
-          <AccordionItem
-            value="financial"
-            id="accordion-item-financial"
-            className="border border-border rounded-lg"
-          >
-                <Card className="border-0">
-                  <AccordionTrigger className="px-0 hover:no-underline">
-                    <CardHeader className="flex-1 py-4">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconCurrencyReal className="h-5 w-5" />
-                        Informações Financeiras
-                      </CardTitle>
-                    </CardHeader>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <CardContent className="pt-0">
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                          {/* Budget File */}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium flex items-center gap-2">
-                              <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                              Orçamento
-                            </label>
-                            <FileUploadField
-                              onFilesChange={handleBudgetFileChange}
-                              maxFiles={5}
-                              disabled={isSubmitting}
-                              showPreview={true}
-                              existingFiles={budgetFile}
-                              variant="compact"
-                              placeholder="Adicionar orçamentos"
-                              label=""
-                            />
-                          </div>
-
-                          {/* Invoice File */}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium flex items-center gap-2">
-                              <IconFile className="h-4 w-4 text-muted-foreground" />
-                              Nota Fiscal
-                            </label>
-                            <FileUploadField
-                              onFilesChange={handleInvoiceFileChange}
-                              maxFiles={5}
-                              disabled={isSubmitting}
-                              showPreview={true}
-                              existingFiles={invoiceFile}
-                              variant="compact"
-                              placeholder="Adicionar NFes"
-                              label=""
-                            />
-                          </div>
-
-                          {/* Receipt File */}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium flex items-center gap-2">
-                              <IconReceipt className="h-4 w-4 text-muted-foreground" />
-                              Recibo
-                            </label>
-                            <FileUploadField
-                              onFilesChange={handleReceiptFileChange}
-                              maxFiles={5}
-                              disabled={isSubmitting}
-                              showPreview={true}
-                              existingFiles={receiptFile}
-                              variant="compact"
-                              placeholder="Adicionar recibos"
-                              label=""
-                            />
-                          </div>
-
-                          {/* Bank Slip File */}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium flex items-center gap-2">
-                              <IconFileBarcode className="h-4 w-4 text-muted-foreground" />
-                              Boleto
-                            </label>
-                            <FileUploadField
-                              onFilesChange={handleBankSlipFileChange}
-                              maxFiles={10}
-                              disabled={isSubmitting}
-                              showPreview={true}
-                              existingFiles={bankSlipFile}
-                              variant="compact"
-                              placeholder="Adicionar boletos"
-                              label=""
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </AccordionContent>
-                </Card>
-          </AccordionItem>
-                )}
         </Accordion>
         </div>
       </form>

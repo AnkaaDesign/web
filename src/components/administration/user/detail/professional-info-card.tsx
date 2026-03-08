@@ -54,13 +54,13 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
                 </div>
               )}
 
-              {user.managedSector && (
+              {user.ledSector && (
                 <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconUserCog className="h-4 w-4" />
-                    Setor Gerenciado
+                    Setor Liderado
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{user.managedSector.name}</span>
+                  <span className="text-sm font-semibold text-foreground">{user.ledSector.name}</span>
                 </div>
               )}
 

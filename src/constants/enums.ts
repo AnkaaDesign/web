@@ -53,11 +53,12 @@ export enum SECTOR_PRIVILEGES {
   LOGISTIC = "LOGISTIC",
   PLOTTING = "PLOTTING",
   COMMERCIAL = "COMMERCIAL",
+  PRODUCTION_MANAGER = "PRODUCTION_MANAGER",
 }
 
 /**
  * TEAM_LEADER is a virtual privilege - not stored in database
- * Determined by: user.sector.privilege === PRODUCTION && user.id === user.sector.managerId
+ * Determined by: user.sector.privilege === PRODUCTION && user.id === user.sector.leaderId
  * Use isTeamLeader() helper function to check this status
  */
 export const TEAM_LEADER = 'TEAM_LEADER' as const;
@@ -176,7 +177,6 @@ export enum SERVICE_ORDER_STATUS {
 
 export enum SERVICE_ORDER_TYPE {
   PRODUCTION = "PRODUCTION",
-  FINANCIAL = "FINANCIAL",
   COMMERCIAL = "COMMERCIAL",
   LOGISTIC = "LOGISTIC",
   ARTWORK = "ARTWORK",
@@ -187,7 +187,6 @@ export const SERVICE_ORDER_TYPE_DISPLAY_ORDER: SERVICE_ORDER_TYPE[] = [
   SERVICE_ORDER_TYPE.COMMERCIAL,
   SERVICE_ORDER_TYPE.ARTWORK,
   SERVICE_ORDER_TYPE.PRODUCTION,
-  SERVICE_ORDER_TYPE.FINANCIAL,
   SERVICE_ORDER_TYPE.LOGISTIC,
 ];
 
@@ -251,8 +250,8 @@ export enum PPE_DELIVERY_STATUS {
   DELIVERED = "DELIVERED",
   WAITING_SIGNATURE = "WAITING_SIGNATURE",
   COMPLETED = "COMPLETED",
-  REPROVED = "REPROVED",
   SIGNATURE_REJECTED = "SIGNATURE_REJECTED",
+  REPROVED = "REPROVED",
   CANCELLED = "CANCELLED",
 }
 
@@ -265,8 +264,8 @@ export enum ASSIGNMENT_TYPE {
 export enum BORROW_STATUS {
   ACTIVE = "ACTIVE",
   RETURNED = "RETURNED",
-  LOST = "LOST",
   OVERDUE = "OVERDUE",
+  LOST = "LOST",
 }
 
 export enum EXTERNAL_WITHDRAWAL_STATUS {
@@ -2121,6 +2120,7 @@ export enum COMMISSION_STATUS {
   SUSPENDED_COMMISSION = "SUSPENDED_COMMISSION",
 }
 
+
 export enum DISCOUNT_TYPE {
   NONE = "NONE",
   PERCENTAGE = "PERCENTAGE",
@@ -2179,10 +2179,52 @@ export enum PAYROLL_MONTH {
 // =====================
 
 export enum TASK_PRICING_STATUS {
+  PENDING = "PENDING",
+  BUDGET_APPROVED = "BUDGET_APPROVED",
+  VERIFIED = "VERIFIED",
+  INTERNAL_APPROVED = "INTERNAL_APPROVED",
+  UPCOMING = "UPCOMING",
+  PARTIAL = "PARTIAL",
+  SETTLED = "SETTLED",
+}
+
+// =====================
+// Invoice / Billing Enums
+// =====================
+
+export enum INVOICE_STATUS {
   DRAFT = "DRAFT",
-  APPROVED = "APPROVED",
-  REJECTED = "REJECTED",
+  ACTIVE = "ACTIVE",
+  PARTIALLY_PAID = "PARTIALLY_PAID",
+  PAID = "PAID",
   CANCELLED = "CANCELLED",
+}
+
+export enum INSTALLMENT_STATUS {
+  PENDING = "PENDING",
+  PROCESSING = "PROCESSING",
+  PAID = "PAID",
+  OVERDUE = "OVERDUE",
+  CANCELLED = "CANCELLED",
+}
+
+export enum BANK_SLIP_STATUS {
+  CREATING = "CREATING",
+  REGISTERING = "REGISTERING",
+  ACTIVE = "ACTIVE",
+  OVERDUE = "OVERDUE",
+  PAID = "PAID",
+  CANCELLED = "CANCELLED",
+  REJECTED = "REJECTED",
+  ERROR = "ERROR",
+}
+
+export enum NFSE_STATUS {
+  PENDING = "PENDING",
+  PROCESSING = "PROCESSING",
+  AUTHORIZED = "AUTHORIZED",
+  CANCELLED = "CANCELLED",
+  ERROR = "ERROR",
 }
 
 // =====================

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconFileText, IconFileInvoice, IconReceipt, IconFileSpreadsheet, IconList, IconLayoutGrid } from "@tabler/icons-react";
+import { IconFileText, IconFileInvoice, IconList, IconLayoutGrid } from "@tabler/icons-react";
 import type { Customer } from "../../../../types";
 import type { File as FileType } from "../../../../types";
 import { cn } from "@/lib/utils";
@@ -42,23 +42,11 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
   const tasks = tasksResponse?.data || [];
 
   // Collect all task documents by type (excluding artworks)
-  const { budgets, invoices, receipts, reimbursements, reimbursementInvoices, totalDocuments } = useMemo(() => {
-    const budgets: FileType[] = [];
-    const invoices: FileType[] = [];
-    const receipts: FileType[] = [];
+  const { reimbursements, reimbursementInvoices, totalDocuments } = useMemo(() => {
     const reimbursements: FileType[] = [];
     const reimbursementInvoices: FileType[] = [];
 
     tasks.forEach((task) => {
-      if (task.budgets) {
-        budgets.push(...task.budgets);
-      }
-      if (task.invoices) {
-        invoices.push(...task.invoices);
-      }
-      if (task.receipts) {
-        receipts.push(...task.receipts);
-      }
       if (task.reimbursements) {
         reimbursements.push(...task.reimbursements);
       }
@@ -67,9 +55,9 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
       }
     });
 
-    const totalDocuments = budgets.length + invoices.length + receipts.length + reimbursements.length + reimbursementInvoices.length;
+    const totalDocuments = reimbursements.length + reimbursementInvoices.length;
 
-    return { budgets, invoices, receipts, reimbursements, reimbursementInvoices, totalDocuments };
+    return { reimbursements, reimbursementInvoices, totalDocuments };
   }, [tasks]);
 
   const hasDocuments = totalDocuments > 0;
@@ -77,9 +65,6 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
   const handleDocumentFileClick = (file: FileType) => {
     if (!fileViewerContext) return;
     const allDocuments = [
-      ...budgets,
-      ...invoices,
-      ...receipts,
       ...reimbursements,
       ...reimbursementInvoices,
     ];
@@ -151,72 +136,6 @@ export function DocumentsCard({ customer, className }: DocumentsCardProps) {
       <CardContent className="pt-0 flex-1">
         {hasDocuments ? (
           <div className="space-y-8">
-            {/* Budgets */}
-            {budgets.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <IconFileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold text-foreground">Orçamentos</h3>
-                </div>
-                <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                  {budgets.map((file: FileType) => (
-                    <FileItem
-                      key={file.id}
-                      file={file}
-                      viewMode={documentsViewMode}
-                      onPreview={handleDocumentFileClick}
-                      onDownload={handleDownload}
-                      showActions
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Invoices */}
-            {invoices.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold text-foreground">Notas Fiscais</h3>
-                </div>
-                <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                  {invoices.map((file: FileType) => (
-                    <FileItem
-                      key={file.id}
-                      file={file}
-                      viewMode={documentsViewMode}
-                      onPreview={handleDocumentFileClick}
-                      onDownload={handleDownload}
-                      showActions
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Receipts */}
-            {receipts.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <IconReceipt className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold text-foreground">Recibos</h3>
-                </div>
-                <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                  {receipts.map((file: FileType) => (
-                    <FileItem
-                      key={file.id}
-                      file={file}
-                      viewMode={documentsViewMode}
-                      onPreview={handleDocumentFileClick}
-                      onDownload={handleDownload}
-                      showActions
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Reimbursements */}
             {reimbursements.length > 0 && (
               <div className="space-y-3">

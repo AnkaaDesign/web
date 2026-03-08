@@ -2473,7 +2473,7 @@ const ChangelogTimelineItem = ({
 
                                 const hasBudgetInfo =
                                   pricing.budgetNumber || pricing.total;
-                                const items = pricing.items || [];
+                                const items = pricing.services || [];
 
                                 return (
                                   <div className="flex flex-col gap-2 mt-1">

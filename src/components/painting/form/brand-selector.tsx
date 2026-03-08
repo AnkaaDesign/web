@@ -43,7 +43,7 @@ export function PaintBrandSelector({ control, disabled, required }: BrandSelecto
               placeholder="Selecione a marca"
               disabled={disabled || isLoading}
               searchable={true}
-              clearable={!required}
+              clearable={false}
               emptyText={isLoading ? "Carregando marcas..." : "Nenhuma marca encontrada"}
               className="bg-transparent"
             />

@@ -1,5 +1,6 @@
 import { formatCurrency, formatDate } from './index';
-import type { TaskPricing, PAYMENT_CONDITION } from '../types/task-pricing';
+import type { TaskPricing } from '../types/task-pricing';
+import type { PAYMENT_CONDITION } from '../constants/enums';
 
 /**
  * Convert number to written form in Portuguese
@@ -20,10 +21,10 @@ function numberToWord(n: number): string {
 /**
  * Get the number of installments from payment condition
  */
-function getInstallmentCount(condition: PAYMENT_CONDITION | null): number {
+function getInstallmentCount(condition: PAYMENT_CONDITION | string | null): number {
   if (!condition) return 0;
 
-  const countMap: Record<PAYMENT_CONDITION, number> = {
+  const countMap: Record<string, number> = {
     CASH: 1,
     INSTALLMENTS_2: 2,
     INSTALLMENTS_3: 3,
@@ -38,7 +39,19 @@ function getInstallmentCount(condition: PAYMENT_CONDITION | null): number {
 }
 
 /**
- * Generate payment terms text based on pricing data
+ * Payment data needed for generating payment text.
+ * paymentCondition and downPaymentDate now live on customer configs,
+ * so callers must extract them before calling this function.
+ */
+interface PaymentTextData {
+  customPaymentText: string | null;
+  paymentCondition?: string | null;
+  downPaymentDate?: Date | string | null;
+  total: number;
+}
+
+/**
+ * Generate payment terms text based on payment data
  * If customPaymentText is provided, it overrides the auto-generated text
  *
  * Payment structure:
@@ -47,7 +60,7 @@ function getInstallmentCount(condition: PAYMENT_CONDITION | null): number {
  * - INSTALLMENTS_3: 3 payments (entrada + 20 + 40 days)
  * - etc. (always 20 days interval between payments)
  */
-export function generatePaymentText(pricing: TaskPricing): string {
+export function generatePaymentText(pricing: PaymentTextData): string {
   // If custom text is provided, use it
   if (pricing.customPaymentText) {
     return pricing.customPaymentText;

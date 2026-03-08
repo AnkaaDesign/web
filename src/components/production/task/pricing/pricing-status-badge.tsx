@@ -9,29 +9,41 @@ interface PricingStatusBadgeProps {
 }
 
 export function PricingStatusBadge({ status, className, size = 'default' }: PricingStatusBadgeProps) {
-  const config = {
-    DRAFT: {
-      label: 'Rascunho',
-      variant: 'secondary' as const,
+  const config: Record<TASK_PRICING_STATUS, { label: string; variant: string }> = {
+    PENDING: {
+      label: 'Pendente',
+      variant: 'secondary',
     },
-    APPROVED: {
-      label: 'Aprovado',
-      variant: 'approved' as const,
+    BUDGET_APPROVED: {
+      label: 'Orçamento Aprovado',
+      variant: 'approved',
     },
-    REJECTED: {
-      label: 'Rejeitado',
-      variant: 'rejected' as const,
+    VERIFIED: {
+      label: 'Verificado',
+      variant: 'processing',
     },
-    CANCELLED: {
-      label: 'Cancelado',
-      variant: 'cancelled' as const,
+    INTERNAL_APPROVED: {
+      label: 'Aprovado Internamente',
+      variant: 'approved',
+    },
+    UPCOMING: {
+      label: 'A Vencer',
+      variant: 'pending',
+    },
+    PARTIAL: {
+      label: 'Parcial',
+      variant: 'inProgress',
+    },
+    SETTLED: {
+      label: 'Liquidado',
+      variant: 'completed',
     },
   };
 
-  const { label, variant } = config[status];
+  const { label, variant } = config[status] || { label: status, variant: 'secondary' };
 
   return (
-    <Badge variant={variant} size={size} className={cn('font-medium whitespace-nowrap', className)}>
+    <Badge variant={variant as any} size={size} className={cn('font-medium whitespace-nowrap', className)}>
       {label}
     </Badge>
   );

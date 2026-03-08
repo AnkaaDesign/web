@@ -5,16 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
-import { paintFormulaComponentService } from "@/api-client/paint";
 import type { Item } from "../../../types";
 
 interface FormulaComponentsEditorProps {
   className?: string;
   availableItems?: Item[];
-  formulaPaintId?: string;
 }
 
-export function FormulaComponentsEditor({ className, availableItems = [], formulaPaintId }: FormulaComponentsEditorProps) {
+export function FormulaComponentsEditor({ className, availableItems = [] }: FormulaComponentsEditorProps) {
   const { control, setValue, watch } = useFormContext();
   const { fields, append, remove } = useFieldArray({
     control,
@@ -23,7 +21,6 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const lastRowRef = useRef<HTMLDivElement>(null);
-  const lastDeductedWeights = useRef<Record<number, number>>({});
 
   // Stable ref callback to store input refs in array
   const setInputRef = useCallback((index: number) => {
@@ -91,8 +88,6 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
     if (value === "") {
       setValue(`components.${index}.weightInGrams`, 0);
       setValue(`components.${index}.rawInput`, "");
-      // Reset tracking when input is cleared
-      lastDeductedWeights.current[index] = 0;
       return;
     }
 
@@ -258,61 +253,22 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
                       handleAmountChange(index, str, previousValue);
                     }}
                     onKeyDown={(e) => handleKeyDown(e, index, "input")}
-                    onBlur={async (e: React.FocusEvent<HTMLInputElement>) => {
-                      // Input component passes event object to onBlur (unlike onChange)
+                    onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
                       const trimmedValue = (e.target.value || "").toString().trim();
                       if (trimmedValue) {
                         const parts = trimmedValue.split(/\s+/).filter(Boolean);
-                        // Replace commas with dots for proper decimal parsing
                         const numbers = parts.map(p => parseFloat(p.replace(",", "."))).filter(n => !isNaN(n));
 
                         let finalWeight = 0;
                         if (numbers.length >= 2) {
-                          // Multiple numbers - calculate sum
                           const sum = numbers.reduce((acc, num) => acc + num, 0);
                           finalWeight = Math.round(sum * 100) / 100;
                           setValue(`components.${index}.weightInGrams`, finalWeight);
-                          // Display with comma as decimal separator
                           setValue(`components.${index}.rawInput`, finalWeight.toString().replace(".", ","));
                         } else if (numbers.length === 1) {
-                          // Single number
                           finalWeight = Math.round(numbers[0] * 100) / 100;
                           setValue(`components.${index}.weightInGrams`, finalWeight);
-                          // Display with comma as decimal separator
                           setValue(`components.${index}.rawInput`, finalWeight.toString().replace(".", ","));
-                        }
-
-                        // Call API to deduct inventory if we have a valid weight and item
-                        const itemId = watch(`components.${index}.itemId`);
-                        if (finalWeight > 0 && itemId) {
-                          // Get last deducted weight for this row
-                          const lastDeducted = lastDeductedWeights.current[index] || 0;
-
-                          // Calculate weight to deduct
-                          let weightToDeduct = 0;
-                          if (finalWeight < lastDeducted) {
-                            // User cleared and started over - deduct full new amount
-                            weightToDeduct = finalWeight;
-                            lastDeductedWeights.current[index] = 0; // Reset tracking
-                          } else if (finalWeight > lastDeducted) {
-                            // User added more - only deduct the difference
-                            weightToDeduct = finalWeight - lastDeducted;
-                          }
-                          // If finalWeight === lastDeducted, no change, don't deduct
-
-                          if (weightToDeduct > 0) {
-                            // Only pass formulaPaintId if it's a real UUID (not temp ID)
-                            const isRealFormula = formulaPaintId && !formulaPaintId.startsWith('temp-');
-
-                            await paintFormulaComponentService.deductForFormulationTest({
-                              itemId,
-                              weight: weightToDeduct,
-                              ...(isRealFormula && { formulaPaintId }), // Only include if real
-                            });
-
-                            // Update tracking after successful deduction
-                            lastDeductedWeights.current[index] = finalWeight;
-                          }
                         }
                       }
                     }}
@@ -328,15 +284,10 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
                     onClick={() => {
                       if (fields.length > 1) {
                         remove(index);
-                        // Clean up tracking for this row
-                        delete lastDeductedWeights.current[index];
                       } else {
-                        // Clear the inputs for the only row instead of removing it
                         setValue(`components.${index}.itemId`, "");
                         setValue(`components.${index}.weightInGrams`, 0);
                         setValue(`components.${index}.rawInput`, "");
-                        // Reset tracking for this row
-                        lastDeductedWeights.current[index] = 0;
                       }
                     }}
                     className="h-10 w-10 text-destructive hover:text-destructive hover:bg-destructive/10"

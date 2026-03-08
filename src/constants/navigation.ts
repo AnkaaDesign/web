@@ -6,7 +6,7 @@ export interface MenuItem {
   icon: string; // Icon name (generic, will be mapped to platform-specific icons)
   path?: string;
   children?: MenuItem[];
-  // Support both SECTOR_PRIVILEGES and TEAM_LEADER (virtual privilege for sector managers only)
+  // Support both SECTOR_PRIVILEGES and TEAM_LEADER (virtual privilege for sector leaders only)
   requiredPrivilege?: SECTOR_PRIVILEGES | typeof TEAM_LEADER | (SECTOR_PRIVILEGES | typeof TEAM_LEADER)[];
   isControlPanel?: boolean; // Indicates if this is a control panel/dashboard
   isDynamic?: boolean; // Indicates if this is a dynamic route
@@ -1074,14 +1074,14 @@ export const NAVIGATION_MENU: MenuItem[] = [
     children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo/detalhes/:id", isDynamic: true }],
   },
 
-  // MINHA EQUIPE - Team leaders only (checked via managedSector relation, not privilege)
-  // This menu item is only visible to users who are sector managers (have managedSector relation)
+  // MINHA EQUIPE - Team leaders only (checked via ledSector relation, not privilege)
+  // This menu item is only visible to users who are sector leaders (have ledSector relation)
   {
     id: "minha-equipe",
     title: "Minha Equipe",
     icon: "team",
     path: "/meu-pessoal",
-    requiredPrivilege: [TEAM_LEADER], // Only visible to sector managers
+    requiredPrivilege: [TEAM_LEADER], // Only visible to sector leaders
     children: [
       { id: "membros-equipe", title: "Membros", icon: "users", path: "/meu-pessoal/usuarios" },
       { id: "emprestimos-equipe", title: "Empréstimos", icon: "loan", path: "/meu-pessoal/emprestimos" },

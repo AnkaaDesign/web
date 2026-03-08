@@ -881,7 +881,7 @@ export const serverKeys = {
 
 /**
  * Query keys for team staff endpoints.
- * These endpoints are secure and automatically filter data based on the authenticated user's managed sector.
+ * These endpoints are secure and automatically filter data based on the authenticated user's led sector.
  */
 export const teamStaffKeys = {
   all: ["teamStaff"] as const,

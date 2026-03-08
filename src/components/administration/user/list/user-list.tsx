@@ -108,19 +108,19 @@ export function UserList({ className }: UserListProps) {
       filters.where = { ...filters.where, sectorId: sector };
     }
 
-    const managedSector = params.get("managedSector");
-    const managedSectors = params.get("managedSectors");
-    if (managedSectors) {
-      filters.managedSectorId = managedSectors.split(",");
-    } else if (managedSector) {
-      filters.where = { ...filters.where, managedSectorId: managedSector };
+    const ledSector = params.get("ledSector");
+    const ledSectors = params.get("ledSectors");
+    if (ledSectors) {
+      filters.ledSectorId = ledSectors.split(",");
+    } else if (ledSector) {
+      filters.where = { ...filters.where, ledSectorId: ledSector };
     }
 
     // Parse boolean filters
 
-    const hasManagedSector = params.get("hasManagedSector");
-    if (hasManagedSector !== null) {
-      filters.hasManagedSector = hasManagedSector === "true";
+    const hasLedSector = params.get("hasLedSector");
+    if (hasLedSector !== null) {
+      filters.hasLedSector = hasLedSector === "true";
     }
 
     const verified = params.get("verified");
@@ -213,12 +213,12 @@ export function UserList({ className }: UserListProps) {
     if (filters.sectorId?.length) params.sectors = filters.sectorId.join(",");
     else if (filters.where?.sectorId) params.sector = filters.where.sectorId as string;
 
-    if (filters.managedSectorId?.length) params.managedSectors = filters.managedSectorId.join(",");
-    else if (filters.where?.managedSectorId) params.managedSector = filters.where.managedSectorId as string;
+    if (filters.ledSectorId?.length) params.ledSectors = filters.ledSectorId.join(",");
+    else if (filters.where?.ledSectorId) params.ledSector = filters.where.ledSectorId as string;
 
     // Boolean filters
-    if (typeof filters.hasManagedSector === "boolean") {
-      params.hasManagedSector = String(filters.hasManagedSector);
+    if (typeof filters.hasLedSector === "boolean") {
+      params.hasLedSector = String(filters.hasLedSector);
     }
     if (typeof filters.verified === "boolean") {
       params.verified = String(filters.verified);
@@ -313,7 +313,7 @@ export function UserList({ className }: UserListProps) {
     }
 
     // Convert frontend filter names to API schema names
-    // The API expects plural field names (statuses, positionIds, sectorIds, managedSectorIds)
+    // The API expects plural field names (statuses, positionIds, sectorIds, ledSectorIds)
     if (result.status) {
       result.statuses = result.status;
       delete result.status;
@@ -326,9 +326,9 @@ export function UserList({ className }: UserListProps) {
       result.sectorIds = result.sectorId;
       delete result.sectorId;
     }
-    if (result.managedSectorId) {
-      result.managedSectorIds = result.managedSectorId;
-      delete result.managedSectorId;
+    if (result.ledSectorId) {
+      result.ledSectorIds = result.ledSectorId;
+      delete result.ledSectorId;
     }
 
     // Apply status filter logic

@@ -28,7 +28,7 @@ const ALL_HOME_SECTIONS: Record<string, SectionConfig> = {
   tasksCloseForecast: { id: "tasksCloseForecast", label: "Tarefas com Liberação Próxima", defaultVisible: true, fields: [] },
   lowStockItems: { id: "lowStockItems", label: "Estoque Baixo", defaultVisible: true, fields: [] },
   completedTasks: { id: "completedTasks", label: "Tarefas Concluídas", defaultVisible: true, fields: [] },
-  openFinancialSOs: { id: "openFinancialSOs", label: "OS Financeiras Pendentes", defaultVisible: true, fields: [] },
+  tasksAwaitingPaymentApproval: { id: "tasksAwaitingPaymentApproval", label: "Aguardando Aprovação de Pagamento", defaultVisible: true, fields: [] },
   timeEntries: { id: "timeEntries", label: "Ponto da Semana", defaultVisible: true, fields: [] },
   recentMessages: { id: "recentMessages", label: "Mensagens Recentes", defaultVisible: true, fields: [] },
 };
@@ -85,8 +85,8 @@ export function HomePage() {
     if (dashboardData?.completedTasks && dashboardData.completedTasks.length > 0) {
       sections.push(ALL_HOME_SECTIONS.completedTasks);
     }
-    if (dashboardData?.openFinancialSOs && dashboardData.openFinancialSOs.length > 0) {
-      sections.push(ALL_HOME_SECTIONS.openFinancialSOs);
+    if (dashboardData?.tasksAwaitingPaymentApproval && dashboardData.tasksAwaitingPaymentApproval.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.tasksAwaitingPaymentApproval);
     }
     if (needsTimeEntries) {
       sections.push(ALL_HOME_SECTIONS.timeEntries);

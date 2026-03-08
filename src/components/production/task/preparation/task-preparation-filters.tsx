@@ -85,7 +85,7 @@ export function TaskPreparationFilters({ open, onOpenChange, filters, onFilterCh
     // Emit customer names for selected IDs (for filter indicator display)
     if (onCustomerNamesChange && localFilters.customerIds?.length) {
       const names: Record<string, string> = {};
-      localFilters.customerIds.forEach((id) => {
+      localFilters.customerIds.forEach((id: string) => {
         const cached = customerCacheRef.current.get(id);
         if (cached) names[id] = cached.name;
       });

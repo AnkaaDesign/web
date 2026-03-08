@@ -2,7 +2,7 @@ import * as React from "react";
 import { useTheme } from "@/contexts/theme-context";
 import { useSidebar } from "@/contexts/sidebar-context";
 import { Toaster as Sonner, toast as sonnerToast } from "sonner";
-import { IconCircleCheck, IconCircleX, IconAlertCircle, IconInfoCircle, IconX } from "@tabler/icons-react";
+import { IconCircleCheck, IconCircleX, IconAlertCircle, IconInfoCircle, IconX, IconLoader } from "@tabler/icons-react";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 type ToastOptions = Parameters<typeof sonnerToast>[1] & { allowDuplicate?: boolean };
@@ -197,10 +197,23 @@ function renderCustomToast(
 
 /**
  * Creates a toast method for a given type.
+ * Supports both calling conventions:
+ *   toast.success("title", "description", options)
+ *   toast.success("title", { id, description, ... })  // sonner-style
  */
 function createToastMethod(type: keyof typeof TOAST_STYLES) {
-  return (title: string, description?: string | string[], options?: ToastOptions) => {
-    const desc = Array.isArray(description) ? description.join("\n") : description;
+  return (title: string, descriptionOrOptions?: string | string[] | ToastOptions, maybeOptions?: ToastOptions) => {
+    let desc: string | undefined;
+    let options: ToastOptions | undefined;
+
+    // Detect if 2nd arg is an options object (sonner-style) vs a description string
+    if (descriptionOrOptions && typeof descriptionOrOptions === 'object' && !Array.isArray(descriptionOrOptions)) {
+      options = descriptionOrOptions as ToastOptions;
+      desc = (options as any)?.description;
+    } else {
+      desc = Array.isArray(descriptionOrOptions) ? descriptionOrOptions.join("\n") : descriptionOrOptions as string | undefined;
+      options = maybeOptions;
+    }
 
     let dedupResult: { show: boolean; id?: string } = { show: true };
     if (!options?.allowDuplicate) {
@@ -234,11 +247,35 @@ const toast = {
   warning: createToastMethod('warning'),
   info: createToastMethod('info'),
 
+  // Custom loading toast with consistent styling
+  loading: (title: string, options?: { id?: string | number; description?: string; duration?: number }) => {
+    const desc = options?.description;
+    return sonnerToast.custom(
+      (_id) => (
+        <div
+          className="w-full rounded-lg border p-4 shadow-sm relative overflow-hidden bg-muted/95 text-foreground border-border"
+          style={{ width: 280, maxHeight: 128, zIndex: TOAST_Z_API }}
+        >
+          <div className="flex items-start gap-2">
+            <IconLoader className="h-4 w-4 shrink-0 animate-spin" />
+            <div className="min-w-0 flex-1">
+              <div className="font-medium text-sm truncate">{title}</div>
+              {desc && <div className="text-sm opacity-80 mt-1 line-clamp-3">{desc}</div>}
+            </div>
+          </div>
+        </div>
+      ),
+      {
+        duration: options?.duration ?? Infinity,
+        ...(options?.id ? { id: options.id } : {}),
+      },
+    );
+  },
+
   // For fully custom toasts and direct sonner access
   custom: sonnerToast.custom,
   promise: sonnerToast.promise,
   dismiss: sonnerToast.dismiss,
-  loading: sonnerToast.loading,
 
   // Clear all toasts
   clearAll: () => toastManager.clearAll(),

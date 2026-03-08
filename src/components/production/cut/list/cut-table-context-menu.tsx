@@ -27,7 +27,7 @@ export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTable
   const isMultiSelection = items.length > 1;
 
   // Check if user can request new cuts (Team leaders or Admin only)
-  // Team leadership is determined by managedSector relationship
+  // Team leadership is determined by ledSector relationship
   const canRequestNewCut = currentUser && (
     isTeamLeader(currentUser) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN)

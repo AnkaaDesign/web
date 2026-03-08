@@ -39,8 +39,8 @@ interface SpecificationsCardProps {
 }
 
 export function SpecificationsCard({ sector }: SpecificationsCardProps) {
-  // Get the manager from managedByUsers relation (first user if multiple)
-  const manager = sector.managedByUsers && sector.managedByUsers.length > 0 ? sector.managedByUsers[0] : null;
+  // Get the leader from the leader relation (single User, not array)
+  const leader = sector.leader ?? null;
 
   return (
     <Card>
@@ -77,10 +77,10 @@ export function SpecificationsCard({ sector }: SpecificationsCardProps) {
                 {sector._count?.tasks || 0} tarefa{(sector._count?.tasks || 0) !== 1 ? "s" : ""}
               </span>
             </div>
-            {manager && (
+            {leader && (
               <div className="flex items-center justify-between py-1">
-                <span className="text-sm text-muted-foreground">Administrador</span>
-                <span className="text-sm font-medium">{manager.name}</span>
+                <span className="text-sm text-muted-foreground">Líder</span>
+                <span className="text-sm font-medium">{leader.name}</span>
               </div>
             )}
           </div>

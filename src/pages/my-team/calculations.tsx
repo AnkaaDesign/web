@@ -119,7 +119,7 @@ export const TeamCalculationsPage = () => {
     const excelContent = [
       ["Relatório de Controle de Ponto da Equipe"],
       [`Data: ${formatDateTime(new Date())}`],
-      [`Setor: ${currentUser?.managedSector?.name || "N/A"}`],
+      [`Setor: ${currentUser?.ledSector?.name || "N/A"}`],
       [`Período: ${MONTHS.find((m) => m.value === selectedMonth)?.label} ${selectedYear}`],
       [],
       ["Colaborador", "Cargo", "Horas Trabalhadas", "Horas Extras", "Faltas", "Atrasos"],
@@ -141,7 +141,7 @@ export const TeamCalculationsPage = () => {
     link.download = `ponto_equipe_${selectedMonth}_${selectedYear}.xls`;
     link.click();
     toast.success("Arquivo Excel exportado com sucesso!");
-  }, [calculations, selectedMonth, selectedYear, currentUser?.managedSector?.name]);
+  }, [calculations, selectedMonth, selectedYear, currentUser?.ledSector?.name]);
 
   const clearFilters = () => {
     setSelectedUserId("");

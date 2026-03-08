@@ -43,7 +43,7 @@ export function isUserBlocked(user: User): boolean {
  * Check if user has specific privilege
  * Uses EXACT privilege matching (not hierarchical) - ADMIN is special case with access to everything
  * FINANCIAL can edit tasks but not inventory, WAREHOUSE can edit inventory but not tasks
- * TEAM_LEADER is a virtual privilege that checks user.managedSector relation (only sector managers)
+ * TEAM_LEADER is a virtual privilege that checks user.ledSector relation (only sector leaders)
  *
  * @param user - The user to check
  * @param requiredPrivilege - Either a SECTOR_PRIVILEGES enum value or the TEAM_LEADER constant
@@ -70,7 +70,7 @@ export function hasPrivilege(user: PrivilegeCheckUser, requiredPrivilege: SECTOR
  * Check if user has ANY of the specified privileges (OR logic)
  * Matches backend @Roles decorator behavior - checks if user's privilege is IN the array
  * ADMIN can access everything, others need exact match
- * TEAM_LEADER is a virtual privilege that checks user.managedSector relation (only sector managers)
+ * TEAM_LEADER is a virtual privilege that checks user.ledSector relation (only sector leaders)
  *
  * @param user - The user to check
  * @param requiredPrivileges - Array of SECTOR_PRIVILEGES values and/or TEAM_LEADER constant
@@ -266,43 +266,43 @@ export function calculateUserStats(users: User[]) {
 // =====================
 
 /**
- * Check if user is a team leader (manages a sector)
- * Note: This now checks the managedSector relation (Sector.managerId points to this user)
+ * Check if user is a team leader (leads a sector)
+ * Note: This checks the ledSector relation (Sector.leaderId points to this user)
  */
 export function isTeamLeader(user: PrivilegeCheckUser): boolean {
-  return Boolean(user.managedSector?.id);
+  return Boolean(user.ledSector?.id);
 }
 
 /**
- * Get the sector ID that the user manages (if any)
+ * Get the sector ID that the user leads (if any)
  */
-export function getManagedSectorId(user: User): string | null {
-  return user.managedSector?.id || null;
+export function getLedSectorId(user: User): string | null {
+  return user.ledSector?.id || null;
 }
 
 /**
  * Check if user can manage another user (is their team leader)
  */
 export function canManageUser(manager: User, targetUser: User): boolean {
-  const managedSectorId = getManagedSectorId(manager);
-  if (!managedSectorId) {
+  const ledSectorId = getLedSectorId(manager);
+  if (!ledSectorId) {
     return false;
   }
 
-  // Manager can manage users in the sector they manage
-  return targetUser.sectorId === managedSectorId;
+  // Leader can manage users in the sector they lead
+  return targetUser.sectorId === ledSectorId;
 }
 
 /**
  * Get users that a leader manages (team members)
  */
 export function getTeamMembers(leader: User, allUsers: User[]): User[] {
-  const managedSectorId = getManagedSectorId(leader);
-  if (!managedSectorId) {
+  const ledSectorId = getLedSectorId(leader);
+  if (!ledSectorId) {
     return [];
   }
 
-  return allUsers.filter((user) => user.sectorId === managedSectorId);
+  return allUsers.filter((user) => user.sectorId === ledSectorId);
 }
 
 /**
@@ -324,18 +324,18 @@ export function isUserLeaderWithPrivileges(user: User): boolean {
 }
 
 /**
- * Get sector object that user manages (if any)
- * Note: This returns the full sector object from the managedSector relation
+ * Get sector object that user leads (if any)
+ * Note: This returns the full sector object from the ledSector relation
  */
-export function getManagedSector(user: User): User["managedSector"] | null {
-  return user.managedSector || null;
+export function getLedSector(user: User): User["ledSector"] | null {
+  return user.ledSector || null;
 }
 
 /**
  * Check if user can access team management features
  */
 export function canAccessTeamManagement(user: User): boolean {
-  // User must be a sector manager OR have admin privileges
+  // User must be a sector leader OR have admin privileges
   return isUserAdmin(user) || isTeamLeader(user);
 }
 

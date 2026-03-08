@@ -6,12 +6,12 @@ import { getSectors } from "../../../../api-client";
 import { useFormContext } from "react-hook-form";
 import type { Sector } from "../../../../types";
 
-interface ManagedSectorSelectorProps {
+interface LedSectorSelectorProps {
   disabled?: boolean;
   initialSector?: Sector;
 }
 
-export function ManagedSectorSelector({ disabled, initialSector }: ManagedSectorSelectorProps) {
+export function LedSectorSelector({ disabled, initialSector }: LedSectorSelectorProps) {
   const form = useFormContext();
 
   // Memoize initial options
@@ -63,7 +63,7 @@ export function ManagedSectorSelector({ disabled, initialSector }: ManagedSector
   return (
     <FormField
       control={form.control}
-      name="managedSectorId"
+      name="ledSectorId"
       render={({ field }) => (
         <FormItem>
           <FormLabel className="flex items-center gap-2">

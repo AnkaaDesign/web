@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { taskPricingService } from "@/api-client/task-pricing";
 import { formatCurrency, formatDate, toTitleCase } from "@/utils";
@@ -46,7 +46,7 @@ interface PricingData extends TaskPricing {
 }
 
 export function PublicBudgetPage() {
-  const { id, customerId: _customerId } = useParams<{ id: string; customerId: string }>();
+  const { id, customerId } = useParams<{ id: string; customerId: string }>();
   const [pricing, setPricing] = useState<PricingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +54,15 @@ export function PublicBudgetPage() {
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Use customerId from URL to filter services for a specific invoiceTo customer
+  // If customerId matches the task's own customer (or is generic), show all services
+  const selectedCustomerId = useMemo(() => {
+    if (!customerId || !pricing?.customerConfigs) return null;
+    // Only filter if the customerId matches one of the customerConfigs customers
+    const isConfigCustomer = pricing.customerConfigs.some(c => c.id === customerId);
+    return isConfigCustomer ? customerId : null;
+  }, [customerId, pricing?.customerConfigs]);
 
   // Fetch pricing data
   const fetchPricing = useCallback(async () => {
@@ -136,6 +145,20 @@ export function PublicBudgetPage() {
     }
   };
 
+  // Filter services based on selected customer (hooks must be before early returns)
+  const filteredServices = useMemo(() => {
+    if (!pricing?.services) return [];
+    if (!selectedCustomerId) return pricing.services;
+    return pricing.services.filter(
+      (service) => service.invoiceToCustomerId === selectedCustomerId || service.invoiceToCustomerId === null
+    );
+  }, [pricing?.services, selectedCustomerId]);
+
+  // Recalculate subtotal for filtered services
+  const filteredSubtotal = useMemo(() => {
+    return filteredServices.reduce((sum, service) => sum + (service.amount || 0), 0);
+  }, [filteredServices]);
+
   // Loading state
   if (loading) {
     return (
@@ -169,9 +192,11 @@ export function PublicBudgetPage() {
 
   // Calculate derived data
   const corporateName = pricing.task?.customer?.corporateName || pricing.task?.customer?.fantasyName || "Cliente";
-  // Prefer the explicitly selected budget responsible from pricing
+  // Find the relevant customer config (filtered by URL param, or first available)
+  const activeConfig = pricing.customerConfigs?.find(c => c.id === selectedCustomerId) || pricing.customerConfigs?.[0];
+  // Prefer the explicitly selected budget responsible from the config
   const commercialRep = pricing.task?.responsibles?.find(r => r.role === "COMMERCIAL");
-  const contactName = pricing.responsible?.name
+  const contactName = activeConfig?.responsible?.name
     || commercialRep?.name
     || pricing.task?.responsibles?.[0]?.name
     || "";
@@ -186,19 +211,33 @@ export function PublicBudgetPage() {
   const termDate = pricing.task?.term ? formatDate(pricing.task.term) : "";
   // Custom delivery days (production time) - used when no term date is set
   const customDeliveryDays = pricing.customForecastDays || null;
-  const paymentText = generatePaymentText(pricing);
+  const paymentText = generatePaymentText({
+    customPaymentText: activeConfig?.customPaymentText || null,
+    paymentCondition: activeConfig?.paymentCondition,
+    downPaymentDate: activeConfig?.downPaymentDate,
+    total: activeConfig?.total ?? pricing.total,
+  });
   const guaranteeText = generateGuaranteeText(pricing);
-  const hasDiscount = pricing.discountType !== "NONE" && pricing.discountValue && pricing.discountValue > 0;
-  const discountAmount = pricing.discountType === "PERCENTAGE"
-    ? (pricing.subtotal * (pricing.discountValue || 0)) / 100
-    : (pricing.discountValue || 0);
+  const configDiscountType = activeConfig?.discountType || "NONE";
+  const configDiscountValue = activeConfig?.discountValue ?? null;
+  const hasDiscount = configDiscountType !== "NONE" && configDiscountValue && configDiscountValue > 0;
 
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
-  const hasExistingSignature = !!pricing.customerSignature?.id;
+  const configSignature = activeConfig?.customerSignature;
+  const hasExistingSignature = !!configSignature?.id;
   // Use serve endpoint for full quality images
   const layoutImageUrl = pricing.layoutFile?.id ? getFileServeUrl(pricing.layoutFile) : null;
   // Use serve endpoint for signature to preserve PNG transparency
-  const signatureImageUrl = pricing.customerSignature?.id ? getFileServeUrl(pricing.customerSignature) : null;
+  const signatureImageUrl = configSignature?.id ? getFileServeUrl(configSignature) : null;
+
+  // Recalculate discount and total based on active filter
+  const displaySubtotal = selectedCustomerId ? filteredSubtotal : pricing.subtotal;
+  const discountAmount = configDiscountType === "PERCENTAGE"
+    ? (displaySubtotal * (configDiscountValue || 0)) / 100
+    : (configDiscountValue || 0);
+  const displayTotal = selectedCustomerId
+    ? Math.max(0, Math.round((displaySubtotal - discountAmount) * 100) / 100)
+    : pricing.total;
 
   // Copy URL to clipboard
   const handleCopyLink = async () => {
@@ -226,10 +265,10 @@ export function PublicBudgetPage() {
         currentDate: formatDate(pricing.createdAt),
         validityDays,
         budgetNumber,
-        items: pricing.items || [],
+        items: pricing.services || [],
         subtotal: pricing.subtotal,
-        discountType: pricing.discountType,
-        discountValue: pricing.discountValue,
+        discountType: configDiscountType,
+        discountValue: configDiscountValue,
         total: pricing.total,
         termDate,
         customDeliveryDays,
@@ -240,9 +279,10 @@ export function PublicBudgetPage() {
         serialNumber: pricing.task?.serialNumber || null,
         plate: pricing.task?.truck?.plate || null,
         chassisNumber: pricing.task?.truck?.chassisNumber || null,
-        invoicesToCustomers: pricing.invoicesToCustomers,
+        customerConfigs: pricing.customerConfigs,
         simultaneousTasks: pricing.simultaneousTasks || null,
-        discountReference: pricing.discountReference || null,
+        discountReference: activeConfig?.discountReference || null,
+        customerFilter: selectedCustomerId,
       });
       toast.success("PDF exportado!");
     } catch (err) {
@@ -351,11 +391,11 @@ export function PublicBudgetPage() {
                   </>
                 )}.
               </p>
-              {pricing.invoicesToCustomers && pricing.invoicesToCustomers.length > 0 && (
+              {pricing.customerConfigs && pricing.customerConfigs.length > 0 && (
                 <p className="text-gray-700 mt-2">
                   <strong>Faturamento para:</strong>{" "}
-                  {pricing.invoicesToCustomers
-                    .map(c => c.fantasyName || c.corporateName || "Cliente")
+                  {pricing.customerConfigs
+                    .map(c => c.customer?.fantasyName || c.customer?.corporateName || "Cliente")
                     .join(", ")}
                 </p>
               )}
@@ -367,24 +407,24 @@ export function PublicBudgetPage() {
                 Serviços
               </h3>
               <div className="space-y-2 pl-4">
-                {pricing.items?.map((item, index) => {
+                {filteredServices.map((service, index) => {
                   // Combine description and observation inline (e.g., "Pintura Geral Azul Firenze")
-                  // For "Outros" items, display only the observation (not "Outros observation")
-                  const isOutros = item.description?.trim().toLowerCase() === "outros";
-                  const description = toTitleCase(item.description || "");
-                  const observation = item.observation || "";
+                  // For "Outros" services, display only the observation (not "Outros observation")
+                  const isOutros = service.description?.trim().toLowerCase() === "outros";
+                  const description = toTitleCase(service.description || "");
+                  const observation = service.observation || "";
                   const displayText = isOutros && observation
                     ? observation
                     : observation
                       ? `${description} ${observation}`
                       : description;
                   return (
-                    <div key={item.id} className="flex justify-between items-baseline">
+                    <div key={service.id} className="flex justify-between items-baseline">
                       <span className="text-gray-800">
                         {index + 1} - {displayText}
                       </span>
                       <span className="text-gray-800 font-normal ml-4 whitespace-nowrap">
-                        {formatCurrency(Number(item.amount) || 0)}
+                        {formatCurrency(Number(service.amount) || 0)}
                       </span>
                     </div>
                   );
@@ -397,16 +437,16 @@ export function PublicBudgetPage() {
                   <>
                     <div className="flex justify-between items-baseline">
                       <span className="text-gray-700">Subtotal</span>
-                      <span className="text-gray-800">{formatCurrency(pricing.subtotal)}</span>
+                      <span className="text-gray-800">{formatCurrency(displaySubtotal)}</span>
                     </div>
                     <div className="flex justify-between items-baseline text-red-600">
                       <span>
                         Desconto
-                        {pricing.discountType === "PERCENTAGE"
-                          ? ` (${pricing.discountValue}%)`
+                        {configDiscountType === "PERCENTAGE"
+                          ? ` (${configDiscountValue}%)`
                           : ""}
-                        {pricing.discountReference && (
-                          <span className="text-gray-500 font-normal"> — Ref: {pricing.discountReference}</span>
+                        {activeConfig?.discountReference && (
+                          <span className="text-gray-500 font-normal"> — Ref: {activeConfig.discountReference}</span>
                         )}
                       </span>
                       <span>- {formatCurrency(discountAmount)}</span>
@@ -416,7 +456,7 @@ export function PublicBudgetPage() {
                 <div className={`flex justify-between items-baseline ${hasDiscount ? 'pt-2 border-t border-gray-200' : ''}`}>
                   <span className="font-bold text-gray-900">Total</span>
                   <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
-                    {formatCurrency(pricing.total)}
+                    {formatCurrency(displayTotal)}
                   </span>
                 </div>
               </div>

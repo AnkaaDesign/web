@@ -124,7 +124,7 @@ export const TeamPpesPage = () => {
     const excelContent = [
       ["Relatório de EPIs da Equipe"],
       [`Data: ${formatDateTime(new Date())}`],
-      [`Setor: ${currentUser?.managedSector?.name || "N/A"}`],
+      [`Setor: ${currentUser?.ledSector?.name || "N/A"}`],
       [],
       ["Colaborador", "E-mail", "Cargo", "EPI", "Quantidade", "Data Entrega", "Validade"],
       ...epis.map((delivery) => [
@@ -146,7 +146,7 @@ export const TeamPpesPage = () => {
     link.download = `epis_equipe_${new Date().toISOString().split("T")[0]}.xls`;
     link.click();
     toast.success("Arquivo Excel exportado com sucesso!");
-  }, [epis, currentUser?.managedSector?.name]);
+  }, [epis, currentUser?.ledSector?.name]);
 
   const clearFilters = () => {
     setSelectedUserId("");

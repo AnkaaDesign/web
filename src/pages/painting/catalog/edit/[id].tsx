@@ -3,6 +3,7 @@ import { PaintForm } from "@/components/painting/form/paint-form";
 import type { PaintFormRef } from "@/components/painting/form/paint-form";
 import { usePaint, usePaintFormulaMutations, usePaintType } from "../../../../hooks";
 import { updatePaint } from "../../../../api-client";
+import { paintFormulaComponentService } from "../../../../api-client/paint";
 import { routes } from "../../../../constants";
 import { mapPaintToFormData } from "../../../../schemas";
 import type { PaintUpdateFormData, PaintFormulaCreateFormData } from "../../../../schemas";
@@ -98,6 +99,30 @@ export default function CatalogEditPage() {
             formulaCreationResults.failed++;
             const errorMessage = error.message || "Erro desconhecido";
             formulaCreationResults.errors.push(`Fórmula "${formula.description || "Sem descrição"}": ${errorMessage}`);
+          }
+        }
+      }
+
+      // Deduct stock for all new formula components after successful update
+      if (newFormulas && newFormulas.length > 0) {
+        for (const formula of newFormulas) {
+          const validComponents = formula.components?.filter((c) => {
+            const weight = c.weightInGrams || c.weight || 0;
+            return c.itemId && weight > 0;
+          }) || [];
+
+          for (const component of validComponents) {
+            const weight = component.weightInGrams || component.weight || 0;
+            if (weight > 0 && component.itemId) {
+              try {
+                await paintFormulaComponentService.deductForFormulationTest({
+                  itemId: component.itemId,
+                  weight,
+                });
+              } catch {
+                // Stock deduction is best-effort
+              }
+            }
           }
         }
       }

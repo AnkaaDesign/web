@@ -49,7 +49,7 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
 
   // Check if user can navigate to paint catalogue detail page
   // Allowed roles: ADMIN, LOGISTIC, COMMERCIAL, FINANCIAL, WAREHOUSE, DESIGNER, and PRODUCTION team leaders
-  const isTeamLeader = Boolean(user?.managedSector?.id);
+  const isTeamLeader = Boolean(user?.ledSector?.id);
   const userPrivilege = user?.sector?.privileges;
   const canViewPaintDetails = userPrivilege === SECTOR_PRIVILEGES.ADMIN ||
     userPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||

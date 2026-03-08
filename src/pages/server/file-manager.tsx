@@ -102,8 +102,6 @@ function convertRemoteItemToAnkaaFile(
   }
 
   const isImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(extension);
-  const isPdf = extension === "pdf";
-
   // Use database file info when available (enables proper thumbnails and inline viewing)
   if (item.dbFileId) {
     return {

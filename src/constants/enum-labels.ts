@@ -132,6 +132,10 @@ import {
   STATISTICS_PERIOD,
   TASK_PRICING_STATUS,
   RESCHEDULE_REASON,
+  INVOICE_STATUS,
+  INSTALLMENT_STATUS,
+  BANK_SLIP_STATUS,
+  NFSE_STATUS,
 } from "./enums";
 
 // =====================
@@ -188,7 +192,6 @@ export const SERVICE_ORDER_STATUS_LABELS: Record<SERVICE_ORDER_STATUS, string> =
 // Form labels (camelCase for better readability in dropdowns)
 export const SERVICE_ORDER_TYPE_LABELS: Record<SERVICE_ORDER_TYPE, string> = {
   [SERVICE_ORDER_TYPE.PRODUCTION]: "Produção",
-  [SERVICE_ORDER_TYPE.FINANCIAL]: "Financeiro",
   [SERVICE_ORDER_TYPE.COMMERCIAL]: "Comercial",
   [SERVICE_ORDER_TYPE.LOGISTIC]: "Logística",
   [SERVICE_ORDER_TYPE.ARTWORK]: "Arte",
@@ -197,7 +200,6 @@ export const SERVICE_ORDER_TYPE_LABELS: Record<SERVICE_ORDER_TYPE, string> = {
 // Column labels (UPPERCASE for table headers and column visibility)
 export const SERVICE_ORDER_TYPE_COLUMN_LABELS: Record<SERVICE_ORDER_TYPE, string> = {
   [SERVICE_ORDER_TYPE.PRODUCTION]: "PRODUÇÃO",
-  [SERVICE_ORDER_TYPE.FINANCIAL]: "FINANCEIRO",
   [SERVICE_ORDER_TYPE.COMMERCIAL]: "COMERCIAL",
   [SERVICE_ORDER_TYPE.LOGISTIC]: "LOGÍSTICA",
   [SERVICE_ORDER_TYPE.ARTWORK]: "ARTE",
@@ -615,6 +617,7 @@ export const SECTOR_PRIVILEGES_LABELS: Record<SECTOR_PRIVILEGES, string> = {
   [SECTOR_PRIVILEGES.EXTERNAL]: "Externo",
   [SECTOR_PRIVILEGES.PLOTTING]: "Plotagem",
   [SECTOR_PRIVILEGES.COMMERCIAL]: "Comercial",
+  [SECTOR_PRIVILEGES.PRODUCTION_MANAGER]: "Gerente de Produção",
 };
 
 export const TREND_DIRECTION_LABELS: Record<TREND_DIRECTION, string> = {
@@ -1969,10 +1972,13 @@ export const STATISTICS_PERIOD_LABELS: Record<STATISTICS_PERIOD, string> = {
 // =====================
 
 export const TASK_PRICING_STATUS_LABELS: Record<TASK_PRICING_STATUS, string> = {
-  [TASK_PRICING_STATUS.DRAFT]: "Rascunho",
-  [TASK_PRICING_STATUS.APPROVED]: "Aprovado",
-  [TASK_PRICING_STATUS.REJECTED]: "Rejeitado",
-  [TASK_PRICING_STATUS.CANCELLED]: "Cancelado",
+  [TASK_PRICING_STATUS.PENDING]: "Pendente",
+  [TASK_PRICING_STATUS.BUDGET_APPROVED]: "Orçamento Aprovado",
+  [TASK_PRICING_STATUS.VERIFIED]: "Verificado",
+  [TASK_PRICING_STATUS.INTERNAL_APPROVED]: "Aprovado Internamente",
+  [TASK_PRICING_STATUS.UPCOMING]: "A Vencer",
+  [TASK_PRICING_STATUS.PARTIAL]: "Parcial",
+  [TASK_PRICING_STATUS.SETTLED]: "Liquidado",
 };
 
 // =====================
@@ -1989,4 +1995,43 @@ export const RESCHEDULE_REASON_LABELS: Record<RESCHEDULE_REASON, string> = {
   [RESCHEDULE_REASON.PRIORITY_CHANGE]: "Mudança de Prioridade",
   [RESCHEDULE_REASON.TECHNICAL_ISSUES]: "Problemas Técnicos",
   [RESCHEDULE_REASON.OTHER]: "Outro",
+};
+
+// =====================
+// Invoice / Billing Labels
+// =====================
+
+export const INVOICE_STATUS_LABELS: Record<INVOICE_STATUS, string> = {
+  [INVOICE_STATUS.DRAFT]: "Rascunho",
+  [INVOICE_STATUS.ACTIVE]: "Ativa",
+  [INVOICE_STATUS.PARTIALLY_PAID]: "Parcialmente Paga",
+  [INVOICE_STATUS.PAID]: "Paga",
+  [INVOICE_STATUS.CANCELLED]: "Cancelada",
+};
+
+export const INSTALLMENT_STATUS_LABELS: Record<INSTALLMENT_STATUS, string> = {
+  [INSTALLMENT_STATUS.PENDING]: "Pendente",
+  [INSTALLMENT_STATUS.PROCESSING]: "Processando",
+  [INSTALLMENT_STATUS.PAID]: "Paga",
+  [INSTALLMENT_STATUS.OVERDUE]: "Vencida",
+  [INSTALLMENT_STATUS.CANCELLED]: "Cancelada",
+};
+
+export const BANK_SLIP_STATUS_LABELS: Record<BANK_SLIP_STATUS, string> = {
+  [BANK_SLIP_STATUS.CREATING]: "Gerando",
+  [BANK_SLIP_STATUS.REGISTERING]: "Registrando",
+  [BANK_SLIP_STATUS.ACTIVE]: "Ativo",
+  [BANK_SLIP_STATUS.OVERDUE]: "Vencido",
+  [BANK_SLIP_STATUS.PAID]: "Pago",
+  [BANK_SLIP_STATUS.CANCELLED]: "Cancelado",
+  [BANK_SLIP_STATUS.REJECTED]: "Rejeitado",
+  [BANK_SLIP_STATUS.ERROR]: "Erro",
+};
+
+export const NFSE_STATUS_LABELS: Record<NFSE_STATUS, string> = {
+  [NFSE_STATUS.PENDING]: "Pendente",
+  [NFSE_STATUS.PROCESSING]: "Processando",
+  [NFSE_STATUS.AUTHORIZED]: "Autorizada",
+  [NFSE_STATUS.CANCELLED]: "Cancelada",
+  [NFSE_STATUS.ERROR]: "Erro",
 };

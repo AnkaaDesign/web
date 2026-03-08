@@ -1,11 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { IconCalendar, IconShield, IconUser, IconPackage, IconTruck, IconCircleCheck, IconFileText, IconPencil, IconExternalLink } from "@tabler/icons-react";
+import { IconCalendar, IconShield, IconUser, IconPackage, IconTruck, IconCircleCheck, IconFileText, IconPencil, IconExternalLink, IconFingerprint } from "@tabler/icons-react";
 import type { PpeDelivery } from "../../../../../types";
 import { PPE_DELIVERY_STATUS_LABELS, getBadgeVariant, PPE_DELIVERY_STATUS } from "../../../../../constants";
 import { formatDateTime } from "../../../../../utils";
 import { cn } from "@/lib/utils";
+
+const BIOMETRIC_LABELS: Record<string, string> = {
+  FINGERPRINT: 'Impressão Digital',
+  FACE_ID: 'Reconhecimento Facial',
+  IRIS: 'Reconhecimento de Íris',
+  DEVICE_PIN: 'PIN do Dispositivo',
+  NONE: 'Nenhuma',
+};
 
 interface PpeDeliveryInfoCardProps {
   ppeDelivery: PpeDelivery;
@@ -103,8 +111,9 @@ export function PpeDeliveryInfoCard({ ppeDelivery, className }: PpeDeliveryInfoC
           </div>
         )}
 
-        {/* Signature Section - Only show for statuses related to signature */}
-        {(ppeDelivery.status === PPE_DELIVERY_STATUS.WAITING_SIGNATURE ||
+        {/* Signature Section - Show for delivered and signature-related statuses */}
+        {(ppeDelivery.status === PPE_DELIVERY_STATUS.DELIVERED ||
+          ppeDelivery.status === PPE_DELIVERY_STATUS.WAITING_SIGNATURE ||
           ppeDelivery.status === PPE_DELIVERY_STATUS.COMPLETED ||
           ppeDelivery.status === PPE_DELIVERY_STATUS.SIGNATURE_REJECTED) && (
           <>
@@ -137,17 +146,78 @@ export function PpeDeliveryInfoCard({ ppeDelivery, className }: PpeDeliveryInfoC
               </Badge>
             </div>
 
-            {/* Signed At */}
-            {ppeDelivery.clicksignSignedAt && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <IconCircleCheck className="h-4 w-4 text-green-500" />
-                  <span className="text-sm font-medium text-muted-foreground">Data da Assinatura</span>
+            {/* In-App Signature Details */}
+            {ppeDelivery.signature && (
+              <>
+                {/* Signer */}
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <IconUser className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground">Assinante</span>
+                  </div>
+                  <span className="text-sm font-semibold text-foreground">
+                    {ppeDelivery.signature.signedByUser?.name || ppeDelivery.user?.name || '-'}
+                  </span>
                 </div>
-                <span className="text-sm font-semibold text-foreground">
-                  {formatDateTime(ppeDelivery.clicksignSignedAt)}
-                </span>
-              </div>
+
+                {/* Biometric Method */}
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <IconFingerprint className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground">Autenticação</span>
+                  </div>
+                  <span className="text-sm font-semibold text-foreground">
+                    {BIOMETRIC_LABELS[ppeDelivery.signature.biometricMethod] || ppeDelivery.signature.biometricMethod}
+                  </span>
+                </div>
+
+                {/* Signature Timestamp */}
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <IconCircleCheck className="h-4 w-4 text-green-500" />
+                    <span className="text-sm font-medium text-muted-foreground">Data da Assinatura</span>
+                  </div>
+                  <span className="text-sm font-semibold text-foreground">
+                    {formatDateTime(ppeDelivery.signature.serverTimestamp || ppeDelivery.signature.clientTimestamp)}
+                  </span>
+                </div>
+
+                {/* Verification Code */}
+                {ppeDelivery.signature.hmacSignature && (
+                  <div className="flex justify-between items-center bg-green-50 dark:bg-green-950/20 rounded-lg px-4 py-3">
+                    <span className="text-xs font-medium text-muted-foreground">Código de verificação</span>
+                    <span className="text-xs font-bold font-mono text-green-600 tracking-wider">
+                      {ppeDelivery.signature.hmacSignature.substring(0, 16).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+
+                {/* Signed Document PDF (in-app) */}
+                {ppeDelivery.signature.signedDocumentId && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <IconFileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground">Termo Assinado</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="h-7"
+                    >
+                      <a
+                        href={`${import.meta.env.VITE_API_URL || ""}/files/serve/${ppeDelivery.signature.signedDocumentId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1"
+                      >
+                        <IconExternalLink className="h-3.5 w-3.5" />
+                        Ver Documento Assinado
+                      </a>
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Delivery Document */}
@@ -155,7 +225,9 @@ export function PpeDeliveryInfoCard({ ppeDelivery, className }: PpeDeliveryInfoC
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <div className="flex items-center gap-2">
                   <IconFileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Termo de Entrega</span>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {ppeDelivery.signature?.signedDocumentId ? "Termo Original" : "Termo de Entrega"}
+                  </span>
                 </div>
                 <Button
                   variant="outline"
@@ -164,13 +236,13 @@ export function PpeDeliveryInfoCard({ ppeDelivery, className }: PpeDeliveryInfoC
                   className="h-7"
                 >
                   <a
-                    href={`${import.meta.env.VITE_API_URL || ""}/files/${ppeDelivery.deliveryDocument.id}`}
+                    href={`${import.meta.env.VITE_API_URL || ""}/files/serve/${ppeDelivery.deliveryDocument.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1"
                   >
                     <IconExternalLink className="h-3.5 w-3.5" />
-                    {ppeDelivery.clicksignSignedAt ? "Ver Documento Assinado" : "Ver Documento"}
+                    Ver Documento
                   </a>
                 </Button>
               </div>

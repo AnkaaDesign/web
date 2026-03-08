@@ -26,7 +26,7 @@ const userFilterSchemas = {
     schema: z.array(z.string()),
     defaultValue: [] as string[],
   },
-  managedSectorId: {
+  ledSectorId: {
     schema: z.array(z.string()),
     defaultValue: [] as string[],
   },
@@ -35,7 +35,7 @@ const userFilterSchemas = {
   hasCommissions: {
     schema: z.coerce.boolean(),
   },
-  hasManagedSector: {
+  hasLedSector: {
     schema: z.coerce.boolean(),
   },
   hasEmail: {
@@ -131,7 +131,7 @@ const userFilterSchemas = {
           name: z.enum(["asc", "desc"]).optional(),
         })
         .optional(),
-      managedSector: z
+      ledSector: z
         .object({
           name: z.enum(["asc", "desc"]).optional(),
         })
@@ -173,11 +173,11 @@ export function convertToApiFilters(urlFilters: UserFilters): Partial<UserGetMan
   // Entity filters
   if (urlFilters.positionId && urlFilters.positionId.length > 0) apiFilters.positionId = urlFilters.positionId;
   if (urlFilters.sectorId && urlFilters.sectorId.length > 0) apiFilters.sectorId = urlFilters.sectorId;
-  if (urlFilters.managedSectorId && urlFilters.managedSectorId.length > 0) apiFilters.managedSectorId = urlFilters.managedSectorId;
+  if (urlFilters.ledSectorId && urlFilters.ledSectorId.length > 0) apiFilters.ledSectorId = urlFilters.ledSectorId;
 
   // Boolean filters
   if (typeof urlFilters.hasCommissions === "boolean") apiFilters.hasCommissions = urlFilters.hasCommissions;
-  if (typeof urlFilters.hasManagedSector === "boolean") apiFilters.hasManagedSector = urlFilters.hasManagedSector;
+  if (typeof urlFilters.hasLedSector === "boolean") apiFilters.hasLedSector = urlFilters.hasLedSector;
   if (typeof urlFilters.hasEmail === "boolean") apiFilters.hasEmail = urlFilters.hasEmail;
   if (typeof urlFilters.hasPhone === "boolean") apiFilters.hasPhone = urlFilters.hasPhone;
   if (typeof urlFilters.verified === "boolean") apiFilters.verified = urlFilters.verified;
@@ -215,11 +215,11 @@ export function convertFromApiFilters(apiFilters: Partial<UserGetManyFormData>):
   // Entity filters
   if (apiFilters.positionId) urlFilters.positionId = apiFilters.positionId;
   if (apiFilters.sectorId) urlFilters.sectorId = apiFilters.sectorId;
-  if (apiFilters.managedSectorId) urlFilters.managedSectorId = apiFilters.managedSectorId;
+  if (apiFilters.ledSectorId) urlFilters.ledSectorId = apiFilters.ledSectorId;
 
   // Boolean filters
   if (typeof apiFilters.hasCommissions === "boolean") urlFilters.hasCommissions = apiFilters.hasCommissions;
-  if (typeof apiFilters.hasManagedSector === "boolean") urlFilters.hasManagedSector = apiFilters.hasManagedSector;
+  if (typeof apiFilters.hasLedSector === "boolean") urlFilters.hasLedSector = apiFilters.hasLedSector;
   if (typeof apiFilters.hasEmail === "boolean") urlFilters.hasEmail = apiFilters.hasEmail;
   if (typeof apiFilters.hasPhone === "boolean") urlFilters.hasPhone = apiFilters.hasPhone;
   if (typeof apiFilters.verified === "boolean") urlFilters.verified = apiFilters.verified;

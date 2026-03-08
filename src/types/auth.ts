@@ -25,7 +25,7 @@ export interface AuthUser {
     name: string;
     privileges: string;
   } | null;
-  managedSector?: {
+  ledSector?: {
     id: string;
     name: string;
     privileges: string;

@@ -113,29 +113,29 @@ export function extractActiveFilters(
     }
   }
 
-  // Managed Sector filters (individual badges for each sector)
-  if (filters.managedSectorId && Array.isArray(filters.managedSectorId) && filters.managedSectorId.length > 0) {
-    const selectedManagedSectors = sectors.filter((sec) => filters.managedSectorId?.includes(sec.id));
+  // Led Sector filters (individual badges for each sector)
+  if (filters.ledSectorId && Array.isArray(filters.ledSectorId) && filters.ledSectorId.length > 0) {
+    const selectedLedSectors = sectors.filter((sec) => filters.ledSectorId?.includes(sec.id));
 
-    selectedManagedSectors.forEach((sector) => {
+    selectedLedSectors.forEach((sector) => {
       activeFilters.push({
-        key: `managedSectorId-${sector.id}`,
-        label: "Setor Gerenciado",
+        key: `ledSectorId-${sector.id}`,
+        label: "Setor Liderado",
         value: sector.name,
         iconType: "shield",
         itemId: sector.id,
-        onRemove: () => onRemoveFilter("managedSectorId", sector.id),
+        onRemove: () => onRemoveFilter("ledSectorId", sector.id),
       });
     });
-  } else if (filters.where?.managedSectorId) {
-    const sector = sectors.find((sec) => sec.id === filters.where?.managedSectorId);
+  } else if (filters.where?.ledSectorId) {
+    const sector = sectors.find((sec) => sec.id === filters.where?.ledSectorId);
     if (sector) {
       activeFilters.push({
-        key: "managedSectorId",
-        label: "Setor Gerenciado",
+        key: "ledSectorId",
+        label: "Setor Liderado",
         value: sector.name,
         iconType: "shield",
-        onRemove: () => onRemoveFilter("managedSectorId"),
+        onRemove: () => onRemoveFilter("ledSectorId"),
       });
     }
   }
@@ -151,13 +151,13 @@ export function extractActiveFilters(
     });
   }
 
-  if (filters.hasManagedSector !== undefined) {
+  if (filters.hasLedSector !== undefined) {
     activeFilters.push({
-      key: "hasManagedSector",
-      label: "Gerencia Setor",
-      value: filters.hasManagedSector ? "Sim" : "Não",
+      key: "hasLedSector",
+      label: "Lidera Setor",
+      value: filters.hasLedSector ? "Sim" : "Não",
       iconType: "shield",
-      onRemove: () => onRemoveFilter("hasManagedSector"),
+      onRemove: () => onRemoveFilter("hasLedSector"),
     });
   }
 
@@ -402,28 +402,28 @@ export function createFilterRemover(currentFilters: Partial<UserGetManyFormData>
           delete newFilters.sectorId;
         }
         break;
-      case "managedSectorId":
-        if (itemId && Array.isArray(newFilters.managedSectorId)) {
-          // Remove specific managed sector from array
-          const filteredManagedSectors = newFilters.managedSectorId.filter((id) => id !== itemId);
-          if (filteredManagedSectors.length > 0) {
-            newFilters.managedSectorId = filteredManagedSectors;
+      case "ledSectorId":
+        if (itemId && Array.isArray(newFilters.ledSectorId)) {
+          // Remove specific led sector from array
+          const filteredLedSectors = newFilters.ledSectorId.filter((id) => id !== itemId);
+          if (filteredLedSectors.length > 0) {
+            newFilters.ledSectorId = filteredLedSectors;
           } else {
-            delete newFilters.managedSectorId;
+            delete newFilters.ledSectorId;
           }
-        } else if (newWhere.managedSectorId) {
-          // Remove managed sector from where clause
-          delete newWhere.managedSectorId;
+        } else if (newWhere.ledSectorId) {
+          // Remove led sector from where clause
+          delete newWhere.ledSectorId;
         } else {
-          // Remove all managed sectors
-          delete newFilters.managedSectorId;
+          // Remove all led sectors
+          delete newFilters.ledSectorId;
         }
         break;
       case "hasCommissions":
         delete newFilters.hasCommissions;
         break;
-      case "hasManagedSector":
-        delete newFilters.hasManagedSector;
+      case "hasLedSector":
+        delete newFilters.hasLedSector;
         break;
       case "commissionEarnings":
         delete newFilters.commissionEarnings;

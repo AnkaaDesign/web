@@ -1,11 +1,12 @@
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useRef } from "react";
 import { IconUser, IconInfoCircle, IconFileText, IconMapPin, IconBriefcase, IconShieldCheck } from "@tabler/icons-react";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { userCreateSchema, userUpdateSchema, type UserCreateFormData, type UserUpdateFormData } from "../../../../schemas";
-import { USER_STATUS } from "../../../../constants";
+import { USER_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { useSector } from "../../../../hooks";
 // Import all form components
 import { NameInput } from "./name-input";
 import { FormInput } from "@/components/ui/form-input";
@@ -124,6 +125,24 @@ export function UserForm(props: UserFormProps) {
     shouldFocusError: true, // Focus on first error field when validation fails
     criteriaMode: "all", // Show all errors for better UX
   });
+
+  // Watch the selected sector to determine its privilege
+  const selectedSectorId = useWatch({ control: form.control, name: "sectorId" });
+  const { data: sectorResponse } = useSector(selectedSectorId || "", {
+    enabled: !!selectedSectorId,
+  });
+  const sectorPrivilege = sectorResponse?.data?.privileges ?? null;
+
+  // When sector changes and the new sector is NOT production, reset isSectorLeader to false
+  const prevSectorIdRef = useRef(selectedSectorId);
+  useEffect(() => {
+    if (prevSectorIdRef.current !== selectedSectorId) {
+      prevSectorIdRef.current = selectedSectorId;
+      if (sectorPrivilege !== SECTOR_PRIVILEGES.PRODUCTION) {
+        form.setValue("isSectorLeader", false, { shouldDirty: true });
+      }
+    }
+  }, [selectedSectorId, sectorPrivilege, form]);
 
   // Reset form when defaultValues change in update mode (e.g., new user data loaded)
   const isInitialMountRef = useRef(true);
@@ -386,7 +405,7 @@ export function UserForm(props: UserFormProps) {
                 <SectorSelector disabled={isSubmitting} required={false} />
               </div>
 
-              <SectorLeaderSwitch disabled={isSubmitting} />
+              <SectorLeaderSwitch disabled={isSubmitting} sectorPrivilege={sectorPrivilege} />
             </CardContent>
           </Card>
 

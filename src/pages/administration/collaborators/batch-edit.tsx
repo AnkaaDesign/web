@@ -33,7 +33,7 @@ const CollaboratorBatchEditPage = () => {
     include: {
       position: true,
       sector: true,
-      managedSector: true,
+      ledSector: true,
     },
   });
 

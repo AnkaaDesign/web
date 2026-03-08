@@ -1,10 +1,42 @@
-import { useMemo, useCallback, useRef } from "react";
+import { useMemo, useCallback, useRef, useState, useEffect } from "react";
+import { useWatch } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { getPaints } from "../../../api-client";
-import { PAINT_FINISH_LABELS } from "../../../constants";
-import { IconLayersIntersect } from "@tabler/icons-react";
+import { PAINT_FINISH_LABELS, PAINT_FINISH } from "../../../constants";
+import { IconLayersIntersect, IconX, IconFlask } from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
+import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import type { Paint } from "../../../types";
+
+const PAINT_SELECT_FIELDS = {
+  id: true,
+  name: true,
+  code: true,
+  hex: true,
+  finish: true,
+  colorPreview: true,
+  manufacturer: true,
+  paintType: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  paintBrand: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  _count: {
+    select: {
+      formulas: true,
+    },
+  },
+};
 
 interface GroundSelectorProps {
   control: any;
@@ -14,87 +46,164 @@ interface GroundSelectorProps {
 }
 
 export function GroundSelector({ control, disabled, required, initialPaints }: GroundSelectorProps) {
-  // Create a stable cache for fetched items
-  const cacheRef = useRef<Map<string, { label: string; value: string; description?: string; metadata?: any }>>(new Map());
+  // Watch groundIds from form state
+  const groundIds = useWatch({ control, name: "groundIds" }) as string[] | undefined;
 
-  // Create stable dependency for initialPaints array
-  const initialPaintIds = useMemo(
-    () => (initialPaints || []).map(p => p.id).sort().join(','),
-    [initialPaints]
+  // Cache of selected paints to display in badges
+  const [selectedPaints, setSelectedPaints] = useState<Map<string, Paint>>(
+    new Map((initialPaints || []).map(paint => [paint.id, paint]))
   );
+  const paintsCache = useRef<Map<string, Paint>>(new Map());
 
   // Memoize initialOptions with stable dependency
-  const initialOptions = useMemo(() => {
-    if (!initialPaints || initialPaints.length === 0) return [];
+  const initialOptions = useMemo(() => initialPaints || [], [initialPaints?.map(p => p.id).join(',')]);
 
-    return initialPaints.map((paint) => {
-      const option = {
-        value: paint.id,
-        label: paint.name,
-        description: paint.paintBrand?.name && paint.finish ? `${paint.paintBrand?.name} - ${PAINT_FINISH_LABELS[paint.finish]}` : undefined,
-        metadata: {
-          hex: paint.hex || undefined,
-        },
-      };
-      // Add to cache
-      cacheRef.current.set(paint.id, option);
-      return option;
-    });
-  }, [initialPaintIds, initialPaints]);
+  // Memoize callbacks
+  const getOptionLabel = useCallback((paint: Paint) => paint.name, []);
+  const getOptionValue = useCallback((paint: Paint) => paint.id, []);
 
-  // Async query function for the combobox - memoized with useCallback
-  const queryPaints = useCallback(async (searchTerm: string, page = 1) => {
+  // Initialize cache with initial paints
+  useEffect(() => {
+    if (initialPaints) {
+      initialPaints.forEach(paint => {
+        paintsCache.current.set(paint.id, paint);
+      });
+    }
+  }, [initialPaints]);
+
+  // Stable query key based on sorted ground IDs
+  const selectedPaintsQueryKey = useMemo(
+    () => (groundIds || []).slice().sort().join(","),
+    [groundIds]
+  );
+
+  // Fetch selected paint details by IDs
+  const { data: selectedPaintDetails } = useQuery({
+    queryKey: ["paints", "ground-details", selectedPaintsQueryKey],
+    queryFn: async () => {
+      if (!groundIds || groundIds.length === 0) return [];
+      const response = await getPaints({
+        where: { id: { in: groundIds } },
+        select: PAINT_SELECT_FIELDS,
+        limit: groundIds.length,
+      } as any);
+      return response.data || [];
+    },
+    enabled: (groundIds?.length ?? 0) > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Update selectedPaints map from fetched data + cache + initialPaints
+  useEffect(() => {
+    if (selectedPaintDetails && selectedPaintDetails.length > 0) {
+      selectedPaintDetails.forEach(paint => {
+        paintsCache.current.set(paint.id, paint);
+      });
+    }
+
+    if (groundIds && groundIds.length > 0) {
+      const newSelectedPaints = new Map<string, Paint>();
+      groundIds.forEach((paintId: string) => {
+        const cachedPaint = paintsCache.current.get(paintId);
+        if (cachedPaint) {
+          newSelectedPaints.set(paintId, cachedPaint);
+        } else {
+          const initialPaint = initialPaints?.find(p => p.id === paintId);
+          if (initialPaint) {
+            newSelectedPaints.set(paintId, initialPaint);
+            paintsCache.current.set(paintId, initialPaint);
+          }
+        }
+      });
+      setSelectedPaints(newSelectedPaints);
+    } else {
+      setSelectedPaints(new Map());
+    }
+  }, [selectedPaintDetails, groundIds, initialPaints]);
+
+  // Async query function for the combobox
+  const queryPaints = useCallback(async (
+    searchTerm: string,
+    page: number = 1,
+  ): Promise<{ data: Paint[]; hasMore: boolean }> => {
     try {
-      // Build query parameters
-      const queryParams: any = {
+      const params: any = {
         orderBy: { name: "asc" },
         page: page,
-        take: 50,
-        include: {
-          paintBrand: true,
-        },
+        take: 15,
+        select: PAINT_SELECT_FIELDS,
       };
 
-      // Only add searchingFor if there's a search term
       if (searchTerm && searchTerm.trim()) {
-        queryParams.searchingFor = searchTerm.trim();
+        params.searchingFor = searchTerm.trim();
       }
 
-      const response = await getPaints(queryParams);
+      const response = await getPaints(params);
       const paints = response.data || [];
       const hasMore = response.meta?.hasNextPage || false;
 
-      // Convert paints to options format and add to cache
-      const options = paints.map((paint) => {
-        const option = {
-          value: paint.id,
-          label: paint.name,
-          description: paint.paintBrand?.name && paint.finish ? `${paint.paintBrand?.name} - ${PAINT_FINISH_LABELS[paint.finish]}` : undefined,
-          metadata: {
-            hex: paint.hex || undefined,
-          },
-        };
-
-        // Add to cache
-        cacheRef.current.set(paint.id, option);
-
-        return option;
+      // Cache all paints we fetch
+      paints.forEach(paint => {
+        paintsCache.current.set(paint.id, paint);
       });
 
-      return {
-        data: options,
-        hasMore: hasMore,
-      };
+      return { data: paints, hasMore };
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error fetching paints:", error);
       }
-      return {
-        data: [],
-        hasMore: false,
-      };
+      return { data: [], hasMore: false };
     }
   }, []);
+
+  // Custom render function for paint items in dropdown
+  const renderPaintItem = (paint: Paint, _isSelected: boolean) => {
+    const color = paint.hex || "#888888";
+
+    return (
+      <div className="flex items-center gap-3 w-full">
+        {paint.colorPreview ? (
+          <div className="w-6 h-6 rounded ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
+            <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" loading="lazy" />
+          </div>
+        ) : paint.finish ? (
+          <div className="w-6 h-6 rounded ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
+            <CanvasNormalMapRenderer baseColor={color} finish={paint.finish as PAINT_FINISH} width={24} height={24} quality="low" className="w-full h-full" />
+          </div>
+        ) : (
+          <div className="w-6 h-6 rounded ring-1 ring-border shadow-sm flex-shrink-0" style={{ backgroundColor: color }} />
+        )}
+
+        <div className="flex-1 min-w-0">
+          <div className="font-medium truncate">{paint.name}</div>
+          <div className="text-xs flex items-center gap-2 mt-0.5 flex-wrap">
+            {paint.paintType?.name && <span className="font-medium">{paint.paintType.name}</span>}
+            {paint.finish && (
+              <>
+                <span className="opacity-60">•</span>
+                <span>{PAINT_FINISH_LABELS[paint.finish]}</span>
+              </>
+            )}
+            {paint.paintBrand?.name && (
+              <>
+                <span className="opacity-60">•</span>
+                <span>{paint.paintBrand.name}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <IconFlask
+          className={cn(
+            "h-4 w-4 flex-shrink-0 transition-colors",
+            ((paint._count?.formulas ?? 0) > 0 || (paint.formulas?.length ?? 0) > 0)
+              ? "text-green-600"
+              : "text-destructive"
+          )}
+        />
+      </div>
+    );
+  };
 
   return (
     <FormField
@@ -108,43 +217,71 @@ export function GroundSelector({ control, disabled, required, initialPaints }: G
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>
           <FormControl>
-            <Combobox
-              async={true}
-              queryKey={["ground-paints"]}
-              queryFn={queryPaints}
-              initialOptions={initialOptions}
-              value={field.value || []}
-              onValueChange={field.onChange}
-              placeholder="Selecione os fundos"
-              disabled={disabled}
-              className="w-full bg-transparent"
-              mode="multiple"
-              searchable={true}
-              clearable={true}
-              emptyText="Nenhuma tinta encontrada"
-              searchPlaceholder="Pesquisar tintas..."
-              pageSize={50}
-              minSearchLength={0}
-              debounceMs={300}
-              renderOption={(option, isSelected) => (
-                <div className="flex items-center gap-3">
-                  {option.metadata?.hex && (
-                    <div
-                      className="w-8 h-8 rounded border border-border flex-shrink-0"
-                      style={{ backgroundColor: option.metadata.hex }}
-                    />
-                  )}
-                  <div className="flex-1">
-                    <div className={isSelected ? "text-white" : ""}>{option.label}</div>
-                    {option.description && (
-                      <div className={`text-xs ${isSelected ? "text-white/90" : "text-muted-foreground"}`}>
-                        {option.description}
-                      </div>
-                    )}
-                  </div>
+            <div className="space-y-3">
+              <Combobox<Paint>
+                value={field.value || []}
+                onValueChange={field.onChange}
+                mode="multiple"
+                placeholder="Selecione os fundos"
+                emptyText="Nenhuma tinta encontrada"
+                searchPlaceholder="Pesquisar tintas..."
+                disabled={disabled}
+                async={true}
+                queryKey={["ground-paints"]}
+                queryFn={queryPaints}
+                getOptionLabel={getOptionLabel}
+                getOptionValue={getOptionValue}
+                renderOption={(paint, isSelected) => renderPaintItem(paint, isSelected)}
+                minSearchLength={0}
+                pageSize={15}
+                debounceMs={500}
+                showCount={true}
+                clearable={true}
+                initialOptions={initialOptions}
+                hideDefaultBadges={true}
+                className="w-full bg-transparent"
+              />
+
+              {/* Selected paints display with custom cards */}
+              {selectedPaints.size > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {Array.from(selectedPaints.values()).map((paint) => {
+                    const color = paint.hex || "#888888";
+
+                    return (
+                      <Badge
+                        key={paint.id}
+                        variant="secondary"
+                        className={cn(
+                          "pl-2.5 pr-2.5 py-1.5 flex items-center gap-2 border transition-colors",
+                          !disabled && "cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
+                        )}
+                        onClick={disabled ? undefined : (e) => {
+                          e.preventDefault();
+                          const currentValue = field.value || [];
+                          field.onChange(currentValue.filter((id: string) => id !== paint.id));
+                        }}
+                      >
+                        {paint.colorPreview ? (
+                          <div className="w-4 h-4 rounded ring-1 ring-border shadow-sm overflow-hidden">
+                            <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" />
+                          </div>
+                        ) : paint.finish ? (
+                          <div className="w-4 h-4 rounded ring-1 ring-border shadow-sm overflow-hidden">
+                            <CanvasNormalMapRenderer baseColor={color} finish={paint.finish as PAINT_FINISH} width={16} height={16} quality="low" className="w-full h-full" />
+                          </div>
+                        ) : (
+                          <div className="w-4 h-4 rounded ring-1 ring-border shadow-sm" style={{ backgroundColor: color }} />
+                        )}
+                        <span className="text-xs font-medium">{paint.name}</span>
+                        {paint.paintType?.name && <span className="text-xs opacity-70">({paint.paintType.name})</span>}
+                        {!disabled && <IconX className="h-3 w-3 ml-1" />}
+                      </Badge>
+                    );
+                  })}
                 </div>
               )}
-            />
+            </div>
           </FormControl>
           <FormMessage />
         </FormItem>

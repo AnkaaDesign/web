@@ -136,7 +136,7 @@ interface RecentMessagesListProps {
   unreadCount?: number;
 }
 
-export function RecentMessagesList({ messages, unreadCount }: RecentMessagesListProps) {
+export function RecentMessagesList({ messages }: RecentMessagesListProps) {
   const [selectedMessage, setSelectedMessage] = useState<HomeDashboardMessage | null>(null);
   const { mutate: markAsViewed } = useMarkAsViewed();
 

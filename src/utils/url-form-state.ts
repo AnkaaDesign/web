@@ -137,7 +137,7 @@ export function getDefaultFormValues(searchParams: URLSearchParams, baseDefaults
     name: "",
     hex: "#000000",
     finish: "SOLID" as any,
-    paintBrandId: null,
+    paintBrandId: "",
     manufacturer: null,
     tags: [],
     paintTypeId: "",

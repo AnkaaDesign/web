@@ -31,7 +31,7 @@ const batchUpdateSchema = z
   .object({
     positionId: z.string().uuid("ID do cargo inválido").nullable().optional(),
     sectorId: z.string().uuid("ID do setor inválido").nullable().optional(),
-    managedSectorId: z.string().uuid("ID do setor gerenciado inválido").nullable().optional(),
+    ledSectorId: z.string().uuid("ID do setor liderado inválido").nullable().optional(),
     status: z
       .enum(Object.values(USER_STATUS) as [string, ...string[]], {
         errorMap: () => ({ message: "status inválido" }),
@@ -80,7 +80,7 @@ export function UserBatchEditDialog({ isOpen, onClose, selectedUsers, onSuccess 
     defaultValues: {
       positionId: null,
       sectorId: null,
-      managedSectorId: null,
+      ledSectorId: null,
       status: undefined,
     },
   });
@@ -276,10 +276,10 @@ export function UserBatchEditDialog({ isOpen, onClose, selectedUsers, onSuccess 
 
                       <FormField
                         control={form.control}
-                        name="managedSectorId"
+                        name="ledSectorId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs">Setor Gerenciado</FormLabel>
+                            <FormLabel className="text-xs">Setor Liderado</FormLabel>
                             <FormControl>
                               <Combobox
                                 value={field.value || "_no_change"}

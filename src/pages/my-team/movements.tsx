@@ -127,7 +127,7 @@ export const TeamMovementsPage = () => {
     const excelContent = [
       ["Relatório de Movimentações da Equipe"],
       [`Data: ${formatDateTime(new Date())}`],
-      [`Setor: ${currentUser?.managedSector?.name || "N/A"}`],
+      [`Setor: ${currentUser?.ledSector?.name || "N/A"}`],
       [],
       ["Colaborador", "Cargo", "Item", "Código", "Tipo", "Quantidade", "Data"],
       ...activities.map((activity) => [
@@ -149,7 +149,7 @@ export const TeamMovementsPage = () => {
     link.download = `movimentacoes_equipe_${new Date().toISOString().split("T")[0]}.xls`;
     link.click();
     toast.success("Arquivo Excel exportado com sucesso!");
-  }, [activities, currentUser?.managedSector?.name]);
+  }, [activities, currentUser?.ledSector?.name]);
 
   const clearFilters = () => {
     setSelectedUserId("");

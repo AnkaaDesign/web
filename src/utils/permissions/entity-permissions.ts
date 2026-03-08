@@ -60,13 +60,25 @@ export function canDeleteTasks(user: PermissionUser | null): boolean {
 
 /**
  * Can user start/finish tasks?
- * Team leaders can start/finish tasks in their managed sector (or tasks without sector)
+ * Team leaders can start/finish tasks in their led sector (or tasks without sector)
  * ADMIN can start/finish any task
  */
 export function canManageTaskStatus(user: PermissionUser | null): boolean {
   if (!user) return false;
   return isTeamLeader(user) || hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+/**
+ * Can user finish/complete tasks?
+ * Only LOGISTIC and ADMIN can finish tasks
+ */
+export function canFinishTask(user: PermissionUser | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.LOGISTIC,
   ]);
 }
 
@@ -107,12 +119,12 @@ export function canLeaderManageTask(user: PermissionUser | null, taskSectorId: s
   // ADMIN can manage any task
   if (user.sector?.privileges === SECTOR_PRIVILEGES.ADMIN) return true;
 
-  // Team leader can manage tasks in their managed sector OR tasks without a sector
+  // Team leader can manage tasks in their led sector OR tasks without a sector
   if (isTeamLeader(user)) {
     // Task has no sector - team leader can manage it (will assign to their sector on start)
     if (!taskSectorId) return true;
-    // Task sector matches leader's managed sector
-    return user.managedSector?.id === taskSectorId;
+    // Task sector matches leader's led sector
+    return user.ledSector?.id === taskSectorId;
   }
 
   return false;

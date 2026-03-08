@@ -33,7 +33,6 @@ const SERVICE_ORDER_COLUMN_IDS = [
   'serviceOrders.logistic',
   'serviceOrders.artwork',
   'serviceOrders.production',
-  'serviceOrders.financial',
 ];
 
 // Map column ID to SERVICE_ORDER_TYPE
@@ -42,7 +41,6 @@ const COLUMN_ID_TO_TYPE: Record<string, SERVICE_ORDER_TYPE> = {
   'serviceOrders.logistic': SERVICE_ORDER_TYPE.LOGISTIC,
   'serviceOrders.artwork': SERVICE_ORDER_TYPE.ARTWORK,
   'serviceOrders.production': SERVICE_ORDER_TYPE.PRODUCTION,
-  'serviceOrders.financial': SERVICE_ORDER_TYPE.FINANCIAL,
 };
 
 export function CollapsedGroupRow({
@@ -71,7 +69,6 @@ export function CollapsedGroupRow({
       [SERVICE_ORDER_TYPE.LOGISTIC]: { total: 0, completed: 0, inProgress: 0, pending: 0, waitingApprove: 0, cancelled: 0 },
       [SERVICE_ORDER_TYPE.ARTWORK]: { total: 0, completed: 0, inProgress: 0, pending: 0, waitingApprove: 0, cancelled: 0 },
       [SERVICE_ORDER_TYPE.PRODUCTION]: { total: 0, completed: 0, inProgress: 0, pending: 0, waitingApprove: 0, cancelled: 0 },
-      [SERVICE_ORDER_TYPE.FINANCIAL]: { total: 0, completed: 0, inProgress: 0, pending: 0, waitingApprove: 0, cancelled: 0 },
     };
 
     for (const task of allGroupTasks) {

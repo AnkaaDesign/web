@@ -33,7 +33,7 @@ export interface FileUploadFieldProps {
   disabled?: boolean;
   className?: string;
   showPreview?: boolean;
-  variant?: "compact" | "full";
+  variant?: "compact" | "full" | "mini";
   placeholder?: string;
   label?: string;
   showFiles?: boolean;
@@ -267,6 +267,104 @@ export function FileUploadField({
       });
     };
   }, []);
+
+  if (variant === "mini") {
+    return (
+      <div className={cn("w-full", className)}>
+        {/* Slot for content above the row (e.g. file suggestions) */}
+        {children}
+
+        {/* Single horizontal row: thumbnails + square dropzone */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {/* Existing file thumbnails */}
+          {showFiles && files.map((file) => {
+            const IconComponent = getFileIcon(file);
+            const isUploaded = !!file.uploaded;
+            const isUploading = file.uploadProgress !== undefined && file.uploadProgress > 0 && file.uploadProgress < 100 && !isUploaded && !file.error;
+            const thumbnailError = thumbnailErrors[file.id] || false;
+            const shouldShowThumbnail = showPreview && !thumbnailError && (file.preview || (isUploaded && file.thumbnailUrl));
+
+            const getThumbnailSrc = () => {
+              const apiBaseUrl = getApiBaseUrl();
+              if (file.thumbnailUrl) {
+                if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
+                if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;
+                return file.thumbnailUrl;
+              }
+              if (file.preview) return file.preview;
+              if (file.uploadedFileId) return `${apiBaseUrl}/files/thumbnail/${file.uploadedFileId}`;
+              return "";
+            };
+
+            return (
+              <div
+                key={file.id}
+                className="group relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border border-border/50 bg-muted"
+                title={file.name}
+              >
+                {isUploading ? (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="w-4 h-4 border border-primary/30 border-t-primary animate-spin rounded-full" />
+                  </div>
+                ) : shouldShowThumbnail ? (
+                  <img
+                    src={getThumbnailSrc()}
+                    alt={file.name}
+                    className="w-full h-full object-cover"
+                    onError={() => setThumbnailErrors(prev => ({ ...prev, [file.id]: true }))}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <IconComponent className={cn("w-5 h-5", isUploaded ? "text-primary" : "text-muted-foreground")} />
+                  </div>
+                )}
+
+                {/* Remove button - visible on hover */}
+                {!disabled && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(file.id);
+                    }}
+                    className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-destructive text-white rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hidden group-hover:flex z-10"
+                  >
+                    <IconX className="w-2.5 h-2.5" />
+                  </button>
+                )}
+
+                {/* Error indicator */}
+                {file.error && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-red-500/80 py-px">
+                    <IconAlertCircle className="w-2.5 h-2.5 text-white mx-auto" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Square dropzone tile - same size as thumbnails */}
+          {!isAtLimit && (
+            <div
+              {...getRootProps()}
+              className={cn(
+                "relative flex-shrink-0 w-14 h-14 border-2 border-dashed border-border rounded-md transition-colors flex flex-col items-center justify-center gap-0.5",
+                !disabled && "cursor-pointer hover:border-primary/50 hover:bg-muted/30",
+                isDragActive && "border-primary bg-primary/5",
+                disabled && "cursor-not-allowed opacity-50 bg-muted/10",
+              )}
+            >
+              <input {...getInputProps()} />
+              <IconUpload className={cn("w-4 h-4", isDragActive ? "text-primary" : "text-muted-foreground")} />
+              <span className="text-[9px] text-muted-foreground leading-tight text-center px-0.5">
+                {isDragActive ? "Soltar" : "+Foto"}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (variant === "compact") {
     return (

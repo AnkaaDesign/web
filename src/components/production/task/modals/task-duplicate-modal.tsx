@@ -30,8 +30,9 @@ const DUPLICATE_TASK_INCLUDE = {
   },
   pricing: {
     include: {
-      items: true,
+      services: true,
       layoutFile: true,
+      customerConfigs: true,
     },
   },
   budgets: true,
@@ -204,30 +205,36 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
         : null,
 
       // Pricing (creates NEW record with same values, budget number auto-incremented by API)
-      ...(sourceTask.pricing && sourceTask.pricing.items?.length > 0
+      ...(sourceTask.pricing && sourceTask.pricing.services?.length > 0
         ? {
             pricing: {
               status: 'DRAFT' as const,
-              items: sourceTask.pricing.items.map((item: any) => ({
+              services: sourceTask.pricing.services.map((item: any) => ({
                 description: item.description,
                 amount: Number(item.amount) || 0,
                 observation: item.observation || null,
                 shouldSync: item.shouldSync ?? true,
               })),
               subtotal: Number(sourceTask.pricing.subtotal) || 0,
-              discountType: sourceTask.pricing.discountType || 'NONE',
-              discountValue: sourceTask.pricing.discountValue != null ? Number(sourceTask.pricing.discountValue) : null,
               total: Number(sourceTask.pricing.total) || 0,
               expiresAt: sourceTask.pricing.expiresAt,
-              paymentCondition: sourceTask.pricing.paymentCondition,
-              downPaymentDate: sourceTask.pricing.downPaymentDate,
-              customPaymentText: sourceTask.pricing.customPaymentText,
               guaranteeYears: sourceTask.pricing.guaranteeYears != null ? Number(sourceTask.pricing.guaranteeYears) : null,
               customGuaranteeText: sourceTask.pricing.customGuaranteeText,
               customForecastDays: sourceTask.pricing.customForecastDays != null ? Number(sourceTask.pricing.customForecastDays) : null,
               simultaneousTasks: sourceTask.pricing.simultaneousTasks != null ? Number(sourceTask.pricing.simultaneousTasks) : null,
-              discountReference: sourceTask.pricing.discountReference,
               layoutFileId: sourceTask.pricing.layoutFile?.id || sourceTask.pricing.layoutFileId || null,
+              // customerConfigs are duplicated with their per-config fields
+              // (discountType, discountValue, discountReference, customPaymentText, responsibleId, customerSignatureId)
+              customerConfigs: sourceTask.pricing.customerConfigs?.map((config: any) => ({
+                customerId: config.customerId,
+                discountType: config.discountType || 'NONE',
+                discountValue: config.discountValue != null ? Number(config.discountValue) : null,
+                discountReference: config.discountReference || null,
+                customPaymentText: config.customPaymentText || null,
+                responsibleId: config.responsibleId || null,
+                paymentCondition: config.paymentCondition || null,
+                downPaymentDate: config.downPaymentDate || null,
+              })) || [],
             },
           }
         : {}),

@@ -109,7 +109,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/pessoal/*": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
 
   // Meu Pessoal - Team leader access (sector employee management)
-  // Uses TEAM_LEADER virtual privilege which checks user.managedSector relation
+  // Uses TEAM_LEADER virtual privilege which checks user.ledSector relation
   "/meu-pessoal": "TEAM_LEADER",
 
   // Pintura - Warehouse operations (PRODUCTION excluded from paint catalog)
@@ -210,7 +210,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   [routes.maintenance.details(":id")]: ["MAINTENANCE", "WAREHOUSE", "ADMIN"],
 
   // My Team routes (team management for team leaders)
-  // Uses TEAM_LEADER virtual privilege which checks user.managedSector relation
+  // Uses TEAM_LEADER virtual privilege which checks user.ledSector relation
   [routes.myTeam.vacations]: "TEAM_LEADER",
   [routes.myTeam.warnings]: "TEAM_LEADER",
   [routes.myTeam.loans]: "TEAM_LEADER",

@@ -205,7 +205,6 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       // Add service order columns based on user privilege
       const serviceOrderColumns = [
         { id: "serviceOrders.production", header: "OS PRODUÇÃO", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.PRODUCTION },
-        { id: "serviceOrders.financial", header: "OS FINANCEIRO", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.FINANCIAL },
         { id: "serviceOrders.commercial", header: "OS COMERCIAL", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.COMMERCIAL },
         { id: "serviceOrders.logistic", header: "OS LOGÍSTICA", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.LOGISTIC },
         { id: "serviceOrders.artwork", header: "OS ARTE", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.ARTWORK },
@@ -723,7 +722,6 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
                           })()
                         : "-")}
                     {column.id === "serviceOrders.production" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} />}
-                    {column.id === "serviceOrders.financial" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} />}
                     {column.id === "serviceOrders.commercial" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.COMMERCIAL} />}
                     {column.id === "serviceOrders.logistic" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.LOGISTIC} />}
                     {column.id === "serviceOrders.artwork" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.ARTWORK} />}

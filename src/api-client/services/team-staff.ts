@@ -26,8 +26,8 @@ import type {
 
 /**
  * Service for secure team staff endpoints.
- * These endpoints automatically filter data based on the authenticated user's managed sector.
- * Only team leaders (users with managedSectorId) can access these endpoints.
+ * These endpoints automatically filter data based on the authenticated user's led sector.
+ * Only team leaders (users with ledSectorId) can access these endpoints.
  */
 export class TeamStaffService {
   private readonly basePath = "/team-staff";
@@ -37,7 +37,7 @@ export class TeamStaffService {
   // =====================
 
   /**
-   * Get all users in the authenticated user's managed sector
+   * Get all users in the authenticated user's led sector
    * @param params - Query parameters (filters, includes, pagination)
    * @returns List of users in the team leader's sector
    */
@@ -53,7 +53,7 @@ export class TeamStaffService {
   // =====================
 
   /**
-   * Get all borrows for users in the authenticated user's managed sector
+   * Get all borrows for users in the authenticated user's led sector
    * @param params - Query parameters (filters, includes, pagination)
    * @returns List of borrows for team members
    */
@@ -69,7 +69,7 @@ export class TeamStaffService {
   // =====================
 
   /**
-   * Get all vacations for users in the authenticated user's managed sector
+   * Get all vacations for users in the authenticated user's led sector
    * @param params - Query parameters (filters, includes, pagination)
    * @returns List of vacations for team members
    */
@@ -85,7 +85,7 @@ export class TeamStaffService {
   // =====================
 
   /**
-   * Get all warnings for users in the authenticated user's managed sector
+   * Get all warnings for users in the authenticated user's led sector
    * @param params - Query parameters (filters, includes, pagination)
    * @returns List of warnings for team members
    */
@@ -101,7 +101,7 @@ export class TeamStaffService {
   // =====================
 
   /**
-   * Get all activities for users in the authenticated user's managed sector
+   * Get all activities for users in the authenticated user's led sector
    * @param params - Query parameters (filters, includes, pagination)
    * @returns List of activities for team members
    */
@@ -117,7 +117,7 @@ export class TeamStaffService {
   // =====================
 
   /**
-   * Get all PPE deliveries for users in the authenticated user's managed sector
+   * Get all PPE deliveries for users in the authenticated user's led sector
    * @param params - Query parameters (filters, includes, pagination)
    * @returns List of PPE deliveries for team members
    */
@@ -133,7 +133,7 @@ export class TeamStaffService {
   // =====================
 
   /**
-   * Get payroll calculations for users in the authenticated user's managed sector
+   * Get payroll calculations for users in the authenticated user's led sector
    * @param year - Year for calculation
    * @param month - Month for calculation (1-12)
    * @returns Payroll calculations for team members

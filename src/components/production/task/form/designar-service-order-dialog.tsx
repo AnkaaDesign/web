@@ -59,7 +59,7 @@ export function DesignarServiceOrderDialog({
       case SECTOR_PRIVILEGES.COMMERCIAL:
         return SERVICE_ORDER_TYPE.COMMERCIAL;
       case SECTOR_PRIVILEGES.FINANCIAL:
-        return SERVICE_ORDER_TYPE.FINANCIAL;
+        return SERVICE_ORDER_TYPE.COMMERCIAL;
       case SECTOR_PRIVILEGES.LOGISTIC:
         return SERVICE_ORDER_TYPE.LOGISTIC;
       case SECTOR_PRIVILEGES.DESIGNER:
@@ -76,7 +76,6 @@ export function DesignarServiceOrderDialog({
     if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) {
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
-        SERVICE_ORDER_TYPE.FINANCIAL,
         SERVICE_ORDER_TYPE.COMMERCIAL,
         SERVICE_ORDER_TYPE.LOGISTIC,
         SERVICE_ORDER_TYPE.ARTWORK,
@@ -85,16 +84,14 @@ export function DesignarServiceOrderDialog({
     if (userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
-        SERVICE_ORDER_TYPE.FINANCIAL,
         SERVICE_ORDER_TYPE.COMMERCIAL,
         SERVICE_ORDER_TYPE.LOGISTIC,
         SERVICE_ORDER_TYPE.ARTWORK,
       ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
-      // Financial users can create FINANCIAL, COMMERCIAL, and LOGISTIC service orders
+      // Financial users can create COMMERCIAL and LOGISTIC service orders
       return [
-        SERVICE_ORDER_TYPE.FINANCIAL,
         SERVICE_ORDER_TYPE.COMMERCIAL,
         SERVICE_ORDER_TYPE.LOGISTIC,
       ];
@@ -116,7 +113,6 @@ export function DesignarServiceOrderDialog({
     // Default: all types
     return [
       SERVICE_ORDER_TYPE.PRODUCTION,
-      SERVICE_ORDER_TYPE.FINANCIAL,
       SERVICE_ORDER_TYPE.COMMERCIAL,
       SERVICE_ORDER_TYPE.LOGISTIC,
       SERVICE_ORDER_TYPE.ARTWORK,
@@ -156,9 +152,6 @@ export function DesignarServiceOrderDialog({
       case SERVICE_ORDER_TYPE.ARTWORK:
         // Artwork service orders: designer and admin users
         return [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN];
-      case SERVICE_ORDER_TYPE.FINANCIAL:
-        // Financial service orders: commercial, financial, and admin users
-        return [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN];
       default:
         return undefined;
     }

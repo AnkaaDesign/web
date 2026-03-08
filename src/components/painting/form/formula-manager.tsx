@@ -100,7 +100,7 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
         <div className="space-y-4">
           <Label>Componentes da Fórmula</Label>
           <div className="mt-4">
-            <FormulaComponentsEditor availableItems={availableItems} formulaPaintId={formulas[0]?.id} />
+            <FormulaComponentsEditor availableItems={availableItems} />
           </div>
           {form.formState.errors.components && <p className="text-sm text-destructive mt-2">{form.formState.errors.components.message}</p>}
         </div>

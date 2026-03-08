@@ -91,8 +91,8 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
         return true;
 
       case SECTOR_PRIVILEGES.FINANCIAL:
-        // Can edit FINANCIAL service orders if not assigned or assigned to them
-        return type === SERVICE_ORDER_TYPE.FINANCIAL && (isNotAssigned || isAssignedToCurrentUser);
+        // Can edit COMMERCIAL service orders if not assigned or assigned to them
+        return type === SERVICE_ORDER_TYPE.COMMERCIAL && (isNotAssigned || isAssignedToCurrentUser);
 
       case SECTOR_PRIVILEGES.LOGISTIC:
         // Can edit LOGISTIC and PRODUCTION service orders if not assigned or assigned to them
@@ -124,7 +124,7 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
       case SECTOR_PRIVILEGES.COMMERCIAL:
         return type === SERVICE_ORDER_TYPE.COMMERCIAL && (isNotAssigned || isAssignedToCurrentUser);
       case SECTOR_PRIVILEGES.FINANCIAL:
-        return type === SERVICE_ORDER_TYPE.FINANCIAL && (isNotAssigned || isAssignedToCurrentUser);
+        return type === SERVICE_ORDER_TYPE.COMMERCIAL && (isNotAssigned || isAssignedToCurrentUser);
       case SECTOR_PRIVILEGES.LOGISTIC:
         return (type === SERVICE_ORDER_TYPE.LOGISTIC || type === SERVICE_ORDER_TYPE.PRODUCTION) && (isNotAssigned || isAssignedToCurrentUser);
       case SECTOR_PRIVILEGES.DESIGNER:
@@ -138,7 +138,6 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
   const { groupedServices, ungroupedIndices } = useMemo(() => {
     const groups: Record<SERVICE_ORDER_TYPE, number[]> = {
       [SERVICE_ORDER_TYPE.PRODUCTION]: [],
-      [SERVICE_ORDER_TYPE.FINANCIAL]: [],
       [SERVICE_ORDER_TYPE.COMMERCIAL]: [],
       [SERVICE_ORDER_TYPE.LOGISTIC]: [],
       [SERVICE_ORDER_TYPE.ARTWORK]: [],
@@ -153,8 +152,10 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
       // Keep in ungrouped if: incomplete OR pending organization (recently added/edited)
       if (!isComplete || pendingFieldIds.has(field.id)) {
         ungrouped.push(index);
-      } else {
+      } else if (groups[service.type as SERVICE_ORDER_TYPE]) {
         groups[service.type as SERVICE_ORDER_TYPE].push(index);
+      } else {
+        ungrouped.push(index);
       }
     });
 
@@ -167,7 +168,7 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
       case SECTOR_PRIVILEGES.COMMERCIAL:
         return SERVICE_ORDER_TYPE.COMMERCIAL;
       case SECTOR_PRIVILEGES.FINANCIAL:
-        return SERVICE_ORDER_TYPE.FINANCIAL;
+        return SERVICE_ORDER_TYPE.COMMERCIAL;
       case SECTOR_PRIVILEGES.LOGISTIC:
         return SERVICE_ORDER_TYPE.LOGISTIC;
       case SECTOR_PRIVILEGES.DESIGNER:
@@ -245,11 +246,10 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
       return Object.values(SERVICE_ORDER_TYPE);
     }
     if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
-      // Financial can only see COMMERCIAL, LOGISTIC, FINANCIAL (not PRODUCTION, ARTWORK)
+      // Financial can only see COMMERCIAL, LOGISTIC (not PRODUCTION, ARTWORK)
       return [
         SERVICE_ORDER_TYPE.COMMERCIAL,
         SERVICE_ORDER_TYPE.LOGISTIC,
-        SERVICE_ORDER_TYPE.FINANCIAL,
       ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
@@ -510,9 +510,6 @@ function ServiceRow({
       case SERVICE_ORDER_TYPE.ARTWORK:
         // Artwork service orders: designer and admin users
         return [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN];
-      case SERVICE_ORDER_TYPE.FINANCIAL:
-        // Financial service orders: commercial, financial, and admin users
-        return [SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN];
       default:
         return undefined;
     }
@@ -641,7 +638,6 @@ function ServiceRow({
     if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) {
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
-        SERVICE_ORDER_TYPE.FINANCIAL,
         SERVICE_ORDER_TYPE.COMMERCIAL,
         SERVICE_ORDER_TYPE.LOGISTIC,
         SERVICE_ORDER_TYPE.ARTWORK,
@@ -651,18 +647,16 @@ function ServiceRow({
       // Commercial can CREATE all types, but can only UPDATE commercial
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
-        SERVICE_ORDER_TYPE.FINANCIAL,
         SERVICE_ORDER_TYPE.COMMERCIAL,
         SERVICE_ORDER_TYPE.LOGISTIC,
         SERVICE_ORDER_TYPE.ARTWORK,
       ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
-      // Financial can CREATE commercial, logistic, and financial service orders
+      // Financial can CREATE commercial and logistic service orders
       return [
         SERVICE_ORDER_TYPE.COMMERCIAL,
         SERVICE_ORDER_TYPE.LOGISTIC,
-        SERVICE_ORDER_TYPE.FINANCIAL,
       ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {

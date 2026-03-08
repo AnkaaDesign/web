@@ -35,15 +35,15 @@ import {
 } from "@/components/ui/dialog";
 import { formatCurrency, formatCNPJ } from "../../../../utils";
 import { cn } from "@/lib/utils";
-import { DISCOUNT_TYPE, SERVICE_ORDER_TYPE } from "@/constants/enums";
-import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
+import { DISCOUNT_TYPE, SERVICE_ORDER_TYPE, TASK_PRICING_STATUS } from "@/constants/enums";
+import { DISCOUNT_TYPE_LABELS, TASK_PRICING_STATUS_LABELS } from "@/constants/enum-labels";
 import { RESPONSIBLE_ROLE_LABELS } from "@/types/responsible";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { ServiceAutocomplete } from "../form/service-autocomplete";
 import { getCustomers } from "../../../../api-client";
 import { getApiBaseUrl } from "@/config/api";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
-import { IconX, IconFileSearch, IconUpload, IconArrowLeft } from "@tabler/icons-react";
+import { IconX, IconUpload, IconArrowLeft } from "@tabler/icons-react";
 
 interface ArtworkOption {
   id: string; // File ID (flattened)
@@ -65,7 +65,7 @@ interface PricingSelectorProps {
   layoutFiles?: FileWithPreview[];
   onLayoutFilesChange?: (files: FileWithPreview[]) => void;
   onItemDeleted?: (description: string) => void;
-  initialInvoiceToCustomers?: Array<{ id: string; fantasyName?: string; corporateName?: string; cnpj?: string }>;
+  initialCustomerConfigs?: Array<{ id: string; fantasyName?: string; corporateName?: string; cnpj?: string }>;
   taskResponsibles?: Array<{ id: string; name: string; role: string }>;
   /** Task artworks available for selection as pricing layout */
   artworks?: ArtworkOption[];
@@ -107,10 +107,10 @@ const VALIDITY_DAYS_OPTIONS = Array.from({ length: 30 }, (_, i) => ({
 export const PricingSelector = forwardRef<
   PricingSelectorRef,
   PricingSelectorProps
->(({ control, disabled, userRole, readOnly, onItemCountChange, layoutFiles: externalLayoutFiles, onLayoutFilesChange, onItemDeleted, initialInvoiceToCustomers, taskResponsibles, artworks }, ref) => {
+>(({ control, disabled, userRole, readOnly, onItemCountChange, layoutFiles: externalLayoutFiles, onLayoutFilesChange, onItemDeleted, initialCustomerConfigs, taskResponsibles, artworks }, ref) => {
   const [initialized, setInitialized] = useState(false);
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
-  const [showCustomPayment, setShowCustomPayment] = useState(false);
+  const [showCustomPayment, setShowCustomPayment] = useState<Record<string, boolean>>({});
   const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
   const [showLayoutUploadMode, setShowLayoutUploadMode] = useState(false);
   const fileViewer = useFileViewer();
@@ -123,24 +123,14 @@ export const PricingSelector = forwardRef<
 
   const { fields, append, remove, replace } = useFieldArray({
     control,
-    name: "pricing.items",
+    name: "pricing.services",
   });
 
   // Watch pricing values
-  const pricingItems = useWatch({ control, name: "pricing.items" });
+  const pricingItems = useWatch({ control, name: "pricing.services" });
   const pricingExpiresAt = useWatch({ control, name: "pricing.expiresAt" });
-  const discountType = useWatch({ control, name: "pricing.discountType" }) || DISCOUNT_TYPE.NONE;
-  const discountValue = useWatch({ control, name: "pricing.discountValue" });
-  const paymentCondition = useWatch({ control, name: "pricing.paymentCondition" });
-  const customPaymentText = useWatch({ control, name: "pricing.customPaymentText" });
   const guaranteeYears = useWatch({ control, name: "pricing.guaranteeYears" });
   const customGuaranteeText = useWatch({ control, name: "pricing.customGuaranteeText" });
-
-  // Current payment condition - directly from stored value or CUSTOM if has custom text
-  const currentPaymentCondition = useMemo(() => {
-    if (customPaymentText) return "CUSTOM";
-    return paymentCondition || "";
-  }, [paymentCondition, customPaymentText]);
 
   // Derive current guarantee option from stored values
   const currentGuaranteeOption = useMemo(() => {
@@ -151,13 +141,19 @@ export const PricingSelector = forwardRef<
 
   // Initialize custom states from existing data
   useEffect(() => {
-    if (customPaymentText && !showCustomPayment) {
-      setShowCustomPayment(true);
+    // Per-customer custom payment text
+    const configs = getValues("pricing.customerConfigs") || [];
+    if (Array.isArray(configs)) {
+      configs.forEach((config: any) => {
+        if (config?.customPaymentText && config?.customerId && !showCustomPayment[config.customerId]) {
+          setShowCustomPayment(prev => ({ ...prev, [config.customerId]: true }));
+        }
+      });
     }
     if (customGuaranteeText && !showCustomGuarantee) {
       setShowCustomGuarantee(true);
     }
-  }, [customPaymentText, customGuaranteeText, showCustomPayment, showCustomGuarantee]);
+  }, [customGuaranteeText, showCustomPayment, showCustomGuarantee, getValues]);
 
   // Note: Layout files initialization is now handled by the parent component (task-edit-form)
   // which passes the actual file data from the API including correct size information.
@@ -268,17 +264,20 @@ export const PricingSelector = forwardRef<
 
   // Initialize cache with initial customers passed from form (no async fetch needed)
   useEffect(() => {
-    if (initialInvoiceToCustomers && initialInvoiceToCustomers.length > 0) {
+    if (initialCustomerConfigs && initialCustomerConfigs.length > 0) {
       // Use customer objects passed directly from the API response
-      initialInvoiceToCustomers.forEach(customer => {
+      initialCustomerConfigs.forEach(customer => {
         customersCache.current.set(customer.id, customer);
       });
-      setSelectedCustomers(new Map(initialInvoiceToCustomers.map(c => [c.id, c])));
+      setSelectedCustomers(new Map(initialCustomerConfigs.map(c => [c.id, c])));
     } else {
       // Fallback: try to fetch from form values if no initial customers provided
-      const invoicesToCustomerIds = getValues("pricing.invoicesToCustomerIds");
-      if (invoicesToCustomerIds && Array.isArray(invoicesToCustomerIds) && invoicesToCustomerIds.length > 0) {
-        const uncachedIds = invoicesToCustomerIds.filter(id => !customersCache.current.has(id));
+      const customerConfigs = getValues("pricing.customerConfigs");
+      const customerConfigIds = Array.isArray(customerConfigs)
+        ? customerConfigs.map((c: any) => typeof c === 'string' ? c : c.customerId).filter(Boolean)
+        : [];
+      if (customerConfigIds.length > 0) {
+        const uncachedIds = customerConfigIds.filter((id: string) => !customersCache.current.has(id));
         if (uncachedIds.length > 0) {
           getCustomers({
             where: { id: { in: uncachedIds } },
@@ -297,6 +296,23 @@ export const PricingSelector = forwardRef<
       }
     }
   }, []); // Run only on mount
+
+  // Watch customerConfigs and clear orphaned service assignments
+  const watchedCustomerConfigs = useWatch({ control, name: "pricing.customerConfigs" });
+  useEffect(() => {
+    const configs = watchedCustomerConfigs || [];
+    const currentIds = Array.isArray(configs)
+      ? configs.map((c: any) => typeof c === 'string' ? c : c.customerId).filter(Boolean)
+      : [];
+    const items = getValues("pricing.services") || [];
+    items.forEach((item: any, index: number) => {
+      if (item.invoiceToCustomerId && !currentIds.includes(item.invoiceToCustomerId)) {
+        setValue(`pricing.services.${index}.invoiceToCustomerId`, null);
+      }
+    });
+  }, [watchedCustomerConfigs, getValues, setValue]);
+
+  // (root-to-config sync removed — all billing fields now live on customerConfigs)
 
   // Search function for customers Combobox
   const searchCustomers = useCallback(async (
@@ -340,7 +356,7 @@ export const PricingSelector = forwardRef<
   const getCustomerLabel = useCallback((customer: any) => customer.fantasyName || customer.corporateName || 'Cliente sem nome', []);
   const getCustomerValue = useCallback((customer: any) => customer.id, []);
 
-  // Calculate subtotal from all pricing items
+  // Aggregate subtotal from all pricing items (services sum)
   const subtotal = useMemo(() => {
     if (!pricingItems || pricingItems.length === 0) return 0;
     return pricingItems.reduce((sum: number, item: any) => {
@@ -349,22 +365,14 @@ export const PricingSelector = forwardRef<
     }, 0);
   }, [pricingItems]);
 
-  // Calculate discount amount
-  const discountAmount = useMemo(() => {
-    if (discountType === DISCOUNT_TYPE.NONE || !discountValue) return 0;
-    if (discountType === DISCOUNT_TYPE.PERCENTAGE) {
-      return Math.round((subtotal * discountValue) / 100 * 100) / 100;
-    }
-    if (discountType === DISCOUNT_TYPE.FIXED_VALUE) {
-      return discountValue;
-    }
-    return 0;
-  }, [subtotal, discountType, discountValue]);
-
-  // Calculate total with discount applied
-  const calculatedTotal = useMemo(() => {
-    return Math.max(0, Math.round((subtotal - discountAmount) * 100) / 100);
-  }, [subtotal, discountAmount]);
+  // Aggregate total from customerConfigs (sum of per-config totals)
+  const aggregateTotal = useMemo(() => {
+    if (!Array.isArray(watchedCustomerConfigs) || watchedCustomerConfigs.length === 0) return subtotal;
+    return watchedCustomerConfigs.reduce((sum: number, config: any) => {
+      if (!config || typeof config !== 'object') return sum;
+      return sum + (typeof config.total === 'number' ? config.total : Number(config.total) || 0);
+    }, 0);
+  }, [watchedCustomerConfigs, subtotal]);
 
   // Check if any pricing item is incomplete
   // An item is incomplete only if it has amount > 0 but no description
@@ -383,7 +391,7 @@ export const PricingSelector = forwardRef<
   useEffect(() => {
     if (!initialized) {
       const expiresAt = getValues("pricing.expiresAt");
-      const items = getValues("pricing.items");
+      const items = getValues("pricing.services");
       const hasItems = items && items.length > 0;
 
       if (expiresAt) {
@@ -419,19 +427,72 @@ export const PricingSelector = forwardRef<
     }
   }, [pricingItems, onItemCountChange]);
 
-  // Update subtotal and total in form
+  // Update aggregate subtotal and total in form
   useEffect(() => {
     if (pricingItems && pricingItems.length > 0) {
       const currentSubtotal = getValues("pricing.subtotal");
       const currentTotal = getValues("pricing.total");
-      if (currentSubtotal !== subtotal) {
-        setValue("pricing.subtotal", subtotal, { shouldDirty: false });
+      // Aggregate subtotal from configs (or use services sum if single-config mode)
+      const configSubtotalSum = Array.isArray(watchedCustomerConfigs) && watchedCustomerConfigs.length > 0
+        ? watchedCustomerConfigs.reduce((sum: number, c: any) => sum + (typeof c?.subtotal === 'number' ? c.subtotal : Number(c?.subtotal) || 0), 0)
+        : subtotal;
+      if (currentSubtotal !== configSubtotalSum) {
+        setValue("pricing.subtotal", configSubtotalSum, { shouldDirty: false });
       }
-      if (currentTotal !== calculatedTotal) {
-        setValue("pricing.total", calculatedTotal, { shouldDirty: false });
+      if (currentTotal !== aggregateTotal) {
+        setValue("pricing.total", aggregateTotal, { shouldDirty: false });
       }
     }
-  }, [subtotal, calculatedTotal, pricingItems, setValue, getValues]);
+  }, [subtotal, aggregateTotal, pricingItems, watchedCustomerConfigs, setValue, getValues]);
+
+  // Auto-calculate per-customer subtotals/totals based on service invoiceToCustomerId assignments
+  useEffect(() => {
+    const configs = watchedCustomerConfigs;
+    if (!Array.isArray(configs) || configs.length < 1 || !pricingItems) return;
+
+    const services = pricingItems || [];
+    let updated = false;
+
+    const newConfigs = configs.map((config: any) => {
+      if (!config || typeof config !== 'object') return config;
+      const customerId = config.customerId;
+      if (!customerId) return config;
+
+      // Sum amounts of services assigned to this customer
+      // When there's only one config, unassigned services (no invoiceToCustomerId) belong to it
+      const isSingleConfig = configs.length === 1;
+      const customerSubtotal = services.reduce((sum: number, svc: any) => {
+        if (svc.invoiceToCustomerId === customerId || (isSingleConfig && !svc.invoiceToCustomerId)) {
+          const amount = typeof svc.amount === 'number' ? svc.amount : Number(svc.amount) || 0;
+          return sum + amount;
+        }
+        return sum;
+      }, 0);
+
+      const roundedSubtotal = Math.round(customerSubtotal * 100) / 100;
+
+      // Calculate per-customer discount
+      const configDiscountType = config.discountType || 'NONE';
+      const configDiscountValue = config.discountValue || 0;
+      let customerDiscountAmount = 0;
+      if (configDiscountType === 'PERCENTAGE' && configDiscountValue) {
+        customerDiscountAmount = Math.round((roundedSubtotal * configDiscountValue / 100) * 100) / 100;
+      } else if (configDiscountType === 'FIXED_VALUE' && configDiscountValue) {
+        customerDiscountAmount = configDiscountValue;
+      }
+      const roundedTotal = Math.max(0, Math.round((roundedSubtotal - customerDiscountAmount) * 100) / 100);
+
+      if (config.subtotal !== roundedSubtotal || config.total !== roundedTotal) {
+        updated = true;
+        return { ...config, subtotal: roundedSubtotal, total: roundedTotal };
+      }
+      return config;
+    });
+
+    if (updated) {
+      setValue("pricing.customerConfigs", newConfigs, { shouldDirty: false });
+    }
+  }, [pricingItems, watchedCustomerConfigs, setValue]);
 
   const handleAddItem = useCallback(() => {
     clearErrors("pricing");
@@ -442,9 +503,7 @@ export const PricingSelector = forwardRef<
       expiryDate.setDate(expiryDate.getDate() + defaultPeriod);
       expiryDate.setHours(23, 59, 59, 999);
       setValue("pricing.expiresAt", expiryDate);
-      setValue("pricing.status", "DRAFT");
-      setValue("pricing.discountType", DISCOUNT_TYPE.NONE);
-      setValue("pricing.discountValue", null);
+      setValue("pricing.status", "PENDING");
       setValue("pricing.subtotal", 0);
       setValue("pricing.total", 0);
     }
@@ -466,7 +525,7 @@ export const PricingSelector = forwardRef<
     setValue("pricing", undefined);
     clearErrors("pricing");
     setValidityPeriod(null);
-    setShowCustomPayment(false);
+    setShowCustomPayment({});
     setShowCustomGuarantee(false);
     setLayoutFiles([]);
   }, [fields.length, remove, setValue, clearErrors]);
@@ -475,12 +534,10 @@ export const PricingSelector = forwardRef<
 
   const canEditStatus = userRole === 'ADMIN' || userRole === 'FINANCIAL' || userRole === 'COMMERCIAL';
 
-  const statusOptions = [
-    { label: 'Rascunho', value: 'DRAFT' },
-    { label: 'Aprovado', value: 'APPROVED' },
-    { label: 'Rejeitado', value: 'REJECTED' },
-    { label: 'Cancelado', value: 'CANCELLED' },
-  ];
+  const statusOptions = Object.values(TASK_PRICING_STATUS).map((value) => ({
+    value,
+    label: TASK_PRICING_STATUS_LABELS[value],
+  }));
 
   const validityPeriodOptions = [
     { label: '15 dias', value: '15' },
@@ -515,14 +572,15 @@ export const PricingSelector = forwardRef<
     }
   }, [pricingExpiresAt, validityPeriod]);
 
-  const handlePaymentConditionChange = useCallback((value: string) => {
+  // Per-customer payment condition change
+  const handleCustomerPaymentConditionChange = useCallback((value: string, configIndex: number, customerId: string) => {
     if (value === "CUSTOM") {
-      setShowCustomPayment(true);
-      setValue("pricing.paymentCondition", "CUSTOM");
+      setShowCustomPayment(prev => ({ ...prev, [customerId]: true }));
+      setValue(`pricing.customerConfigs.${configIndex}.paymentCondition`, "CUSTOM");
     } else {
-      setShowCustomPayment(false);
-      setValue("pricing.customPaymentText", null);
-      setValue("pricing.paymentCondition", value);
+      setShowCustomPayment(prev => ({ ...prev, [customerId]: false }));
+      setValue(`pricing.customerConfigs.${configIndex}.customPaymentText`, null);
+      setValue(`pricing.customerConfigs.${configIndex}.paymentCondition`, value || null);
     }
   }, [setValue]);
 
@@ -550,161 +608,22 @@ export const PricingSelector = forwardRef<
 
   return (
     <div className="space-y-4">
-      {/* Pricing Items - displayed in order, newest at bottom */}
-      {fields.length > 0 && (
-        <div className="space-y-3">
-          {fields.map((field, index) => (
-            <PricingItemRow
-              key={field.id}
-              control={control}
-              index={index}
-              disabled={disabled}
-              readOnly={readOnly}
-              onRemove={() => handleRemoveItem(index)}
-              isFirstRow={index === 0}
-              isLastRow={index === fields.length - 1}
-              ref={index === fields.length - 1 ? lastRowRef : null}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Add Service Button - Always at bottom, new items appear above */}
-      {!readOnly && !disabled && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleAddItem}
-          disabled={disabled}
-          className="w-full"
-        >
-          <IconPlus className="h-4 w-4 mr-2" />
-          Adicionar Serviço
-        </Button>
-      )}
-
-      {/* Discount Section */}
-      {hasPricingItems && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField
-              control={control}
-              name="pricing.discountType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo de Desconto</FormLabel>
-                  <FormControl>
-                    <Combobox
-                      value={field.value || DISCOUNT_TYPE.NONE}
-                      onValueChange={(newType) => {
-                        const safeType = newType || DISCOUNT_TYPE.NONE;
-                        const previousType = field.value || DISCOUNT_TYPE.NONE;
-                        field.onChange(safeType);
-                        if (safeType === DISCOUNT_TYPE.NONE) {
-                          setValue("pricing.discountValue", null);
-                          setValue("pricing.discountReference", null);
-                        } else if (previousType !== safeType && previousType !== DISCOUNT_TYPE.NONE) {
-                          setValue("pricing.discountValue", null);
-                        }
-                      }}
-                      disabled={disabled || readOnly}
-                      options={[
-                        DISCOUNT_TYPE.NONE,
-                        DISCOUNT_TYPE.PERCENTAGE,
-                        DISCOUNT_TYPE.FIXED_VALUE,
-                      ].map((type) => ({
-                        value: type,
-                        label: DISCOUNT_TYPE_LABELS[type],
-                      }))}
-                      placeholder="Selecione o tipo"
-                      emptyText="Nenhum tipo encontrado"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={control}
-              name="pricing.discountValue"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    Valor do Desconto
-                    {discountType === DISCOUNT_TYPE.PERCENTAGE && (
-                      <span className="text-xs text-muted-foreground">(%)</span>
-                    )}
-                    {discountType === DISCOUNT_TYPE.FIXED_VALUE && (
-                      <span className="text-xs text-muted-foreground">(R$)</span>
-                    )}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type={discountType === DISCOUNT_TYPE.FIXED_VALUE ? "currency" : "number"}
-                      {...field}
-                      value={field.value ?? ""}
-                      onChange={(value) => {
-                        if (value === null || value === undefined || value === "") {
-                          field.onChange(null);
-                        } else if (typeof value === "number") {
-                          field.onChange(value);
-                        } else {
-                          const num = Number(value);
-                          field.onChange(isNaN(num) ? null : num);
-                        }
-                      }}
-                      disabled={disabled || readOnly || discountType === DISCOUNT_TYPE.NONE}
-                      placeholder={discountType === DISCOUNT_TYPE.NONE ? "-" : discountType === DISCOUNT_TYPE.FIXED_VALUE ? "R$ 0,00" : "0"}
-                      min={discountType === DISCOUNT_TYPE.PERCENTAGE ? 0 : undefined}
-                      max={discountType === DISCOUNT_TYPE.PERCENTAGE ? 100 : undefined}
-                      step={discountType === DISCOUNT_TYPE.PERCENTAGE ? 0.01 : undefined}
-                      className="bg-transparent"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          {/* Discount Reference - Only show if discount type is not NONE */}
-          {discountType !== DISCOUNT_TYPE.NONE && (
-            <FormField
-              control={control}
-              name="pricing.discountReference"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Referência do Desconto</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      value={field.value || ""}
-                      placeholder="Justificativa ou referência para o desconto aplicado..."
-                      disabled={disabled || readOnly}
-                      maxLength={500}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
-        </div>
-      )}
-
-      {/* Invoices to Customers */}
+      {/* Customer Configs (Invoice To) - First section */}
       {hasPricingItems && (
         <FormField
           control={control}
-          name="pricing.invoicesToCustomerIds"
+          name="pricing.customerConfigs"
           render={({ field }) => {
+            // Derive IDs from config objects for the Combobox
+            const configIds = Array.isArray(field.value)
+              ? field.value.map((c: any) => typeof c === 'string' ? c : c.customerId).filter(Boolean)
+              : [];
+
             // Update selected customers when field value changes
             useEffect(() => {
-              if (field.value && Array.isArray(field.value)) {
+              if (configIds.length > 0) {
                 const newSelectedCustomers = new Map<string, any>();
-                field.value.forEach((customerId: string) => {
+                configIds.forEach((customerId: string) => {
                   const cachedCustomer = customersCache.current.get(customerId);
                   if (cachedCustomer) {
                     newSelectedCustomers.set(customerId, cachedCustomer);
@@ -714,7 +633,34 @@ export const PricingSelector = forwardRef<
               } else {
                 setSelectedCustomers(new Map());
               }
-            }, [field.value]);
+            }, [JSON.stringify(configIds)]);
+
+            // Handle Combobox value change: convert ID additions/removals to config objects
+            const handleCustomerConfigChange = (newIds: string | string[] | null | undefined) => {
+              const ids = Array.isArray(newIds) ? newIds : [];
+              const currentConfigs: any[] = Array.isArray(field.value) ? field.value : [];
+
+              // Build new configs: keep existing ones, add new ones with defaults
+              const newConfigs = ids.map((id: string) => {
+                const existing = currentConfigs.find((c: any) =>
+                  (typeof c === 'string' ? c : c.customerId) === id
+                );
+                if (existing && typeof existing === 'object') return existing;
+                return {
+                  customerId: id,
+                  subtotal: 0,
+                  discountType: 'NONE' as const,
+                  discountValue: null,
+                  total: 0,
+                  paymentCondition: null,
+                  downPaymentDate: null,
+                  customPaymentText: null,
+                  responsibleId: null,
+                  discountReference: null,
+                };
+              });
+              field.onChange(newConfigs);
+            };
 
             return (
               <FormItem>
@@ -722,10 +668,8 @@ export const PricingSelector = forwardRef<
                 <FormControl>
                   <div className="space-y-3">
                     <Combobox
-                      value={field.value || []}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                      }}
+                      value={configIds}
+                      onValueChange={handleCustomerConfigChange}
                       mode="multiple"
                       placeholder="Selecione clientes para faturamento..."
                       emptyText="Nenhum cliente encontrado"
@@ -779,8 +723,10 @@ export const PricingSelector = forwardRef<
                             )}
                             onClick={disabled || readOnly ? undefined : (e) => {
                               e.preventDefault();
-                              const currentValue = field.value || [];
-                              field.onChange(currentValue.filter((id: string) => id !== customer.id));
+                              const currentConfigs: any[] = Array.isArray(field.value) ? field.value : [];
+                              field.onChange(currentConfigs.filter((c: any) =>
+                                (typeof c === 'string' ? c : c.customerId) !== customer.id
+                              ));
                             }}
                           >
                             <CustomerLogoDisplay
@@ -806,40 +752,42 @@ export const PricingSelector = forwardRef<
         />
       )}
 
-      {/* Budget Responsible */}
-      {hasPricingItems && taskResponsibles && taskResponsibles.length > 0 && (
-        <FormField
-          control={control}
-          name="pricing.responsibleId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Responsável do Orçamento</FormLabel>
-              <FormControl>
-                <Combobox
-                  value={field.value || ''}
-                  onValueChange={(value) => {
-                    field.onChange(value || null);
-                  }}
-                  options={taskResponsibles
-                    .filter(r => !r.id.startsWith('temp-'))
-                    .map(r => ({
-                      value: r.id,
-                      label: `${r.name} (${RESPONSIBLE_ROLE_LABELS[r.role as keyof typeof RESPONSIBLE_ROLE_LABELS] || r.role})`,
-                    }))}
-                  placeholder="Selecione o responsável do orçamento"
-                  emptyText="Nenhum responsável disponível"
-                  disabled={disabled || readOnly}
-                  searchable={false}
-                  clearable={true}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      {/* Pricing Items - displayed in order, newest at bottom */}
+      {fields.length > 0 && (
+        <div className="space-y-3">
+          {fields.map((field, index) => (
+            <PricingItemRow
+              key={field.id}
+              control={control}
+              index={index}
+              disabled={disabled}
+              readOnly={readOnly}
+              onRemove={() => handleRemoveItem(index)}
+              isFirstRow={index === 0}
+              isLastRow={index === fields.length - 1}
+              ref={index === fields.length - 1 ? lastRowRef : null}
+              customerConfigCustomers={Array.from(selectedCustomers.values())}
+            />
+          ))}
+        </div>
       )}
 
-      {/* Totals */}
+      {/* Add Service Button - Always at bottom, new items appear above */}
+      {!readOnly && !disabled && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleAddItem}
+          disabled={disabled}
+          className="w-full"
+        >
+          <IconPlus className="h-4 w-4 mr-2" />
+          Adicionar Serviço
+        </Button>
+      )}
+
+      {/* Totals (aggregated from customer configs) */}
       {hasPricingItems && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormItem>
@@ -863,7 +811,7 @@ export const PricingSelector = forwardRef<
             </FormLabel>
             <FormControl>
               <Input
-                value={formatCurrency(calculatedTotal)}
+                value={formatCurrency(aggregateTotal)}
                 readOnly
                 className="bg-transparent font-bold text-lg text-primary cursor-not-allowed border-primary"
               />
@@ -884,7 +832,7 @@ export const PricingSelector = forwardRef<
                 <FormControl>
                   <Combobox
                     options={statusOptions}
-                    value={field.value || 'DRAFT'}
+                    value={field.value || 'PENDING'}
                     onValueChange={field.onChange}
                     placeholder="Selecione o status"
                     emptyText="Nenhum status encontrado"
@@ -926,69 +874,268 @@ export const PricingSelector = forwardRef<
         </div>
       )}
 
-      {/* Payment Section */}
-      {hasPricingItems && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Payment Condition */}
-          <FormItem>
-            <FormLabel>Condição de Pagamento</FormLabel>
-            <FormControl>
-              <Combobox
-                value={currentPaymentCondition}
-                onValueChange={(value) => {
-                  if (typeof value === 'string') {
-                    handlePaymentConditionChange(value);
-                  }
-                }}
-                disabled={disabled || readOnly}
-                options={PAYMENT_CONDITIONS.map((opt) => ({
-                  value: opt.value,
-                  label: opt.label,
-                }))}
-                placeholder="Selecione"
-                emptyText="Nenhuma opção"
-              />
-            </FormControl>
-          </FormItem>
-
-          {/* Down Payment Date */}
-          <FormField
-            control={control}
-            name="pricing.downPaymentDate"
-            render={({ field }) => (
-              <DateTimeInput
-                field={field}
-                mode="date"
-                label="Data da Entrada"
-                disabled={disabled || readOnly}
-              />
-            )}
-          />
-        </div>
-      )}
-
-      {/* Custom Payment Text */}
-      {hasPricingItems && showCustomPayment && (
-        <FormField
-          control={control}
-          name="pricing.customPaymentText"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Texto Personalizado de Pagamento</FormLabel>
-              <FormControl>
-                <textarea
-                  {...field}
-                  value={field.value || ""}
-                  placeholder="Descreva as condições de pagamento personalizadas..."
-                  disabled={disabled || readOnly}
-                  rows={3}
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+      {/* Payment Sections - Per-Customer */}
+      {hasPricingItems && Array.isArray(watchedCustomerConfigs) && watchedCustomerConfigs.length >= 1 && (
+        <div className="space-y-4">
+          {watchedCustomerConfigs.length >= 2 && (
+            <FormLabel>Configurações por Cliente</FormLabel>
           )}
-        />
+          {watchedCustomerConfigs.map((config: any, i: number) => {
+            const customerId = typeof config === 'string' ? config : config?.customerId;
+            if (!customerId) return null;
+            const customer = selectedCustomers.get(customerId);
+            const configPaymentCondition = config?.paymentCondition || "";
+            const configCustomPaymentText = config?.customPaymentText;
+            const currentCondition = configCustomPaymentText ? "CUSTOM" : configPaymentCondition;
+            const configSubtotal = config?.subtotal || 0;
+            const configDiscountType = config?.discountType || 'NONE';
+            const configTotal = config?.total || 0;
+            const isMultiCustomer = watchedCustomerConfigs.length >= 2;
+
+            return (
+              <div key={customerId} className={isMultiCustomer ? "border border-dashed border-border rounded-lg p-4 space-y-4" : "space-y-4"}>
+                {isMultiCustomer && (
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  {customer && (
+                    <CustomerLogoDisplay
+                      logo={customer.logo}
+                      customerName={customer.fantasyName}
+                      size="xs"
+                      shape="rounded"
+                      className="flex-shrink-0"
+                    />
+                  )}
+                  {customer?.fantasyName || customer?.corporateName || "Cliente"}
+                </h4>
+                )}
+
+                {/* Budget Responsible per customer */}
+                {taskResponsibles && taskResponsibles.length > 0 && (
+                  <FormField
+                    control={control}
+                    name={`pricing.customerConfigs.${i}.responsibleId`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Responsável do Orçamento</FormLabel>
+                        <FormControl>
+                          <Combobox
+                            value={field.value || ''}
+                            onValueChange={(value) => {
+                              field.onChange(value || null);
+                            }}
+                            options={taskResponsibles
+                              .filter(r => !r.id.startsWith('temp-'))
+                              .map(r => ({
+                                value: r.id,
+                                label: `${r.name} (${RESPONSIBLE_ROLE_LABELS[r.role as keyof typeof RESPONSIBLE_ROLE_LABELS] || r.role})`,
+                              }))}
+                            placeholder="Selecione o responsável do orçamento"
+                            emptyText="Nenhum responsável disponível"
+                            disabled={disabled || readOnly}
+                            searchable={false}
+                            clearable={true}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* Payment & Method */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Payment Condition */}
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Condição de Pagamento</FormLabel>
+                    <FormControl>
+                      <Combobox
+                        value={currentCondition}
+                        onValueChange={(value) => {
+                          if (typeof value === 'string') {
+                            handleCustomerPaymentConditionChange(value, i, customerId);
+                          }
+                        }}
+                        disabled={disabled || readOnly}
+                        options={PAYMENT_CONDITIONS.map((opt) => ({
+                          value: opt.value,
+                          label: opt.label,
+                        }))}
+                        placeholder="Selecione"
+                        emptyText="Nenhuma opção"
+                      />
+                    </FormControl>
+                  </FormItem>
+
+                  {/* Down Payment Date */}
+                  <FormField
+                    control={control}
+                    name={`pricing.customerConfigs.${i}.downPaymentDate`}
+                    render={({ field }) => (
+                      <DateTimeInput
+                        field={field}
+                        mode="date"
+                        label="Data da Entrada"
+                        disabled={disabled || readOnly}
+                      />
+                    )}
+                  />
+
+                  {/* Payment Method */}
+                  </div>
+
+                {/* Custom Payment Text */}
+                {showCustomPayment[customerId] && (
+                  <FormField
+                    control={control}
+                    name={`pricing.customerConfigs.${i}.customPaymentText`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Texto Personalizado de Pagamento</FormLabel>
+                        <FormControl>
+                          <textarea
+                            {...field}
+                            value={field.value || ""}
+                            placeholder="Descreva as condições de pagamento personalizadas..."
+                            disabled={disabled || readOnly}
+                            rows={3}
+                            className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* Per-Customer Discount */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Discount Type */}
+                  <FormField
+                    control={control}
+                    name={`pricing.customerConfigs.${i}.discountType`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Desconto</FormLabel>
+                        <FormControl>
+                          <Combobox
+                            value={field.value || 'NONE'}
+                            onValueChange={(value) => {
+                              const safeType = value || 'NONE';
+                              field.onChange(safeType);
+                              if (safeType === 'NONE') {
+                                setValue(`pricing.customerConfigs.${i}.discountValue`, null);
+                                setValue(`pricing.customerConfigs.${i}.discountReference`, null);
+                              }
+                            }}
+                            disabled={disabled || readOnly}
+                            options={Object.values(DISCOUNT_TYPE).map((type) => ({
+                              value: type,
+                              label: DISCOUNT_TYPE_LABELS[type],
+                            }))}
+                            placeholder="Selecione"
+                            emptyText="Nenhuma opção"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Discount Value */}
+                  <FormField
+                    control={control}
+                    name={`pricing.customerConfigs.${i}.discountValue`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Valor Desconto
+                          {configDiscountType === 'PERCENTAGE' && <span className="text-muted-foreground ml-1">(%)</span>}
+                          {configDiscountType === 'FIXED_VALUE' && <span className="text-muted-foreground ml-1">(R$)</span>}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type={configDiscountType === 'FIXED_VALUE' ? 'currency' : 'number'}
+                            value={field.value ?? ""}
+                            onChange={(value) => {
+                              if (configDiscountType === 'FIXED_VALUE') {
+                                field.onChange(value);
+                              } else {
+                                const num = Number(value);
+                                field.onChange(isNaN(num) ? null : num);
+                              }
+                            }}
+                            disabled={disabled || readOnly || configDiscountType === 'NONE'}
+                            placeholder={configDiscountType === 'NONE' ? "-" : configDiscountType === 'FIXED_VALUE' ? "R$ 0,00" : "0"}
+                            min={configDiscountType === 'PERCENTAGE' ? 0 : undefined}
+                            max={configDiscountType === 'PERCENTAGE' ? 100 : undefined}
+                            step={configDiscountType === 'PERCENTAGE' ? 0.01 : undefined}
+                            className="bg-transparent"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Discount Reference */}
+                  <FormField
+                    control={control}
+                    name={`pricing.customerConfigs.${i}.discountReference`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Referência Desconto</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            value={field.value || ""}
+                            placeholder={configDiscountType === 'NONE' ? "-" : "Justificativa..."}
+                            disabled={disabled || readOnly || configDiscountType === 'NONE'}
+                            maxLength={500}
+                            className="bg-transparent"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Per-Customer Subtotal & Total (only show when multiple customers) */}
+                {isMultiCustomer && <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Subtotal (auto-calculated from assigned services) */}
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <IconCurrencyReal className="h-3.5 w-3.5" />
+                      Subtotal
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        value={formatCurrency(configSubtotal)}
+                        readOnly
+                        className="bg-muted cursor-not-allowed text-sm"
+                      />
+                    </FormControl>
+                  </FormItem>
+
+                  {/* Total (auto-calculated) */}
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <IconCurrencyReal className="h-3.5 w-3.5 text-primary" />
+                      Valor Total
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        value={formatCurrency(configTotal)}
+                        readOnly
+                        className="bg-transparent font-bold text-lg text-primary cursor-not-allowed border-primary"
+                      />
+                    </FormControl>
+                  </FormItem>
+                </div>}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {/* Custom Guarantee Text */}
@@ -1212,10 +1359,11 @@ interface PricingItemRowProps {
   onRemove: () => void;
   isFirstRow: boolean;
   isLastRow: boolean;
+  customerConfigCustomers?: Array<{ id: string; fantasyName?: string; corporateName?: string; cnpj?: string }>;
 }
 
 const PricingItemRow = forwardRef<HTMLDivElement, PricingItemRowProps>(
-  ({ control, index, disabled, readOnly, onRemove, isFirstRow, isLastRow: _isLastRow }, ref) => {
+  ({ control, index, disabled, readOnly, onRemove, isFirstRow, isLastRow: _isLastRow, customerConfigCustomers }, ref) => {
     // Observation modal state
     const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
     const [tempObservation, setTempObservation] = useState("");
@@ -1223,14 +1371,14 @@ const PricingItemRow = forwardRef<HTMLDivElement, PricingItemRowProps>(
     // Watch observation field
     const currentObservation = useWatch({
       control,
-      name: `pricing.items.${index}.observation`,
+      name: `pricing.services.${index}.observation`,
       defaultValue: "",
     });
 
     // Get observation field controller for updating
     const { field: observationField } = useController({
       control,
-      name: `pricing.items.${index}.observation`,
+      name: `pricing.services.${index}.observation`,
       defaultValue: "",
     });
 
@@ -1255,28 +1403,67 @@ const PricingItemRow = forwardRef<HTMLDivElement, PricingItemRowProps>(
     // Check if observation has content
     const hasObservation = Boolean(currentObservation && currentObservation.trim());
 
+    const hasMultipleCustomerConfigs = customerConfigCustomers && customerConfigCustomers.length >= 2;
+
     return (
       <>
         <div
           ref={ref}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end"
+          className={cn(
+            "grid grid-cols-1 gap-4 items-end",
+            hasMultipleCustomerConfigs
+              ? "sm:grid-cols-[1fr_200px_260px]"
+              : "sm:grid-cols-[1fr_260px]"
+          )}
         >
-          {/* Service Description - 1/2 width */}
-          <ServiceAutocomplete
-            control={control}
-            name={`pricing.items.${index}.description`}
-            disabled={disabled || readOnly}
-            label="Serviço"
-            placeholder="Selecione ou digite um serviço"
-            showLabel={isFirstRow}
-            type={SERVICE_ORDER_TYPE.PRODUCTION}
-          />
+          {/* Service Description - flexible width */}
+          <div>
+            <ServiceAutocomplete
+              control={control}
+              name={`pricing.services.${index}.description`}
+              disabled={disabled || readOnly}
+              label="Serviço"
+              placeholder="Selecione ou digite um serviço"
+              showLabel={isFirstRow}
+              type={SERVICE_ORDER_TYPE.PRODUCTION}
+            />
+          </div>
 
-          {/* Value + Buttons - 1/2 width */}
+          {/* Customer Config Assignment - fixed 200px, only when 2+ customer configs */}
+          {hasMultipleCustomerConfigs && (
+            <div>
+              <FormField
+                control={control}
+                name={`pricing.services.${index}.invoiceToCustomerId`}
+                render={({ field }) => (
+                  <FormItem>
+                    {isFirstRow && (
+                      <FormLabel>Faturar para</FormLabel>
+                    )}
+                    <FormControl>
+                      <Combobox
+                        value={field.value || ""}
+                        onValueChange={(value) => field.onChange(value || null)}
+                        disabled={disabled || readOnly}
+                        options={customerConfigCustomers.map((customer) => ({
+                          value: customer.id,
+                          label: customer.fantasyName || customer.corporateName || "Cliente sem nome",
+                        }))}
+                        placeholder="Selecione o cliente"
+                        searchable={false}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
+
+          {/* Value + Buttons - fixed 180px */}
           <div className="flex items-end gap-2">
             <FormField
               control={control}
-              name={`pricing.items.${index}.amount`}
+              name={`pricing.services.${index}.amount`}
               render={({ field }) => (
                 <FormItem className="flex-1">
                   {isFirstRow && (

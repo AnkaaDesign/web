@@ -4,6 +4,7 @@ import { TaskDeadlineList } from "./task-deadline-list";
 import { ServiceOrderList } from "./service-order-list";
 import { LowStockList } from "./low-stock-list";
 import { CompletedTasksList } from "./completed-tasks-list";
+import { AwaitingApprovalTasksList } from "./awaiting-approval-tasks-list";
 
 interface HomeDashboardSectionProps {
   data: HomeDashboardData;
@@ -20,7 +21,7 @@ export function HomeDashboardSection({ data, sector, isSectionVisible }: HomeDas
     (data.tasksCloseForecast && data.tasksCloseForecast.length > 0) ||
     (data.lowStockItems && data.lowStockItems.length > 0) ||
     (data.completedTasks && data.completedTasks.length > 0) ||
-    (data.openFinancialSOs && data.openFinancialSOs.length > 0);
+    (data.tasksAwaitingPaymentApproval && data.tasksAwaitingPaymentApproval.length > 0);
 
   if (!hasContent) return null;
 
@@ -60,9 +61,10 @@ export function HomeDashboardSection({ data, sector, isSectionVisible }: HomeDas
         <CompletedTasksList tasks={data.completedTasks} />
       )}
 
-      {isVisible("openFinancialSOs") && data.openFinancialSOs && data.openFinancialSOs.length > 0 && (
-        <ServiceOrderList orders={data.openFinancialSOs} title="OS Financeiras Pendentes" />
+      {isVisible("tasksAwaitingPaymentApproval") && data.tasksAwaitingPaymentApproval && data.tasksAwaitingPaymentApproval.length > 0 && (
+        <AwaitingApprovalTasksList tasks={data.tasksAwaitingPaymentApproval} />
       )}
+
     </div>
   );
 }

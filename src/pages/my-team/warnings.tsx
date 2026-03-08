@@ -42,8 +42,8 @@ export default function MyTeamWarningsPage() {
     return <Navigate to={routes.authentication.login} replace />;
   }
 
-  // Only team leaders (users with managedSector) can access this page
-  if (!user.managedSector) {
+  // Only team leaders (users with ledSector) can access this page
+  if (!user.ledSector) {
     return <Navigate to={routes.home} replace />;
   }
 
@@ -51,7 +51,7 @@ export default function MyTeamWarningsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Fetch users from the team leader's managed sector using secure endpoint
+  // Fetch users from the team leader's led sector using secure endpoint
   const { data: usersResponse } = useTeamStaffUsers({
     include: {
       position: {
@@ -105,7 +105,7 @@ export default function MyTeamWarningsPage() {
     return baseFilters;
   }, [selectedUserId, currentPage, pageSize]);
 
-  // Fetch warnings using secure team-staff endpoint (automatically filtered by managed sector)
+  // Fetch warnings using secure team-staff endpoint (automatically filtered by led sector)
   const { data: warningsResponse, isLoading: isLoadingWarnings, refetch } = useTeamStaffWarnings(warningFilters);
   const warnings = warningsResponse?.data || [];
   const totalRecords = warningsResponse?.meta?.totalRecords || 0;

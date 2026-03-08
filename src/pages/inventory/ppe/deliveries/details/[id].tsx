@@ -73,6 +73,12 @@ const EPIDeliveryDetails = () => {
       },
       reviewedByUser: true,
       ppeSchedule: true,
+      signature: {
+        include: {
+          signedByUser: true,
+          signedDocument: true,
+        },
+      },
       deliveryDocument: true,
     },
     enabled: !!id,

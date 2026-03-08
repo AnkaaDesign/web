@@ -9,7 +9,6 @@ import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import type { ComboboxOption } from "@/components/ui/combobox";
-import { toast } from "@/components/ui/sonner";
 import {
   SECTOR_PRIVILEGES,
   routes,
@@ -32,9 +31,19 @@ import { cn } from "@/lib/utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
-import { canViewPricing } from "@/utils/permissions/pricing-permissions";
+import { canViewPricing, canUpdatePricingStatus, getAvailablePricingStatusTransitions } from "@/utils/permissions/pricing-permissions";
 import { PricingStatusBadge } from "@/components/production/task/pricing/pricing-status-badge";
+import { InstallmentStatusBadge } from "@/components/production/task/billing/installment-status-badge";
+import { BankSlipStatusBadge } from "@/components/production/task/billing/bank-slip-status-badge";
+import { BoletoActions } from "@/components/production/task/billing/boleto-actions";
+import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
+import { NfseActions } from "@/components/production/task/billing/nfse-actions";
+import { useInvoicesByTask } from "@/hooks/production/use-invoice";
+import type { Invoice } from "@/types/invoice";
+import { taskPricingService } from "@/api-client/task-pricing";
+import type { TASK_PRICING_STATUS } from "@/types/task-pricing";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text-generators";
+import { toast } from "@/components/ui/sonner";
 import { getApiBaseUrl } from "@/utils/file";
 import { SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_DISPLAY_ORDER } from "../../../../constants";
 import { RESPONSIBLE_ROLE_LABELS, ResponsibleRole } from "@/types/responsible";
@@ -72,7 +81,6 @@ import {
   IconUser,
   IconBuilding,
   IconBuildingFactory,
-  IconCurrencyReal,
   IconFile,
   IconFileText,
   IconFileInvoice,
@@ -108,6 +116,9 @@ import {
   IconZoomReset,
   IconChevronLeft,
   IconChevronRight,
+  IconFolderCheck,
+  IconCameraCheck,
+  IconCameraBolt,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -768,6 +779,8 @@ const TASK_SECTIONS: SectionConfig[] = [
       { id: "truckSpot", label: "Localização", sectionId: "overview" },
       { id: "vehicle", label: "Veículo", sectionId: "overview" },
       { id: "details", label: "Detalhes", sectionId: "overview" },
+      { id: "finishedAt", label: "Finalizado Em", sectionId: "overview" },
+      { id: "invoiceToCustomers", label: "Faturar Para", sectionId: "overview" },
     ],
   },
   {
@@ -836,17 +849,6 @@ const TASK_SECTIONS: SectionConfig[] = [
     ],
   },
   {
-    id: "documents",
-    label: "Documentos",
-    defaultVisible: true,
-    fields: [
-      { id: "budgetDocs", label: "Orçamentos", sectionId: "documents" },
-      { id: "invoices", label: "Notas Fiscais", sectionId: "documents" },
-      { id: "receipts", label: "Recibos", sectionId: "documents" },
-      { id: "bankSlips", label: "Boletos", sectionId: "documents" },
-    ],
-  },
-  {
     id: "paints",
     label: "Tintas",
     defaultVisible: true,
@@ -870,6 +872,14 @@ const TASK_SECTIONS: SectionConfig[] = [
     defaultVisible: true,
     fields: [
       { id: "airbrushingList", label: "Lista de Aerografias", sectionId: "airbrushings" },
+    ],
+  },
+  {
+    id: "dossie",
+    label: "Dossiê",
+    defaultVisible: true,
+    fields: [
+      { id: "dossieContent", label: "Registros por Ordem de Serviço", sectionId: "dossie" },
     ],
   },
   {
@@ -897,7 +907,8 @@ export const TaskDetailsPage = () => {
   const [nextServiceOrderToStart, setNextServiceOrderToStart] = useState<any>(null);
   const [filesViewMode, setFilesViewMode] = useState<FileViewMode>("grid");
   const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("grid");
-  const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("grid");
+  const [pricingCustomerFilter, setPricingCustomerFilter] = useState<string | null>(null);
+  const [isUpdatingPricingStatus, setIsUpdatingPricingStatus] = useState(false);
   // Get user's sector privilege for service order permissions
   const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
 
@@ -964,6 +975,14 @@ export const TaskDetailsPage = () => {
   // Check if user has any visible service order types
   const hasVisibleServiceOrders = visibleServiceOrderTypes.length > 0;
 
+  // Check if user can access customer pages (ADMIN, FINANCIAL, LOGISTIC, COMMERCIAL)
+  const canAccessCustomerPages = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL)
+  );
+
   // Check if user can view airbrushing financial data (FINANCIAL or ADMIN only)
   const canViewAirbrushingFinancials = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN));
 
@@ -977,9 +996,16 @@ export const TaskDetailsPage = () => {
   // Check if user can edit tasks (PRODUCTION, LEADER, ADMIN)
   const canEdit = canEditTasks(currentUser ?? null);
 
-  // Check if user can view pricing and documents (ADMIN, FINANCIAL, COMMERCIAL only)
+  // Check if user can view pricing (ADMIN, FINANCIAL, COMMERCIAL only)
   const canViewPricingSection = canViewPricing(currentUser?.sector?.privileges || '');
-  const canViewDocumentsSection = canViewPricing(currentUser?.sector?.privileges || ''); // Same permissions as pricing
+  const canChangePricingStatus = canUpdatePricingStatus(currentUser?.sector?.privileges || '');
+
+  // Fetch invoice data for inline boleto/NFS-e display in pricing section
+  const { data: invoiceResponse } = useInvoicesByTask(id!);
+  const invoices: Invoice[] = useMemo(() => {
+    const data = invoiceResponse?.data;
+    return Array.isArray(data) ? data : (data ? [data] : []);
+  }, [invoiceResponse]);
 
   // Check if user can view commission field - ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only
   // (Production users receive commission, so they need to see it)
@@ -1004,18 +1030,22 @@ export const TaskDetailsPage = () => {
     (isProductionSector && isTeamLeader(currentUser))
   );
 
+  // Sections completely hidden for financial users (not even toggleable)
+  const FINANCIAL_HIDDEN_SECTIONS = ['cuts', 'observation', 'serviceOrders', 'files', 'changelog'];
+  // Sections hidden by default but toggleable for financial users
+  const FINANCIAL_DEFAULT_HIDDEN_SECTIONS = ['dates', 'layout', 'artworks', 'paints', 'airbrushings'];
   // Filter sections and fields based on user privileges
   const filteredSections = useMemo(() => {
     return TASK_SECTIONS
       .filter(section => {
+        // Financial users: completely hide certain sections
+        if (isFinancialSector && FINANCIAL_HIDDEN_SECTIONS.includes(section.id)) return false;
         // Hide pricing section for users without permission (ADMIN, FINANCIAL, COMMERCIAL only)
         if (section.id === 'pricing' && !canViewPricingSection) return false;
-        // Hide documents section for users without permission (ADMIN, FINANCIAL, COMMERCIAL only)
-        if (section.id === 'documents' && !canViewDocumentsSection) return false;
         // Hide files section if user can't view any file type
         if (section.id === 'files' && !canViewBaseFiles && !canViewProjectFiles && !canViewCheckinFiles && !canViewCheckoutFiles) return false;
-        // Hide cuts section for financial users
-        if (section.id === 'cuts' && isFinancialSector) return false;
+        // Hide dossiê section for users who can't view checkin files (same permissions)
+        if (section.id === 'dossie' && !canViewCheckinFiles) return false;
         // Hide layout section for users without permission (ADMIN, LOGISTIC, PRODUCTION team leaders only)
         if (section.id === 'layout' && !canViewLayoutSection) return false;
         // Artworks section is visible to ALL users (content is filtered by approval status)
@@ -1025,6 +1055,11 @@ export const TaskDetailsPage = () => {
       })
       .map(section => {
         let filteredFields = section.fields;
+
+        // Financial users: hide finishedAt and invoiceToCustomers from non-financial overview
+        if (!isFinancialSector && section.id === 'overview') {
+          filteredFields = filteredFields.filter(field => field.id !== 'finishedAt' && field.id !== 'invoiceToCustomers');
+        }
 
         // Filter commission field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only)
         if (!canViewCommissionField) {
@@ -1036,12 +1071,17 @@ export const TaskDetailsPage = () => {
           filteredFields = filteredFields.filter(field => !PRIVILEGED_RESTRICTED_FIELDS.includes(field.id));
         }
 
+        // Financial users: sections that are hidden by default but toggleable
+        if (isFinancialSector && FINANCIAL_DEFAULT_HIDDEN_SECTIONS.includes(section.id)) {
+          return { ...section, fields: filteredFields, defaultVisible: false };
+        }
+
         if (filteredFields.length !== section.fields.length) {
           return { ...section, fields: filteredFields };
         }
         return section;
       });
-  }, [canViewPricingSection, canViewDocumentsSection, canViewBaseFiles, canViewProjectFiles, canViewCheckinFiles, canViewCheckoutFiles, canViewLayoutSection, isWarehouseSector, isProductionSector, currentUser, canViewCommissionField, canViewRestrictedFields]);
+  }, [canViewPricingSection, canViewBaseFiles, canViewProjectFiles, canViewCheckinFiles, canViewCheckoutFiles, canViewLayoutSection, isWarehouseSector, isProductionSector, currentUser, canViewCommissionField, canViewRestrictedFields, isFinancialSector]);
 
   // Initialize section visibility hook with filtered sections
   const sectionVisibility = useSectionVisibility(
@@ -1072,7 +1112,7 @@ export const TaskDetailsPage = () => {
   };
 
   // Handler for projectFiles collection viewing
-  const handleProjectFileClick = (file: any) => {
+  const handleProjectFileClick = (file: CustomFile) => {
     if (!fileViewerContext) return;
     const projectFilesList = task?.projectFiles || [];
     const index = projectFilesList.findIndex(f => f.id === file.id);
@@ -1080,7 +1120,7 @@ export const TaskDetailsPage = () => {
   };
 
   // Handler for checkinFiles collection viewing
-  const handleCheckinFileClick = (file: any) => {
+  const handleCheckinFileClick = (file: CustomFile) => {
     if (!fileViewerContext) return;
     const checkinFilesList = task?.checkinFiles || [];
     const index = checkinFilesList.findIndex(f => f.id === file.id);
@@ -1088,12 +1128,20 @@ export const TaskDetailsPage = () => {
   };
 
   // Handler for checkoutFiles collection viewing
-  const handleCheckoutFileClick = (file: any) => {
+  const handleCheckoutFileClick = (file: CustomFile) => {
     if (!fileViewerContext) return;
     const checkoutFilesList = task?.checkoutFiles || [];
     const index = checkoutFilesList.findIndex(f => f.id === file.id);
     fileViewerContext.actions.viewFiles(checkoutFilesList, index);
   };
+
+  // Handler for dossiê file viewing (scoped to a service order's checkin+checkout files)
+  const handleDossieFileClick = useCallback((serviceOrder: any, file: CustomFile) => {
+    if (!fileViewerContext) return;
+    const allFiles = [...(serviceOrder.checkinFiles || []), ...(serviceOrder.checkoutFiles || [])];
+    const index = allFiles.findIndex((f: any) => f.id === file.id);
+    fileViewerContext.actions.viewFiles(allFiles, index >= 0 ? index : 0);
+  }, [fileViewerContext]);
 
   // Handler for artworks collection viewing
   const handleArtworkFileClick = (file: any) => {
@@ -1102,14 +1150,6 @@ export const TaskDetailsPage = () => {
     const artworkFiles = (task?.artworks || []).map(artwork => artwork.file || artwork).filter((f): f is CustomFile => Boolean(f && typeof f === 'object' && 'id' in f));
     const index = artworkFiles.findIndex(f => f?.id === file.id);
     fileViewerContext.actions.viewFiles(artworkFiles, index);
-  };
-
-  // Handler for documents collection viewing (budgets, invoices, receipts)
-  const handleDocumentFileClick = (file: any) => {
-    if (!fileViewerContext) return;
-    const allDocuments = [...(task?.budgets || []), ...(task?.invoices || []), ...(task?.receipts || []), ...(task?.bankSlips || [])];
-    const index = allDocuments.findIndex(f => f.id === file.id);
-    fileViewerContext.actions.viewFiles(allDocuments, index);
   };
 
   // Handler for cuts collection viewing
@@ -1125,6 +1165,7 @@ export const TaskDetailsPage = () => {
     data: response,
     isLoading,
     error,
+    refresh: refreshTask,
   } = useTaskDetail(id!, {
     enabled: !!id,
     include: {
@@ -1139,6 +1180,8 @@ export const TaskDetailsPage = () => {
       serviceOrders: {
         include: {
           assignedTo: true,
+          checkinFiles: true,
+          checkoutFiles: true,
         },
       },
       baseFiles: true,
@@ -1152,15 +1195,16 @@ export const TaskDetailsPage = () => {
       },
       pricing: {
         include: {
-          items: true,
-          layoutFile: true,
-          customerSignature: true,
+          customerConfigs: {
+            include: {
+              customer: true,
+              installments: { orderBy: { number: 'asc' } },
+              responsible: true,
+              customerSignature: true,
+            },
+          },
         },
       },
-      budgets: true,
-      invoices: true,
-      receipts: true,
-      bankSlips: true,
       observation: {
         include: {
           files: true,
@@ -1313,6 +1357,14 @@ export const TaskDetailsPage = () => {
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   }, [task?.serviceOrders, visibleServiceOrderTypes, userSectorPrivilege]);
 
+  // Check if there's any dossiê content (service orders with checkin or checkout files)
+  const hasDossieContent = useMemo(() => {
+    if (!task?.serviceOrders) return false;
+    return task.serviceOrders.some(
+      (so: any) => (so.checkinFiles?.length > 0 || so.checkoutFiles?.length > 0)
+    );
+  }, [task?.serviceOrders]);
+
   // Determine the source section from the URL path
   // /producao/cronograma/detalhes/123 → 'cronograma'
   // /producao/agenda/detalhes/123 → 'agenda'
@@ -1372,6 +1424,80 @@ export const TaskDetailsPage = () => {
 
   const taskDisplayName = task ? getTaskDisplayName(task) : "Carregando...";
 
+  // Compute which grid cards should span full width (when they'd be alone in a row)
+  const fullSpanSections = useMemo(() => {
+    if (!task) return new Set<string>();
+
+    type CardDef = { id: string; span: 1 | 2 };
+    const visibleCards: CardDef[] = [];
+
+    if (sectionVisibility.isSectionVisible("overview")) {
+      visibleCards.push({ id: 'overview', span: 1 });
+    }
+    if (sectionVisibility.isSectionVisible("dates")) {
+      visibleCards.push({ id: 'dates', span: 1 });
+    }
+    if (sectionVisibility.isSectionVisible("pricing") && canViewPricingSection && task.pricing?.services?.length) {
+      const hasMultipleCustomers = (task.pricing?.customerConfigs?.length ?? 0) >= 2;
+      visibleCards.push({ id: 'pricing', span: hasMultipleCustomers && !pricingCustomerFilter ? 2 : 1 });
+    }
+    if (sectionVisibility.isSectionVisible("serviceOrders") && hasVisibleServiceOrders && filteredServiceOrders.length > 0) {
+      visibleCards.push({ id: 'serviceOrders', span: 1 });
+    }
+    if (sectionVisibility.isSectionVisible("layout") && task.truck && (task.truck.leftSideLayout || task.truck.rightSideLayout || task.truck.backSideLayout)) {
+      visibleCards.push({ id: 'layout', span: 1 });
+    }
+    if (sectionVisibility.isSectionVisible("artworks") && filteredArtworks.length > 0) {
+      visibleCards.push({ id: 'artworks', span: 1 });
+    }
+    if (sectionVisibility.isSectionVisible("cuts") && !isFinancialSector && cuts.length > 0) {
+      visibleCards.push({ id: 'cuts', span: 1 });
+    }
+    if (sectionVisibility.isSectionVisible("files")) {
+      const hasBaseFiles = canViewBaseFiles && task.baseFiles && task.baseFiles.length > 0;
+      const hasProjectFiles = canViewProjectFiles && task.projectFiles && task.projectFiles.length > 0;
+      const hasCheckinFiles = canViewCheckinFiles && task.checkinFiles && task.checkinFiles.length > 0;
+      const hasCheckoutFiles = canViewCheckoutFiles && task.checkoutFiles && task.checkoutFiles.length > 0;
+      if (hasBaseFiles || hasProjectFiles || hasCheckinFiles || hasCheckoutFiles) {
+        visibleCards.push({ id: 'files', span: 1 });
+      }
+    }
+    if (sectionVisibility.isSectionVisible("paints") && (task.generalPainting || (task.logoPaints && task.logoPaints.length > 0))) {
+      visibleCards.push({ id: 'paints', span: 1 });
+    }
+    if (sectionVisibility.isSectionVisible("observation") && task.observation) {
+      visibleCards.push({ id: 'observation', span: 1 });
+    }
+    if (sectionVisibility.isSectionVisible("airbrushings") && airbrushings.length > 0) {
+      visibleCards.push({ id: 'airbrushings', span: 1 });
+    }
+    if (sectionVisibility.isSectionVisible("dossie") && canViewCheckinFiles && hasDossieContent) {
+      visibleCards.push({ id: 'dossie', span: 2 });
+    }
+
+    const result = new Set<string>();
+    let slot = 0; // 0 = left col, 1 = right col
+    let lastSpan1Idx = -1;
+
+    for (let i = 0; i < visibleCards.length; i++) {
+      const card = visibleCards[i];
+      if (card.span === 2) {
+        if (slot === 1) result.add(visibleCards[lastSpan1Idx].id);
+        slot = 0;
+      } else {
+        if (slot === 0) {
+          lastSpan1Idx = i;
+          slot = 1;
+        } else {
+          slot = 0;
+        }
+      }
+    }
+    if (slot === 1) result.add(visibleCards[lastSpan1Idx].id);
+
+    return result;
+  }, [task, sectionVisibility, canViewPricingSection, pricingCustomerFilter, hasVisibleServiceOrders, filteredServiceOrders, filteredArtworks, isFinancialSector, cuts, canViewBaseFiles, canViewProjectFiles, canViewCheckinFiles, canViewCheckoutFiles, airbrushings, hasDossieContent]);
+
   // Track page access
   usePageTracker({
     title: task ? `Tarefa: ${taskDisplayName}` : "Detalhes da Tarefa",
@@ -1406,6 +1532,39 @@ export const TaskDetailsPage = () => {
       console.error("Error updating task status:", error);
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  // Handle pricing status change
+  const handlePricingStatusChange = async (newStatus: string, currentStatus?: string) => {
+    if (!task?.pricing?.id) return;
+
+    // Confirmation for INTERNAL_APPROVED (triggers invoice/boleto generation)
+    if (newStatus === 'INTERNAL_APPROVED') {
+      const confirmed = window.confirm(
+        'Aprovar internamente irá gerar faturas e boletos automaticamente. Deseja continuar?'
+      );
+      if (!confirmed) return;
+    }
+
+    // Confirmation for reverting SETTLED → PARTIAL (payment reversal)
+    if (currentStatus === 'SETTLED' && newStatus === 'PARTIAL') {
+      const confirmed = window.confirm(
+        'Reverter o status de liquidado para parcial? Isso indica que houve estorno de pagamento.'
+      );
+      if (!confirmed) return;
+    }
+
+    setIsUpdatingPricingStatus(true);
+    try {
+      await taskPricingService.updateStatus(task.pricing.id, newStatus);
+      refreshTask();
+      toast.success('Status atualizado', 'O status da precificação foi alterado com sucesso.');
+    } catch (error) {
+      console.error("Error updating pricing status:", error);
+      toast.error('Erro ao atualizar status', 'Não foi possível alterar o status da precificação. Tente novamente.');
+    } finally {
+      setIsUpdatingPricingStatus(false);
     }
   };
 
@@ -1648,7 +1807,7 @@ export const TaskDetailsPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Overview Card */}
               {sectionVisibility.isSectionVisible("overview") && (
-                <Card className="border flex flex-col animate-in-50 duration-700">
+                <Card className={cn("border flex flex-col animate-in-50 duration-700", fullSpanSections.has("overview") && "lg:col-span-2")}>
             <CardHeader className="pb-6">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -1675,7 +1834,16 @@ export const TaskDetailsPage = () => {
                     shape="rounded"
                     className="flex-shrink-0"
                   />
-                  <span className="text-sm font-semibold text-foreground text-right">{task.customer.corporateName || task.customer.fantasyName}</span>
+                  {canAccessCustomerPages ? (
+                    <span
+                      className="text-sm font-semibold text-foreground text-right cursor-pointer hover:text-primary hover:underline transition-colors"
+                      onClick={() => navigate(routes.administration.customers.details(task.customer!.id))}
+                    >
+                      {task.customer.corporateName || task.customer.fantasyName}
+                    </span>
+                  ) : (
+                    <span className="text-sm font-semibold text-foreground text-right">{task.customer.corporateName || task.customer.fantasyName}</span>
+                  )}
                     </div>
                   </div>
                 )}
@@ -1856,13 +2024,47 @@ export const TaskDetailsPage = () => {
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/50 rounded-lg p-4">{task.details}</p>
                 </div>
               )}
+
+              {/* Finished At - Financial sector overview field */}
+              {sectionVisibility.isFieldVisible("finishedAt") && task.finishedAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                  <span className="text-sm font-medium text-muted-foreground">Finalizado Em</span>
+                  <span className="text-sm font-medium">{formatDate(task.finishedAt)}</span>
+                </div>
+              )}
+
+              {/* Invoice To Customers - Financial sector overview field */}
+              {sectionVisibility.isFieldVisible("invoiceToCustomers") && (task as any).pricing?.customerConfigs?.length > 0 && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                  <span className="text-sm font-medium text-muted-foreground">Faturar Para</span>
+                  <span className="text-sm font-medium text-right max-w-[60%]">
+                    {(task as any).pricing.customerConfigs.map((c: any, i: number, arr: any[]) => {
+                      const name = c.customer?.corporateName || c.customer?.fantasyName;
+                      if (!name) return null;
+                      return canAccessCustomerPages && c.customerId ? (
+                        <span key={c.customerId}>
+                          <span
+                            className="cursor-pointer hover:text-primary hover:underline transition-colors"
+                            onClick={() => navigate(routes.administration.customers.details(c.customerId))}
+                          >
+                            {name}
+                          </span>
+                          {i < arr.length - 1 ? ', ' : ''}
+                        </span>
+                      ) : (
+                        <span key={c.customerId || i}>{name}{i < arr.length - 1 ? ', ' : ''}</span>
+                      );
+                    })}
+                  </span>
+                </div>
+              )}
                 </CardContent>
               </Card>
           )}
 
               {/* Dates Card */}
               {sectionVisibility.isSectionVisible("dates") && (
-              <Card className="border flex flex-col animate-in fade-in-50 duration-800">
+              <Card className={cn("border flex flex-col animate-in fade-in-50 duration-800", fullSpanSections.has("dates") && "lg:col-span-2")}>
                 <CardHeader className="pb-6">
                   <CardTitle className="flex items-center gap-2">
           <IconCalendarWeek className="h-5 w-5 text-muted-foreground" />
@@ -1945,10 +2147,14 @@ export const TaskDetailsPage = () => {
               </Card>
               )}
 
+
               {/* Pricing Card - Only visible to ADMIN, FINANCIAL, and COMMERCIAL sectors */}
-              {sectionVisibility.isSectionVisible("pricing") && canViewPricingSection && task.pricing && task.pricing.items && task.pricing.items.length > 0 && (() => {
+              {sectionVisibility.isSectionVisible("pricing") && canViewPricingSection && task.pricing && task.pricing.services && task.pricing.services.length > 0 && (() => {
+                const hasMultipleCustomers = (task.pricing?.customerConfigs?.length ?? 0) >= 2;
+                const isCompleteView = !pricingCustomerFilter;
+                const shouldSpanFull = hasMultipleCustomers && isCompleteView;
                 return (
-                  <Card className="border flex flex-col animate-in fade-in-50 duration-825">
+                  <Card className={cn("border flex flex-col animate-in fade-in-50 duration-825", shouldSpanFull && "lg:col-span-2")}>
                     <CardHeader className="pb-6">
                       <div className="flex items-center justify-between">
                         <CardTitle className="flex items-center gap-2">
@@ -1959,13 +2165,107 @@ export const TaskDetailsPage = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(`/cliente/${task.customer?.id || 'c'}/orcamento/${task.pricing?.id}`, '_blank')}
+                            onClick={() => {
+                              const customerId = pricingCustomerFilter || task.customer?.id || 'c';
+                              window.open(`/cliente/${customerId}/orcamento/${task.pricing?.id}`, '_blank');
+                            }}
                             className="gap-2"
                           >
                             <IconLayoutGrid className="h-4 w-4" />
                             Visualizar
                           </Button>
-                          <PricingStatusBadge status={task.pricing.status} size="lg" />
+                          {/* Customer filter combobox - only show when 2+ invoiceTo customers */}
+                          {task.pricing?.customerConfigs && task.pricing.customerConfigs.length >= 2 && (
+                            <Combobox
+                              value={pricingCustomerFilter || "all"}
+                              onValueChange={(value) => setPricingCustomerFilter(value === "all" ? null : (typeof value === 'string' ? value : null))}
+                              options={[
+                                { value: "all", label: "Completo" },
+                                ...task.pricing.customerConfigs.map((config) => ({
+                                  value: config.customerId,
+                                  label: config.customer?.corporateName || config.customer?.fantasyName || "Cliente",
+                                })),
+                              ]}
+                              searchable={false}
+                              placeholder="Filtrar cliente"
+                              className="h-9 rounded-md"
+                            />
+                          )}
+                          {(() => {
+                            if (!task.pricing) return null;
+                            const pricingStatus = task.pricing.status;
+
+                            if (!canChangePricingStatus) {
+                              return <PricingStatusBadge status={pricingStatus} size="lg" />;
+                            }
+
+                            const statusLabels: Record<TASK_PRICING_STATUS, string> = {
+                              PENDING: 'Pendente',
+                              BUDGET_APPROVED: 'Orçamento Aprovado',
+                              VERIFIED: 'Verificado',
+                              INTERNAL_APPROVED: 'Aprovado Internamente',
+                              UPCOMING: 'A Vencer',
+                              PARTIAL: 'Parcial',
+                              SETTLED: 'Liquidado',
+                            };
+
+                            // Build options: all statuses the user can transition to + current
+                            const allStatuses: TASK_PRICING_STATUS[] = [
+                              'PENDING', 'BUDGET_APPROVED', 'VERIFIED', 'INTERNAL_APPROVED',
+                              'UPCOMING', 'PARTIAL', 'SETTLED',
+                            ];
+                            const userPrivilege = currentUser?.sector?.privileges || '';
+                            const availableTransitions = getAvailablePricingStatusTransitions(pricingStatus, userPrivilege);
+
+                            const statusOptions: ComboboxOption[] = allStatuses
+                              .filter((s) => s === pricingStatus || availableTransitions.includes(s))
+                              .map((s) => ({
+                                value: s,
+                                label: statusLabels[s],
+                                disabled: s === pricingStatus,
+                              }));
+
+                            const getPricingStatusTriggerClass = (status: TASK_PRICING_STATUS) => {
+                              switch (status) {
+                                case 'PENDING':
+                                  return "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600";
+                                case 'BUDGET_APPROVED':
+                                  return "bg-green-700 text-white hover:bg-green-800 border-green-800";
+                                case 'VERIFIED':
+                                  return "bg-blue-700 text-white hover:bg-blue-800 border-blue-800";
+                                case 'INTERNAL_APPROVED':
+                                  return "bg-green-700 text-white hover:bg-green-800 border-green-800";
+                                case 'UPCOMING':
+                                  return "bg-amber-600 text-white hover:bg-amber-700 border-amber-700";
+                                case 'PARTIAL':
+                                  return "bg-blue-700 text-white hover:bg-blue-800 border-blue-800";
+                                case 'SETTLED':
+                                  return "bg-green-700 text-white hover:bg-green-800 border-green-800";
+                                default:
+                                  return "";
+                              }
+                            };
+
+                            return (
+                              <Combobox
+                                value={pricingStatus}
+                                onValueChange={(value) => {
+                                  if (value && typeof value === 'string' && value !== pricingStatus) {
+                                    handlePricingStatusChange(value, pricingStatus);
+                                  }
+                                }}
+                                options={statusOptions}
+                                searchable={false}
+                                clearable={false}
+                                disabled={isUpdatingPricingStatus}
+                                className="w-[220px] h-9 rounded-md"
+                                triggerClassName={cn(
+                                  "font-medium",
+                                  getPricingStatusTriggerClass(pricingStatus)
+                                )}
+                              />
+                            );
+                          })()}
                         </div>
                       </div>
                     </CardHeader>
@@ -1988,93 +2288,223 @@ export const TaskDetailsPage = () => {
                   </div>
 
                   {/* Pricing items table */}
-                  <div className="border border-border dark:border-border/30 rounded-lg overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-muted/50">
-                    <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">
-                    Descrição
-                  </th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-muted-foreground w-32">
-                    Valor
-                  </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border dark:divide-border/30">
-                    {task.pricing.items.map((item, index) => {
+                  {(() => {
+                    const filteredServices = task.pricing.services
+                      .filter((item) => !pricingCustomerFilter || item.invoiceToCustomer?.id === pricingCustomerFilter || !item.invoiceToCustomerId);
+
+                    const renderServiceRow = (item: any, index: number, showCustomerCol: boolean) => {
                       const isOutrosWithObservation = item.description === 'Outros' && !!item.observation;
                       const displayDescription = isOutrosWithObservation ? item.observation : item.description;
                       return (
-                  <tr key={item.id || index} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span>{displayDescription}</span>
-                        {/* Observation Indicator with HoverCard */}
-                        {!isOutrosWithObservation && item.observation && (
-                          <HoverCard openDelay={100} closeDelay={100}>
-                            <HoverCardTrigger asChild>
-                              <button className="relative flex items-center justify-center h-6 w-6 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
-                                <IconNote className="h-4 w-4" />
-                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
-                                  !
+                        <tr key={item.id || index} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-3 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span>{displayDescription}</span>
+                              {!isOutrosWithObservation && item.observation && (
+                                <HoverCard openDelay={100} closeDelay={100}>
+                                  <HoverCardTrigger asChild>
+                                    <button className="relative flex items-center justify-center h-6 w-6 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+                                      <IconNote className="h-4 w-4" />
+                                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                                        !
+                                      </span>
+                                    </button>
+                                  </HoverCardTrigger>
+                                  <HoverCardContent className="w-72 p-3" side="top">
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <IconNote className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm font-medium">Observação</span>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground">{item.observation}</p>
+                                    </div>
+                                  </HoverCardContent>
+                                </HoverCard>
+                              )}
+                            </div>
+                          </td>
+                          {showCustomerCol && (
+                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                              {canAccessCustomerPages && item.invoiceToCustomer?.id ? (
+                                <span
+                                  className="cursor-pointer hover:text-primary hover:underline transition-colors"
+                                  onClick={() => navigate(routes.administration.customers.details(item.invoiceToCustomer!.id))}
+                                >
+                                  {item.invoiceToCustomer.corporateName || item.invoiceToCustomer.fantasyName}
                                 </span>
-                              </button>
-                            </HoverCardTrigger>
-                            <HoverCardContent className="w-72 p-3" side="top">
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <IconNote className="h-4 w-4 text-muted-foreground" />
-                                  <span className="text-sm font-medium">Observação</span>
-                                </div>
-                                <p className="text-sm text-muted-foreground">{item.observation}</p>
-                              </div>
-                            </HoverCardContent>
-                          </HoverCard>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right font-medium">
-                      {formatCurrency(
-                        typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0
-                      )}
-                    </td>
-                  </tr>
+                              ) : (
+                                item.invoiceToCustomer?.corporateName || item.invoiceToCustomer?.fantasyName || "-"
+                              )}
+                            </td>
+                          )}
+                          <td className="px-4 py-3 text-sm text-right font-medium">
+                            {formatCurrency(
+                              typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0
+                            )}
+                          </td>
+                        </tr>
                       );
-                    })}
-                  </tbody>
-                </table>
-                  </div>
+                    };
+
+                    // Group by customer when "Completo" with 2+ customers — 2-column layout
+                    if (!pricingCustomerFilter && (task.pricing?.customerConfigs?.length ?? 0) >= 2) {
+                      const customerGroups = new Map<string, { name: string; services: typeof filteredServices }>();
+
+                      for (const item of filteredServices) {
+                        const customerId = item.invoiceToCustomer?.id || '__unassigned__';
+                        const customerName = item.invoiceToCustomer?.corporateName || item.invoiceToCustomer?.fantasyName || 'Sem cliente';
+                        if (!customerGroups.has(customerId)) {
+                          customerGroups.set(customerId, { name: customerName, services: [] });
+                        }
+                        customerGroups.get(customerId)!.services.push(item);
+                      }
+
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {Array.from(customerGroups.entries()).map(([customerId, group]) => (
+                            <div key={customerId} className="border border-border dark:border-border/30 rounded-lg overflow-hidden flex flex-col">
+                              <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/40 border-b border-border dark:border-border/30">
+                                <IconBuilding className="h-4 w-4 text-muted-foreground" />
+                                {canAccessCustomerPages && customerId !== '__unassigned__' ? (
+                                  <span
+                                    className="text-sm font-semibold cursor-pointer hover:text-primary hover:underline transition-colors"
+                                    onClick={() => navigate(routes.administration.customers.details(customerId))}
+                                  >
+                                    {group.name}
+                                  </span>
+                                ) : (
+                                  <span className="text-sm font-semibold">{group.name}</span>
+                                )}
+                                <span className="text-xs text-muted-foreground ml-auto">
+                                  {formatCurrency(group.services.reduce((sum, s) => sum + (typeof s.amount === 'number' ? s.amount : Number(s.amount) || 0), 0))}
+                                </span>
+                              </div>
+                              <table className="w-full flex-1">
+                                <thead className="bg-muted/50">
+                                  <tr>
+                                    <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">Descrição</th>
+                                    <th className="px-4 py-2.5 text-right text-sm font-semibold text-muted-foreground w-28">Valor</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border dark:divide-border/30">
+                                  {group.services.map((item, index) => renderServiceRow(item, index, false))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+
+                    // Single customer or filtered view: flat table
+                    return (
+                      <div className="border border-border dark:border-border/30 rounded-lg overflow-hidden">
+                        <table className="w-full">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">Descrição</th>
+                              <th className="px-4 py-3 text-right text-sm font-semibold text-muted-foreground w-32">Valor</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border dark:divide-border/30">
+                            {filteredServices.map((item, index) => renderServiceRow(item, index, false))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
 
                   {/* Pricing Summary */}
+                  {(() => {
+                    const configs = task.pricing?.customerConfigs || [];
+                    const hasConfigs = configs.length > 0;
+
+                    // Determine which discount/total source to use
+                    let displaySubtotal: number;
+                    let discountType: string | null = null;
+                    let discountValue: number | null = null;
+                    let discountReference: string | null = null;
+                    let discountAmount = 0;
+                    let displayTotal: number;
+
+                    if (pricingCustomerFilter) {
+                      // Specific customer filtered: use that config's data
+                      const selectedConfig = configs.find((c) => c.customerId === pricingCustomerFilter);
+                      if (selectedConfig) {
+                        displaySubtotal = typeof selectedConfig.subtotal === 'number' ? selectedConfig.subtotal : Number(selectedConfig.subtotal) || 0;
+                        discountType = selectedConfig.discountType;
+                        discountValue = selectedConfig.discountValue;
+                        discountReference = selectedConfig.discountReference || null;
+                        discountAmount = discountType === 'PERCENTAGE'
+                          ? (displaySubtotal * (discountValue || 0)) / 100
+                          : (discountValue || 0);
+                        displayTotal = typeof selectedConfig.total === 'number' ? selectedConfig.total : Number(selectedConfig.total) || 0;
+                      } else {
+                        // Fallback: compute from filtered services + global discount
+                        const filtered = task.pricing.services.filter((item) => item.invoiceToCustomer?.id === pricingCustomerFilter || !item.invoiceToCustomerId);
+                        displaySubtotal = filtered.reduce((sum, item) => sum + (typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0), 0);
+                        displayTotal = displaySubtotal;
+                      }
+                    } else if (hasConfigs && configs.length >= 2) {
+                      // "Completo" with 2+ configs: aggregate from configs, no global discount
+                      displaySubtotal = configs.reduce((sum, c) => sum + (typeof c.subtotal === 'number' ? c.subtotal : Number(c.subtotal) || 0), 0);
+                      displayTotal = configs.reduce((sum, c) => sum + (typeof c.total === 'number' ? c.total : Number(c.total) || 0), 0);
+                      // Show aggregate discount if subtotal != total
+                      if (displaySubtotal !== displayTotal) {
+                        discountAmount = displaySubtotal - displayTotal;
+                      }
+                    } else if (hasConfigs && configs.length === 1) {
+                      // Single config: use that config's data
+                      const config = configs[0];
+                      let configSubtotal = typeof config.subtotal === 'number' ? config.subtotal : Number(config.subtotal) || 0;
+                      // Fallback: if config subtotal is 0 but services have amounts, compute from services
+                      if (configSubtotal === 0 && task.pricing.services?.length > 0) {
+                        configSubtotal = task.pricing.services.reduce((sum: number, item: any) => sum + (typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0), 0);
+                      }
+                      displaySubtotal = configSubtotal;
+                      discountType = config.discountType;
+                      discountValue = config.discountValue;
+                      discountReference = config.discountReference || null;
+                      discountAmount = discountType === 'PERCENTAGE'
+                        ? (displaySubtotal * (discountValue || 0)) / 100
+                        : (discountValue || 0);
+                      let configTotal = typeof config.total === 'number' ? config.total : Number(config.total) || 0;
+                      if (configTotal === 0 && displaySubtotal > 0) {
+                        configTotal = Math.max(0, displaySubtotal - discountAmount);
+                      }
+                      displayTotal = configTotal;
+                    } else {
+                      // No configs: fallback to global pricing aggregates (no per-config discount)
+                      displaySubtotal = typeof task.pricing.subtotal === 'number' ? task.pricing.subtotal : Number(task.pricing.subtotal) || 0;
+                      displayTotal = typeof task.pricing.total === 'number' ? task.pricing.total : Number(task.pricing.total) || 0;
+                    }
+
+                    return (
                   <div className="bg-muted/20 border border-border dark:border-border/30 rounded-lg p-4 space-y-3">
                     {/* Subtotal */}
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal</span>
                       <span className="font-medium">
-                        {formatCurrency(
-                          typeof task.pricing.subtotal === 'number' ? task.pricing.subtotal : Number(task.pricing.subtotal) || 0
-                        )}
+                        {formatCurrency(displaySubtotal)}
                       </span>
                     </div>
 
                     {/* Discount (if applicable) */}
-                    {task.pricing.discountType && task.pricing.discountType !== 'NONE' && task.pricing.discountValue && (
+                    {discountAmount > 0 && (
                       <div className="flex items-center justify-between text-sm text-destructive">
                         <span>
                           Desconto
-                          {task.pricing.discountType === 'PERCENTAGE'
-                            ? ` (${task.pricing.discountValue}%)`
-                            : ' (Valor Fixo)'}
-                          {task.pricing.discountReference && (
-                            <span className="text-muted-foreground font-normal"> — Ref: {task.pricing.discountReference}</span>
+                          {discountType === 'PERCENTAGE' && discountValue
+                            ? ` (${discountValue}%)`
+                            : discountType === 'FIXED_VALUE'
+                              ? ' (Valor Fixo)'
+                              : ''}
+                          {discountReference && (
+                            <span className="text-muted-foreground font-normal"> — Ref: {discountReference}</span>
                           )}
                         </span>
                         <span className="font-medium">
-                          - {formatCurrency(
-                            task.pricing.discountType === 'PERCENTAGE'
-                              ? (task.pricing.subtotal * task.pricing.discountValue) / 100
-                              : task.pricing.discountValue
-                          )}
+                          - {formatCurrency(discountAmount)}
                         </span>
                       </div>
                     )}
@@ -2083,12 +2513,194 @@ export const TaskDetailsPage = () => {
                     <div className="flex items-center justify-between pt-3 border-t border-border dark:border-border/30">
                       <span className="text-base font-bold text-foreground">TOTAL</span>
                       <span className="text-xl font-bold text-primary">
-                        {formatCurrency(
-                          typeof task.pricing.total === 'number' ? task.pricing.total : Number(task.pricing.total) || 0
-                        )}
+                        {formatCurrency(displayTotal)}
                       </span>
                     </div>
                   </div>
+                    );
+                  })()}
+
+                  {/* Per-Customer Config Cards */}
+                  {task.pricing?.customerConfigs && task.pricing.customerConfigs.length > 0 && (() => {
+                    const configs = pricingCustomerFilter
+                      ? task.pricing!.customerConfigs!.filter((c) => c.customerId === pricingCustomerFilter)
+                      : task.pricing!.customerConfigs!.length >= 2
+                        ? task.pricing!.customerConfigs!
+                        : [];
+
+                    if (configs.length === 0) return null;
+
+                    const isMultiColumnLayout = !pricingCustomerFilter && configs.length >= 2;
+
+                    return (
+                      <div className={cn("gap-3", isMultiColumnLayout ? "grid grid-cols-1 md:grid-cols-2" : "space-y-3")}>
+                        {configs.map((config) => {
+                          const configSubtotal = typeof config.subtotal === 'number' ? config.subtotal : Number(config.subtotal) || 0;
+                          const configDiscountAmount = config.discountType === 'PERCENTAGE'
+                            ? (configSubtotal * (config.discountValue || 0)) / 100
+                            : (config.discountValue || 0);
+                          const configTotal = typeof config.total === 'number' ? config.total : Number(config.total) || 0;
+                          const configPaymentText = generatePaymentText({
+                            customPaymentText: config.customPaymentText,
+                            paymentCondition: config.paymentCondition,
+                            downPaymentDate: config.downPaymentDate,
+                            total: configTotal,
+                          });
+
+                          return (
+                            <div key={config.id} className="bg-muted/30 rounded-lg p-4 space-y-2">
+                              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                <IconBuilding className="h-4 w-4 text-muted-foreground" />
+                                {canAccessCustomerPages && config.customerId ? (
+                                  <span
+                                    className="cursor-pointer hover:text-primary hover:underline transition-colors"
+                                    onClick={() => navigate(routes.administration.customers.details(config.customerId))}
+                                  >
+                                    {config.customer?.corporateName || config.customer?.fantasyName || 'Cliente'}
+                                  </span>
+                                ) : (
+                                  config.customer?.corporateName || config.customer?.fantasyName || 'Cliente'
+                                )}
+                              </div>
+
+                              {config.responsible?.name && (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <IconUser className="h-4 w-4" />
+                                  <span>Responsável: <span className="font-medium text-foreground">{config.responsible.name}</span></span>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Subtotal</span>
+                                <span className="font-medium">{formatCurrency(configSubtotal)}</span>
+                              </div>
+
+                              {config.discountType && config.discountType !== 'NONE' && config.discountValue ? (
+                                <div className="flex items-center justify-between text-sm text-destructive">
+                                  <span>
+                                    Desconto
+                                    {config.discountType === 'PERCENTAGE'
+                                      ? ` (${config.discountValue}%)`
+                                      : ' (Valor Fixo)'}
+                                    {config.discountReference && (
+                                      <span className="text-muted-foreground font-normal"> — Ref: {config.discountReference}</span>
+                                    )}
+                                  </span>
+                                  <span className="font-medium">- {formatCurrency(configDiscountAmount)}</span>
+                                </div>
+                              ) : null}
+
+                              <div className="flex items-center justify-between pt-2 border-t border-border dark:border-border/30">
+                                <span className="text-sm font-bold text-foreground">Total</span>
+                                <span className="text-base font-bold text-primary">{formatCurrency(configTotal)}</span>
+                              </div>
+
+                              {configPaymentText && (
+                                <div className="pt-2">
+                                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1">
+                                    <IconCreditCard className="h-4 w-4 text-muted-foreground" />
+                                    Condições de Pagamento
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">{configPaymentText}</p>
+                                </div>
+                              )}
+
+                              {/* Boletos (from invoice data or fallback to simple parcelas) */}
+                              {(() => {
+                                const configInvoice = invoices.find((inv) => inv.customerConfigId === config.id);
+                                if (configInvoice) {
+                                  const invoiceInstallments = configInvoice.installments
+                                    ? [...configInvoice.installments].sort((a, b) => a.number - b.number)
+                                    : [];
+                                  return (
+                                    <div className="pt-2 space-y-2">
+                                      {/* Boletos */}
+                                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                        <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
+                                        Boletos
+                                      </div>
+                                      <div className="divide-y divide-border/50 rounded-md border border-border/50 overflow-hidden">
+                                        {invoiceInstallments.map((installment) => (
+                                          <div key={installment.id} className="px-3 py-2 hover:bg-muted/40 transition-colors">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+                                                <span className="text-xs font-medium text-muted-foreground w-6">
+                                                  #{installment.number}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                  {formatDate(installment.dueDate)}
+                                                </span>
+                                                <span className="text-xs font-medium">
+                                                  {formatCurrency(installment.amount)}
+                                                </span>
+                                                <InstallmentStatusBadge status={installment.status} size="sm" />
+                                                {installment.bankSlip && (
+                                                  <BankSlipStatusBadge status={installment.bankSlip.status} size="sm" />
+                                                )}
+                                              </div>
+                                              <BoletoActions
+                                                installmentId={installment.id}
+                                                bankSlip={installment.bankSlip}
+                                              />
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+
+                                      {/* NFS-e */}
+                                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground pt-1">
+                                        <IconFileInvoice className="h-3.5 w-3.5 text-muted-foreground" />
+                                        NFS-e
+                                      </div>
+                                      <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+                                        <div className="flex items-center gap-3">
+                                          {configInvoice.nfseDocument ? (
+                                            <>
+                                              <NfseStatusBadge status={configInvoice.nfseDocument.status} size="sm" />
+                                              {configInvoice.nfseDocument.nfseNumber && (
+                                                <span className="text-xs text-muted-foreground">
+                                                  #{configInvoice.nfseDocument.nfseNumber}
+                                                </span>
+                                              )}
+                                              <span className="text-xs text-muted-foreground">
+                                                {formatCurrency(configInvoice.nfseDocument.totalAmount)}
+                                              </span>
+                                            </>
+                                          ) : (
+                                            <span className="text-xs text-muted-foreground">Nao emitida</span>
+                                          )}
+                                        </div>
+                                        <NfseActions invoiceId={configInvoice.id} nfseDocument={configInvoice.nfseDocument} />
+                                      </div>
+                                    </div>
+                                  );
+                                }
+
+                                // Fallback: simple parcelas when no invoice data
+                                if (config.installments && config.installments.length > 0) {
+                                  return (
+                                    <div className="pt-2">
+                                      <div className="text-sm font-semibold text-foreground mb-1">Parcelas</div>
+                                      <div className="space-y-1">
+                                        {config.installments.map((inst) => (
+                                          <div key={inst.id} className="flex items-center justify-between text-sm text-muted-foreground">
+                                            <span>{inst.number}ª — {formatDate(inst.dueDate)}</span>
+                                            <span className="font-medium text-foreground">{formatCurrency(inst.amount)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                }
+
+                                return null;
+                              })()}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
 
                   {/* Delivery Deadline */}
                   {(task.pricing.customForecastDays || (task.pricing.simultaneousTasks && task.pricing.simultaneousTasks > 1)) && (
@@ -2110,7 +2722,41 @@ export const TaskDetailsPage = () => {
 
                   {/* Payment Conditions */}
                   {(() => {
-                    const paymentText = generatePaymentText(task.pricing);
+                    const configs = task.pricing?.customerConfigs || [];
+                    // When filtering a specific customer, use that config's payment data
+                    if (pricingCustomerFilter) {
+                      const selectedConfig = configs.find((c) => c.customerId === pricingCustomerFilter);
+                      if (selectedConfig) return null; // Already shown in per-customer card above
+                    }
+                    // When "Completo" with 2+ configs, skip global (shown in per-customer cards)
+                    if (!pricingCustomerFilter && configs.length >= 2) return null;
+                    // When 1 config, use that config's data
+                    if (configs.length === 1) {
+                      const config = configs[0];
+                      const configTotal = typeof config.total === 'number' ? config.total : Number(config.total) || 0;
+                      const paymentText = generatePaymentText({
+                        customPaymentText: config.customPaymentText,
+                        paymentCondition: config.paymentCondition,
+                        downPaymentDate: config.downPaymentDate,
+                        total: configTotal,
+                      });
+                      return paymentText ? (
+                        <div className="bg-muted/30 rounded-lg p-4">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
+                            <IconCreditCard className="h-4 w-4 text-muted-foreground" />
+                            Condições de Pagamento
+                          </div>
+                          <p className="text-sm text-muted-foreground">{paymentText}</p>
+                        </div>
+                      ) : null;
+                    }
+                    // Fallback to global pricing (paymentCondition/downPaymentDate now live on config level)
+                    const paymentText = generatePaymentText({
+                      customPaymentText: null,
+                      paymentCondition: null,
+                      downPaymentDate: null,
+                      total: typeof task.pricing.total === 'number' ? task.pricing.total : Number(task.pricing.total) || 0,
+                    });
                     return paymentText ? (
                       <div className="bg-muted/30 rounded-lg p-4">
                         <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
@@ -2120,6 +2766,103 @@ export const TaskDetailsPage = () => {
                         <p className="text-sm text-muted-foreground">{paymentText}</p>
                       </div>
                     ) : null;
+                  })()}
+
+                  {/* Boletos & NFS-e for single-customer case (not shown in per-customer cards) */}
+                  {(() => {
+                    const configs = task.pricing?.customerConfigs || [];
+                    // Only show here when there's a single config and no customer filter (per-customer cards don't render)
+                    if (pricingCustomerFilter || configs.length !== 1) return null;
+                    const config = configs[0];
+                    const configInvoice = invoices.find((inv) => inv.customerConfigId === config.id);
+                    if (!configInvoice) {
+                      // Fallback: simple parcelas
+                      if (!config.installments || config.installments.length === 0) return null;
+                      return (
+                        <div className="bg-muted/30 rounded-lg p-4">
+                          <div className="text-sm font-semibold text-foreground mb-2">Parcelas</div>
+                          <div className="space-y-1">
+                            {config.installments.map((inst) => (
+                              <div key={inst.id} className="flex items-center justify-between text-sm text-muted-foreground">
+                                <span>{inst.number}ª — {formatDate(inst.dueDate)}</span>
+                                <span className="font-medium text-foreground">{formatCurrency(inst.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    const invoiceInstallments = configInvoice.installments
+                      ? [...configInvoice.installments].sort((a, b) => a.number - b.number)
+                      : [];
+
+                    return (
+                      <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                        {/* Boletos */}
+                        {invoiceInstallments.length > 0 && (
+                          <>
+                            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                              <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
+                              Boletos
+                            </div>
+                            <div className="divide-y divide-border/50 rounded-md border border-border/50 overflow-hidden">
+                              {invoiceInstallments.map((installment) => (
+                                <div key={installment.id} className="px-3 py-2 hover:bg-muted/40 transition-colors">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+                                      <span className="text-xs font-medium text-muted-foreground w-6">
+                                        #{installment.number}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {formatDate(installment.dueDate)}
+                                      </span>
+                                      <span className="text-xs font-medium">
+                                        {formatCurrency(installment.amount)}
+                                      </span>
+                                      <InstallmentStatusBadge status={installment.status} size="sm" />
+                                      {installment.bankSlip && (
+                                        <BankSlipStatusBadge status={installment.bankSlip.status} size="sm" />
+                                      )}
+                                    </div>
+                                    <BoletoActions
+                                      installmentId={installment.id}
+                                      bankSlip={installment.bankSlip}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        {/* NFS-e */}
+                        <div className="flex items-center gap-2 text-sm font-semibold text-foreground pt-1">
+                          <IconFileInvoice className="h-3.5 w-3.5 text-muted-foreground" />
+                          NFS-e
+                        </div>
+                        <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
+                          <div className="flex items-center gap-3">
+                            {configInvoice.nfseDocument ? (
+                              <>
+                                <NfseStatusBadge status={configInvoice.nfseDocument.status} size="sm" />
+                                {configInvoice.nfseDocument.nfseNumber && (
+                                  <span className="text-xs text-muted-foreground">
+                                    #{configInvoice.nfseDocument.nfseNumber}
+                                  </span>
+                                )}
+                                <span className="text-xs text-muted-foreground">
+                                  {formatCurrency(configInvoice.nfseDocument.totalAmount)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Nao emitida</span>
+                            )}
+                          </div>
+                          <NfseActions invoiceId={configInvoice.id} nfseDocument={configInvoice.nfseDocument} />
+                        </div>
+                      </div>
+                    );
                   })()}
 
                   {/* Guarantee */}
@@ -2158,8 +2901,14 @@ export const TaskDetailsPage = () => {
                     </div>
                   )}
 
-                  {/* Customer Signature */}
-                  {task.pricing.customerSignature && (
+                  {/* Customer Signature - read from the first config (or filtered config) */}
+                  {(() => {
+                    const sigConfig = pricingCustomerFilter
+                      ? task.pricing.customerConfigs?.find((c: any) => c.customerId === pricingCustomerFilter)
+                      : task.pricing.customerConfigs?.[0];
+                    const configSig = sigConfig?.customerSignature;
+                    if (!configSig) return null;
+                    return (
                     <div className="bg-muted/30 rounded-lg p-4">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
                         <IconWriting className="h-4 w-4 text-muted-foreground" />
@@ -2167,18 +2916,19 @@ export const TaskDetailsPage = () => {
                       </div>
                       <div className="flex justify-center">
                         <img
-                          src={`${getApiBaseUrl()}/files/serve/${task.pricing.customerSignature.id}`}
+                          src={`${getApiBaseUrl()}/files/serve/${configSig.id}`}
                           alt="Assinatura do cliente"
                           className="max-h-24 object-contain cursor-pointer hover:opacity-90 transition-opacity"
                           onClick={() => {
-                            if (fileViewerContext && task.pricing?.customerSignature) {
-                              fileViewerContext.actions.viewFile(task.pricing.customerSignature);
+                            if (fileViewerContext && configSig) {
+                              fileViewerContext.actions.viewFile(configSig);
                             }
                           }}
                         />
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </CardContent>
                 </Card>
@@ -2198,7 +2948,7 @@ export const TaskDetailsPage = () => {
                 }, {} as Record<SERVICE_ORDER_TYPE, typeof filteredServiceOrders>);
 
                 return (
-                  <Card className="border flex flex-col animate-in fade-in-50 duration-900">
+                  <Card className={cn("border flex flex-col animate-in fade-in-50 duration-900", fullSpanSections.has("serviceOrders") && "lg:col-span-2")}>
                     <CardHeader className="pb-6">
                       <CardTitle className="flex items-center gap-2">
                         <IconClipboardList className="h-5 w-5 text-muted-foreground" />
@@ -2401,7 +3151,7 @@ export const TaskDetailsPage = () => {
 
               {/* Truck Layout Card - Only show if truck has at least one layout */}
               {sectionVisibility.isSectionVisible("layout") && task.truck && (task.truck.leftSideLayout || task.truck.rightSideLayout || task.truck.backSideLayout) && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-850">
+                <Card className={cn("border flex flex-col animate-in fade-in-50 duration-850", fullSpanSections.has("layout") && "lg:col-span-2")}>
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
                       <IconLayoutGrid className="h-5 w-5 text-muted-foreground" />
@@ -2416,7 +3166,7 @@ export const TaskDetailsPage = () => {
 
               {/* Artworks Card - Visible to ALL users, content filtered by approval status */}
               {sectionVisibility.isSectionVisible("artworks") && filteredArtworks.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1">
+                <Card className={cn("border flex flex-col animate-in fade-in-50 duration-1000", fullSpanSections.has("artworks") ? "lg:col-span-2" : "lg:col-span-1")}>
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2505,7 +3255,7 @@ export const TaskDetailsPage = () => {
 
               {/* Cuts Card - Hidden for Financial sector users */}
               {sectionVisibility.isSectionVisible("cuts") && !isFinancialSector && cuts.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-950 lg:col-span-1">
+                <Card className={cn("border flex flex-col animate-in fade-in-50 duration-950", fullSpanSections.has("cuts") ? "lg:col-span-2" : "lg:col-span-1")}>
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2589,7 +3339,7 @@ export const TaskDetailsPage = () => {
                 if (totalFiles === 0) return null;
 
                 return (
-                  <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1">
+                  <Card className={cn("border flex flex-col animate-in fade-in-50 duration-1000", fullSpanSections.has("files") ? "lg:col-span-2" : "lg:col-span-1")}>
                     <CardHeader className="pb-6">
                       <div className="flex items-center justify-between">
                         <CardTitle className="flex items-center gap-2">
@@ -2718,132 +3468,9 @@ export const TaskDetailsPage = () => {
                 );
               })()}
 
-              {/* Documents Card - Budget, NFE, Receipt - Only visible to ADMIN, FINANCIAL, and COMMERCIAL sectors */}
-              {sectionVisibility.isSectionVisible("documents") && canViewDocumentsSection && ((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0) || (task.bankSlips && task.bankSlips.length > 0)) && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1050">
-                  <CardHeader className="pb-6">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconFileText className="h-5 w-5 text-muted-foreground" />
-                        Documentos
-                        <Badge variant="secondary" className="ml-2">
-                          {[...(task.budgets || []), ...(task.invoices || []), ...(task.receipts || []), ...(task.bankSlips || [])].length}
-                        </Badge>
-                      </CardTitle>
-                      <div className="flex gap-1">
-                        <Button
-                          variant={documentsViewMode === "list" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setDocumentsViewMode("list")}
-                          className="h-7 w-7 p-0"
-                        >
-                          <IconList className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant={documentsViewMode === "grid" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setDocumentsViewMode("grid")}
-                          className="h-7 w-7 p-0"
-                        >
-                          <IconLayoutGrid className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-              <CardContent className="pt-0 flex-1">
-                <div className="space-y-6">
-                  {task.budgets && task.budgets.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="text-sm font-semibold">Orçamentos</h4>
-                  </div>
-                  <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                    {task.budgets.map((budget: any) => (
-                  <FileItem
-                    key={budget.id}
-                    file={budget}
-                    viewMode={documentsViewMode}
-                    onPreview={handleDocumentFileClick}
-                    onDownload={handleDownload}
-                    showActions
-                  />
-                    ))}
-                  </div>
-                </div>
-                  )}
-
-                  {task.invoices && task.invoices.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <IconFileText className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="text-sm font-semibold">Notas Fiscais</h4>
-                  </div>
-                  <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                    {task.invoices.map((nfe: any) => (
-                  <FileItem
-                    key={nfe.id}
-                    file={nfe}
-                    viewMode={documentsViewMode}
-                    onPreview={handleDocumentFileClick}
-                    onDownload={handleDownload}
-                    showActions
-                  />
-                    ))}
-                  </div>
-                </div>
-                  )}
-
-                  {task.receipts && task.receipts.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <IconFile className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="text-sm font-semibold">Recibos</h4>
-                  </div>
-                  <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                    {task.receipts.map((receipt: any) => (
-                  <FileItem
-                    key={receipt.id}
-                    file={receipt}
-                    viewMode={documentsViewMode}
-                    onPreview={handleDocumentFileClick}
-                    onDownload={handleDownload}
-                    showActions
-                  />
-                    ))}
-                  </div>
-                </div>
-                  )}
-
-                  {task.bankSlips && task.bankSlips.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <IconBarcode className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="text-sm font-semibold">Boletos</h4>
-                  </div>
-                  <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                    {task.bankSlips.map((bankSlip: any) => (
-                  <FileItem
-                    key={bankSlip.id}
-                    file={bankSlip}
-                    viewMode={documentsViewMode}
-                    onPreview={handleDocumentFileClick}
-                    onDownload={handleDownload}
-                    showActions
-                  />
-                    ))}
-                  </div>
-                </div>
-                  )}
-                </div>
-              </CardContent>
-                </Card>
-              )}
-
-
               {/* Paints Card - Show only if task has general painting or logo paints */}
               {sectionVisibility.isSectionVisible("paints") && (task.generalPainting || (task.logoPaints && task.logoPaints.length > 0)) && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1150">
+                <Card className={cn("border flex flex-col animate-in fade-in-50 duration-1150", fullSpanSections.has("paints") && "lg:col-span-2")}>
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
           <IconPaint className="h-5 w-5 text-muted-foreground" />
@@ -3065,7 +3692,7 @@ export const TaskDetailsPage = () => {
 
               {/* Observation Card */}
               {sectionVisibility.isSectionVisible("observation") && task.observation && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1200">
+                <Card className={cn("border flex flex-col animate-in fade-in-50 duration-1200", fullSpanSections.has("observation") && "lg:col-span-2")}>
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
                       <div className="p-2 rounded-lg bg-yellow-500/10">
@@ -3119,7 +3746,7 @@ export const TaskDetailsPage = () => {
 
               {/* Airbrushings Card - Only show if task has airbrushings */}
               {sectionVisibility.isSectionVisible("airbrushings") && airbrushings.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1250 lg:col-span-1">
+                <Card className={cn("border flex flex-col animate-in fade-in-50 duration-1250", fullSpanSections.has("airbrushings") ? "lg:col-span-2" : "lg:col-span-1")}>
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
                       <IconSpray className="h-5 w-5 text-muted-foreground" />
@@ -3281,6 +3908,149 @@ export const TaskDetailsPage = () => {
               </CardContent>
                 </Card>
               )}
+
+              {/* Dossiê Card - Proof of services organized by service order with check-in/check-out files */}
+              {sectionVisibility.isSectionVisible("dossie") && canViewCheckinFiles && hasDossieContent && (() => {
+                const serviceOrdersWithFiles = (task.serviceOrders || [])
+                  .filter((so: any) => so.checkinFiles?.length > 0 || so.checkoutFiles?.length > 0)
+                  .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+
+                if (serviceOrdersWithFiles.length === 0) return null;
+
+                const totalDossieFiles = serviceOrdersWithFiles.reduce(
+                  (sum: number, so: any) => sum + (so.checkinFiles?.length || 0) + (so.checkoutFiles?.length || 0), 0
+                );
+
+                return (
+                  <Card className={cn("border flex flex-col animate-in fade-in-50 duration-1200", fullSpanSections.has("dossie") ? "lg:col-span-2" : "lg:col-span-1")}>
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                          <IconFolderCheck className="h-5 w-5 text-muted-foreground" />
+                          Dossiê
+                          <Badge variant="secondary" className="ml-2">
+                            {totalDossieFiles} {totalDossieFiles === 1 ? 'arquivo' : 'arquivos'}
+                          </Badge>
+                        </CardTitle>
+                        <div className="flex gap-1">
+                          <Button
+                            variant={filesViewMode === "list" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setFilesViewMode("list")}
+                            className="h-7 w-7 p-0"
+                          >
+                            <IconList className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant={filesViewMode === "grid" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setFilesViewMode("grid")}
+                            className="h-7 w-7 p-0"
+                          >
+                            <IconLayoutGrid className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Registro fotográfico dos serviços por ordem de serviço
+                      </p>
+                    </CardHeader>
+                    <CardContent className="pt-0 flex-1">
+                      <div className="space-y-6">
+                        {serviceOrdersWithFiles.map((serviceOrder: any) => {
+                          const isOutrosWithObservation = serviceOrder.description === 'Outros' && !!serviceOrder.observation;
+                          const displayDescription = isOutrosWithObservation ? serviceOrder.observation : serviceOrder.description;
+                          const checkinFiles = serviceOrder.checkinFiles || [];
+                          const checkoutFiles = serviceOrder.checkoutFiles || [];
+                          const statusVariant = getBadgeVariantFromStatus(serviceOrder.status ?? '', "SERVICE_ORDER");
+
+                          return (
+                            <div key={serviceOrder.id} className="border rounded-lg overflow-hidden">
+                              {/* Service Order Header */}
+                              <div className="bg-muted/50 px-4 py-3 flex items-center justify-between gap-3 border-b">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <h4 className="text-sm font-semibold truncate">{displayDescription}</h4>
+                                  {!isOutrosWithObservation && serviceOrder.observation && (
+                                    <HoverCard openDelay={100} closeDelay={100}>
+                                      <HoverCardTrigger asChild>
+                                        <button className="relative flex items-center justify-center h-5 w-5 rounded border border-input bg-background hover:bg-accent transition-colors flex-shrink-0">
+                                          <IconNote className="h-3 w-3" />
+                                        </button>
+                                      </HoverCardTrigger>
+                                      <HoverCardContent className="w-64 p-3" side="top">
+                                        <p className="text-sm text-muted-foreground">{serviceOrder.observation}</p>
+                                      </HoverCardContent>
+                                    </HoverCard>
+                                  )}
+                                  <Badge variant="outline" className="text-[10px] flex-shrink-0">
+                                    {SERVICE_ORDER_TYPE_LABELS[serviceOrder.type as SERVICE_ORDER_TYPE]}
+                                  </Badge>
+                                </div>
+                                <Badge variant={statusVariant} className="text-xs flex-shrink-0">
+                                  {SERVICE_ORDER_STATUS_LABELS[serviceOrder.status as SERVICE_ORDER_STATUS]}
+                                </Badge>
+                              </div>
+
+                              {/* Check-in / Check-out Content */}
+                              <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Check-in Section */}
+                                <div>
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <IconCameraCheck className="h-4 w-4 text-blue-500" />
+                                    <h5 className="text-sm font-medium">Check-in</h5>
+                                    <Badge variant="outline" className="text-[10px]">{checkinFiles.length}</Badge>
+                                  </div>
+                                  {checkinFiles.length > 0 ? (
+                                    <div className={cn(filesViewMode === "grid" ? "flex flex-wrap gap-2" : "grid grid-cols-1 gap-1.5")}>
+                                      {checkinFiles.map((file: any) => (
+                                        <FileItem
+                                          key={file.id}
+                                          file={file}
+                                          viewMode={filesViewMode}
+                                          onPreview={(f) => handleDossieFileClick(serviceOrder, f)}
+                                          onDownload={handleDownload}
+                                          showActions
+                                        />
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground italic">Nenhum arquivo de check-in</p>
+                                  )}
+                                </div>
+
+                                {/* Check-out Section */}
+                                <div>
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <IconCameraBolt className="h-4 w-4 text-green-500" />
+                                    <h5 className="text-sm font-medium">Check-out</h5>
+                                    <Badge variant="outline" className="text-[10px]">{checkoutFiles.length}</Badge>
+                                  </div>
+                                  {checkoutFiles.length > 0 ? (
+                                    <div className={cn(filesViewMode === "grid" ? "flex flex-wrap gap-2" : "grid grid-cols-1 gap-1.5")}>
+                                      {checkoutFiles.map((file: any) => (
+                                        <FileItem
+                                          key={file.id}
+                                          file={file}
+                                          viewMode={filesViewMode}
+                                          onPreview={(f) => handleDossieFileClick(serviceOrder, f)}
+                                          onDownload={handleDownload}
+                                          showActions
+                                        />
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground italic">Nenhum arquivo de check-out</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
             </div>
 
             {/* Changelog History - Hidden for Warehouse and Production (except team leaders) */}

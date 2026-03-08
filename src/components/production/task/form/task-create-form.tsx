@@ -11,7 +11,6 @@ import {
   IconTruck,
   IconBox,
   IconPalette,
-  IconFile,
   IconFileText,
   IconPhoto,
   IconRuler,
@@ -63,10 +62,10 @@ import { getUniqueDescriptions } from "../../../../api-client/serviceOrder";
 import { uploadSingleFile } from "../../../../api-client/file";
 import {
   normalizeDescription,
-  getPricingItemsToAddFromServiceOrders,
-  getServiceOrdersToAddFromPricingItems,
+  getPricingServicesToAddFromServiceOrders,
+  getServiceOrdersToAddFromPricingServices,
   type SyncServiceOrder,
-  type SyncPricingItem,
+  type SyncPricingService,
 } from "../../../../utils/task-pricing-service-order-sync";
 
 // Extended form schema for the UI (superset of fields for the accordion form)
@@ -145,19 +144,17 @@ export const TaskCreateForm = () => {
           date.setHours(23, 59, 59, 999);
           return date;
         })(),
-        status: 'DRAFT',
+        status: 'PENDING',
         subtotal: 0,
         discountType: 'NONE',
         discountValue: null,
         total: 0,
-        paymentCondition: null,
-        downPaymentDate: null,
         customPaymentText: null,
         guaranteeYears: null,
         customGuaranteeText: null,
         customForecastDays: null,
         layoutFileId: null,
-        items: [{ description: "", amount: null, observation: null, shouldSync: true }],
+        services: [{ description: "", amount: null, observation: null, shouldSync: true }],
       },
     },
   });
@@ -321,7 +318,7 @@ export const TaskCreateForm = () => {
 
   // Reorder synced pricing items to match PRODUCTION service order reorder
   const handleProductionReorder = useCallback((descriptions: string[]) => {
-    const currentPricingItems = ((form.getValues('pricing') as any)?.items as any[]) || [];
+    const currentPricingItems = ((form.getValues('pricing') as any)?.services as any[]) || [];
     if (currentPricingItems.length === 0) return;
 
     // Build a map: normalized description → target order index
@@ -358,7 +355,7 @@ export const TaskCreateForm = () => {
     if (pricingSelectorRef.current) {
       pricingSelectorRef.current.replaceItems(newItems);
     } else {
-      form.setValue('pricing.items', newItems, { shouldDirty: true });
+      form.setValue('pricing.services', newItems, { shouldDirty: true });
     }
   }, [form]);
 
@@ -381,7 +378,7 @@ export const TaskCreateForm = () => {
   useEffect(() => {
     if (!isFormInitializedRef.current) {
       const currentServiceOrders = (servicesValues as any[]) || [];
-      const currentPricingItems = ((pricingValues as any)?.items as any[]) || [];
+      const currentPricingItems = ((pricingValues as any)?.services as any[]) || [];
 
       const validServiceOrders = currentServiceOrders.filter(
         (so: any) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.description?.trim().length >= 3
@@ -430,7 +427,7 @@ export const TaskCreateForm = () => {
       if (isSubmittingRef.current) return;
 
       const currentServiceOrders = (servicesValues as any[]) || [];
-      const currentPricingItems = ((pricingValues as any)?.items as any[]) || [];
+      const currentPricingItems = ((pricingValues as any)?.services as any[]) || [];
 
       const validServiceOrders = currentServiceOrders.filter(
         (so: any) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.description?.trim().length >= 3
@@ -458,7 +455,7 @@ export const TaskCreateForm = () => {
           shouldSync: so.shouldSync !== false,
         }));
 
-        const syncPricingItems: SyncPricingItem[] = validPricingItems.map((item: any) => ({
+        const syncPricingServices: SyncPricingService[] = validPricingItems.map((item: any) => ({
           id: item.id,
           description: item.description || '',
           observation: item.observation || null,
@@ -486,7 +483,7 @@ export const TaskCreateForm = () => {
         }
 
         const currentPIObsMap = new Map<string, string | null>();
-        for (const item of syncPricingItems) {
+        for (const item of syncPricingServices) {
           const normalizedDesc = normalizeDescription(item.description);
           if (normalizedDesc) {
             currentPIObsMap.set(normalizedDesc, item.observation || null);
@@ -548,7 +545,7 @@ export const TaskCreateForm = () => {
 
         // SYNC 1: Service Orders → Pricing Items
         const pricingItemsToAddRaw = serviceOrdersAdded
-          ? getPricingItemsToAddFromServiceOrders(syncServiceOrders, syncPricingItems)
+          ? getPricingServicesToAddFromServiceOrders(syncServiceOrders, syncPricingServices)
           : [];
 
         const pricingItemsToAdd = pricingItemsToAddRaw.filter((item: any) => {
@@ -566,7 +563,7 @@ export const TaskCreateForm = () => {
           if (pricingSelectorRef.current) {
             pricingSelectorRef.current.replaceItems(finalPricingItems);
           } else {
-            form.setValue('pricing.items', finalPricingItems, {
+            form.setValue('pricing.services', finalPricingItems, {
               shouldDirty: true,
               shouldTouch: true,
             });
@@ -575,7 +572,7 @@ export const TaskCreateForm = () => {
 
         // SYNC 2: Pricing Items → Service Orders
         const serviceOrdersToAddRaw = pricingItemsAdded
-          ? getServiceOrdersToAddFromPricingItems(syncPricingItems, syncServiceOrders, historicalDescriptionsRef.current)
+          ? getServiceOrdersToAddFromPricingServices(syncPricingServices, syncServiceOrders, historicalDescriptionsRef.current)
           : [];
 
         const serviceOrdersToAdd = serviceOrdersToAddRaw.filter((so: any) => {
@@ -720,7 +717,7 @@ export const TaskCreateForm = () => {
 
         // Get pricing from form
         const pricingRaw = data.pricing;
-        const hasPricingItems = pricingRaw?.items?.some((item: any) => item.description && item.description.trim().length > 0);
+        const hasPricingItems = pricingRaw?.services?.some((item: any) => item.description && item.description.trim().length > 0);
 
         // Build responsible data
         const existingRepIds = responsibleRows
@@ -781,7 +778,7 @@ export const TaskCreateForm = () => {
             })) : undefined,
             pricing: hasPricingItems ? {
               ...pricingRaw,
-              items: pricingRaw.items.filter((item: any) => item.description && item.description.trim().length > 0),
+              services: pricingRaw.services.filter((item: any) => item.description && item.description.trim().length > 0),
             } : undefined,
             ...additionalData,
           } as TaskCreateFormData;

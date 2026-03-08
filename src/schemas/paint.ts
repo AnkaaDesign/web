@@ -1306,7 +1306,7 @@ export const paintCreateSchema = z.object({
     errorMap: () => ({ message: "acabamento inválido" }),
   }),
   paintTypeId: z.string().uuid("Tipo de tinta inválido"),
-  paintBrandId: z.string().uuid("Marca de tinta inválida").nullable().optional(),
+  paintBrandId: z.string().uuid("Marca de tinta é obrigatória"),
   manufacturer: z
     .enum(Object.values(TRUCK_MANUFACTURER) as [string, ...string[]], {
       errorMap: () => ({ message: "MONTADORA inválida" }),
@@ -2428,7 +2428,7 @@ export const mapPaintToFormData = createMapToFormDataHelper<Paint, PaintUpdateFo
   tags: paint.tags,
   paintTypeId: paint.paintTypeId,
   groundIds: paint.paintGrounds?.map((pg) => pg.groundPaintId) || [],
-  previewConfig: paint.previewConfig || null,
+  previewConfig: (paint.previewConfig || null) as PaintUpdateFormData["previewConfig"],
 }));
 
 export const mapPaintFormulaToFormData = createMapToFormDataHelper<PaintFormula, PaintFormulaUpdateFormData>((formula) => ({

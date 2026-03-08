@@ -53,11 +53,6 @@ export interface PpeDelivery extends BaseEntity {
   quantity: number;
   reason: string | null;
 
-  // ClickSign integration fields
-  clicksignEnvelopeId?: string | null;
-  clicksignDocumentKey?: string | null;
-  clicksignSignerKey?: string | null;
-  clicksignSignedAt?: Date | null;
   deliveryDocumentId?: string | null;
 
   // Relations (optional, populated based on query)
@@ -73,6 +68,51 @@ export interface PpeDelivery extends BaseEntity {
     path: string;
     size: number;
   };
+  signature?: PpeDeliverySignature | null;
+}
+
+// =====================
+// In-App Signature Types
+// =====================
+
+export type BiometricMethod = 'FINGERPRINT' | 'FACE_ID' | 'IRIS' | 'DEVICE_PIN' | 'NONE';
+export type NetworkType = 'WIFI' | 'CELLULAR' | 'ETHERNET' | 'UNKNOWN';
+
+export interface PpeDeliverySignature extends BaseEntity {
+  deliveryId: string;
+  signedByUserId: string;
+  signedByCpf: string;
+  biometricMethod: BiometricMethod;
+  biometricSuccess: boolean;
+  deviceBrand: string | null;
+  deviceModel: string | null;
+  deviceOs: string | null;
+  deviceOsVersion: string | null;
+  appVersion: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  locationAccuracy: number | null;
+  networkType: NetworkType;
+  ipAddress: string | null;
+  clientTimestamp: Date;
+  serverTimestamp: Date;
+  evidenceHash: string;
+  hmacSignature: string;
+  signedDocumentId: string | null;
+  evidenceJson: Record<string, any>;
+  legalBasis: string;
+  consentGiven: boolean;
+
+  // Relations
+  signedByUser?: User;
+  signedDocument?: {
+    id: string;
+    filename: string;
+    originalName: string;
+    mimetype: string;
+    path: string;
+    size: number;
+  } | null;
 }
 
 // PPE configuration is now stored directly on the Item model
@@ -198,6 +238,15 @@ export interface PpeDeliveryIncludes {
     | {
         include?: ItemIncludes;
       };
+  signature?:
+    | boolean
+    | {
+        include?: {
+          signedByUser?: boolean;
+          signedDocument?: boolean;
+        };
+      };
+  deliveryDocument?: boolean;
 }
 
 // PPE configuration includes are not needed as PPE config is stored directly on Item

@@ -10,7 +10,7 @@ export interface UserBatchEditFormData {
       cpf?: string | null;
       positionId?: string | null;
       sectorId?: string | null;
-      managedSectorId?: string | null;
+      ledSectorId?: string | null;
       status?: USER_STATUS;
     };
   }>;

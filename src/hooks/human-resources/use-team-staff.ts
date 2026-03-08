@@ -34,7 +34,7 @@ import { teamStaffKeys } from "../common/query-keys";
 /**
  * Hook to fetch users in the authenticated team leader's sector.
  * This hook uses the secure team-staff endpoint which automatically filters
- * based on the user's managedSectorId.
+ * based on the user's ledSectorId.
  *
  * @param filters - Query parameters (includes, orderBy, etc.)
  * @param options - React Query options
@@ -64,7 +64,7 @@ export function useTeamStaffUsers(
 /**
  * Hook to fetch borrows for users in the authenticated team leader's sector.
  * This hook uses the secure team-staff endpoint which automatically filters
- * based on the user's managedSectorId.
+ * based on the user's ledSectorId.
  *
  * @param filters - Query parameters (includes, orderBy, pagination, etc.)
  * @param options - React Query options
@@ -94,7 +94,7 @@ export function useTeamStaffBorrows(
 /**
  * Hook to fetch vacations for users in the authenticated team leader's sector.
  * This hook uses the secure team-staff endpoint which automatically filters
- * based on the user's managedSectorId.
+ * based on the user's ledSectorId.
  *
  * @param filters - Query parameters (includes, orderBy, pagination, etc.)
  * @param options - React Query options
@@ -124,7 +124,7 @@ export function useTeamStaffVacations(
 /**
  * Hook to fetch warnings for users in the authenticated team leader's sector.
  * This hook uses the secure team-staff endpoint which automatically filters
- * based on the user's managedSectorId.
+ * based on the user's ledSectorId.
  *
  * @param filters - Query parameters (includes, orderBy, pagination, etc.)
  * @param options - React Query options
@@ -154,7 +154,7 @@ export function useTeamStaffWarnings(
 /**
  * Hook to fetch activities for users in the authenticated team leader's sector.
  * This hook uses the secure team-staff endpoint which automatically filters
- * based on the user's managedSectorId.
+ * based on the user's ledSectorId.
  *
  * @param filters - Query parameters (includes, orderBy, pagination, etc.)
  * @param options - React Query options
@@ -184,7 +184,7 @@ export function useTeamStaffActivities(
 /**
  * Hook to fetch PPE deliveries (EPIs) for users in the authenticated team leader's sector.
  * This hook uses the secure team-staff endpoint which automatically filters
- * based on the user's managedSectorId.
+ * based on the user's ledSectorId.
  *
  * @param filters - Query parameters (includes, orderBy, pagination, etc.)
  * @param options - React Query options
@@ -214,7 +214,7 @@ export function useTeamStaffEpis(
 /**
  * Hook to fetch payroll calculations for users in the authenticated team leader's sector.
  * This hook uses the secure team-staff endpoint which automatically filters
- * based on the user's managedSectorId.
+ * based on the user's ledSectorId.
  *
  * @param year - Year for calculation
  * @param month - Month for calculation (1-12)

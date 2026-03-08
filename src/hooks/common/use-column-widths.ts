@@ -180,7 +180,6 @@ export const DEFAULT_COLUMN_WIDTHS: Record<string, number> = {
   "serviceOrders.logistic": 100,
   "serviceOrders.artwork": 100,
   "serviceOrders.production": 100,
-  "serviceOrders.financial": 100,
 };
 
 /**

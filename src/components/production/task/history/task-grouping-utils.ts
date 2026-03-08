@@ -106,29 +106,6 @@ export interface TaskGroup {
 }
 
 /**
- * Find all tasks that should be grouped with a given task based on name similarity
- */
-function findSimilarTasks(
-  targetTask: Task,
-  tasks: Task[],
-  usedIndices: Set<number>,
-  similarityThreshold: number
-): { task: Task; index: number }[] {
-  const similar: { task: Task; index: number }[] = [];
-
-  for (let i = 0; i < tasks.length; i++) {
-    if (usedIndices.has(i)) continue;
-
-    const task = tasks[i];
-    if (shouldGroupTasks(targetTask, task, similarityThreshold)) {
-      similar.push({ task, index: i });
-    }
-  }
-
-  return similar;
-}
-
-/**
  * Sort tasks by serial number (numeric extraction)
  */
 function sortBySerialNumber(tasks: Task[]): Task[] {

@@ -96,7 +96,6 @@ export function ColumnVisibilityManager({
   defaultColumns,
   columnOrder,
   onColumnOrderChange,
-  onColumnOrderReset,
   onColumnWidthsReset,
 }: ColumnVisibilityManagerProps) {
   const [open, setOpen] = useState(false);

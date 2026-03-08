@@ -209,7 +209,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     positionId: "Cargo",
     sector: "Setor",
     sectorId: "Setor",
-    managedSector: "Setor Gerenciado",
+    ledSector: "Setor Liderado",
     performanceLevel: "Nível de Desempenho",
 
     // Status and employment
@@ -528,6 +528,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
   [CHANGE_LOG_ENTITY_TYPE.SECTOR]: {
     name: "Nome",
     privileges: "Privilégios",
+    leaderId: "Líder",
+    leader: "Líder",
     users: "Usuários",
     positions: "Cargos",
     tasks: "Tarefas",
@@ -758,13 +760,13 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     budgetNumber: "Número do Orçamento",
     simultaneousTasks: "Tarefas Simultâneas",
     discountReference: "Referência do Desconto",
-    invoicesToCustomerIds: "Faturar Para (Clientes)",
+    customerConfigIds: "Faturar Para (Clientes)",
     customerSignatureId: "Assinatura do Cliente",
     customForecastDays: "Dias de Previsão Personalizados",
-    items: "Itens do Orçamento",
-    items_snapshot: "Itens do Orçamento (snapshot)",
+    services: "Serviços do Orçamento",
+    services_snapshot: "Serviços do Orçamento (snapshot)",
     // Nested relationship fields
-    "items.length": "Quantidade de Itens",
+    "services.length": "Quantidade de Serviços",
   },
   [CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM]: {
     amount: "Valor",
