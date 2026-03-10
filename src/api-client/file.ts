@@ -58,8 +58,9 @@ interface BatchFileUploadResponse {
   success: boolean;
   message: string;
   data?: {
-    successful: File[];
+    success: File[];
     failed: Array<{ file: string; error: string }>;
+    totalProcessed: number;
     totalSuccess: number;
     totalFailed: number;
   };

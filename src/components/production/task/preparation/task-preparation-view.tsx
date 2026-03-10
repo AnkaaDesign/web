@@ -465,7 +465,7 @@ export function TaskPreparationView({
       },
     };
 
-    // FINANCIAL users: single table with COMPLETED tasks filtered by paymentStatus != SETTLED
+    // FINANCIAL users: single table with COMPLETED tasks that have pricing and pricing status != SETTLED
     if (isFinancialUser) {
       // Include pricing with customerConfigs for the invoiceToCustomers column
       result.include.pricing = {
@@ -477,7 +477,7 @@ export function TaskPreparationView({
           },
         },
       };
-      // No shouldDisplayInPreparation — financial uses direct status + paymentStatus filter
+      result.shouldDisplayForFinancial = true;
     } else if (isDesignerUser) {
       // DESIGNER users have special display logic: only show tasks with incomplete artwork SOs or no artwork SOs
       result.shouldDisplayForDesigner = true;
@@ -803,7 +803,6 @@ export function TaskPreparationView({
                 refetchOnWindowFocus="always"
                 filters={{
                   ...queryFilters,
-                  status: [TASK_STATUS.COMPLETED],
                   limit: 1000,
                 }}
                 visibleColumns={visibleColumns}

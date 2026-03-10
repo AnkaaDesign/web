@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/contexts/theme-context";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useTaskDetail, useTaskMutations, useServiceOrderMutations, useCutsByTask, useLayoutsByTruck, useCurrentUser, useAirbrushingsByTask } from "../../../../hooks";
@@ -31,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
-import { canViewPricing, canUpdatePricingStatus, getAvailablePricingStatusTransitions } from "@/utils/permissions/pricing-permissions";
+import { canViewPricing, canUpdatePricingStatus } from "@/utils/permissions/pricing-permissions";
 import { PricingStatusBadge } from "@/components/production/task/pricing/pricing-status-badge";
 import { InstallmentStatusBadge } from "@/components/production/task/billing/installment-status-badge";
 import { BankSlipStatusBadge } from "@/components/production/task/billing/bank-slip-status-badge";
@@ -43,7 +44,6 @@ import type { Invoice } from "@/types/invoice";
 import { taskPricingService } from "@/api-client/task-pricing";
 import type { TASK_PRICING_STATUS } from "@/types/task-pricing";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text-generators";
-import { toast } from "@/components/ui/sonner";
 import { getApiBaseUrl } from "@/utils/file";
 import { SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_DISPLAY_ORDER } from "../../../../constants";
 import { RESPONSIBLE_ROLE_LABELS, ResponsibleRole } from "@/types/responsible";
@@ -896,6 +896,7 @@ export const TaskDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const { update } = useTaskMutations();
   const { update: updateServiceOrder } = useServiceOrderMutations();
@@ -909,6 +910,13 @@ export const TaskDetailsPage = () => {
   const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("grid");
   const [pricingCustomerFilter, setPricingCustomerFilter] = useState<string | null>(null);
   const [isUpdatingPricingStatus, setIsUpdatingPricingStatus] = useState(false);
+  const [pricingConfirmDialog, setPricingConfirmDialog] = useState<{
+    open: boolean;
+    newStatus: string;
+    currentStatus: string;
+    title: string;
+    description: string;
+  }>({ open: false, newStatus: '', currentStatus: '', title: '', description: '' });
   // Get user's sector privilege for service order permissions
   const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
 
@@ -1034,6 +1042,11 @@ export const TaskDetailsPage = () => {
   const FINANCIAL_HIDDEN_SECTIONS = ['cuts', 'observation', 'serviceOrders', 'files', 'changelog'];
   // Sections hidden by default but toggleable for financial users
   const FINANCIAL_DEFAULT_HIDDEN_SECTIONS = ['dates', 'layout', 'artworks', 'paints', 'airbrushings'];
+  // Overview fields hidden by default for financial users (toggleable)
+  const FINANCIAL_DEFAULT_HIDDEN_FIELDS = [
+    'responsibles', 'sector', 'plate', 'chassisNumber', 'truckCategory',
+    'implementType', 'truckSpot', 'vehicle',
+  ];
   // Filter sections and fields based on user privileges
   const filteredSections = useMemo(() => {
     return TASK_SECTIONS
@@ -1074,6 +1087,16 @@ export const TaskDetailsPage = () => {
         // Financial users: sections that are hidden by default but toggleable
         if (isFinancialSector && FINANCIAL_DEFAULT_HIDDEN_SECTIONS.includes(section.id)) {
           return { ...section, fields: filteredFields, defaultVisible: false };
+        }
+
+        // Financial users: hide certain overview fields by default (still toggleable)
+        if (isFinancialSector && section.id === 'overview') {
+          filteredFields = filteredFields.map(field =>
+            FINANCIAL_DEFAULT_HIDDEN_FIELDS.includes(field.id)
+              ? { ...field, defaultVisible: false }
+              : field
+          );
+          return { ...section, fields: filteredFields };
         }
 
         if (filteredFields.length !== section.fields.length) {
@@ -1197,7 +1220,11 @@ export const TaskDetailsPage = () => {
         include: {
           customerConfigs: {
             include: {
-              customer: true,
+              customer: {
+                include: {
+                  logo: true,
+                },
+              },
               installments: { orderBy: { number: 'asc' } },
               responsible: true,
               customerSignature: true,
@@ -1357,11 +1384,11 @@ export const TaskDetailsPage = () => {
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   }, [task?.serviceOrders, visibleServiceOrderTypes, userSectorPrivilege]);
 
-  // Check if there's any dossiê content (service orders with checkin or checkout files)
+  // Check if there's any dossiê content (PRODUCTION service orders with checkin or checkout files)
   const hasDossieContent = useMemo(() => {
     if (!task?.serviceOrders) return false;
     return task.serviceOrders.some(
-      (so: any) => (so.checkinFiles?.length > 0 || so.checkoutFiles?.length > 0)
+      (so: any) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && (so.checkinFiles?.length > 0 || so.checkoutFiles?.length > 0)
     );
   }, [task?.serviceOrders]);
 
@@ -1434,6 +1461,10 @@ export const TaskDetailsPage = () => {
     if (sectionVisibility.isSectionVisible("overview")) {
       visibleCards.push({ id: 'overview', span: 1 });
     }
+    // Financial users: place dossié next to overview (both span: 1)
+    if (isFinancialSector && sectionVisibility.isSectionVisible("dossie") && canViewCheckinFiles && hasDossieContent) {
+      visibleCards.push({ id: 'dossie', span: 1 });
+    }
     if (sectionVisibility.isSectionVisible("dates")) {
       visibleCards.push({ id: 'dates', span: 1 });
     }
@@ -1471,7 +1502,7 @@ export const TaskDetailsPage = () => {
     if (sectionVisibility.isSectionVisible("airbrushings") && airbrushings.length > 0) {
       visibleCards.push({ id: 'airbrushings', span: 1 });
     }
-    if (sectionVisibility.isSectionVisible("dossie") && canViewCheckinFiles && hasDossieContent) {
+    if (!isFinancialSector && sectionVisibility.isSectionVisible("dossie") && canViewCheckinFiles && hasDossieContent) {
       visibleCards.push({ id: 'dossie', span: 2 });
     }
 
@@ -1541,28 +1572,40 @@ export const TaskDetailsPage = () => {
 
     // Confirmation for INTERNAL_APPROVED (triggers invoice/boleto generation)
     if (newStatus === 'INTERNAL_APPROVED') {
-      const confirmed = window.confirm(
-        'Aprovar internamente irá gerar faturas e boletos automaticamente. Deseja continuar?'
-      );
-      if (!confirmed) return;
+      setPricingConfirmDialog({
+        open: true,
+        newStatus,
+        currentStatus: currentStatus || '',
+        title: 'Aprovar Internamente',
+        description: 'Aprovar internamente irá gerar faturas e boletos automaticamente. Deseja continuar?',
+      });
+      return;
     }
 
     // Confirmation for reverting SETTLED → PARTIAL (payment reversal)
     if (currentStatus === 'SETTLED' && newStatus === 'PARTIAL') {
-      const confirmed = window.confirm(
-        'Reverter o status de liquidado para parcial? Isso indica que houve estorno de pagamento.'
-      );
-      if (!confirmed) return;
+      setPricingConfirmDialog({
+        open: true,
+        newStatus,
+        currentStatus: currentStatus || '',
+        title: 'Reverter para Parcial',
+        description: 'Reverter o status de liquidado para parcial? Isso indica que houve estorno de pagamento.',
+      });
+      return;
     }
 
+    await executePricingStatusChange(newStatus);
+  };
+
+  const executePricingStatusChange = async (newStatus: string) => {
+    if (!task?.pricing?.id) return;
     setIsUpdatingPricingStatus(true);
     try {
       await taskPricingService.updateStatus(task.pricing.id, newStatus);
       refreshTask();
-      toast.success('Status atualizado', 'O status da precificação foi alterado com sucesso.');
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
     } catch (error) {
       console.error("Error updating pricing status:", error);
-      toast.error('Erro ao atualizar status', 'Não foi possível alterar o status da precificação. Tente novamente.');
     } finally {
       setIsUpdatingPricingStatus(false);
     }
@@ -2012,52 +2055,64 @@ export const TaskDetailsPage = () => {
                     </span>
                   </div>
                 )}
-              </div>
 
-              {/* Details */}
-              {sectionVisibility.isFieldVisible("details") && task.details && (
-                <div className="mt-6">
-                  <div className="flex items-center gap-2 mb-3">
-                <IconFileText className="h-5 w-5 text-muted-foreground" />
-                <h3 className="text-sm font-semibold">Detalhes</h3>
+                {/* Details */}
+                {sectionVisibility.isFieldVisible("details") && task.details && (
+                  <div className="bg-muted/50 rounded-lg px-4 py-2.5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <IconFileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground">Detalhes</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{task.details}</p>
                   </div>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/50 rounded-lg p-4">{task.details}</p>
-                </div>
-              )}
+                )}
 
-              {/* Finished At - Financial sector overview field */}
-              {sectionVisibility.isFieldVisible("finishedAt") && task.finishedAt && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                  <span className="text-sm font-medium text-muted-foreground">Finalizado Em</span>
-                  <span className="text-sm font-medium">{formatDate(task.finishedAt)}</span>
-                </div>
-              )}
+                {/* Finished At - Financial sector overview field */}
+                {sectionVisibility.isFieldVisible("finishedAt") && task.finishedAt && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconCalendarCheck className="h-4 w-4" />
+                      Finalizado Em
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{formatDate(task.finishedAt)}</span>
+                  </div>
+                )}
 
-              {/* Invoice To Customers - Financial sector overview field */}
-              {sectionVisibility.isFieldVisible("invoiceToCustomers") && (task as any).pricing?.customerConfigs?.length > 0 && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                  <span className="text-sm font-medium text-muted-foreground">Faturar Para</span>
-                  <span className="text-sm font-medium text-right max-w-[60%]">
-                    {(task as any).pricing.customerConfigs.map((c: any, i: number, arr: any[]) => {
-                      const name = c.customer?.corporateName || c.customer?.fantasyName;
-                      if (!name) return null;
-                      return canAccessCustomerPages && c.customerId ? (
-                        <span key={c.customerId}>
-                          <span
-                            className="cursor-pointer hover:text-primary hover:underline transition-colors"
-                            onClick={() => navigate(routes.administration.customers.details(c.customerId))}
-                          >
-                            {name}
-                          </span>
-                          {i < arr.length - 1 ? ', ' : ''}
+                {/* Invoice To Customers - Financial sector overview field */}
+                {sectionVisibility.isFieldVisible("invoiceToCustomers") && (task as any).pricing?.customerConfigs?.length > 0 && (
+                  (task as any).pricing.customerConfigs.map((c: any) => {
+                    const name = c.customer?.corporateName || c.customer?.fantasyName;
+                    if (!name) return null;
+                    return (
+                      <div key={c.customerId || c.id} className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-1.5">
+                        <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <IconReceipt className="h-4 w-4" />
+                          Faturar Para
                         </span>
-                      ) : (
-                        <span key={c.customerId || i}>{name}{i < arr.length - 1 ? ', ' : ''}</span>
-                      );
-                    })}
-                  </span>
-                </div>
-              )}
+                        <div className="flex items-center gap-2">
+                          <CustomerLogoDisplay
+                            logo={c.customer?.logo}
+                            customerName={name}
+                            size="sm"
+                            shape="rounded"
+                            className="flex-shrink-0"
+                          />
+                          {canAccessCustomerPages && c.customerId ? (
+                            <span
+                              className="text-sm font-semibold text-foreground text-right cursor-pointer hover:text-primary hover:underline transition-colors"
+                              onClick={() => navigate(routes.administration.customers.details(c.customerId))}
+                            >
+                              {name}
+                            </span>
+                          ) : (
+                            <span className="text-sm font-semibold text-foreground text-right">{name}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
                 </CardContent>
               </Card>
           )}
@@ -2215,14 +2270,11 @@ export const TaskDetailsPage = () => {
                               'UPCOMING', 'PARTIAL', 'SETTLED',
                             ];
                             const userPrivilege = currentUser?.sector?.privileges || '';
-                            const availableTransitions = getAvailablePricingStatusTransitions(pricingStatus, userPrivilege);
-
                             const statusOptions: ComboboxOption[] = allStatuses
-                              .filter((s) => s === pricingStatus || availableTransitions.includes(s))
                               .map((s) => ({
                                 value: s,
                                 label: statusLabels[s],
-                                disabled: s === pricingStatus,
+                                disabled: s === pricingStatus || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s === 'INTERNAL_APPROVED'),
                               }));
 
                             const getPricingStatusTriggerClass = (status: TASK_PRICING_STATUS) => {
@@ -3912,7 +3964,7 @@ export const TaskDetailsPage = () => {
               {/* Dossiê Card - Proof of services organized by service order with check-in/check-out files */}
               {sectionVisibility.isSectionVisible("dossie") && canViewCheckinFiles && hasDossieContent && (() => {
                 const serviceOrdersWithFiles = (task.serviceOrders || [])
-                  .filter((so: any) => so.checkinFiles?.length > 0 || so.checkoutFiles?.length > 0)
+                  .filter((so: any) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && (so.checkinFiles?.length > 0 || so.checkoutFiles?.length > 0))
                   .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
 
                 if (serviceOrdersWithFiles.length === 0) return null;
@@ -3922,124 +3974,112 @@ export const TaskDetailsPage = () => {
                 );
 
                 return (
-                  <Card className={cn("border flex flex-col animate-in fade-in-50 duration-1200", fullSpanSections.has("dossie") ? "lg:col-span-2" : "lg:col-span-1")}>
-                    <CardHeader className="pb-4">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="flex items-center gap-2">
-                          <IconFolderCheck className="h-5 w-5 text-muted-foreground" />
-                          Dossiê
-                          <Badge variant="secondary" className="ml-2">
-                            {totalDossieFiles} {totalDossieFiles === 1 ? 'arquivo' : 'arquivos'}
-                          </Badge>
-                        </CardTitle>
-                        <div className="flex gap-1">
-                          <Button
-                            variant={filesViewMode === "list" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setFilesViewMode("list")}
-                            className="h-7 w-7 p-0"
-                          >
-                            <IconList className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant={filesViewMode === "grid" ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setFilesViewMode("grid")}
-                            className="h-7 w-7 p-0"
-                          >
-                            <IconLayoutGrid className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
+                  <Card className={cn("border border-border/40 flex flex-col animate-in fade-in-50 duration-1200", fullSpanSections.has("dossie") ? "lg:col-span-2" : "lg:col-span-1")}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFolderCheck className="h-5 w-5 text-muted-foreground" />
+                        Dossiê
+                        <Badge variant="secondary" className="ml-1">
+                          {totalDossieFiles} {totalDossieFiles === 1 ? 'foto' : 'fotos'}
+                        </Badge>
+                      </CardTitle>
                       <p className="text-xs text-muted-foreground mt-1">
                         Registro fotográfico dos serviços por ordem de serviço
                       </p>
                     </CardHeader>
                     <CardContent className="pt-0 flex-1">
-                      <div className="space-y-6">
+                      <div className="space-y-4">
                         {serviceOrdersWithFiles.map((serviceOrder: any) => {
                           const isOutrosWithObservation = serviceOrder.description === 'Outros' && !!serviceOrder.observation;
                           const displayDescription = isOutrosWithObservation ? serviceOrder.observation : serviceOrder.description;
                           const checkinFiles = serviceOrder.checkinFiles || [];
                           const checkoutFiles = serviceOrder.checkoutFiles || [];
-                          const statusVariant = getBadgeVariantFromStatus(serviceOrder.status ?? '', "SERVICE_ORDER");
+                          const apiUrl = getApiBaseUrl();
 
                           return (
-                            <div key={serviceOrder.id} className="border rounded-lg overflow-hidden">
+                            <div key={serviceOrder.id} className="border border-border/30 rounded-lg overflow-hidden">
                               {/* Service Order Header */}
-                              <div className="bg-muted/50 px-4 py-3 flex items-center justify-between gap-3 border-b">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <h4 className="text-sm font-semibold truncate">{displayDescription}</h4>
-                                  {!isOutrosWithObservation && serviceOrder.observation && (
-                                    <HoverCard openDelay={100} closeDelay={100}>
-                                      <HoverCardTrigger asChild>
-                                        <button className="relative flex items-center justify-center h-5 w-5 rounded border border-input bg-background hover:bg-accent transition-colors flex-shrink-0">
-                                          <IconNote className="h-3 w-3" />
-                                        </button>
-                                      </HoverCardTrigger>
-                                      <HoverCardContent className="w-64 p-3" side="top">
-                                        <p className="text-sm text-muted-foreground">{serviceOrder.observation}</p>
-                                      </HoverCardContent>
-                                    </HoverCard>
-                                  )}
-                                  <Badge variant="outline" className="text-[10px] flex-shrink-0">
-                                    {SERVICE_ORDER_TYPE_LABELS[serviceOrder.type as SERVICE_ORDER_TYPE]}
-                                  </Badge>
-                                </div>
-                                <Badge variant={statusVariant} className="text-xs flex-shrink-0">
-                                  {SERVICE_ORDER_STATUS_LABELS[serviceOrder.status as SERVICE_ORDER_STATUS]}
-                                </Badge>
+                              <div className="bg-muted/30 px-3 py-2 flex items-center gap-2 border-b border-border/30">
+                                <h4 className="text-xs font-semibold truncate">{displayDescription}</h4>
+                                {!isOutrosWithObservation && serviceOrder.observation && (
+                                  <HoverCard openDelay={100} closeDelay={100}>
+                                    <HoverCardTrigger asChild>
+                                      <button className="relative flex items-center justify-center h-4 w-4 rounded border border-border/40 bg-background hover:bg-accent transition-colors flex-shrink-0">
+                                        <IconNote className="h-2.5 w-2.5" />
+                                      </button>
+                                    </HoverCardTrigger>
+                                    <HoverCardContent className="w-64 p-3" side="top">
+                                      <p className="text-sm text-muted-foreground">{serviceOrder.observation}</p>
+                                    </HoverCardContent>
+                                  </HoverCard>
+                                )}
                               </div>
 
-                              {/* Check-in / Check-out Content */}
-                              <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Check-in Section */}
-                                <div>
-                                  <div className="flex items-center gap-2 mb-3">
+                              {/* Check-in / Check-out Content - stacked vertically */}
+                              <div className="px-3 py-3 space-y-5">
+                                {/* Check-in */}
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-1.5">
                                     <IconCameraCheck className="h-4 w-4 text-blue-500" />
-                                    <h5 className="text-sm font-medium">Check-in</h5>
-                                    <Badge variant="outline" className="text-[10px]">{checkinFiles.length}</Badge>
+                                    <span className="text-xs font-medium">Check-in</span>
+                                    <span className="text-[11px] text-muted-foreground">{checkinFiles.length}</span>
                                   </div>
                                   {checkinFiles.length > 0 ? (
-                                    <div className={cn(filesViewMode === "grid" ? "flex flex-wrap gap-2" : "grid grid-cols-1 gap-1.5")}>
-                                      {checkinFiles.map((file: any) => (
-                                        <FileItem
-                                          key={file.id}
-                                          file={file}
-                                          viewMode={filesViewMode}
-                                          onPreview={(f) => handleDossieFileClick(serviceOrder, f)}
-                                          onDownload={handleDownload}
-                                          showActions
-                                        />
-                                      ))}
+                                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                                      {checkinFiles.map((file: any) => {
+                                        const src = file.thumbnailUrl
+                                          ? (file.thumbnailUrl.startsWith('/api') ? `${apiUrl}${file.thumbnailUrl}` : file.thumbnailUrl)
+                                          : `${apiUrl}/files/thumbnail/${file.id}`;
+                                        return (
+                                          <button
+                                            key={file.id}
+                                            onClick={() => handleDossieFileClick(serviceOrder, file)}
+                                            className="relative flex-shrink-0 w-16 h-16 rounded overflow-hidden border border-border/30 bg-muted hover:opacity-80 transition-opacity cursor-pointer"
+                                          >
+                                            <img
+                                              src={src}
+                                              alt={file.originalName || file.filename}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          </button>
+                                        );
+                                      })}
                                     </div>
                                   ) : (
-                                    <p className="text-xs text-muted-foreground italic">Nenhum arquivo de check-in</p>
+                                    <p className="text-[11px] text-muted-foreground italic">Nenhuma foto</p>
                                   )}
                                 </div>
 
-                                {/* Check-out Section */}
-                                <div>
-                                  <div className="flex items-center gap-2 mb-3">
+                                {/* Check-out */}
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-1.5">
                                     <IconCameraBolt className="h-4 w-4 text-green-500" />
-                                    <h5 className="text-sm font-medium">Check-out</h5>
-                                    <Badge variant="outline" className="text-[10px]">{checkoutFiles.length}</Badge>
+                                    <span className="text-xs font-medium">Check-out</span>
+                                    <span className="text-[11px] text-muted-foreground">{checkoutFiles.length}</span>
                                   </div>
                                   {checkoutFiles.length > 0 ? (
-                                    <div className={cn(filesViewMode === "grid" ? "flex flex-wrap gap-2" : "grid grid-cols-1 gap-1.5")}>
-                                      {checkoutFiles.map((file: any) => (
-                                        <FileItem
-                                          key={file.id}
-                                          file={file}
-                                          viewMode={filesViewMode}
-                                          onPreview={(f) => handleDossieFileClick(serviceOrder, f)}
-                                          onDownload={handleDownload}
-                                          showActions
-                                        />
-                                      ))}
+                                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                                      {checkoutFiles.map((file: any) => {
+                                        const src = file.thumbnailUrl
+                                          ? (file.thumbnailUrl.startsWith('/api') ? `${apiUrl}${file.thumbnailUrl}` : file.thumbnailUrl)
+                                          : `${apiUrl}/files/thumbnail/${file.id}`;
+                                        return (
+                                          <button
+                                            key={file.id}
+                                            onClick={() => handleDossieFileClick(serviceOrder, file)}
+                                            className="relative flex-shrink-0 w-16 h-16 rounded overflow-hidden border border-border/30 bg-muted hover:opacity-80 transition-opacity cursor-pointer"
+                                          >
+                                            <img
+                                              src={src}
+                                              alt={file.originalName || file.filename}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          </button>
+                                        );
+                                      })}
                                     </div>
                                   ) : (
-                                    <p className="text-xs text-muted-foreground italic">Nenhum arquivo de check-out</p>
+                                    <p className="text-[11px] text-muted-foreground italic">Nenhuma foto</p>
                                   )}
                                 </div>
                               </div>
@@ -4113,6 +4153,30 @@ export const TaskDetailsPage = () => {
                 ) : (
                   "Confirmar"
                 )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Pricing Status Confirmation Dialog */}
+        <AlertDialog open={pricingConfirmDialog.open} onOpenChange={(open) => setPricingConfirmDialog((prev) => ({ ...prev, open }))}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{pricingConfirmDialog.title}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {pricingConfirmDialog.description}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isUpdatingPricingStatus}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={isUpdatingPricingStatus}
+                onClick={async () => {
+                  await executePricingStatusChange(pricingConfirmDialog.newStatus);
+                  setPricingConfirmDialog((prev) => ({ ...prev, open: false }));
+                }}
+              >
+                {isUpdatingPricingStatus ? 'Processando...' : 'Confirmar'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

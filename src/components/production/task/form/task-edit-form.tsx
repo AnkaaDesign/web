@@ -356,6 +356,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const [hasCheckinFileChanges, setHasCheckinFileChanges] = useState(false);
   const [hasCheckoutFileChanges, setHasCheckoutFileChanges] = useState(false);
 
+  // Refs for checkin/checkout file state (avoids stale closures in submit handler)
+  const checkinFilesByServiceOrderRef = useRef(checkinFilesByServiceOrder);
+  const checkoutFilesByServiceOrderRef = useRef(checkoutFilesByServiceOrder);
+  useEffect(() => { checkinFilesByServiceOrderRef.current = checkinFilesByServiceOrder; }, [checkinFilesByServiceOrder]);
+  useEffect(() => { checkoutFilesByServiceOrderRef.current = checkoutFilesByServiceOrder; }, [checkoutFilesByServiceOrder]);
+
+  // Track pending pre-upload promises to prevent saving before uploads complete
+  const pendingCheckinUploadsRef = useRef(0);
+  const pendingCheckoutUploadsRef = useRef(0);
+
   // Sync baseFiles when task.baseFiles changes (after successful update or initial load)
   useEffect(() => {
     // Skip sync if user has made changes that haven't been submitted yet
@@ -1205,6 +1215,28 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           return;
         }
 
+        // CRITICAL: Wait for pending checkin/checkout pre-uploads to complete before saving
+        // Without this, saving before upload completes would send empty checkinFileIds/checkoutFileIds,
+        // causing the API to clear existing file associations via { set: [] }
+        if (pendingCheckinUploadsRef.current > 0 || pendingCheckoutUploadsRef.current > 0) {
+          console.log('[TaskEditForm] ⏳ Waiting for pending checkin/checkout pre-uploads...');
+          toast.info('Aguardando upload das fotos ser concluído...');
+          // Poll until uploads complete (check every 200ms, timeout after 30s)
+          const maxWait = 30000;
+          const pollInterval = 200;
+          let waited = 0;
+          while ((pendingCheckinUploadsRef.current > 0 || pendingCheckoutUploadsRef.current > 0) && waited < maxWait) {
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            waited += pollInterval;
+          }
+          if (pendingCheckinUploadsRef.current > 0 || pendingCheckoutUploadsRef.current > 0) {
+            console.log('[TaskEditForm] ❌ Pre-upload timed out');
+            toast.error('O upload das fotos está demorando. Tente novamente.');
+            return;
+          }
+          console.log('[TaskEditForm] ✅ Pre-uploads completed');
+        }
+
         // Filter out cuts without files (empty/default cuts)
         // Only cuts with files will be submitted
         const validCuts = cuts.filter((cut) => cut.file || cut.fileId);
@@ -1543,21 +1575,24 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             dataForFormData.projectFileIds = currentProjectFileIds;
           }
           // Inject checkin/checkout file IDs into service orders data (per service order)
+          // Use refs to get the latest file state (avoids stale closure after waiting for uploads)
           if (!isCommercialUser && (hasCheckinFileChanges || hasCheckoutFileChanges)) {
             // Ensure serviceOrders is present — it may not be in changedData if only files changed
             if (!dataForFormData.serviceOrders) {
               const formSOs = form.getValues("serviceOrders") || [];
               dataForFormData.serviceOrders = ensureArray(formSOs).filter((so: any) => so.id);
             }
+            const latestCheckinFiles = checkinFilesByServiceOrderRef.current;
+            const latestCheckoutFiles = checkoutFilesByServiceOrderRef.current;
             const serviceOrders = dataForFormData.serviceOrders as any[] || [];
             for (const so of serviceOrders) {
               if (so.id) {
                 if (hasCheckinFileChanges) {
-                  const soCheckinFiles = checkinFilesByServiceOrder[so.id] || [];
+                  const soCheckinFiles = latestCheckinFiles[so.id] || [];
                   so.checkinFileIds = soCheckinFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
                 }
                 if (hasCheckoutFileChanges) {
-                  const soCheckoutFiles = checkoutFilesByServiceOrder[so.id] || [];
+                  const soCheckoutFiles = latestCheckoutFiles[so.id] || [];
                   so.checkoutFileIds = soCheckoutFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
                 }
               }
@@ -1900,21 +1935,24 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             (submitData as any).projectFileIds = [...currentProjectFileIds];
           }
           // Inject checkin/checkout file IDs into service orders data (per service order)
+          // Use refs to get the latest file state (avoids stale closure after waiting for uploads)
           if (!isCommercialUser && (hasCheckinFileChanges || hasCheckoutFileChanges)) {
             // Ensure serviceOrders is present — it may not be in changedData if only files changed
             if (!(submitData as any).serviceOrders) {
               const formSOs = form.getValues("serviceOrders") || [];
               (submitData as any).serviceOrders = ensureArray(formSOs).filter((so: any) => so.id);
             }
+            const latestCheckinFiles = checkinFilesByServiceOrderRef.current;
+            const latestCheckoutFiles = checkoutFilesByServiceOrderRef.current;
             const serviceOrders = (submitData as any).serviceOrders as any[] || [];
             for (const so of serviceOrders) {
               if (so.id) {
                 if (hasCheckinFileChanges) {
-                  const soCheckinFiles = checkinFilesByServiceOrder[so.id] || [];
+                  const soCheckinFiles = latestCheckinFiles[so.id] || [];
                   so.checkinFileIds = soCheckinFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
                 }
                 if (hasCheckoutFileChanges) {
-                  const soCheckoutFiles = checkoutFilesByServiceOrder[so.id] || [];
+                  const soCheckoutFiles = latestCheckoutFiles[so.id] || [];
                   so.checkoutFileIds = soCheckoutFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
                 }
               }
@@ -2187,7 +2225,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         }, 100);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, uploadedFiles, baseFiles, projectFiles, checkinFilesByServiceOrder, checkoutFilesByServiceOrder, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, uploadedFiles, baseFiles, projectFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -2284,8 +2322,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       });
 
       if (result?.data) {
-        // BatchFileUploadResponse.data has { successful: File[], failed: [...] }
-        const uploadedRecords = result.data.successful || (Array.isArray(result.data) ? result.data : [result.data]);
+        // BatchFileUploadResponse.data has { success: File[], failed: [...] }
+        const uploadedRecords = result.data.success || (Array.isArray(result.data) ? result.data : [result.data]);
         // Map uploaded records back to files by matching order
         let uploadIdx = 0;
         return allFiles.map(f => {
@@ -2315,10 +2353,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     setHasFileChanges(true);
     setHasCheckinFileChanges(true);
 
-    // Pre-upload new files
-    const uploaded = await preUploadNewFiles(files, 'serviceOrderCheckinFiles');
-    if (uploaded !== files) {
-      setCheckinFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: uploaded }));
+    // Pre-upload new files (track pending count)
+    pendingCheckinUploadsRef.current++;
+    try {
+      const uploaded = await preUploadNewFiles(files, 'serviceOrderCheckinFiles');
+      if (uploaded !== files) {
+        setCheckinFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: uploaded }));
+      }
+    } finally {
+      pendingCheckinUploadsRef.current--;
     }
   }, [preUploadNewFiles]);
 
@@ -2329,10 +2372,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     setHasFileChanges(true);
     setHasCheckoutFileChanges(true);
 
-    // Pre-upload new files
-    const uploaded = await preUploadNewFiles(files, 'serviceOrderCheckoutFiles');
-    if (uploaded !== files) {
-      setCheckoutFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: uploaded }));
+    // Pre-upload new files (track pending count)
+    pendingCheckoutUploadsRef.current++;
+    try {
+      const uploaded = await preUploadNewFiles(files, 'serviceOrderCheckoutFiles');
+      if (uploaded !== files) {
+        setCheckoutFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: uploaded }));
+      }
+    } finally {
+      pendingCheckoutUploadsRef.current--;
     }
   }, [preUploadNewFiles]);
 
@@ -4196,7 +4244,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 )}
 
                 {/* Check-in Files Card - grouped by service order, compact with FileUploadField */}
-                {canViewCheckinCheckout && task.serviceOrders && task.serviceOrders.filter(so => so.id && so.status !== SERVICE_ORDER_STATUS.CANCELLED).length > 0 && (
+                {canViewCheckinCheckout && task.serviceOrders && task.serviceOrders.filter(so => so.id && so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.status !== SERVICE_ORDER_STATUS.CANCELLED).length > 0 && (
           <AccordionItem
             value="checkin-files"
             id="accordion-item-checkin-files"
@@ -4214,7 +4262,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                   <AccordionContent>
                     <CardContent className="pt-0 space-y-3">
                       {task.serviceOrders
-                        .filter(so => so.id && so.status !== SERVICE_ORDER_STATUS.CANCELLED)
+                        .filter(so => so.id && so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.status !== SERVICE_ORDER_STATUS.CANCELLED)
                         .map((so) => {
                           const soFiles = checkinFilesByServiceOrder[so.id!] || [];
                           return (
@@ -4252,7 +4300,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 )}
 
                 {/* Check-out Files Card - grouped by service order, shows checkin reference above */}
-                {canViewCheckinCheckout && task.status === TASK_STATUS.COMPLETED && task.serviceOrders && task.serviceOrders.filter(so => so.id && so.status !== SERVICE_ORDER_STATUS.CANCELLED).length > 0 && (
+                {canViewCheckinCheckout && task.status === TASK_STATUS.COMPLETED && task.serviceOrders && task.serviceOrders.filter(so => so.id && so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.status !== SERVICE_ORDER_STATUS.CANCELLED).length > 0 && (
           <AccordionItem
             value="checkout-files"
             id="accordion-item-checkout-files"
@@ -4270,7 +4318,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                   <AccordionContent>
                     <CardContent className="pt-0 space-y-4">
                       {task.serviceOrders
-                        .filter(so => so.id && so.status !== SERVICE_ORDER_STATUS.CANCELLED)
+                        .filter(so => so.id && so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.status !== SERVICE_ORDER_STATUS.CANCELLED)
                         .map((so) => {
                           const soCheckinFiles = checkinFilesByServiceOrder[so.id!] || [];
                           const soCheckoutFiles = checkoutFilesByServiceOrder[so.id!] || [];
@@ -4302,7 +4350,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                                     return (
                                       <div
                                         key={file.id}
-                                        className="relative flex-shrink-0 w-10 h-10 rounded overflow-hidden border border-border/50 bg-muted opacity-60"
+                                        className="relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border border-border/50 bg-muted opacity-60"
                                       >
                                         {src ? (
                                           <img

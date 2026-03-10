@@ -761,7 +761,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
                   fileContext: 'cut',
                   entityType: 'task',
                 });
-                const uploadedFile = uploadResponse.data?.successful?.[0];
+                const uploadedFile = uploadResponse.data?.success?.[0];
                 if (uploadResponse.success && uploadedFile) {
                   cutData.fileId = uploadedFile.id;
                 }

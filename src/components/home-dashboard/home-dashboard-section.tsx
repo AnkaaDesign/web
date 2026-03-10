@@ -5,6 +5,7 @@ import { ServiceOrderList } from "./service-order-list";
 import { LowStockList } from "./low-stock-list";
 import { CompletedTasksList } from "./completed-tasks-list";
 import { AwaitingApprovalTasksList } from "./awaiting-approval-tasks-list";
+import { AwaitingPricingApprovalList } from "./awaiting-pricing-approval-list";
 
 interface HomeDashboardSectionProps {
   data: HomeDashboardData;
@@ -21,7 +22,8 @@ export function HomeDashboardSection({ data, sector, isSectionVisible }: HomeDas
     (data.tasksCloseForecast && data.tasksCloseForecast.length > 0) ||
     (data.lowStockItems && data.lowStockItems.length > 0) ||
     (data.completedTasks && data.completedTasks.length > 0) ||
-    (data.tasksAwaitingPaymentApproval && data.tasksAwaitingPaymentApproval.length > 0);
+    (data.tasksAwaitingPaymentApproval && data.tasksAwaitingPaymentApproval.length > 0) ||
+    (data.tasksAwaitingPricingApproval && data.tasksAwaitingPricingApproval.length > 0);
 
   if (!hasContent) return null;
 
@@ -63,6 +65,10 @@ export function HomeDashboardSection({ data, sector, isSectionVisible }: HomeDas
 
       {isVisible("tasksAwaitingPaymentApproval") && data.tasksAwaitingPaymentApproval && data.tasksAwaitingPaymentApproval.length > 0 && (
         <AwaitingApprovalTasksList tasks={data.tasksAwaitingPaymentApproval} />
+      )}
+
+      {isVisible("tasksAwaitingPricingApproval") && data.tasksAwaitingPricingApproval && data.tasksAwaitingPricingApproval.length > 0 && (
+        <AwaitingPricingApprovalList tasks={data.tasksAwaitingPricingApproval} />
       )}
 
     </div>

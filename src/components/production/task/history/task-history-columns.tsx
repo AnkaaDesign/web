@@ -24,7 +24,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { ServiceOrderCell } from "./service-order-cell";
 import { IconCheck, IconAlertTriangle } from "@tabler/icons-react";
-import { BillingStatusBadge } from "../billing/billing-status-badge";
+import { PricingStatusBadge } from "../pricing/pricing-status-badge";
 
 // Helper function to render date in single-line format: dd/mm/yy hh:mm
 const renderDate = (date: Date | null) => {
@@ -484,7 +484,7 @@ export const createTaskHistoryColumns = (options?: {
     width: "140px",
     formatter: (value: string | null) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
-      return <span className="font-mono truncate">{value}</span>;
+      return <span className="truncate">{value}</span>;
     },
   },
   {
@@ -808,14 +808,14 @@ export const createTaskHistoryColumns = (options?: {
   {
     id: "paymentStatus",
     header: "STATUS PGTO",
-    accessorKey: "paymentStatus",
+    accessorFn: (row) => row.pricing?.status || null,
     sortable: true,
     filterable: true,
     defaultVisible: false,
     width: "140px",
     formatter: (value: string | null) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
-      return <BillingStatusBadge status={value} size="sm" />;
+      return <PricingStatusBadge status={value as any} size="sm" />;
     },
   },
   {

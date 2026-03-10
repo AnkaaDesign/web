@@ -52,17 +52,12 @@ export function canUpdatePricingStatus(userRole: string): boolean {
  * Currently all statuses can transition to any other status (except themselves)
  * to allow administrative corrections.
  */
-const ALL_STATUSES: TASK_PRICING_STATUS[] = [
-  'PENDING', 'BUDGET_APPROVED', 'VERIFIED', 'INTERNAL_APPROVED',
-  'UPCOMING', 'PARTIAL', 'SETTLED',
-];
-
 const VALID_TRANSITIONS: Record<TASK_PRICING_STATUS, TASK_PRICING_STATUS[]> = {
   PENDING: ['BUDGET_APPROVED'],
-  BUDGET_APPROVED: ['VERIFIED'],
-  VERIFIED: ['INTERNAL_APPROVED'],
+  BUDGET_APPROVED: ['VERIFIED', 'PENDING'],
+  VERIFIED: ['INTERNAL_APPROVED', 'BUDGET_APPROVED'],
   INTERNAL_APPROVED: ['UPCOMING'],
-  UPCOMING: ['PARTIAL'],
+  UPCOMING: ['PARTIAL', 'INTERNAL_APPROVED'],
   PARTIAL: ['SETTLED', 'UPCOMING'],
   // SETTLED → PARTIAL is intentionally allowed to handle payment reversal
   // (chargeback/estorno) scenarios where a previously settled invoice has

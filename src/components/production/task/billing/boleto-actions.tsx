@@ -83,7 +83,7 @@ export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
   return (
     <>
       <div className="flex items-center gap-1">
-        {bankSlip.pdfFileId && isActive && (
+        {(bankSlip.pdfFileId || bankSlip.digitableLine) && isActive && (
           <Button
             variant="ghost"
             size="sm"
