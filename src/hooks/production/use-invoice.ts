@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { invoiceService } from '@/api-client/invoice';
-import { toast } from '@/components/ui/sonner';
 
 export const invoiceKeys = {
   all: ['invoices'] as const,
@@ -56,10 +55,6 @@ export function useCancelInvoice() {
       invoiceService.cancel(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: invoiceKeys.all });
-      toast.success('Fatura cancelada com sucesso');
-    },
-    onError: () => {
-      toast.error('Erro ao cancelar fatura');
     },
   });
 }
@@ -73,10 +68,6 @@ export function useRegenerateBoleto() {
       invoiceService.regenerateBoleto(installmentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: invoiceKeys.all });
-      toast.success('Boleto regenerado com sucesso');
-    },
-    onError: () => {
-      toast.error('Erro ao regenerar boleto');
     },
   });
 }
@@ -90,10 +81,6 @@ export function useCancelBoleto() {
       invoiceService.cancelBoleto(installmentId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: invoiceKeys.all });
-      toast.success('Boleto cancelado com sucesso');
-    },
-    onError: () => {
-      toast.error('Erro ao cancelar boleto');
     },
   });
 }
@@ -107,10 +94,6 @@ export function useEmitNfse() {
       invoiceService.emitNfse(invoiceId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: invoiceKeys.all });
-      toast.success('NFS-e será emitida em instantes');
-    },
-    onError: () => {
-      toast.error('Erro ao emitir NFS-e');
     },
   });
 }
@@ -120,14 +103,10 @@ export function useCancelNfse() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ invoiceId, data }: { invoiceId: string; data: any }) =>
-      invoiceService.cancelNfse(invoiceId, data),
+    mutationFn: ({ invoiceId, nfseDocumentId, data }: { invoiceId: string; nfseDocumentId: string; data: any }) =>
+      invoiceService.cancelNfse(invoiceId, { ...data, nfseDocumentId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: invoiceKeys.all });
-      toast.success('NFS-e cancelada com sucesso');
-    },
-    onError: () => {
-      toast.error('Erro ao cancelar NFS-e');
     },
   });
 }

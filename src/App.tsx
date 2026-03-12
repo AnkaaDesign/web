@@ -64,6 +64,8 @@ const ResponsiblesPassword = lazy(() => import("@/pages/responsibles/[id]/passwo
 const FinancialCustomersList = lazy(() => import("@/pages/financial/customers/list").then((module) => ({ default: module.FinancialCustomersListPage })));
 const FinancialCustomersDetails = lazy(() => import("@/pages/financial/customers/details/[id]").then((module) => ({ default: module.FinancialCustomersDetailsPage })));
 const FinancialCustomersEdit = lazy(() => import("@/pages/financial/customers/edit/[id]").then((module) => ({ default: module.FinancialCustomersEditPage })));
+const FinancialNfseList = lazy(() => import("@/pages/financial/nfse/list").then((module) => ({ default: module.NfseListPage })));
+const FinancialNfseDetail = lazy(() => import("@/pages/financial/nfse/detail").then((module) => ({ default: module.NfseDetailPage })));
 const AdministrationCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
 const AdministrationCustomersEdit = lazy(() => import("@/pages/administration/customers/edit/[id]").then((module) => ({ default: module.EditCustomerPage })));
 const AdministrationCustomersDetails = lazy(() => import("@/pages/administration/customers/details/[id]").then((module) => ({ default: module.CustomerDetailsPage })));
@@ -1001,6 +1003,22 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <FinancialCustomersEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.nfse.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialNfseList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/financeiro/notas-fiscais/:id"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialNfseDetail />
                     </Suspense>
                   }
                 />

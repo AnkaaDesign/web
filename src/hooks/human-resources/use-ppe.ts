@@ -1,6 +1,6 @@
 // packages/frontend/src/hooks/usePpe.ts
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   // PpeSize
   createPpeSize,
@@ -24,6 +24,9 @@ import {
   batchMarkPpeDeliveriesAsDelivered,
   batchApprovePpeDeliveries,
   batchRejectPpeDeliveries,
+  // PpeDelivery Signature
+  getPpeSignatureDetails,
+  verifyPpeSignature,
   // PpeDeliverySchedule
   createPpeDeliverySchedule,
   deletePpeDeliverySchedule,
@@ -539,6 +542,40 @@ export function useBatchMarkPpeDeliveriesAsDelivered() {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Batch mark as delivered failed:", error);
       }
+    },
+  });
+}
+
+// =====================================================
+// PPE Signature Hooks
+// =====================================================
+
+export function usePpeSignatureDetails(
+  deliveryId: string,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<{ success: boolean; data: any }>({
+    queryKey: [...ppeDeliveryKeys.detail(deliveryId), "signature"],
+    queryFn: () => getPpeSignatureDetails(deliveryId),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: (options?.enabled ?? true) && !!deliveryId,
+  });
+}
+
+export function useVerifyPpeSignature() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    { success: boolean; valid: boolean; details?: string },
+    Error,
+    string
+  >({
+    mutationFn: (deliveryId: string) => verifyPpeSignature(deliveryId),
+    onSuccess: (_data, deliveryId) => {
+      // Invalidate the signature details query so it refetches
+      queryClient.invalidateQueries({
+        queryKey: [...ppeDeliveryKeys.detail(deliveryId), "signature"],
+      });
     },
   });
 }

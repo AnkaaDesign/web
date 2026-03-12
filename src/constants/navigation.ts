@@ -506,6 +506,31 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       {
+        id: "mensagens-admin",
+        title: "Mensagens",
+        icon: "message",
+        path: "/administracao/mensagens",
+        children: [
+          { id: "mensagens-admin-criar", title: "Criar", icon: "plus", path: "/administracao/mensagens/criar" },
+          { id: "mensagens-admin-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/mensagens/:id", isDynamic: true },
+          { id: "mensagens-admin-editar", title: "Editar", icon: "edit", path: "/administracao/mensagens/:id/editar", isDynamic: true },
+        ],
+      },
+      {
+        id: "minhas-mensagens-admin",
+        title: "Minhas Mensagens",
+        icon: "message",
+        path: "/pessoal/mensagens",
+        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
+      },
+      {
+        id: "notas-fiscais",
+        title: "Notas Fiscais",
+        icon: "receipt",
+        path: "/financeiro/notas-fiscais",
+        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+      },
+      {
         id: "notificacoes-admin",
         title: "Notificações",
         icon: "notification",
@@ -528,24 +553,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
             ],
           },
         ],
-      },
-      {
-        id: "mensagens-admin",
-        title: "Mensagens",
-        icon: "message",
-        path: "/administracao/mensagens",
-        children: [
-          { id: "mensagens-admin-criar", title: "Criar", icon: "plus", path: "/administracao/mensagens/criar" },
-          { id: "mensagens-admin-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/mensagens/:id", isDynamic: true },
-          { id: "mensagens-admin-editar", title: "Editar", icon: "edit", path: "/administracao/mensagens/:id/editar", isDynamic: true },
-        ],
-      },
-      {
-        id: "minhas-mensagens-admin",
-        title: "Minhas Mensagens",
-        icon: "message",
-        path: "/pessoal/mensagens",
-        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
       },
       {
         id: "setores",
@@ -851,6 +858,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Minhas Mensagens",
     icon: "message",
     path: "/pessoal/mensagens",
+    requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
+  },
+  {
+    id: "notas-fiscais-financeiro",
+    title: "Notas Fiscais",
+    icon: "receipt",
+    path: "/financeiro/notas-fiscais",
     requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
   },
 

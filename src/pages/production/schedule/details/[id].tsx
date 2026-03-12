@@ -31,7 +31,7 @@ import { formatDate, formatDateTime, formatCurrency, formatChassis, formatTruckS
 import { cn } from "@/lib/utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
-import { canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
+import { canCancelServiceOrder, canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { canViewPricing, canUpdatePricingStatus } from "@/utils/permissions/pricing-permissions";
 import { PricingStatusBadge } from "@/components/production/task/pricing/pricing-status-badge";
 import { InstallmentStatusBadge } from "@/components/production/task/billing/installment-status-badge";
@@ -39,6 +39,7 @@ import { BankSlipStatusBadge } from "@/components/production/task/billing/bank-s
 import { BoletoActions } from "@/components/production/task/billing/boleto-actions";
 import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
 import { NfseActions } from "@/components/production/task/billing/nfse-actions";
+import { NfseEnrichedInfo } from "@/components/production/task/billing/nfse-enriched-info";
 import { useInvoicesByTask } from "@/hooks/production/use-invoice";
 import type { Invoice } from "@/types/invoice";
 import { taskPricingService } from "@/api-client/task-pricing";
@@ -1031,10 +1032,11 @@ export const TaskDetailsPage = () => {
   // Includes: forecastDate, responsibles
   const PRIVILEGED_RESTRICTED_FIELDS = ['responsibles', 'forecast'];
 
-  // Check if user can view layout section (ADMIN, LOGISTIC, or PRODUCTION team leaders only)
+  // Check if user can view layout section (ADMIN, LOGISTIC, PRODUCTION_MANAGER, or PRODUCTION team leaders only)
   const canViewLayoutSection = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.PRODUCTION_MANAGER) ||
     (isProductionSector && isTeamLeader(currentUser))
   );
 
@@ -2676,9 +2678,6 @@ export const TaskDetailsPage = () => {
                                           <div key={installment.id} className="px-3 py-2 hover:bg-muted/40 transition-colors">
                                             <div className="flex items-center justify-between">
                                               <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
-                                                <span className="text-xs font-medium text-muted-foreground w-6">
-                                                  #{installment.number}
-                                                </span>
                                                 <span className="text-xs text-muted-foreground">
                                                   {formatDate(installment.dueDate)}
                                                 </span>
@@ -2695,6 +2694,17 @@ export const TaskDetailsPage = () => {
                                                 bankSlip={installment.bankSlip}
                                               />
                                             </div>
+                                            {installment.bankSlip?.pdfFile && (
+                                              <div className="mt-1.5">
+                                                <FileItem
+                                                  file={installment.bankSlip.pdfFile as unknown as CustomFile}
+                                                  viewMode="list"
+                                                  onPreview={(file) => fileViewerContext?.actions.viewFile(file)}
+                                                  onDownload={(file) => fileViewerContext?.actions.downloadFile(file)}
+                                                  showActions
+                                                />
+                                              </div>
+                                            )}
                                           </div>
                                         ))}
                                       </div>
@@ -2704,25 +2714,36 @@ export const TaskDetailsPage = () => {
                                         <IconFileInvoice className="h-3.5 w-3.5 text-muted-foreground" />
                                         NFS-e
                                       </div>
-                                      <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
-                                        <div className="flex items-center gap-3">
-                                          {configInvoice.nfseDocument ? (
+                                      <div className="rounded-md border border-border/50 px-3 py-2">
+                                        {(() => {
+                                          const nfseDocuments = configInvoice.nfseDocuments ?? [];
+                                          const activeNfse = nfseDocuments.find((d) => d.status === 'AUTHORIZED') ?? nfseDocuments[nfseDocuments.length - 1] ?? null;
+                                          return (
                                             <>
-                                              <NfseStatusBadge status={configInvoice.nfseDocument.status} size="sm" />
-                                              {configInvoice.nfseDocument.nfseNumber && (
-                                                <span className="text-xs text-muted-foreground">
-                                                  #{configInvoice.nfseDocument.nfseNumber}
-                                                </span>
+                                              <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                  {activeNfse ? (
+                                                    <NfseStatusBadge status={activeNfse.status} size="sm" />
+                                                  ) : (
+                                                    <span className="text-xs text-muted-foreground">Nao emitida</span>
+                                                  )}
+                                                  {nfseDocuments.length > 1 && (
+                                                    <span className="text-xs text-muted-foreground">
+                                                      ({nfseDocuments.length} emissões)
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                                              </div>
+                                              {activeNfse?.elotechNfseId && (
+                                                <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} showPdfLink />
                                               )}
-                                              <span className="text-xs text-muted-foreground">
-                                                {formatCurrency(configInvoice.nfseDocument.totalAmount)}
-                                              </span>
+                                              {activeNfse?.status === 'ERROR' && activeNfse.errorMessage && (
+                                                <p className="text-xs text-destructive mt-1">{activeNfse.errorMessage}</p>
+                                              )}
                                             </>
-                                          ) : (
-                                            <span className="text-xs text-muted-foreground">Nao emitida</span>
-                                          )}
-                                        </div>
-                                        <NfseActions invoiceId={configInvoice.id} nfseDocument={configInvoice.nfseDocument} />
+                                          );
+                                        })()}
                                       </div>
                                     </div>
                                   );
@@ -2863,9 +2884,6 @@ export const TaskDetailsPage = () => {
                                 <div key={installment.id} className="px-3 py-2 hover:bg-muted/40 transition-colors">
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
-                                      <span className="text-xs font-medium text-muted-foreground w-6">
-                                        #{installment.number}
-                                      </span>
                                       <span className="text-xs text-muted-foreground">
                                         {formatDate(installment.dueDate)}
                                       </span>
@@ -2882,6 +2900,17 @@ export const TaskDetailsPage = () => {
                                       bankSlip={installment.bankSlip}
                                     />
                                   </div>
+                                  {installment.bankSlip?.pdfFile && (
+                                    <div className="mt-1.5">
+                                      <FileItem
+                                        file={installment.bankSlip.pdfFile as unknown as CustomFile}
+                                        viewMode="list"
+                                        onPreview={(file) => fileViewerContext?.actions.viewFile(file)}
+                                        onDownload={(file) => fileViewerContext?.actions.downloadFile(file)}
+                                        showActions
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -2893,25 +2922,36 @@ export const TaskDetailsPage = () => {
                           <IconFileInvoice className="h-3.5 w-3.5 text-muted-foreground" />
                           NFS-e
                         </div>
-                        <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
-                          <div className="flex items-center gap-3">
-                            {configInvoice.nfseDocument ? (
+                        <div className="rounded-md border border-border/50 px-3 py-2">
+                          {(() => {
+                            const nfseDocuments = configInvoice.nfseDocuments ?? [];
+                            const activeNfse = nfseDocuments.find((d) => d.status === 'AUTHORIZED') ?? nfseDocuments[nfseDocuments.length - 1] ?? null;
+                            return (
                               <>
-                                <NfseStatusBadge status={configInvoice.nfseDocument.status} size="sm" />
-                                {configInvoice.nfseDocument.nfseNumber && (
-                                  <span className="text-xs text-muted-foreground">
-                                    #{configInvoice.nfseDocument.nfseNumber}
-                                  </span>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    {activeNfse ? (
+                                      <NfseStatusBadge status={activeNfse.status} size="sm" />
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">Nao emitida</span>
+                                    )}
+                                    {nfseDocuments.length > 1 && (
+                                      <span className="text-xs text-muted-foreground">
+                                        ({nfseDocuments.length} emissões)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                                </div>
+                                {activeNfse?.elotechNfseId && (
+                                  <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} showPdfLink />
                                 )}
-                                <span className="text-xs text-muted-foreground">
-                                  {formatCurrency(configInvoice.nfseDocument.totalAmount)}
-                                </span>
+                                {activeNfse?.status === 'ERROR' && activeNfse.errorMessage && (
+                                  <p className="text-xs text-destructive mt-1">{activeNfse.errorMessage}</p>
+                                )}
                               </>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">Nao emitida</span>
-                            )}
-                          </div>
-                          <NfseActions invoiceId={configInvoice.id} nfseDocument={configInvoice.nfseDocument} />
+                            );
+                          })()}
                         </div>
                       </div>
                     );
@@ -3113,8 +3153,6 @@ export const TaskDetailsPage = () => {
                           // Determine available status options based on service order type and user role
                           const isArtworkServiceOrder = serviceOrder.type === SERVICE_ORDER_TYPE.ARTWORK;
                           const isDesignerUser = userSectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
-                          const isAdminUser = userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
-
                           // Build status options based on service order type:
                           // - ARTWORK: PENDING, IN_PROGRESS, WAITING_APPROVE, COMPLETED (approval workflow)
                           //   - DESIGNER can only set up to WAITING_APPROVE (admin must approve to COMPLETED)
@@ -3144,8 +3182,8 @@ export const TaskDetailsPage = () => {
                             });
                           }
 
-                          // Add CANCELLED only for ADMIN (for any service order type)
-                          if (isAdminUser) {
+                          // Add CANCELLED for users with cancel permission (FINANCIAL, COMMERCIAL, ADMIN)
+                          if (canCancelServiceOrder(userSectorPrivilege)) {
                             statusOptions.push({
                               value: SERVICE_ORDER_STATUS.CANCELLED,
                               label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.CANCELLED],

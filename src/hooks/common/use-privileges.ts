@@ -70,6 +70,7 @@ export function usePrivileges() {
   const isWarehouse = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.WAREHOUSE) : false;
   const isProduction = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.PRODUCTION) : false;
   const isMaintenance = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.MAINTENANCE) : false;
+  const isProductionManager = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.PRODUCTION_MANAGER) : false;
   const isBasic = user ? !user.sector || user.sector.privileges === SECTOR_PRIVILEGES.BASIC : false;
 
   /**
@@ -116,6 +117,7 @@ export function usePrivileges() {
           isHR,
           isWarehouse,
           isProduction,
+          isProductionManager,
           isMaintenance,
         });
       }
@@ -143,6 +145,7 @@ export function usePrivileges() {
     isHR,
     isWarehouse,
     isProduction,
+    isProductionManager,
     isMaintenance,
     isBasic,
 

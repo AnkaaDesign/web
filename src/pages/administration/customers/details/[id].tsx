@@ -6,6 +6,7 @@ import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "../../../../c
 import { useCustomer, useCustomerMutations } from "../../../../hooks";
 import { useAuth } from "@/contexts/auth-context";
 import { hasAnyPrivilege } from "@/utils";
+import { canDeleteCustomers } from "@/utils/permissions/entity-permissions";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -122,12 +123,12 @@ export const CustomerDetailsPage = () => {
               icon: IconEdit,
               onClick: () => navigate(routes.administration.customers.edit(id)),
             },
-            {
+            ...(canDeleteCustomers(user) ? [{
               key: "delete",
               label: "Excluir",
               icon: IconTrash,
               onClick: () => setIsDeleteDialogOpen(true),
-            },
+            }] : []),
           ]}
           className="flex-shrink-0"
         />

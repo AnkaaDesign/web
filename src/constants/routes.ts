@@ -115,6 +115,10 @@ export const routes = {
       edit: (id: string) => `/financeiro/clientes/editar/${id}`,
       root: "/financeiro/clientes",
     },
+    nfse: {
+      detail: (id: number) => `/financeiro/notas-fiscais/${id}`,
+      root: "/financeiro/notas-fiscais",
+    },
     root: "/financeiro",
   },
 

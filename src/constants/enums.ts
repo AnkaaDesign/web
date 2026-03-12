@@ -2219,6 +2219,11 @@ export enum BANK_SLIP_STATUS {
   ERROR = "ERROR",
 }
 
+export enum BANK_SLIP_TYPE {
+  NORMAL = "NORMAL",
+  HIBRIDO = "HIBRIDO",
+}
+
 export enum NFSE_STATUS {
   PENDING = "PENDING",
   PROCESSING = "PROCESSING",

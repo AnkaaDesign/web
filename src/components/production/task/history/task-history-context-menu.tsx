@@ -83,14 +83,17 @@ export function TaskHistoryContextMenu({
   // FINANCIAL users should only see View and Edit options
   const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
 
-  // Users who can use "Liberar" action: ADMIN, LOGISTIC, and COMMERCIAL only
-  const canLiberar = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN ||
+  // Users who can use "Liberar" action: PRODUCTION, LOGISTIC, PRODUCTION_MANAGER, COMMERCIAL, and ADMIN
+  const canLiberar = user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION ||
                      user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC ||
-                     user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
+                     user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION_MANAGER ||
+                     user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL ||
+                     user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
 
-  // Users who can use "Dar Entrada" action: ADMIN and LOGISTIC only
+  // Users who can use "Dar Entrada" action: ADMIN, LOGISTIC, and PRODUCTION_MANAGER
   const canDarEntrada = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN ||
-                        user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC;
+                        user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC ||
+                        user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
 
   // LOGISTIC and COMMERCIAL users can see limited context menu options (Visualizar, Editar, Liberar)
   const isLogisticOrCommercial = user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC ||

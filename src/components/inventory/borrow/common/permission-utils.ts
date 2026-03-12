@@ -14,24 +14,22 @@ export function canCreateBorrow(user: User | null | undefined): boolean {
 
 /**
  * Check if user can edit a borrow
- * Only ADMIN can edit borrows
+ * WAREHOUSE and ADMIN can edit borrows
  */
 export function canEditBorrow(user: User | null | undefined, _borrow?: Borrow): boolean {
   if (!user) return false;
 
-  // Only admins can edit borrows
-  return hasPrivilege(user, SECTOR_PRIVILEGES.ADMIN);
+  return hasAnyPrivilege(user, [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]);
 }
 
 /**
  * Check if user can delete a borrow
- * Only ADMIN can delete borrows
+ * WAREHOUSE and ADMIN can delete borrows
  */
 export function canDeleteBorrow(user: User | null | undefined, _borrow?: Borrow): boolean {
   if (!user) return false;
 
-  // Only admins can delete borrows
-  return hasPrivilege(user, SECTOR_PRIVILEGES.ADMIN);
+  return hasAnyPrivilege(user, [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]);
 }
 
 /**
@@ -93,8 +91,8 @@ export function getBorrowPermissions(user: User | null | undefined, borrow?: Bor
  */
 export const PERMISSION_MESSAGES = {
   create: "Você precisa de permissões de Almoxarifado ou Administrador para criar empréstimos.",
-  edit: "Apenas Administradores podem editar empréstimos.",
-  delete: "Apenas Administradores podem excluir empréstimos.",
+  edit: "Você precisa de permissões de Almoxarifado ou Administrador para editar empréstimos.",
+  delete: "Você precisa de permissões de Almoxarifado ou Administrador para excluir empréstimos.",
   return: "Você precisa de permissões de Almoxarifado ou Administrador para devolver empréstimos.",
   view: "Você precisa estar autenticado para visualizar empréstimos.",
   manage: "Você precisa de permissões de Almoxarifado ou Administrador para gerenciar empréstimos.",

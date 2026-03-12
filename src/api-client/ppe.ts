@@ -306,6 +306,28 @@ export class PpeDeliveryService {
     return response.data;
   }
 
+  // =====================
+  // Signature Operations
+  // =====================
+
+  async getSignatureDetails(
+    deliveryId: string,
+  ): Promise<{ success: boolean; data: any }> {
+    const response = await apiClient.get<{ success: boolean; data: any }>(
+      `${this.basePath}/${deliveryId}/signature`,
+    );
+    return response.data;
+  }
+
+  async verifySignature(
+    deliveryId: string,
+  ): Promise<{ success: boolean; valid: boolean; details?: string }> {
+    const response = await apiClient.post<{ success: boolean; valid: boolean; details?: string }>(
+      `${this.basePath}/${deliveryId}/verify-signature`,
+    );
+    return response.data;
+  }
+
 }
 
 // =====================
@@ -450,6 +472,8 @@ export const requestPpeDelivery = (data: Omit<PpeDeliveryCreateFormData, "userId
 export const getMyPpeDeliveries = (params?: PpeDeliveryGetManyFormData) => ppeDeliveryService.getMyPpeDeliveries(params);
 export const batchApprovePpeDeliveries = (deliveryIds: string[], approvedBy?: string) => ppeDeliveryService.batchApprove(deliveryIds, approvedBy);
 export const batchRejectPpeDeliveries = (deliveryIds: string[], reviewedBy?: string, reason?: string) => ppeDeliveryService.batchReject(deliveryIds, reviewedBy, reason);
+export const getPpeSignatureDetails = (deliveryId: string) => ppeDeliveryService.getSignatureDetails(deliveryId);
+export const verifyPpeSignature = (deliveryId: string) => ppeDeliveryService.verifySignature(deliveryId);
 
 // PpeDeliverySchedule exports
 export const getPpeDeliverySchedules = (params?: PpeDeliveryScheduleGetManyFormData) => ppeDeliveryScheduleService.getPpeDeliverySchedules(params);

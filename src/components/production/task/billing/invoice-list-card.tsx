@@ -15,6 +15,7 @@ import { BankSlipStatusBadge } from './bank-slip-status-badge';
 import { BoletoActions } from './boleto-actions';
 import { NfseStatusBadge } from './nfse-status-badge';
 import { NfseActions } from './nfse-actions';
+import { NfseEnrichedInfo } from './nfse-enriched-info';
 import { FileItem, useFileViewer } from '@/components/common/file';
 import type { Invoice } from '@/types/invoice';
 import type { File as CustomFile } from '@/types/file';
@@ -50,9 +51,6 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
   const getAllPdfFiles = (): CustomFile[] => {
     const files: CustomFile[] = [];
     for (const invoice of invoices) {
-      if (invoice.nfseDocument?.pdfFile) {
-        files.push(invoice.nfseDocument.pdfFile as unknown as CustomFile);
-      }
       for (const inst of invoice.installments || []) {
         if (inst.bankSlip?.pdfFile) {
           files.push(inst.bankSlip.pdfFile as unknown as CustomFile);
@@ -208,7 +206,7 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
                                       />
                                     </div>
                                     {boletoPdfFile && (
-                                      <div className="mt-2 ml-12">
+                                      <div className="mt-2">
                                         <FileItem
                                           file={boletoPdfFile as unknown as CustomFile}
                                           viewMode="list"
@@ -234,37 +232,32 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
                             </span>
                           </div>
                           <div className="px-4 py-2.5">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                {invoice.nfseDocument ? (
-                                  <>
-                                    <NfseStatusBadge status={invoice.nfseDocument.status} size="sm" />
-                                    {invoice.nfseDocument.nfseNumber && (
-                                      <span className="text-sm text-muted-foreground">
-                                        #{invoice.nfseDocument.nfseNumber}
-                                      </span>
-                                    )}
-                                    <span className="text-sm text-muted-foreground">
-                                      {formatCurrency(invoice.nfseDocument.totalAmount)}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">Nao emitida</span>
-                                )}
-                              </div>
-                              <NfseActions invoiceId={invoice.id} nfseDocument={invoice.nfseDocument} />
-                            </div>
-                            {invoice.nfseDocument?.pdfFile && (
-                              <div className="mt-2">
-                                <FileItem
-                                  file={invoice.nfseDocument.pdfFile as unknown as CustomFile}
-                                  viewMode="list"
-                                  onPreview={handlePdfPreviewInCollection}
-                                  onDownload={handleFileDownload}
-                                  showActions
-                                />
-                              </div>
-                            )}
+                            {(() => {
+                              const nfseDocuments = invoice.nfseDocuments ?? [];
+                              const activeNfse = nfseDocuments.find((d) => d.status === 'AUTHORIZED') ?? nfseDocuments[nfseDocuments.length - 1] ?? null;
+                              return (
+                                <div>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      {activeNfse ? (
+                                        <NfseStatusBadge status={activeNfse.status} size="sm" />
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground">Nao emitida</span>
+                                      )}
+                                      {nfseDocuments.length > 1 && (
+                                        <span className="text-xs text-muted-foreground">
+                                          ({nfseDocuments.length} emissoes)
+                                        </span>
+                                      )}
+                                    </div>
+                                    <NfseActions invoiceId={invoice.id} nfseDocuments={nfseDocuments} />
+                                  </div>
+                                  {activeNfse?.elotechNfseId && (
+                                    <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} />
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
 

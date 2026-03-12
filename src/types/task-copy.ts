@@ -64,13 +64,13 @@ export const COPYABLE_TASK_FIELDS: CopyableTaskField[] = [
  */
 export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'>, string[]> = {
   // Basic fields - disabled for Financial, Warehouse, Designer
-  name: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
-  details: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
-  entryDate: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
-  term: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
-  forecastDate: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
-  responsibles: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
-  customerId: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  name: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  details: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  entryDate: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  term: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  forecastDate: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  responsibles: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  customerId: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Commission - disabled for Financial, Designer, Logistic, Warehouse
   commission: ['ADMIN', 'COMMERCIAL', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
@@ -88,10 +88,10 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
   artworkIds: ['ADMIN', 'COMMERCIAL', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Base files - accessible by most sectors
-  baseFileIds: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  baseFileIds: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
-  // Project files (Projetos) - editable by ADMIN, COMMERCIAL, LOGISTIC
-  projectFileIds: ['ADMIN', 'COMMERCIAL', 'LOGISTIC'],
+  // Project files (Projetos) - editable by ADMIN, COMMERCIAL, LOGISTIC, PRODUCTION_MANAGER
+  projectFileIds: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER'],
 
   // Cuts - hidden for Financial, Logistic, Commercial
   cuts: ['ADMIN', 'DESIGNER', 'WAREHOUSE', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
@@ -100,14 +100,14 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
   airbrushings: ['ADMIN', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Service orders - hidden for Warehouse and Plotting
-  serviceOrders: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'FINANCIAL', 'DESIGNER', 'PRODUCTION', 'MAINTENANCE'],
+  serviceOrders: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'FINANCIAL', 'DESIGNER', 'PRODUCTION', 'MAINTENANCE'],
 
   // Vehicle fields - disabled for Warehouse, Designer, Financial
-  implementType: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
-  category: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  implementType: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  category: ['ADMIN', 'COMMERCIAL', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Medidas do Caminhão - hidden for Warehouse, Financial, Designer, Commercial
-  layouts: ['ADMIN', 'LOGISTIC', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
+  layouts: ['ADMIN', 'LOGISTIC', 'PRODUCTION_MANAGER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
   // Observation - hidden for Warehouse, Financial, Designer, Logistic, Commercial
   observation: ['ADMIN', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],

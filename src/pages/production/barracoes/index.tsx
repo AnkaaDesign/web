@@ -57,7 +57,7 @@ export function GaragesPage() {
   // Check privileges
   const { isAdmin, isTeamLeader, canAccess } = usePrivileges();
   const { toast } = useToast();
-  const canDirectMove = isAdmin || isTeamLeader || canAccess([SECTOR_PRIVILEGES.LOGISTIC]);
+  const canDirectMove = isAdmin || isTeamLeader || canAccess([SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]);
   const canRequestMovement = canAccess([SECTOR_PRIVILEGES.PRODUCTION]) && !canDirectMove;
   const canEditGaragePositions = canDirectMove || canRequestMovement;
 

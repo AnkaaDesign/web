@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { IconFileDownload, IconSend, IconX } from '@tabler/icons-react';
+import { IconSend, IconX } from '@tabler/icons-react';
 import { toast } from '@/components/ui/sonner';
 import { useEmitNfse, useCancelNfse } from '@/hooks/production/use-invoice';
-import { invoiceService } from '@/api-client/invoice';
 import type { NfseDocument } from '@/types/invoice';
 import {
   Dialog,
@@ -14,28 +13,44 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+const CANCEL_REASONS = [
+  { code: '1', label: 'Erro na emissão' },
+  { code: '2', label: 'Serviço não prestado' },
+  { code: '4', label: 'Duplicidade da nota' },
+];
 
 interface NfseActionsProps {
   invoiceId: string;
-  nfseDocument: NfseDocument | null | undefined;
+  nfseDocuments: NfseDocument[] | null | undefined;
 }
 
-export function NfseActions({ invoiceId, nfseDocument }: NfseActionsProps) {
+export function NfseActions({ invoiceId, nfseDocuments }: NfseActionsProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [cancelReasonCode, setCancelReasonCode] = useState('1');
   const emitNfse = useEmitNfse();
   const cancelNfse = useCancelNfse();
 
-  const handleViewDanfse = async () => {
-    try {
-      const response = await invoiceService.getNfsePdf(invoiceId);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    } catch {
-      toast.error('Erro ao abrir DANFSE');
-    }
-  };
+  // Find the latest authorized NFSe (for cancel action)
+  const authorizedNfse = nfseDocuments?.find((d) => d.status === 'AUTHORIZED') ?? null;
+
+  // Find if there's an NFSe in error or pending state (for re-emit action)
+  const errorOrPendingNfse = nfseDocuments?.find(
+    (d) => d.status === 'ERROR' || d.status === 'PENDING'
+  ) ?? null;
+
+  // Can emit if: no NFSe documents yet, or latest is in error/pending state
+  const hasAnyNfse = (nfseDocuments?.length ?? 0) > 0;
+  const canEmit = !hasAnyNfse || !!errorOrPendingNfse;
+  const canCancel = !!authorizedNfse;
 
   const handleEmit = () => {
     emitNfse.mutate(invoiceId);
@@ -46,44 +61,35 @@ export function NfseActions({ invoiceId, nfseDocument }: NfseActionsProps) {
       toast.error('Motivo do cancelamento é obrigatório e deve ter no mínimo 15 caracteres.');
       return;
     }
+    if (!authorizedNfse) return;
     cancelNfse.mutate(
-      { invoiceId, data: { reason: cancelReason } },
+      {
+        invoiceId,
+        nfseDocumentId: authorizedNfse.id,
+        data: { reason: cancelReason, reasonCode: Number(cancelReasonCode) },
+      },
       {
         onSuccess: () => {
           setShowCancelDialog(false);
           setCancelReason('');
+          setCancelReasonCode('1');
         },
       }
     );
   };
 
-  const hasNfse = !!nfseDocument;
-  const isAuthorized = nfseDocument?.status === 'AUTHORIZED';
-  const canEmit = hasNfse && (nfseDocument?.status === 'ERROR' || nfseDocument?.status === 'PENDING');
-  const canCancel = isAuthorized;
+  if (!canEmit && !canCancel) return null;
 
   return (
     <>
       <div className="flex items-center gap-1">
-        {isAuthorized && nfseDocument.pdfFileId && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleViewDanfse}
-            title="Ver DANFSE"
-            className="h-7 w-7 p-0"
-          >
-            <IconFileDownload className="h-4 w-4" />
-          </Button>
-        )}
-
         {canEmit && (
           <Button
             variant="ghost"
             size="sm"
             onClick={handleEmit}
             disabled={emitNfse.isPending}
-            title={hasNfse ? 'Reemitir NFS-e' : 'Emitir NFS-e'}
+            title={hasAnyNfse ? 'Reemitir NFS-e' : 'Emitir NFS-e'}
             className="h-7 w-7 p-0"
           >
             <IconSend className="h-4 w-4" />
@@ -111,12 +117,30 @@ export function NfseActions({ invoiceId, nfseDocument }: NfseActionsProps) {
               Informe o motivo do cancelamento da NFS-e. Esta acao nao pode ser desfeita.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Input
-              value={cancelReason}
-              onChange={(value) => setCancelReason(String(value ?? ''))}
-              placeholder="Motivo do cancelamento..."
-            />
+          <div className="space-y-3 py-4">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Motivo</label>
+              <Select value={cancelReasonCode} onValueChange={setCancelReasonCode}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CANCEL_REASONS.map((r) => (
+                    <SelectItem key={r.code} value={r.code}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Justificativa</label>
+              <Input
+                value={cancelReason}
+                onChange={(value) => setCancelReason(String(value ?? ''))}
+                placeholder="Descreva o motivo do cancelamento..."
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCancelDialog(false)}>

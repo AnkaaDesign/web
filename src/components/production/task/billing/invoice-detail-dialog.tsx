@@ -18,6 +18,7 @@ import { formatCurrency } from '@/utils';
 import { InvoiceStatusBadge } from './invoice-status-badge';
 import { NfseStatusBadge } from './nfse-status-badge';
 import { NfseActions } from './nfse-actions';
+import { NfseEnrichedInfo } from './nfse-enriched-info';
 import { InstallmentRow } from './installment-row';
 import { useCancelInvoice } from '@/hooks/production/use-invoice';
 import type { Invoice } from '@/types/invoice';
@@ -81,26 +82,36 @@ export function InvoiceDetailDialog({ invoice, open, onOpenChange }: InvoiceDeta
           </div>
 
           {/* NFS-e Section */}
-          {(invoice.nfseDocument || invoice.status === 'ACTIVE' || invoice.status === 'PAID') && (
-            <div className="flex items-center justify-between py-3 border-b border-border">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium">NFS-e</span>
-                {invoice.nfseDocument ? (
-                  <>
-                    <NfseStatusBadge status={invoice.nfseDocument.status} size="sm" />
-                    {invoice.nfseDocument.nfseNumber && (
-                      <span className="text-sm text-muted-foreground">
-                        #{invoice.nfseDocument.nfseNumber}
+          {(() => {
+            const nfseDocuments = invoice.nfseDocuments ?? [];
+            const hasAny = nfseDocuments.length > 0;
+            const showSection = hasAny || invoice.status === 'ACTIVE' || invoice.status === 'PAID';
+            if (!showSection) return null;
+            const activeNfse = nfseDocuments.find((d) => d.status === 'AUTHORIZED') ?? nfseDocuments[nfseDocuments.length - 1] ?? null;
+            return (
+              <div className="py-3 border-b border-border">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium">NFS-e</span>
+                    {activeNfse ? (
+                      <NfseStatusBadge status={activeNfse.status} size="sm" />
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Nao emitida</span>
+                    )}
+                    {nfseDocuments.length > 1 && (
+                      <span className="text-xs text-muted-foreground">
+                        ({nfseDocuments.length} emissoes)
                       </span>
                     )}
-                  </>
-                ) : (
-                  <span className="text-sm text-muted-foreground">Nao emitida</span>
+                  </div>
+                  <NfseActions invoiceId={invoice.id} nfseDocuments={nfseDocuments} />
+                </div>
+                {activeNfse?.elotechNfseId && (
+                  <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} />
                 )}
               </div>
-              <NfseActions invoiceId={invoice.id} nfseDocument={invoice.nfseDocument} />
-            </div>
-          )}
+            );
+          })()}
 
           {/* Installments Table */}
           {invoice.installments && invoice.installments.length > 0 && (

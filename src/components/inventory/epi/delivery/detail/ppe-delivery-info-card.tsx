@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { IconCalendar, IconShield, IconUser, IconPackage, IconTruck, IconCircleCheck, IconFileText, IconPencil, IconExternalLink, IconFingerprint } from "@tabler/icons-react";
+import { IconCalendar, IconShield, IconShieldCheck, IconUser, IconPackage, IconTruck, IconCircleCheck, IconFileText, IconPencil, IconExternalLink, IconFingerprint, IconLoader2 } from "@tabler/icons-react";
 import type { PpeDelivery } from "../../../../../types";
 import { PPE_DELIVERY_STATUS_LABELS, getBadgeVariant, PPE_DELIVERY_STATUS } from "../../../../../constants";
 import { formatDateTime } from "../../../../../utils";
 import { cn } from "@/lib/utils";
+import { useVerifyPpeSignature } from "@/hooks/human-resources/use-ppe";
+import { toast } from "@/components/ui/sonner";
 
 const BIOMETRIC_LABELS: Record<string, string> = {
   FINGERPRINT: 'Impressão Digital',
@@ -23,6 +26,32 @@ interface PpeDeliveryInfoCardProps {
 export function PpeDeliveryInfoCard({ ppeDelivery, className }: PpeDeliveryInfoCardProps) {
   const statusLabel = PPE_DELIVERY_STATUS_LABELS[ppeDelivery.status] || ppeDelivery.status;
   const statusVariant = getBadgeVariant(ppeDelivery.status, "PPE_DELIVERY");
+
+  const verifySignatureMutation = useVerifyPpeSignature();
+  const [verificationResult, setVerificationResult] = useState<{ valid: boolean; details?: string } | null>(null);
+
+  const handleVerifySignature = () => {
+    setVerificationResult(null);
+    verifySignatureMutation.mutate(ppeDelivery.id, {
+      onSuccess: (result) => {
+        setVerificationResult({ valid: result.valid, details: result.details });
+        if (result.valid) {
+          toast.success("Integridade verificada", {
+            description: "A assinatura digital foi verificada com sucesso.",
+          });
+        } else {
+          toast.error("Verificação falhou", {
+            description: result.details || "A assinatura digital pode ter sido adulterada.",
+          });
+        }
+      },
+      onError: (error) => {
+        toast.error("Erro ao verificar", {
+          description: error.message || "Ocorreu um erro ao verificar a integridade da assinatura.",
+        });
+      },
+    });
+  };
 
   return (
     <Card className={cn("shadow-sm border border-border", className)}>
@@ -191,6 +220,48 @@ export function PpeDeliveryInfoCard({ ppeDelivery, className }: PpeDeliveryInfoC
                     </span>
                   </div>
                 )}
+
+                {/* Verify Integrity Button */}
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleVerifySignature}
+                    disabled={verifySignatureMutation.isPending}
+                    className="w-full"
+                  >
+                    {verifySignatureMutation.isPending ? (
+                      <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <IconShieldCheck className="mr-2 h-4 w-4" />
+                    )}
+                    Verificar Integridade
+                  </Button>
+
+                  {/* Verification Result Feedback */}
+                  {verificationResult && (
+                    <div
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium",
+                        verificationResult.valid
+                          ? "bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400"
+                          : "bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400",
+                      )}
+                    >
+                      {verificationResult.valid ? (
+                        <>
+                          <IconCircleCheck className="h-4 w-4 flex-shrink-0" />
+                          Assinatura íntegra e válida
+                        </>
+                      ) : (
+                        <>
+                          <IconShield className="h-4 w-4 flex-shrink-0" />
+                          {verificationResult.details || "Assinatura inválida ou adulterada"}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Signed Document PDF (in-app) */}
                 {ppeDelivery.signature.signedDocumentId && (

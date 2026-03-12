@@ -102,11 +102,12 @@ export const TaskCreateForm = () => {
   const isCommercialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
   const isLogisticUser = user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC;
   const isAdminUser = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  const isProductionManagerUser = user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
 
   const showResponsibles = isAdminUser || isCommercialUser;
   const showPaint = isAdminUser || isCommercialUser;
   const showLogoPaints = isAdminUser; // Commercial can't see logo paints
-  const showLayout = isAdminUser || isLogisticUser;
+  const showLayout = isAdminUser || isLogisticUser || isProductionManagerUser;
   const showPricing = isAdminUser || isCommercialUser;
   const showArtworks = isAdminUser || isCommercialUser;
 

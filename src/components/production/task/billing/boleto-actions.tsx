@@ -1,15 +1,10 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  IconFileDownload,
-  IconCopy,
-  IconQrcode,
   IconRefresh,
   IconX,
 } from '@tabler/icons-react';
-import { toast } from '@/components/ui/sonner';
 import { useRegenerateBoleto, useCancelBoleto } from '@/hooks/production/use-invoice';
-import { invoiceService } from '@/api-client/invoice';
 import type { BankSlip } from '@/types/invoice';
 import {
   Dialog,
@@ -30,37 +25,6 @@ export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
   const regenerateBoleto = useRegenerateBoleto();
   const cancelBoleto = useCancelBoleto();
 
-  const handleViewPdf = async () => {
-    try {
-      const response = await invoiceService.getBoletoPdf(installmentId);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    } catch {
-      toast.error('Erro ao abrir PDF do boleto');
-    }
-  };
-
-  const handleCopyBarcode = async () => {
-    if (!bankSlip?.digitableLine) return;
-    try {
-      await navigator.clipboard.writeText(bankSlip.digitableLine);
-      toast.success('Linha digitável copiada');
-    } catch {
-      toast.error('Erro ao copiar linha digitável');
-    }
-  };
-
-  const handleCopyPix = async () => {
-    if (!bankSlip?.pixQrCode) return;
-    try {
-      await navigator.clipboard.writeText(bankSlip.pixQrCode);
-      toast.success('Código PIX copiado');
-    } catch {
-      toast.error('Erro ao copiar código PIX');
-    }
-  };
-
   const handleRegenerate = () => {
     regenerateBoleto.mutate(installmentId);
   };
@@ -76,49 +40,14 @@ export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
 
   if (!bankSlip) return null;
 
-  const isActive = bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE';
   const canRegenerate = bankSlip.status === 'ERROR' || bankSlip.status === 'REJECTED';
   const canCancel = bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE';
+
+  if (!canRegenerate && !canCancel) return null;
 
   return (
     <>
       <div className="flex items-center gap-1">
-        {(bankSlip.pdfFileId || bankSlip.digitableLine) && isActive && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleViewPdf}
-            title="Ver PDF"
-            className="h-7 w-7 p-0"
-          >
-            <IconFileDownload className="h-4 w-4" />
-          </Button>
-        )}
-
-        {bankSlip.digitableLine && isActive && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCopyBarcode}
-            title="Copiar Linha Digitável"
-            className="h-7 w-7 p-0"
-          >
-            <IconCopy className="h-4 w-4" />
-          </Button>
-        )}
-
-        {bankSlip.pixQrCode && isActive && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCopyPix}
-            title="Copiar PIX"
-            className="h-7 w-7 p-0"
-          >
-            <IconQrcode className="h-4 w-4" />
-          </Button>
-        )}
-
         {canRegenerate && (
           <Button
             variant="ghost"

@@ -9,8 +9,8 @@ export const invoiceService = {
     apiClient.get(`/invoices/${id}`, {
       params: {
         include: {
-          installments: { include: { bankSlip: true } },
-          nfseDocument: true,
+          installments: { include: { bankSlip: { include: { pdfFile: true } } } },
+          nfseDocuments: true,
           customer: true,
           task: true,
         },
@@ -22,8 +22,8 @@ export const invoiceService = {
     apiClient.get(`/invoices/task/${taskId}`, {
       params: {
         include: {
-          installments: { include: { bankSlip: true } },
-          nfseDocument: true,
+          installments: { include: { bankSlip: { include: { pdfFile: true } } } },
+          nfseDocuments: true,
           customer: true,
         },
       },
@@ -56,8 +56,4 @@ export const invoiceService = {
   // Cancel NFS-e for invoice
   cancelNfse: (invoiceId: string, data: any) =>
     apiClient.put(`/invoices/${invoiceId}/nfse/cancel`, data),
-
-  // Get NFS-e PDF
-  getNfsePdf: (invoiceId: string) =>
-    apiClient.get(`/invoices/${invoiceId}/nfse/pdf`, { responseType: 'blob' }),
 };

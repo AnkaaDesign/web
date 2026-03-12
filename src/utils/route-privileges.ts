@@ -8,16 +8,16 @@ type RoutePrivilegeValue = RoutePrivilege | RoutePrivilege[];
 // Enhanced route privilege mappings with support for arrays and granular permissions
 export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // Home - All authenticated users can access (all privileges)
-  "/": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  "/": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
 
   // Administração - Admin access with specific granular permissions
   "/administracao": "ADMIN",
-  "/administracao/clientes": ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "COMMERCIAL"], // BASIC allows all authenticated, but specific access for Financial and Logistic
-  [routes.administration.customers.details(":id")]: ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "COMMERCIAL"], // Customer details using function
-  "/administracao/clientes/detalhes/:id": ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "COMMERCIAL"], // Financial and Logistic can view customer details - explicit pattern
-  [routes.administration.customers.edit(":id")]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can edit customers
-  "/administracao/clientes/editar/:id": ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can edit customers - explicit pattern
-  [routes.administration.customers.create]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can create customers
+  "/administracao/clientes": ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL"], // BASIC allows all authenticated, but specific access for Financial, Logistic, and Production Manager
+  [routes.administration.customers.details(":id")]: ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL"], // Customer details using function
+  "/administracao/clientes/detalhes/:id": ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL"], // Financial, Logistic, and Production Manager can view customer details - explicit pattern
+  [routes.administration.customers.edit(":id")]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER"], // Financial, Commercial, Logistic, Production Manager, and Admin can edit customers
+  "/administracao/clientes/editar/:id": ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER"], // Financial, Commercial, Logistic, Production Manager, and Admin can edit customers - explicit pattern
+  [routes.administration.customers.create]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER"], // Financial, Commercial, Logistic, Production Manager, and Admin can create customers
   // Responsibles - Admin and Commercial can manage responsibles
   [routes.responsibles.root]: ["ADMIN", "COMMERCIAL"],
   [routes.responsibles.create]: ["ADMIN", "COMMERCIAL"],
@@ -36,8 +36,8 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // Financeiro - Financial sector routes
   "/financeiro": "FINANCIAL",
   "/financeiro/*": "FINANCIAL",
-  "/financeiro/clientes": ["FINANCIAL", "LOGISTIC", "ADMIN"], // Financial and Logistic customers list page (team leaders check at component level)
-  "/financeiro/clientes/detalhes/:id": ["FINANCIAL", "LOGISTIC", "ADMIN"], // Financial and Logistic customer details
+  "/financeiro/clientes": ["FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN"], // Financial, Logistic, and Production Manager customers list page (team leaders check at component level)
+  "/financeiro/clientes/detalhes/:id": ["FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN"], // Financial, Logistic, and Production Manager customer details
   "/financeiro/clientes/editar/:id": ["FINANCIAL", "ADMIN"], // Only Financial and Admin can edit
   "/financeiro/clientes/cadastrar": ["FINANCIAL", "ADMIN"], // Only Financial and Admin can create
   "/financeiro/producao": "FINANCIAL", // Redirects to /producao
@@ -100,23 +100,23 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/estoque/retiradas-externas/cadastrar": "WAREHOUSE", // External withdrawal create
 
   // Profile - All authenticated users can access
-  "/perfil": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
-  "/perfil/notificacoes": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"], // Profile notifications
+  "/perfil": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  "/perfil/notificacoes": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"], // Profile notifications
 
   // Personal - All authenticated users can access (personal info)
-  "/pessoal": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
-  "/pessoal/mensagens": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
-  "/pessoal/*": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  "/pessoal": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  "/pessoal/mensagens": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  "/pessoal/*": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
 
   // Meu Pessoal - Team leader access (sector employee management)
   // Uses TEAM_LEADER virtual privilege which checks user.ledSector relation
   "/meu-pessoal": "TEAM_LEADER",
 
   // Pintura - Warehouse operations (PRODUCTION excluded from paint catalog)
-  "/pintura": ["WAREHOUSE", "DESIGNER", "LOGISTIC", "ADMIN"],
-  "/pintura/catalogo": ["WAREHOUSE", "DESIGNER", "ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION"],
+  "/pintura": ["WAREHOUSE", "DESIGNER", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN"],
+  "/pintura/catalogo": ["WAREHOUSE", "DESIGNER", "ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PRODUCTION"],
   // NOTE: /pintura/catalogo-basico privileges defined using routes.catalog.root on line 193 to avoid duplication
-  "/pintura/catalogo/detalhes/:id": ["WAREHOUSE", "DESIGNER", "ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION"],
+  "/pintura/catalogo/detalhes/:id": ["WAREHOUSE", "DESIGNER", "ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PRODUCTION"],
   "/pintura/catalogo/editar/:id": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can edit paints
   "/pintura/catalogo/cadastrar": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can create paints
   "/pintura/producoes": ["PRODUCTION", "WAREHOUSE", "ADMIN"], // Designer excluded from paint productions
@@ -142,20 +142,20 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // PLOTTING can access cut page, cronograma, history, and pessoal (has flat navigation)
   // COMMERCIAL can view and edit tasks in schedule and preparation, view history, garages, observations, airbrushings, and paint catalog (has flat navigation)
   // NOTE: Team leaders (checked via isTeamLeader()) can access schedule, history (manages their sector's tasks)
-  [routes.production.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL"], // Team leaders check at component level
-  [routes.production.schedule.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL"], // Team leaders check at component level
+  [routes.production.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL"], // Team leaders check at component level
+  [routes.production.schedule.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL"], // Team leaders check at component level
   // [routes.production.schedule.create]: ["PRODUCTION", "WAREHOUSE"], // Removed - tasks are now created in the "in preparation" page
-  [routes.production.schedule.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // Task detail page
-  [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // DESIGNER, FINANCIAL, LOGISTIC, PLOTTING can edit with restrictions
-  [routes.production.preparation.root]: ["DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // PRODUCTION and WAREHOUSE excluded from preparation
-  [routes.production.preparation.create]: ["PRODUCTION", "DESIGNER", "LOGISTIC", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Preparation task create - WAREHOUSE excluded
-  [routes.production.preparation.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Preparation task detail - WAREHOUSE excluded
-  "/producao/agenda/detalhes/:id": ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Agenda details
-  [routes.production.preparation.edit(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Preparation task edit - WAREHOUSE excluded
-  "/producao/agenda/editar/:id": ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Agenda edit - explicit route for designer access
-  [routes.production.history.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL"], // Team leaders check at component level
-  [routes.production.history.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // History detail page
-  [routes.production.garages.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Garages/Barracões - LOGISTIC can edit layouts
+  [routes.production.schedule.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL", "ADMIN"], // Task detail page
+  [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL", "ADMIN"], // DESIGNER, FINANCIAL, LOGISTIC, PRODUCTION_MANAGER, PLOTTING can edit with restrictions
+  [routes.production.preparation.root]: ["DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // PRODUCTION and WAREHOUSE excluded from preparation
+  [routes.production.preparation.create]: ["PRODUCTION", "DESIGNER", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Preparation task create - WAREHOUSE excluded
+  [routes.production.preparation.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // Preparation task detail - WAREHOUSE excluded
+  "/producao/agenda/detalhes/:id": ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // Agenda details
+  [routes.production.preparation.edit(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // Preparation task edit - WAREHOUSE excluded
+  "/producao/agenda/editar/:id": ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // Agenda edit - explicit route for designer access
+  [routes.production.history.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL"], // Team leaders check at component level
+  [routes.production.history.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL", "ADMIN"], // History detail page
+  [routes.production.garages.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // Garages/Barracões - LOGISTIC and PRODUCTION_MANAGER can edit layouts
   [routes.production.airbrushings.root]: ["WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"], // PRODUCTION and DESIGNER excluded from airbrushings
   [routes.production.airbrushings.list]: ["WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"],
   [routes.production.airbrushings.create]: ["WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // PRODUCTION and DESIGNER excluded
@@ -169,13 +169,13 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
 
   // Observations - accessible to production-related sectors (read-only for most, edit for admin)
   // DESIGNER and LOGISTIC excluded from observations
-  [routes.production.observations.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"],
-  [routes.production.observations.details(":id")]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"],
-  [routes.production.observations.create]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Production, warehouse, commercial, financial, and admin can create
-  [routes.production.observations.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Production, warehouse, commercial, financial, and admin can edit
+  [routes.production.observations.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL", "PRODUCTION_MANAGER", "ADMIN"],
+  [routes.production.observations.details(":id")]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL", "PRODUCTION_MANAGER", "ADMIN"],
+  [routes.production.observations.create]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "PRODUCTION_MANAGER", "ADMIN"], // Production, warehouse, commercial, financial, production manager, and admin can create
+  [routes.production.observations.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "PRODUCTION_MANAGER", "ADMIN"], // Production, warehouse, commercial, financial, production manager, and admin can edit
 
   // Registro de Ponto - All authenticated users can access
-  "/registro-de-ponto": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
+  "/registro-de-ponto": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
 
   // Recursos Humanos - HR with admin requirements for sensitive operations
   "/recursos-humanos": "HUMAN_RESOURCES",
@@ -200,7 +200,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
 
   // Catalog routes (view-only for designers, commercial, logistic, team leaders - NOTE: uses same details path as painting.catalog, so privileges defined on line 87)
   // Team leaders check at component level via isTeamLeader()
-  [routes.catalog.root]: ["DESIGNER", "COMMERCIAL", "LOGISTIC", "TEAM_LEADER", "ADMIN"],
+  [routes.catalog.root]: ["DESIGNER", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "TEAM_LEADER", "ADMIN"],
   // [routes.catalog.details(":id")]: "DESIGNER", // REMOVED: Conflicts with painting.catalog.details (same path), using hardcoded entry on line 87 instead
 
   // Maintenance routes (maintenance access for technicians and warehouse)
@@ -223,8 +223,8 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // Note: Specific routes for /administracao/clientes are defined above, wildcards won't override them
   "/administracao/*": "ADMIN",
   [`${routes.inventory.root}/*`]: "WAREHOUSE",
-  "/pintura/*": ["WAREHOUSE", "DESIGNER", "COMMERCIAL", "LOGISTIC", "TEAM_LEADER", "ADMIN"], // PRODUCTION excluded from paint routes
-  [`${routes.production.root}/*`]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL"], // DESIGNER, FINANCIAL, LOGISTIC, PLOTTING have read access to production routes
+  "/pintura/*": ["WAREHOUSE", "DESIGNER", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "TEAM_LEADER", "ADMIN"], // PRODUCTION excluded from paint routes
+  [`${routes.production.root}/*`]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL"], // DESIGNER, FINANCIAL, LOGISTIC, PRODUCTION_MANAGER, PLOTTING have read access to production routes
   "/recursos-humanos/*": "HUMAN_RESOURCES",
   "/human-resources/*": "HUMAN_RESOURCES",
   "/meu-pessoal/*": "TEAM_LEADER", // Team leader routes - uses virtual privilege

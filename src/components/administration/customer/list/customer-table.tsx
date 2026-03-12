@@ -21,7 +21,7 @@ import type { CustomerColumn } from "./customer-table-columns";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { CustomerListSkeleton } from "./customer-list-skeleton";
 import { useAuth } from "@/contexts/auth-context";
-import { canEditCustomers, canDeleteCustomers, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
+import { canEditCustomers, canDeleteCustomers, canBatchOperateCustomers, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { getCustomerDetailRoute, getCustomerEditRoute } from "@/utils/sector-routes";
 
 interface CustomerTableProps {
@@ -486,7 +486,7 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
             </DropdownMenuItem>
           )}
 
-          {canEdit && contextMenu?.isBulk && contextMenu.customers.length > 1 && onMerge && (
+          {canBatchOperateCustomers(user) && contextMenu?.isBulk && contextMenu.customers.length > 1 && onMerge && (
             <DropdownMenuItem onClick={() => {
               if (contextMenu) {
                 onMerge(contextMenu.customers);

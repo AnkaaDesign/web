@@ -42,6 +42,10 @@ export interface Task extends BaseEntity {
   sectorId: string | null;
   responsibles?: Responsible[];
   responsibleIds?: string[];
+  budgetIds?: string[];
+  invoiceIds?: string[];
+  receiptIds?: string[];
+  bankSlipIds?: string[];
   reimbursementIds?: string[];
   reimbursementInvoiceIds?: string[];
   baseFileIds?: string[];
@@ -56,6 +60,10 @@ export interface Task extends BaseEntity {
   customer?: Customer;
   pricingId?: string | null; // Foreign key to TaskPricing
   pricing?: TaskPricing; // Task pricing (one-to-one: each task has its own unique pricing)
+  budgets?: File[];
+  invoices?: File[];
+  receipts?: File[];
+  bankSlips?: File[];
   reimbursements?: File[]; // Many-to-many relation
   reimbursementInvoices?: File[]; // Many-to-many relation
   baseFiles?: File[]; // Files used as base for artwork design

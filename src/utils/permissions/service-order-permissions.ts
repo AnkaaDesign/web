@@ -74,7 +74,8 @@ export function getVisibleServiceOrderTypes(sectorPrivilege: SECTOR_PRIVILEGES |
       ];
 
     case SECTOR_PRIVILEGES.LOGISTIC:
-      // Logistic sees: production, logistic, commercial, artwork
+    case SECTOR_PRIVILEGES.PRODUCTION_MANAGER:
+      // Logistic and Production Manager see: production, logistic, commercial, artwork
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
         SERVICE_ORDER_TYPE.LOGISTIC,
@@ -131,8 +132,9 @@ export function canEditServiceOrderOfType(
   // Type-specific edit permissions
   switch (serviceOrderType) {
     case SERVICE_ORDER_TYPE.PRODUCTION:
-      // LOGISTIC and PRODUCTION can edit production service orders
+      // LOGISTIC, PRODUCTION_MANAGER, and PRODUCTION can edit production service orders
       return sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
+             sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER ||
              sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION;
 
     case SERVICE_ORDER_TYPE.COMMERCIAL:
@@ -141,8 +143,9 @@ export function canEditServiceOrderOfType(
              sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL;
 
     case SERVICE_ORDER_TYPE.LOGISTIC:
-      // Only LOGISTIC can edit logistic service orders
-      return sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC;
+      // LOGISTIC and PRODUCTION_MANAGER can edit logistic service orders
+      return sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
+             sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
 
     case SERVICE_ORDER_TYPE.ARTWORK:
       // Only DESIGNER can edit artwork service orders
@@ -155,12 +158,13 @@ export function canEditServiceOrderOfType(
 
 /**
  * Check if user can cancel any service order
- * Only ADMIN can cancel service orders
- * IMPORTANT: CANCELLED status should only be visible/selectable by ADMIN
+ * FINANCIAL, COMMERCIAL, and ADMIN can cancel service orders
  */
 export function canCancelServiceOrder(sectorPrivilege: SECTOR_PRIVILEGES | undefined): boolean {
   if (!sectorPrivilege) return false;
-  return sectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
+  return sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
+         sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
+         sectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
 }
 
 /**
@@ -182,9 +186,10 @@ export function canCompleteArtworkServiceOrder(sectorPrivilege: SECTOR_PRIVILEGE
  * - PRODUCTION, COMMERCIAL, LOGISTIC: PENDING, IN_PROGRESS, COMPLETED (simple workflow)
  *
  * IMPORTANT:
- * - Only ADMIN can see/set CANCELLED status
+ * - CANCELLED is available to users who can cancel (ADMIN, COMMERCIAL, FINANCIAL)
  * - WAITING_APPROVE is ONLY for ARTWORK (designer → admin approval workflow)
  * - DESIGNER can only set WAITING_APPROVE, not COMPLETED (admin approves)
+ * - Users who can EDIT the SO type get base statuses even if they can't cancel
  */
 export function getAllowedServiceOrderStatuses(
   sectorPrivilege: SECTOR_PRIVILEGES | undefined,
@@ -195,7 +200,7 @@ export function getAllowedServiceOrderStatuses(
   // Check if user can edit this type at all
   if (!canEditServiceOrderOfType(sectorPrivilege, serviceOrderType)) return [];
 
-  const isAdmin = sectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
+  const canCancel = canCancelServiceOrder(sectorPrivilege);
 
   // ARTWORK has special approval workflow with WAITING_APPROVE status
   if (serviceOrderType === SERVICE_ORDER_TYPE.ARTWORK) {
@@ -206,8 +211,12 @@ export function getAllowedServiceOrderStatuses(
       SERVICE_ORDER_STATUS.COMPLETED,
     ];
 
-    // ADMIN can set any status including CANCELLED
-    if (isAdmin) {
+    // Users who can cancel get CANCELLED status option
+    if (canCancel) {
+      // DESIGNER cannot set COMPLETED (only WAITING_APPROVE for admin approval)
+      if (sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
+        return [...artworkStatuses.filter(s => s !== SERVICE_ORDER_STATUS.COMPLETED), SERVICE_ORDER_STATUS.CANCELLED];
+      }
       return [...artworkStatuses, SERVICE_ORDER_STATUS.CANCELLED];
     }
 
@@ -226,8 +235,8 @@ export function getAllowedServiceOrderStatuses(
     SERVICE_ORDER_STATUS.COMPLETED,
   ];
 
-  // ADMIN can set any status including CANCELLED
-  if (isAdmin) {
+  // Users who can cancel get CANCELLED status option
+  if (canCancel) {
     return [...simpleStatuses, SERVICE_ORDER_STATUS.CANCELLED];
   }
 
@@ -252,9 +261,10 @@ export function getServiceOrderPermissions(
 
   switch (serviceOrderType) {
     case SERVICE_ORDER_TYPE.PRODUCTION:
-      // Production visible to ALL, but editable only by Admin, Logistic, and Production
+      // Production visible to ALL, but editable only by Admin, Logistic, Production Manager, and Production
       const canEditProduction =
         sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
+        sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER ||
         sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION;
 
       return {
@@ -272,8 +282,8 @@ export function getServiceOrderPermissions(
       if (sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
         return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
       }
-      if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
-        // Logistic can view but not edit commercial service orders
+      if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC || sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER) {
+        // Logistic and Production Manager can view but not edit commercial service orders
         return { canView: true, canEdit: false, editOnlyOwnOrUnassigned: false };
       }
       // Not visible to other sectors
@@ -282,7 +292,7 @@ export function getServiceOrderPermissions(
     case SERVICE_ORDER_TYPE.LOGISTIC:
       // Visible to: Admin, Logistic, Commercial, Financial
       // Editable by: Admin, Logistic only
-      if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
+      if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC || sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER) {
         return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
       }
       if (sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL || sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
@@ -298,8 +308,8 @@ export function getServiceOrderPermissions(
       if (sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
         return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
       }
-      if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC || sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
-        // Logistic and Commercial can view but not edit artwork service orders
+      if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC || sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER || sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
+        // Logistic, Production Manager, and Commercial can view but not edit artwork service orders
         return { canView: true, canEdit: false, editOnlyOwnOrUnassigned: false };
       }
       // Not visible to other sectors
