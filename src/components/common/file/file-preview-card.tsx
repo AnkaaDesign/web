@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { File as AnkaaFile } from "../../../types";
-import { formatFileSize, getFileCategory, getFileDisplayName, getFileDownloadUrl, getFileUrl, isImageFile } from "../../../utils/file";
+import { formatFileSize, getFileCategory, getFileDisplayName, getFileDownloadUrl, getFileUrl, isImageFile, rewriteCdnUrl } from "../../../utils/file";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { IconPhoto, IconFileText, IconVideo, IconMusic, IconFileZip, IconFile, IconVectorBezier, IconEye } from "@tabler/icons-react";
@@ -159,7 +159,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
 
                   if (file.thumbnailUrl) {
                     if (file.thumbnailUrl.startsWith("http")) {
-                      thumbnailSrc = file.thumbnailUrl;
+                      thumbnailSrc = rewriteCdnUrl(file.thumbnailUrl);
                     } else if (file.thumbnailUrl.startsWith("/")) {
                       thumbnailSrc = `${apiUrl}${file.thumbnailUrl}`;
                     } else {

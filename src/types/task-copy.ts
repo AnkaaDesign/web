@@ -12,7 +12,7 @@ export type CopyableTaskField =
   | 'commission'
   | 'responsibles'
   | 'customerId'
-  | 'pricingId'
+  | 'quoteId'
   | 'paintId'
   | 'artworkIds'
   | 'baseFileIds'
@@ -42,7 +42,7 @@ export const COPYABLE_TASK_FIELDS: CopyableTaskField[] = [
   'commission',
   'responsibles',
   'customerId',
-  'pricingId',
+  'quoteId',
   'paintId',
   'artworkIds',
   'baseFileIds',
@@ -75,8 +75,8 @@ export const COPYABLE_FIELD_PERMISSIONS: Record<Exclude<CopyableTaskField, 'all'
   // Commission - disabled for Financial, Designer, Logistic, Warehouse
   commission: ['ADMIN', 'COMMERCIAL', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
 
-  // Pricing - only visible to ADMIN, FINANCIAL, COMMERCIAL (canViewPricingSections)
-  pricingId: ['ADMIN', 'FINANCIAL', 'COMMERCIAL'],
+  // Quote - only visible to ADMIN, FINANCIAL, COMMERCIAL (canViewQuoteSections)
+  quoteId: ['ADMIN', 'FINANCIAL', 'COMMERCIAL'],
 
   // Paint - editable by most sectors except Warehouse, Financial, Logistic
   paintId: ['ADMIN', 'COMMERCIAL', 'DESIGNER', 'PLOTTING', 'PRODUCTION', 'MAINTENANCE'],
@@ -200,9 +200,9 @@ export const COPYABLE_FIELD_METADATA: Record<CopyableTaskField, CopyableFieldMet
     description: 'Cliente associado à tarefa',
     category: 'Comercial',
   },
-  pricingId: {
-    label: 'Precificação',
-    description: 'Cópia independente da tabela de preços e itens',
+  quoteId: {
+    label: 'Orçamento',
+    description: 'Cópia independente do orçamento e itens',
     category: 'Comercial',
   },
   paintId: {

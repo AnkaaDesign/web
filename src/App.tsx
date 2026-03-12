@@ -262,6 +262,7 @@ const ProductionTasksBatchEdit = lazy(() => import("@/pages/production/schedule/
 const ProductionTasksCreate = lazy(() => import("@/pages/production/schedule/create"));
 const ProductionTasksEdit = lazy(() => import("@/pages/production/schedule/edit/[id]").then((module) => ({ default: module.TaskEditPage })));
 const ProductionTasksDetails = lazy(() => import("@/pages/production/schedule/details/[id]").then((module) => ({ default: module.TaskDetailsPage })));
+const ProductionTaskQuote = lazy(() => import("@/pages/production/schedule/task-quote/[taskId]"));
 const ProductionPreparation = lazy(() => import("@/pages/production/preparation").then((module) => ({ default: module.PreparationPage })));
 const ProductionGarages = lazy(() => import("@/pages/production/barracoes").then((module) => ({ default: module.GaragesPage })));
 
@@ -500,6 +501,14 @@ function App() {
                   }
                 />
 
+                <Route
+                  path={routes.production.preparation.quote(":taskId")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProductionTaskQuote />
+                    </Suspense>
+                  }
+                />
                 <Route
                   path={routes.production.preparation.root}
                   element={

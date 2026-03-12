@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { taskPricingService } from "@/api-client/task-pricing";
+import { taskQuoteService } from "@/api-client/task-quote";
 import { formatCurrency, formatDate, toTitleCase } from "@/utils";
 import { getApiBaseUrl } from "@/utils/file";
-import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text-generators";
+import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { exportBudgetPdfFromData } from "@/utils/budget-pdf-generator";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/components/ui/sonner";
 import { IconUpload, IconCheck, IconAlertCircle, IconLoader2, IconBrandWhatsapp, IconDotsVertical, IconCopy, IconFileTypePdf } from "@tabler/icons-react";
-import type { TaskPricing } from "@/types/task-pricing";
+import type { TaskQuote } from "@/types/task-quote";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 
 // Company constants assembled from centralized config
@@ -26,7 +26,7 @@ const getFileServeUrl = (file: { id: string } | null | undefined): string => {
   return `${apiBaseUrl}/files/serve/${file.id}`;
 };
 
-interface PricingData extends TaskPricing {
+interface QuoteData extends TaskQuote {
   task?: {
     id: string;
     name?: string;
@@ -47,7 +47,7 @@ interface PricingData extends TaskPricing {
 
 export function PublicBudgetPage() {
   const { id, customerId } = useParams<{ id: string; customerId: string }>();
-  const [pricing, setPricing] = useState<PricingData | null>(null);
+  const [quote, setQuote] = useState<QuoteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -58,14 +58,14 @@ export function PublicBudgetPage() {
   // Use customerId from URL to filter services for a specific invoiceTo customer
   // If customerId matches the task's own customer (or is generic), show all services
   const selectedCustomerId = useMemo(() => {
-    if (!customerId || !pricing?.customerConfigs) return null;
+    if (!customerId || !quote?.customerConfigs) return null;
     // Only filter if the customerId matches one of the customerConfigs customers
-    const isConfigCustomer = pricing.customerConfigs.some(c => c.id === customerId);
+    const isConfigCustomer = quote.customerConfigs.some(c => c.id === customerId);
     return isConfigCustomer ? customerId : null;
-  }, [customerId, pricing?.customerConfigs]);
+  }, [customerId, quote?.customerConfigs]);
 
-  // Fetch pricing data
-  const fetchPricing = useCallback(async () => {
+  // Fetch quote data
+  const fetchQuote = useCallback(async () => {
     if (!id) {
       setError("ID do orçamento não fornecido.");
       setLoading(false);
@@ -74,9 +74,9 @@ export function PublicBudgetPage() {
 
     try {
       setLoading(true);
-      const response = await taskPricingService.getPublic(id);
+      const response = await taskQuoteService.getPublic(id);
       if (response.data?.success && response.data?.data) {
-        setPricing(response.data.data);
+        setQuote(response.data.data);
         setError(null);
       } else {
         setError(response.data?.message || "Erro ao carregar orçamento.");
@@ -90,8 +90,8 @@ export function PublicBudgetPage() {
   }, [id]);
 
   useEffect(() => {
-    fetchPricing();
-  }, [fetchPricing]);
+    fetchQuote();
+  }, [fetchQuote]);
 
   // Handle signature file selection
   const handleSignatureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,11 +127,11 @@ export function PublicBudgetPage() {
 
     try {
       setUploading(true);
-      const response = await taskPricingService.uploadPublicSignature(id, signatureFile);
+      const response = await taskQuoteService.uploadPublicSignature(id, signatureFile);
       if (response.data?.success) {
         toast.success("Assinatura enviada com sucesso!");
-        // Refresh pricing data
-        await fetchPricing();
+        // Refresh quote data
+        await fetchQuote();
         setSignatureFile(null);
         setSignaturePreview(null);
       } else {
@@ -147,12 +147,12 @@ export function PublicBudgetPage() {
 
   // Filter services based on selected customer (hooks must be before early returns)
   const filteredServices = useMemo(() => {
-    if (!pricing?.services) return [];
-    if (!selectedCustomerId) return pricing.services;
-    return pricing.services.filter(
+    if (!quote?.services) return [];
+    if (!selectedCustomerId) return quote.services;
+    return quote.services.filter(
       (service) => service.invoiceToCustomerId === selectedCustomerId || service.invoiceToCustomerId === null
     );
-  }, [pricing?.services, selectedCustomerId]);
+  }, [quote?.services, selectedCustomerId]);
 
   // Recalculate subtotal for filtered services
   const filteredSubtotal = useMemo(() => {
@@ -188,36 +188,36 @@ export function PublicBudgetPage() {
     );
   }
 
-  if (!pricing) return null;
+  if (!quote) return null;
 
   // Calculate derived data
-  const corporateName = pricing.task?.customer?.corporateName || pricing.task?.customer?.fantasyName || "Cliente";
+  const corporateName = quote.task?.customer?.corporateName || quote.task?.customer?.fantasyName || "Cliente";
   // Find the relevant customer config (filtered by URL param, or first available)
-  const activeConfig = pricing.customerConfigs?.find(c => c.id === selectedCustomerId) || pricing.customerConfigs?.[0];
+  const activeConfig = quote.customerConfigs?.find(c => c.id === selectedCustomerId) || quote.customerConfigs?.[0];
   // Prefer the explicitly selected budget responsible from the config
-  const commercialRep = pricing.task?.responsibles?.find(r => r.role === "COMMERCIAL");
+  const commercialRep = quote.task?.responsibles?.find(r => r.role === "COMMERCIAL");
   const contactName = activeConfig?.responsible?.name
     || commercialRep?.name
-    || pricing.task?.responsibles?.[0]?.name
+    || quote.task?.responsibles?.[0]?.name
     || "";
   // Format budget number with leading zeros (e.g., "0042")
-  const budgetNumber = pricing.budgetNumber
-    ? String(pricing.budgetNumber).padStart(4, '0')
-    : pricing.task?.serialNumber || "0000";
+  const budgetNumber = quote.budgetNumber
+    ? String(quote.budgetNumber).padStart(4, '0')
+    : quote.task?.serialNumber || "0000";
   // Calculate validity in days (budget expiration, NOT delivery time)
-  const validityDays = pricing.expiresAt
-    ? Math.max(0, Math.round((new Date(pricing.expiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+  const validityDays = quote.expiresAt
+    ? Math.max(0, Math.round((new Date(quote.expiresAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
     : 30;
-  const termDate = pricing.task?.term ? formatDate(pricing.task.term) : "";
+  const termDate = quote.task?.term ? formatDate(quote.task.term) : "";
   // Custom delivery days (production time) - used when no term date is set
-  const customDeliveryDays = pricing.customForecastDays || null;
+  const customDeliveryDays = quote.customForecastDays || null;
   const paymentText = generatePaymentText({
     customPaymentText: activeConfig?.customPaymentText || null,
     paymentCondition: activeConfig?.paymentCondition,
     downPaymentDate: activeConfig?.downPaymentDate,
-    total: activeConfig?.total ?? pricing.total,
+    total: activeConfig?.total ?? quote.total,
   });
-  const guaranteeText = generateGuaranteeText(pricing);
+  const guaranteeText = generateGuaranteeText(quote);
   const configDiscountType = activeConfig?.discountType || "NONE";
   const configDiscountValue = activeConfig?.discountValue ?? null;
   const hasDiscount = configDiscountType !== "NONE" && configDiscountValue && configDiscountValue > 0;
@@ -226,18 +226,18 @@ export function PublicBudgetPage() {
   const configSignature = activeConfig?.customerSignature;
   const hasExistingSignature = !!configSignature?.id;
   // Use serve endpoint for full quality images
-  const layoutImageUrl = pricing.layoutFile?.id ? getFileServeUrl(pricing.layoutFile) : null;
+  const layoutImageUrl = quote.layoutFile?.id ? getFileServeUrl(quote.layoutFile) : null;
   // Use serve endpoint for signature to preserve PNG transparency
   const signatureImageUrl = configSignature?.id ? getFileServeUrl(configSignature) : null;
 
   // Recalculate discount and total based on active filter
-  const displaySubtotal = selectedCustomerId ? filteredSubtotal : pricing.subtotal;
+  const displaySubtotal = selectedCustomerId ? filteredSubtotal : quote.subtotal;
   const discountAmount = configDiscountType === "PERCENTAGE"
     ? (displaySubtotal * (configDiscountValue || 0)) / 100
     : (configDiscountValue || 0);
   const displayTotal = selectedCustomerId
     ? Math.max(0, Math.round((displaySubtotal - discountAmount) * 100) / 100)
-    : pricing.total;
+    : quote.total;
 
   // Copy URL to clipboard
   const handleCopyLink = async () => {
@@ -262,25 +262,25 @@ export function PublicBudgetPage() {
       await exportBudgetPdfFromData({
         corporateName,
         contactName,
-        currentDate: formatDate(pricing.createdAt),
+        currentDate: formatDate(quote.createdAt),
         validityDays,
         budgetNumber,
-        items: pricing.services || [],
-        subtotal: pricing.subtotal,
+        items: quote.services || [],
+        subtotal: quote.subtotal,
         discountType: configDiscountType,
         discountValue: configDiscountValue,
-        total: pricing.total,
+        total: quote.total,
         termDate,
         customDeliveryDays,
         paymentText,
         guaranteeText,
         layoutImageUrl,
         customerSignatureUrl: signatureImageUrl,
-        serialNumber: pricing.task?.serialNumber || null,
-        plate: pricing.task?.truck?.plate || null,
-        chassisNumber: pricing.task?.truck?.chassisNumber || null,
-        customerConfigs: pricing.customerConfigs,
-        simultaneousTasks: pricing.simultaneousTasks || null,
+        serialNumber: quote.task?.serialNumber || null,
+        plate: quote.task?.truck?.plate || null,
+        chassisNumber: quote.task?.truck?.chassisNumber || null,
+        customerConfigs: quote.customerConfigs,
+        simultaneousTasks: quote.simultaneousTasks || null,
         discountReference: activeConfig?.discountReference || null,
         customerFilter: selectedCustomerId,
       });
@@ -307,7 +307,7 @@ export function PublicBudgetPage() {
                   Orçamento Nº {budgetNumber}
                 </h1>
                 <p className="text-sm text-gray-600 mt-1">
-                  <span className="font-semibold">Emissão:</span> {formatDate(pricing.createdAt)}
+                  <span className="font-semibold">Emissão:</span> {formatDate(quote.createdAt)}
                 </p>
                 <p className="text-sm text-gray-600">
                   <span className="font-semibold">Validade:</span> {validityDays} dias
@@ -374,27 +374,27 @@ export function PublicBudgetPage() {
               <p className="text-gray-700">
                 Conforme solicitado, apresentamos nossa proposta de preço para execução dos
                 serviços abaixo descriminados
-                {(pricing.task?.serialNumber || pricing.task?.truck?.plate || pricing.task?.truck?.chassisNumber) && (
+                {(quote.task?.serialNumber || quote.task?.truck?.plate || quote.task?.truck?.chassisNumber) && (
                   <>
                     {" "}no veículo
-                    {pricing.task?.serialNumber && (
-                      <> nº série: <strong>{pricing.task.serialNumber}</strong></>
+                    {quote.task?.serialNumber && (
+                      <> nº série: <strong>{quote.task.serialNumber}</strong></>
                     )}
-                    {pricing.task?.serialNumber && (pricing.task?.truck?.plate || pricing.task?.truck?.chassisNumber) && ","}
-                    {pricing.task?.truck?.plate && (
-                      <> placa: <strong>{pricing.task.truck.plate}</strong></>
+                    {quote.task?.serialNumber && (quote.task?.truck?.plate || quote.task?.truck?.chassisNumber) && ","}
+                    {quote.task?.truck?.plate && (
+                      <> placa: <strong>{quote.task.truck.plate}</strong></>
                     )}
-                    {pricing.task?.truck?.plate && pricing.task?.truck?.chassisNumber && ","}
-                    {pricing.task?.truck?.chassisNumber && (
-                      <> chassi: <strong>{pricing.task.truck.chassisNumber}</strong></>
+                    {quote.task?.truck?.plate && quote.task?.truck?.chassisNumber && ","}
+                    {quote.task?.truck?.chassisNumber && (
+                      <> chassi: <strong>{quote.task.truck.chassisNumber}</strong></>
                     )}
                   </>
                 )}.
               </p>
-              {pricing.customerConfigs && pricing.customerConfigs.length > 0 && (
+              {quote.customerConfigs && quote.customerConfigs.length > 0 && (
                 <p className="text-gray-700 mt-2">
                   <strong>Faturamento para:</strong>{" "}
-                  {pricing.customerConfigs
+                  {quote.customerConfigs
                     .map(c => c.customer?.fantasyName || c.customer?.corporateName || "Cliente")
                     .join(", ")}
                 </p>
@@ -470,8 +470,8 @@ export function PublicBudgetPage() {
                 </h3>
                 <p className="text-gray-700">
                   O prazo de entrega é de {customDeliveryDays} dias úteis a partir da data de liberação.
-                  {pricing.simultaneousTasks && pricing.simultaneousTasks > 1 && (
-                    <> Capacidade de produção: {pricing.simultaneousTasks} tarefas simultâneas.</>
+                  {quote.simultaneousTasks && quote.simultaneousTasks > 1 && (
+                    <> Capacidade de produção: {quote.simultaneousTasks} tarefas simultâneas.</>
                   )}
                 </p>
               </div>

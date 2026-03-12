@@ -1272,8 +1272,8 @@ const ChangelogTimelineItem = ({
                             onRollback &&
                             (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
                               entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK ||
-                              entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING ||
-                              entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM) && (
+                              entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE ||
+                              entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM) && (
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -2319,8 +2319,8 @@ export function ChangelogHistory({
     // Only allow rollback for supported entities
     if (
       entityType !== CHANGE_LOG_ENTITY_TYPE.TASK &&
-      entityType !== CHANGE_LOG_ENTITY_TYPE.TASK_PRICING &&
-      entityType !== CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM
+      entityType !== CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE &&
+      entityType !== CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM
     ) {
       return;
     }
@@ -2417,7 +2417,7 @@ export function ChangelogHistory({
       "totalCost",
       "discount",
       "profit",
-      "pricingId",
+      "quoteId",
     ];
 
     // Define restricted fields that should only be visible to privileged users (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER)

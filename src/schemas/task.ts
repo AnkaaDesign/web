@@ -6,7 +6,7 @@ import type { Task } from "../types";
 import { TASK_STATUS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, TRUCK_CATEGORY, IMPLEMENT_TYPE } from "../constants";
 import { cutCreateNestedSchema } from "./cut";
 import { airbrushingCreateNestedSchema } from "./airbrushing";
-import { taskPricingCreateNestedSchema } from "./task-pricing";
+import { taskQuoteCreateNestedSchema } from "./task-quote";
 import { responsibleCreateInlineSchema } from "./responsible";
 
 // =====================
@@ -227,7 +227,7 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
         .optional(),
       cutRequest: z.boolean().optional(),
       cutPlan: z.boolean().optional(),
-      pricing: z
+      quote: z
         .union([
           z.boolean(),
           z.object({
@@ -1088,7 +1088,7 @@ const taskServiceOrderCreateSchema = z.object({
   observation: z.string().nullable().optional(), // For rejection notes
   startedAt: nullableDate.optional(),
   finishedAt: nullableDate.optional(),
-  shouldSync: z.boolean().optional().default(true), // Controls bidirectional sync with TaskPricingService
+  shouldSync: z.boolean().optional().default(true), // Controls bidirectional sync with TaskQuoteService
   // File IDs for checkin/checkout photos grouped by service order
   checkinFileIds: z.array(z.string().uuid("Arquivo de checkin inválido")).optional(),
   checkoutFileIds: z.array(z.string().uuid("Arquivo de checkout inválido")).optional(),
@@ -1211,7 +1211,7 @@ export const taskCreateSchema = z
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
-    pricing: taskPricingCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
+    quote: taskQuoteCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   .superRefine((data, ctx) => {
     // Require at least one of: customer, serialNumber, plate, or name
@@ -1335,7 +1335,7 @@ export const taskUpdateSchema = z
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
-    pricing: taskPricingCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
+    quote: taskQuoteCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   // Auto-fill dates based on status changes (before validation)
   .transform((data) => {

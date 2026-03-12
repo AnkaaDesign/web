@@ -300,7 +300,7 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     isReorderingRef.current = true;
     replace(newValues);
 
-    // Notify parent to reorder synced pricing items for PRODUCTION groups
+    // Notify parent to reorder synced quote items for PRODUCTION groups
     if (type === SERVICE_ORDER_TYPE.PRODUCTION && onProductionReorder) {
       const newDescriptionOrder = reorderedGroupItems
         .map((item: any) => item.description)

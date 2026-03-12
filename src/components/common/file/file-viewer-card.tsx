@@ -35,6 +35,7 @@ import {
   IconVectorBezier,
 } from "@tabler/icons-react";
 import { fileViewerService } from "../../../utils/file-viewer";
+import { rewriteCdnUrl } from "../../../utils/file";
 import { FileViewerContext } from "./file-viewer";
 import { getApiBaseUrl } from "@/config/api";
 
@@ -211,7 +212,7 @@ export const generateThumbnailUrl = (
   // If file has a thumbnail URL, use it
   if (file.thumbnailUrl) {
     return file.thumbnailUrl.startsWith("http")
-      ? file.thumbnailUrl
+      ? rewriteCdnUrl(file.thumbnailUrl)
       : `${apiUrl}${file.thumbnailUrl}`;
   }
 

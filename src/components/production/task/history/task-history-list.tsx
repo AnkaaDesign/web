@@ -439,7 +439,7 @@ export function TaskHistoryList({
           budgets: true,
           invoices: true,
           receipts: true,
-          pricing: true,
+          quote: true,
           logoPaints: true,
           cuts: true,
           serviceOrders: true,
@@ -475,7 +475,7 @@ export function TaskHistoryList({
 
       try {
         // Call the copy-from endpoint for each target task sequentially
-        // to avoid budgetNumber unique constraint race conditions when copying pricing
+        // to avoid budgetNumber unique constraint race conditions when copying quote
         const results: { success: boolean; taskId: string; result?: any; error?: any }[] = [];
         for (const targetTask of targetTasks) {
           try {

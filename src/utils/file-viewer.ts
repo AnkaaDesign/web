@@ -2,6 +2,7 @@
 
 import type { File as AnkaaFile } from "../types";
 import { getApiBaseUrl } from "@/config/api";
+import { rewriteCdnUrl } from "./file";
 
 // File type detection and security utilities
 export interface FileViewerConfig {
@@ -170,9 +171,9 @@ export const generateFileUrls = (file: AnkaaFile, baseUrl?: string) => {
   // For remote storage files, use the direct URLs; for database files, use API endpoints
   if (isRemoteFile) {
     return {
-      serve: file.path, // Direct remote storage URL
-      download: file.path, // Direct remote storage URL
-      thumbnail: file.thumbnailUrl ? (file.thumbnailUrl.startsWith("http") ? file.thumbnailUrl : `${apiUrl}${file.thumbnailUrl}`) : null,
+      serve: rewriteCdnUrl(file.path), // Direct remote storage URL
+      download: rewriteCdnUrl(file.path), // Direct remote storage URL
+      thumbnail: file.thumbnailUrl ? (file.thumbnailUrl.startsWith("http") ? rewriteCdnUrl(file.thumbnailUrl) : `${apiUrl}${file.thumbnailUrl}`) : null,
       thumbnailSmall: file.thumbnailUrl || file.path, // Use thumbnail or file itself for remote storage
       thumbnailMedium: file.thumbnailUrl || file.path,
       thumbnailLarge: file.thumbnailUrl || file.path,
@@ -183,7 +184,7 @@ export const generateFileUrls = (file: AnkaaFile, baseUrl?: string) => {
   return {
     serve: `${apiUrl}/files/serve/${file.id}`,
     download: `${apiUrl}/files/${file.id}/download`,
-    thumbnail: file.thumbnailUrl ? (file.thumbnailUrl.startsWith("http") ? file.thumbnailUrl : `${apiUrl}${file.thumbnailUrl}`) : null,
+    thumbnail: file.thumbnailUrl ? (file.thumbnailUrl.startsWith("http") ? rewriteCdnUrl(file.thumbnailUrl) : `${apiUrl}${file.thumbnailUrl}`) : null,
     thumbnailSmall: `${apiUrl}/files/thumbnail/${file.id}?size=small`,
     thumbnailMedium: `${apiUrl}/files/thumbnail/${file.id}?size=medium`,
     thumbnailLarge: `${apiUrl}/files/thumbnail/${file.id}?size=large`,

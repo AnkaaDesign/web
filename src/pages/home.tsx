@@ -29,7 +29,7 @@ const ALL_HOME_SECTIONS: Record<string, SectionConfig> = {
   lowStockItems: { id: "lowStockItems", label: "Estoque Baixo", defaultVisible: true, fields: [] },
   completedTasks: { id: "completedTasks", label: "Tarefas Concluídas", defaultVisible: true, fields: [] },
   tasksAwaitingPaymentApproval: { id: "tasksAwaitingPaymentApproval", label: "Aguardando Aprovação de Pagamento", defaultVisible: true, fields: [] },
-  tasksAwaitingPricingApproval: { id: "tasksAwaitingPricingApproval", label: "Aguardando Aprovação Interna", defaultVisible: true, fields: [] },
+  tasksAwaitingQuoteApproval: { id: "tasksAwaitingQuoteApproval", label: "Aguardando Aprovação Interna", defaultVisible: true, fields: [] },
   timeEntries: { id: "timeEntries", label: "Ponto da Semana", defaultVisible: true, fields: [] },
   recentMessages: { id: "recentMessages", label: "Mensagens Recentes", defaultVisible: true, fields: [] },
 };
@@ -90,8 +90,8 @@ export function HomePage() {
     if (dashboardData?.tasksAwaitingPaymentApproval && dashboardData.tasksAwaitingPaymentApproval.length > 0) {
       sections.push(ALL_HOME_SECTIONS.tasksAwaitingPaymentApproval);
     }
-    if (dashboardData?.tasksAwaitingPricingApproval && dashboardData.tasksAwaitingPricingApproval.length > 0) {
-      sections.push(ALL_HOME_SECTIONS.tasksAwaitingPricingApproval);
+    if (dashboardData?.tasksAwaitingQuoteApproval && dashboardData.tasksAwaitingQuoteApproval.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.tasksAwaitingQuoteApproval);
     }
     if (needsTimeEntries) {
       sections.push(ALL_HOME_SECTIONS.timeEntries);

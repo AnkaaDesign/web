@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter } from "@tabler/icons-react";
+import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter, IconReceipt } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
@@ -12,6 +12,7 @@ import { SetSectorModal } from "../schedule/set-sector-modal";
 import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { useAuth } from "@/contexts/auth-context";
 import { canDeleteTasks, canFinishTask } from "@/utils/permissions/entity-permissions";
+import { canViewQuote } from "@/utils/permissions/quote-permissions";
 import { isTeamLeader } from "@/utils/user";
 import { canLeaderManageTask } from "@/utils/permissions/entity-permissions";
 import {
@@ -621,6 +622,17 @@ export function TaskHistoryContextMenu({
             <DropdownMenuItem onClick={handleDuplicate}>
               <IconCopy className="mr-2 h-4 w-4" />
               <span className="truncate">Criar Cópias</span>
+            </DropdownMenuItem>
+          )}
+
+          {/* Quote - ADMIN, FINANCIAL, COMMERCIAL (single selection only) */}
+          {canViewQuote(user?.sector?.privileges || "") && !isBulk && (
+            <DropdownMenuItem onClick={() => {
+              navigate(routes.production.preparation.quote(task.id));
+              setDropdownOpen(false);
+            }}>
+              <IconReceipt className="mr-2 h-4 w-4" />
+              <span className="truncate">Orçamento</span>
             </DropdownMenuItem>
           )}
 

@@ -1,6 +1,6 @@
 import { formatCurrency, formatDate, toTitleCase } from "./index";
 import type { Task } from "../types/task";
-import { generatePaymentText, generateGuaranteeText } from "./pricing-text-generators";
+import { generatePaymentText, generateGuaranteeText } from "./quote-text-generators";
 import { getApiBaseUrl } from "./file";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
 
@@ -314,14 +314,14 @@ function calculateAdaptiveLayout(
  * Based on the Ankaa Design official template (2 pages: front + back)
  */
 export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void> {
-  if (!task.pricing || !task.pricing.services || task.pricing.services.length === 0) {
-    throw new Error("Nenhum item de precificação encontrado");
+  if (!task.quote || !task.quote.services || task.quote.services.length === 0) {
+    throw new Error("Nenhum item de orçamento encontrado");
   }
 
   // Get customer info
   const corporateName = task.customer?.corporateName || task.customer?.fantasyName || "Cliente";
   // Find the first customer config to read per-config fields
-  const firstConfig = task.pricing?.customerConfigs?.[0];
+  const firstConfig = task.quote?.customerConfigs?.[0];
   // Prefer the explicitly selected budget responsible from the config
   const commercialRep = task.responsibles?.find((r: any) => r.role === "COMMERCIAL");
   const contactName = firstConfig?.responsible?.name
@@ -334,10 +334,10 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
   const termDate = task.term ? formatDate(task.term) : "";
 
   // Calculate validity in days (budget expiration, NOT delivery time)
-  const validityDays = task.pricing.expiresAt
+  const validityDays = task.quote.expiresAt
     ? (() => {
         const today = new Date();
-        const expires = new Date(task.pricing.expiresAt);
+        const expires = new Date(task.quote.expiresAt);
         // Reset time to midnight for accurate day calculation
         today.setHours(0, 0, 0, 0);
         expires.setHours(0, 0, 0, 0);
@@ -346,11 +346,11 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     : 30;
 
   // Custom delivery days (production time) - used when no term date is set
-  const customDeliveryDays = task.pricing.customForecastDays || null;
+  const customDeliveryDays = task.quote.customForecastDays || null;
 
   // Format budget number with leading zeros (e.g., "0042")
-  const budgetNumber = task.pricing.budgetNumber
-    ? String(task.pricing.budgetNumber).padStart(4, '0')
+  const budgetNumber = task.quote.budgetNumber
+    ? String(task.quote.budgetNumber).padStart(4, '0')
     : task.serialNumber || "0000";
 
   // Generate payment and guarantee text (customPaymentText, paymentCondition, downPaymentDate now live on config)
@@ -358,15 +358,15 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     customPaymentText: firstConfig?.customPaymentText || null,
     paymentCondition: firstConfig?.paymentCondition,
     downPaymentDate: firstConfig?.downPaymentDate,
-    total: firstConfig?.total ?? task.pricing.total,
+    total: firstConfig?.total ?? task.quote.total,
   });
-  const guaranteeText = generateGuaranteeText(task.pricing);
+  const guaranteeText = generateGuaranteeText(task.quote);
 
   // Get layout file URL if available - use direct URL (no fetch needed)
   // The <img> tag in the print window will load the image directly without CORS restrictions
   const apiBaseUrl = getApiBaseUrl();
-  const layoutImageUrl: string | null = task.pricing.layoutFile?.id
-    ? `${apiBaseUrl}/files/serve/${task.pricing.layoutFile.id}`
+  const layoutImageUrl: string | null = task.quote.layoutFile?.id
+    ? `${apiBaseUrl}/files/serve/${task.quote.layoutFile.id}`
     : null;
 
   // Get customer signature URL if available - read from the first config
@@ -380,11 +380,11 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     currentDate,
     validityDays,
     budgetNumber,
-    items: task.pricing.services,
-    subtotal: task.pricing.subtotal,
+    items: task.quote.services,
+    subtotal: task.quote.subtotal,
     discountType: firstConfig?.discountType || 'NONE',
     discountValue: firstConfig?.discountValue ?? null,
-    total: task.pricing.total,
+    total: task.quote.total,
     termDate,
     customDeliveryDays,
     paymentText,
@@ -395,9 +395,9 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     serialNumber: task.serialNumber || null,
     plate: task.truck?.plate || null,
     chassisNumber: task.truck?.chassisNumber || null,
-    // New TaskPricing fields
-    customerConfigs: task.pricing.customerConfigs,
-    simultaneousTasks: task.pricing.simultaneousTasks || null,
+    // New TaskQuote fields
+    customerConfigs: task.quote.customerConfigs,
+    simultaneousTasks: task.quote.simultaneousTasks || null,
     discountReference: firstConfig?.discountReference || null,
   });
 
@@ -443,7 +443,7 @@ export interface BudgetHtmlData {
   serialNumber: string | null;
   plate: string | null;
   chassisNumber: string | null;
-  // New TaskPricing fields
+  // New TaskQuote fields
   customerConfigs?: Array<{
     customer?: { corporateName?: string; fantasyName?: string };
     discountType?: string;

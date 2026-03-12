@@ -32,8 +32,8 @@ import { cn } from "@/lib/utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { canCancelServiceOrder, canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
-import { canViewPricing, canUpdatePricingStatus } from "@/utils/permissions/pricing-permissions";
-import { PricingStatusBadge } from "@/components/production/task/pricing/pricing-status-badge";
+import { canViewQuote, canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
+import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { InstallmentStatusBadge } from "@/components/production/task/billing/installment-status-badge";
 import { BankSlipStatusBadge } from "@/components/production/task/billing/bank-slip-status-badge";
 import { BoletoActions } from "@/components/production/task/billing/boleto-actions";
@@ -42,10 +42,11 @@ import { NfseActions } from "@/components/production/task/billing/nfse-actions";
 import { NfseEnrichedInfo } from "@/components/production/task/billing/nfse-enriched-info";
 import { useInvoicesByTask } from "@/hooks/production/use-invoice";
 import type { Invoice } from "@/types/invoice";
-import { taskPricingService } from "@/api-client/task-pricing";
-import type { TASK_PRICING_STATUS } from "@/types/task-pricing";
-import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text-generators";
-import { getApiBaseUrl } from "@/utils/file";
+import { taskQuoteService } from "@/api-client/task-quote";
+import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
+import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
+import { getApiBaseUrl, rewriteCdnUrl } from "@/utils/file";
+import { exportDossiePdf } from "@/utils/dossie-pdf-generator";
 import { SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_DISPLAY_ORDER } from "../../../../constants";
 import { RESPONSIBLE_ROLE_LABELS, ResponsibleRole } from "@/types/responsible";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -798,12 +799,12 @@ const TASK_SECTIONS: SectionConfig[] = [
     ],
   },
   {
-    id: "pricing",
-    label: "Precificação",
+    id: "quote",
+    label: "Orçamento / Faturamento",
     defaultVisible: true,
     fields: [
-      { id: "pricingItems", label: "Itens de Precificação", sectionId: "pricing" },
-      { id: "totalValue", label: "Valor Total", sectionId: "pricing" },
+      { id: "quoteItems", label: "Itens do Orçamento", sectionId: "quote" },
+      { id: "totalValue", label: "Valor Total", sectionId: "quote" },
     ],
   },
   {
@@ -845,8 +846,6 @@ const TASK_SECTIONS: SectionConfig[] = [
     fields: [
       { id: "baseFileFiles", label: "Arquivos Base", sectionId: "files" },
       { id: "projectFileFiles", label: "Projetos", sectionId: "files" },
-      { id: "checkinFileFiles", label: "Check-in", sectionId: "files" },
-      { id: "checkoutFileFiles", label: "Check-out", sectionId: "files" },
     ],
   },
   {
@@ -909,9 +908,9 @@ export const TaskDetailsPage = () => {
   const [nextServiceOrderToStart, setNextServiceOrderToStart] = useState<any>(null);
   const [filesViewMode, setFilesViewMode] = useState<FileViewMode>("grid");
   const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("grid");
-  const [pricingCustomerFilter, setPricingCustomerFilter] = useState<string | null>(null);
-  const [isUpdatingPricingStatus, setIsUpdatingPricingStatus] = useState(false);
-  const [pricingConfirmDialog, setPricingConfirmDialog] = useState<{
+  const [quoteCustomerFilter, setQuoteCustomerFilter] = useState<string | null>(null);
+  const [isUpdatingQuoteStatus, setIsUpdatingQuoteStatus] = useState(false);
+  const [quoteConfirmDialog, setQuoteConfirmDialog] = useState<{
     open: boolean;
     newStatus: string;
     currentStatus: string;
@@ -955,14 +954,6 @@ export const TaskDetailsPage = () => {
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC)
   );
-  // Check if user can view checkout files (ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC only)
-  const canViewCheckoutFiles = currentUser && (
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) ||
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC)
-  );
-
   // Check if user can view artwork badges and non-approved artworks (ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER only)
   const canViewArtworkBadges = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
@@ -1005,11 +996,11 @@ export const TaskDetailsPage = () => {
   // Check if user can edit tasks (PRODUCTION, LEADER, ADMIN)
   const canEdit = canEditTasks(currentUser ?? null);
 
-  // Check if user can view pricing (ADMIN, FINANCIAL, COMMERCIAL only)
-  const canViewPricingSection = canViewPricing(currentUser?.sector?.privileges || '');
-  const canChangePricingStatus = canUpdatePricingStatus(currentUser?.sector?.privileges || '');
+  // Check if user can view quote (ADMIN, FINANCIAL, COMMERCIAL only)
+  const canViewQuoteSection = canViewQuote(currentUser?.sector?.privileges || '');
+  const canChangeQuoteStatus = canUpdateQuoteStatus(currentUser?.sector?.privileges || '');
 
-  // Fetch invoice data for inline boleto/NFS-e display in pricing section
+  // Fetch invoice data for inline boleto/NFS-e display in quote section
   const { data: invoiceResponse } = useInvoicesByTask(id!);
   const invoices: Invoice[] = useMemo(() => {
     const data = invoiceResponse?.data;
@@ -1055,10 +1046,10 @@ export const TaskDetailsPage = () => {
       .filter(section => {
         // Financial users: completely hide certain sections
         if (isFinancialSector && FINANCIAL_HIDDEN_SECTIONS.includes(section.id)) return false;
-        // Hide pricing section for users without permission (ADMIN, FINANCIAL, COMMERCIAL only)
-        if (section.id === 'pricing' && !canViewPricingSection) return false;
+        // Hide quote section for users without permission (ADMIN, FINANCIAL, COMMERCIAL only)
+        if (section.id === 'quote' && !canViewQuoteSection) return false;
         // Hide files section if user can't view any file type
-        if (section.id === 'files' && !canViewBaseFiles && !canViewProjectFiles && !canViewCheckinFiles && !canViewCheckoutFiles) return false;
+        if (section.id === 'files' && !canViewBaseFiles && !canViewProjectFiles) return false;
         // Hide dossiê section for users who can't view checkin files (same permissions)
         if (section.id === 'dossie' && !canViewCheckinFiles) return false;
         // Hide layout section for users without permission (ADMIN, LOGISTIC, PRODUCTION team leaders only)
@@ -1106,7 +1097,7 @@ export const TaskDetailsPage = () => {
         }
         return section;
       });
-  }, [canViewPricingSection, canViewBaseFiles, canViewProjectFiles, canViewCheckinFiles, canViewCheckoutFiles, canViewLayoutSection, isWarehouseSector, isProductionSector, currentUser, canViewCommissionField, canViewRestrictedFields, isFinancialSector]);
+  }, [canViewQuoteSection, canViewBaseFiles, canViewProjectFiles, canViewCheckinFiles, canViewLayoutSection, isWarehouseSector, isProductionSector, currentUser, canViewCommissionField, canViewRestrictedFields, isFinancialSector]);
 
   // Initialize section visibility hook with filtered sections
   const sectionVisibility = useSectionVisibility(
@@ -1142,22 +1133,6 @@ export const TaskDetailsPage = () => {
     const projectFilesList = task?.projectFiles || [];
     const index = projectFilesList.findIndex(f => f.id === file.id);
     fileViewerContext.actions.viewFiles(projectFilesList, index);
-  };
-
-  // Handler for checkinFiles collection viewing
-  const handleCheckinFileClick = (file: CustomFile) => {
-    if (!fileViewerContext) return;
-    const checkinFilesList = task?.checkinFiles || [];
-    const index = checkinFilesList.findIndex(f => f.id === file.id);
-    fileViewerContext.actions.viewFiles(checkinFilesList, index);
-  };
-
-  // Handler for checkoutFiles collection viewing
-  const handleCheckoutFileClick = (file: CustomFile) => {
-    if (!fileViewerContext) return;
-    const checkoutFilesList = task?.checkoutFiles || [];
-    const index = checkoutFilesList.findIndex(f => f.id === file.id);
-    fileViewerContext.actions.viewFiles(checkoutFilesList, index);
   };
 
   // Handler for dossiê file viewing (scoped to a service order's checkin+checkout files)
@@ -1211,14 +1186,12 @@ export const TaskDetailsPage = () => {
       },
       baseFiles: true,
       projectFiles: true,
-      checkinFiles: true,
-      checkoutFiles: true,
       artworks: {
         include: {
           file: true,
         },
       },
-      pricing: {
+      quote: {
         include: {
           customerConfigs: {
             include: {
@@ -1470,9 +1443,9 @@ export const TaskDetailsPage = () => {
     if (sectionVisibility.isSectionVisible("dates")) {
       visibleCards.push({ id: 'dates', span: 1 });
     }
-    if (sectionVisibility.isSectionVisible("pricing") && canViewPricingSection && task.pricing?.services?.length) {
-      const hasMultipleCustomers = (task.pricing?.customerConfigs?.length ?? 0) >= 2;
-      visibleCards.push({ id: 'pricing', span: hasMultipleCustomers && !pricingCustomerFilter ? 2 : 1 });
+    if (sectionVisibility.isSectionVisible("quote") && canViewQuoteSection && task.quote?.services?.length) {
+      const hasMultipleCustomers = (task.quote?.customerConfigs?.length ?? 0) >= 2;
+      visibleCards.push({ id: 'quote', span: hasMultipleCustomers && !quoteCustomerFilter ? 2 : 1 });
     }
     if (sectionVisibility.isSectionVisible("serviceOrders") && hasVisibleServiceOrders && filteredServiceOrders.length > 0) {
       visibleCards.push({ id: 'serviceOrders', span: 1 });
@@ -1489,9 +1462,7 @@ export const TaskDetailsPage = () => {
     if (sectionVisibility.isSectionVisible("files")) {
       const hasBaseFiles = canViewBaseFiles && task.baseFiles && task.baseFiles.length > 0;
       const hasProjectFiles = canViewProjectFiles && task.projectFiles && task.projectFiles.length > 0;
-      const hasCheckinFiles = canViewCheckinFiles && task.checkinFiles && task.checkinFiles.length > 0;
-      const hasCheckoutFiles = canViewCheckoutFiles && task.checkoutFiles && task.checkoutFiles.length > 0;
-      if (hasBaseFiles || hasProjectFiles || hasCheckinFiles || hasCheckoutFiles) {
+      if (hasBaseFiles || hasProjectFiles) {
         visibleCards.push({ id: 'files', span: 1 });
       }
     }
@@ -1529,7 +1500,7 @@ export const TaskDetailsPage = () => {
     if (slot === 1) result.add(visibleCards[lastSpan1Idx].id);
 
     return result;
-  }, [task, sectionVisibility, canViewPricingSection, pricingCustomerFilter, hasVisibleServiceOrders, filteredServiceOrders, filteredArtworks, isFinancialSector, cuts, canViewBaseFiles, canViewProjectFiles, canViewCheckinFiles, canViewCheckoutFiles, airbrushings, hasDossieContent]);
+  }, [task, sectionVisibility, canViewQuoteSection, quoteCustomerFilter, hasVisibleServiceOrders, filteredServiceOrders, filteredArtworks, isFinancialSector, cuts, canViewBaseFiles, canViewProjectFiles, canViewCheckinFiles, airbrushings, hasDossieContent]);
 
   // Track page access
   usePageTracker({
@@ -1568,25 +1539,25 @@ export const TaskDetailsPage = () => {
     }
   };
 
-  // Handle pricing status change
-  const handlePricingStatusChange = async (newStatus: string, currentStatus?: string) => {
-    if (!task?.pricing?.id) return;
+  // Handle quote status change
+  const handleQuoteStatusChange = async (newStatus: string, currentStatus?: string) => {
+    if (!task?.quote?.id) return;
 
     // Confirmation for INTERNAL_APPROVED (triggers invoice/boleto generation)
     if (newStatus === 'INTERNAL_APPROVED') {
-      setPricingConfirmDialog({
+      setQuoteConfirmDialog({
         open: true,
         newStatus,
         currentStatus: currentStatus || '',
-        title: 'Aprovar Internamente',
-        description: 'Aprovar internamente irá gerar faturas e boletos automaticamente. Deseja continuar?',
+        title: 'INTERNAL_APPROVED_WARNING',
+        description: '',
       });
       return;
     }
 
     // Confirmation for reverting SETTLED → PARTIAL (payment reversal)
     if (currentStatus === 'SETTLED' && newStatus === 'PARTIAL') {
-      setPricingConfirmDialog({
+      setQuoteConfirmDialog({
         open: true,
         newStatus,
         currentStatus: currentStatus || '',
@@ -1596,20 +1567,20 @@ export const TaskDetailsPage = () => {
       return;
     }
 
-    await executePricingStatusChange(newStatus);
+    await executeQuoteStatusChange(newStatus);
   };
 
-  const executePricingStatusChange = async (newStatus: string) => {
-    if (!task?.pricing?.id) return;
-    setIsUpdatingPricingStatus(true);
+  const executeQuoteStatusChange = async (newStatus: string) => {
+    if (!task?.quote?.id) return;
+    setIsUpdatingQuoteStatus(true);
     try {
-      await taskPricingService.updateStatus(task.pricing.id, newStatus);
+      await taskQuoteService.updateStatus(task.quote.id, newStatus);
       refreshTask();
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
     } catch (error) {
-      console.error("Error updating pricing status:", error);
+      console.error("Error updating quote status:", error);
     } finally {
-      setIsUpdatingPricingStatus(false);
+      setIsUpdatingQuoteStatus(false);
     }
   };
 
@@ -2081,8 +2052,8 @@ export const TaskDetailsPage = () => {
                 )}
 
                 {/* Invoice To Customers - Financial sector overview field */}
-                {sectionVisibility.isFieldVisible("invoiceToCustomers") && (task as any).pricing?.customerConfigs?.length > 0 && (
-                  (task as any).pricing.customerConfigs.map((c: any) => {
+                {sectionVisibility.isFieldVisible("invoiceToCustomers") && (task as any).quote?.customerConfigs?.length > 0 && (
+                  (task as any).quote.customerConfigs.map((c: any) => {
                     const name = c.customer?.corporateName || c.customer?.fantasyName;
                     if (!name) return null;
                     return (
@@ -2206,9 +2177,9 @@ export const TaskDetailsPage = () => {
 
 
               {/* Pricing Card - Only visible to ADMIN, FINANCIAL, and COMMERCIAL sectors */}
-              {sectionVisibility.isSectionVisible("pricing") && canViewPricingSection && task.pricing && task.pricing.services && task.pricing.services.length > 0 && (() => {
-                const hasMultipleCustomers = (task.pricing?.customerConfigs?.length ?? 0) >= 2;
-                const isCompleteView = !pricingCustomerFilter;
+              {sectionVisibility.isSectionVisible("quote") && canViewQuoteSection && task.quote && task.quote.services && task.quote.services.length > 0 && (() => {
+                const hasMultipleCustomers = (task.quote?.customerConfigs?.length ?? 0) >= 2;
+                const isCompleteView = !quoteCustomerFilter;
                 const shouldSpanFull = hasMultipleCustomers && isCompleteView;
                 return (
                   <Card className={cn("border flex flex-col animate-in fade-in-50 duration-825", shouldSpanFull && "lg:col-span-2")}>
@@ -2216,15 +2187,15 @@ export const TaskDetailsPage = () => {
                       <div className="flex items-center justify-between">
                         <CardTitle className="flex items-center gap-2">
           <IconFileInvoice className="h-5 w-5 text-muted-foreground" />
-          Precificação Detalhada
+          {(!task.quote?.status || task.quote.status === 'PENDING') ? 'Orçamento Detalhado' : 'Faturamento Detalhado'}
         </CardTitle>
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              const customerId = pricingCustomerFilter || task.customer?.id || 'c';
-                              window.open(`/cliente/${customerId}/orcamento/${task.pricing?.id}`, '_blank');
+                              const customerId = quoteCustomerFilter || task.customer?.id || 'c';
+                              window.open(`/cliente/${customerId}/orcamento/${task.quote?.id}`, '_blank');
                             }}
                             className="gap-2"
                           >
@@ -2232,13 +2203,13 @@ export const TaskDetailsPage = () => {
                             Visualizar
                           </Button>
                           {/* Customer filter combobox - only show when 2+ invoiceTo customers */}
-                          {task.pricing?.customerConfigs && task.pricing.customerConfigs.length >= 2 && (
+                          {task.quote?.customerConfigs && task.quote.customerConfigs.length >= 2 && (
                             <Combobox
-                              value={pricingCustomerFilter || "all"}
-                              onValueChange={(value) => setPricingCustomerFilter(value === "all" ? null : (typeof value === 'string' ? value : null))}
+                              value={quoteCustomerFilter || "all"}
+                              onValueChange={(value) => setQuoteCustomerFilter(value === "all" ? null : (typeof value === 'string' ? value : null))}
                               options={[
                                 { value: "all", label: "Completo" },
-                                ...task.pricing.customerConfigs.map((config) => ({
+                                ...task.quote.customerConfigs.map((config) => ({
                                   value: config.customerId,
                                   label: config.customer?.corporateName || config.customer?.fantasyName || "Cliente",
                                 })),
@@ -2249,48 +2220,51 @@ export const TaskDetailsPage = () => {
                             />
                           )}
                           {(() => {
-                            if (!task.pricing) return null;
-                            const pricingStatus = task.pricing.status;
+                            if (!task.quote) return null;
+                            const quoteStatus = task.quote.status;
 
-                            if (!canChangePricingStatus) {
-                              return <PricingStatusBadge status={pricingStatus} size="lg" />;
+                            if (!canChangeQuoteStatus) {
+                              return <QuoteStatusBadge status={quoteStatus} size="lg" />;
                             }
 
-                            const statusLabels: Record<TASK_PRICING_STATUS, string> = {
+                            const statusLabels: Record<TASK_QUOTE_STATUS, string> = {
                               PENDING: 'Pendente',
                               BUDGET_APPROVED: 'Orçamento Aprovado',
-                              VERIFIED: 'Verificado',
+                              VERIFIED_BY_FINANCIAL: 'Verificado pelo Financeiro',
                               INTERNAL_APPROVED: 'Aprovado Internamente',
                               UPCOMING: 'A Vencer',
+                              DUE: 'Vencido',
                               PARTIAL: 'Parcial',
                               SETTLED: 'Liquidado',
                             };
 
                             // Build options: all statuses the user can transition to + current
-                            const allStatuses: TASK_PRICING_STATUS[] = [
-                              'PENDING', 'BUDGET_APPROVED', 'VERIFIED', 'INTERNAL_APPROVED',
-                              'UPCOMING', 'PARTIAL', 'SETTLED',
+                            const allStatuses: TASK_QUOTE_STATUS[] = [
+                              'PENDING', 'BUDGET_APPROVED', 'VERIFIED_BY_FINANCIAL', 'INTERNAL_APPROVED',
+                              'UPCOMING', 'DUE', 'PARTIAL', 'SETTLED',
                             ];
                             const userPrivilege = currentUser?.sector?.privileges || '';
                             const statusOptions: ComboboxOption[] = allStatuses
                               .map((s) => ({
                                 value: s,
                                 label: statusLabels[s],
-                                disabled: s === pricingStatus || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s === 'INTERNAL_APPROVED'),
+                                disabled: s === quoteStatus || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s === 'INTERNAL_APPROVED'),
                               }));
 
-                            const getPricingStatusTriggerClass = (status: TASK_PRICING_STATUS) => {
+                            const getQuoteStatusTriggerClass = (status: TASK_QUOTE_STATUS) => {
                               switch (status) {
                                 case 'PENDING':
                                   return "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600";
                                 case 'BUDGET_APPROVED':
                                   return "bg-green-700 text-white hover:bg-green-800 border-green-800";
-                                case 'VERIFIED':
+                                case 'VERIFIED_BY_FINANCIAL':
                                   return "bg-blue-700 text-white hover:bg-blue-800 border-blue-800";
                                 case 'INTERNAL_APPROVED':
                                   return "bg-green-700 text-white hover:bg-green-800 border-green-800";
                                 case 'UPCOMING':
                                   return "bg-amber-600 text-white hover:bg-amber-700 border-amber-700";
+                                case 'DUE':
+                                  return "bg-red-600 text-white hover:bg-red-700 border-red-700";
                                 case 'PARTIAL':
                                   return "bg-blue-700 text-white hover:bg-blue-800 border-blue-800";
                                 case 'SETTLED':
@@ -2302,20 +2276,20 @@ export const TaskDetailsPage = () => {
 
                             return (
                               <Combobox
-                                value={pricingStatus}
+                                value={quoteStatus}
                                 onValueChange={(value) => {
-                                  if (value && typeof value === 'string' && value !== pricingStatus) {
-                                    handlePricingStatusChange(value, pricingStatus);
+                                  if (value && typeof value === 'string' && value !== quoteStatus) {
+                                    handleQuoteStatusChange(value, quoteStatus);
                                   }
                                 }}
                                 options={statusOptions}
                                 searchable={false}
                                 clearable={false}
-                                disabled={isUpdatingPricingStatus}
+                                disabled={isUpdatingQuoteStatus}
                                 className="w-[220px] h-9 rounded-md"
                                 triggerClassName={cn(
                                   "font-medium",
-                                  getPricingStatusTriggerClass(pricingStatus)
+                                  getQuoteStatusTriggerClass(quoteStatus)
                                 )}
                               />
                             );
@@ -2327,24 +2301,24 @@ export const TaskDetailsPage = () => {
                 <div className="space-y-4">
                   {/* Budget Number and Validity */}
                   <div className="flex flex-wrap gap-3">
-                    {task.pricing.budgetNumber && (
+                    {task.quote.budgetNumber && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
                         <IconReceipt className="h-4 w-4" />
-                        <span>Orçamento Nº: <span className="font-medium text-foreground">{String(task.pricing.budgetNumber).padStart(4, '0')}</span></span>
+                        <span>Orçamento Nº: <span className="font-medium text-foreground">{String(task.quote.budgetNumber).padStart(4, '0')}</span></span>
                       </div>
                     )}
-                    {task.pricing.expiresAt && (
+                    {task.quote.expiresAt && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
                         <IconCalendar className="h-4 w-4" />
-                        <span>Validade: <span className="font-medium text-foreground">{formatDate(task.pricing.expiresAt)}</span></span>
+                        <span>Validade: <span className="font-medium text-foreground">{formatDate(task.quote.expiresAt)}</span></span>
                       </div>
                     )}
                   </div>
 
                   {/* Pricing items table */}
                   {(() => {
-                    const filteredServices = task.pricing.services
-                      .filter((item) => !pricingCustomerFilter || item.invoiceToCustomer?.id === pricingCustomerFilter || !item.invoiceToCustomerId);
+                    const filteredServices = task.quote.services
+                      .filter((item) => !quoteCustomerFilter || item.invoiceToCustomer?.id === quoteCustomerFilter || !item.invoiceToCustomerId);
 
                     const renderServiceRow = (item: any, index: number, showCustomerCol: boolean) => {
                       const isOutrosWithObservation = item.description === 'Outros' && !!item.observation;
@@ -2401,7 +2375,7 @@ export const TaskDetailsPage = () => {
                     };
 
                     // Group by customer when "Completo" with 2+ customers — 2-column layout
-                    if (!pricingCustomerFilter && (task.pricing?.customerConfigs?.length ?? 0) >= 2) {
+                    if (!quoteCustomerFilter && (task.quote?.customerConfigs?.length ?? 0) >= 2) {
                       const customerGroups = new Map<string, { name: string; services: typeof filteredServices }>();
 
                       for (const item of filteredServices) {
@@ -2470,7 +2444,7 @@ export const TaskDetailsPage = () => {
 
                   {/* Pricing Summary */}
                   {(() => {
-                    const configs = task.pricing?.customerConfigs || [];
+                    const configs = task.quote?.customerConfigs || [];
                     const hasConfigs = configs.length > 0;
 
                     // Determine which discount/total source to use
@@ -2481,9 +2455,9 @@ export const TaskDetailsPage = () => {
                     let discountAmount = 0;
                     let displayTotal: number;
 
-                    if (pricingCustomerFilter) {
+                    if (quoteCustomerFilter) {
                       // Specific customer filtered: use that config's data
-                      const selectedConfig = configs.find((c) => c.customerId === pricingCustomerFilter);
+                      const selectedConfig = configs.find((c) => c.customerId === quoteCustomerFilter);
                       if (selectedConfig) {
                         displaySubtotal = typeof selectedConfig.subtotal === 'number' ? selectedConfig.subtotal : Number(selectedConfig.subtotal) || 0;
                         discountType = selectedConfig.discountType;
@@ -2495,7 +2469,7 @@ export const TaskDetailsPage = () => {
                         displayTotal = typeof selectedConfig.total === 'number' ? selectedConfig.total : Number(selectedConfig.total) || 0;
                       } else {
                         // Fallback: compute from filtered services + global discount
-                        const filtered = task.pricing.services.filter((item) => item.invoiceToCustomer?.id === pricingCustomerFilter || !item.invoiceToCustomerId);
+                        const filtered = task.quote.services.filter((item) => item.invoiceToCustomer?.id === quoteCustomerFilter || !item.invoiceToCustomerId);
                         displaySubtotal = filtered.reduce((sum, item) => sum + (typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0), 0);
                         displayTotal = displaySubtotal;
                       }
@@ -2509,28 +2483,26 @@ export const TaskDetailsPage = () => {
                       }
                     } else if (hasConfigs && configs.length === 1) {
                       // Single config: use that config's data
+                      // Discount is now per-service; config totals already have discounts applied
                       const config = configs[0];
                       let configSubtotal = typeof config.subtotal === 'number' ? config.subtotal : Number(config.subtotal) || 0;
-                      // Fallback: if config subtotal is 0 but services have amounts, compute from services
-                      if (configSubtotal === 0 && task.pricing.services?.length > 0) {
-                        configSubtotal = task.pricing.services.reduce((sum: number, item: any) => sum + (typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0), 0);
+                      if (configSubtotal === 0 && task.quote.services?.length > 0) {
+                        configSubtotal = task.quote.services.reduce((sum: number, item: any) => sum + (typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0), 0);
                       }
                       displaySubtotal = configSubtotal;
-                      discountType = config.discountType;
-                      discountValue = config.discountValue;
-                      discountReference = config.discountReference || null;
-                      discountAmount = discountType === 'PERCENTAGE'
-                        ? (displaySubtotal * (discountValue || 0)) / 100
-                        : (discountValue || 0);
                       let configTotal = typeof config.total === 'number' ? config.total : Number(config.total) || 0;
                       if (configTotal === 0 && displaySubtotal > 0) {
-                        configTotal = Math.max(0, displaySubtotal - discountAmount);
+                        configTotal = displaySubtotal;
                       }
                       displayTotal = configTotal;
+                      // Derive aggregate discount from subtotal - total difference
+                      if (displaySubtotal !== displayTotal) {
+                        discountAmount = displaySubtotal - displayTotal;
+                      }
                     } else {
-                      // No configs: fallback to global pricing aggregates (no per-config discount)
-                      displaySubtotal = typeof task.pricing.subtotal === 'number' ? task.pricing.subtotal : Number(task.pricing.subtotal) || 0;
-                      displayTotal = typeof task.pricing.total === 'number' ? task.pricing.total : Number(task.pricing.total) || 0;
+                      // No configs: fallback to global quote aggregates (no per-config discount)
+                      displaySubtotal = typeof task.quote.subtotal === 'number' ? task.quote.subtotal : Number(task.quote.subtotal) || 0;
+                      displayTotal = typeof task.quote.total === 'number' ? task.quote.total : Number(task.quote.total) || 0;
                     }
 
                     return (
@@ -2575,25 +2547,24 @@ export const TaskDetailsPage = () => {
                   })()}
 
                   {/* Per-Customer Config Cards */}
-                  {task.pricing?.customerConfigs && task.pricing.customerConfigs.length > 0 && (() => {
-                    const configs = pricingCustomerFilter
-                      ? task.pricing!.customerConfigs!.filter((c) => c.customerId === pricingCustomerFilter)
-                      : task.pricing!.customerConfigs!.length >= 2
-                        ? task.pricing!.customerConfigs!
+                  {task.quote?.customerConfigs && task.quote.customerConfigs.length > 0 && (() => {
+                    const configs = quoteCustomerFilter
+                      ? task.quote!.customerConfigs!.filter((c) => c.customerId === quoteCustomerFilter)
+                      : task.quote!.customerConfigs!.length >= 2
+                        ? task.quote!.customerConfigs!
                         : [];
 
                     if (configs.length === 0) return null;
 
-                    const isMultiColumnLayout = !pricingCustomerFilter && configs.length >= 2;
+                    const isMultiColumnLayout = !quoteCustomerFilter && configs.length >= 2;
 
                     return (
                       <div className={cn("gap-3", isMultiColumnLayout ? "grid grid-cols-1 md:grid-cols-2" : "space-y-3")}>
                         {configs.map((config) => {
                           const configSubtotal = typeof config.subtotal === 'number' ? config.subtotal : Number(config.subtotal) || 0;
-                          const configDiscountAmount = config.discountType === 'PERCENTAGE'
-                            ? (configSubtotal * (config.discountValue || 0)) / 100
-                            : (config.discountValue || 0);
                           const configTotal = typeof config.total === 'number' ? config.total : Number(config.total) || 0;
+                          // Discount is now per-service; derive aggregate discount from subtotal vs total
+                          const configDiscountAmount = Math.max(0, configSubtotal - configTotal);
                           const configPaymentText = generatePaymentText({
                             customPaymentText: config.customPaymentText,
                             paymentCondition: config.paymentCondition,
@@ -2629,17 +2600,9 @@ export const TaskDetailsPage = () => {
                                 <span className="font-medium">{formatCurrency(configSubtotal)}</span>
                               </div>
 
-                              {config.discountType && config.discountType !== 'NONE' && config.discountValue ? (
+                              {configDiscountAmount > 0 ? (
                                 <div className="flex items-center justify-between text-sm text-destructive">
-                                  <span>
-                                    Desconto
-                                    {config.discountType === 'PERCENTAGE'
-                                      ? ` (${config.discountValue}%)`
-                                      : ' (Valor Fixo)'}
-                                    {config.discountReference && (
-                                      <span className="text-muted-foreground font-normal"> — Ref: {config.discountReference}</span>
-                                    )}
-                                  </span>
+                                  <span>Desconto (serviços)</span>
                                   <span className="font-medium">- {formatCurrency(configDiscountAmount)}</span>
                                 </div>
                               ) : null}
@@ -2776,18 +2739,18 @@ export const TaskDetailsPage = () => {
                   })()}
 
                   {/* Delivery Deadline */}
-                  {(task.pricing.customForecastDays || (task.pricing.simultaneousTasks && task.pricing.simultaneousTasks > 1)) && (
+                  {(task.quote.customForecastDays || (task.quote.simultaneousTasks && task.quote.simultaneousTasks > 1)) && (
                     <div className="bg-muted/30 rounded-lg p-4">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
                         <IconTruck className="h-4 w-4 text-muted-foreground" />
                         Prazo de Entrega
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {task.pricing.customForecastDays && (
-                          <>O prazo de entrega é de {task.pricing.customForecastDays} dias úteis a partir da data de liberação.</>
+                        {task.quote.customForecastDays && (
+                          <>O prazo de entrega é de {task.quote.customForecastDays} dias úteis a partir da data de liberação.</>
                         )}
-                        {task.pricing.simultaneousTasks && task.pricing.simultaneousTasks > 1 && (
-                          <>{task.pricing.customForecastDays ? ' ' : ''}Capacidade de produção: {task.pricing.simultaneousTasks} tarefas simultâneas.</>
+                        {task.quote.simultaneousTasks && task.quote.simultaneousTasks > 1 && (
+                          <>{task.quote.customForecastDays ? ' ' : ''}Capacidade de produção: {task.quote.simultaneousTasks} tarefas simultâneas.</>
                         )}
                       </p>
                     </div>
@@ -2795,14 +2758,14 @@ export const TaskDetailsPage = () => {
 
                   {/* Payment Conditions */}
                   {(() => {
-                    const configs = task.pricing?.customerConfigs || [];
+                    const configs = task.quote?.customerConfigs || [];
                     // When filtering a specific customer, use that config's payment data
-                    if (pricingCustomerFilter) {
-                      const selectedConfig = configs.find((c) => c.customerId === pricingCustomerFilter);
+                    if (quoteCustomerFilter) {
+                      const selectedConfig = configs.find((c) => c.customerId === quoteCustomerFilter);
                       if (selectedConfig) return null; // Already shown in per-customer card above
                     }
                     // When "Completo" with 2+ configs, skip global (shown in per-customer cards)
-                    if (!pricingCustomerFilter && configs.length >= 2) return null;
+                    if (!quoteCustomerFilter && configs.length >= 2) return null;
                     // When 1 config, use that config's data
                     if (configs.length === 1) {
                       const config = configs[0];
@@ -2823,12 +2786,12 @@ export const TaskDetailsPage = () => {
                         </div>
                       ) : null;
                     }
-                    // Fallback to global pricing (paymentCondition/downPaymentDate now live on config level)
+                    // Fallback to global quote (paymentCondition/downPaymentDate now live on config level)
                     const paymentText = generatePaymentText({
                       customPaymentText: null,
                       paymentCondition: null,
                       downPaymentDate: null,
-                      total: typeof task.pricing.total === 'number' ? task.pricing.total : Number(task.pricing.total) || 0,
+                      total: typeof task.quote.total === 'number' ? task.quote.total : Number(task.quote.total) || 0,
                     });
                     return paymentText ? (
                       <div className="bg-muted/30 rounded-lg p-4">
@@ -2843,9 +2806,9 @@ export const TaskDetailsPage = () => {
 
                   {/* Boletos & NFS-e for single-customer case (not shown in per-customer cards) */}
                   {(() => {
-                    const configs = task.pricing?.customerConfigs || [];
+                    const configs = task.quote?.customerConfigs || [];
                     // Only show here when there's a single config and no customer filter (per-customer cards don't render)
-                    if (pricingCustomerFilter || configs.length !== 1) return null;
+                    if (quoteCustomerFilter || configs.length !== 1) return null;
                     const config = configs[0];
                     const configInvoice = invoices.find((inv) => inv.customerConfigId === config.id);
                     if (!configInvoice) {
@@ -2959,7 +2922,7 @@ export const TaskDetailsPage = () => {
 
                   {/* Guarantee */}
                   {(() => {
-                    const guaranteeText = generateGuaranteeText(task.pricing);
+                    const guaranteeText = generateGuaranteeText(task.quote);
                     return guaranteeText ? (
                       <div className="bg-muted/30 rounded-lg p-4">
                         <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
@@ -2972,7 +2935,7 @@ export const TaskDetailsPage = () => {
                   })()}
 
                   {/* Layout File Preview */}
-                  {task.pricing.layoutFile && (
+                  {task.quote.layoutFile && (
                     <div className="bg-muted/30 rounded-lg p-4">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
                         <IconPhoto className="h-4 w-4 text-muted-foreground" />
@@ -2980,12 +2943,12 @@ export const TaskDetailsPage = () => {
                       </div>
                       <div className="flex justify-start">
                         <img
-                          src={`${getApiBaseUrl()}/files/thumbnail/${task.pricing.layoutFile.id}`}
+                          src={`${getApiBaseUrl()}/files/thumbnail/${task.quote.layoutFile.id}`}
                           alt="Layout aprovado"
                           className="max-h-48 rounded-lg shadow-sm object-contain cursor-pointer hover:opacity-90 transition-opacity"
                           onClick={() => {
-                            if (fileViewerContext && task.pricing?.layoutFile) {
-                              fileViewerContext.actions.viewFile(task.pricing.layoutFile);
+                            if (fileViewerContext && task.quote?.layoutFile) {
+                              fileViewerContext.actions.viewFile(task.quote.layoutFile);
                             }
                           }}
                         />
@@ -2995,9 +2958,9 @@ export const TaskDetailsPage = () => {
 
                   {/* Customer Signature - read from the first config (or filtered config) */}
                   {(() => {
-                    const sigConfig = pricingCustomerFilter
-                      ? task.pricing.customerConfigs?.find((c: any) => c.customerId === pricingCustomerFilter)
-                      : task.pricing.customerConfigs?.[0];
+                    const sigConfig = quoteCustomerFilter
+                      ? task.quote.customerConfigs?.find((c: any) => c.customerId === quoteCustomerFilter)
+                      : task.quote.customerConfigs?.[0];
                     const configSig = sigConfig?.customerSignature;
                     if (!configSig) return null;
                     return (
@@ -3418,13 +3381,11 @@ export const TaskDetailsPage = () => {
                 </Card>
               )}
 
-              {/* Files Card - Unified section for base files, projects, check-in, check-out */}
+              {/* Files Card - Unified section for base files and projects */}
               {sectionVisibility.isSectionVisible("files") && (() => {
                 const hasBaseFiles = canViewBaseFiles && task.baseFiles && task.baseFiles.length > 0;
                 const hasProjectFiles = canViewProjectFiles && task.projectFiles && task.projectFiles.length > 0;
-                const hasCheckinFiles = canViewCheckinFiles && task.checkinFiles && task.checkinFiles.length > 0;
-                const hasCheckoutFiles = canViewCheckoutFiles && task.checkoutFiles && task.checkoutFiles.length > 0;
-                const totalFiles = (hasBaseFiles ? task.baseFiles!.length : 0) + (hasProjectFiles ? task.projectFiles!.length : 0) + (hasCheckinFiles ? task.checkinFiles!.length : 0) + (hasCheckoutFiles ? task.checkoutFiles!.length : 0);
+                const totalFiles = (hasBaseFiles ? task.baseFiles!.length : 0) + (hasProjectFiles ? task.projectFiles!.length : 0);
 
                 if (totalFiles === 0) return null;
 
@@ -3507,51 +3468,6 @@ export const TaskDetailsPage = () => {
                           </div>
                         )}
 
-                        {/* Check-in Files */}
-                        {hasCheckinFiles && (
-                          <div>
-                            <div className="flex items-center gap-2 mb-3">
-                              <IconFile className="h-4 w-4 text-muted-foreground" />
-                              <h4 className="text-sm font-semibold">Check-in</h4>
-                              <Badge variant="outline" className="text-xs">{task.checkinFiles!.length}</Badge>
-                            </div>
-                            <div className={cn(filesViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                              {task.checkinFiles!.map((file) => (
-                                <FileItem
-                                  key={file.id}
-                                  file={file}
-                                  viewMode={filesViewMode}
-                                  onPreview={handleCheckinFileClick}
-                                  onDownload={handleDownload}
-                                  showActions
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Check-out Files */}
-                        {hasCheckoutFiles && (
-                          <div>
-                            <div className="flex items-center gap-2 mb-3">
-                              <IconFile className="h-4 w-4 text-muted-foreground" />
-                              <h4 className="text-sm font-semibold">Check-out</h4>
-                              <Badge variant="outline" className="text-xs">{task.checkoutFiles!.length}</Badge>
-                            </div>
-                            <div className={cn(filesViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                              {task.checkoutFiles!.map((file) => (
-                                <FileItem
-                                  key={file.id}
-                                  file={file}
-                                  viewMode={filesViewMode}
-                                  onPreview={handleCheckoutFileClick}
-                                  onDownload={handleDownload}
-                                  showActions
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -3859,7 +3775,7 @@ export const TaskDetailsPage = () => {
 
                       // If thumbnailUrl exists and is already a full URL
                       if (firstArtwork.thumbnailUrl?.startsWith("http")) {
-                        return firstArtwork.thumbnailUrl;
+                        return rewriteCdnUrl(firstArtwork.thumbnailUrl);
                       }
 
                       // If thumbnailUrl exists (relative path), use thumbnail endpoint
@@ -4014,13 +3930,41 @@ export const TaskDetailsPage = () => {
                 return (
                   <Card className={cn("border border-border/40 flex flex-col animate-in fade-in-50 duration-1200", fullSpanSections.has("dossie") ? "lg:col-span-2" : "lg:col-span-1")}>
                     <CardHeader className="pb-3">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconFolderCheck className="h-5 w-5 text-muted-foreground" />
-                        Dossiê
-                        <Badge variant="secondary" className="ml-1">
-                          {totalDossieFiles} {totalDossieFiles === 1 ? 'foto' : 'fotos'}
-                        </Badge>
-                      </CardTitle>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                          <IconFolderCheck className="h-5 w-5 text-muted-foreground" />
+                          Dossiê
+                          <Badge variant="secondary" className="ml-1">
+                            {totalDossieFiles} {totalDossieFiles === 1 ? 'foto' : 'fotos'}
+                          </Badge>
+                        </CardTitle>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1"
+                          onClick={() => {
+                            exportDossiePdf({
+                              taskDisplayName,
+                              customerName: task.customer?.corporateName || task.customer?.fantasyName || undefined,
+                              serialNumber: task.serialNumber,
+                              plate: task.truck?.plate,
+                              serviceOrders: serviceOrdersWithFiles.map((so: any) => ({
+                                id: so.id,
+                                description: so.description,
+                                observation: so.observation,
+                                position: so.position,
+                                checkinFiles: so.checkinFiles || [],
+                                checkoutFiles: so.checkoutFiles || [],
+                              })),
+                            }).catch((err) => {
+                              console.error('[Dossiê PDF] Error:', err);
+                            });
+                          }}
+                        >
+                          <IconDownload className="h-3.5 w-3.5" />
+                          PDF
+                        </Button>
+                      </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         Registro fotográfico dos serviços por ordem de serviço
                       </p>
@@ -4144,7 +4088,7 @@ export const TaskDetailsPage = () => {
                   task.truck?.rightSideLayoutId,
                   task.truck?.backSideLayoutId,
                 ].filter(Boolean) as string[]}
-                pricingId={task.pricing?.id}
+                quoteId={task.quote?.id}
                 className="lg:w-1/2 animate-in fade-in-50 duration-1300"
                 maxHeight="45rem"
               />
@@ -4197,26 +4141,92 @@ export const TaskDetailsPage = () => {
         </AlertDialog>
 
         {/* Pricing Status Confirmation Dialog */}
-        <AlertDialog open={pricingConfirmDialog.open} onOpenChange={(open) => setPricingConfirmDialog((prev) => ({ ...prev, open }))}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{pricingConfirmDialog.title}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {pricingConfirmDialog.description}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isUpdatingPricingStatus}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                disabled={isUpdatingPricingStatus}
-                onClick={async () => {
-                  await executePricingStatusChange(pricingConfirmDialog.newStatus);
-                  setPricingConfirmDialog((prev) => ({ ...prev, open: false }));
-                }}
-              >
-                {isUpdatingPricingStatus ? 'Processando...' : 'Confirmar'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
+        <AlertDialog open={quoteConfirmDialog.open} onOpenChange={(open) => setQuoteConfirmDialog((prev) => ({ ...prev, open }))}>
+          <AlertDialogContent className={quoteConfirmDialog.title === 'INTERNAL_APPROVED_WARNING' ? 'max-w-lg border-red-500 border-2' : ''}>
+            {quoteConfirmDialog.title === 'INTERNAL_APPROVED_WARNING' ? (
+              <>
+                <AlertDialogHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                      <IconAlertCircle className="h-7 w-7 text-red-600 dark:text-red-400" />
+                    </div>
+                    <AlertDialogTitle className="text-xl text-red-700 dark:text-red-400">
+                      Aprovacao Interna - Acao Irreversivel
+                    </AlertDialogTitle>
+                  </div>
+                </AlertDialogHeader>
+
+                <div className="rounded-lg border-2 border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-4 my-2 space-y-3">
+                  <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+                    Ao confirmar, as seguintes acoes serao executadas automaticamente:
+                  </p>
+                  <ul className="text-sm text-red-700 dark:text-red-400 space-y-2 list-none">
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 font-bold">1.</span>
+                      <span><strong>Faturas</strong> serao geradas para cada cliente vinculado ao orcamento</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 font-bold">2.</span>
+                      <span><strong>Boletos bancarios</strong> serao emitidos automaticamente no Sicredi para cada parcela</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="mt-0.5 font-bold">3.</span>
+                      <span><strong>Notas Fiscais (NFS-e)</strong> serao emitidas automaticamente para cada fatura</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 my-1">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                    Verifique antes de confirmar:
+                  </p>
+                  <ul className="text-sm text-amber-700 dark:text-amber-400 mt-1 space-y-1 list-disc list-inside">
+                    <li>Valores, descontos e condicoes de pagamento estao corretos?</li>
+                    <li>Os dados do(s) cliente(s) estao atualizados (CNPJ/CPF, endereco)?</li>
+                    <li>As parcelas e datas de vencimento estao configuradas?</li>
+                  </ul>
+                </div>
+
+                <AlertDialogDescription className="text-sm text-muted-foreground mt-1">
+                  Essa acao nao pode ser desfeita facilmente. Boletos e notas fiscais emitidos precisarao ser cancelados manualmente caso haja algum erro.
+                </AlertDialogDescription>
+
+                <AlertDialogFooter className="mt-2">
+                  <AlertDialogCancel disabled={isUpdatingQuoteStatus}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={isUpdatingQuoteStatus}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    onClick={async () => {
+                      await executeQuoteStatusChange(quoteConfirmDialog.newStatus);
+                      setQuoteConfirmDialog((prev) => ({ ...prev, open: false }));
+                    }}
+                  >
+                    {isUpdatingQuoteStatus ? 'Processando...' : 'Confirmar Aprovacao Interna'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            ) : (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{quoteConfirmDialog.title}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {quoteConfirmDialog.description}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isUpdatingQuoteStatus}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={isUpdatingQuoteStatus}
+                    onClick={async () => {
+                      await executeQuoteStatusChange(quoteConfirmDialog.newStatus);
+                      setQuoteConfirmDialog((prev) => ({ ...prev, open: false }));
+                    }}
+                  >
+                    {isUpdatingQuoteStatus ? 'Processando...' : 'Confirmar'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            )}
           </AlertDialogContent>
         </AlertDialog>
 

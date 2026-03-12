@@ -184,17 +184,72 @@ export const sanitizeFilename = (filename: string | undefined | null): string =>
 // Re-export centralized API URL resolver
 export { getApiBaseUrl };
 
+// =====================
+// CDN URL Rewriting for Offline/LAN Mode
+// =====================
+
+/** CDN domains that serve files (won't resolve on LAN without internet) */
+const CDN_DOMAINS = ['arquivos.ankaadesign.com.br', 'arquivos.ankaa.app'];
+
+/**
+ * Check if a URL points to a CDN domain that may not resolve on LAN
+ */
+const isCdnUrl = (url: string): boolean => {
+  try {
+    const hostname = new URL(url).hostname;
+    return CDN_DOMAINS.some(d => hostname === d);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Check if the app is currently accessed from a private/local network.
+ * When true, CDN URLs should be rewritten to use the local API server.
+ */
+const isOnLocalNetwork = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return (
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1'
+  );
+};
+
+/**
+ * Rewrite a CDN URL to use the local API's static file serving route.
+ * CDN URL: https://arquivos.ankaadesign.com.br/24/3/12/uuid.jpg
+ * Local:   http://192.168.0.11:3030/files/storage/24/3/12/uuid.jpg
+ *
+ * Returns the original URL if not a CDN URL or not on local network.
+ */
+export const rewriteCdnUrl = (url: string): string => {
+  if (!isOnLocalNetwork() || !isCdnUrl(url)) {
+    return url;
+  }
+  try {
+    const parsed = new URL(url);
+    const apiUrl = getApiBaseUrl();
+    return `${apiUrl}/files/storage${parsed.pathname}`;
+  } catch {
+    return url;
+  }
+};
+
 /**
  * Normalizes a thumbnail URL to ensure it's a complete URL
  * If the URL is relative (starts with /api/files or /files), it prepends the API base URL
- * If it's already a complete URL (starts with http), it returns it as-is
+ * If it's already a complete URL (starts with http), it rewrites CDN URLs when on LAN
  */
 export const normalizeThumbnailUrl = (thumbnailUrl: string | undefined | null): string | undefined => {
   if (!thumbnailUrl) return undefined;
 
-  // If already a complete URL, return as-is
+  // If already a complete URL, rewrite CDN URLs when on LAN
   if (thumbnailUrl.startsWith('http://') || thumbnailUrl.startsWith('https://')) {
-    return thumbnailUrl;
+    return rewriteCdnUrl(thumbnailUrl);
   }
 
   const apiBaseUrl = getApiBaseUrl();
@@ -214,8 +269,9 @@ export const getFileUrl = (file: File, baseUrl?: string): string => {
   if (!file || !file.id) return "";
 
   // Check if this is a remote storage file (path starts with http)
+  // Rewrite CDN URLs when on LAN so files are served by the local API
   if (file.path && file.path.startsWith("http")) {
-    return file.path; // Use direct remote storage URL
+    return rewriteCdnUrl(file.path);
   }
 
   // Database file - use API endpoint
@@ -226,7 +282,7 @@ export const getFileUrl = (file: File, baseUrl?: string): string => {
 export const getFileDownloadUrl = (file: File, baseUrl?: string): string => {
   // Check if this is a remote storage file (path starts with http)
   if (file.path && file.path.startsWith("http")) {
-    return file.path; // Use direct remote storage URL
+    return rewriteCdnUrl(file.path);
   }
 
   // Database file - use API endpoint
@@ -238,8 +294,9 @@ export const getFileThumbnailUrl = (file: File, size: "small" | "medium" | "larg
   if (!isImageFile(file)) return "";
 
   // Check if this is a remote storage file with thumbnailUrl (images only)
+  // Rewrite CDN URLs when on LAN
   if (file.thumbnailUrl && file.thumbnailUrl.startsWith("http")) {
-    return file.thumbnailUrl; // Use direct remote storage URL as thumbnail
+    return rewriteCdnUrl(file.thumbnailUrl);
   }
 
   // Database file - use API endpoint

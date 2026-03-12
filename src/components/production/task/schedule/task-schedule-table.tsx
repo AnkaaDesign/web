@@ -444,6 +444,12 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
           }
           break;
 
+        case "quote":
+          if (tasks.length === 1) {
+            navigate(routes.production.preparation.quote(tasks[0].id));
+          }
+          break;
+
         case "delete":
           setDeleteDialog({
             tasks,

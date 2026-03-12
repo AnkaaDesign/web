@@ -7,7 +7,7 @@ import { usePrivileges } from './use-privileges';
  * with descriptive, self-documenting permission flags.
  *
  * Usage:
- *   const { canViewPricing, canEditIdentity, canViewCuts } = useTaskPermissions();
+ *   const { canViewQuote, canEditIdentity, canViewCuts } = useTaskPermissions();
  */
 export function useTaskPermissions() {
   const {
@@ -56,7 +56,7 @@ export function useTaskPermissions() {
   ]);
 
   // -- Section visibility (edit form & detail page) -----------------------
-  const canViewPricing = isAdmin || isFinancial || isCommercial;
+  const canViewQuote = isAdmin || isFinancial || isCommercial;
   const canViewRestrictedFields = isAdmin || isFinancial || isCommercial || isLogistic || isProductionManager || isDesigner;
   const canViewCommission = isAdmin || isFinancial || isCommercial || isProduction;
   const canViewDates = !isWarehouse;
@@ -105,7 +105,7 @@ export function useTaskPermissions() {
     canCancel,
 
     // Section visibility
-    canViewPricing,
+    canViewQuote,
     canViewRestrictedFields,
     canViewCommission,
     canViewDates,

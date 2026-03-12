@@ -14,7 +14,6 @@ import {
   IconFileText,
   IconPhoto,
   IconRuler,
-  IconFileInvoice,
   IconUser,
   IconNotes,
 } from "@tabler/icons-react";
@@ -46,7 +45,6 @@ import { PlateTagsInput } from "./plate-tags-input";
 import { SerialNumberRangeInput } from "./serial-number-range-input";
 import { TaskNameAutocomplete } from "./task-name-autocomplete";
 import { ServiceSelectorAutoGrouped } from "./service-selector-auto-grouped";
-import { PricingSelector, type PricingSelectorRef } from "../pricing/pricing-selector";
 import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { LayoutForm } from "@/components/production/layout/layout-form";
@@ -58,15 +56,8 @@ import { ResponsibleRole } from "@/types/responsible";
 import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard";
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toast } from "@/components/ui/sonner";
-import { getUniqueDescriptions } from "../../../../api-client/serviceOrder";
 import { uploadSingleFile } from "../../../../api-client/file";
-import {
-  normalizeDescription,
-  getPricingServicesToAddFromServiceOrders,
-  getServiceOrdersToAddFromPricingServices,
-  type SyncServiceOrder,
-  type SyncPricingService,
-} from "../../../../utils/task-pricing-service-order-sync";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Extended form schema for the UI (superset of fields for the accordion form)
 const taskCreateFormSchema = z.object({
@@ -83,7 +74,6 @@ const taskCreateFormSchema = z.object({
   paintId: z.string().nullable().optional(),
   paintIds: z.array(z.string()).optional(),
   serviceOrders: z.array(z.any()).optional(),
-  pricing: z.any().optional(),
 }).refine((data) => {
   return data.plates.length > 0 || data.serialNumbers.length > 0 || data.name || data.customerId;
 }, {
@@ -108,7 +98,6 @@ export const TaskCreateForm = () => {
   const showPaint = isAdminUser || isCommercialUser;
   const showLogoPaints = isAdminUser; // Commercial can't see logo paints
   const showLayout = isAdminUser || isLogisticUser || isProductionManagerUser;
-  const showPricing = isAdminUser || isCommercialUser;
   const showArtworks = isAdminUser || isCommercialUser;
 
   // Initialize form
@@ -138,25 +127,6 @@ export const TaskCreateForm = () => {
           shouldSync: false,
         },
       ],
-      pricing: {
-        expiresAt: (() => {
-          const date = new Date();
-          date.setDate(date.getDate() + 30);
-          date.setHours(23, 59, 59, 999);
-          return date;
-        })(),
-        status: 'PENDING',
-        subtotal: 0,
-        discountType: 'NONE',
-        discountValue: null,
-        total: 0,
-        customPaymentText: null,
-        guaranteeYears: null,
-        customGuaranteeText: null,
-        customForecastDays: null,
-        layoutFileId: null,
-        services: [{ description: "", amount: null, observation: null, shouldSync: true }],
-      },
     },
   });
 
@@ -168,9 +138,8 @@ export const TaskCreateForm = () => {
   const serialNumbers = useWatch({ control: form.control, name: "serialNumbers" }) || [];
   const customerIdValue = useWatch({ control: form.control, name: "customerId" });
 
-  // Watch service orders and pricing for sync
+  // Watch service orders
   const servicesValues = useWatch({ control: form.control, name: "serviceOrders" });
-  const pricingValues = useWatch({ control: form.control, name: "pricing" });
 
   // Accordion state
   const [openAccordion, setOpenAccordion] = useState<string | undefined>("basic-information");
@@ -249,10 +218,6 @@ export const TaskCreateForm = () => {
     }
   }, [currentLayoutStates]);
 
-  // Pricing state
-  const pricingSelectorRef = useRef<PricingSelectorRef>(null);
-  const [pricingItemCount, setPricingItemCount] = useState(0);
-
   // File upload states - base files
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
   const [baseFileIds, setBaseFileIds] = useState<string[]>([]);
@@ -272,366 +237,8 @@ export const TaskCreateForm = () => {
     setUploadedFileIds(files.filter(f => f.uploaded && f.uploadedFileId).map(f => f.uploadedFileId!));
   }, []);
 
-  // Pricing layout files
-  const [pricingLayoutFiles, setPricingLayoutFiles] = useState<FileWithPreview[]>([]);
-
-  // =====================================================================
-  // SERVICE ORDER ↔ PRICING BIDIRECTIONAL SYNC (ported from edit form)
-  // =====================================================================
-
-  // Sync refs
-  const isFormInitializedRef = useRef<boolean>(false);
-  const isSyncingRef = useRef<boolean>(false);
+  // Submitting ref for form state
   const isSubmittingRef = useRef<boolean>(false);
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSyncedServiceOrderCountRef = useRef<number>(0);
-  const lastSyncedPricingItemCountRef = useRef<number>(0);
-  const historicalDescriptionsRef = useRef<string[]>([]);
-
-  // Track deleted items to prevent sync from recreating them
-  const deletedServiceOrderDescriptionsRef = useRef<Set<string>>(new Set());
-  const deletedPricingItemDescriptionsRef = useRef<Set<string>>(new Set());
-
-  // Track previous observation values to detect which side changed
-  const prevSOObservationsRef = useRef<Map<string, string | null>>(new Map());
-  const prevPIObservationsRef = useRef<Map<string, string | null>>(new Map());
-
-  // Callbacks to track deleted items from child components
-  const handleServiceOrderDeleted = useCallback((description: string) => {
-    const normalizedDesc = normalizeDescription(description);
-    if (normalizedDesc) {
-      deletedServiceOrderDescriptionsRef.current.add(normalizedDesc);
-      if (lastSyncedServiceOrderCountRef.current > 0) {
-        lastSyncedServiceOrderCountRef.current -= 1;
-      }
-    }
-  }, []);
-
-  const handlePricingItemDeleted = useCallback((description: string) => {
-    const normalizedDesc = normalizeDescription(description);
-    if (normalizedDesc) {
-      deletedPricingItemDescriptionsRef.current.add(normalizedDesc);
-      if (lastSyncedPricingItemCountRef.current > 0) {
-        lastSyncedPricingItemCountRef.current -= 1;
-      }
-    }
-  }, []);
-
-  // Reorder synced pricing items to match PRODUCTION service order reorder
-  const handleProductionReorder = useCallback((descriptions: string[]) => {
-    const currentPricingItems = ((form.getValues('pricing') as any)?.services as any[]) || [];
-    if (currentPricingItems.length === 0) return;
-
-    // Build a map: normalized description → target order index
-    const orderMap = new Map<string, number>();
-    descriptions.forEach((desc, idx) => {
-      orderMap.set(normalizeDescription(desc), idx);
-    });
-
-    // Separate synced (matched) and unsynced pricing items, keeping original indices
-    const synced: { item: any; orderIdx: number; origIdx: number }[] = [];
-
-    currentPricingItems.forEach((item: any, origIdx: number) => {
-      const normalized = normalizeDescription(item.description || '');
-      const orderIdx = orderMap.get(normalized);
-      if (orderIdx !== undefined && item.shouldSync !== false) {
-        synced.push({ item, orderIdx, origIdx });
-      }
-    });
-
-    if (synced.length < 2) return; // Nothing to reorder
-
-    // Sort synced items by the new order
-    synced.sort((a, b) => a.orderIdx - b.orderIdx);
-
-    // Reconstruct: place synced items back into the same slot positions they originally occupied
-    const syncedSlots = synced.map(s => s.origIdx).sort((a, b) => a - b);
-    const newItems = [...currentPricingItems];
-    syncedSlots.forEach((slot, i) => {
-      newItems[slot] = synced[i].item;
-    });
-
-    // Use PricingSelector's useFieldArray replace method instead of form.setValue
-    // to ensure proper sync with useFieldArray's internal state
-    if (pricingSelectorRef.current) {
-      pricingSelectorRef.current.replaceItems(newItems);
-    } else {
-      form.setValue('pricing.services', newItems, { shouldDirty: true });
-    }
-  }, [form]);
-
-  // Fetch historical PRODUCTION service order descriptions on mount
-  useEffect(() => {
-    const fetchHistoricalDescriptions = async () => {
-      try {
-        const response = await getUniqueDescriptions({ type: SERVICE_ORDER_TYPE.PRODUCTION, limit: 200 });
-        if (response.success && response.data) {
-          historicalDescriptionsRef.current = response.data;
-        }
-      } catch (error) {
-        // Silent fail - sync will still work without historical data
-      }
-    };
-    fetchHistoricalDescriptions();
-  }, []);
-
-  // Initialize sync refs on first render
-  useEffect(() => {
-    if (!isFormInitializedRef.current) {
-      const currentServiceOrders = (servicesValues as any[]) || [];
-      const currentPricingItems = ((pricingValues as any)?.services as any[]) || [];
-
-      const validServiceOrders = currentServiceOrders.filter(
-        (so: any) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.description?.trim().length >= 3
-      );
-      const validPricingItems = currentPricingItems.filter(
-        (item: any) => item.description?.trim().length >= 3
-      );
-
-      lastSyncedServiceOrderCountRef.current = validServiceOrders.length;
-      lastSyncedPricingItemCountRef.current = validPricingItems.length;
-
-      // Initialize previous observation maps
-      const initialSOObsMap = new Map<string, string | null>();
-      for (const so of validServiceOrders) {
-        const normalizedDesc = normalizeDescription(so.description);
-        if (normalizedDesc) {
-          initialSOObsMap.set(normalizedDesc, so.observation || null);
-        }
-      }
-      prevSOObservationsRef.current = initialSOObsMap;
-
-      const initialPIObsMap = new Map<string, string | null>();
-      for (const item of validPricingItems) {
-        const normalizedDesc = normalizeDescription(item.description);
-        if (normalizedDesc) {
-          initialPIObsMap.set(normalizedDesc, item.observation || null);
-        }
-      }
-      prevPIObservationsRef.current = initialPIObsMap;
-
-      setTimeout(() => {
-        isFormInitializedRef.current = true;
-      }, 1000);
-    }
-  }, []); // Only run once on mount
-
-  // Debounced sync effect - only runs after user stops typing for 1.5 seconds
-  useEffect(() => {
-    if (!isFormInitializedRef.current || isSyncingRef.current || isSubmittingRef.current) return;
-
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
-
-    syncTimeoutRef.current = setTimeout(() => {
-      if (isSubmittingRef.current) return;
-
-      const currentServiceOrders = (servicesValues as any[]) || [];
-      const currentPricingItems = ((pricingValues as any)?.services as any[]) || [];
-
-      const validServiceOrders = currentServiceOrders.filter(
-        (so: any) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.description?.trim().length >= 3
-      );
-      const validPricingItems = currentPricingItems.filter(
-        (item: any) => item.description?.trim().length >= 3
-      );
-
-      const currentSOCount = validServiceOrders.length;
-      const currentPricingCount = validPricingItems.length;
-
-      const serviceOrdersAdded = currentSOCount > lastSyncedServiceOrderCountRef.current;
-      const pricingItemsAdded = currentPricingCount > lastSyncedPricingItemCountRef.current;
-
-      isSyncingRef.current = true;
-
-      try {
-        const syncServiceOrders: SyncServiceOrder[] = validServiceOrders.map((so: any) => ({
-          id: so.id,
-          description: so.description || '',
-          observation: so.observation || null,
-          type: so.type,
-          status: so.status || SERVICE_ORDER_STATUS.PENDING,
-          statusOrder: so.statusOrder || 1,
-          shouldSync: so.shouldSync !== false,
-        }));
-
-        const syncPricingServices: SyncPricingService[] = validPricingItems.map((item: any) => ({
-          id: item.id,
-          description: item.description || '',
-          observation: item.observation || null,
-          amount: item.amount || 0,
-          shouldSync: item.shouldSync !== false,
-        }));
-
-        const filterEmptyPricingItems = (items: any[]) => items.filter((item: any) => {
-          const hasDescription = item.description && item.description.trim() !== "";
-          const hasAmount = item.amount !== null && item.amount !== undefined && item.amount > 0;
-          return hasDescription || hasAmount;
-        });
-
-        const filterEmptyServiceOrders = (orders: any[]) => orders.filter((so: any) => {
-          return so.description && so.description.trim().length >= 3;
-        });
-
-        // Observation sync with change detection
-        const currentSOObsMap = new Map<string, string | null>();
-        for (const so of syncServiceOrders) {
-          const normalizedDesc = normalizeDescription(so.description);
-          if (normalizedDesc) {
-            currentSOObsMap.set(normalizedDesc, so.observation || null);
-          }
-        }
-
-        const currentPIObsMap = new Map<string, string | null>();
-        for (const item of syncPricingServices) {
-          const normalizedDesc = normalizeDescription(item.description);
-          if (normalizedDesc) {
-            currentPIObsMap.set(normalizedDesc, item.observation || null);
-          }
-        }
-
-        const soObsChangedDescs = new Set<string>();
-        const piObsChangedDescs = new Set<string>();
-
-        for (const [desc, obs] of currentSOObsMap) {
-          const prevObs = prevSOObservationsRef.current.get(desc);
-          const normalizedPrev = prevObs || null;
-          const normalizedCurrent = obs || null;
-          if (normalizedPrev !== normalizedCurrent) {
-            soObsChangedDescs.add(desc);
-          }
-        }
-
-        for (const [desc, obs] of currentPIObsMap) {
-          const prevObs = prevPIObservationsRef.current.get(desc);
-          const normalizedPrev = prevObs || null;
-          const normalizedCurrent = obs || null;
-          if (normalizedPrev !== normalizedCurrent) {
-            piObsChangedDescs.add(desc);
-          }
-        }
-
-        // Sync observations: SO→PI if SO changed, PI→SO if PI changed
-        let pricingObservationsUpdated = false;
-        const pricingItemsWithSyncedObs = currentPricingItems.map((item: any) => {
-          if (!item.description || item.description.trim().length < 3) return item;
-          const normalizedDesc = normalizeDescription(item.description);
-          if (soObsChangedDescs.has(normalizedDesc) && !piObsChangedDescs.has(normalizedDesc)) {
-            const soObs = currentSOObsMap.get(normalizedDesc);
-            const currentItemObs = item.observation || null;
-            if (currentItemObs !== soObs) {
-              pricingObservationsUpdated = true;
-              return { ...item, observation: soObs };
-            }
-          }
-          return item;
-        });
-
-        let soObservationsUpdated = false;
-        const serviceOrdersWithSyncedObs = currentServiceOrders.map((so: any) => {
-          if (so.type !== SERVICE_ORDER_TYPE.PRODUCTION) return so;
-          if (!so.description || so.description.trim().length < 3) return so;
-          const normalizedDesc = normalizeDescription(so.description);
-          if (piObsChangedDescs.has(normalizedDesc) && !soObsChangedDescs.has(normalizedDesc)) {
-            const piObs = currentPIObsMap.get(normalizedDesc);
-            const currentSOObs = so.observation || null;
-            if (currentSOObs !== piObs) {
-              soObservationsUpdated = true;
-              return { ...so, observation: piObs };
-            }
-          }
-          return so;
-        });
-
-        // SYNC 1: Service Orders → Pricing Items
-        const pricingItemsToAddRaw = serviceOrdersAdded
-          ? getPricingServicesToAddFromServiceOrders(syncServiceOrders, syncPricingServices)
-          : [];
-
-        const pricingItemsToAdd = pricingItemsToAddRaw.filter((item: any) => {
-          const normalizedDesc = normalizeDescription(item.description);
-          return !deletedPricingItemDescriptionsRef.current.has(normalizedDesc);
-        });
-
-        if (pricingItemsToAdd.length > 0 || pricingObservationsUpdated) {
-          const basePricingItems = pricingItemsToAdd.length > 0
-            ? filterEmptyPricingItems(pricingItemsWithSyncedObs)
-            : pricingItemsWithSyncedObs;
-          const finalPricingItems = [...basePricingItems, ...pricingItemsToAdd];
-
-          // Use PricingSelector's useFieldArray replace method instead of form.setValue
-          if (pricingSelectorRef.current) {
-            pricingSelectorRef.current.replaceItems(finalPricingItems);
-          } else {
-            form.setValue('pricing.services', finalPricingItems, {
-              shouldDirty: true,
-              shouldTouch: true,
-            });
-          }
-        }
-
-        // SYNC 2: Pricing Items → Service Orders
-        const serviceOrdersToAddRaw = pricingItemsAdded
-          ? getServiceOrdersToAddFromPricingServices(syncPricingServices, syncServiceOrders, historicalDescriptionsRef.current)
-          : [];
-
-        const serviceOrdersToAdd = serviceOrdersToAddRaw.filter((so: any) => {
-          const normalizedDesc = normalizeDescription(so.description);
-          return !deletedServiceOrderDescriptionsRef.current.has(normalizedDesc);
-        });
-
-        if (serviceOrdersToAdd.length > 0 || soObservationsUpdated) {
-          const baseServiceOrders = serviceOrdersToAdd.length > 0
-            ? filterEmptyServiceOrders(serviceOrdersWithSyncedObs)
-            : serviceOrdersWithSyncedObs;
-          const finalServiceOrders = [...serviceOrdersToAdd, ...baseServiceOrders];
-
-          form.setValue('serviceOrders', finalServiceOrders, {
-            shouldDirty: true,
-            shouldTouch: true,
-          });
-        }
-
-        // Update previous observation refs
-        const newPrevSOMap = new Map<string, string | null>();
-        const finalSOsForPrevMap = soObservationsUpdated ? serviceOrdersWithSyncedObs : currentServiceOrders;
-        for (const so of finalSOsForPrevMap) {
-          if (so.type !== SERVICE_ORDER_TYPE.PRODUCTION) continue;
-          const normalizedDesc = normalizeDescription(so.description);
-          if (normalizedDesc) {
-            newPrevSOMap.set(normalizedDesc, so.observation || null);
-          }
-        }
-        prevSOObservationsRef.current = newPrevSOMap;
-
-        const newPrevPIMap = new Map<string, string | null>();
-        const finalPIsForPrevMap = pricingObservationsUpdated ? pricingItemsWithSyncedObs : currentPricingItems;
-        for (const item of finalPIsForPrevMap) {
-          const normalizedDesc = normalizeDescription(item.description);
-          if (normalizedDesc) {
-            newPrevPIMap.set(normalizedDesc, item.observation || null);
-          }
-        }
-        prevPIObservationsRef.current = newPrevPIMap;
-
-        // Update refs with new counts
-        lastSyncedServiceOrderCountRef.current = currentSOCount + serviceOrdersToAdd.length;
-        lastSyncedPricingItemCountRef.current = currentPricingCount + pricingItemsToAdd.length;
-
-      } finally {
-        setTimeout(() => {
-          isSyncingRef.current = false;
-        }, 500);
-      }
-    }, 1500);
-
-    return () => {
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-    };
-  }, [servicesValues, pricingValues, form]);
 
   // Calculate how many tasks will be created
   const taskCount = useMemo(() => {
@@ -662,11 +269,6 @@ export const TaskCreateForm = () => {
 
         setIsSubmitting(true);
         isSubmittingRef.current = true;
-
-        // Cancel any pending sync
-        if (syncTimeoutRef.current) {
-          clearTimeout(syncTimeoutRef.current);
-        }
 
         const { plates, serialNumbers, name, customerId, status, category, implementType, forecastDate, term, details, paintId, paintIds } = data;
 
@@ -716,10 +318,6 @@ export const TaskCreateForm = () => {
           (so: any) => so && so.description && so.description.trim().length >= 3
         );
 
-        // Get pricing from form
-        const pricingRaw = data.pricing;
-        const hasPricingItems = pricingRaw?.services?.some((item: any) => item.description && item.description.trim().length > 0);
-
         // Build responsible data
         const existingRepIds = responsibleRows
           .filter(row => !row.isNew && row.id && row.id.trim() !== '')
@@ -768,7 +366,7 @@ export const TaskCreateForm = () => {
             artworkStatuses: artworkFileIds.length > 0 && Object.keys(remappedArtworkStatuses).length > 0 ? remappedArtworkStatuses : undefined,
             baseFileIds: uploadedBaseFileIds.length > 0 ? uploadedBaseFileIds : undefined,
             responsibleIds: existingRepIds.length > 0 ? existingRepIds : undefined,
-            // Service orders and pricing are cloned per task (individual instances)
+            // Service orders are cloned per task (individual instances)
             serviceOrders: serviceOrders.length > 0 ? serviceOrders.map((so: any) => ({
               description: so.description,
               type: so.type,
@@ -777,10 +375,6 @@ export const TaskCreateForm = () => {
               assignedToId: so.assignedToId || null,
               shouldSync: so.shouldSync !== false,
             })) : undefined,
-            pricing: hasPricingItems ? {
-              ...pricingRaw,
-              services: pricingRaw.services.filter((item: any) => item.description && item.description.trim().length > 0),
-            } : undefined,
             ...additionalData,
           } as TaskCreateFormData;
           return taskData;
@@ -1186,9 +780,7 @@ export const TaskCreateForm = () => {
                                 disabled={isSubmitting}
                                 currentUserId={user?.id}
                                 userPrivilege={user?.sector?.privileges}
-                                onItemDeleted={handleServiceOrderDeleted}
                                 isAccordionOpen={openAccordion === "serviceOrders"}
-                                onProductionReorder={handleProductionReorder}
                               />
                               <FormMessage />
                             </FormItem>
@@ -1199,55 +791,13 @@ export const TaskCreateForm = () => {
                   </Card>
                 </AccordionItem>
 
-                {/* Pricing - COMMERCIAL/ADMIN */}
-                {showPricing && (
-                  <AccordionItem
-                    value="pricing"
-                    id="accordion-item-pricing"
-                    className="border border-border rounded-lg"
-                  >
-                    <Card className="border-0">
-                      <AccordionTrigger className="px-0 hover:no-underline">
-                        <CardHeader className="flex-1 py-4">
-                          <CardTitle className="flex items-center gap-2">
-                            <IconFileInvoice className="h-5 w-5" />
-                            Precificação
-                            {pricingItemCount > 0 && (
-                              <Badge variant="secondary" className="ml-2">
-                                {pricingItemCount}
-                              </Badge>
-                            )}
-                          </CardTitle>
-                        </CardHeader>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <CardContent className="pt-0">
-                          <PricingSelector
-                            ref={pricingSelectorRef}
-                            control={form.control}
-                            disabled={isSubmitting}
-                            userRole={user?.sector?.privileges}
-                            onItemCountChange={setPricingItemCount}
-                            layoutFiles={pricingLayoutFiles}
-                            onLayoutFilesChange={setPricingLayoutFiles}
-                            onItemDeleted={handlePricingItemDeleted}
-                            artworks={uploadedFiles
-                              .filter(f => f.uploaded && f.uploadedFileId)
-                              .map(f => ({
-                                id: f.uploadedFileId!,
-                                filename: f.name,
-                                originalName: f.name,
-                                thumbnailUrl: (f as any).thumbnailUrl,
-                                status: (f as any).status,
-                                mimetype: f.type,
-                                size: f.size,
-                              }))}
-                          />
-                        </CardContent>
-                      </AccordionContent>
-                    </Card>
-                  </AccordionItem>
-                )}
+                {/* Quote info note */}
+                <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800">
+                  <IconInfoCircle className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-700 dark:text-blue-300">
+                    O orçamento pode ser gerenciado na página dedicada da tarefa após a criação.
+                  </AlertDescription>
+                </Alert>
 
                 {/* Medidas do Caminhão - LOGISTIC/ADMIN */}
                 {showLayout && (

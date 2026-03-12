@@ -6,6 +6,6 @@ export { ServiceOrderList } from "./service-order-list";
 export { LowStockList } from "./low-stock-list";
 export { CompletedTasksList } from "./completed-tasks-list";
 export { AwaitingApprovalTasksList } from "./awaiting-approval-tasks-list";
-export { AwaitingPricingApprovalList } from "./awaiting-pricing-approval-list";
+export { AwaitingQuoteApprovalList } from "./awaiting-quote-approval-list";
 export { RecentMessagesList } from "./recent-messages-list";
 export { TimeEntriesCard } from "./time-entries-card";

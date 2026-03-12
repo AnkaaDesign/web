@@ -20,7 +20,7 @@ import {
 import { rollbackFieldChange } from "@/api-client/task";
 import { useQueryClient } from "@tanstack/react-query";
 import { taskKeys, serviceOrderKeys, truckKeys, changeLogKeys } from "../../hooks/common/query-keys";
-import { taskPricingKeys } from "../../hooks/production/use-task-pricing";
+import { taskQuoteKeys } from "../../hooks/production/use-task-quote";
 import type { ChangeLog } from "../../types";
 import {
   CHANGE_LOG_ENTITY_TYPE,
@@ -45,10 +45,10 @@ import {
   AIRBRUSHING_STATUS_LABELS,
   PAINT_FINISH_LABELS,
   TRUCK_MANUFACTURER_LABELS,
-  TASK_PRICING_STATUS_LABELS,
+  TASK_QUOTE_STATUS_LABELS,
   PAYMENT_CONDITION_LABELS,
 } from "../../constants/enum-labels";
-import { ENTITY_BADGE_CONFIG, PAINT_FINISH, TASK_PRICING_STATUS, PAYMENT_CONDITION } from "../../constants";
+import { ENTITY_BADGE_CONFIG, PAINT_FINISH, TASK_QUOTE_STATUS, PAYMENT_CONDITION } from "../../constants";
 import {
   formatRelativeTime,
   formatDateTime,
@@ -391,7 +391,7 @@ interface TaskWithServiceOrdersChangelogProps {
   serviceOrderIds: string[];
   truckId?: string;
   layoutIds?: string[];
-  pricingId?: string;
+  quoteId?: string;
   className?: string;
   maxHeight?: string;
   limit?: number;
@@ -486,7 +486,7 @@ const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
       return;
     }
 
-    // TASK/SERVICE_ORDER/TRUCK/TASK_PRICING/TASK_PRICING_ITEM UPDATE/ROLLBACK/BATCH_UPDATE actions should never be grouped —
+    // TASK/SERVICE_ORDER/TRUCK/TASK_QUOTE/TASK_QUOTE_ITEM UPDATE/ROLLBACK/BATCH_UPDATE actions should never be grouped —
     // each gets its own card so that every field change can have its own rollback button
     const isRollbackableUpdate =
       (changelog.action === CHANGE_LOG_ACTION.UPDATE ||
@@ -495,8 +495,8 @@ const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
       (changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
         changelog.entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ||
         changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK ||
-        changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING ||
-        changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM);
+        changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE ||
+        changelog.entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM);
 
     if (isRollbackableUpdate) {
       if (currentGroup.length > 0) groups.push(currentGroup);
@@ -689,9 +689,9 @@ const ChangelogTimelineItem = ({
           ? "Caminhão"
           : entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT
             ? "Layout"
-            : entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING
-              ? "Precificação"
-              : entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM
+            : entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE
+              ? "Orçamento"
+              : entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM
                 ? "Item do Orçamento"
                 : "";
 
@@ -934,8 +934,8 @@ const ChangelogTimelineItem = ({
                   </div>
                 )}
 
-                {/* Task Pricing Details */}
-                {entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING && (
+                {/* Task Quote Details */}
+                {entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE && (
                   <>
                     {createdEntityData.budgetNumber && (
                       <div className="text-sm">
@@ -949,7 +949,7 @@ const ChangelogTimelineItem = ({
                       <div className="text-sm">
                         <span className="text-muted-foreground">Status: </span>
                         <span className="text-foreground font-medium">
-                          {TASK_PRICING_STATUS_LABELS[createdEntityData.status as TASK_PRICING_STATUS] || createdEntityData.status}
+                          {TASK_QUOTE_STATUS_LABELS[createdEntityData.status as TASK_QUOTE_STATUS] || createdEntityData.status}
                         </span>
                       </div>
                     )}
@@ -989,8 +989,8 @@ const ChangelogTimelineItem = ({
                   </>
                 )}
 
-                {/* Task Pricing Item Details (per-item CREATE/ADD) */}
-                {entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM && (
+                {/* Task Quote Item Details (per-item CREATE/ADD) */}
+                {entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM && (
                   <>
                     {createdEntityData.description && (
                       <div className="text-sm">
@@ -1567,7 +1567,7 @@ const ChangelogTimelineItem = ({
 
                 // Filter out financial fields for non-FINANCIAL/ADMIN users
                 const financialFields = [
-                  "pricingId",
+                  "quoteId",
                   "budgetIds",
                   "invoiceIds",
                   "receiptIds",
@@ -1672,8 +1672,8 @@ const ChangelogTimelineItem = ({
                           (entityType === CHANGE_LOG_ENTITY_TYPE.TASK ||
                             entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ||
                             entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK ||
-                            entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING ||
-                            entityType === CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM) && (
+                            entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE ||
+                            entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM) && (
                             <Button
                               size="sm"
                               variant="ghost"
@@ -2404,8 +2404,8 @@ const ChangelogTimelineItem = ({
                                 </>
                               );
                             })()
-                          ) : changelog.field === "pricingId" ? (
-                            // Special handling for pricingId - show pricing info elegantly with items
+                          ) : changelog.field === "quoteId" ? (
+                            // Special handling for quoteId - show quote info elegantly with items
                             (() => {
                               const parseValue = (val: any) => {
                                 if (val === null || val === undefined)
@@ -2450,14 +2450,14 @@ const ChangelogTimelineItem = ({
                                 }).format(value);
                               };
 
-                              const oldPricing = parseValue(changelog.oldValue);
-                              const newPricing = parseValue(changelog.newValue);
+                              const oldQuote = parseValue(changelog.oldValue);
+                              const newQuote = parseValue(changelog.newValue);
 
-                              const renderPricingValue = (
-                                pricing: any,
+                              const renderQuoteValue = (
+                                quote: any,
                                 isOld: boolean,
                               ) => {
-                                if (!pricing || !pricing.id) {
+                                if (!quote || !quote.id) {
                                   return (
                                     <span
                                       className={
@@ -2472,25 +2472,25 @@ const ChangelogTimelineItem = ({
                                 }
 
                                 const hasBudgetInfo =
-                                  pricing.budgetNumber || pricing.total;
-                                const items = pricing.services || [];
+                                  quote.budgetNumber || quote.total;
+                                const items = quote.services || [];
 
                                 return (
                                   <div className="flex flex-col gap-2 mt-1">
                                     {hasBudgetInfo ? (
                                       <div className="border dark:border-border rounded-lg px-3 py-2 bg-muted/30">
                                         <div className="flex items-center gap-2">
-                                          {pricing.budgetNumber && (
+                                          {quote.budgetNumber && (
                                             <span
                                               className={`text-sm font-semibold ${isOld ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
                                             >
-                                              Orçamento #{pricing.budgetNumber}
+                                              Orçamento #{quote.budgetNumber}
                                             </span>
                                           )}
-                                          {pricing.total !== null &&
-                                            pricing.total !== undefined && (
+                                          {quote.total !== null &&
+                                            quote.total !== undefined && (
                                               <span className="text-sm font-medium text-muted-foreground">
-                                                {formatCurrency(pricing.total)}
+                                                {formatCurrency(quote.total)}
                                               </span>
                                             )}
                                         </div>
@@ -2526,7 +2526,7 @@ const ChangelogTimelineItem = ({
                                       <span
                                         className={`font-mono text-xs ${isOld ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
                                       >
-                                        {pricing.id}
+                                        {quote.id}
                                       </span>
                                     )}
                                   </div>
@@ -2539,21 +2539,21 @@ const ChangelogTimelineItem = ({
                                     <span className="text-muted-foreground">
                                       Antes:{" "}
                                     </span>
-                                    {renderPricingValue(oldPricing, true)}
+                                    {renderQuoteValue(oldQuote, true)}
                                   </div>
                                   <div className="text-sm mt-2">
                                     <span className="text-muted-foreground">
                                       Depois:{" "}
                                     </span>
-                                    {renderPricingValue(newPricing, false)}
+                                    {renderQuoteValue(newQuote, false)}
                                   </div>
                                 </>
                               );
                             })()
                           ) : changelog.field === "items" &&
                             entityType ===
-                              CHANGE_LOG_ENTITY_TYPE.TASK_PRICING ? (
-                            // Special handling for pricing items changes
+                              CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE ? (
+                            // Special handling for quote items changes
                             (() => {
                               const parseVal = (val: any) => {
                                 if (!val) return null;
@@ -2729,7 +2729,7 @@ export function TaskWithServiceOrdersChangelog({
   serviceOrderIds,
   truckId,
   layoutIds = [],
-  pricingId,
+  quoteId,
   className,
   maxHeight,
   limit = 100,
@@ -2759,12 +2759,12 @@ export function TaskWithServiceOrdersChangelog({
         refetchServiceOrderChangelogs(),
         refetchTruckChangelogs(),
         refetchLayoutChangelogs(),
-        refetchPricingChangelogs(),
-        refetchPricingItemChangelogs(),
+        refetchQuoteChangelogs(),
+        refetchQuoteItemChangelogs(),
         queryClient.invalidateQueries({ queryKey: taskKeys.all }),
         queryClient.invalidateQueries({ queryKey: serviceOrderKeys.all }),
         queryClient.invalidateQueries({ queryKey: truckKeys.all }),
-        queryClient.invalidateQueries({ queryKey: taskPricingKeys.all }),
+        queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all }),
         queryClient.invalidateQueries({ queryKey: changeLogKeys.all }),
       ]);
     } catch {
@@ -2858,16 +2858,16 @@ export function TaskWithServiceOrdersChangelog({
     enabled: layoutIds.length > 0,
   });
 
-  // Fetch task pricing changelogs
+  // Fetch task quote changelogs
   const {
-    data: pricingChangelogsResponse,
-    isLoading: pricingLoading,
-    error: pricingError,
-    refetch: refetchPricingChangelogs,
+    data: quoteChangelogsResponse,
+    isLoading: quoteLoading,
+    error: quoteError,
+    refetch: refetchQuoteChangelogs,
   } = useChangeLogs({
     where: {
-      entityType: CHANGE_LOG_ENTITY_TYPE.TASK_PRICING,
-      entityId: pricingId || undefined,
+      entityType: CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE,
+      entityId: quoteId || undefined,
     },
     include: {
       user: true,
@@ -2876,19 +2876,19 @@ export function TaskWithServiceOrdersChangelog({
       createdAt: "desc",
     },
     take: limit,
-    enabled: !!pricingId,
+    enabled: !!quoteId,
   });
 
-  // Fetch task pricing item changelogs (per-item granular tracking)
+  // Fetch task quote item changelogs (per-item granular tracking)
   const {
-    data: pricingItemChangelogsResponse,
-    isLoading: pricingItemLoading,
-    error: pricingItemError,
-    refetch: refetchPricingItemChangelogs,
+    data: quoteItemChangelogsResponse,
+    isLoading: quoteItemLoading,
+    error: quoteItemError,
+    refetch: refetchQuoteItemChangelogs,
   } = useChangeLogs({
     where: {
-      entityType: CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM,
-      entityId: pricingId || undefined,
+      entityType: CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM,
+      entityId: quoteId || undefined,
     },
     include: {
       user: true,
@@ -2897,7 +2897,7 @@ export function TaskWithServiceOrdersChangelog({
       createdAt: "desc",
     },
     take: limit,
-    enabled: !!pricingId,
+    enabled: !!quoteId,
   });
 
   // Combine and sort all changelogs
@@ -2915,10 +2915,10 @@ export function TaskWithServiceOrdersChangelog({
     // Only include layout logs if the query is enabled (has layout IDs)
     const layoutLogs =
       layoutIds.length > 0 ? layoutChangelogsResponse?.data || [] : [];
-    // Only include pricing logs if the query is enabled (has pricing ID)
-    const pricingLogs = pricingId ? pricingChangelogsResponse?.data || [] : [];
-    // Only include pricing item logs if the query is enabled (has pricing ID)
-    const pricingItemLogs = pricingId ? pricingItemChangelogsResponse?.data || [] : [];
+    // Only include quote logs if the query is enabled (has quote ID)
+    const quoteLogs = quoteId ? quoteChangelogsResponse?.data || [] : [];
+    // Only include quote item logs if the query is enabled (has quote ID)
+    const quoteItemLogs = quoteId ? quoteItemChangelogsResponse?.data || [] : [];
 
     // Build a map of service order entityId -> type from CREATE actions
     const serviceOrderTypeMap = new Map<string, SERVICE_ORDER_TYPE>();
@@ -2966,8 +2966,8 @@ export function TaskWithServiceOrdersChangelog({
       ...filteredServiceLogs,
       ...truckLogs,
       ...layoutLogs,
-      ...pricingLogs,
-      ...pricingItemLogs,
+      ...quoteLogs,
+      ...quoteItemLogs,
     ];
 
     // Deduplicate: Remove LAYOUT CREATE entries when a TASK UPDATE on "layouts" field
@@ -3041,12 +3041,12 @@ export function TaskWithServiceOrdersChangelog({
     serviceOrderChangelogsResponse,
     truckChangelogsResponse,
     layoutChangelogsResponse,
-    pricingChangelogsResponse,
-    pricingItemChangelogsResponse,
+    quoteChangelogsResponse,
+    quoteItemChangelogsResponse,
     serviceOrderIds,
     truckId,
     layoutIds,
-    pricingId,
+    quoteId,
     visibleServiceOrderTypes,
   ]);
 
@@ -3259,8 +3259,8 @@ export function TaskWithServiceOrdersChangelog({
   }, [combinedChangelogs]);
 
   const isLoading =
-    taskLoading || serviceOrdersLoading || truckLoading || layoutsLoading || pricingLoading || pricingItemLoading;
-  const error = taskError || serviceOrdersError || truckError || layoutsError || pricingError || pricingItemError;
+    taskLoading || serviceOrdersLoading || truckLoading || layoutsLoading || quoteLoading || quoteItemLoading;
+  const error = taskError || serviceOrdersError || truckError || layoutsError || quoteError || quoteItemError;
 
   if (error) {
     return (

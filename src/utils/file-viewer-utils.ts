@@ -9,6 +9,7 @@
 
 import type { File as AnkaaFile } from "../types";
 import { getApiBaseUrl as getApiBaseUrlFromConfig } from "@/config/api";
+import { rewriteCdnUrl } from "./file";
 
 // =====================
 // Type Definitions
@@ -445,10 +446,10 @@ export const generateThumbnailUrl = (
   const baseUrl = getApiBaseUrl();
   const fileType = detectFileType(file);
 
-  // If file has a thumbnail URL, use it
+  // If file has a thumbnail URL, use it (rewrite CDN URLs when on LAN)
   if (file.thumbnailUrl) {
     return file.thumbnailUrl.startsWith("http")
-      ? file.thumbnailUrl
+      ? rewriteCdnUrl(file.thumbnailUrl)
       : `${baseUrl}${file.thumbnailUrl}`;
   }
 
@@ -493,10 +494,10 @@ export const generateFileUrls = (file: AnkaaFile, options: FileUrlOptions = {}) 
       large: `${apiUrl}/files/thumbnail/${file.id}?size=large`,
     },
 
-    /** Custom thumbnail if available */
+    /** Custom thumbnail if available (rewrite CDN URLs when on LAN) */
     customThumbnail: file.thumbnailUrl
       ? file.thumbnailUrl.startsWith("http")
-        ? file.thumbnailUrl
+        ? rewriteCdnUrl(file.thumbnailUrl)
         : `${apiUrl}${file.thumbnailUrl}`
       : null,
   };

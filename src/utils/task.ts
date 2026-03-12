@@ -167,23 +167,23 @@ export function formatTaskSummary(task: Task): string {
 }
 
 /**
- * Calculate task price from pricing total (only BUDGET_APPROVED or later pricing)
+ * Calculate task price from quote total (only BUDGET_APPROVED or later quote)
  */
 export function calculateTaskPrice(task: Task): number {
-  if (!task.pricing) return 0;
-  if (task.pricing.status === 'PENDING') return 0;
-  return task.pricing.total || 0;
+  if (!task.quote) return 0;
+  if (task.quote.status === 'PENDING') return 0;
+  return task.quote.total || 0;
 }
 
 /**
- * Get task price from approved pricing (alias for calculateTaskPrice)
+ * Get task price from approved quote (alias for calculateTaskPrice)
  */
 export function getTaskPrice(task: Task): number {
   return calculateTaskPrice(task);
 }
 
 /**
- * Format task price from pricing total
+ * Format task price from quote total
  */
 export function formatTaskPrice(task: Task): string {
   const price = calculateTaskPrice(task);
@@ -377,31 +377,33 @@ export function validateAllServiceOrdersCompleted(task: Task): ServiceOrderValid
 }
 
 // ============================================================================
-// TASK PRICING UTILITIES
+// TASK QUOTE UTILITIES
 // ============================================================================
 
-import type { TaskPricing } from '../types/task-pricing';
+import type { TaskQuote } from '../types/task-quote';
 
 /**
- * Check if pricing is expired
+ * Check if quote is expired
  */
-export function isPricingExpired(pricing: TaskPricing): boolean {
-  if (!pricing.expiresAt) return false;
-  return new Date(pricing.expiresAt) < new Date();
+export function isQuoteExpired(quote: TaskQuote): boolean {
+  if (!quote.expiresAt) return false;
+  return new Date(quote.expiresAt) < new Date();
 }
 
 /**
- * Get pricing status label in Portuguese
+ * Get quote status label in Portuguese
  */
-export function getPricingStatusLabel(status: string): string {
+export function getQuoteStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     PENDING: 'Pendente',
     BUDGET_APPROVED: 'Orçamento Aprovado',
-    VERIFIED: 'Verificado',
+    VERIFIED_BY_FINANCIAL: 'Verificado pelo Financeiro',
     INTERNAL_APPROVED: 'Aprovado Internamente',
     UPCOMING: 'A Vencer',
+    DUE: 'Vencido',
     PARTIAL: 'Parcial',
     SETTLED: 'Liquidado',
   };
   return labels[status] || status;
 }
+

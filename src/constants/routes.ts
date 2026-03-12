@@ -495,6 +495,7 @@ export const routes = {
       create: "/producao/agenda/cadastrar",
       details: (id: string) => `/producao/agenda/detalhes/${id}`,
       edit: (id: string) => `/producao/agenda/editar/${id}`,
+      quote: (taskId: string) => `/producao/agenda/orcamento/${taskId}`,
     },
     garages: {
       root: "/producao/barracoes",

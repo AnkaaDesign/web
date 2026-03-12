@@ -20,6 +20,7 @@ import {
 import type { FileWithPreview } from "@/components/common/file";
 import { ArtworkStatusSelector } from "../artwork";
 import { getApiBaseUrl } from "@/config/api";
+import { rewriteCdnUrl } from "@/utils/file";
 
 export interface ArtworkFileUploadFieldProps {
   onFilesChange: (files: FileWithPreview[]) => void;
@@ -257,7 +258,7 @@ export function ArtworkFileUploadField({
                 const apiBaseUrl = getApiBaseUrl();
                 if (file.thumbnailUrl) {
                   if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
-                  if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;
+                  if (file.thumbnailUrl.startsWith("http")) return rewriteCdnUrl(file.thumbnailUrl);
                   return file.thumbnailUrl;
                 }
                 if (file.preview) return file.preview;

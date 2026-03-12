@@ -17,7 +17,7 @@ import type { Cut, CutIncludes } from "./cut";
 import type { Truck, TruckIncludes } from "./truck";
 import type { Bonus } from "./bonus";
 import type { BonusDiscount } from "./bonusDiscount";
-import type { TaskPricing } from "./task-pricing";
+import type { TaskQuote } from "./task-quote";
 import type { Responsible } from "./responsible";
 
 // =====================
@@ -58,8 +58,8 @@ export interface Task extends BaseEntity {
   // Relations
   sector?: Sector;
   customer?: Customer;
-  pricingId?: string | null; // Foreign key to TaskPricing
-  pricing?: TaskPricing; // Task pricing (one-to-one: each task has its own unique pricing)
+  quoteId?: string | null; // Foreign key to TaskQuote
+  quote?: TaskQuote; // Task quote (one-to-one: each task has its own unique quote)
   budgets?: File[];
   invoices?: File[];
   receipts?: File[];
@@ -102,7 +102,7 @@ export interface TaskIncludes {
     | {
         include?: CustomerIncludes;
       };
-  pricing?: boolean | { include?: { services?: boolean; layoutFile?: boolean; customerSignature?: boolean; customerConfigs?: boolean; responsible?: boolean } }; // Task pricing (one-to-one: each task has its own unique pricing)
+  quote?: boolean | { include?: { services?: boolean; layoutFile?: boolean; customerSignature?: boolean; customerConfigs?: boolean; responsible?: boolean } }; // Task quote (one-to-one: each task has its own unique quote)
   reimbursements?: boolean; // Many-to-many relation
   reimbursementInvoices?: boolean; // Many-to-many relation
   observation?:

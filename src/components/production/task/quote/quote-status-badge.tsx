@@ -1,15 +1,15 @@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { TASK_PRICING_STATUS } from '@/types/task-pricing';
+import type { TASK_QUOTE_STATUS } from '@/types/task-quote';
 
-interface PricingStatusBadgeProps {
-  status: TASK_PRICING_STATUS;
+interface QuoteStatusBadgeProps {
+  status: TASK_QUOTE_STATUS;
   className?: string;
   size?: 'default' | 'sm' | 'lg';
 }
 
-export function PricingStatusBadge({ status, className, size = 'default' }: PricingStatusBadgeProps) {
-  const config: Record<TASK_PRICING_STATUS, { label: string; variant: string }> = {
+export function QuoteStatusBadge({ status, className, size = 'default' }: QuoteStatusBadgeProps) {
+  const config: Record<TASK_QUOTE_STATUS, { label: string; variant: string }> = {
     PENDING: {
       label: 'Pendente',
       variant: 'secondary',
@@ -18,8 +18,8 @@ export function PricingStatusBadge({ status, className, size = 'default' }: Pric
       label: 'Orçamento Aprovado',
       variant: 'approved',
     },
-    VERIFIED: {
-      label: 'Verificado',
+    VERIFIED_BY_FINANCIAL: {
+      label: 'Verificado pelo Financeiro',
       variant: 'processing',
     },
     INTERNAL_APPROVED: {
@@ -29,6 +29,10 @@ export function PricingStatusBadge({ status, className, size = 'default' }: Pric
     UPCOMING: {
       label: 'A Vencer',
       variant: 'pending',
+    },
+    DUE: {
+      label: 'Vencido',
+      variant: 'destructive',
     },
     PARTIAL: {
       label: 'Parcial',

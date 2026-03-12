@@ -72,7 +72,7 @@ export function BudgetPdfExportDialog({
               disabled={isExporting}
             />
             <p className="text-xs text-muted-foreground">
-              Estas observações aparecerão no orçamento após os itens de precificação.
+              Estas observações aparecerão no orçamento após os itens do orçamento.
             </p>
           </div>
 

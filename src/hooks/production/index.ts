@@ -1,5 +1,5 @@
 export * from "./use-task";
-export * from "./use-task-pricing";
+export * from "./use-task-quote";
 export * from "./use-activity";
 export * from "./use-activity-form-url-state";
 export * from "./use-service-order";

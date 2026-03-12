@@ -11,7 +11,6 @@ import {
   IconSparkles,
   IconScissors,
   IconCurrencyReal,
-  IconFileInvoice,
   IconFileText,
   IconHash,
   IconLicense,
@@ -49,7 +48,6 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CustomerSelector } from "./customer-selector";
 import { SectorSelector } from "./sector-selector";
 import { ServiceSelectorAutoGrouped } from "./service-selector-auto-grouped";
-import { PricingSelector, type PricingSelectorRef } from "../pricing/pricing-selector";
 import { MultiCutSelector, type MultiCutSelectorRef } from "./multi-cut-selector";
 import { GeneralPaintingSelector } from "./general-painting-selector";
 import type { ServiceOrderData } from "./designar-service-order-dialog";
@@ -63,14 +61,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/components/ui/sonner";
 import { toTitleCase } from "../../../../utils";
-import {
-  getPricingServicesToAddFromServiceOrders,
-  getServiceOrdersToAddFromPricingServices,
-  normalizeDescription,
-  type SyncServiceOrder,
-  type SyncPricingService,
-} from "../../../../utils/task-pricing-service-order-sync";
-import { getUniqueDescriptions } from "../../../../api-client/serviceOrder";
+// Quote is now accessed via context menu, not from the edit form
 import { LayoutForm } from "@/components/production/layout/layout-form";
 import { SpotSelector } from "./spot-selector";
 import { useLayoutsByTruck, useLayoutMutations } from "../../../../hooks";
@@ -124,7 +115,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   // Wrap updateAsync for debugging/logging
   const updateAsync = async (params: any) => {
     console.log('[Task Update] 🚀 Submitting with params:', params);
-    console.log('[Task Update] 🚀 Pricing data being sent:', params.data?.pricing ? JSON.stringify(params.data.pricing, null, 2) : 'NO PRICING DATA');
+    console.log('[Task Update] Quote data being sent:', params.data?.quote ? JSON.stringify(params.data.quote, null, 2) : 'NO QUOTE DATA');
     // NOTE: artworkStatuses is now added in the FormData/JSON preparation sections
     // to avoid duplicates and to properly filter temp IDs vs real UUIDs
     const result = await taskMutations.updateAsync(params);
@@ -133,7 +124,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
   const {
     privilege, isTeamLeader,
-    canViewPricing: canViewPricingSections,
     canViewRestrictedFields,
     canViewCommission: canViewCommissionField,
     canViewDates, canViewServices, canViewLayout, canViewTruckSpot,
@@ -396,8 +386,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const [cutsCount, setCutsCount] = useState(0);
   const multiAirbrushingSelectorRef = useRef<MultiAirbrushingSelectorRef>(null);
   const [airbrushingsCount, setAirbrushingsCount] = useState(0);
-  const pricingSelectorRef = useRef<PricingSelectorRef>(null);
-  const [pricingItemCount, setPricingItemCount] = useState(0);
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
   const [hasLayoutChanges, setHasLayoutChanges] = useState(false);
   const [hasFileChanges, setHasFileChanges] = useState(false);
@@ -406,11 +394,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const [observationFiles, setObservationFiles] = useState<FileWithPreview[]>(
     convertToFileWithPreview(task.observation?.files)
   );
-  // Pricing layout file state
-  const [pricingLayoutFiles, setPricingLayoutFiles] = useState<FileWithPreview[]>(
-    task.pricing?.layoutFile ? convertToFileWithPreview([task.pricing.layoutFile]) : []
-  );
-
   // Responsibles state - using row-based system
   const [responsibleRows, setResponsibleRows] = useState<ResponsibleRowData[]>(() => {
     // Initialize from task responsibles
@@ -443,6 +426,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     }];
   });
 
+  const handleResponsibleRowsChange = useCallback((rows: ResponsibleRowData[]) => {
+    setResponsibleRows(rows);
+    if (showResponsibleErrors && validateResponsibleRows(rows)) {
+      setShowResponsibleErrors(false);
+    }
+  }, [showResponsibleErrors]);
+
   // Accordion state - track which section is open (only one at a time)
   const [openAccordion, setOpenAccordion] = useState<string | undefined>("basic-information");
 
@@ -471,8 +461,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     finishedAt: "dates",
     // Services
     serviceOrders: "serviceOrders",
-    // Pricing
-    pricing: "pricing",
     // Layout
     leftSideLayout: "layout",
     rightSideLayout: "layout",
@@ -761,88 +749,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       sectorId: taskData.sectorId || null,
       responsibleIds: taskData.responsibleIds || [],
       paintId: taskData.paintId || null,
-      // Initialize pricing with default structure - default row is part of initial state, not a change
-      pricing: taskData.pricing ? {
-        // Default to 30 days from now if expiresAt is null (required when items exist)
-        expiresAt: taskData.pricing.expiresAt ? new Date(taskData.pricing.expiresAt) : (() => {
-          const date = new Date();
-          date.setDate(date.getDate() + 30);
-          date.setHours(23, 59, 59, 999);
-          return date;
-        })(),
-        status: taskData.pricing.status || 'PENDING',
-        subtotal: taskData.pricing.subtotal || 0,
-        total: taskData.pricing.total || 0,
-        // Guarantee Terms
-        guaranteeYears: taskData.pricing.guaranteeYears || null,
-        customGuaranteeText: taskData.pricing.customGuaranteeText || null,
-        // Custom Forecast
-        customForecastDays: taskData.pricing.customForecastDays || null,
-        // Layout File
-        layoutFileId: taskData.pricing.layoutFileId || null,
-        // Customer Configs (map full objects with per-customer payment fields)
-        customerConfigs: taskData.pricing.customerConfigs?.map((c: any) => ({
-          customerId: c.customerId || c.id,
-          subtotal: c.subtotal ?? 0,
-          discountType: c.discountType || 'NONE',
-          discountValue: c.discountValue ?? null,
-          total: c.total ?? 0,
-          paymentCondition: c.paymentCondition || null,
-          downPaymentDate: c.downPaymentDate ? new Date(c.downPaymentDate) : null,
-          customPaymentText: c.customPaymentText || null,
-          responsibleId: c.responsibleId || null,
-          discountReference: c.discountReference || null,
-          // Preserve existing installments so they're not lost on save
-          installments: c.installments?.map((inst: any) => ({
-            number: inst.number,
-            dueDate: inst.dueDate ? new Date(inst.dueDate) : new Date(),
-            amount: typeof inst.amount === 'number' ? inst.amount : Number(inst.amount) || 0,
-          })) || [],
-        })) || [],
-        // New Fields
-        simultaneousTasks: taskData.pricing.simultaneousTasks || null,
-        services: (() => {
-          if (taskData.pricing.services && taskData.pricing.services.length > 0) {
-            // Log raw API values for debugging
-            console.log('[TaskEditForm] 📥 RAW pricing items from API:');
-            taskData.pricing.services.forEach((item: any, index: number) => {
-              console.log(`  [${index}] "${item.description}" - shouldSync from API: ${item.shouldSync} (type: ${typeof item.shouldSync})`);
-            });
-            return taskData.pricing.services.map((item) => ({
-              id: item.id,
-              description: item.description || "",
-              observation: item.observation || null,
-              amount: typeof item.amount === 'number' ? item.amount : (item.amount ? Number(item.amount) : 0),
-              shouldSync: item.shouldSync !== false, // Include shouldSync flag (default true)
-              invoiceToCustomerId: item.invoiceToCustomerId || null,
-            }));
-          }
-          return [{ description: "", amount: null, observation: null, shouldSync: true, invoiceToCustomerId: null }]; // Default empty row
-        })()
-      } : {
-        // Default pricing structure when no pricing exists
-        expiresAt: (() => {
-          const date = new Date();
-          date.setDate(date.getDate() + 30);
-          date.setHours(23, 59, 59, 999);
-          return date;
-        })(),
-        status: 'PENDING',
-        subtotal: 0,
-        total: 0,
-        // Guarantee Terms (defaults)
-        guaranteeYears: null,
-        customGuaranteeText: null,
-        // Custom Forecast (defaults)
-        customForecastDays: null,
-        // Layout File (defaults)
-        layoutFileId: null,
-        // Customer Configs (defaults)
-        customerConfigs: [],
-        // New Fields (defaults)
-        simultaneousTasks: null,
-        services: [{ description: "", amount: null, observation: null }], // Default empty row
-      },
+      // NOTE: Pricing/Quote is now managed on a separate page (/production/schedule/task-quote/[taskId])
       // Initialize serviceOrders with default row - part of initial state
       // Maintain creation order (sorted by createdAt ASC) to preserve user's intended order
       serviceOrders: (() => {
@@ -952,12 +859,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       // This must happen BEFORE any async operations to prevent race conditions
       isSubmittingRef.current = true;
 
-      // CRITICAL FIX: Clear any pending sync timeout to prevent sync from running during submission
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-        syncTimeoutRef.current = null;
-        console.log('[TaskEditForm] Cleared pending sync timeout for clean submission');
-      }
+      // NOTE: syncTimeoutRef was removed along with the sync block (now on task-quote page)
 
       // DEBUG: Log current form values for date fields
       // const _currentFormValues = form.getValues();
@@ -972,7 +874,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
       // CRITICAL: Log deleted items for debugging
       console.log('[TaskEditForm] Deleted service orders tracked:', Array.from(deletedServiceOrderDescriptionsRef.current));
-      console.log('[TaskEditForm] Deleted pricing items tracked:', Array.from(deletedPricingItemDescriptionsRef.current));
 
       try {
         // Validate responsible rows before submitting
@@ -985,7 +886,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         setIsSubmitting(true);
 
         console.log('[TaskEditForm] 📋 ========== FORM SUBMISSION START ==========');
-        console.log('[TaskEditForm] 📋 Raw changedData.pricing BEFORE any processing:', JSON.stringify(changedData.pricing, null, 2));
+        console.log('[TaskEditForm] Raw changedData.quote BEFORE any processing:', JSON.stringify(changedData.quote, null, 2));
 
         // Set entry date to 7:30 if provided (since the date picker only allows date selection)
         if (changedData.entryDate) {
@@ -1032,29 +933,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           }
           return null;
         };
-
-        // Fix pricing.discountValue and ensure pricing arrays are actual arrays
-        if (changedData.pricing) {
-          const pricing = changedData.pricing as any;
-
-          // Ensure items is an array
-          if (pricing.services) {
-            pricing.services = ensureArray(pricing.services).map((item: any) => ({
-              ...item,
-              amount: ensureNumber(item.amount) ?? 0,
-            }));
-          }
-
-          // Normalize customerConfigs: ensure it's an array and coerce numeric fields
-          if (pricing.customerConfigs) {
-            pricing.customerConfigs = ensureArray(pricing.customerConfigs).map((config: any) => ({
-              ...config,
-              subtotal: ensureNumber(config.subtotal) ?? 0,
-              discountValue: ensureNumber(config.discountValue),
-              total: ensureNumber(config.total) ?? 0,
-            }));
-          }
-        }
 
         // Ensure serviceOrders is an array
         if (changedData.serviceOrders) {
@@ -1124,51 +1002,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // If the array was not in changedData at all, it means service orders weren't modified.
         }
 
-        // Filter and validate pricing (if it exists in changedData)
-        // Empty items (no description) are filtered out
-        if (changedData.pricing && changedData.pricing.services && changedData.pricing.services.length > 0) {
-          console.log('[TaskEditForm] 🔍 Pricing items BEFORE filtering:', JSON.stringify(changedData.pricing.services, null, 2));
-
-          // Filter out items without description (empty items)
-          const validItems = changedData.pricing.services.filter((item: any) => {
-            const hasDescription = item.description && item.description.trim() !== "";
-            console.log(`[TaskEditForm] Item "${item.description}" has description? ${hasDescription}`);
-            return hasDescription;
-          });
-
-          console.log('[TaskEditForm] 🔍 Valid pricing items AFTER filtering:', validItems.length, JSON.stringify(validItems, null, 2));
-
-          // Log shouldSync values specifically for debugging
-          console.log('[TaskEditForm] 📍 shouldSync values for each pricing item:');
-          validItems.forEach((item: any, index: number) => {
-            console.log(`  [${index}] "${item.description}" - shouldSync: ${item.shouldSync} (type: ${typeof item.shouldSync})`);
-          });
-
-          // Update changedData with filtered items
-          if (validItems.length > 0) {
-            // Normalize amounts - empty/null becomes 0 (courtesy)
-            changedData.pricing = {
-              ...changedData.pricing,
-              services: validItems.map((item: any) => ({
-                ...item,
-                amount: item.amount ?? 0,
-              })),
-            };
-
-            // Check if expiry date is missing (only if there are valid items)
-            if (!changedData.pricing.expiresAt) {
-              console.log('[TaskEditForm] ❌ Early return: pricing.expiresAt missing');
-              toast.error("A data de validade da precificação é obrigatória.");
-              return;
-            }
-          } else {
-            // No valid items - remove pricing from changedData entirely
-            console.log('[TaskEditForm] ⚠️ WARNING: All pricing items filtered out - DELETING entire pricing from changedData!');
-            delete changedData.pricing;
-          }
-        } else if (changedData.pricing) {
-          console.log('[TaskEditForm] ⚠️ WARNING: Pricing exists but has no items or empty items array');
-          console.log('[TaskEditForm] Pricing data:', JSON.stringify(changedData.pricing, null, 2));
+        // Remove quote from changedData - it's now managed on a separate page
+        if (changedData.quote) {
+          delete changedData.quote;
         }
 
         // Filter out empty airbrushings (airbrushings with no meaningful data)
@@ -1365,7 +1201,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         const newBaseFiles = baseFiles.filter(f => !f.uploaded);
         const newProjectFiles = projectFiles.filter(f => !f.uploaded);
         const newObservationFiles = observationFiles.filter(f => !f.uploaded);
-        const newPricingLayoutFiles = pricingLayoutFiles.filter(f => !f.uploaded);
 
         // Check for cut files
         const changedCuts = changedData.cuts as any[] || [];
@@ -1384,8 +1219,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         const hasNewFiles = newArtworkFiles.length > 0 ||
                            newBaseFiles.length > 0 || newProjectFiles.length > 0 ||
                            hasCutFiles || hasAirbrushingFiles ||
-                           newObservationFiles.length > 0 || layoutPhotoFiles.length > 0 ||
-                           newPricingLayoutFiles.length > 0;
+                           newObservationFiles.length > 0 || layoutPhotoFiles.length > 0;
 
         let result;
 
@@ -1413,9 +1247,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
             files.observationFiles = newObservationFiles.filter(f => f instanceof File) as File[];
 
-          }
-          if (newPricingLayoutFiles.length > 0) {
-            files.pricingLayoutFile = newPricingLayoutFiles.filter(f => f instanceof File) as File[];
           }
 
           // Add layout photo files if any (sent WITH task update, backend handles them)
@@ -1470,7 +1301,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // These are large arrays that bloat the payload size
           // MUST MATCH fieldsToOmitIfUnchanged in useEditForm config
           // NOTE: 'cuts' are excluded - created separately via POST /cuts
-          // NOTE: 'airbrushings', 'pricing', 'serviceOrders' are NOT excluded - they use filtering logic
+          // NOTE: 'airbrushings', 'quote', 'serviceOrders' are NOT excluded - they use filtering logic
           const excludedFields = new Set([
             'cuts',
             'paintIds',
@@ -2117,7 +1948,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // This allows users to add new items with previously deleted descriptions
           console.log('[TaskEditForm] Clearing deletion tracking refs after successful save');
           deletedServiceOrderDescriptionsRef.current.clear();
-          deletedPricingItemDescriptionsRef.current.clear();
 
           // Create cuts separately via POST /cuts with FormData
 
@@ -2225,7 +2055,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         }, 100);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, uploadedFiles, baseFiles, projectFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, hasProjectFileChanges, hasCheckinFileChanges, hasCheckoutFileChanges, uploadedFiles, baseFiles, projectFiles, observationFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -2242,7 +2072,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     // Don't send these large arrays if they haven't changed (reduces payload size)
     // This must match the excludedFields Set in handleFormSubmit for consistency
     // NOTE: 'cuts' are omitted - created separately via POST /cuts
-    // NOTE: 'airbrushings', 'pricing', 'serviceOrders' are NOT omitted - they need filtering logic
+    // NOTE: 'airbrushings', 'quote', 'serviceOrders' are NOT omitted - they need filtering logic
     fieldsToOmitIfUnchanged: [
       "cuts",
       "paintIds",
@@ -2423,11 +2253,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const formValues = form.watch();
 
   // Watch specific fields with useWatch for better reactivity
-  const pricingValues = useWatch({
-    control: form.control,
-    name: 'pricing',
-  });
-
   const cutsValues = useWatch({
     control: form.control,
     name: 'cuts',
@@ -2476,499 +2301,18 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
   // Responsibles are now managed by the ResponsibleManager component
 
-  // =====================================================================
-  // BIDIRECTIONAL SYNC: Pricing Items ↔ Production Service Orders
-  // When user adds a PRODUCTION service order, auto-add pricing item
-  // When user adds a pricing item, auto-add PRODUCTION service order
-  //
-  // IMPORTANT: This sync only runs when user FINISHES adding an item,
-  // not while they're typing. We use debouncing and track item counts
-  // to detect when new items are truly added.
-  // =====================================================================
+  // NOTE: Bidirectional sync between quote items and service orders has been
+  // moved to the separate task quote page (/production/schedule/task-quote/[taskId]).
 
-  // Refs to track state and prevent issues
-  const isFormInitializedRef = useRef<boolean>(false);
-  const isSyncingRef = useRef<boolean>(false);
-  const isSubmittingRef = useRef<boolean>(false); // CRITICAL: Prevents sync during form submission
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSyncedServiceOrderCountRef = useRef<number>(0);
-  const lastSyncedPricingItemCountRef = useRef<number>(0);
-  const historicalDescriptionsRef = useRef<string[]>([]);
-
-  // Track deleted items to prevent sync from recreating them
-  // These are normalized descriptions of items that were intentionally deleted during this editing session
+  // Refs used by the submission handler
+  const isSubmittingRef = useRef<boolean>(false);
   const deletedServiceOrderDescriptionsRef = useRef<Set<string>>(new Set());
-  const deletedPricingItemDescriptionsRef = useRef<Set<string>>(new Set());
 
-  // Track previous observation values to detect which side changed
-  // This allows us to sync observations only FROM the side that was edited
-  // Key: normalized description, Value: observation value (string or null)
-  const prevSOObservationsRef = useRef<Map<string, string | null>>(new Map());
-  const prevPIObservationsRef = useRef<Map<string, string | null>>(new Map());
+  // End of sync removal placeholder
 
-  // Callbacks to track deleted items from child components
-  const handleServiceOrderDeleted = useCallback((description: string) => {
-    const normalizedDesc = normalizeDescription(description);
-    if (normalizedDesc) {
-      deletedServiceOrderDescriptionsRef.current.add(normalizedDesc);
-      // CRITICAL FIX: Update the lastSynced count to reflect the deletion
-      // This prevents false "items added" detection when the item count temporarily decreases
-      if (lastSyncedServiceOrderCountRef.current > 0) {
-        lastSyncedServiceOrderCountRef.current -= 1;
-      }
-      console.log('[PRICING↔SO SYNC] Tracking deleted service order:', normalizedDesc, 'New count ref:', lastSyncedServiceOrderCountRef.current);
-    }
-  }, []);
+  // SYNC BLOCK REMOVED - see task-quote page
 
-  const handlePricingItemDeleted = useCallback((description: string) => {
-    const normalizedDesc = normalizeDescription(description);
-    if (normalizedDesc) {
-      deletedPricingItemDescriptionsRef.current.add(normalizedDesc);
-      // CRITICAL FIX: Update the lastSynced count to reflect the deletion
-      // This prevents false "items added" detection when the item count temporarily decreases
-      if (lastSyncedPricingItemCountRef.current > 0) {
-        lastSyncedPricingItemCountRef.current -= 1;
-      }
-      console.log('[PRICING↔SO SYNC] Tracking deleted pricing item:', normalizedDesc, 'New count ref:', lastSyncedPricingItemCountRef.current);
-    }
-  }, []);
 
-  // Reorder synced pricing items to match PRODUCTION service order reorder
-  const handleProductionReorder = useCallback((descriptions: string[]) => {
-    const currentPricingItems = ((form.getValues('pricing') as any)?.services as any[]) || [];
-    if (currentPricingItems.length === 0) return;
-
-    // Build a map: normalized description → target order index
-    const orderMap = new Map<string, number>();
-    descriptions.forEach((desc, idx) => {
-      orderMap.set(normalizeDescription(desc), idx);
-    });
-
-    // Separate synced (matched) and unsynced pricing items, keeping original indices
-    const synced: { item: any; orderIdx: number; origIdx: number }[] = [];
-    const unsynced: { item: any; origIdx: number }[] = [];
-
-    currentPricingItems.forEach((item: any, origIdx: number) => {
-      const normalized = normalizeDescription(item.description || '');
-      const orderIdx = orderMap.get(normalized);
-      if (orderIdx !== undefined && item.shouldSync !== false) {
-        synced.push({ item, orderIdx, origIdx });
-      } else {
-        unsynced.push({ item, origIdx });
-      }
-    });
-
-    if (synced.length < 2) return; // Nothing to reorder
-
-    // Sort synced items by the new order
-    synced.sort((a, b) => a.orderIdx - b.orderIdx);
-
-    // Reconstruct: place synced items back into the same slot positions they originally occupied
-    const syncedSlots = synced.map(s => s.origIdx).sort((a, b) => a - b);
-    const newItems = [...currentPricingItems];
-    syncedSlots.forEach((slot, i) => {
-      newItems[slot] = synced[i].item;
-    });
-
-    // Use PricingSelector's useFieldArray replace method instead of form.setValue
-    // to ensure proper sync with useFieldArray's internal state
-    if (pricingSelectorRef.current) {
-      pricingSelectorRef.current.replaceItems(newItems);
-    } else {
-      form.setValue('pricing.services', newItems, { shouldDirty: true });
-    }
-  }, [form]);
-
-  // Responsible rows are now managed by ResponsibleManager component
-  // Handler to update responsible rows and sync with form
-  const handleResponsibleRowsChange = useCallback((rows: ResponsibleRowData[]) => {
-    console.log('[TaskEditForm] handleResponsibleRowsChange called:', {
-      rows,
-      rowsWithData: rows.map(r => ({
-        id: r.id,
-        name: r.name,
-        phone: r.phone,
-        isNew: r.isNew,
-        hasValidData: r.isNew && !!r.name?.trim() && !!r.phone?.trim()
-      }))
-    });
-
-    // Update responsible rows state
-    setResponsibleRows(rows);
-    if (showResponsibleErrors && validateResponsibleRows(rows)) {
-      setShowResponsibleErrors(false);
-    }
-
-    // Update the form's responsibleIds with existing responsibles
-    const existingRepIds = rows
-      .filter(row => !row.isNew && row.id && row.id.trim() !== '')
-      .map(row => row.id);
-
-    // Check if there are new responsibles with data to mark form as dirty
-    const hasNewRepsWithData = rows.some(row =>
-      row.isNew && row.name && row.name.trim() && row.phone && row.phone.trim()
-    );
-
-    // Get current form value to compare
-    const currentFormIds = form.getValues("responsibleIds") || [];
-    const originalIds = task.responsibles?.map(r => r.id) || [];
-
-    // Only update form if the IDs actually changed from the original
-    const idsChanged = existingRepIds.join(',') !== originalIds.join(',');
-
-    console.log('[TaskEditForm] Responsible state:', {
-      existingRepIds,
-      hasNewRepsWithData,
-      currentFormIds,
-      originalIds,
-      idsChanged
-    });
-
-    // Only call setValue if IDs changed or we have new reps with data
-    // This prevents unnecessary form dirty state when only empty rows exist
-    if (idsChanged || hasNewRepsWithData) {
-      form.setValue("responsibleIds", existingRepIds, {
-        shouldDirty: true,
-        shouldTouch: true,
-        shouldValidate: true
-      });
-    }
-  }, [form, task.responsibles, showResponsibleErrors]);
-
-  // Fetch historical PRODUCTION service order descriptions on mount
-  useEffect(() => {
-    const fetchHistoricalDescriptions = async () => {
-      try {
-        const response = await getUniqueDescriptions({ type: SERVICE_ORDER_TYPE.PRODUCTION, limit: 200 });
-        if (response.success && response.data) {
-          historicalDescriptionsRef.current = response.data;
-          console.log('[PRICING↔SO SYNC] Loaded', response.data.length, 'historical descriptions');
-        }
-      } catch (error) {
-        console.error('[PRICING↔SO SYNC] Failed to load historical descriptions:', error);
-      }
-    };
-    fetchHistoricalDescriptions();
-  }, []);
-
-  // Initialize refs on first render with current data counts
-  useEffect(() => {
-    if (!isFormInitializedRef.current) {
-      const currentServiceOrders = (servicesValues as any[]) || [];
-      const currentPricingItems = ((pricingValues as any)?.services as any[]) || [];
-
-      // Count only PRODUCTION service orders with valid descriptions
-      const validServiceOrders = currentServiceOrders.filter(
-        (so: any) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.description?.trim().length >= 3
-      );
-      const validPricingItems = currentPricingItems.filter(
-        (item: any) => item.description?.trim().length >= 3
-      );
-
-      lastSyncedServiceOrderCountRef.current = validServiceOrders.length;
-      lastSyncedPricingItemCountRef.current = validPricingItems.length;
-
-      // Initialize previous observation maps with current values
-      // This prevents false "change" detection on the first sync
-      const initialSOObsMap = new Map<string, string | null>();
-      for (const so of validServiceOrders) {
-        const normalizedDesc = normalizeDescription(so.description);
-        if (normalizedDesc) {
-          initialSOObsMap.set(normalizedDesc, so.observation || null);
-        }
-      }
-      prevSOObservationsRef.current = initialSOObsMap;
-
-      const initialPIObsMap = new Map<string, string | null>();
-      for (const item of validPricingItems) {
-        const normalizedDesc = normalizeDescription(item.description);
-        if (normalizedDesc) {
-          initialPIObsMap.set(normalizedDesc, item.observation || null);
-        }
-      }
-      prevPIObservationsRef.current = initialPIObsMap;
-
-      // Mark form as initialized after a delay to skip any initial render cycles
-      setTimeout(() => {
-        isFormInitializedRef.current = true;
-      }, 1000);
-    }
-  }, []); // Only run once on mount
-
-  // Debounced sync effect - only runs after user stops typing for 1.5 seconds
-  useEffect(() => {
-    // Skip if form not initialized, already syncing, or form is being submitted
-    // CRITICAL: isSubmittingRef prevents sync from interfering with deletion during form submission
-    if (!isFormInitializedRef.current || isSyncingRef.current || isSubmittingRef.current) return;
-
-    // Clear any pending sync
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
-
-    // Debounce: wait 1.5 seconds after last change before syncing
-    syncTimeoutRef.current = setTimeout(() => {
-      // CRITICAL: Double-check submission flag inside the timeout callback
-      // This prevents sync from running if form submission started during the debounce period
-      if (isSubmittingRef.current) {
-        console.log('[PRICING↔SO SYNC] Skipping sync - form is being submitted');
-        return;
-      }
-
-      const currentServiceOrders = (servicesValues as any[]) || [];
-      const currentPricingItems = ((pricingValues as any)?.services as any[]) || [];
-
-      // Get valid (complete) items only - must have description >= 3 chars
-      const validServiceOrders = currentServiceOrders.filter(
-        (so: any) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.description?.trim().length >= 3
-      );
-      const validPricingItems = currentPricingItems.filter(
-        (item: any) => item.description?.trim().length >= 3
-      );
-
-      const currentSOCount = validServiceOrders.length;
-      const currentPricingCount = validPricingItems.length;
-
-      // Check if item count INCREASED (new item was added)
-      const serviceOrdersAdded = currentSOCount > lastSyncedServiceOrderCountRef.current;
-      const pricingItemsAdded = currentPricingCount > lastSyncedPricingItemCountRef.current;
-
-      // Set syncing flag
-      isSyncingRef.current = true;
-
-      try {
-        // Prepare data for sync functions
-        // CRITICAL: Include shouldSync flag and filter out items that shouldn't sync
-        const syncServiceOrders: SyncServiceOrder[] = validServiceOrders.map((so: any) => ({
-          id: so.id,
-          description: so.description || '',
-          observation: so.observation || null,
-          type: so.type,
-          status: so.status || SERVICE_ORDER_STATUS.PENDING,
-          statusOrder: so.statusOrder || 1,
-          shouldSync: so.shouldSync !== false,
-        }));
-
-        const syncPricingServices: SyncPricingService[] = validPricingItems.map((item: any) => ({
-          id: item.id,
-          description: item.description || '',
-          observation: item.observation || null,
-          amount: item.amount || 0,
-          shouldSync: item.shouldSync !== false,
-        }));
-
-        // Helper to filter empty pricing items
-        const filterEmptyPricingServices = (items: any[]) => items.filter((item: any) => {
-          const hasDescription = item.description && item.description.trim() !== "";
-          const hasAmount = item.amount !== null && item.amount !== undefined && item.amount > 0;
-          return hasDescription || hasAmount;
-        });
-
-        // Helper to filter empty service orders
-        const filterEmptyServiceOrders = (orders: any[]) => orders.filter((so: any) => {
-          return so.description && so.description.trim().length >= 3;
-        });
-
-        // =====================================================================
-        // OBSERVATION SYNC WITH CHANGE DETECTION
-        // We track which side changed and only sync FROM the changed side.
-        // This prevents the issue where clearing an observation on one side
-        // gets restored by the sync from the other side.
-        // =====================================================================
-
-        // Build current observation maps
-        const currentSOObsMap = new Map<string, string | null>();
-        for (const so of syncServiceOrders) {
-          const normalizedDesc = normalizeDescription(so.description);
-          if (normalizedDesc) {
-            currentSOObsMap.set(normalizedDesc, so.observation || null);
-          }
-        }
-
-        const currentPIObsMap = new Map<string, string | null>();
-        for (const item of syncPricingServices) {
-          const normalizedDesc = normalizeDescription(item.description);
-          if (normalizedDesc) {
-            currentPIObsMap.set(normalizedDesc, item.observation || null);
-          }
-        }
-
-        // Detect which side changed for each description
-        const soObsChangedDescs = new Set<string>();
-        const piObsChangedDescs = new Set<string>();
-
-        for (const [desc, obs] of currentSOObsMap) {
-          const prevObs = prevSOObservationsRef.current.get(desc);
-          // Normalize comparison: treat undefined, null, and "" as equivalent
-          const normalizedPrev = prevObs || null;
-          const normalizedCurrent = obs || null;
-          if (normalizedPrev !== normalizedCurrent) {
-            soObsChangedDescs.add(desc);
-          }
-        }
-
-        for (const [desc, obs] of currentPIObsMap) {
-          const prevObs = prevPIObservationsRef.current.get(desc);
-          // Normalize comparison: treat undefined, null, and "" as equivalent
-          const normalizedPrev = prevObs || null;
-          const normalizedCurrent = obs || null;
-          if (normalizedPrev !== normalizedCurrent) {
-            piObsChangedDescs.add(desc);
-          }
-        }
-
-        // Sync observations based on which side changed
-        // If SO changed but PI didn't -> sync SO observation to PI
-        // If PI changed but SO didn't -> sync PI observation to SO
-        // If both changed -> conflict, don't sync (keep both values)
-
-        let pricingObservationsUpdated = false;
-        const pricingItemsWithSyncedObs = currentPricingItems.map((item: any) => {
-          if (!item.description || item.description.trim().length < 3) return item;
-          const normalizedDesc = normalizeDescription(item.description);
-
-          // Only sync if SO changed AND PI didn't change (to avoid conflicts)
-          if (soObsChangedDescs.has(normalizedDesc) && !piObsChangedDescs.has(normalizedDesc)) {
-            const soObs = currentSOObsMap.get(normalizedDesc);
-            const currentItemObs = item.observation || null;
-            if (currentItemObs !== soObs) {
-              pricingObservationsUpdated = true;
-              console.log('[PRICING↔SO SYNC] Syncing SO→PI observation:', normalizedDesc, soObs);
-              return { ...item, observation: soObs };
-            }
-          }
-          return item;
-        });
-
-        let soObservationsUpdated = false;
-        const serviceOrdersWithSyncedObs = currentServiceOrders.map((so: any) => {
-          if (so.type !== SERVICE_ORDER_TYPE.PRODUCTION) return so;
-          if (!so.description || so.description.trim().length < 3) return so;
-          const normalizedDesc = normalizeDescription(so.description);
-
-          // Only sync if PI changed AND SO didn't change (to avoid conflicts)
-          if (piObsChangedDescs.has(normalizedDesc) && !soObsChangedDescs.has(normalizedDesc)) {
-            const piObs = currentPIObsMap.get(normalizedDesc);
-            const currentSOObs = so.observation || null;
-            if (currentSOObs !== piObs) {
-              soObservationsUpdated = true;
-              console.log('[PRICING↔SO SYNC] Syncing PI→SO observation:', normalizedDesc, piObs);
-              return { ...so, observation: piObs };
-            }
-          }
-          return so;
-        });
-
-        // =====================================================================
-        // SYNC 1: Service Orders → Pricing Items (NEW ITEMS)
-        // =====================================================================
-        const pricingItemsToAddRaw = serviceOrdersAdded
-          ? getPricingServicesToAddFromServiceOrders(syncServiceOrders, syncPricingServices)
-          : [];
-
-        // Filter out items that were deleted during this editing session
-        const pricingItemsToAdd = pricingItemsToAddRaw.filter((item: any) => {
-          const normalizedDesc = normalizeDescription(item.description);
-          return !deletedPricingItemDescriptionsRef.current.has(normalizedDesc);
-        });
-
-        // Update pricing if new items added OR observations changed
-        if (pricingItemsToAdd.length > 0 || pricingObservationsUpdated) {
-          const basePricingItems = pricingItemsToAdd.length > 0
-            ? filterEmptyPricingServices(pricingItemsWithSyncedObs)
-            : pricingItemsWithSyncedObs;
-          const finalPricingItems = [...basePricingItems, ...pricingItemsToAdd];
-
-          console.log('[PRICING↔SO SYNC] Updating pricing items:', {
-            added: pricingItemsToAdd.length,
-            observationsUpdated: pricingObservationsUpdated,
-          });
-          // Use PricingSelector's useFieldArray replace method instead of form.setValue
-          if (pricingSelectorRef.current) {
-            pricingSelectorRef.current.replaceItems(finalPricingItems);
-          } else {
-            form.setValue('pricing.services', finalPricingItems, {
-              shouldDirty: true,
-              shouldTouch: true,
-            });
-          }
-        }
-
-        // =====================================================================
-        // SYNC 2: Pricing Items → Service Orders (NEW ITEMS)
-        // =====================================================================
-        const serviceOrdersToAddRaw = pricingItemsAdded
-          ? getServiceOrdersToAddFromPricingServices(syncPricingServices, syncServiceOrders, historicalDescriptionsRef.current)
-          : [];
-
-        // Filter out items that were deleted during this editing session
-        const serviceOrdersToAdd = serviceOrdersToAddRaw.filter((so: any) => {
-          const normalizedDesc = normalizeDescription(so.description);
-          return !deletedServiceOrderDescriptionsRef.current.has(normalizedDesc);
-        });
-
-        // Update service orders if new items added OR observations changed
-        if (serviceOrdersToAdd.length > 0 || soObservationsUpdated) {
-          const baseServiceOrders = serviceOrdersToAdd.length > 0
-            ? filterEmptyServiceOrders(serviceOrdersWithSyncedObs)
-            : serviceOrdersWithSyncedObs;
-          const finalServiceOrders = [...serviceOrdersToAdd, ...baseServiceOrders];
-
-          console.log('[PRICING↔SO SYNC] Updating service orders:', {
-            added: serviceOrdersToAdd.length,
-            observationsUpdated: soObservationsUpdated,
-          });
-          form.setValue('serviceOrders', finalServiceOrders, {
-            shouldDirty: true,
-            shouldTouch: true,
-          });
-        }
-
-        // =====================================================================
-        // UPDATE PREVIOUS OBSERVATION REFS
-        // CRITICAL: Update to the TARGET values (after sync) to prevent false
-        // change detection on the next render when the synced values come back.
-        // =====================================================================
-        const newPrevSOMap = new Map<string, string | null>();
-        const finalSOsForPrevMap = soObservationsUpdated ? serviceOrdersWithSyncedObs : currentServiceOrders;
-        for (const so of finalSOsForPrevMap) {
-          if (so.type !== SERVICE_ORDER_TYPE.PRODUCTION) continue;
-          const normalizedDesc = normalizeDescription(so.description);
-          if (normalizedDesc) {
-            newPrevSOMap.set(normalizedDesc, so.observation || null);
-          }
-        }
-        prevSOObservationsRef.current = newPrevSOMap;
-
-        const newPrevPIMap = new Map<string, string | null>();
-        const finalPIsForPrevMap = pricingObservationsUpdated ? pricingItemsWithSyncedObs : currentPricingItems;
-        for (const item of finalPIsForPrevMap) {
-          const normalizedDesc = normalizeDescription(item.description);
-          if (normalizedDesc) {
-            newPrevPIMap.set(normalizedDesc, item.observation || null);
-          }
-        }
-        prevPIObservationsRef.current = newPrevPIMap;
-
-        // Update refs with new counts (using local variables instead of calling functions again)
-        lastSyncedServiceOrderCountRef.current = currentSOCount + serviceOrdersToAdd.length;
-        lastSyncedPricingItemCountRef.current = currentPricingCount + pricingItemsToAdd.length;
-
-      } finally {
-        // Reset syncing flag after delay
-        setTimeout(() => {
-          isSyncingRef.current = false;
-        }, 500);
-      }
-    }, 1500); // 1.5 second debounce
-
-    // Cleanup timeout on unmount or when deps change
-    return () => {
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-    };
-  }, [servicesValues, pricingValues, form]);
 
   // Get form state
   const { formState: _formState } = form;
@@ -3059,31 +2403,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     return meaningfulCuts.some((cut) => !cut.file && !cut.fileId);
   }, [cutsValues]);
 
-  const hasIncompletePricing = useMemo(() => {
-    const pricing = pricingValues as any;
-    if (!pricing || !pricing.services || pricing.services.length === 0) return false;
-
-    // Only validate pricing if it's being changed (in formFieldChanges)
-    // This prevents existing incomplete pricing from blocking unrelated edits
-    const isPricingBeingChanged = 'pricing' in formFieldChanges;
-    if (!isPricingBeingChanged) return false;
-
-    // Filter to only items with descriptions (empty items will be filtered out on submit)
-    const itemsWithDescription = pricing.services.filter((item: any) =>
-      item.description && item.description.trim() !== ""
-    );
-
-    // If there are items with descriptions, check if expiry date is missing
-    if (itemsWithDescription.length > 0 && !pricing.expiresAt) {
-      return true; // Missing expiry date
-    }
-
-    // Note: Amount is optional (0 = courtesy), so we don't check it
-    // Empty items (no description) will be filtered out on submit, not blocked
-
-    return false;
-  }, [pricingValues, formFieldChanges]);
-
   const hasIncompleteServices = useMemo(() => {
     const services = servicesValues as any[] || [];
 
@@ -3132,7 +2451,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       // Check if form is valid (no blocking validation errors)
       // This matches the form's internal validation but WITHOUT the hasChanges check
       // (isDirty will handle whether there are changes)
-      const isValid = !isSubmitting && !hasCutsWithoutFiles && !hasIncompletePricing && !hasIncompleteServices && !hasIncompleteObservation && !layoutWidthError;
+      const isValid = !isSubmitting && !hasCutsWithoutFiles && !hasIncompleteServices && !hasIncompleteObservation && !layoutWidthError;
 
       // Only notify parent if isDirty OR isValid changed to avoid infinite loops
       if (prevIsDirtyRef.current !== isDirty || prevIsValidRef.current !== isValid) {
@@ -3155,7 +2474,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     hasNewResponsibles,
     isSubmitting,
     hasCutsWithoutFiles,
-    hasIncompletePricing,
     hasIncompleteServices,
     hasIncompleteObservation,
     layoutWidthError,
@@ -3181,8 +2499,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   //     hasNewResponsibles,
   //     formFieldChangesCount: Object.keys(formFieldChanges).length,
   //     hasCutsWithoutFiles,
-  //     hasIncompletePricing,
-  //     hasIncompleteServices,
+  //   //     hasIncompleteServices,
   //     hasIncompleteObservation,
   //     hasLayoutError: !!layoutWidthError
   //   });
@@ -3769,9 +3086,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             currentUserId={user?.id}
                             userPrivilege={privilege}
                             isTeamLeader={isTeamLeader}
-                            onItemDeleted={handleServiceOrderDeleted}
                             isAccordionOpen={openAccordion === "serviceOrders"}
-                            onProductionReorder={handleProductionReorder}
                           />
                           <FormMessage />
                         </FormItem>
@@ -3783,59 +3098,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
-                {/* Pricing Card - Visible to ADMIN, FINANCIAL, and COMMERCIAL users */}
-                {canViewPricingSections && (
-          <AccordionItem
-            value="pricing"
-            id="accordion-item-pricing"
-            className="border border-border rounded-lg"
-          >
-                <Card className="border-0">
-                  <AccordionTrigger className="px-0 hover:no-underline">
-                    <CardHeader className="flex-1 py-4">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconFileInvoice className="h-5 w-5" />
-                        Precificação
-                        {pricingItemCount > 0 && (
-                          <Badge variant="secondary" className="ml-2">
-                            {pricingItemCount}
-                          </Badge>
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <CardContent className="pt-0">
-                      <PricingSelector
-                        ref={pricingSelectorRef}
-                        control={form.control}
-                        disabled={isSubmitting}
-                        userRole={privilege}
-                        onItemCountChange={setPricingItemCount}
-                        layoutFiles={pricingLayoutFiles}
-                        onLayoutFilesChange={setPricingLayoutFiles}
-                        onItemDeleted={handlePricingItemDeleted}
-                        initialCustomerConfigs={task?.pricing?.customerConfigs?.map((c: any) => c.customer).filter(Boolean)}
-                        taskResponsibles={task?.responsibles}
-                        artworks={(task.artworks || []).map((artwork: any) => {
-                          const file = artwork.file || artwork;
-                          return {
-                            id: file.id,
-                            artworkId: artwork.artworkId || artwork.id,
-                            filename: file.filename,
-                            originalName: file.originalName,
-                            thumbnailUrl: file.thumbnailUrl,
-                            status: artwork.status,
-                            mimetype: file.mimetype,
-                            size: file.size,
-                          };
-                        })}
-                      />
-                    </CardContent>
-                  </AccordionContent>
-                </Card>
-          </AccordionItem>
-                )}
+                {/* Quote is now accessed via context menu - removed from edit form */}
 
                 {/* Medidas do Caminhão - Only visible to ADMIN, LOGISTIC, and PRODUCTION team leaders */}
                 {canViewLayout && (

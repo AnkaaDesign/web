@@ -130,7 +130,7 @@ import {
   STATISTICS_GROUP_BY,
   STATISTICS_METRIC,
   STATISTICS_PERIOD,
-  TASK_PRICING_STATUS,
+  TASK_QUOTE_STATUS,
   RESCHEDULE_REASON,
   INVOICE_STATUS,
   INSTALLMENT_STATUS,
@@ -1430,8 +1430,8 @@ export const CHANGE_LOG_ENTITY_TYPE_LABELS: Record<CHANGE_LOG_ENTITY_TYPE, strin
   [CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER]: "Ordem de Serviço",
   [CHANGE_LOG_ENTITY_TYPE.SUPPLIER]: "Fornecedor",
   [CHANGE_LOG_ENTITY_TYPE.TASK]: "Tarefa",
-  [CHANGE_LOG_ENTITY_TYPE.TASK_PRICING]: "Preço da Tarefa",
-  [CHANGE_LOG_ENTITY_TYPE.TASK_PRICING_ITEM]: "Item do Orçamento",
+  [CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE]: "Faturamento da Tarefa",
+  [CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM]: "Item do Faturamento",
   [CHANGE_LOG_ENTITY_TYPE.TIME_CLOCK_ENTRY]: "Registro de Ponto",
   [CHANGE_LOG_ENTITY_TYPE.TRUCK]: "Caminhão",
   [CHANGE_LOG_ENTITY_TYPE.USER]: "Usuário",
@@ -1968,18 +1968,31 @@ export const STATISTICS_PERIOD_LABELS: Record<STATISTICS_PERIOD, string> = {
 };
 
 // =====================
-// Task Pricing Labels
+// Task Quote Labels
 // =====================
 
-export const TASK_PRICING_STATUS_LABELS: Record<TASK_PRICING_STATUS, string> = {
-  [TASK_PRICING_STATUS.PENDING]: "Pendente",
-  [TASK_PRICING_STATUS.BUDGET_APPROVED]: "Orçamento Aprovado",
-  [TASK_PRICING_STATUS.VERIFIED]: "Verificado",
-  [TASK_PRICING_STATUS.INTERNAL_APPROVED]: "Aprovado Internamente",
-  [TASK_PRICING_STATUS.UPCOMING]: "A Vencer",
-  [TASK_PRICING_STATUS.PARTIAL]: "Parcial",
-  [TASK_PRICING_STATUS.SETTLED]: "Liquidado",
+export const TASK_QUOTE_STATUS_LABELS: Record<TASK_QUOTE_STATUS, string> = {
+  [TASK_QUOTE_STATUS.PENDING]: "Pendente",
+  [TASK_QUOTE_STATUS.BUDGET_APPROVED]: "Orçamento Aprovado",
+  [TASK_QUOTE_STATUS.VERIFIED_BY_FINANCIAL]: "Verificado pelo Financeiro",
+  [TASK_QUOTE_STATUS.INTERNAL_APPROVED]: "Aprovado Internamente",
+  [TASK_QUOTE_STATUS.UPCOMING]: "A Vencer",
+  [TASK_QUOTE_STATUS.DUE]: "Vencido",
+  [TASK_QUOTE_STATUS.PARTIAL]: "Parcial",
+  [TASK_QUOTE_STATUS.SETTLED]: "Liquidado",
 };
+
+/**
+ * Returns the display label for a task quote based on its status.
+ * Before BUDGET_APPROVED → "Orçamento" (budget phase)
+ * BUDGET_APPROVED or later → "Faturamento" (billing/invoicing phase)
+ */
+export function getTaskQuoteDisplayLabel(status?: TASK_QUOTE_STATUS | null): string {
+  if (!status || status === TASK_QUOTE_STATUS.PENDING) {
+    return 'Orçamento';
+  }
+  return 'Faturamento';
+}
 
 // =====================
 // Reschedule Reason Labels

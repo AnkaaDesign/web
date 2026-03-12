@@ -5,7 +5,9 @@ import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditTasks, canDeleteTasks, canLeaderManageTask, canFinishTask } from "@/utils/permissions/entity-permissions";
+import { canViewQuote } from "@/utils/permissions/quote-permissions";
 import { isTeamLeader } from "@/utils/user";
+import { IconReceipt } from "@tabler/icons-react";
 
 interface TaskTableContextMenuProps {
   contextMenu: {
@@ -17,7 +19,7 @@ interface TaskTableContextMenuProps {
   onAction: (action: TaskAction, tasks: Task[]) => void;
 }
 
-export type TaskAction = "start" | "finish" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkBaseFiles" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask" | "bulkServiceOrder" | "bulkLayout" | "bulkDocuments";
+export type TaskAction = "start" | "finish" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkBaseFiles" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask" | "bulkServiceOrder" | "bulkLayout" | "bulkDocuments" | "quote";
 
 export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTableContextMenuProps) {
   const { user } = useAuth();
@@ -94,6 +96,14 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           <DropdownMenuItem onClick={() => handleAction("duplicate")}>
             <IconCopy className="mr-2 h-4 w-4" />
             Criar Cópias
+          </DropdownMenuItem>
+        )}
+
+        {/* Quote - ADMIN, FINANCIAL, COMMERCIAL (single selection only) */}
+        {canViewQuote(user?.sector?.privileges || "") && !isMultiSelection && (
+          <DropdownMenuItem onClick={() => handleAction("quote")}>
+            <IconReceipt className="mr-2 h-4 w-4" />
+            Orçamento
           </DropdownMenuItem>
         )}
 

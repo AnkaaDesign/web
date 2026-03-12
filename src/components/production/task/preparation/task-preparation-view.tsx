@@ -465,10 +465,10 @@ export function TaskPreparationView({
       },
     };
 
-    // FINANCIAL users: single table with COMPLETED tasks that have pricing and pricing status != SETTLED
+    // FINANCIAL users: single table with COMPLETED tasks that have quote and quote status != SETTLED
     if (isFinancialUser) {
-      // Include pricing with customerConfigs for the invoiceToCustomers column
-      result.include.pricing = {
+      // Include quote with customerConfigs for the invoiceToCustomers column
+      result.include.quote = {
         include: {
           customerConfigs: {
             include: {
@@ -602,7 +602,7 @@ export function TaskPreparationView({
           budgets: true,
           invoices: true,
           receipts: true,
-          pricing: true,
+          quote: true,
           logoPaints: true,
           cuts: true,
           serviceOrders: true,
@@ -638,7 +638,7 @@ export function TaskPreparationView({
 
       try {
         // Call the copy-from endpoint for each target task sequentially
-        // to avoid budgetNumber unique constraint race conditions when copying pricing
+        // to avoid budgetNumber unique constraint race conditions when copying quote
         const results: { success: boolean; taskId: string; result?: any; error?: any }[] = [];
         for (const targetTask of targetTasks) {
           try {

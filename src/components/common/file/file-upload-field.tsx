@@ -23,6 +23,7 @@ import {
 } from "@tabler/icons-react";
 import type { FileWithPreview } from "./file-uploader";
 import { getApiBaseUrl } from "@/config/api";
+import { rewriteCdnUrl } from "@/utils/file";
 
 export interface FileUploadFieldProps {
   onFilesChange: (files: FileWithPreview[]) => void;
@@ -288,7 +289,7 @@ export function FileUploadField({
               const apiBaseUrl = getApiBaseUrl();
               if (file.thumbnailUrl) {
                 if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
-                if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;
+                if (file.thumbnailUrl.startsWith("http")) return rewriteCdnUrl(file.thumbnailUrl);
                 return file.thumbnailUrl;
               }
               if (file.preview) return file.preview;
@@ -443,7 +444,7 @@ export function FileUploadField({
                   const apiBaseUrl = getApiBaseUrl();
                   if (file.thumbnailUrl) {
                     if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
-                    if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;
+                    if (file.thumbnailUrl.startsWith("http")) return rewriteCdnUrl(file.thumbnailUrl);
                     return file.thumbnailUrl;
                   }
                   if (file.preview) return file.preview;
@@ -572,7 +573,7 @@ export function FileUploadField({
                   const apiBaseUrl = getApiBaseUrl();
                   if (file.thumbnailUrl) {
                     if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
-                    if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;
+                    if (file.thumbnailUrl.startsWith("http")) return rewriteCdnUrl(file.thumbnailUrl);
                     return file.thumbnailUrl;
                   }
                   if (file.preview) return file.preview;

@@ -6,11 +6,11 @@ import type { HomeDashboardTask } from "../../types";
 
 const PAGE_SIZE = 20;
 
-interface AwaitingPricingApprovalListProps {
+interface AwaitingQuoteApprovalListProps {
   tasks: HomeDashboardTask[];
 }
 
-export function AwaitingPricingApprovalList({ tasks }: AwaitingPricingApprovalListProps) {
+export function AwaitingQuoteApprovalList({ tasks }: AwaitingQuoteApprovalListProps) {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
 

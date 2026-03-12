@@ -1,6 +1,7 @@
 // PDF Thumbnail Generation Utilities
 import type { File as AnkaaFile } from "../types";
 import { getApiBaseUrl } from "@/config/api";
+import { rewriteCdnUrl } from "./file";
 
 /**
  * PDF thumbnail options
@@ -33,7 +34,7 @@ export const getPDFThumbnailUrl = (
   // If the file already has a thumbnail URL, use it
   if (file.thumbnailUrl) {
     if (file.thumbnailUrl.startsWith("http")) {
-      return file.thumbnailUrl;
+      return rewriteCdnUrl(file.thumbnailUrl);
     }
     // Build full URL with size parameter
     const url = new URL(`${apiUrl}${file.thumbnailUrl}`);

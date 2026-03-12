@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { File as AnkaaFile } from "../../../types";
-import { formatFileSize, getFileCategory, isImageFile } from "../../../utils/file";
+import { formatFileSize, getFileCategory, isImageFile, rewriteCdnUrl } from "../../../utils/file";
 import { getPDFThumbnailUrl, isPDFFile } from "../../../utils/pdf-thumbnail";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -84,7 +84,7 @@ const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" = "small"): s
 
   if (file.thumbnailUrl) {
     if (file.thumbnailUrl.startsWith("http")) {
-      return file.thumbnailUrl;
+      return rewriteCdnUrl(file.thumbnailUrl);
     }
     return `${apiUrl}/files/thumbnail/${file.id}?size=${size}`;
   }

@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../../types";
-import { isImageFile, isVideoFile, getFileUrl, getFileDownloadUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl } from "../../../utils/file";
+import { isImageFile, isVideoFile, getFileUrl, getFileDownloadUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl, rewriteCdnUrl } from "../../../utils/file";
 import { InlinePdfViewer, type InlinePdfViewerRef } from "./inline-pdf-viewer";
 import { VideoPlayer } from "./video-player";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
@@ -883,7 +883,7 @@ export function FilePreviewModal({
                           : // Use thumbnail for EPS files if available
                           isEPS && currentFile.thumbnailUrl
                           ? currentFile.thumbnailUrl.startsWith("http")
-                            ? currentFile.thumbnailUrl
+                            ? rewriteCdnUrl(currentFile.thumbnailUrl)
                             : `${baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || ''}/files/thumbnail/${currentFile.id}?size=large`
                           : // Use direct file URL for all other images
                             getFileUrl(currentFile, baseUrl)
@@ -963,7 +963,7 @@ export function FilePreviewModal({
                     // For PDFs and EPS with thumbnails, use the thumbnail endpoint
                     const apiUrl = baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || '';
                     thumbnailSrc = file.thumbnailUrl && file.thumbnailUrl.startsWith("http")
-                      ? file.thumbnailUrl
+                      ? rewriteCdnUrl(file.thumbnailUrl)
                       : `${apiUrl}/files/thumbnail/${file.id}?size=small`;
                   } else {
                     // For regular images, use the thumbnail utility or direct URL

@@ -3,8 +3,11 @@ import { Button } from '@/components/ui/button';
 import {
   IconRefresh,
   IconX,
+  IconDownload,
+  IconLoader2,
 } from '@tabler/icons-react';
 import { useRegenerateBoleto, useCancelBoleto } from '@/hooks/production/use-invoice';
+import { invoiceService } from '@/api-client/invoice';
 import type { BankSlip } from '@/types/invoice';
 import {
   Dialog,
@@ -22,6 +25,7 @@ interface BoletoActionsProps {
 
 export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const regenerateBoleto = useRegenerateBoleto();
   const cancelBoleto = useCancelBoleto();
 
@@ -38,16 +42,49 @@ export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
     );
   };
 
+  const handleDownloadPdf = async () => {
+    setIsDownloading(true);
+    try {
+      const response = await invoiceService.getBoletoPdf(installmentId);
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (error) {
+      console.error('Failed to download boleto PDF:', error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   if (!bankSlip) return null;
 
   const canRegenerate = bankSlip.status === 'ERROR' || bankSlip.status === 'REJECTED';
   const canCancel = bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE';
+  const canDownloadPdf = bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE';
 
-  if (!canRegenerate && !canCancel) return null;
+  if (!canRegenerate && !canCancel && !canDownloadPdf) return null;
 
   return (
     <>
       <div className="flex items-center gap-1">
+        {canDownloadPdf && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDownloadPdf}
+            disabled={isDownloading}
+            title="Ver Boleto PDF"
+            className="h-7 w-7 p-0"
+          >
+            {isDownloading ? (
+              <IconLoader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <IconDownload className="h-4 w-4" />
+            )}
+          </Button>
+        )}
+
         {canRegenerate && (
           <Button
             variant="ghost"
