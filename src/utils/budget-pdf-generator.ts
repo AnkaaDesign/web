@@ -111,9 +111,7 @@ function calculateAdaptiveLayout(
   hasPaymentConditions: boolean,
   hasGuarantee: boolean,
   hasDiscount: boolean,
-  hasCustomerConfigs: boolean,
   hasSimultaneousTasks: boolean,
-  hasDiscountReference: boolean
 ): AdaptiveLayoutConfig {
   // A4 page height = 297mm
   const PAGE_HEIGHT = 297;
@@ -140,17 +138,17 @@ function calculateAdaptiveLayout(
     // Title section
     titleHeight:         { default: 6, min: 5, current: 6 },
     titleMarginBottom:   { default: 3, min: 1, current: 3 },
-    // Customer section - INCREASED to account for customer name + contact + intro text with serial/plate + customerConfigs
-    customerHeight:      { default: hasCustomerConfigs ? 32 : 28, min: 18, current: hasCustomerConfigs ? 32 : 28 },
+    // Customer section - accounts for customer name + contact + intro text with serial/plate
+    customerHeight:      { default: 28, min: 18, current: 28 },
     customerMarginBottom:{ default: 4, min: 1, current: 4 },
     // Services section
     servicesTitle:       { default: 5, min: 4, current: 5 },
     servicesTitleMargin: { default: 2, min: 1, current: 2 },
     // Service items - INCREASED to account for potential text wrapping
     serviceItemHeight:   { default: 5.5, min: 3.0, current: 5.5 },
-    // Totals - INCREASED if discountReference is present
+    // Totals
     totalsMarginTop:     { default: 3, min: 1, current: 3 },
-    totalsHeight:        { default: hasDiscount ? (hasDiscountReference ? 20 : 16) : 10, min: hasDiscount ? 10 : 7, current: hasDiscount ? (hasDiscountReference ? 20 : 16) : 10 },
+    totalsHeight:        { default: hasDiscount ? 16 : 10, min: hasDiscount ? 10 : 7, current: hasDiscount ? 16 : 10 },
     // Terms sections (per section) - INCREASED for guarantee text which can be 2-3 lines, and simultaneousTasks info
     termsSectionHeight:  { default: hasSimultaneousTasks ? 24 : 20, min: 12, current: hasSimultaneousTasks ? 24 : 20 },
     // Footer
@@ -376,14 +374,13 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
 
   const htmlContent = generateBudgetHtml({
     corporateName,
+    taskName: task.name || '',
     contactName,
     currentDate,
     validityDays,
     budgetNumber,
     items: task.quote.services,
     subtotal: task.quote.subtotal,
-    discountType: firstConfig?.discountType || 'NONE',
-    discountValue: firstConfig?.discountValue ?? null,
     total: task.quote.total,
     termDate,
     customDeliveryDays,
@@ -395,10 +392,7 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     serialNumber: task.serialNumber || null,
     plate: task.truck?.plate || null,
     chassisNumber: task.truck?.chassisNumber || null,
-    // New TaskQuote fields
-    customerConfigs: task.quote.customerConfigs,
     simultaneousTasks: task.quote.simultaneousTasks || null,
-    discountReference: firstConfig?.discountReference || null,
   });
 
   // Open print window
@@ -424,14 +418,13 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
 
 export interface BudgetHtmlData {
   corporateName: string;
+  taskName: string;
   contactName: string;
   currentDate: string;
   validityDays: number;
   budgetNumber: string;
   items: any[];
   subtotal: number;
-  discountType: string;
-  discountValue: number | null;
   total: number;
   termDate: string;
   customDeliveryDays: number | null; // Custom delivery time in working days
@@ -443,18 +436,7 @@ export interface BudgetHtmlData {
   serialNumber: string | null;
   plate: string | null;
   chassisNumber: string | null;
-  // New TaskQuote fields
-  customerConfigs?: Array<{
-    customer?: { corporateName?: string; fantasyName?: string };
-    discountType?: string;
-    discountValue?: number | null;
-    discountReference?: string | null;
-    responsible?: { name?: string } | null;
-    customerSignature?: { id: string } | null;
-    customPaymentText?: string | null;
-  }>;
   simultaneousTasks?: number | null;
-  discountReference?: string | null;
   customerFilter?: string | null; // Customer ID to filter services by
 }
 
@@ -492,15 +474,24 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     ? allItems.filter(item => item.invoiceToCustomerId === data.customerFilter || item.invoiceToCustomerId === null)
     : allItems;
   const displaySubtotal = data.customerFilter
-    ? items.reduce((sum: number, item: any) => sum + (item.amount || 0), 0)
+    ? items.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0)
     : data.subtotal;
 
+  // Compute per-service discount totals
+  const perServiceDiscountAmount = items.reduce((sum: number, item: any) => {
+    const amount = typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0;
+    if (item.discountType === 'PERCENTAGE' && item.discountValue) {
+      return sum + Math.round((amount * item.discountValue / 100) * 100) / 100;
+    } else if (item.discountType === 'FIXED_VALUE' && item.discountValue) {
+      return sum + Math.min(item.discountValue, amount);
+    }
+    return sum;
+  }, 0);
+
   // Calculate adaptive layout based on content
-  const hasDiscount = data.discountType !== 'NONE' && data.discountValue && data.discountValue > 0;
+  const hasDiscount = perServiceDiscountAmount > 0;
   const hasDeliveryTerm = !!(data.customDeliveryDays || data.termDate);
-  const hasCustomerConfigs = !!(data.customerConfigs && data.customerConfigs.length > 0);
   const hasSimultaneousTasks = !!(data.customDeliveryDays && data.simultaneousTasks && data.simultaneousTasks > 1);
-  const hasDiscountReference = !!(hasDiscount && data.discountReference);
 
   const layout = calculateAdaptiveLayout(
     items.length,
@@ -508,9 +499,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     !!data.paymentText,
     !!data.guaranteeText,
     Boolean(hasDiscount),
-    hasCustomerConfigs,
     hasSimultaneousTasks,
-    hasDiscountReference
   );
 
   // All layout values are now from the adaptive calculator
@@ -523,7 +512,6 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
   const servicesHtml = items
     .map((item, index) => {
       const amount = typeof item.amount === "number" ? item.amount : Number(item.amount) || 0;
-      const valueDisplay = formatCurrency(amount);
       // Combine description and observation inline (Title Case)
       // For "Outros" items, display only the observation
       const isOutros = item.description?.trim().toLowerCase() === "outros";
@@ -535,27 +523,37 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
         : observation
           ? `${description} ${observation}`
           : description;
+      // Per-service discount
+      const hasDisc = item.discountType && item.discountType !== 'NONE' && item.discountValue;
+      let discAmt = 0;
+      if (hasDisc) {
+        discAmt = item.discountType === 'PERCENTAGE'
+          ? Math.round((amount * item.discountValue / 100) * 100) / 100
+          : Math.min(item.discountValue, amount);
+      }
+      const netAmount = Math.max(0, amount - discAmt);
+      const discRefInline = hasDisc && item.discountReference
+        ? ` <span style="font-size: ${L.serviceFontSize - 2}pt; color: #888;">(${item.discountType === 'PERCENTAGE' ? `${item.discountValue}%` : formatCurrency(discAmt)} desc. — Ref: ${escapeHtml(item.discountReference)})</span>`
+        : '';
+      const valueHtml = hasDisc
+        ? `<span class="service-value" style="display: flex; flex-direction: column; align-items: flex-end;"><span style="text-decoration: line-through; color: #999; font-size: ${L.serviceFontSize - 2}pt; line-height: 1;">${formatCurrency(amount)}</span><span>${formatCurrency(netAmount)}</span></span>`
+        : `<span class="service-value">${formatCurrency(amount)}</span>`;
       return `
         <div class="service-item">
-          <span class="service-desc">${index + 1} - ${escapeHtml(descriptionWithObs)}</span>
-          <span class="service-value">${valueDisplay}</span>
+          <span class="service-desc">${index + 1} - ${escapeHtml(descriptionWithObs)}${discRefInline}</span>
+          ${valueHtml}
         </div>
       `;
     })
     .join("");
 
   // Generate totals section
-  const discountRefSuffix = data.discountReference ? ` — Ref: ${escapeHtml(data.discountReference)}` : '';
-  const discountLabel = data.discountType === 'PERCENTAGE'
-    ? `Desconto (${data.discountValue}%)${discountRefSuffix}`
-    : `Desconto${discountRefSuffix}`;
-  const discountAmount = data.discountType === 'PERCENTAGE'
-    ? (displaySubtotal * (data.discountValue || 0) / 100)
-    : (data.discountValue || 0);
+  const discountLabel = 'Desconto';
+  const discountAmount = perServiceDiscountAmount;
 
   // Calculate display total when filtering
   const displayTotal = data.customerFilter
-    ? displaySubtotal - discountAmount
+    ? Math.max(0, displaySubtotal - discountAmount)
     : data.total;
 
   // Always show total, only show subtotal/discount rows when there's a discount
@@ -609,7 +607,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Orçamento Nº ${data.budgetNumber} - ${data.corporateName}</title>
+  <title>Orçamento Nº ${data.budgetNumber} - ${escapeHtml(data.taskName || data.corporateName)}</title>
   <style>
     @page {
       size: A4;
@@ -1011,7 +1009,6 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
       <div class="customer-section">
         <div class="customer-name">À ${escapeHtml(data.contactName || corporateName(data.corporateName))}</div>
         <p class="intro-text">Conforme solicitado, apresentamos nossa proposta de preço para execução dos serviços abaixo descriminados${data.serialNumber || data.plate || data.chassisNumber ? ` no veículo${data.serialNumber ? ` nº série: <strong>${escapeHtml(data.serialNumber)}</strong>` : ''}${data.serialNumber && (data.plate || data.chassisNumber) ? ',' : ''}${data.plate ? ` placa: <strong style="font-weight: 600;">${escapeHtml(data.plate)}</strong>` : ''}${data.plate && data.chassisNumber ? ',' : ''}${data.chassisNumber ? ` chassi: <strong style="font-weight: 600;">${escapeHtml(data.chassisNumber)}</strong>` : ''}` : ''}.</p>
-        ${data.customerConfigs && data.customerConfigs.length > 0 ? `<p class="intro-text" style="margin-top: 3mm;"><strong>Faturamento para:</strong> ${data.customerConfigs.map(c => escapeHtml(c.customer?.fantasyName || c.customer?.corporateName || "Cliente")).join(", ")}</p>` : ""}
       </div>
 
       <!-- Services -->

@@ -47,9 +47,13 @@ export function NfseActions({ invoiceId, nfseDocuments }: NfseActionsProps) {
     (d) => d.status === 'ERROR' || d.status === 'PENDING'
   ) ?? null;
 
-  // Can emit if: no NFSe documents yet, or latest is in error/pending state
+  // Check if all NFSe documents are cancelled (allows re-emission)
+  const allCancelled = (nfseDocuments?.length ?? 0) > 0 &&
+    nfseDocuments!.every((d) => d.status === 'CANCELLED');
+
+  // Can emit if: no NFSe documents yet, latest is in error/pending state, or all are cancelled
   const hasAnyNfse = (nfseDocuments?.length ?? 0) > 0;
-  const canEmit = !hasAnyNfse || !!errorOrPendingNfse;
+  const canEmit = !hasAnyNfse || !!errorOrPendingNfse || allCancelled;
   const canCancel = !!authorizedNfse;
 
   const handleEmit = () => {

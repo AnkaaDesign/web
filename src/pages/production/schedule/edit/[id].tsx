@@ -24,6 +24,9 @@ export const TaskEditPage = () => {
   const pathSegments = location.pathname.split('/');
   const source = pathSegments[2]; // Index 2 is the section (cronograma, agenda, historico)
 
+  // Forward taskIds from location.state for next/previous navigation continuity
+  const taskIds = (location.state as { taskIds?: string[] } | null)?.taskIds;
+
   // Get breadcrumb configuration based on source
   const getBreadcrumbConfig = (source: string) => {
     switch (source) {
@@ -230,7 +233,7 @@ export const TaskEditPage = () => {
           />
         </div>
         <div className="flex-1 overflow-y-auto pb-6">
-          <TaskEditForm task={task} onFormStateChange={setFormState} detailsRoute={breadcrumbConfig.detailsRoute} />
+          <TaskEditForm task={task} onFormStateChange={setFormState} detailsRoute={breadcrumbConfig.detailsRoute} navigationState={taskIds ? { taskIds } : undefined} />
         </div>
         <UnsavedChangesDialog open={showDialog} onConfirm={confirmNavigation} onCancel={cancelNavigation} />
       </div>

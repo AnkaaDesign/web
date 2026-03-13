@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconEye, IconBeach, IconAlertTriangle } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconExternalLink, IconBeach, IconAlertTriangle } from "@tabler/icons-react";
 
 import type { Vacation } from "../../../../types";
 import type { VacationGetManyFormData } from "../../../../schemas";
@@ -224,10 +224,10 @@ export function VacationTable({ filters, onDataChange, className, mode = 'hr' }:
 
   const handleView = useCallback(
     (vacation: Vacation) => {
-      navigate(routes.humanResources.vacations.details(vacation.id));
+      window.open(routes.humanResources.vacations.details(vacation.id), '_blank');
       setContextMenu(null);
     },
-    [navigate],
+    [],
   );
 
   const handleEdit = useCallback(
@@ -501,8 +501,8 @@ export function VacationTable({ filters, onDataChange, className, mode = 'hr' }:
               {contextMenu.vacations.length === 1 ? (
                 <>
                   <DropdownMenuItem onClick={() => handleView(contextMenu.vacations[0])}>
-                    <IconEye className="mr-2 h-4 w-4" />
-                    Visualizar
+                    <IconExternalLink className="mr-2 h-4 w-4" />
+                    Abrir em nova guia
                   </DropdownMenuItem>
                   {canEdit && (
                     <DropdownMenuItem onClick={() => handleEdit(contextMenu.vacations[0])}>

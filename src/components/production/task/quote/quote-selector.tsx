@@ -35,8 +35,8 @@ import {
 } from "@/components/ui/dialog";
 import { formatCurrency, formatCNPJ } from "../../../../utils";
 import { cn } from "@/lib/utils";
-import { DISCOUNT_TYPE, SERVICE_ORDER_TYPE, TASK_QUOTE_STATUS } from "@/constants/enums";
-import { DISCOUNT_TYPE_LABELS, TASK_QUOTE_STATUS_LABELS } from "@/constants/enum-labels";
+import { SERVICE_ORDER_TYPE, TASK_QUOTE_STATUS } from "@/constants/enums";
+import { TASK_QUOTE_STATUS_LABELS } from "@/constants/enum-labels";
 import { RESPONSIBLE_ROLE_LABELS } from "@/types/responsible";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { ServiceAutocomplete } from "../form/service-autocomplete";
@@ -654,14 +654,11 @@ export const QuoteSelector = forwardRef<
                 return {
                   customerId: id,
                   subtotal: 0,
-                  discountType: 'NONE' as const,
-                  discountValue: null,
                   total: 0,
                   paymentCondition: null,
                   downPaymentDate: null,
                   customPaymentText: null,
                   responsibleId: null,
-                  discountReference: null,
                 };
               });
               field.onChange(newConfigs);
@@ -893,7 +890,6 @@ export const QuoteSelector = forwardRef<
             const configCustomPaymentText = config?.customPaymentText;
             const currentCondition = configCustomPaymentText ? "CUSTOM" : configPaymentCondition;
             const configSubtotal = config?.subtotal || 0;
-            const configDiscountType = config?.discountType || 'NONE';
             const configTotal = config?.total || 0;
             const isMultiCustomer = watchedCustomerConfigs.length >= 2;
 
@@ -1012,98 +1008,6 @@ export const QuoteSelector = forwardRef<
                   />
                 )}
 
-                {/* Per-Customer Discount */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* Discount Type */}
-                  <FormField
-                    control={control}
-                    name={`quote.customerConfigs.${i}.discountType`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Desconto</FormLabel>
-                        <FormControl>
-                          <Combobox
-                            value={field.value || 'NONE'}
-                            onValueChange={(value) => {
-                              const safeType = value || 'NONE';
-                              field.onChange(safeType);
-                              if (safeType === 'NONE') {
-                                setValue(`quote.customerConfigs.${i}.discountValue`, null);
-                                setValue(`quote.customerConfigs.${i}.discountReference`, null);
-                              }
-                            }}
-                            disabled={disabled || readOnly}
-                            options={Object.values(DISCOUNT_TYPE).map((type) => ({
-                              value: type,
-                              label: DISCOUNT_TYPE_LABELS[type],
-                            }))}
-                            placeholder="Selecione"
-                            emptyText="Nenhuma opção"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Discount Value */}
-                  <FormField
-                    control={control}
-                    name={`quote.customerConfigs.${i}.discountValue`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Valor Desconto
-                          {configDiscountType === 'PERCENTAGE' && <span className="text-muted-foreground ml-1">(%)</span>}
-                          {configDiscountType === 'FIXED_VALUE' && <span className="text-muted-foreground ml-1">(R$)</span>}
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type={configDiscountType === 'FIXED_VALUE' ? 'currency' : 'number'}
-                            value={field.value ?? ""}
-                            onChange={(value) => {
-                              if (configDiscountType === 'FIXED_VALUE') {
-                                field.onChange(value);
-                              } else {
-                                const num = Number(value);
-                                field.onChange(isNaN(num) ? null : num);
-                              }
-                            }}
-                            disabled={disabled || readOnly || configDiscountType === 'NONE'}
-                            placeholder={configDiscountType === 'NONE' ? "-" : configDiscountType === 'FIXED_VALUE' ? "R$ 0,00" : "0"}
-                            min={configDiscountType === 'PERCENTAGE' ? 0 : undefined}
-                            max={configDiscountType === 'PERCENTAGE' ? 100 : undefined}
-                            step={configDiscountType === 'PERCENTAGE' ? 0.01 : undefined}
-                            className="bg-transparent"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Discount Reference */}
-                  <FormField
-                    control={control}
-                    name={`quote.customerConfigs.${i}.discountReference`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Referência Desconto</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            value={field.value || ""}
-                            placeholder={configDiscountType === 'NONE' ? "-" : "Justificativa..."}
-                            disabled={disabled || readOnly || configDiscountType === 'NONE'}
-                            maxLength={500}
-                            className="bg-transparent"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
 
                 {/* Per-Customer Subtotal & Total (only show when multiple customers) */}
                 {isMultiCustomer && <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

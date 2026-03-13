@@ -22,8 +22,8 @@ export function QuoteStatusBadge({ status, className, size = 'default' }: QuoteS
       label: 'Verificado pelo Financeiro',
       variant: 'processing',
     },
-    INTERNAL_APPROVED: {
-      label: 'Aprovado Internamente',
+    BILLING_APPROVED: {
+      label: 'Faturamento Aprovado',
       variant: 'approved',
     },
     UPCOMING: {

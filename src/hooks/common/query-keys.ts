@@ -719,6 +719,9 @@ export const taskKeys = {
 
   // Analytics
   statistics: () => ["tasks", "statistics"] as const,
+
+  // Forecast history
+  forecastHistory: (taskId: string) => ["tasks", "forecastHistory", taskId] as const,
 };
 
 // =====================================================

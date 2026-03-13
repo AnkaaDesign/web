@@ -398,7 +398,7 @@ export function getQuoteStatusLabel(status: string): string {
     PENDING: 'Pendente',
     BUDGET_APPROVED: 'Orçamento Aprovado',
     VERIFIED_BY_FINANCIAL: 'Verificado pelo Financeiro',
-    INTERNAL_APPROVED: 'Aprovado Internamente',
+    BILLING_APPROVED: 'Faturamento Aprovado',
     UPCOMING: 'A Vencer',
     DUE: 'Vencido',
     PARTIAL: 'Parcial',

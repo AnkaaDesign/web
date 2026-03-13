@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { IconDots, IconEye, IconEdit, IconTrash, IconBell, IconSend, IconCalendar } from "@tabler/icons-react";
+import { IconDots, IconEye, IconExternalLink, IconEdit, IconTrash, IconBell, IconSend, IconCalendar } from "@tabler/icons-react";
 import { formatDateTime, formatRelativeTime } from "../../../../utils";
 import { NOTIFICATION_IMPORTANCE_LABELS, NOTIFICATION_CHANNEL_LABELS, NOTIFICATION_TYPE_LABELS } from "../../../../constants";
 import type { Notification } from "../../../../types";
@@ -68,8 +68,8 @@ export function NotificationCard({ notification, onView, onEdit, onDelete, onSen
             <DropdownMenuContent align="end">
               {onView && (
                 <DropdownMenuItem onClick={handleAction(() => onView(notification.id))}>
-                  <IconEye className="w-4 h-4 mr-2" />
-                  Visualizar
+                  <IconExternalLink className="w-4 h-4 mr-2" />
+                  Abrir em nova guia
                 </DropdownMenuItem>
               )}
               {onEdit && (

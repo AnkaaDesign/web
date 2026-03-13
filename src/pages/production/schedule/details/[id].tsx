@@ -28,6 +28,8 @@ import {
   IMPLEMENT_TYPE_LABELS,
 } from "../../../../constants";
 import { formatDate, formatDateTime, formatCurrency, formatChassis, formatTruckSpot, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
+import { ForecastHistoryTimeline } from "@/components/production/task/form/forecast-history-timeline";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
@@ -791,7 +793,7 @@ const TASK_SECTIONS: SectionConfig[] = [
     defaultVisible: true,
     fields: [
       { id: "created", label: "Criado", sectionId: "dates" },
-      { id: "forecast", label: "Previsão", sectionId: "dates" },
+      { id: "forecast", label: "Previsão de Liberação", sectionId: "dates" },
       { id: "entry", label: "Entrada", sectionId: "dates" },
       { id: "term", label: "Prazo", sectionId: "dates" },
       { id: "started", label: "Iniciado", sectionId: "dates" },
@@ -891,6 +893,22 @@ const TASK_SECTIONS: SectionConfig[] = [
     ],
   },
 ];
+
+function ForecastHistoryCollapsible({ taskId }: { taskId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-auto px-4 py-1 text-xs text-muted-foreground hover:text-foreground">
+          {open ? "Ocultar historico" : "Ver historico de reagendamentos"}
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-4 pt-1 pb-2">
+        <ForecastHistoryTimeline taskId={taskId} />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 export const TaskDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -1543,13 +1561,13 @@ export const TaskDetailsPage = () => {
   const handleQuoteStatusChange = async (newStatus: string, currentStatus?: string) => {
     if (!task?.quote?.id) return;
 
-    // Confirmation for INTERNAL_APPROVED (triggers invoice/boleto generation)
-    if (newStatus === 'INTERNAL_APPROVED') {
+    // Confirmation for BILLING_APPROVED (triggers invoice/boleto generation)
+    if (newStatus === 'BILLING_APPROVED') {
       setQuoteConfirmDialog({
         open: true,
         newStatus,
         currentStatus: currentStatus || '',
-        title: 'INTERNAL_APPROVED_WARNING',
+        title: 'BILLING_APPROVED_WARNING',
         description: '',
       });
       return;
@@ -1813,7 +1831,9 @@ export const TaskDetailsPage = () => {
                 key: "edit",
                 label: "Editar",
                 icon: IconEdit,
-                onClick: () => navigate(breadcrumbConfig.editRoute(task.id)),
+                onClick: () => navigate(breadcrumbConfig.editRoute(task.id), {
+                  state: taskIds ? { taskIds } : undefined,
+                }),
               }] : []),
             ]}
           className="flex-shrink-0"
@@ -2115,12 +2135,15 @@ export const TaskDetailsPage = () => {
 
                 {/* Forecast */}
                 {sectionVisibility.isFieldVisible("forecast") && task.forecastDate && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconCalendarTime className="h-4 w-4" />
-                      Previsão
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">{formatDateTime(task.forecastDate)}</span>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <IconCalendarTime className="h-4 w-4" />
+                        Previsao de Liberacao
+                      </span>
+                      <span className="text-sm font-semibold text-foreground">{formatDateTime(task.forecastDate)}</span>
+                    </div>
+                    <ForecastHistoryCollapsible taskId={task.id} />
                   </div>
                 )}
 
@@ -2194,7 +2217,7 @@ export const TaskDetailsPage = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              const customerId = quoteCustomerFilter || task.customer?.id || 'c';
+                              const customerId = quoteCustomerFilter || 'all';
                               window.open(`/cliente/${customerId}/orcamento/${task.quote?.id}`, '_blank');
                             }}
                             className="gap-2"
@@ -2231,7 +2254,7 @@ export const TaskDetailsPage = () => {
                               PENDING: 'Pendente',
                               BUDGET_APPROVED: 'Orçamento Aprovado',
                               VERIFIED_BY_FINANCIAL: 'Verificado pelo Financeiro',
-                              INTERNAL_APPROVED: 'Aprovado Internamente',
+                              BILLING_APPROVED: 'Faturamento Aprovado',
                               UPCOMING: 'A Vencer',
                               DUE: 'Vencido',
                               PARTIAL: 'Parcial',
@@ -2240,7 +2263,7 @@ export const TaskDetailsPage = () => {
 
                             // Build options: all statuses the user can transition to + current
                             const allStatuses: TASK_QUOTE_STATUS[] = [
-                              'PENDING', 'BUDGET_APPROVED', 'VERIFIED_BY_FINANCIAL', 'INTERNAL_APPROVED',
+                              'PENDING', 'BUDGET_APPROVED', 'VERIFIED_BY_FINANCIAL', 'BILLING_APPROVED',
                               'UPCOMING', 'DUE', 'PARTIAL', 'SETTLED',
                             ];
                             const userPrivilege = currentUser?.sector?.privileges || '';
@@ -2248,7 +2271,7 @@ export const TaskDetailsPage = () => {
                               .map((s) => ({
                                 value: s,
                                 label: statusLabels[s],
-                                disabled: s === quoteStatus || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s === 'INTERNAL_APPROVED'),
+                                disabled: s === quoteStatus || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s === 'BILLING_APPROVED'),
                               }));
 
                             const getQuoteStatusTriggerClass = (status: TASK_QUOTE_STATUS) => {
@@ -2259,7 +2282,7 @@ export const TaskDetailsPage = () => {
                                   return "bg-green-700 text-white hover:bg-green-800 border-green-800";
                                 case 'VERIFIED_BY_FINANCIAL':
                                   return "bg-blue-700 text-white hover:bg-blue-800 border-blue-800";
-                                case 'INTERNAL_APPROVED':
+                                case 'BILLING_APPROVED':
                                   return "bg-green-700 text-white hover:bg-green-800 border-green-800";
                                 case 'UPCOMING':
                                   return "bg-amber-600 text-white hover:bg-amber-700 border-amber-700";
@@ -2323,6 +2346,14 @@ export const TaskDetailsPage = () => {
                     const renderServiceRow = (item: any, index: number, showCustomerCol: boolean) => {
                       const isOutrosWithObservation = item.description === 'Outros' && !!item.observation;
                       const displayDescription = isOutrosWithObservation ? item.observation : item.description;
+                      const amount = typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0;
+                      const hasServiceDiscount = item.discountType && item.discountType !== 'NONE' && item.discountValue;
+                      let serviceDiscountAmount = 0;
+                      if (hasServiceDiscount) {
+                        serviceDiscountAmount = item.discountType === 'PERCENTAGE'
+                          ? Math.round((amount * item.discountValue / 100) * 100) / 100
+                          : Math.min(item.discountValue, amount);
+                      }
                       return (
                         <tr key={item.id || index} className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-3 text-sm">
@@ -2350,6 +2381,9 @@ export const TaskDetailsPage = () => {
                                 </HoverCard>
                               )}
                             </div>
+                            {hasServiceDiscount && item.discountReference && (
+                              <p className="text-xs text-muted-foreground mt-0.5">Ref: {item.discountReference}</p>
+                            )}
                           </td>
                           {showCustomerCol && (
                             <td className="px-4 py-3 text-sm text-muted-foreground">
@@ -2365,9 +2399,17 @@ export const TaskDetailsPage = () => {
                               )}
                             </td>
                           )}
-                          <td className="px-4 py-3 text-sm text-right font-medium">
-                            {formatCurrency(
-                              typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0
+                          <td className="px-4 py-3 text-sm text-right">
+                            {hasServiceDiscount ? (
+                              <div className="flex flex-col items-end">
+                                <span className="text-muted-foreground line-through text-xs">{formatCurrency(amount)}</span>
+                                <span className="font-medium">{formatCurrency(Math.max(0, amount - serviceDiscountAmount))}</span>
+                                <span className="text-destructive text-xs">
+                                  -{item.discountType === 'PERCENTAGE' ? `${item.discountValue}%` : formatCurrency(serviceDiscountAmount)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="font-medium">{formatCurrency(amount)}</span>
                             )}
                           </td>
                         </tr>
@@ -2404,7 +2446,16 @@ export const TaskDetailsPage = () => {
                                   <span className="text-sm font-semibold">{group.name}</span>
                                 )}
                                 <span className="text-xs text-muted-foreground ml-auto">
-                                  {formatCurrency(group.services.reduce((sum, s) => sum + (typeof s.amount === 'number' ? s.amount : Number(s.amount) || 0), 0))}
+                                  {formatCurrency(group.services.reduce((sum, s) => {
+                                    const amt = typeof s.amount === 'number' ? s.amount : Number(s.amount) || 0;
+                                    let disc = 0;
+                                    if ((s as any).discountType === 'PERCENTAGE' && (s as any).discountValue) {
+                                      disc = Math.round((amt * (s as any).discountValue / 100) * 100) / 100;
+                                    } else if ((s as any).discountType === 'FIXED_VALUE' && (s as any).discountValue) {
+                                      disc = Math.min((s as any).discountValue, amt);
+                                    }
+                                    return sum + Math.max(0, amt - disc);
+                                  }, 0))}
                                 </span>
                               </div>
                               <table className="w-full flex-1">
@@ -2448,10 +2499,8 @@ export const TaskDetailsPage = () => {
                     const hasConfigs = configs.length > 0;
 
                     // Determine which discount/total source to use
+                    // Discounts are now per-service; config totals already reflect applied discounts
                     let displaySubtotal: number;
-                    let discountType: string | null = null;
-                    let discountValue: number | null = null;
-                    let discountReference: string | null = null;
                     let discountAmount = 0;
                     let displayTotal: number;
 
@@ -2460,13 +2509,10 @@ export const TaskDetailsPage = () => {
                       const selectedConfig = configs.find((c) => c.customerId === quoteCustomerFilter);
                       if (selectedConfig) {
                         displaySubtotal = typeof selectedConfig.subtotal === 'number' ? selectedConfig.subtotal : Number(selectedConfig.subtotal) || 0;
-                        discountType = selectedConfig.discountType;
-                        discountValue = selectedConfig.discountValue;
-                        discountReference = selectedConfig.discountReference || null;
-                        discountAmount = discountType === 'PERCENTAGE'
-                          ? (displaySubtotal * (discountValue || 0)) / 100
-                          : (discountValue || 0);
                         displayTotal = typeof selectedConfig.total === 'number' ? selectedConfig.total : Number(selectedConfig.total) || 0;
+                        if (displaySubtotal !== displayTotal) {
+                          discountAmount = displaySubtotal - displayTotal;
+                        }
                       } else {
                         // Fallback: compute from filtered services + global discount
                         const filtered = task.quote.services.filter((item) => item.invoiceToCustomer?.id === quoteCustomerFilter || !item.invoiceToCustomerId);
@@ -2515,20 +2561,10 @@ export const TaskDetailsPage = () => {
                       </span>
                     </div>
 
-                    {/* Discount (if applicable) */}
+                    {/* Discount (if applicable — derived from per-service discounts) */}
                     {discountAmount > 0 && (
                       <div className="flex items-center justify-between text-sm text-destructive">
-                        <span>
-                          Desconto
-                          {discountType === 'PERCENTAGE' && discountValue
-                            ? ` (${discountValue}%)`
-                            : discountType === 'FIXED_VALUE'
-                              ? ' (Valor Fixo)'
-                              : ''}
-                          {discountReference && (
-                            <span className="text-muted-foreground font-normal"> — Ref: {discountReference}</span>
-                          )}
-                        </span>
+                        <span>Desconto</span>
                         <span className="font-medium">
                           - {formatCurrency(discountAmount)}
                         </span>
@@ -4142,8 +4178,8 @@ export const TaskDetailsPage = () => {
 
         {/* Pricing Status Confirmation Dialog */}
         <AlertDialog open={quoteConfirmDialog.open} onOpenChange={(open) => setQuoteConfirmDialog((prev) => ({ ...prev, open }))}>
-          <AlertDialogContent className={quoteConfirmDialog.title === 'INTERNAL_APPROVED_WARNING' ? 'max-w-lg border-red-500 border-2' : ''}>
-            {quoteConfirmDialog.title === 'INTERNAL_APPROVED_WARNING' ? (
+          <AlertDialogContent className={quoteConfirmDialog.title === 'BILLING_APPROVED_WARNING' ? 'max-w-lg border-red-500 border-2' : ''}>
+            {quoteConfirmDialog.title === 'BILLING_APPROVED_WARNING' ? (
               <>
                 <AlertDialogHeader>
                   <div className="flex items-center gap-3">
@@ -4151,7 +4187,7 @@ export const TaskDetailsPage = () => {
                       <IconAlertCircle className="h-7 w-7 text-red-600 dark:text-red-400" />
                     </div>
                     <AlertDialogTitle className="text-xl text-red-700 dark:text-red-400">
-                      Aprovacao Interna - Acao Irreversivel
+                      Faturamento Aprovado - Acao Irreversivel
                     </AlertDialogTitle>
                   </div>
                 </AlertDialogHeader>

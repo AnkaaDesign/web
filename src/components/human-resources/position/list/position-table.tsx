@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconEye, IconBriefcase, IconAlertTriangle, IconPlus } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconExternalLink, IconBriefcase, IconAlertTriangle, IconPlus } from "@tabler/icons-react";
 
 import type { Position } from "../../../../types";
 import type { PositionGetManyFormData } from "../../../../schemas";
@@ -217,10 +217,10 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
 
   const handleView = useCallback(
     (position: Position) => {
-      navigate(routes.humanResources.positions.details(position.id));
+      window.open(routes.humanResources.positions.details(position.id), '_blank');
       setContextMenu(null);
     },
-    [navigate],
+    [],
   );
 
   const handleEdit = useCallback(
@@ -517,8 +517,8 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
               {contextMenu.positions.length === 1 ? (
                 <>
                   <DropdownMenuItem onClick={() => handleView(contextMenu.positions[0])}>
-                    <IconEye className="mr-2 h-4 w-4" />
-                    Visualizar
+                    <IconExternalLink className="mr-2 h-4 w-4" />
+                    Abrir em nova guia
                   </DropdownMenuItem>
                   {canEdit && (
                     <DropdownMenuItem onClick={() => handleEdit(contextMenu.positions[0])}>

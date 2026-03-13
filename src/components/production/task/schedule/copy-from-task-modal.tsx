@@ -219,6 +219,7 @@ export function CopyFromTaskModal({
     'Pintura',
     'Arquivos',
     'Produção',
+    'Ordens de Serviço',
     'Veículo',
   ];
 

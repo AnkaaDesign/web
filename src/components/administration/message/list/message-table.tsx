@@ -20,7 +20,7 @@ import {
   IconChevronUp,
   IconChevronDown,
   IconSelector,
-  IconEye,
+  IconExternalLink,
   IconEdit,
   IconTrash,
   IconArchive,
@@ -303,7 +303,7 @@ export function MessageTable({
 
   const handleView = () => {
     if (contextMenu?.items[0]) {
-      navigate(routes.administration.messages?.details?.(contextMenu.items[0].id) || `/administracao/mensagens/${contextMenu.items[0].id}`);
+      window.open(routes.administration.messages?.details?.(contextMenu.items[0].id) || `/administracao/mensagens/${contextMenu.items[0].id}`, '_blank');
       setContextMenu(null);
     }
   };
@@ -546,8 +546,8 @@ export function MessageTable({
           )}
 
           <DropdownMenuItem onClick={handleView}>
-            <IconEye className="mr-2 h-4 w-4" />
-            Visualizar
+            <IconExternalLink className="mr-2 h-4 w-4" />
+            Abrir em nova guia
           </DropdownMenuItem>
 
           {contextMenu?.items.length === 1 && contextMenu.items[0].status !== 'archived' && (

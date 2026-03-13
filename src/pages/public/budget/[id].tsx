@@ -56,11 +56,10 @@ export function PublicBudgetPage() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Use customerId from URL to filter services for a specific invoiceTo customer
-  // If customerId matches the task's own customer (or is generic), show all services
+  // If customerId matches one of the customerConfigs' customerId, activate filtering
   const selectedCustomerId = useMemo(() => {
     if (!customerId || !quote?.customerConfigs) return null;
-    // Only filter if the customerId matches one of the customerConfigs customers
-    const isConfigCustomer = quote.customerConfigs.some(c => c.id === customerId);
+    const isConfigCustomer = quote.customerConfigs.some(c => c.customerId === customerId);
     return isConfigCustomer ? customerId : null;
   }, [customerId, quote?.customerConfigs]);
 
@@ -156,7 +155,7 @@ export function PublicBudgetPage() {
 
   // Recalculate subtotal for filtered services
   const filteredSubtotal = useMemo(() => {
-    return filteredServices.reduce((sum, service) => sum + (service.amount || 0), 0);
+    return filteredServices.reduce((sum, service) => sum + (Number(service.amount) || 0), 0);
   }, [filteredServices]);
 
   // Loading state
@@ -193,7 +192,7 @@ export function PublicBudgetPage() {
   // Calculate derived data
   const corporateName = quote.task?.customer?.corporateName || quote.task?.customer?.fantasyName || "Cliente";
   // Find the relevant customer config (filtered by URL param, or first available)
-  const activeConfig = quote.customerConfigs?.find(c => c.id === selectedCustomerId) || quote.customerConfigs?.[0];
+  const activeConfig = quote.customerConfigs?.find(c => c.customerId === selectedCustomerId) || quote.customerConfigs?.[0];
   // Prefer the explicitly selected budget responsible from the config
   const commercialRep = quote.task?.responsibles?.find(r => r.role === "COMMERCIAL");
   const contactName = activeConfig?.responsible?.name
@@ -218,9 +217,21 @@ export function PublicBudgetPage() {
     total: activeConfig?.total ?? quote.total,
   });
   const guaranteeText = generateGuaranteeText(quote);
-  const configDiscountType = activeConfig?.discountType || "NONE";
-  const configDiscountValue = activeConfig?.discountValue ?? null;
-  const hasDiscount = configDiscountType !== "NONE" && configDiscountValue && configDiscountValue > 0;
+
+  // Compute per-service discount totals
+  const relevantServices = (quote.services || []).filter((s: any) =>
+    !selectedCustomerId || s.invoiceToCustomerId === selectedCustomerId || !s.invoiceToCustomerId
+  );
+  const computedDiscountAmount = relevantServices.reduce((sum: number, svc: any) => {
+    const amount = typeof svc.amount === 'number' ? svc.amount : Number(svc.amount) || 0;
+    if (svc.discountType === 'PERCENTAGE' && svc.discountValue) {
+      return sum + Math.round((amount * svc.discountValue / 100) * 100) / 100;
+    } else if (svc.discountType === 'FIXED_VALUE' && svc.discountValue) {
+      return sum + Math.min(svc.discountValue, amount);
+    }
+    return sum;
+  }, 0);
+  const hasDiscount = computedDiscountAmount > 0;
 
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
   const configSignature = activeConfig?.customerSignature;
@@ -231,13 +242,13 @@ export function PublicBudgetPage() {
   const signatureImageUrl = configSignature?.id ? getFileServeUrl(configSignature) : null;
 
   // Recalculate discount and total based on active filter
+  const isCompleteViewGlobal = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
   const displaySubtotal = selectedCustomerId ? filteredSubtotal : quote.subtotal;
-  const discountAmount = configDiscountType === "PERCENTAGE"
-    ? (displaySubtotal * (configDiscountValue || 0)) / 100
-    : (configDiscountValue || 0);
   const displayTotal = selectedCustomerId
-    ? Math.max(0, Math.round((displaySubtotal - discountAmount) * 100) / 100)
-    : quote.total;
+    ? Math.max(0, Math.round((displaySubtotal - computedDiscountAmount) * 100) / 100)
+    : isCompleteViewGlobal
+      ? quote.customerConfigs!.reduce((sum: number, c: any) => sum + (typeof c.total === 'number' ? c.total : Number(c.total) || 0), 0)
+      : quote.total;
 
   // Copy URL to clipboard
   const handleCopyLink = async () => {
@@ -261,14 +272,13 @@ export function PublicBudgetPage() {
       toast.info("Gerando PDF...");
       await exportBudgetPdfFromData({
         corporateName,
+        taskName: quote.task?.name || '',
         contactName,
         currentDate: formatDate(quote.createdAt),
         validityDays,
         budgetNumber,
         items: quote.services || [],
         subtotal: quote.subtotal,
-        discountType: configDiscountType,
-        discountValue: configDiscountValue,
         total: quote.total,
         termDate,
         customDeliveryDays,
@@ -279,9 +289,7 @@ export function PublicBudgetPage() {
         serialNumber: quote.task?.serialNumber || null,
         plate: quote.task?.truck?.plate || null,
         chassisNumber: quote.task?.truck?.chassisNumber || null,
-        customerConfigs: quote.customerConfigs,
         simultaneousTasks: quote.simultaneousTasks || null,
-        discountReference: activeConfig?.discountReference || null,
         customerFilter: selectedCustomerId,
       });
       toast.success("PDF exportado!");
@@ -391,25 +399,19 @@ export function PublicBudgetPage() {
                   </>
                 )}.
               </p>
-              {quote.customerConfigs && quote.customerConfigs.length > 0 && (
-                <p className="text-gray-700 mt-2">
-                  <strong>Faturamento para:</strong>{" "}
-                  {quote.customerConfigs
-                    .map(c => c.customer?.fantasyName || c.customer?.corporateName || "Cliente")
-                    .join(", ")}
-                </p>
-              )}
             </div>
 
             {/* Services */}
-            <div className="mb-6">
+            {(() => {
+              const isCompleteView = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
+              return (
+              <div className="mb-6">
               <h3 className="text-lg font-bold mb-4" style={{ color: COMPANY.primaryGreen }}>
                 Serviços
               </h3>
-              <div className="space-y-2 pl-4">
+              <table className="w-full ml-4" style={{ borderCollapse: 'collapse' }}>
+                <tbody>
                 {filteredServices.map((service, index) => {
-                  // Combine description and observation inline (e.g., "Pintura Geral Azul Firenze")
-                  // For "Outros" services, display only the observation (not "Outros observation")
                   const isOutros = service.description?.trim().toLowerCase() === "outros";
                   const description = toTitleCase(service.description || "");
                   const observation = service.observation || "";
@@ -418,49 +420,93 @@ export function PublicBudgetPage() {
                     : observation
                       ? `${description} ${observation}`
                       : description;
+                  const amount = Number(service.amount) || 0;
+                  const svc = service as any;
+                  const hasDisc = svc.discountType && svc.discountType !== 'NONE' && svc.discountValue;
+                  let discAmt = 0;
+                  if (hasDisc) {
+                    discAmt = svc.discountType === 'PERCENTAGE'
+                      ? Math.round((amount * svc.discountValue / 100) * 100) / 100
+                      : Math.min(svc.discountValue, amount);
+                  }
+                  const invoiceToName = svc.invoiceToCustomer?.corporateName || svc.invoiceToCustomer?.fantasyName;
                   return (
-                    <div key={service.id} className="flex justify-between items-baseline">
-                      <span className="text-gray-800">
+                    <tr key={service.id} className="align-top">
+                      <td className="text-gray-800 py-1 pr-2">
                         {index + 1} - {displayText}
-                      </span>
-                      <span className="text-gray-800 font-normal ml-4 whitespace-nowrap">
-                        {formatCurrency(Number(service.amount) || 0)}
-                      </span>
-                    </div>
+                        {hasDisc && svc.discountReference && (
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({svc.discountType === 'PERCENTAGE' ? `${svc.discountValue}%` : formatCurrency(discAmt)} desc. — Ref: {svc.discountReference})
+                          </span>
+                        )}
+                      </td>
+                      {isCompleteView && (
+                        <td className="text-xs text-gray-500 whitespace-nowrap py-1 px-2">
+                          {invoiceToName || '-'}
+                        </td>
+                      )}
+                      <td className="text-gray-800 font-normal whitespace-nowrap text-right py-1 pl-2">
+                        {hasDisc ? (
+                          <>
+                            <span className="line-through text-gray-400 text-[10px] mr-1">{formatCurrency(amount)}</span>
+                            {formatCurrency(Math.max(0, amount - discAmt))}
+                          </>
+                        ) : (
+                          formatCurrency(amount)
+                        )}
+                      </td>
+                    </tr>
                   );
                 })}
-              </div>
+                </tbody>
+              </table>
 
-              {/* Totals - Always show total, only show subtotal/discount rows when there's a discount */}
-              <div className="mt-6 pl-4 space-y-1">
-                {hasDiscount && (
-                  <>
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-gray-700">Subtotal</span>
-                      <span className="text-gray-800">{formatCurrency(displaySubtotal)}</span>
-                    </div>
-                    <div className="flex justify-between items-baseline text-red-600">
-                      <span>
-                        Desconto
-                        {configDiscountType === "PERCENTAGE"
-                          ? ` (${configDiscountValue}%)`
-                          : ""}
-                        {activeConfig?.discountReference && (
-                          <span className="text-gray-500 font-normal"> — Ref: {activeConfig.discountReference}</span>
-                        )}
-                      </span>
-                      <span>- {formatCurrency(discountAmount)}</span>
-                    </div>
-                  </>
-                )}
-                <div className={`flex justify-between items-baseline ${hasDiscount ? 'pt-2 border-t border-gray-200' : ''}`}>
-                  <span className="font-bold text-gray-900">Total</span>
-                  <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
-                    {formatCurrency(displayTotal)}
-                  </span>
+              {/* Totals */}
+              {isCompleteView ? (
+                // Completo: show per-customer subtotals
+                <div className="mt-6 pl-4 space-y-3">
+                  {quote.customerConfigs!.map((config: any) => {
+                    const configTotal = typeof config.total === 'number' ? config.total : Number(config.total) || 0;
+                    const customerName = config.customer?.corporateName || config.customer?.fantasyName || 'Cliente';
+                    return (
+                      <div key={config.id} className="flex justify-between items-baseline">
+                        <span className="text-gray-700 text-sm">{customerName}</span>
+                        <span className="text-gray-800 font-medium">{formatCurrency(configTotal)}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="flex justify-between items-baseline pt-2 border-t border-gray-200">
+                    <span className="font-bold text-gray-900">Total</span>
+                    <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
+                      {formatCurrency(displayTotal)}
+                    </span>
+                  </div>
                 </div>
+              ) : (
+                <div className="mt-6 pl-4 space-y-1">
+                  {hasDiscount && (
+                    <>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-gray-700">Subtotal</span>
+                        <span className="text-gray-800">{formatCurrency(displaySubtotal)}</span>
+                      </div>
+                      <div className="flex justify-between items-baseline text-red-600">
+                        <span>Desconto</span>
+                        <span>- {formatCurrency(computedDiscountAmount)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className={`flex justify-between items-baseline ${hasDiscount ? 'pt-2 border-t border-gray-200' : ''}`}>
+                    <span className="font-bold text-gray-900">Total</span>
+                    <span className="font-bold text-lg" style={{ color: COMPANY.primaryGreen }}>
+                      {formatCurrency(displayTotal)}
+                    </span>
+                  </div>
+                </div>
+              )}
               </div>
-            </div>
+              );
+            })()}
 
             {/* Delivery Term - customDeliveryDays takes priority over termDate */}
             {customDeliveryDays ? (
@@ -488,14 +534,46 @@ export function PublicBudgetPage() {
             ) : null}
 
             {/* Payment Terms */}
-            {paymentText && (
-              <div className="mb-6">
-                <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
-                  Condições de pagamento
-                </h3>
-                <p className="text-gray-700">{paymentText}</p>
-              </div>
-            )}
+            {(() => {
+              const isCompleteView = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
+              if (isCompleteView) {
+                // Show per-customer payment conditions
+                return (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
+                      Condições de pagamento
+                    </h3>
+                    <div className="space-y-3">
+                      {quote.customerConfigs!.map((config: any) => {
+                        const configPaymentText = generatePaymentText({
+                          customPaymentText: config.customPaymentText || null,
+                          paymentCondition: config.paymentCondition,
+                          downPaymentDate: config.downPaymentDate,
+                          total: config.total ?? 0,
+                        });
+                        if (!configPaymentText) return null;
+                        const customerName = config.customer?.corporateName || config.customer?.fantasyName || 'Cliente';
+                        return (
+                          <div key={config.id}>
+                            <p className="text-sm font-semibold text-gray-800">{customerName}</p>
+                            <p className="text-gray-700">{configPaymentText}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+              if (!paymentText) return null;
+              return (
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
+                    Condições de pagamento
+                  </h3>
+                  <p className="text-gray-700">{paymentText}</p>
+                </div>
+              );
+            })()}
 
             {/* Guarantee */}
             {guaranteeText && (

@@ -2,7 +2,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from "@/components/ui/button";
 import {
   IconDotsVertical,
-  IconEye,
+  IconExternalLink,
   IconEdit,
   IconCheck,
   IconPlayerPlay,
@@ -82,8 +82,8 @@ export function MaintenanceActionsDropdown({
         {/* View Action - Always available */}
         {onView && (
           <DropdownMenuItem onClick={() => onView(maintenance)}>
-            <IconEye className="mr-2 h-4 w-4" />
-            Visualizar
+            <IconExternalLink className="mr-2 h-4 w-4" />
+            Abrir em nova guia
           </DropdownMenuItem>
         )}
 

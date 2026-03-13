@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconEye, IconAlertTriangle, IconPaperclip } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconExternalLink, IconAlertTriangle, IconPaperclip } from "@tabler/icons-react";
 
 import type { Warning } from "../../../../types";
 import type { WarningGetManyFormData } from "../../../../schemas";
@@ -212,10 +212,10 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
 
   const handleView = useCallback(
     (warning: Warning) => {
-      navigate(routes.humanResources.warnings.details(warning.id));
+      window.open(routes.humanResources.warnings.details(warning.id), '_blank');
       setContextMenu(null);
     },
-    [navigate],
+    [],
   );
 
   const handleEdit = useCallback(
@@ -484,8 +484,8 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
               {contextMenu.warnings.length === 1 ? (
                 <>
                   <DropdownMenuItem onClick={() => handleView(contextMenu.warnings[0])}>
-                    <IconEye className="mr-2 h-4 w-4" />
-                    Visualizar
+                    <IconExternalLink className="mr-2 h-4 w-4" />
+                    Abrir em nova guia
                   </DropdownMenuItem>
                   {canEdit && (
                     <DropdownMenuItem onClick={() => handleEdit(contextMenu.warnings[0])}>

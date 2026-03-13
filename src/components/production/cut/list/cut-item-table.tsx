@@ -226,7 +226,7 @@ export function CutItemTable({ filters = {}, className, onDataChange, visibleCol
       case "view":
         if (items.length === 1) {
           // Navigate to cut details page
-          navigate(routes.production.cutting.details(items[0].id));
+          window.open(routes.production.cutting.details(items[0].id), '_blank');
         }
         break;
 

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconChevronDown, IconChevronUp, IconSelector, IconEye, IconEdit, IconTrash, IconAlertTriangle, IconArrowsExchange } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp, IconSelector, IconExternalLink, IconEdit, IconTrash, IconAlertTriangle, IconArrowsExchange } from "@tabler/icons-react";
 import type { Activity } from "../../../../types";
 import type { ActivityGetManyFormData } from "../../../../schemas";
 import { useActivityMutations, useActivities } from "../../../../hooks";
@@ -192,10 +192,10 @@ export const ActivityTable = ({ filters, visibleColumns, onDataChange, className
 
   const handleView = useCallback(
     (activity: Activity) => {
-      navigate(routes.inventory.movements.details(activity.id));
+      window.open(routes.inventory.movements.details(activity.id), '_blank');
       setContextMenu(null);
     },
-    [navigate],
+    [],
   );
 
   const handleEdit = useCallback(
@@ -400,8 +400,8 @@ export const ActivityTable = ({ filters, visibleColumns, onDataChange, className
               {contextMenu.activities.length === 1 ? (
                 <>
                   <DropdownMenuItem onClick={() => handleView(contextMenu.activities[0])}>
-                    <IconEye className="mr-2 h-4 w-4" />
-                    Visualizar
+                    <IconExternalLink className="mr-2 h-4 w-4" />
+                    Abrir em nova guia
                   </DropdownMenuItem>
                   {canEdit && (
                     <DropdownMenuItem onClick={() => handleEdit(contextMenu.activities[0])}>

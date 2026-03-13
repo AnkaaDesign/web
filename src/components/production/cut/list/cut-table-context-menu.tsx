@@ -1,6 +1,6 @@
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconPlayerPlay, IconCheck, IconScissors, IconEye, IconTrash } from "@tabler/icons-react";
+import { IconPlayerPlay, IconCheck, IconScissors, IconExternalLink, IconTrash } from "@tabler/icons-react";
 import { CUT_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Cut } from "../../../../types";
 import { useAuth } from "../../../../hooks";
@@ -56,8 +56,8 @@ export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTable
         {/* View action (single selection only) */}
         {!isMultiSelection && (
           <DropdownMenuItem onClick={() => handleAction("view")}>
-            <IconEye className="mr-2 h-4 w-4" />
-            Visualizar
+            <IconExternalLink className="mr-2 h-4 w-4" />
+            Abrir em nova guia
           </DropdownMenuItem>
         )}
 

@@ -236,8 +236,8 @@ export function QuoteStepServices({
               className={cn(
                 "grid gap-2 items-end text-xs font-medium text-muted-foreground px-1",
                 hasMultipleCustomers
-                  ? "grid-cols-[1fr_210px_130px_170px_110px_1fr_36px_36px_36px]"
-                  : "grid-cols-[1fr_130px_140px_110px_1fr_36px_36px_36px]",
+                  ? "grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px_36px]"
+                  : "grid-cols-[minmax(150px,2fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px_36px]",
               )}
             >
               <span>Serviço</span>
@@ -386,8 +386,8 @@ const ServiceRow = forwardRef<HTMLDivElement, ServiceRowProps>(
           className={cn(
             "grid gap-2 items-center",
             hasMultipleCustomers
-              ? "grid-cols-[1fr_210px_130px_170px_110px_1fr_36px_36px_36px]"
-              : "grid-cols-[1fr_130px_140px_110px_1fr_36px_36px_36px]",
+              ? "grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px_36px]"
+              : "grid-cols-[minmax(150px,2fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px_36px]",
           )}
         >
           {/* Description */}

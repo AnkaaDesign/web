@@ -82,9 +82,10 @@ export function TaskPreparationView({
   }, []);
   const { data: currentUser } = useCurrentUser();
 
-  // Check if user can view price (Admin or Financial only)
+  // Check if user can view price (Admin, Commercial or Financial only)
   const canViewPrice = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
   );
 
@@ -484,13 +485,26 @@ export function TaskPreparationView({
     } else {
       // Non-designer, non-financial users use the standard preparation display logic
       result.shouldDisplayInPreparation = true;
+
+      // Include quote for users who can view price (ADMIN, COMMERCIAL)
+      if (canViewPrice) {
+        result.include.quote = {
+          include: {
+            customerConfigs: {
+              include: {
+                customer: true,
+              },
+            },
+          },
+        };
+      }
     }
 
     // Remove status filter to allow any status (except CANCELLED and fully completed)
     delete result.status;
 
     return result;
-  }, [baseQueryFilters, isFinancialUser, isDesignerUser]);
+  }, [baseQueryFilters, isFinancialUser, isDesignerUser, canViewPrice]);
 
   // Handle filter changes
   const handleFilterChange = useCallback(
@@ -822,6 +836,7 @@ export function TaskPreparationView({
                 onOrderedTaskIdsChange={handleCompletedOrderedIdsChange}
                 showSelectedOnly={showSelectedOnly}
                 allOrderedTaskIds={allOrderedTaskIds}
+                sortStorageKey="task-preparation-sort-completed"
               />
             </div>
           </div>
@@ -854,6 +869,7 @@ export function TaskPreparationView({
                   onOrderedTaskIdsChange={handleProductionOrderedIdsChange}
                   showSelectedOnly={showSelectedOnly}
                   allOrderedTaskIds={allOrderedTaskIds}
+                  sortStorageKey="task-preparation-sort-production"
                 />
               </div>
             )}
@@ -885,6 +901,7 @@ export function TaskPreparationView({
                   onOrderedTaskIdsChange={handlePreparationOrderedIdsChange}
                   showSelectedOnly={showSelectedOnly}
                   allOrderedTaskIds={allOrderedTaskIds}
+                  sortStorageKey="task-preparation-sort-preparation"
                 />
               </div>
             )}
@@ -916,6 +933,7 @@ export function TaskPreparationView({
                   onOrderedTaskIdsChange={handleCompletedOrderedIdsChange}
                   showSelectedOnly={showSelectedOnly}
                   allOrderedTaskIds={allOrderedTaskIds}
+                  sortStorageKey="task-preparation-sort-completed"
                 />
               </div>
             )}

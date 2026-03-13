@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 // Type definitions
@@ -59,6 +59,12 @@ export interface UseTableStateOptions {
    * URL always takes precedence over localStorage (supports URL sharing).
    */
   sortStorageKey?: string;
+  /**
+   * Whether to store sort state in URL search params (default: true).
+   * When false, sort is managed with local React state + localStorage only.
+   * Useful when multiple tables on the same page would conflict on the shared ?sort= param.
+   */
+  useUrlForSort?: boolean;
 }
 
 /**
@@ -170,9 +176,27 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
  * Hook for managing table state (pagination, selection, sorting) in URL
  */
 export function useTableState(options: UseTableStateOptions = {}) {
-  const { defaultPageSize = 40, resetSelectionOnPageChange = false, defaultSort = [], sortStorageKey } = options;
+  const { defaultPageSize = 40, resetSelectionOnPageChange = false, defaultSort = [], sortStorageKey, useUrlForSort = true } = options;
 
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Local sort state for when useUrlForSort is false
+  const [localSortConfigs, setLocalSortConfigs] = useState<Array<{ column: string; direction: "asc" | "desc" }>>(() => {
+    if (useUrlForSort) return [];
+    // Initialize from localStorage, then fall back to defaults
+    if (sortStorageKey) {
+      try {
+        const stored = localStorage.getItem(sortStorageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.filter((config: any) => config && typeof config.column === "string" && (config.direction === "asc" || config.direction === "desc"));
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    return defaultSort;
+  });
 
   // Track last clicked item for shift+click range selection
   const lastClickedIdRef = useRef<string | null>(null);
@@ -209,6 +233,11 @@ export function useTableState(options: UseTableStateOptions = {}) {
   }, [searchParams]);
 
   const sortState = useMemo(() => {
+    // When not using URL for sort, use local React state
+    if (!useUrlForSort) {
+      return { sortConfigs: localSortConfigs };
+    }
+
     const sortValue = searchParams.get("sort");
     let sortConfigs: Array<{ column: string; direction: "asc" | "desc" }> = [];
 
@@ -245,7 +274,7 @@ export function useTableState(options: UseTableStateOptions = {}) {
 
     return { sortConfigs };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, defaultSort, sortStorageKey]);
+  }, [searchParams, defaultSort, sortStorageKey, useUrlForSort, localSortConfigs]);
 
   const filterState = useMemo(() => {
     const showSelectedOnlyValue = searchParams.get("showSelectedOnly");
@@ -449,14 +478,18 @@ export function useTableState(options: UseTableStateOptions = {}) {
   // Sort methods
   const setSortConfigs = useCallback(
     (sortConfigs: Array<{ column: string; direction: "asc" | "desc" }>) => {
-      updateUrl((params) => {
-        const serialized = serializeValue(sortConfigs);
-        if (serialized === null) {
-          params.delete("sort");
-        } else {
-          params.set("sort", serialized);
-        }
-      });
+      if (useUrlForSort) {
+        updateUrl((params) => {
+          const serialized = serializeValue(sortConfigs);
+          if (serialized === null) {
+            params.delete("sort");
+          } else {
+            params.set("sort", serialized);
+          }
+        });
+      } else {
+        setLocalSortConfigs(sortConfigs);
+      }
       // Persist to localStorage if sortStorageKey is set
       if (sortStorageKey) {
         try {
@@ -470,7 +503,7 @@ export function useTableState(options: UseTableStateOptions = {}) {
         }
       }
     },
-    [updateUrl, sortStorageKey],
+    [updateUrl, sortStorageKey, useUrlForSort],
   );
 
   const addSort = useCallback(
@@ -516,10 +549,7 @@ export function useTableState(options: UseTableStateOptions = {}) {
 
   const clearSort = useCallback(() => {
     setSortConfigs([]);
-    if (sortStorageKey) {
-      try { localStorage.removeItem(sortStorageKey); } catch { /* ignore */ }
-    }
-  }, [setSortConfigs, sortStorageKey]);
+  }, [setSortConfigs]);
 
   // Helper methods
   const getSortDirection = useCallback(
@@ -575,13 +605,17 @@ export function useTableState(options: UseTableStateOptions = {}) {
   }, [updateUrl]);
 
   const resetSort = useCallback(() => {
-    updateUrl((params) => {
-      params.delete("sort");
-    });
+    if (useUrlForSort) {
+      updateUrl((params) => {
+        params.delete("sort");
+      });
+    } else {
+      setLocalSortConfigs(defaultSort);
+    }
     if (sortStorageKey) {
       try { localStorage.removeItem(sortStorageKey); } catch { /* ignore */ }
     }
-  }, [updateUrl, sortStorageKey]);
+  }, [updateUrl, sortStorageKey, useUrlForSort, defaultSort]);
 
   const resetAll = useCallback(() => {
     updateUrl((params) => {

@@ -9,7 +9,7 @@ import { canEditBorrows, canDeleteBorrows, shouldShowInteractiveElements } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { IconChevronUp, IconChevronDown, IconEdit, IconPackageImport, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconPackageExport, IconX } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconEdit, IconPackageImport, IconTrash, IconSelector, IconExternalLink, IconAlertTriangle, IconPackageExport, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
@@ -374,7 +374,7 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
 
   const handleView = () => {
     if (contextMenu && !contextMenu.isBulk) {
-      navigate(routes.inventory.loans.details(contextMenu.items[0].id));
+      window.open(routes.inventory.loans.details(contextMenu.items[0].id), '_blank');
       setContextMenu(null);
     }
   };
@@ -699,8 +699,8 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
 
           {!contextMenu?.isBulk && (
             <DropdownMenuItem onClick={handleView}>
-              <IconEye className="mr-2 h-4 w-4" />
-              Visualizar
+              <IconExternalLink className="mr-2 h-4 w-4" />
+              Abrir em nova guia
             </DropdownMenuItem>
           )}
 

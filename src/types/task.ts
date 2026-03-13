@@ -81,10 +81,30 @@ export interface Task extends BaseEntity {
   truck?: Truck;
   relatedTasks?: Task[];
   relatedTo?: Task[];
+  forecastHistory?: TaskForecastHistory[];
 
   // Bonus relations
   bonuses?: Bonus[];
   bonusDiscount?: BonusDiscount;
+}
+
+// =====================
+// Task Forecast History
+// =====================
+
+export type TaskForecastHistorySource = 'MANUAL' | 'AUTO_ENTRY_DATE' | 'AUTO_STARTED_AT' | 'COPY' | 'INITIAL';
+
+export interface TaskForecastHistory {
+  id: string;
+  taskId: string;
+  previousDate: Date | null;
+  newDate: Date | null;
+  reason: string | null;
+  notes: string | null;
+  source: TaskForecastHistorySource;
+  changedById: string;
+  createdAt: Date;
+  changedBy?: { id: string; name: string };
 }
 
 // =====================

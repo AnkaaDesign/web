@@ -70,9 +70,10 @@ export function TaskHistoryList({
   const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
   const { data: currentUser } = useCurrentUser();
 
-  // Check if user can view price (Admin or Financial only)
+  // Check if user can view price (Admin, Commercial or Financial only)
   const canViewPrice = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
   );
 

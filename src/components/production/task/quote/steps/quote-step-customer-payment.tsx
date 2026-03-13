@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
+import { Switch } from "@/components/ui/switch";
 import { IconCurrencyReal, IconCreditCard } from "@tabler/icons-react";
 import { formatCurrency } from "../../../../../utils";
 import { RESPONSIBLE_ROLE_LABELS } from "@/types/responsible";
@@ -54,6 +55,24 @@ export function QuoteStepCustomerPayment({
       setShowCustomPayment(true);
     }
   }, [config?.customPaymentText, showCustomPayment]);
+
+  // Default budget responsible to the first task responsible
+  useEffect(() => {
+    if (
+      taskResponsibles &&
+      taskResponsibles.length > 0 &&
+      !config?.responsibleId
+    ) {
+      const firstValid = taskResponsibles.find((r) => !r.id.startsWith("temp-"));
+      if (firstValid) {
+        setValue(
+          `customerConfigs.${configIndex}.responsibleId`,
+          firstValid.id,
+          { shouldDirty: false },
+        );
+      }
+    }
+  }, [taskResponsibles, config?.responsibleId, setValue, configIndex]);
 
   const handlePaymentConditionChange = useCallback(
     (value: string) => {
@@ -174,9 +193,31 @@ export function QuoteStepCustomerPayment({
           />
         )}
 
-        {/* Payment Condition + Down Payment Date */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <FormItem className="sm:col-span-2">
+        {/* Generate Invoice Toggle + Payment Condition + Down Payment Date */}
+        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-4 items-end">
+          <FormField
+            control={control}
+            name={`customerConfigs.${configIndex}.generateInvoice`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Emitir Nota Fiscal</FormLabel>
+                <FormControl>
+                  <div className="flex items-center gap-2 rounded-md border border-border/40 dark:border-border/20 px-3 h-10">
+                    <Switch
+                      checked={field.value !== false}
+                      onCheckedChange={field.onChange}
+                      disabled={disabled}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {field.value !== false ? "Sim" : "Não"}
+                    </span>
+                  </div>
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          <FormItem>
             <FormLabel>Condição de Pagamento</FormLabel>
             <FormControl>
               <Combobox

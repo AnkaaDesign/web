@@ -45,6 +45,8 @@ interface TaskPreparationTableProps {
   setColumnWidth: (columnId: string, width: number) => void;
   /** Override refetchOnWindowFocus for the underlying query */
   refetchOnWindowFocus?: boolean | 'always';
+  /** localStorage key for persisting sort configuration per table */
+  sortStorageKey?: string;
 }
 
 export function TaskPreparationTable({
@@ -68,6 +70,7 @@ export function TaskPreparationTable({
   getColumnWidth,
   setColumnWidth,
   refetchOnWindowFocus,
+  sortStorageKey = 'task-preparation-sort',
 }: TaskPreparationTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -75,7 +78,7 @@ export function TaskPreparationTable({
   const canEdit = canEditTasks(user as any);
 
   const userSectorPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
-  const canViewPrice = !!user && (hasPrivilege(user as any, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(user as any, SECTOR_PRIVILEGES.FINANCIAL));
+  const canViewPrice = !!user && (hasPrivilege(user as any, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(user as any, SECTOR_PRIVILEGES.COMMERCIAL) || hasPrivilege(user as any, SECTOR_PRIVILEGES.FINANCIAL));
 
   // Table state - NO PAGINATION for preparation
   const tableState = useTableState({
@@ -86,7 +89,8 @@ export function TaskPreparationTable({
       { column: 'identificador', direction: 'asc' },
     ],
     resetSelectionOnPageChange: false,
-    sortStorageKey: 'task-preparation-sort',
+    sortStorageKey,
+    useUrlForSort: false,
   });
 
   const {
@@ -329,7 +333,10 @@ export function TaskPreparationTable({
           <TableRow className="bg-muted hover:bg-muted border-b-2 border-border">
             {/* Selection checkbox */}
             {canEdit && (
-              <TableHead className="sticky top-2 z-10 w-12 bg-muted border-r p-0 after:content-[''] after:absolute after:left-[-1px] after:right-[-1px] after:top-[-8px] after:h-[8px] after:bg-card after:z-[15]">
+              <TableHead
+                className="sticky z-10 w-12 bg-muted border-r p-0 transition-[top] duration-200 ease-out after:content-[''] after:absolute after:left-[-1px] after:right-[-1px] after:-top-28 after:h-28 after:bg-background after:z-[15]"
+                style={{ top: 'var(--sticky-header-offset, 0.5rem)' }}
+              >
                 <div className="flex items-center justify-center h-full w-full px-2 py-2">
                   <Checkbox
                     checked={allSelected}
@@ -356,7 +363,8 @@ export function TaskPreparationTable({
                 minWidth={COLUMN_WIDTH_CONSTRAINTS.minWidth}
                 maxWidth={COLUMN_WIDTH_CONSTRAINTS.maxWidth}
                 onResize={(width) => setColumnWidth(column.id, width)}
-                className={cn("sticky top-2 z-10 after:content-[''] after:absolute after:left-[-1px] after:right-[-1px] after:top-[-8px] after:h-[8px] after:bg-card after:z-[15]", column.className, column.headerClassName)}
+                className={cn("sticky z-10 transition-[top] duration-200 ease-out after:content-[''] after:absolute after:left-[-1px] after:right-[-1px] after:-top-28 after:h-28 after:bg-background after:z-[15]", column.className, column.headerClassName)}
+                style={{ top: 'var(--sticky-header-offset, 0.5rem)' }}
               >
                 {column.header}
               </ColumnHeader>

@@ -6,7 +6,7 @@ import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditPpeDeliveries, canDeletePpeDeliveries, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { IconChevronUp, IconChevronDown, IconRefresh, IconEdit, IconTrash, IconSelector, IconAlertTriangle, IconShield, IconEye, IconCheck, IconX } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconRefresh, IconEdit, IconTrash, IconSelector, IconAlertTriangle, IconShield, IconExternalLink, IconCheck, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
@@ -412,14 +412,14 @@ export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeac
           <DropdownMenuItem
             onClick={() => {
               if (contextMenu?.items && !contextMenu.isBulk) {
-                navigate(routes.inventory.ppe.details(contextMenu.items[0].id));
+                window.open(routes.inventory.ppe.details(contextMenu.items[0].id), '_blank');
               }
               setContextMenu(null);
             }}
             disabled={contextMenu?.isBulk}
           >
-            <IconEye className="mr-2 h-4 w-4" />
-            Visualizar
+            <IconExternalLink className="mr-2 h-4 w-4" />
+            Abrir em nova guia
           </DropdownMenuItem>
 
           {canEdit && (

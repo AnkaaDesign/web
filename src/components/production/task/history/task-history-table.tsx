@@ -69,9 +69,10 @@ export function TaskHistoryTable({
   // Get user's sector privilege for column visibility
   const userSectorPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
 
-  // Check if user can view price (Admin or Financial only)
+  // Check if user can view price (Admin, Commercial or Financial only)
   const canViewPrice = user && (
     hasPrivilege(user, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(user, SECTOR_PRIVILEGES.COMMERCIAL) ||
     hasPrivilege(user, SECTOR_PRIVILEGES.FINANCIAL)
   );
 
@@ -197,6 +198,24 @@ export function TaskHistoryTable({
           plate: true,
           chassisNumber: true,
           // Don't load layouts for history list view - not displayed
+        },
+      },
+      quote: {
+        select: {
+          id: true,
+          total: true,
+          status: true,
+          customerConfigs: {
+            include: {
+              customer: {
+                select: {
+                  id: true,
+                  corporateName: true,
+                  fantasyName: true,
+                },
+              },
+            },
+          },
         },
       },
       // Note: commission is a direct field on Task, not a relation, so it's always included

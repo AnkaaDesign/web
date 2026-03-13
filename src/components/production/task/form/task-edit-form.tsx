@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEditForm } from "../../../../hooks/common/use-edit-form";
@@ -71,6 +72,7 @@ interface TaskEditFormProps {
   task: Task;
   onFormStateChange?: (state: { isValid: boolean; isDirty: boolean; isSubmitting: boolean }) => void;
   detailsRoute?: (id: string) => string;
+  navigationState?: Record<string, any>;
 }
 
 // Helper function to convert File entity or array of File entities to FileWithPreview
@@ -106,11 +108,14 @@ const convertToFileWithPreview = (file: any | any[] | undefined | null): FileWit
   } as FileWithPreview];
 };
 
-export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEditFormProps) => {
+export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigationState }: TaskEditFormProps) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const taskMutations = useTaskMutations();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResponsibleErrors, setShowResponsibleErrors] = useState(false);
+  const [showForecastReason, setShowForecastReason] = useState(false);
+  const [forecastReason, setForecastReason] = useState<string>("");
 
   // Wrap updateAsync for debugging/logging
   const updateAsync = async (params: any) => {
@@ -1622,6 +1627,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             }
           );
 
+          // Attach forecast reschedule reason to FormData if forecastDate changed
+          if (showForecastReason && forecastReason && formData.has('forecastDate')) {
+            formData.append('forecastReason', forecastReason);
+          }
+
           // DEBUG: Log what's actually in the FormData
           console.log('[Task Update] 📤 FormData contents:');
           for (const [key, value] of formData.entries()) {
@@ -1902,6 +1912,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           delete (submitData as any)._onlyCuts;
           delete (submitData as any)._onlyNewResponsibles;
 
+          // Attach forecast reschedule reason if forecastDate changed
+          if (showForecastReason && forecastReason && 'forecastDate' in submitData) {
+            (submitData as any).forecastReason = forecastReason;
+          }
+
           // DEBUG: Log submitData right before API call
           console.log('[TaskEditForm] JSON path - submitData before API call:', JSON.stringify(submitData, (_key, value) => {
             if (value instanceof Date) return `Date(${value.toISOString()})`;
@@ -2040,13 +2055,15 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           await new Promise(resolve => setTimeout(resolve, 100));
           // Redirect to task details after successful update
           const redirectUrl = detailsRoute ? detailsRoute(task.id) : `/producao/cronograma/detalhes/${task.id}`;
-          window.location.href = redirectUrl;
+          navigate(redirectUrl, { state: navigationState, replace: true });
         }
       } catch (error) {
         console.error('[TaskEditForm] ❌ Error during form submission:', error);
         // API client already shows error toast, no need to show another one
       } finally {
         setIsSubmitting(false);
+        setShowForecastReason(false);
+        setForecastReason("");
         // CRITICAL FIX: Reset submission flag to allow sync to resume after submission completes
         // Use setTimeout to ensure this happens after all React state updates settle
         setTimeout(() => {
@@ -2964,27 +2981,45 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     <CardContent className="space-y-4 pt-0">
                     {/* First Row: Forecast Date (only visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER) */}
                     {canViewRestrictedFields && (
-                    <FormField
-                      control={form.control}
-                      name="forecastDate"
-                      render={({ field }) => (
-                        <DateTimeInput
-                          {...{
-                            field: {
-                              onChange: (value: Date | null) => field.onChange(value),
-                              onBlur: () => field.onBlur(),
-                              value: field.value ?? null,
-                              name: field.name,
-                            },
-                            mode: "datetime",
-                            context: "start",
-                            label: "Data de Previsão de Liberação",
-                            disabled: isSubmitting || !canEditDates,
-                            allowManualInput: true,
-                          } as any}
-                        />
+                    <div className="space-y-3">
+                      <FormField
+                        control={form.control}
+                        name="forecastDate"
+                        render={({ field }) => (
+                          <DateTimeInput
+                            {...{
+                              field: {
+                                onChange: (value: Date | null) => {
+                                  field.onChange(value);
+                                  // Show reason input when forecastDate changes on a task that already had one
+                                  const hadForecast = !!task.forecastDate;
+                                  const dateChanged = hadForecast && value && new Date(task.forecastDate!).getTime() !== value.getTime();
+                                  setShowForecastReason(!!dateChanged);
+                                },
+                                onBlur: () => field.onBlur(),
+                                value: field.value ?? null,
+                                name: field.name,
+                              },
+                              mode: "datetime",
+                              context: "start",
+                              label: "Previsao de Liberacao",
+                              disabled: isSubmitting || !canEditDates,
+                              allowManualInput: true,
+                            } as any}
+                          />
+                        )}
+                      />
+                      {showForecastReason && (
+                        <div className="space-y-1.5">
+                          <Label className="text-sm">Motivo do Reagendamento</Label>
+                          <Input
+                            placeholder="Ex: Solicitacao do cliente, falta de material..."
+                            value={forecastReason}
+                            onChange={(value) => setForecastReason(String(value ?? ""))}
+                          />
+                        </div>
                       )}
-                    />
+                    </div>
                     )}
 
                     {/* Second Row: Entry Date and Deadline */}
@@ -3811,6 +3846,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         </Accordion>
         </div>
       </form>
+
     </Form>
   );
 };

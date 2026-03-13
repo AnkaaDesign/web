@@ -126,9 +126,10 @@ export function FilePreviewModal({
 
   const totalImages = previewableFiles.length;
 
-  // Reset states when file changes
+  // Reset states when file changes (navigating to a different file)
   React.useEffect(() => {
-    setZoom(fitZoom);
+    setZoom(1);
+    setFitZoom(1);
     setRotation(0);
     setPanX(0);
     setPanY(0);
@@ -141,7 +142,7 @@ export function FilePreviewModal({
     setPdfPageNumber(1);
     setPdfScale(1);
     setPdfFitScale(1);
-  }, [currentIndex, fitZoom, files]);
+  }, [currentIndex, files]);
 
   // Calculate the minimum PDF scale (either fit scale or 0.25, whichever allows full view)
   const pdfMinScale = React.useMemo(() => {

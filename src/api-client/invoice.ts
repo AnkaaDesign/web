@@ -45,6 +45,10 @@ export const invoiceService = {
   cancelBoleto: (installmentId: string, data?: any) =>
     apiClient.put(`/invoices/${installmentId}/boleto/cancel`, data),
 
+  // Change bank slip due date
+  changeBankSlipDueDate: (installmentId: string, newDueDate: string) =>
+    apiClient.put(`/invoices/${installmentId}/boleto/due-date`, { newDueDate }),
+
   // Get boleto PDF
   getBoletoPdf: (installmentId: string) =>
     apiClient.get(`/invoices/${installmentId}/boleto/pdf`, { responseType: 'blob' }),

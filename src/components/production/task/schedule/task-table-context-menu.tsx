@@ -2,6 +2,7 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub,
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { IconPlayerPlay, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconLayout } from "@tabler/icons-react";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
 import type { Task } from "../../../../types";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditTasks, canDeleteTasks, canLeaderManageTask, canFinishTask } from "@/utils/permissions/entity-permissions";
@@ -103,7 +104,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         {canViewQuote(user?.sector?.privileges || "") && !isMultiSelection && (
           <DropdownMenuItem onClick={() => handleAction("quote")}>
             <IconReceipt className="mr-2 h-4 w-4" />
-            Orçamento
+            {getTaskQuoteDisplayLabel(tasks[0]?.quote?.status)}
           </DropdownMenuItem>
         )}
 

@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter, IconReceipt } from "@tabler/icons-react";
+import { IconExternalLink, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter, IconReceipt } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
+import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
 import type { Task } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
 import { SetStatusModal } from "../schedule/set-status-modal";
@@ -178,7 +179,7 @@ export function TaskHistoryContextMenu({
 
   const handleView = () => {
     if (task && !isBulk) {
-      navigate(routes.production.schedule.details(task.id));
+      window.open(routes.production.schedule.details(task.id), '_blank');
     }
     setDropdownOpen(false);
   };
@@ -606,8 +607,8 @@ export function TaskHistoryContextMenu({
           {/* View action - single selection only */}
           {!isBulk && task && (
             <DropdownMenuItem onClick={handleView}>
-              <IconEye className="mr-2 h-4 w-4" />
-              <span className="truncate">Visualizar</span>
+              <IconExternalLink className="mr-2 h-4 w-4" />
+              <span className="truncate">Abrir em nova guia</span>
             </DropdownMenuItem>
           )}
 
@@ -632,7 +633,7 @@ export function TaskHistoryContextMenu({
               setDropdownOpen(false);
             }}>
               <IconReceipt className="mr-2 h-4 w-4" />
-              <span className="truncate">Orçamento</span>
+              <span className="truncate">{getTaskQuoteDisplayLabel(task.quote?.status)}</span>
             </DropdownMenuItem>
           )}
 

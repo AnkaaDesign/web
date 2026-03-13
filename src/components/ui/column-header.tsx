@@ -69,6 +69,7 @@ export interface ColumnHeaderProps {
 
   // Styling and layout
   className?: string;
+  style?: React.CSSProperties;
   align?: "left" | "center" | "right";
   tooltip?: string;
 
@@ -112,6 +113,7 @@ export function ColumnHeader({
 
   // Styling props
   className,
+  style: additionalStyle,
   align = "left",
   tooltip,
 
@@ -481,6 +483,7 @@ export function ColumnHeader({
         width: width,
         minWidth: minWidth,
         maxWidth: maxWidth,
+        ...additionalStyle,
       }}
     >
       <ContentContainer>

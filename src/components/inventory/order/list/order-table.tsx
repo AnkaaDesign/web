@@ -7,7 +7,7 @@ import { canEditOrders, canDeleteOrders, shouldShowInteractiveElements } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconShoppingCart, IconCheck, IconChecks, IconX, IconPlus } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconExternalLink, IconAlertTriangle, IconShoppingCart, IconCheck, IconChecks, IconX, IconPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
@@ -319,10 +319,9 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
 
   const handleViewDetails = React.useCallback(() => {
     if (contextMenu && !contextMenu.isBulk) {
-      navigate(routes.inventory.orders?.details?.(contextMenu.orders[0].id) || `/inventory/orders/details/${contextMenu.orders[0].id}`);
-      setContextMenu(null);
+      window.open(routes.inventory.orders?.details?.(contextMenu.orders[0].id) || `/inventory/orders/details/${contextMenu.orders[0].id}`, '_blank');
     }
-  }, [contextMenu, navigate]);
+  }, [contextMenu]);
 
   const handleEditOrder = React.useCallback(() => {
     if (contextMenu) {
@@ -569,8 +568,8 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
           {!contextMenu?.isBulk && (
             <>
               <DropdownMenuItem onClick={handleViewDetails}>
-                <IconEye className="mr-2 h-4 w-4" />
-                Visualizar
+                <IconExternalLink className="mr-2 h-4 w-4" />
+                Abrir em nova guia
               </DropdownMenuItem>
               {canEdit && (
                 <DropdownMenuItem onClick={handleEditOrder}>

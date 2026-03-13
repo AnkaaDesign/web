@@ -21,7 +21,7 @@ import {
   IconChevronUp,
   IconChevronDown,
   IconSelector,
-  IconEye,
+  IconExternalLink,
   IconEdit,
   IconTrash,
   IconSend,
@@ -313,8 +313,7 @@ export function NotificationTable({
 
   const handleView = () => {
     if (contextMenu?.items[0]) {
-      navigate(routes.administration.notifications.details(contextMenu.items[0].id));
-      setContextMenu(null);
+      window.open(routes.administration.notifications.details(contextMenu.items[0].id), '_blank');
     }
   };
 
@@ -566,8 +565,8 @@ export function NotificationTable({
           )}
 
           <DropdownMenuItem onClick={handleView}>
-            <IconEye className="mr-2 h-4 w-4" />
-            Visualizar
+            <IconExternalLink className="mr-2 h-4 w-4" />
+            Abrir em nova guia
           </DropdownMenuItem>
 
           {contextMenu?.items.length === 1 && !contextMenu.items[0].sentAt && (

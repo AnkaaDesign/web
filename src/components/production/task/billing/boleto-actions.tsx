@@ -5,9 +5,11 @@ import {
   IconX,
   IconDownload,
   IconLoader2,
+  IconCalendarEvent,
 } from '@tabler/icons-react';
-import { useRegenerateBoleto, useCancelBoleto } from '@/hooks/production/use-invoice';
+import { useRegenerateBoleto, useCancelBoleto, useChangeBankSlipDueDate } from '@/hooks/production/use-invoice';
 import { invoiceService } from '@/api-client/invoice';
+import { toast } from '@/components/ui/sonner';
 import type { BankSlip } from '@/types/invoice';
 import {
   Dialog,
@@ -25,9 +27,12 @@ interface BoletoActionsProps {
 
 export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showDueDateDialog, setShowDueDateDialog] = useState(false);
+  const [newDueDate, setNewDueDate] = useState<Date | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const regenerateBoleto = useRegenerateBoleto();
   const cancelBoleto = useCancelBoleto();
+  const changeDueDate = useChangeBankSlipDueDate();
 
   const handleRegenerate = () => {
     regenerateBoleto.mutate(installmentId);
@@ -39,6 +44,32 @@ export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
       {
         onSuccess: () => setShowCancelDialog(false),
       }
+    );
+  };
+
+  const handleChangeDueDate = () => {
+    if (!newDueDate) {
+      toast.error('Selecione a nova data de vencimento.');
+      return;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (newDueDate < today) {
+      toast.error('A nova data de vencimento deve ser igual ou posterior a hoje.');
+      return;
+    }
+    changeDueDate.mutate(
+      {
+        installmentId,
+        newDueDate: newDueDate.toISOString().split('T')[0],
+      },
+      {
+        onSuccess: () => {
+          setShowDueDateDialog(false);
+          setNewDueDate(null);
+          toast.success('Data de vencimento alterada com sucesso.');
+        },
+      },
     );
   };
 
@@ -62,8 +93,9 @@ export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
   const canRegenerate = bankSlip.status === 'ERROR' || bankSlip.status === 'REJECTED';
   const canCancel = bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE';
   const canDownloadPdf = bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE';
+  const canChangeDueDate = bankSlip.status === 'OVERDUE';
 
-  if (!canRegenerate && !canCancel && !canDownloadPdf) return null;
+  if (!canRegenerate && !canCancel && !canDownloadPdf && !canChangeDueDate) return null;
 
   return (
     <>
@@ -82,6 +114,18 @@ export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
             ) : (
               <IconDownload className="h-4 w-4" />
             )}
+          </Button>
+        )}
+
+        {canChangeDueDate && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowDueDateDialog(true)}
+            title="Alterar Vencimento"
+            className="h-7 w-7 p-0"
+          >
+            <IconCalendarEvent className="h-4 w-4" />
           </Button>
         )}
 
@@ -129,6 +173,41 @@ export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
               disabled={cancelBoleto.isPending}
             >
               {cancelBoleto.isPending ? 'Cancelando...' : 'Confirmar Cancelamento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDueDateDialog} onOpenChange={setShowDueDateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Vencimento do Boleto</DialogTitle>
+            <DialogDescription>
+              Selecione a nova data de vencimento para este boleto. A data deve ser igual ou posterior a hoje.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium mb-1.5 block">Nova Data de Vencimento</label>
+            <input
+              type="date"
+              value={newDueDate ? newDueDate.toISOString().split('T')[0] : ''}
+              onChange={(e) => {
+                const dateStr = e.target.value;
+                setNewDueDate(dateStr ? new Date(dateStr + 'T00:00:00') : null);
+              }}
+              min={new Date().toISOString().split('T')[0]}
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDueDateDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleChangeDueDate}
+              disabled={changeDueDate.isPending || !newDueDate}
+            >
+              {changeDueDate.isPending ? 'Alterando...' : 'Confirmar'}
             </Button>
           </DialogFooter>
         </DialogContent>

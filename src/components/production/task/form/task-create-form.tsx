@@ -57,7 +57,6 @@ import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "../../../../api-client/file";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Extended form schema for the UI (superset of fields for the accordion form)
 const taskCreateFormSchema = z.object({
@@ -121,6 +120,46 @@ export const TaskCreateForm = () => {
         {
           description: "Em Negociação",
           type: SERVICE_ORDER_TYPE.COMMERCIAL,
+          status: SERVICE_ORDER_STATUS.PENDING,
+          statusOrder: 1,
+          assignedToId: null,
+          shouldSync: false,
+        },
+        {
+          description: "Elaborar Layout",
+          type: SERVICE_ORDER_TYPE.ARTWORK,
+          status: SERVICE_ORDER_STATUS.PENDING,
+          statusOrder: 1,
+          assignedToId: null,
+          shouldSync: false,
+        },
+        {
+          description: "Elaborar Projeto",
+          type: SERVICE_ORDER_TYPE.ARTWORK,
+          status: SERVICE_ORDER_STATUS.PENDING,
+          statusOrder: 1,
+          assignedToId: null,
+          shouldSync: false,
+        },
+        {
+          description: "Preparar Arquivos para Plotagem",
+          type: SERVICE_ORDER_TYPE.ARTWORK,
+          status: SERVICE_ORDER_STATUS.PENDING,
+          statusOrder: 1,
+          assignedToId: null,
+          shouldSync: false,
+        },
+        {
+          description: "Checklist Entrada",
+          type: SERVICE_ORDER_TYPE.LOGISTIC,
+          status: SERVICE_ORDER_STATUS.PENDING,
+          statusOrder: 1,
+          assignedToId: null,
+          shouldSync: false,
+        },
+        {
+          description: "Checklist Saída",
+          type: SERVICE_ORDER_TYPE.LOGISTIC,
           status: SERVICE_ORDER_STATUS.PENDING,
           statusOrder: 1,
           assignedToId: null,
@@ -790,14 +829,6 @@ export const TaskCreateForm = () => {
                     </AccordionContent>
                   </Card>
                 </AccordionItem>
-
-                {/* Quote info note */}
-                <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800">
-                  <IconInfoCircle className="h-4 w-4 text-blue-600" />
-                  <AlertDescription className="text-blue-700 dark:text-blue-300">
-                    O orçamento pode ser gerenciado na página dedicada da tarefa após a criação.
-                  </AlertDescription>
-                </Alert>
 
                 {/* Medidas do Caminhão - LOGISTIC/ADMIN */}
                 {showLayout && (

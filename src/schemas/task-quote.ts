@@ -28,7 +28,7 @@ export const taskQuoteStatusSchema = z.enum([
   'PENDING',
   'BUDGET_APPROVED',
   'VERIFIED_BY_FINANCIAL',
-  'INTERNAL_APPROVED',
+  'BILLING_APPROVED',
   'UPCOMING',
   'DUE',
   'PARTIAL',
@@ -112,6 +112,7 @@ export const taskQuoteCustomerConfigSchema = z.object({
     z.coerce.date().nullable()
   ).optional(),
   customPaymentText: z.string().max(2000).optional().nullable(),
+  generateInvoice: z.boolean().optional().default(true),
   responsibleId: z.string().uuid().optional().nullable(),
   installments: z.array(z.object({
     id: z.string().uuid().optional(),

@@ -2300,7 +2300,7 @@ const ChangelogTimelineItem = ({
                                 </div>
                               );
                             })()
-                          ) : changelog.field === "serviceOrders" ? (
+                          ) : changelog.field === "serviceOrders" || changelog.field?.startsWith("serviceOrders:") ? (
                             // Special handling for serviceOrders from copy operation - show list
                             (() => {
                               const parseValue = (val: any) => {

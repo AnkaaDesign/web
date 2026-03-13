@@ -1,5 +1,4 @@
-import { IconDots, IconEye, IconPackage, IconTrash } from "@tabler/icons-react";
-import { useNavigate } from "react-router-dom";
+import { IconDots, IconEye, IconExternalLink, IconPackage, IconTrash } from "@tabler/icons-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,7 +16,6 @@ interface BorrowActionsDropdownProps {
 }
 
 export function BorrowActionsDropdown({ borrow, onEdit, onDelete, className }: BorrowActionsDropdownProps) {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { deleteMutation } = useBorrowMutations();
 
@@ -30,7 +28,7 @@ export function BorrowActionsDropdown({ borrow, onEdit, onDelete, className }: B
   const isReturnable = borrow.status === BORROW_STATUS.ACTIVE;
 
   const handleView = () => {
-    navigate(routes.inventory.loans.details(borrow.id));
+    window.open(routes.inventory.loans.details(borrow.id), '_blank');
   };
 
   const handleEdit = () => {
@@ -72,8 +70,8 @@ export function BorrowActionsDropdown({ borrow, onEdit, onDelete, className }: B
         <DropdownMenuSeparator />
 
         <DropdownMenuItem onClick={handleView}>
-          <IconEye className="mr-2 h-4 w-4" />
-          Visualizar
+          <IconExternalLink className="mr-2 h-4 w-4" />
+          Abrir em nova guia
         </DropdownMenuItem>
 
         {canEdit && (

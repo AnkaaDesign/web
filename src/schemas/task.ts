@@ -1503,3 +1503,14 @@ export interface TaskCopyRequest {
   sourceTaskId: string;
   fields: string[];
 }
+
+// =====================
+// Reschedule Forecast Schema
+// =====================
+
+export const taskRescheduleForecastSchema = z.object({
+  forecastDate: z.coerce.date({ required_error: 'Data de previsão é obrigatória' }),
+  reason: z.string().min(1, 'Motivo é obrigatório').max(500),
+});
+
+export type TaskRescheduleForecastFormData = z.infer<typeof taskRescheduleForecastSchema>;

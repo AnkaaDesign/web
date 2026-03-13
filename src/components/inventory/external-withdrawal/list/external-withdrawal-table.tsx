@@ -7,7 +7,7 @@ import { canEditExternalWithdrawals, canDeleteExternalWithdrawals, shouldShowInt
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconPackageExport, IconCheck, IconPlus, IconCurrencyReal } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconExternalLink, IconAlertTriangle, IconPackageExport, IconCheck, IconPlus, IconCurrencyReal } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
@@ -364,10 +364,9 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
 
   const handleViewDetails = React.useCallback(() => {
     if (contextMenu) {
-      navigate(routes.inventory.externalWithdrawals?.details?.(contextMenu.withdrawal.id) || `/inventory/external-withdrawals/details/${contextMenu.withdrawal.id}`);
-      setContextMenu(null);
+      window.open(routes.inventory.externalWithdrawals?.details?.(contextMenu.withdrawal.id) || `/inventory/external-withdrawals/details/${contextMenu.withdrawal.id}`, '_blank');
     }
-  }, [contextMenu, navigate]);
+  }, [contextMenu]);
 
   const handleEditWithdrawal = React.useCallback(() => {
     if (contextMenu) {
@@ -627,8 +626,8 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
           <DropdownMenuItem onClick={handleViewDetails}>
-            <IconEye className="mr-2 h-4 w-4" />
-            Visualizar
+            <IconExternalLink className="mr-2 h-4 w-4" />
+            Abrir em nova guia
           </DropdownMenuItem>
           {canEdit && (
             <DropdownMenuItem onClick={handleEditWithdrawal}>

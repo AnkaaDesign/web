@@ -232,7 +232,7 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
         <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
             <div
-              className="absolute top-0 right-0 z-20 w-0 h-0 border-l-[28px] border-l-transparent pointer-events-auto cursor-help"
+              className="absolute top-0 right-0 z-[5] w-0 h-0 border-l-[28px] border-l-transparent pointer-events-auto cursor-help"
               style={{ borderTop: `28px solid ${urgencyInfo.color}` }}
             >
               <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
@@ -706,7 +706,7 @@ export const createTaskHistoryColumns = (options?: {
   {
     id: "price",
     header: "VALOR TOTAL",
-    accessorKey: "price",
+    accessorFn: (row) => row.quote?.total ?? null,
     sortable: true,
     filterable: true,
     defaultVisible: false,
@@ -807,7 +807,7 @@ export const createTaskHistoryColumns = (options?: {
   },
   {
     id: "paymentStatus",
-    header: "STATUS PGTO",
+    header: "STATUS FATURAMENTO",
     accessorFn: (row) => row.quote?.status || null,
     sortable: true,
     filterable: true,

@@ -72,6 +72,19 @@ export function useRegenerateBoleto() {
   });
 }
 
+// Change bank slip due date
+export function useChangeBankSlipDueDate() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ installmentId, newDueDate }: { installmentId: string; newDueDate: string }) =>
+      invoiceService.changeBankSlipDueDate(installmentId, newDueDate),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: invoiceKeys.all });
+    },
+  });
+}
+
 // Cancel boleto
 export function useCancelBoleto() {
   const queryClient = useQueryClient();

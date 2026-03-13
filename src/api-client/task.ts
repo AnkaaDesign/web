@@ -14,6 +14,7 @@ import type {
   TaskQueryFormData,
   TaskCopyRequest,
   ResponsibleCreateInlineFormData,
+  TaskRescheduleForecastFormData,
 } from "../schemas";
 import type {
   // Interface types (for responses)
@@ -427,6 +428,20 @@ export class TaskService {
     });
     return response.data;
   }
+
+  // =====================
+  // Forecast Operations
+  // =====================
+
+  async rescheduleForecast(id: string, data: TaskRescheduleForecastFormData): Promise<TaskUpdateResponse> {
+    const response = await apiClient.put<TaskUpdateResponse>(`${this.basePath}/${id}/reschedule-forecast`, data);
+    return response.data;
+  }
+
+  async getForecastHistory(id: string, query?: { page?: number; take?: number }) {
+    const response = await apiClient.get(`${this.basePath}/${id}/forecast-history`, { params: query });
+    return response.data;
+  }
 }
 
 // =====================
@@ -481,3 +496,7 @@ export const swapTaskPositions = (id: string, targetTaskId: string, query?: Task
 // Copy operation exports
 export const copyFromTask = (destinationTaskId: string, data: TaskCopyRequest, query?: TaskQueryFormData) =>
   taskService.copyFromTask(destinationTaskId, data, query);
+
+// Forecast operation exports
+export const rescheduleForecast = (id: string, data: TaskRescheduleForecastFormData) => taskService.rescheduleForecast(id, data);
+export const getForecastHistory = (id: string, query?: { page?: number; take?: number }) => taskService.getForecastHistory(id, query);
