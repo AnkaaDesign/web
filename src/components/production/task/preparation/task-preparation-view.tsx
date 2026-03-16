@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Task } from "@/types";
 import type { TaskGetManyFormData } from "@/schemas";
@@ -49,12 +50,14 @@ interface TaskPreparationViewProps {
   className?: string;
   storageKey?: string;
   searchPlaceholder?: string;
+  controlsContainer?: HTMLDivElement | null;
 }
 
 export function TaskPreparationView({
   className,
   storageKey = "task-preparation-visible-columns",
   searchPlaceholder = "Buscar por nome, número de série, placa...",
+  controlsContainer,
 }: TaskPreparationViewProps) {
   // Query client for manual cache invalidation
   const queryClient = useQueryClient();
@@ -80,7 +83,7 @@ export function TaskPreparationView({
       return merged;
     });
   }, []);
-  const { data: currentUser } = useCurrentUser();
+  const { data: currentUser, isLoading: isUserLoading } = useCurrentUser();
 
   // Check if user can view price (Admin, Commercial or Financial only)
   const canViewPrice = currentUser && (
@@ -441,9 +444,22 @@ export function TaskPreparationView({
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
     const result: Record<string, any> = {
       ...filterWithoutOrderBy,
-      // Include serviceOrders for progress bar display and truck layouts for measures column
+      // Don't fire task queries until user data is loaded to prevent duplicate requests
+      enabled: !isUserLoading,
+      // Include serviceOrders with select for progress bar display (only fields actually used),
+      // truck layouts for measures column, forecastHistory for reschedule indicators,
+      // and quote with minimal fields for price/status/invoiceToCustomers columns
       include: {
-        serviceOrders: true,
+        serviceOrders: {
+          select: {
+            id: true,
+            type: true,
+            status: true,
+            description: true,
+            assignedToId: true,
+          },
+        },
+        forecastHistory: true,
         truck: {
           include: {
             leftSideLayout: {
@@ -463,48 +479,38 @@ export function TaskPreparationView({
             },
           },
         },
-      },
-    };
-
-    // FINANCIAL users: single table with COMPLETED tasks that have quote and quote status != SETTLED
-    if (isFinancialUser) {
-      // Include quote with customerConfigs for the invoiceToCustomers column
-      result.include.quote = {
-        include: {
-          customerConfigs: {
-            include: {
-              customer: true,
-            },
-          },
-        },
-      };
-      result.shouldDisplayForFinancial = true;
-    } else if (isDesignerUser) {
-      // DESIGNER users have special display logic: only show tasks with incomplete artwork SOs or no artwork SOs
-      result.shouldDisplayForDesigner = true;
-    } else {
-      // Non-designer, non-financial users use the standard preparation display logic
-      result.shouldDisplayInPreparation = true;
-
-      // Include quote for users who can view price (ADMIN, COMMERCIAL)
-      if (canViewPrice) {
-        result.include.quote = {
-          include: {
+        quote: {
+          select: {
+            total: true,
+            status: true,
             customerConfigs: {
-              include: {
-                customer: true,
+              select: {
+                customer: {
+                  select: {
+                    fantasyName: true,
+                    corporateName: true,
+                  },
+                },
               },
             },
           },
-        };
-      }
+        },
+      },
+    };
+
+    if (isFinancialUser) {
+      result.shouldDisplayForFinancial = true;
+    } else if (isDesignerUser) {
+      result.shouldDisplayForDesigner = true;
+    } else {
+      result.shouldDisplayInPreparation = true;
     }
 
     // Remove status filter to allow any status (except CANCELLED and fully completed)
     delete result.status;
 
     return result;
-  }, [baseQueryFilters, isFinancialUser, isDesignerUser, canViewPrice]);
+  }, [baseQueryFilters, isFinancialUser, isDesignerUser, isUserLoading]);
 
   // Handle filter changes
   const handleFilterChange = useCallback(
@@ -729,84 +735,92 @@ export function TaskPreparationView({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [copyFromTaskState.step, handleCopyFromTaskCancel]);
 
-  return (
-    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex flex-col p-4 pt-6 space-y-4 pb-6">
-        {/* Search and controls */}
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <TableSearchInput
-            value={displaySearchText}
-            onChange={setSearch}
-            placeholder={searchPlaceholder}
-            isPending={displaySearchText !== searchingFor}
-          />
-          <div className="flex gap-2">
-            <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+  const controlsContent = (
+    <>
+      {/* Search and controls */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <TableSearchInput
+          value={displaySearchText}
+          onChange={setSearch}
+          placeholder={searchPlaceholder}
+          isPending={displaySearchText !== searchingFor}
+        />
+        <div className="flex gap-2">
+          <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
 
-            {/* Expand/Collapse All Groups Button */}
-            {hasGroups && (
-              <Button
-                variant="outline"
-                size="default"
-                onClick={expandedGroups.size > 0 ? handleCollapseAll : handleExpandAll}
-                title={expandedGroups.size > 0 ? "Recolher todos os grupos" : "Expandir todos os grupos"}
-              >
-                {expandedGroups.size > 0 ? (
-                  <>
-                    <IconChevronRight className="h-4 w-4" />
-                    <span>Recolher Grupos</span>
-                  </>
-                ) : (
-                  <>
-                    <IconChevronDown className="h-4 w-4" />
-                    <span>Expandir Grupos</span>
-                  </>
-                )}
-              </Button>
-            )}
-
+          {/* Expand/Collapse All Groups Button */}
+          {hasGroups && (
             <Button
-              variant={activeFilters.length > 0 ? "default" : "outline"}
+              variant="outline"
               size="default"
-              onClick={() => setShowFilterModal(!showFilterModal)}
+              onClick={expandedGroups.size > 0 ? handleCollapseAll : handleExpandAll}
+              title={expandedGroups.size > 0 ? "Recolher todos os grupos" : "Expandir todos os grupos"}
             >
-              <IconFilter className="h-4 w-4" />
-              <span>Filtros{activeFilters.length > 0 ? ` (${activeFilters.length})` : ''}</span>
+              {expandedGroups.size > 0 ? (
+                <>
+                  <IconChevronRight className="h-4 w-4" />
+                  <span>Recolher Grupos</span>
+                </>
+              ) : (
+                <>
+                  <IconChevronDown className="h-4 w-4" />
+                  <span>Expandir Grupos</span>
+                </>
+              )}
             </Button>
-            <ColumnVisibilityManager
-              columns={allColumns}
-              visibleColumns={visibleColumns}
-              onVisibilityChange={setVisibleColumns}
-              defaultColumns={defaultVisibleColumns}
-              columnOrder={columnOrder}
-              onColumnOrderChange={setColumnOrder}
-              onColumnOrderReset={resetColumnOrder}
-              onColumnWidthsReset={resetColumnWidths}
-            />
-            {currentUser?.sector?.privileges !== SECTOR_PRIVILEGES.WAREHOUSE && (
-              <TaskExport filters={queryFilters} currentItems={allTableData} totalRecords={allTableData.length} visibleColumns={visibleColumns} />
-            )}
-          </div>
+          )}
+
+          <Button
+            variant={activeFilters.length > 0 ? "default" : "outline"}
+            size="default"
+            onClick={() => setShowFilterModal(!showFilterModal)}
+          >
+            <IconFilter className="h-4 w-4" />
+            <span>Filtros{activeFilters.length > 0 ? ` (${activeFilters.length})` : ''}</span>
+          </Button>
+          <ColumnVisibilityManager
+            columns={allColumns}
+            visibleColumns={visibleColumns}
+            onVisibilityChange={setVisibleColumns}
+            defaultColumns={defaultVisibleColumns}
+            columnOrder={columnOrder}
+            onColumnOrderChange={setColumnOrder}
+            onColumnOrderReset={resetColumnOrder}
+            onColumnWidthsReset={resetColumnWidths}
+          />
+          {currentUser?.sector?.privileges !== SECTOR_PRIVILEGES.WAREHOUSE && (
+            <TaskExport filters={queryFilters} currentItems={allTableData} totalRecords={allTableData.length} visibleColumns={visibleColumns} />
+          )}
         </div>
+      </div>
 
-        {/* Active Filter Indicators */}
-        {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={handleClearAllFilters} className="px-1 py-1" />}
+      {/* Active Filter Indicators */}
+      {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={handleClearAllFilters} className="px-1 py-1" />}
 
-        {/* Source selection mode indicator */}
-        {copyFromTaskState.step === "selecting_source" && (
-          <div className="bg-primary/10 border border-primary/20 rounded-md p-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <IconHandClick className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium">
-                Clique em uma tarefa para selecionar como origem dos dados
-              </span>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleCopyFromTaskCancel}>
-              <IconX className="h-4 w-4 mr-1" />
-              Cancelar
-            </Button>
+      {/* Source selection mode indicator */}
+      {copyFromTaskState.step === "selecting_source" && (
+        <div className="bg-primary/10 border border-primary/20 rounded-md p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <IconHandClick className="h-5 w-5 text-primary" />
+            <span className="text-sm font-medium">
+              Clique em uma tarefa para selecionar como origem dos dados
+            </span>
           </div>
-        )}
+          <Button variant="ghost" size="sm" onClick={handleCopyFromTaskCancel}>
+            <IconX className="h-4 w-4 mr-1" />
+            Cancelar
+          </Button>
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <>
+      {controlsContainer && createPortal(controlsContent, controlsContainer)}
+      <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex flex-col p-4 pt-6 space-y-4 pb-6">
+        {!controlsContainer && controlsContent}
 
         {/* Tables grouped by status */}
         {/* For FINANCIAL users: Single table with completed tasks not yet settled */}
@@ -973,5 +987,6 @@ export function TaskPreparationView({
         />
       </CardContent>
     </Card>
+    </>
   );
 }

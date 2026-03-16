@@ -22,8 +22,13 @@ import {
   IconX,
   IconArrowLeft,
   IconInfoCircle,
+  IconHash,
+  IconCar,
+  IconBarcode,
+  IconClipboardCheck,
+  IconTag,
 } from "@tabler/icons-react";
-import { formatCNPJ } from "../../../../../utils";
+import { formatCNPJ, formatDate, formatChassis } from "../../../../../utils";
 import { getCustomers } from "../../../../../api-client";
 import { getApiBaseUrl } from "@/config/api";
 import { cn } from "@/lib/utils";
@@ -279,43 +284,114 @@ export function QuoteStepInfo({
     );
   }, []);
 
-  const taskIdentifier =
-    task.serialNumber || task.truck?.plate || task.name || "Tarefa";
 
   return (
     <div className="space-y-6">
-      {/* Task Info Card (read-only) */}
+      {/* Task, Customer & Invoice-To Info Card (read-only) */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <IconInfoCircle className="h-4 w-4" />
-            Dados da Tarefa
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Tarefa</p>
-              <p className="font-medium">{task.name || "-"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Cliente</p>
-              <p className="font-medium">
-                {task.customer?.fantasyName ||
-                  task.customer?.corporateName ||
-                  "-"}
-              </p>
-            </div>
-            {task.serialNumber && (
-              <div>
-                <p className="text-xs text-muted-foreground">Nº Série</p>
-                <p className="font-medium">{task.serialNumber}</p>
+        <CardContent className="pt-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left column: Task Info */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconTag className="h-4 w-4" />
+                  Tarefa
+                </span>
+                <span className="text-sm font-semibold text-foreground">{task.name || "-"}</span>
               </div>
-            )}
-            {task.truck?.plate && (
-              <div>
-                <p className="text-xs text-muted-foreground">Placa</p>
-                <p className="font-medium">{task.truck.plate}</p>
+              {task.serialNumber && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconHash className="h-4 w-4" />
+                    Número de Série
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{task.serialNumber}</span>
+                </div>
+              )}
+              {task.truck?.plate && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCar className="h-4 w-4" />
+                    Placa
+                  </span>
+                  <span className="text-sm font-semibold text-foreground uppercase">{task.truck.plate}</span>
+                </div>
+              )}
+              {task.truck?.chassisNumber && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconBarcode className="h-4 w-4" />
+                    Nº Chassi
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatChassis(task.truck.chassisNumber)}</span>
+                </div>
+              )}
+              {task.finishedAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconClipboardCheck className="h-4 w-4" />
+                    Finalizado Em
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(task.finishedAt)}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right column: Invoice-To Customers */}
+            {selectedCustomers.size > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <IconInfoCircle className="h-4 w-4 text-muted-foreground" />
+                  Faturar Para — Dados para NFS-e
+                </div>
+                <div className="space-y-3">
+                  {Array.from(selectedCustomers.entries()).map(([id, customer], index) => {
+                    if (!customer) return null;
+                    const missingFields: string[] = [];
+                    if (!customer.cnpj && !customer.cpf) missingFields.push("CNPJ/CPF");
+                    if (!customer.corporateName) missingFields.push("Razão Social");
+                    if (!customer.city || !customer.state) missingFields.push("Cidade/Estado");
+                    if (!customer.address) missingFields.push("Endereço");
+
+                    return (
+                      <div key={id} className="bg-muted/30 rounded-lg p-3 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold">Cliente {index + 1}</span>
+                          {missingFields.length > 0 && (
+                            <Badge variant="destructive" className="text-[10px]">Dados incompletos</Badge>
+                          )}
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Razão Social</span>
+                            <span className="font-medium">{customer.corporateName || customer.fantasyName}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">{customer.cnpj ? "CNPJ" : "CPF"}</span>
+                            <span className="font-medium">{customer.cnpj ? formatCNPJ(customer.cnpj) : customer.cpf || <span className="text-destructive text-xs">Não informado</span>}</span>
+                          </div>
+                          {customer.stateRegistration && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">IE</span>
+                              <span className="font-medium">{customer.stateRegistration}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Endereço</span>
+                            <span className="font-medium text-right">
+                              {[customer.address, customer.addressNumber, customer.neighborhood, customer.city, customer.state].filter(Boolean).join(", ") || <span className="text-destructive text-xs">Não informado</span>}
+                              {customer.zipCode && ` — ${customer.zipCode}`}
+                            </span>
+                          </div>
+                        </div>
+                        {missingFields.length > 0 && (
+                          <p className="text-xs text-destructive">Campos faltantes: {missingFields.join(", ")}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -360,6 +436,7 @@ export function QuoteStepInfo({
                     paymentCondition: null,
                     downPaymentDate: null,
                     customPaymentText: null,
+                    generateInvoice: true,
                     responsibleId: null,
                   };
                 });

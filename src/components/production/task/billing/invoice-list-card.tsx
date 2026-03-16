@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   IconCurrencyDollar,
   IconChevronDown,
   IconChevronRight,
   IconReceipt,
   IconFileInvoice,
+  IconDownload,
+  IconLoader2,
 } from '@tabler/icons-react';
 import { formatCurrency, formatDate } from '@/utils';
 import { useInvoicesByTask } from '@/hooks/production/use-invoice';
@@ -16,7 +19,10 @@ import { BoletoActions } from './boleto-actions';
 import { NfseStatusBadge } from './nfse-status-badge';
 import { NfseActions } from './nfse-actions';
 import { NfseEnrichedInfo } from './nfse-enriched-info';
+import { nfseService } from '@/api-client/nfse';
 import { FileItem, useFileViewer } from '@/components/common/file';
+import { invoiceService } from '@/api-client/invoice';
+import { toast } from '@/components/ui/sonner';
 import type { Invoice } from '@/types/invoice';
 import type { File as CustomFile } from '@/types/file';
 
@@ -27,6 +33,46 @@ interface InvoiceListCardProps {
 export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
   const { data: response, isLoading } = useInvoicesByTask(taskId);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
+  const handleDownloadAllBoletos = async (installments: any[]) => {
+    const downloadable = installments.filter(
+      (inst) => inst.bankSlip && (inst.bankSlip.status === 'ACTIVE' || inst.bankSlip.status === 'OVERDUE'),
+    );
+    if (downloadable.length === 0) {
+      toast.error('Nenhum boleto disponível para download.');
+      return;
+    }
+    setIsDownloadingAll(true);
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+
+      for (const inst of downloadable) {
+        const res = await invoiceService.getBoletoPdf(inst.id);
+        const blob = res.data instanceof Blob
+          ? res.data
+          : new Blob([res.data], { type: 'application/pdf' });
+        zip.file(`boleto-parcela-${inst.number}.pdf`, blob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `boletos.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`${downloadable.length} boleto(s) baixado(s) com sucesso.`);
+    } catch {
+      toast.error('Erro ao baixar boletos.');
+    } finally {
+      setIsDownloadingAll(false);
+    }
+  };
+
   // Try to get file viewer context for PDF preview/download
   let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
   try {
@@ -173,11 +219,30 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
                         {/* Boletos Section */}
                         {installments.length > 0 && (
                           <div className="bg-muted/10">
-                            <div className="flex items-center gap-2 px-4 py-2 bg-muted/30 border-b border-border">
-                              <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                Boletos
-                              </span>
+                            <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border">
+                              <div className="flex items-center gap-2">
+                                <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                  Boletos
+                                </span>
+                              </div>
+                              {installments.some((inst) => inst.bankSlip && (inst.bankSlip.status === 'ACTIVE' || inst.bankSlip.status === 'OVERDUE')) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDownloadAllBoletos(installments)}
+                                  disabled={isDownloadingAll}
+                                  title="Baixar todos os boletos"
+                                  className="h-7 px-2 text-xs gap-1"
+                                >
+                                  {isDownloadingAll ? (
+                                    <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <IconDownload className="h-3.5 w-3.5" />
+                                  )}
+                                  Baixar todos
+                                </Button>
+                              )}
                             </div>
                             <div className="divide-y divide-border">
                               {installments.map((installment) => {
@@ -250,7 +315,12 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
                                         </span>
                                       )}
                                     </div>
-                                    <NfseActions invoiceId={invoice.id} nfseDocuments={nfseDocuments} />
+                                    <div className="flex items-center gap-1">
+                                      {activeNfse?.elotechNfseId && (
+                                        <NfseDownloadButton elotechNfseId={activeNfse.elotechNfseId} />
+                                      )}
+                                      <NfseActions invoiceId={invoice.id} nfseDocuments={nfseDocuments} />
+                                    </div>
                                   </div>
                                   {activeNfse?.elotechNfseId && (
                                     <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} />
@@ -272,5 +342,44 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
       </Card>
 
     </>
+  );
+}
+
+function NfseDownloadButton({ elotechNfseId }: { elotechNfseId: number }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsDownloading(true);
+    try {
+      const res = await nfseService.getPdf(elotechNfseId);
+      const blob = res.data instanceof Blob
+        ? res.data
+        : new Blob([res.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch {
+      toast.error('Erro ao baixar PDF da NFS-e.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleDownload}
+      disabled={isDownloading}
+      title="Ver NFS-e PDF"
+      className="h-7 w-7 p-0"
+    >
+      {isDownloading ? (
+        <IconLoader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <IconDownload className="h-4 w-4" />
+      )}
+    </Button>
   );
 }

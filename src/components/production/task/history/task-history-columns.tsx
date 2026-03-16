@@ -23,7 +23,7 @@ import { canViewServiceOrderType } from "../../../../utils/permissions/service-o
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { ServiceOrderCell } from "./service-order-cell";
-import { IconCheck, IconAlertTriangle } from "@tabler/icons-react";
+import { IconCheck, IconAlertTriangle, IconCalendarEvent } from "@tabler/icons-react";
 import { QuoteStatusBadge } from "../quote/quote-status-badge";
 
 // Helper function to render date in single-line format: dd/mm/yy hh:mm
@@ -171,6 +171,14 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
   // Show urgency indicator when approaching forecast with incomplete orders (but not today or past)
   const showUrgencyIndicator = showIndicators && urgencyInfo && !isForecastToday && !isForecastPast;
 
+  // Check for manual reschedule history (most recent MANUAL entry)
+  const lastManualReschedule = showIndicators
+    ? task.forecastHistory
+        ?.filter(h => h.source === 'MANUAL')
+        ?.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())?.[0]
+    : undefined;
+  const hasBeenRescheduled = !!lastManualReschedule;
+
   // Green text when entryDate is filled (vehicle has entered) and task is not completed
   const hasEntryDate = !!task.entryDate && task.status !== TASK_STATUS.COMPLETED;
 
@@ -293,6 +301,30 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
             <div className="text-sm">
               <div className="font-medium text-red-500">Liberação atrasada</div>
               <div className="text-muted-foreground">A liberação ({formatted}) já passou e a data de entrada ainda não foi preenchida</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      )}
+
+      {/* Reschedule indicator - top-right corner flag when forecast has been manually rescheduled */}
+      {hasBeenRescheduled && lastManualReschedule && (
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            <div className="absolute top-0 right-0 z-[5] w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-violet-500 pointer-events-auto cursor-help">
+              <IconCalendarEvent className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left" className="max-w-xs">
+            <div className="text-sm space-y-1">
+              <div className="font-medium text-violet-500">Previsão reagendada</div>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <span>{formatDate(lastManualReschedule.previousDate)}</span>
+                <span>→</span>
+                <span className="font-medium text-foreground">{formatDate(lastManualReschedule.newDate)}</span>
+              </div>
+              {lastManualReschedule.reason && (
+                <div className="text-muted-foreground italic">{lastManualReschedule.reason}</div>
+              )}
             </div>
           </TooltipContent>
         </Tooltip>

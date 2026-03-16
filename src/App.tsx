@@ -510,6 +510,22 @@ function App() {
                   }
                 />
                 <Route
+                  path={routes.production.history.quote(":taskId")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProductionTaskQuote />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.production.schedule.quote(":taskId")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProductionTaskQuote />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path={routes.production.preparation.root}
                   element={
                     <Suspense fallback={<PageLoader />}>

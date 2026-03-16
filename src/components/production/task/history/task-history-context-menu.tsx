@@ -629,7 +629,7 @@ export function TaskHistoryContextMenu({
           {/* Quote - ADMIN, FINANCIAL, COMMERCIAL (single selection only) */}
           {canViewQuote(user?.sector?.privileges || "") && !isBulk && (
             <DropdownMenuItem onClick={() => {
-              navigate(routes.production.preparation.quote(task.id));
+              navigate(routes.production.history.quote(task.id));
               setDropdownOpen(false);
             }}>
               <IconReceipt className="mr-2 h-4 w-4" />

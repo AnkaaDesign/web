@@ -17,7 +17,4 @@ export const nfseService = {
 
   getPdf: (elotechNfseId: number) =>
     apiClient.get(`/nfse/${elotechNfseId}/pdf`, { responseType: 'blob' }),
-
-  getPdfUrl: (elotechNfseId: number) =>
-    `/nfse/${elotechNfseId}/pdf`,
 };

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, type NavigateOptions } from "react-router-dom";
 
 interface UseUnsavedChangesGuardOptions {
   isDirty: boolean;
@@ -108,13 +108,16 @@ export function useUnsavedChangesGuard({ isDirty, isSubmitting = false }: UseUns
   }, [shouldBlock]);
 
   // Wraps navigation calls; shows dialog if dirty, navigates if clean
+  const pendingOptionsRef = useRef<NavigateOptions | undefined>(undefined);
+
   const guardedNavigate = useCallback(
-    (to: string) => {
+    (to: string, options?: NavigateOptions) => {
       if (shouldBlock) {
         pendingNavigationRef.current = to;
+        pendingOptionsRef.current = options;
         setShowDialog(true);
       } else {
-        navigate(to);
+        navigate(to, options);
       }
     },
     [shouldBlock, navigate],
@@ -129,10 +132,12 @@ export function useUnsavedChangesGuard({ isDirty, isSubmitting = false }: UseUns
     setShowDialog(false);
 
     const target = pendingNavigationRef.current;
+    const options = pendingOptionsRef.current;
     pendingNavigationRef.current = null;
+    pendingOptionsRef.current = undefined;
 
     if (target) {
-      navigate(target);
+      navigate(target, options);
     } else {
       // popstate case — go back
       window.history.back();

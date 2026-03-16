@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import {
   FormControl,
@@ -56,13 +56,16 @@ export function QuoteStepCustomerPayment({
     }
   }, [config?.customPaymentText, showCustomPayment]);
 
-  // Default budget responsible to the first task responsible
+  // Default budget responsible to the first task responsible (only on mount)
+  const hasAutoDefaulted = useRef(false);
   useEffect(() => {
+    if (hasAutoDefaulted.current) return;
     if (
       taskResponsibles &&
       taskResponsibles.length > 0 &&
       !config?.responsibleId
     ) {
+      hasAutoDefaulted.current = true;
       const firstValid = taskResponsibles.find((r) => !r.id.startsWith("temp-"));
       if (firstValid) {
         setValue(

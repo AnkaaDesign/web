@@ -55,10 +55,23 @@ export const TaskEditPage = () => {
   const breadcrumbConfig = getBreadcrumbConfig(source);
 
   // Unsaved changes guard
-  const { showDialog, confirmNavigation, cancelNavigation, guardedNavigate } = useUnsavedChangesGuard({
+  const { showDialog, confirmNavigation, cancelNavigation, guardedNavigate: rawGuardedNavigate } = useUnsavedChangesGuard({
     isDirty: formState.isDirty,
     isSubmitting: formState.isSubmitting,
   });
+
+  // Wrap guardedNavigate to auto-inject taskIds state when navigating to the detail page
+  const detailPath = id ? breadcrumbConfig.detailsRoute(id) : null;
+  const guardedNavigate = React.useCallback(
+    (to: string, options?: { state?: Record<string, unknown> }) => {
+      if (taskIds && detailPath && to === detailPath) {
+        rawGuardedNavigate(to, { ...options, state: { ...options?.state, taskIds } });
+      } else {
+        rawGuardedNavigate(to, options);
+      }
+    },
+    [rawGuardedNavigate, taskIds, detailPath],
+  );
 
   // Debug form state
   React.useEffect(() => {
@@ -141,7 +154,7 @@ export const TaskEditPage = () => {
   };
 
   const handleCancel = () => {
-    guardedNavigate(breadcrumbConfig.href);
+    guardedNavigate(breadcrumbConfig.detailsRoute(id!));
   };
 
   if (isLoading) {

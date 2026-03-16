@@ -18,10 +18,10 @@ export function AwaitingQuoteApprovalList({ tasks }: AwaitingQuoteApprovalListPr
 
   return (
     <DashboardCardList
-      title="Aguardando Aprovação Interna"
+      title="Aguardando Faturamento Aprovado"
       icon={<IconFileCheck className="h-4 w-4 text-blue-500" />}
       viewAllLink="/producao/agenda"
-      emptyMessage="Nenhuma tarefa aguardando aprovação interna"
+      emptyMessage="Nenhuma tarefa aguardando faturamento aprovado"
       isEmpty={tasks.length === 0}
       footer={
         <DashboardPagination

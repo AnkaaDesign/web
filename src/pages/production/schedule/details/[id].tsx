@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/contexts/theme-context";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { useTaskDetail, useTaskMutations, useServiceOrderMutations, useCutsByTask, useLayoutsByTruck, useCurrentUser, useAirbrushingsByTask } from "../../../../hooks";
+import { useTaskDetail, useTaskMutations, useServiceOrderMutations, useCutsByTask, useLayoutsByTruck, useCurrentUser, useAirbrushingsByTask, useForecastHistory } from "../../../../hooks";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { canCancelServiceOrder, canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
-import { canViewQuote, canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
+import { canViewQuote, canEditQuote, canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { InstallmentStatusBadge } from "@/components/production/task/billing/installment-status-badge";
 import { BankSlipStatusBadge } from "@/components/production/task/billing/bank-slip-status-badge";
@@ -43,6 +43,8 @@ import { NfseStatusBadge } from "@/components/production/task/billing/nfse-statu
 import { NfseActions } from "@/components/production/task/billing/nfse-actions";
 import { NfseEnrichedInfo } from "@/components/production/task/billing/nfse-enriched-info";
 import { useInvoicesByTask } from "@/hooks/production/use-invoice";
+import { invoiceService } from "@/api-client/invoice";
+import { nfseService } from "@/api-client/nfse";
 import type { Invoice } from "@/types/invoice";
 import { taskQuoteService } from "@/api-client/task-quote";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
@@ -100,6 +102,7 @@ import {
   IconCut,
   IconSpray,
   IconDownload,
+  IconLoader2,
   IconLayoutGrid,
   IconBarcode,
   IconList,
@@ -896,6 +899,12 @@ const TASK_SECTIONS: SectionConfig[] = [
 
 function ForecastHistoryCollapsible({ taskId }: { taskId: string }) {
   const [open, setOpen] = useState(false);
+  const { data } = useForecastHistory(taskId);
+  const entries = (data?.data ?? []) as any[];
+
+  // Only show when there are more than 1 entry (i.e., actual reschedules beyond the initial)
+  if (entries.length <= 1) return null;
+
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
@@ -1016,6 +1025,7 @@ export const TaskDetailsPage = () => {
 
   // Check if user can view quote (ADMIN, FINANCIAL, COMMERCIAL only)
   const canViewQuoteSection = canViewQuote(currentUser?.sector?.privileges || '');
+  const canEditQuoteSection = canEditQuote(currentUser?.sector?.privileges || '');
   const canChangeQuoteStatus = canUpdateQuoteStatus(currentUser?.sector?.privileges || '');
 
   // Fetch invoice data for inline boleto/NFS-e display in quote section (only for roles that can view quotes)
@@ -1400,12 +1410,14 @@ export const TaskDetailsPage = () => {
           label: 'Agenda',
           href: routes.production.preparation.root,
           editRoute: routes.production.preparation.edit,
+          quoteRoute: routes.production.preparation.quote,
         };
       case 'historico':
         return {
           label: 'Histórico',
           href: routes.production.history.root,
           editRoute: routes.production.history.edit,
+          quoteRoute: routes.production.history.quote,
         };
       case 'cronograma':
       default:
@@ -1413,6 +1425,7 @@ export const TaskDetailsPage = () => {
           label: 'Cronograma',
           href: routes.production.schedule.list,
           editRoute: routes.production.schedule.edit,
+          quoteRoute: routes.production.schedule.quote,
         };
     }
   };
@@ -2225,6 +2238,17 @@ export const TaskDetailsPage = () => {
                             <IconLayoutGrid className="h-4 w-4" />
                             Visualizar
                           </Button>
+                          {canEditQuoteSection && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate(breadcrumbConfig.quoteRoute(task.id))}
+                              className="gap-2"
+                            >
+                              <IconEdit className="h-4 w-4" />
+                              Editar
+                            </Button>
+                          )}
                           {/* Customer filter combobox - only show when 2+ invoiceTo customers */}
                           {task.quote?.customerConfigs && task.quote.customerConfigs.length >= 2 && (
                             <Combobox
@@ -2355,16 +2379,16 @@ export const TaskDetailsPage = () => {
                           : Math.min(item.discountValue, amount);
                       }
                       return (
-                        <tr key={item.id || index} className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3 text-sm">
+                        <tr key={item.id || index} className="hover:bg-muted/30 transition-colors h-[3.75rem]">
+                          <td className="px-4 py-1.5 text-sm align-middle">
                             <div className="flex items-center gap-2">
                               <span>{displayDescription}</span>
                               {!isOutrosWithObservation && item.observation && (
                                 <HoverCard openDelay={100} closeDelay={100}>
                                   <HoverCardTrigger asChild>
-                                    <button className="relative flex items-center justify-center h-6 w-6 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
-                                      <IconNote className="h-4 w-4" />
-                                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                                    <button className="relative flex items-center justify-center h-5 w-5 rounded border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+                                      <IconNote className="h-3.5 w-3.5" />
+                                      <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
                                         !
                                       </span>
                                     </button>
@@ -2381,12 +2405,17 @@ export const TaskDetailsPage = () => {
                                 </HoverCard>
                               )}
                             </div>
-                            {hasServiceDiscount && item.discountReference && (
-                              <p className="text-xs text-muted-foreground mt-0.5">Ref: {item.discountReference}</p>
+                            {hasServiceDiscount && (
+                              <p className="text-xs text-muted-foreground leading-tight">
+                                {item.discountReference && <>Ref: {item.discountReference} · </>}
+                                <span className="text-destructive">
+                                  -{item.discountType === 'PERCENTAGE' ? `${item.discountValue}%` : formatCurrency(serviceDiscountAmount)}
+                                </span>
+                              </p>
                             )}
                           </td>
                           {showCustomerCol && (
-                            <td className="px-4 py-3 text-sm text-muted-foreground">
+                            <td className="px-4 py-1.5 text-sm text-muted-foreground align-middle">
                               {canAccessCustomerPages && item.invoiceToCustomer?.id ? (
                                 <span
                                   className="cursor-pointer hover:text-primary hover:underline transition-colors"
@@ -2399,14 +2428,11 @@ export const TaskDetailsPage = () => {
                               )}
                             </td>
                           )}
-                          <td className="px-4 py-3 text-sm text-right">
+                          <td className="px-4 py-1.5 text-sm text-right align-middle">
                             {hasServiceDiscount ? (
-                              <div className="flex flex-col items-end">
-                                <span className="text-muted-foreground line-through text-xs">{formatCurrency(amount)}</span>
+                              <div className="inline-flex flex-col items-end">
+                                <span className="text-muted-foreground line-through text-xs leading-tight">{formatCurrency(amount)}</span>
                                 <span className="font-medium">{formatCurrency(Math.max(0, amount - serviceDiscountAmount))}</span>
-                                <span className="text-destructive text-xs">
-                                  -{item.discountType === 'PERCENTAGE' ? `${item.discountValue}%` : formatCurrency(serviceDiscountAmount)}
-                                </span>
                               </div>
                             ) : (
                               <span className="font-medium">{formatCurrency(amount)}</span>
@@ -2430,21 +2456,24 @@ export const TaskDetailsPage = () => {
                       }
 
                       return (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {Array.from(customerGroups.entries()).map(([customerId, group]) => (
-                            <div key={customerId} className="border border-border dark:border-border/30 rounded-lg overflow-hidden flex flex-col">
+                        <div className="grid grid-cols-1 md:grid-cols-2 items-stretch gap-3">
+                          {Array.from(customerGroups.entries()).map(([customerId, group], groupIndex) => (
+                            <div key={customerId} className="border border-border dark:border-border/30 rounded-lg overflow-hidden">
                               <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/40 border-b border-border dark:border-border/30">
                                 <IconBuilding className="h-4 w-4 text-muted-foreground" />
-                                {canAccessCustomerPages && customerId !== '__unassigned__' ? (
-                                  <span
-                                    className="text-sm font-semibold cursor-pointer hover:text-primary hover:underline transition-colors"
-                                    onClick={() => navigate(routes.administration.customers.details(customerId))}
-                                  >
-                                    {group.name}
-                                  </span>
-                                ) : (
-                                  <span className="text-sm font-semibold">{group.name}</span>
-                                )}
+                                <span className="text-sm font-semibold">
+                                  <span className="text-muted-foreground font-medium">Cliente {groupIndex + 1}:</span>{" "}
+                                  {canAccessCustomerPages && customerId !== '__unassigned__' ? (
+                                    <span
+                                      className="cursor-pointer hover:text-primary hover:underline transition-colors"
+                                      onClick={() => navigate(routes.administration.customers.details(customerId))}
+                                    >
+                                      {group.name}
+                                    </span>
+                                  ) : (
+                                    group.name
+                                  )}
+                                </span>
                                 <span className="text-xs text-muted-foreground ml-auto">
                                   {formatCurrency(group.services.reduce((sum, s) => {
                                     const amt = typeof s.amount === 'number' ? s.amount : Number(s.amount) || 0;
@@ -2458,17 +2487,19 @@ export const TaskDetailsPage = () => {
                                   }, 0))}
                                 </span>
                               </div>
-                              <table className="w-full flex-1">
-                                <thead className="bg-muted/50">
-                                  <tr>
-                                    <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">Descrição</th>
-                                    <th className="px-4 py-2.5 text-right text-sm font-semibold text-muted-foreground w-28">Valor</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border dark:divide-border/30">
-                                  {group.services.map((item, index) => renderServiceRow(item, index, false))}
-                                </tbody>
-                              </table>
+                              <div>
+                                <table className="w-full">
+                                  <thead className="bg-muted/50">
+                                    <tr>
+                                      <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">Descrição</th>
+                                      <th className="px-4 py-2.5 text-right text-sm font-semibold text-muted-foreground w-28">Valor</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-border dark:divide-border/30">
+                                    {group.services.map((item, index) => renderServiceRow(item, index, false))}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -2595,8 +2626,8 @@ export const TaskDetailsPage = () => {
                     const isMultiColumnLayout = !quoteCustomerFilter && configs.length >= 2;
 
                     return (
-                      <div className={cn("gap-3", isMultiColumnLayout ? "grid grid-cols-1 md:grid-cols-2" : "space-y-3")}>
-                        {configs.map((config) => {
+                      <div className={cn("gap-3", isMultiColumnLayout ? "grid grid-cols-1 md:grid-cols-2 items-stretch" : "space-y-3")}>
+                        {configs.map((config, configIndex) => {
                           const configSubtotal = typeof config.subtotal === 'number' ? config.subtotal : Number(config.subtotal) || 0;
                           const configTotal = typeof config.total === 'number' ? config.total : Number(config.total) || 0;
                           // Discount is now per-service; derive aggregate discount from subtotal vs total
@@ -2609,9 +2640,10 @@ export const TaskDetailsPage = () => {
                           });
 
                           return (
-                            <div key={config.id} className="bg-muted/30 rounded-lg p-4 space-y-2">
+                            <div key={config.id} className="bg-muted/30 rounded-lg p-4 space-y-2 flex flex-col">
                               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                                 <IconBuilding className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-muted-foreground font-medium">Cliente {configIndex + 1}:</span>
                                 {canAccessCustomerPages && config.customerId ? (
                                   <span
                                     className="cursor-pointer hover:text-primary hover:underline transition-colors"
@@ -2668,9 +2700,12 @@ export const TaskDetailsPage = () => {
                                   return (
                                     <div className="pt-2 space-y-2">
                                       {/* Boletos */}
-                                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                                        <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
-                                        Boletos
+                                      <div className="flex items-center justify-between text-sm font-semibold text-foreground">
+                                        <div className="flex items-center gap-2">
+                                          <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
+                                          Boletos
+                                        </div>
+                                        <DownloadAllBoletosButton installments={invoiceInstallments} />
                                       </div>
                                       <div className="divide-y divide-border/50 rounded-md border border-border/50 overflow-hidden">
                                         {invoiceInstallments.map((installment) => (
@@ -2732,10 +2767,15 @@ export const TaskDetailsPage = () => {
                                                     </span>
                                                   )}
                                                 </div>
-                                                <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                                                <div className="flex items-center gap-1">
+                                                  {activeNfse?.elotechNfseId && (
+                                                    <NfseDownloadButton elotechNfseId={activeNfse.elotechNfseId} />
+                                                  )}
+                                                  <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                                                </div>
                                               </div>
                                               {activeNfse?.elotechNfseId && (
-                                                <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} showPdfLink />
+                                                <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} />
                                               )}
                                               {activeNfse?.status === 'ERROR' && activeNfse.errorMessage && (
                                                 <p className="text-xs text-destructive mt-1">{activeNfse.errorMessage}</p>
@@ -2874,9 +2914,12 @@ export const TaskDetailsPage = () => {
                         {/* Boletos */}
                         {invoiceInstallments.length > 0 && (
                           <>
-                            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                              <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
-                              Boletos
+                            <div className="flex items-center justify-between text-sm font-semibold text-foreground">
+                              <div className="flex items-center gap-2">
+                                <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
+                                Boletos
+                              </div>
+                              <DownloadAllBoletosButton installments={invoiceInstallments} />
                             </div>
                             <div className="divide-y divide-border/50 rounded-md border border-border/50 overflow-hidden">
                               {invoiceInstallments.map((installment) => (
@@ -2940,10 +2983,15 @@ export const TaskDetailsPage = () => {
                                       </span>
                                     )}
                                   </div>
-                                  <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                                  <div className="flex items-center gap-1">
+                                    {activeNfse?.elotechNfseId && activeNfse.status === 'AUTHORIZED' && (
+                                      <NfseDownloadButton elotechNfseId={activeNfse.elotechNfseId} />
+                                    )}
+                                    <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                                  </div>
                                 </div>
                                 {activeNfse?.elotechNfseId && (
-                                  <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} showPdfLink />
+                                  <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} />
                                 )}
                                 {activeNfse?.status === 'ERROR' && activeNfse.errorMessage && (
                                   <p className="text-xs text-destructive mt-1">{activeNfse.errorMessage}</p>
@@ -4187,23 +4235,23 @@ export const TaskDetailsPage = () => {
                       <IconAlertCircle className="h-7 w-7 text-red-600 dark:text-red-400" />
                     </div>
                     <AlertDialogTitle className="text-xl text-red-700 dark:text-red-400">
-                      Faturamento Aprovado - Acao Irreversivel
+                      Faturamento Aprovado - Ação Irreversível
                     </AlertDialogTitle>
                   </div>
                 </AlertDialogHeader>
 
                 <div className="rounded-lg border-2 border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-4 my-2 space-y-3">
                   <p className="text-sm font-semibold text-red-800 dark:text-red-300">
-                    Ao confirmar, as seguintes acoes serao executadas automaticamente:
+                    Ao confirmar, as seguintes ações serão executadas automaticamente:
                   </p>
                   <ul className="text-sm text-red-700 dark:text-red-400 space-y-2 list-none">
                     <li className="flex items-start gap-2">
                       <span className="mt-0.5 font-bold">1.</span>
-                      <span><strong>Faturas</strong> serao geradas para cada cliente vinculado ao orcamento</span>
+                      <span><strong>Faturas</strong> serão geradas para cada cliente vinculado ao orçamento</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="mt-0.5 font-bold">2.</span>
-                      <span><strong>Boletos bancarios</strong> serao emitidos automaticamente no Sicredi para cada parcela</span>
+                      <span><strong>Boletos bancários</strong> serão emitidos automaticamente no Sicredi para cada parcela</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="mt-0.5 font-bold">3.</span>
@@ -4217,14 +4265,14 @@ export const TaskDetailsPage = () => {
                     Verifique antes de confirmar:
                   </p>
                   <ul className="text-sm text-amber-700 dark:text-amber-400 mt-1 space-y-1 list-disc list-inside">
-                    <li>Valores, descontos e condicoes de pagamento estao corretos?</li>
-                    <li>Os dados do(s) cliente(s) estao atualizados (CNPJ/CPF, endereco)?</li>
-                    <li>As parcelas e datas de vencimento estao configuradas?</li>
+                    <li>Valores, descontos e condições de pagamento estão corretos?</li>
+                    <li>Os dados do(s) cliente(s) estão atualizados (CNPJ/CPF, endereço)?</li>
+                    <li>As parcelas e datas de vencimento estão configuradas?</li>
                   </ul>
                 </div>
 
                 <AlertDialogDescription className="text-sm text-muted-foreground mt-1">
-                  Essa acao nao pode ser desfeita facilmente. Boletos e notas fiscais emitidos precisarao ser cancelados manualmente caso haja algum erro.
+                  Essa ação não pode ser desfeita facilmente. Boletos e notas fiscais emitidos precisarão ser cancelados manualmente caso haja algum erro.
                 </AlertDialogDescription>
 
                 <AlertDialogFooter className="mt-2">
@@ -4237,7 +4285,7 @@ export const TaskDetailsPage = () => {
                       setQuoteConfirmDialog((prev) => ({ ...prev, open: false }));
                     }}
                   >
-                    {isUpdatingQuoteStatus ? 'Processando...' : 'Confirmar Aprovacao Interna'}
+                    {isUpdatingQuoteStatus ? 'Processando...' : 'Confirmar Faturamento Aprovado'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </>
@@ -4291,5 +4339,101 @@ export const TaskDetailsPage = () => {
     </PrivilegeRoute>
   );
 };
+
+function DownloadAllBoletosButton({ installments }: { installments: any[] }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const downloadable = installments.filter(
+    (inst) => inst.bankSlip && (inst.bankSlip.status === 'ACTIVE' || inst.bankSlip.status === 'OVERDUE'),
+  );
+
+  if (downloadable.length < 2) return null;
+
+  const handleDownloadAll = async () => {
+    setIsDownloading(true);
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+
+      for (const inst of downloadable) {
+        const res = await invoiceService.getBoletoPdf(inst.id);
+        const blob = res.data instanceof Blob
+          ? res.data
+          : new Blob([res.data], { type: 'application/pdf' });
+        zip.file(`boleto-parcela-${inst.number}.pdf`, blob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `boletos.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently fail
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleDownloadAll}
+      disabled={isDownloading}
+      title="Baixar todos os boletos"
+      className="h-7 px-2 text-xs gap-1"
+    >
+      {isDownloading ? (
+        <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <IconDownload className="h-3.5 w-3.5" />
+      )}
+      Baixar todos
+    </Button>
+  );
+}
+
+function NfseDownloadButton({ elotechNfseId }: { elotechNfseId: number }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const res = await nfseService.getPdf(elotechNfseId);
+      const blob = res.data instanceof Blob
+        ? res.data
+        : new Blob([res.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch {
+      // silently fail
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleDownload}
+      disabled={isDownloading}
+      title="Ver NFS-e PDF"
+      className="h-7 w-7 p-0"
+    >
+      {isDownloading ? (
+        <IconLoader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <IconDownload className="h-4 w-4" />
+      )}
+    </Button>
+  );
+}
 
 export default TaskDetailsPage;

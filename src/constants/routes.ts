@@ -472,6 +472,7 @@ export const routes = {
       root: "/producao/historico",
       details: (id: string) => `/producao/historico/detalhes/${id}`,
       edit: (id: string) => `/producao/historico/editar/${id}`,
+      quote: (taskId: string) => `/producao/historico/detalhes/${taskId}/orcamento`,
     },
     observations: {
       create: "/producao/observacoes/cadastrar",
@@ -489,13 +490,14 @@ export const routes = {
       edit: (id: string) => `/producao/cronograma/editar/${id}`,
       list: "/producao/cronograma",
       root: "/producao/cronograma",
+      quote: (taskId: string) => `/producao/cronograma/detalhes/${taskId}/orcamento`,
     },
     preparation: {
       root: "/producao/agenda",
       create: "/producao/agenda/cadastrar",
       details: (id: string) => `/producao/agenda/detalhes/${id}`,
       edit: (id: string) => `/producao/agenda/editar/${id}`,
-      quote: (taskId: string) => `/producao/agenda/orcamento/${taskId}`,
+      quote: (taskId: string) => `/producao/agenda/detalhes/${taskId}/orcamento`,
     },
     garages: {
       root: "/producao/barracoes",

@@ -28,6 +28,7 @@ interface QuoteStepReviewProps {
   userRole?: string;
   selectedCustomers: Map<string, any>;
   onStatusChange?: (status: string) => void;
+  layoutFiles?: Array<{ thumbnailUrl?: string; uploadedFileId?: string; id?: string }>;
 }
 
 export function QuoteStepReview({
@@ -36,6 +37,7 @@ export function QuoteStepReview({
   userRole,
   selectedCustomers,
   onStatusChange,
+  layoutFiles,
 }: QuoteStepReviewProps) {
   const { control } = useFormContext();
 
@@ -129,16 +131,17 @@ export function QuoteStepReview({
             // Multi-customer grouped layout
             if (hasMultipleCustomers && customerGroups) {
               return (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 items-stretch gap-3">
                   {Array.from(customerGroups.entries()).map(
-                    ([customerId, group]) => (
+                    ([customerId, group], groupIndex) => (
                       <div
                         key={customerId}
-                        className="border border-border dark:border-border/30 rounded-lg overflow-hidden flex flex-col"
+                        className="border border-border dark:border-border/30 rounded-lg overflow-hidden"
                       >
                         <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/40 border-b border-border dark:border-border/30">
                           <IconBuilding className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm font-semibold">
+                            <span className="text-muted-foreground font-medium">Cliente {groupIndex + 1}:</span>{" "}
                             {group.name}
                           </span>
                           <span className="text-xs text-muted-foreground ml-auto">
@@ -154,23 +157,25 @@ export function QuoteStepReview({
                             )}
                           </span>
                         </div>
-                        <table className="w-full flex-1">
-                          <thead className="bg-muted/50">
-                            <tr>
-                              <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">
-                                Descrição
-                              </th>
-                              <th className="px-4 py-2.5 text-right text-sm font-semibold text-muted-foreground w-28">
-                                Valor
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border dark:divide-border/30">
-                            {group.services.map((svc: any, idx: number) => (
-                              <ServiceTableRow key={idx} service={svc} />
-                            ))}
-                          </tbody>
-                        </table>
+                        <div>
+                          <table className="w-full">
+                            <thead className="bg-muted/50">
+                              <tr>
+                                <th className="px-4 py-2.5 text-left text-sm font-semibold text-muted-foreground">
+                                  Descrição
+                                </th>
+                                <th className="px-4 py-2.5 text-right text-sm font-semibold text-muted-foreground w-28">
+                                  Valor
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border dark:divide-border/30">
+                              {group.services.map((svc: any, idx: number) => (
+                                <ServiceTableRow key={idx} service={svc} />
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     ),
                   )}
@@ -235,7 +240,7 @@ export function QuoteStepReview({
             if (configs.length === 0) return null;
 
             return (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 items-stretch gap-3">
                 {configs.map((config: any, i: number) => {
                   const customer = selectedCustomers.get(config.customerId);
                   const configSubtotal =
@@ -260,7 +265,7 @@ export function QuoteStepReview({
                   return (
                     <div
                       key={config.customerId || i}
-                      className="bg-muted/30 rounded-lg p-4 space-y-2"
+                      className="bg-muted/30 rounded-lg p-4 space-y-2 flex flex-col"
                     >
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                         {customer && (
@@ -274,8 +279,9 @@ export function QuoteStepReview({
                         {!customer && (
                           <IconBuilding className="h-4 w-4 text-muted-foreground" />
                         )}
-                        {customer?.fantasyName ||
-                          customer?.corporateName ||
+                        <span className="text-muted-foreground font-medium">Cliente {i + 1}:</span>
+                        {customer?.corporateName ||
+                          customer?.fantasyName ||
                           "Cliente"}
                       </div>
 
@@ -391,19 +397,26 @@ export function QuoteStepReview({
           )}
 
           {/* Layout Preview */}
-          {layoutFileId && (
-            <div className="bg-muted/30 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
-                <IconPhoto className="h-4 w-4 text-muted-foreground" />
-                Layout
+          {(() => {
+            const layoutFile = layoutFiles?.[0];
+            const thumbnailSrc = layoutFileId
+              ? `${getApiBaseUrl()}/files/thumbnail/${layoutFileId}`
+              : layoutFile?.thumbnailUrl || (layoutFile?.uploadedFileId ? `${getApiBaseUrl()}/files/thumbnail/${layoutFile.uploadedFileId}` : null);
+            if (!thumbnailSrc) return null;
+            return (
+              <div className="bg-muted/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+                  <IconPhoto className="h-4 w-4 text-muted-foreground" />
+                  Layout
+                </div>
+                <img
+                  src={thumbnailSrc}
+                  alt="Layout aprovado"
+                  className="max-h-48 rounded-lg shadow-sm object-contain"
+                />
               </div>
-              <img
-                src={`${getApiBaseUrl()}/files/thumbnail/${layoutFileId}`}
-                alt="Layout aprovado"
-                className="max-h-48 rounded-lg shadow-sm object-contain"
-              />
-            </div>
-          )}
+            );
+          })()}
         </div>
       </CardContent>
     </Card>
@@ -436,12 +449,17 @@ function ServiceTableRow({ service }: { service: any }) {
     : service.description;
 
   return (
-    <tr className="hover:bg-muted/30 transition-colors">
-      <td className="px-4 py-3 text-sm">
+    <tr className="hover:bg-muted/30 transition-colors h-[3.75rem]">
+      <td className="px-4 py-1.5 text-sm align-middle">
         <div>
-          <span>{displayDescription}</span>
+          <span>
+            {displayDescription}
+            {!isOutrosWithObservation && service.observation && (
+              <span className="text-muted-foreground italic"> — {service.observation}</span>
+            )}
+          </span>
           {discount > 0 && (
-            <p className="text-xs text-destructive mt-0.5">
+            <p className="text-xs text-destructive leading-tight">
               Desconto:{" "}
               {service.discountType === "PERCENTAGE"
                 ? `${service.discountValue}%`
@@ -451,17 +469,12 @@ function ServiceTableRow({ service }: { service: any }) {
                 ` — ${service.discountReference}`}
             </p>
           )}
-          {!isOutrosWithObservation && service.observation && (
-            <p className="text-xs text-muted-foreground italic mt-0.5">
-              {service.observation}
-            </p>
-          )}
         </div>
       </td>
-      <td className="px-4 py-3 text-sm text-right font-medium">
+      <td className="px-4 py-1.5 text-sm text-right font-medium align-middle">
         {discount > 0 ? (
           <div>
-            <p className="text-xs text-muted-foreground line-through">
+            <p className="text-xs text-muted-foreground line-through leading-tight">
               {formatCurrency(amount)}
             </p>
             <p>{formatCurrency(net)}</p>

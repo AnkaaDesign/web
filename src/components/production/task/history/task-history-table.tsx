@@ -143,9 +143,10 @@ export function TaskHistoryTable({
       serviceOrders: {
         select: {
           id: true,
-          name: true,
           status: true,
           type: true,
+          description: true,
+          assignedToId: true,
           assignedTo: {
             select: {
               id: true,
@@ -181,12 +182,6 @@ export function TaskHistoryTable({
         },
       },
       createdBy: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      updatedBy: {
         select: {
           id: true,
           name: true,

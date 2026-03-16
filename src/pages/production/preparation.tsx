@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { TaskPreparationView } from "@/components/production/task/preparation/task-preparation-view";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -61,6 +61,12 @@ export const PreparationPage = () => {
     return () => main.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Callback ref for the controls portal container
+  const [controlsContainer, setControlsContainer] = useState<HTMLDivElement | null>(null);
+  const controlsRef = useCallback((node: HTMLDivElement | null) => {
+    setControlsContainer(node);
+  }, []);
+
   // ADMIN, COMMERCIAL, and LOGISTIC can create tasks
   const canCreateTasks =
     user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN ||
@@ -109,10 +115,12 @@ export const PreparationPage = () => {
                 : undefined
             }
           />
+          <div ref={controlsRef} className="flex flex-col gap-3 pt-3 [&_input]:bg-card [&_button]:bg-card" />
         </div>
         <TaskPreparationView
           storageKey="task-preparation-visible-columns"
           searchPlaceholder="Buscar por nome, número de série, placa..."
+          controlsContainer={controlsContainer}
         />
       </div>
     </PrivilegeRoute>
