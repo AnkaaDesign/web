@@ -45,6 +45,9 @@ interface FileUploadOptions {
   fileContext?: string;
   entityId?: string;
   entityType?: string;
+  customerName?: string;
+  supplierName?: string;
+  userName?: string;
 }
 
 interface FileUploadResponse {
@@ -179,6 +182,9 @@ export class FileService {
           ...(options.fileContext && { fileContext: options.fileContext }),
           ...(options.entityId && { entityId: options.entityId }),
           ...(options.entityType && { entityType: options.entityType }),
+          ...(options.customerName && { customerName: options.customerName }),
+          ...(options.supplierName && { supplierName: options.supplierName }),
+          ...(options.userName && { userName: options.userName }),
         },
       };
 
@@ -234,6 +240,9 @@ export class FileService {
           ...(options.fileContext && { fileContext: options.fileContext }),
           ...(options.entityId && { entityId: options.entityId }),
           ...(options.entityType && { entityType: options.entityType }),
+          ...(options.customerName && { customerName: options.customerName }),
+          ...(options.supplierName && { supplierName: options.supplierName }),
+          ...(options.userName && { userName: options.userName }),
         },
       };
 

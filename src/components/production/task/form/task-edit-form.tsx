@@ -2165,6 +2165,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         fileContext,
         entityId: task.id,
         entityType: 'TASK',
+        customerName: task.customer?.fantasyName,
       });
 
       if (result?.data) {
@@ -2190,7 +2191,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
       toast.error('Erro ao enviar arquivo. Tente novamente.');
     }
     return allFiles;
-  }, [task.id]);
+  }, [task.id, task.customer?.fantasyName]);
 
   // Handle checkin files change per service order (with pre-upload)
   const handleCheckinFilesChange = useCallback(async (serviceOrderId: string, files: FileWithPreview[]) => {
