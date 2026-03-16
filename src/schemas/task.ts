@@ -1088,7 +1088,6 @@ const taskServiceOrderCreateSchema = z.object({
   observation: z.string().nullable().optional(), // For rejection notes
   startedAt: nullableDate.optional(),
   finishedAt: nullableDate.optional(),
-  shouldSync: z.boolean().optional().default(true), // Controls bidirectional sync with TaskQuoteService
   // File IDs for checkin/checkout photos grouped by service order
   checkinFileIds: z.array(z.string().uuid("Arquivo de checkin inválido")).optional(),
   checkoutFileIds: z.array(z.string().uuid("Arquivo de checkout inválido")).optional(),

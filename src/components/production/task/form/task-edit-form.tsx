@@ -770,7 +770,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
               observation: so.observation || null, // Include observation field
               startedAt: so.startedAt ? new Date(so.startedAt) : null,
               finishedAt: so.finishedAt ? new Date(so.finishedAt) : null,
-              shouldSync: (so as any).shouldSync !== false, // Include shouldSync flag (default true)
               createdAt: so.createdAt, // Keep createdAt for ordering
             }))
             // Push cancelled items to end, preserve API order (type + position) for the rest
@@ -2258,7 +2257,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const handleDesignarServiceOrder = useCallback((serviceOrder: ServiceOrderData) => {
     const currentServiceOrders = form.getValues("serviceOrders") || [];
     // Prepend the new service order to the beginning of the array so it appears at the top
-    form.setValue("serviceOrders", [{ ...serviceOrder, shouldSync: true }, ...currentServiceOrders], {
+    form.setValue("serviceOrders", [{ ...serviceOrder }, ...currentServiceOrders], {
       shouldDirty: true,
       shouldTouch: true,
       shouldValidate: true,

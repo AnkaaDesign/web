@@ -32,11 +32,6 @@ import { uploadSingleFile } from "../../../../api-client/file";
 import { getCustomers } from "../../../../api-client";
 import type { FileWithPreview } from "@/components/common/file";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
-import {
-  getServiceOrdersToAddFromQuoteServices,
-  type SyncQuoteService,
-} from "../../../../utils/task-quote-service-order-sync";
-import { SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
 
 // Step components
 import { QuoteStepInfo } from "@/components/production/task/quote/steps/quote-step-info";
@@ -110,7 +105,6 @@ export default function TaskQuotePage() {
           description: "",
           amount: null,
           observation: null,
-          shouldSync: true,
           invoiceToCustomerId: null,
           discountType: "NONE",
           discountValue: null,
@@ -169,7 +163,6 @@ export default function TaskQuotePage() {
                   : item.amount
                     ? Number(item.amount)
                     : 0,
-              shouldSync: item.shouldSync !== false,
               invoiceToCustomerId: item.invoiceToCustomerId || null,
               discountType: item.discountType || "NONE",
               discountValue: item.discountValue != null ? Number(item.discountValue) : null,
@@ -180,7 +173,6 @@ export default function TaskQuotePage() {
                 description: "",
                 amount: null,
                 observation: null,
-                shouldSync: true,
                 invoiceToCustomerId: null,
                 discountType: "NONE",
                 discountValue: null,

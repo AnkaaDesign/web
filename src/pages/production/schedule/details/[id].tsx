@@ -1018,8 +1018,8 @@ export const TaskDetailsPage = () => {
   const canViewQuoteSection = canViewQuote(currentUser?.sector?.privileges || '');
   const canChangeQuoteStatus = canUpdateQuoteStatus(currentUser?.sector?.privileges || '');
 
-  // Fetch invoice data for inline boleto/NFS-e display in quote section
-  const { data: invoiceResponse } = useInvoicesByTask(id!);
+  // Fetch invoice data for inline boleto/NFS-e display in quote section (only for roles that can view quotes)
+  const { data: invoiceResponse } = useInvoicesByTask(canViewQuoteSection ? id! : "");
   const invoices: Invoice[] = useMemo(() => {
     const data = invoiceResponse?.data;
     return Array.isArray(data) ? data : (data ? [data] : []);

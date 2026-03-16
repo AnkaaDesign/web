@@ -10,7 +10,6 @@ export interface TaskQuoteService extends BaseEntity {
   observation?: string | null;
   amount: number;
   quoteId: string;
-  shouldSync: boolean; // Controls bidirectional sync with ServiceOrder
   invoiceToCustomerId?: string | null;
   invoiceToCustomer?: { id: string; corporateName?: string; fantasyName: string; cnpj?: string | null };
   discountType: DISCOUNT_TYPE;

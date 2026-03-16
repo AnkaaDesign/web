@@ -21,7 +21,7 @@ interface DossiePdfOptions {
 
 /**
  * Generates and exports a Dossiê PDF with Antes (Check-in) / Depois (Check-out) photos
- * organized by service order. Uses full-resolution file URLs (not thumbnails).
+ * organized by service order. Each page has header, up to 2 service orders, and footer.
  * Opens a new window with print dialog for the user to save as PDF.
  */
 export async function exportDossiePdf({ taskDisplayName, customerName, serialNumber, plate, serviceOrders }: DossiePdfOptions): Promise<void> {
@@ -33,39 +33,29 @@ export async function exportDossiePdf({ taskDisplayName, customerName, serialNum
   const currentDate = formatDate(new Date());
   const whatsappLink = `https://wa.me/${COMPANY_INFO.phoneClean}`;
 
-  // Build service order pages - each SO gets its own section, may span multiple pages
-  const serviceOrdersHtml = serviceOrders.map((so) => {
+  // Vehicle info line
+  const vehicleInfo = [
+    serialNumber ? `Série: ${escapeHtml(serialNumber)}` : '',
+    plate ? `Placa: ${escapeHtml(plate)}` : '',
+  ].filter(Boolean).join(' | ');
+
+  // Build a single photo row — all images in one row, min 3 columns
+  const buildPhotoRow = (files: Array<{ id: string; filename: string; originalName?: string }>) => {
+    if (files.length === 0) return '';
+    const cols = Math.max(3, files.length);
+    const cells = files.map(file =>
+      `<div class="photo-cell"><img src="${apiUrl}/files/serve/${file.id}" alt="${escapeHtml(file.originalName || file.filename)}" class="photo-img" /></div>`
+    ).join('');
+    const spacers = Array(cols - files.length).fill('<div class="photo-cell photo-cell-spacer"></div>').join('');
+    return `<div class="photo-row" style="grid-template-columns: repeat(${cols}, 1fr);">${cells}${spacers}</div>`;
+  };
+
+  // Build a service order block
+  const buildServiceOrder = (so: ServiceOrderFiles) => {
     const isOutrosWithObservation = so.description === 'Outros' && !!so.observation;
     const displayDescription = isOutrosWithObservation ? so.observation : so.description;
     const checkinFiles = so.checkinFiles || [];
     const checkoutFiles = so.checkoutFiles || [];
-
-    // Determine max count for pairing antes/depois side by side
-    const maxCount = Math.max(checkinFiles.length, checkoutFiles.length);
-
-    // Build paired photo rows (antes | depois)
-    let photoPairsHtml = '';
-    for (let i = 0; i < maxCount; i++) {
-      const checkinFile = checkinFiles[i];
-      const checkoutFile = checkoutFiles[i];
-
-      photoPairsHtml += `
-        <div class="photo-pair">
-          <div class="photo-cell">
-            ${checkinFile
-              ? `<img src="${apiUrl}/files/serve/${checkinFile.id}" alt="${escapeHtml(checkinFile.originalName || checkinFile.filename)}" class="photo-img" />`
-              : `<div class="photo-empty">—</div>`
-            }
-          </div>
-          <div class="photo-cell">
-            ${checkoutFile
-              ? `<img src="${apiUrl}/files/serve/${checkoutFile.id}" alt="${escapeHtml(checkoutFile.originalName || checkoutFile.filename)}" class="photo-img" />`
-              : `<div class="photo-empty">—</div>`
-            }
-          </div>
-        </div>
-      `;
-    }
 
     return `
       <div class="service-order-block">
@@ -73,20 +63,64 @@ export async function exportDossiePdf({ taskDisplayName, customerName, serialNum
           <span class="so-title">${escapeHtml(displayDescription || 'Serviço')}</span>
           ${!isOutrosWithObservation && so.observation ? `<span class="so-obs">${escapeHtml(so.observation)}</span>` : ''}
         </div>
-        <div class="photo-columns-header">
-          <div class="column-label antes-label">Antes (Check-in) — ${checkinFiles.length} foto${checkinFiles.length !== 1 ? 's' : ''}</div>
-          <div class="column-label depois-label">Depois (Check-out) — ${checkoutFiles.length} foto${checkoutFiles.length !== 1 ? 's' : ''}</div>
-        </div>
-        ${photoPairsHtml}
+        ${checkinFiles.length > 0 ? `
+          <div class="section-label antes-label">Antes (Check-in)</div>
+          ${buildPhotoRow(checkinFiles)}
+        ` : ''}
+        ${checkoutFiles.length > 0 ? `
+          <div class="section-label depois-label">Depois (Check-out)</div>
+          ${buildPhotoRow(checkoutFiles)}
+        ` : ''}
       </div>
     `;
-  }).join('');
+  };
 
-  // Vehicle info line
-  const vehicleInfo = [
-    serialNumber ? `Série: ${escapeHtml(serialNumber)}` : '',
-    plate ? `Placa: ${escapeHtml(plate)}` : '',
-  ].filter(Boolean).join(' | ');
+  // Build header HTML
+  const buildHeader = (showTitle: boolean) => `
+    <header class="header">
+      <img src="/logo.png" alt="${escapeHtml(COMPANY_INFO.name)}" class="logo" />
+      <div class="header-right">
+        <div class="header-title">DOSSIÊ</div>
+        <div class="header-info">
+          <span class="header-info-label">Data:</span> ${currentDate}
+        </div>
+      </div>
+    </header>
+    <div class="header-line"></div>
+    ${showTitle ? `
+      <div class="document-title">${escapeHtml(taskDisplayName)}</div>
+      ${customerName ? `<div class="document-subtitle">${escapeHtml(customerName)}</div>` : ''}
+      ${vehicleInfo ? `<div class="vehicle-info"><strong>${vehicleInfo}</strong></div>` : ''}
+    ` : ''}
+  `;
+
+  // Build footer HTML
+  const footerHtml = `
+    <footer class="footer">
+      <div class="footer-company">${COMPANY_INFO.name}</div>
+      <div class="footer-info">
+        ${COMPANY_INFO.address}<br />
+        <a href="${whatsappLink}" class="footer-link">${COMPANY_INFO.phone}</a> |
+        <a href="${COMPANY_INFO.websiteUrl}" class="footer-link">${COMPANY_INFO.website}</a>
+      </div>
+    </footer>
+  `;
+
+  // Paginate: 2 service orders per page
+  const pages: string[] = [];
+  for (let i = 0; i < serviceOrders.length; i += 2) {
+    const isFirstPage = i === 0;
+    const soBlocks = serviceOrders.slice(i, i + 2).map(buildServiceOrder).join('');
+    pages.push(`
+      <div class="page">
+        ${buildHeader(isFirstPage)}
+        <div class="page-content">
+          ${soBlocks}
+        </div>
+        ${footerHtml}
+      </div>
+    `);
+  }
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -120,10 +154,16 @@ export async function exportDossiePdf({ taskDisplayName, customerName, serialNum
 
     .page {
       width: 210mm;
-      min-height: 297mm;
+      height: 297mm;
       padding: 10mm 20mm 12mm 20mm;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      page-break-after: always;
+    }
+
+    .page:last-child {
+      page-break-after: auto;
     }
 
     /* Header */
@@ -199,8 +239,7 @@ export async function exportDossiePdf({ taskDisplayName, customerName, serialNum
 
     /* Service order block */
     .service-order-block {
-      margin-bottom: 6mm;
-      break-inside: avoid;
+      margin-bottom: 5mm;
     }
 
     .so-header {
@@ -224,20 +263,13 @@ export async function exportDossiePdf({ taskDisplayName, customerName, serialNum
       font-style: italic;
     }
 
-    .photo-columns-header {
-      display: flex;
-      gap: 2mm;
-      margin-bottom: 1.5mm;
-      border-bottom: 0.5px solid #ddd;
-      padding: 1.5mm 0;
-    }
-
-    .column-label {
-      flex: 1;
+    .section-label {
       font-size: 8.5pt;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.3px;
+      margin-bottom: 1.5mm;
+      margin-top: 2mm;
     }
 
     .antes-label {
@@ -248,15 +280,14 @@ export async function exportDossiePdf({ taskDisplayName, customerName, serialNum
       color: #16a34a;
     }
 
-    .photo-pair {
-      display: flex;
-      gap: 2mm;
-      margin-bottom: 2mm;
-      break-inside: avoid;
+    /* Photo row: CSS grid, columns set inline */
+    .photo-row {
+      display: grid;
+      gap: 1.5mm;
+      margin-bottom: 1.5mm;
     }
 
     .photo-cell {
-      flex: 1;
       aspect-ratio: 4/3;
       overflow: hidden;
       border-radius: 1mm;
@@ -273,9 +304,9 @@ export async function exportDossiePdf({ taskDisplayName, customerName, serialNum
       object-fit: cover;
     }
 
-    .photo-empty {
-      color: #ccc;
-      font-size: 14pt;
+    .photo-cell-spacer {
+      border: none;
+      background: transparent;
     }
 
     /* Footer */
@@ -311,55 +342,11 @@ export async function exportDossiePdf({ taskDisplayName, customerName, serialNum
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
       }
-
-      .page {
-        page-break-after: auto;
-      }
-
-      .service-order-block {
-        break-inside: avoid;
-      }
-
-      .photo-pair {
-        break-inside: avoid;
-      }
     }
   </style>
 </head>
 <body>
-  <div class="page">
-    <!-- Header -->
-    <header class="header">
-      <img src="/logo.png" alt="${escapeHtml(COMPANY_INFO.name)}" class="logo" />
-      <div class="header-right">
-        <div class="header-title">DOSSIÊ</div>
-        <div class="header-info">
-          <span class="header-info-label">Data:</span> ${currentDate}
-        </div>
-      </div>
-    </header>
-    <div class="header-line"></div>
-
-    <!-- Title -->
-    <div class="document-title">${escapeHtml(taskDisplayName)}</div>
-    ${customerName ? `<div class="document-subtitle">${escapeHtml(customerName)}</div>` : ''}
-    ${vehicleInfo ? `<div class="vehicle-info"><strong>${vehicleInfo}</strong></div>` : ''}
-
-    <!-- Content -->
-    <div class="page-content">
-      ${serviceOrdersHtml}
-    </div>
-
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="footer-company">${COMPANY_INFO.name}</div>
-      <div class="footer-info">
-        ${COMPANY_INFO.address}<br />
-        <a href="${whatsappLink}" class="footer-link">${COMPANY_INFO.phone}</a> |
-        <a href="${COMPANY_INFO.websiteUrl}" class="footer-link">${COMPANY_INFO.website}</a>
-      </div>
-    </footer>
-  </div>
+  ${pages.join('')}
 </body>
 </html>
   `;
@@ -375,13 +362,12 @@ export async function exportDossiePdf({ taskDisplayName, customerName, serialNum
 
   // Wait for images to load before printing
   printWindow.onload = () => {
-    // Give images extra time to render
     const images = printWindow.document.querySelectorAll('img');
     const imagePromises = Array.from(images).map(img => {
       if (img.complete) return Promise.resolve();
       return new Promise<void>((resolve) => {
         img.onload = () => resolve();
-        img.onerror = () => resolve(); // Don't block on failed images
+        img.onerror = () => resolve();
       });
     });
 

@@ -6,15 +6,18 @@ import { LowStockList } from "./low-stock-list";
 import { CompletedTasksList } from "./completed-tasks-list";
 import { AwaitingApprovalTasksList } from "./awaiting-approval-tasks-list";
 import { AwaitingQuoteApprovalList } from "./awaiting-quote-approval-list";
+import { TimeEntriesCard } from "./time-entries-card";
 
 interface HomeDashboardSectionProps {
   data: HomeDashboardData;
   sector?: string;
+  showTimeEntries?: boolean;
   isSectionVisible?: (sectionId: string) => boolean;
 }
 
-export function HomeDashboardSection({ data, sector, isSectionVisible }: HomeDashboardSectionProps) {
+export function HomeDashboardSection({ data, sector, showTimeEntries, isSectionVisible }: HomeDashboardSectionProps) {
   const isVisible = (id: string) => !isSectionVisible || isSectionVisible(id);
+  const isAdmin = sector === SECTOR_PRIVILEGES.ADMIN;
 
   const hasContent =
     (data.tasksCloseDeadline && data.tasksCloseDeadline.length > 0) ||
@@ -23,7 +26,8 @@ export function HomeDashboardSection({ data, sector, isSectionVisible }: HomeDas
     (data.lowStockItems && data.lowStockItems.length > 0) ||
     (data.completedTasks && data.completedTasks.length > 0) ||
     (data.tasksAwaitingPaymentApproval && data.tasksAwaitingPaymentApproval.length > 0) ||
-    (data.tasksAwaitingQuoteApproval && data.tasksAwaitingQuoteApproval.length > 0);
+    (data.tasksAwaitingQuoteApproval && data.tasksAwaitingQuoteApproval.length > 0) ||
+    showTimeEntries;
 
   if (!hasContent) return null;
 
@@ -43,7 +47,7 @@ export function HomeDashboardSection({ data, sector, isSectionVisible }: HomeDas
       )}
 
       {isVisible("openServiceOrders") && data.openServiceOrders && data.openServiceOrders.length > 0 && (
-        <ServiceOrderList orders={data.openServiceOrders} title="Ordens de Serviço Abertas" />
+        <ServiceOrderList orders={data.openServiceOrders} title="Ordens de Serviço Abertas" showTypeBadge={isAdmin} />
       )}
 
       {isVisible("tasksCloseForecast") && data.tasksCloseForecast && data.tasksCloseForecast.length > 0 && (
@@ -53,10 +57,6 @@ export function HomeDashboardSection({ data, sector, isSectionVisible }: HomeDas
           variant="forecast"
           viewAllLink="/producao/agenda"
         />
-      )}
-
-      {isVisible("lowStockItems") && data.lowStockItems && data.lowStockItems.length > 0 && (
-        <LowStockList items={data.lowStockItems} totalCount={data.counts.lowStockItems} />
       )}
 
       {isVisible("completedTasks") && data.completedTasks && data.completedTasks.length > 0 && (
@@ -71,6 +71,11 @@ export function HomeDashboardSection({ data, sector, isSectionVisible }: HomeDas
         <AwaitingQuoteApprovalList tasks={data.tasksAwaitingQuoteApproval} />
       )}
 
+      {isVisible("lowStockItems") && data.lowStockItems && data.lowStockItems.length > 0 && (
+        <LowStockList items={data.lowStockItems} totalCount={data.counts.lowStockItems} />
+      )}
+
+      {isVisible("timeEntries") && showTimeEntries && <TimeEntriesCard />}
     </div>
   );
 }

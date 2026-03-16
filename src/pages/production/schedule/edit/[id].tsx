@@ -111,11 +111,7 @@ export const TaskEditPage = () => {
         },
       },
       createdBy: true,
-      truck: {
-        include: {
-          garage: true,
-        },
-      },
+      truck: true,
       observation: {
         include: {
           files: true,

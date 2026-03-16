@@ -1,20 +1,11 @@
 import { IconHistory, IconArrowRight } from "@tabler/icons-react";
 import { useForecastHistory } from "../../../../hooks";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { TaskForecastHistory } from "../../../../types";
 
 interface ForecastHistoryTimelineProps {
   taskId: string;
 }
-
-const SOURCE_LABELS: Record<string, string> = {
-  MANUAL: "Manual",
-  AUTO_ENTRY_DATE: "Auto (Data de Entrada)",
-  AUTO_STARTED_AT: "Auto (Data de Inicio)",
-  COPY: "Copia",
-  INITIAL: "Criacao",
-};
 
 function formatDate(date: Date | string | null): string {
   if (!date) return "\u2014";
@@ -55,21 +46,16 @@ function HistoryEntry({ entry }: { entry: TaskForecastHistory }) {
         </span>
       </div>
 
-      <div className="flex items-center gap-1.5 text-sm">
+      <div className="flex items-center gap-1.5 text-sm flex-wrap">
         <span className="text-muted-foreground">{formatDate(entry.previousDate)}</span>
         <IconArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         <span className="font-medium">{formatDate(entry.newDate)}</span>
-      </div>
-
-      <div className="flex items-center gap-1.5 flex-wrap">
         {entry.reason && (
-          <Badge variant="secondary" className="text-xs">
-            {entry.reason}
-          </Badge>
+          <>
+            <span className="text-muted-foreground">—</span>
+            <span className="text-sm italic">{entry.reason}</span>
+          </>
         )}
-        <Badge variant="outline" className="text-xs">
-          {SOURCE_LABELS[entry.source] || entry.source}
-        </Badge>
       </div>
     </div>
   );

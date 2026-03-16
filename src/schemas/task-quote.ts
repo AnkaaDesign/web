@@ -60,7 +60,6 @@ export const taskQuoteServiceSchema = z.object({
   description: z.string().min(1, 'Descrição é obrigatória').max(400),
   observation: z.string().max(2000).optional().nullable(),
   amount: moneySchema,
-  shouldSync: z.boolean().optional().default(true), // Controls bidirectional sync with ServiceOrder
   invoiceToCustomerId: z.string().uuid('Cliente inválido').optional().nullable(),
   // Per-service discount (moved from CustomerConfig)
   discountType: discountTypeSchema.default('NONE').optional(),
@@ -75,7 +74,6 @@ const taskQuoteServiceCreateSchema = z.object({
   observation: z.string().max(2000).optional().nullable(),
   // Amount might come as formatted currency string (e.g., "R$ 520,00")
   amount: z.preprocess(preprocessMoney, z.number().optional().nullable()),
-  shouldSync: z.boolean().optional().default(true), // Controls bidirectional sync with ServiceOrder
   invoiceToCustomerId: z.string().uuid('Cliente inválido').optional().nullable(),
   // Per-service discount
   discountType: z.preprocess(

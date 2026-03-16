@@ -26,7 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Switch } from "@/components/ui/switch";
+
 import {
   IconPlus,
   IconTrash,
@@ -46,7 +46,6 @@ import {
 import {
   getQuoteServicesToAddFromServiceOrders,
   type SyncServiceOrder,
-  type SyncQuoteService,
 } from "../../../../../utils/task-quote-service-order-sync";
 
 interface QuoteStepServicesProps {
@@ -94,7 +93,6 @@ export function QuoteStepServices({
             description: svc.description,
             observation: svc.observation || null,
             amount: svc.amount ?? 0,
-            shouldSync: true,
             invoiceToCustomerId: null,
             discountType: "NONE",
             discountValue: null,
@@ -190,7 +188,6 @@ export function QuoteStepServices({
       description: "",
       observation: null,
       amount: undefined,
-      shouldSync: true,
       invoiceToCustomerId: null,
       discountType: "NONE",
       discountValue: null,
@@ -236,8 +233,8 @@ export function QuoteStepServices({
               className={cn(
                 "grid gap-2 items-end text-xs font-medium text-muted-foreground px-1",
                 hasMultipleCustomers
-                  ? "grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px_36px]"
-                  : "grid-cols-[minmax(150px,2fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px_36px]",
+                  ? "grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px]"
+                  : "grid-cols-[minmax(150px,2fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px]",
               )}
             >
               <span>Serviço</span>
@@ -247,7 +244,6 @@ export function QuoteStepServices({
               <span>Vlr. Desc.</span>
               <span>Referência</span>
               <span className="text-center">Obs</span>
-              <span className="text-center">Sinc</span>
               <span></span>
             </div>
           )}
@@ -386,8 +382,8 @@ const ServiceRow = forwardRef<HTMLDivElement, ServiceRowProps>(
           className={cn(
             "grid gap-2 items-center",
             hasMultipleCustomers
-              ? "grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px_36px]"
-              : "grid-cols-[minmax(150px,2fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px_36px]",
+              ? "grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px]"
+              : "grid-cols-[minmax(150px,2fr)_130px_minmax(120px,1fr)_110px_minmax(100px,1fr)_36px_36px]",
           )}
         >
           {/* Description */}
@@ -563,25 +559,6 @@ const ServiceRow = forwardRef<HTMLDivElement, ServiceRowProps>(
                 </span>
               )}
             </Button>
-          </div>
-
-          {/* Sync Toggle */}
-          <div className="flex justify-center">
-            <FormField
-              control={control}
-              name={`services.${index}.shouldSync`}
-              render={({ field }) => (
-                <FormItem className="flex items-center space-y-0">
-                  <FormControl>
-                    <Switch
-                      checked={field.value !== false}
-                      onCheckedChange={field.onChange}
-                      disabled={disabled}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
           </div>
 
           {/* Remove Button */}

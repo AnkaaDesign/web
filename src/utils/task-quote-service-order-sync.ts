@@ -25,7 +25,6 @@ export interface SyncServiceOrder {
   status?: string;
   statusOrder?: number;
   assignedToId?: string | null;
-  shouldSync?: boolean; // When false, this item should not participate in sync
 }
 
 export interface SyncQuoteService {
@@ -33,7 +32,6 @@ export interface SyncQuoteService {
   description: string;
   observation?: string | null;
   amount?: number | null;
-  shouldSync?: boolean; // When false, this service should not participate in sync
 }
 
 /**
@@ -69,26 +67,15 @@ export function getQuoteServicesToAddFromServiceOrders(
     existingQuoteServices.map(item => normalizeDescription(item.description))
   );
 
-  // CRITICAL: Also track descriptions of quote services with shouldSync = false
-  // These should never be recreated by sync
-  const noSyncDescriptions = new Set(
-    existingQuoteServices
-      .filter(item => item.shouldSync === false)
-      .map(item => normalizeDescription(item.description))
-  );
-
   for (const so of serviceOrders) {
     // Only sync PRODUCTION type with valid descriptions
     if (so.type !== SERVICE_ORDER_TYPE.PRODUCTION) continue;
     if (!so.description || so.description.trim().length < 3) continue;
-    // CRITICAL: Skip service orders with shouldSync = false
-    if (so.shouldSync === false) continue;
 
     const normalizedDesc = normalizeDescription(so.description);
 
     // Check if this quote service already exists (by description only)
-    // OR if it was previously deleted (shouldSync = false)
-    if (!existingDescriptions.has(normalizedDesc) && !noSyncDescriptions.has(normalizedDesc)) {
+    if (!existingDescriptions.has(normalizedDesc)) {
       servicesToAdd.push({
         description: so.description.trim(),
         observation: so.observation || null, // Sync observation separately
@@ -128,24 +115,13 @@ export function getServiceOrdersToAddFromQuoteServices(
       .map(so => normalizeDescription(so.description))
   );
 
-  // CRITICAL: Also track descriptions of service orders with shouldSync = false
-  // These should never be recreated by sync
-  const noSyncDescriptions = new Set(
-    existingServiceOrders
-      .filter(so => so.type === SERVICE_ORDER_TYPE.PRODUCTION && so.shouldSync === false)
-      .map(so => normalizeDescription(so.description))
-  );
-
   for (const item of quoteServices) {
     if (!item.description || item.description.trim().length < 3) continue;
-    // CRITICAL: Skip quote services with shouldSync = false
-    if (item.shouldSync === false) continue;
 
     const normalizedItemDesc = normalizeDescription(item.description);
 
     // Check if a matching service order already exists (by description only)
-    // OR if it was previously deleted (shouldSync = false)
-    if (existingDescriptions.has(normalizedItemDesc) || noSyncDescriptions.has(normalizedItemDesc)) {
+    if (existingDescriptions.has(normalizedItemDesc)) {
       continue;
     }
 

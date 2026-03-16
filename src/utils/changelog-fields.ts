@@ -772,7 +772,6 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     amount: "Valor",
     description: "Descrição",
     observation: "Observação",
-    shouldSync: "Sincronizar com O.S.",
     position: "Posição",
   },
   [CHANGE_LOG_ENTITY_TYPE.LAYOUT]: {

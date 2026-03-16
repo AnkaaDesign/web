@@ -123,7 +123,6 @@ export const TaskCreateForm = () => {
           status: SERVICE_ORDER_STATUS.PENDING,
           statusOrder: 1,
           assignedToId: null,
-          shouldSync: false,
         },
         {
           description: "Elaborar Layout",
@@ -131,7 +130,6 @@ export const TaskCreateForm = () => {
           status: SERVICE_ORDER_STATUS.PENDING,
           statusOrder: 1,
           assignedToId: null,
-          shouldSync: false,
         },
         {
           description: "Elaborar Projeto",
@@ -139,7 +137,6 @@ export const TaskCreateForm = () => {
           status: SERVICE_ORDER_STATUS.PENDING,
           statusOrder: 1,
           assignedToId: null,
-          shouldSync: false,
         },
         {
           description: "Preparar Arquivos para Plotagem",
@@ -147,7 +144,6 @@ export const TaskCreateForm = () => {
           status: SERVICE_ORDER_STATUS.PENDING,
           statusOrder: 1,
           assignedToId: null,
-          shouldSync: false,
         },
         {
           description: "Checklist Entrada",
@@ -155,7 +151,6 @@ export const TaskCreateForm = () => {
           status: SERVICE_ORDER_STATUS.PENDING,
           statusOrder: 1,
           assignedToId: null,
-          shouldSync: false,
         },
         {
           description: "Checklist Saída",
@@ -163,7 +158,6 @@ export const TaskCreateForm = () => {
           status: SERVICE_ORDER_STATUS.PENDING,
           statusOrder: 1,
           assignedToId: null,
-          shouldSync: false,
         },
       ],
     },
@@ -412,7 +406,7 @@ export const TaskCreateForm = () => {
               status: so.status || SERVICE_ORDER_STATUS.PENDING,
               statusOrder: so.statusOrder || 1,
               assignedToId: so.assignedToId || null,
-              shouldSync: so.shouldSync !== false,
+
             })) : undefined,
             ...additionalData,
           } as TaskCreateFormData;

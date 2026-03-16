@@ -11,7 +11,7 @@ import { usePrivileges } from "../hooks/common/use-privileges";
 import { useSectionVisibility } from "../hooks/common/use-section-visibility";
 import type { SectionConfig } from "../hooks/common/use-section-visibility";
 import { SectionVisibilityManager } from "../components/ui/section-visibility-manager";
-import { HomeDashboardSection, HomeDashboardSkeleton, TimeEntriesCard, RecentMessagesList } from "../components/home-dashboard";
+import { HomeDashboardSection, HomeDashboardSkeleton, RecentMessagesList } from "../components/home-dashboard";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -81,9 +81,6 @@ export function HomePage() {
     if (dashboardData?.tasksCloseForecast && dashboardData.tasksCloseForecast.length > 0) {
       sections.push(ALL_HOME_SECTIONS.tasksCloseForecast);
     }
-    if (dashboardData?.lowStockItems && dashboardData.lowStockItems.length > 0) {
-      sections.push(ALL_HOME_SECTIONS.lowStockItems);
-    }
     if (dashboardData?.completedTasks && dashboardData.completedTasks.length > 0) {
       sections.push(ALL_HOME_SECTIONS.completedTasks);
     }
@@ -92,6 +89,9 @@ export function HomePage() {
     }
     if (dashboardData?.tasksAwaitingQuoteApproval && dashboardData.tasksAwaitingQuoteApproval.length > 0) {
       sections.push(ALL_HOME_SECTIONS.tasksAwaitingQuoteApproval);
+    }
+    if (dashboardData?.lowStockItems && dashboardData.lowStockItems.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.lowStockItems);
     }
     if (needsTimeEntries) {
       sections.push(ALL_HOME_SECTIONS.timeEntries);
@@ -194,12 +194,11 @@ export function HomePage() {
           <HomeDashboardSection
             data={dashboardData}
             sector={currentPrivilege || undefined}
+            showTimeEntries={needsTimeEntries}
             isSectionVisible={isAdmin ? sectionVisibility.isSectionVisible : undefined}
           />
         )
       )}
-      {isVisible("timeEntries") && needsTimeEntries && <TimeEntriesCard />}
-
       {/* Recent Messages - card layout */}
       {isVisible("recentMessages") && dashboardData?.recentMessages && dashboardData.recentMessages.length > 0 && (
         <RecentMessagesList

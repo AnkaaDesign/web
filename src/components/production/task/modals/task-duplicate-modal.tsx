@@ -185,7 +185,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
         observation: service.observation || null,
         startedAt: null,
         finishedAt: null,
-        shouldSync: true,
       })) || [],
 
       // Truck - copy all fields, use form values for plate/chassis (no fallback to avoid duplicates)
@@ -213,7 +212,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                 description: item.description,
                 amount: Number(item.amount) || 0,
                 observation: item.observation || null,
-                shouldSync: item.shouldSync ?? true,
                 discountType: item.discountType || 'NONE',
                 discountValue: item.discountValue != null ? Number(item.discountValue) : null,
                 discountReference: item.discountReference || null,

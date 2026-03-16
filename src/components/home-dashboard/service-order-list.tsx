@@ -38,9 +38,10 @@ function getForecastUrgencyColor(forecastDate: string | null): string {
 interface ServiceOrderListProps {
   orders: HomeDashboardServiceOrder[];
   title?: string;
+  showTypeBadge?: boolean;
 }
 
-export function ServiceOrderList({ orders, title = "Ordens de Serviço Abertas" }: ServiceOrderListProps) {
+export function ServiceOrderList({ orders, title = "Ordens de Serviço Abertas", showTypeBadge = false }: ServiceOrderListProps) {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
 
@@ -80,9 +81,11 @@ export function ServiceOrderList({ orders, title = "Ordens de Serviço Abertas" 
           >
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-sm text-foreground truncate">{order.description}</span>
-              <span className={`text-[10px] font-medium text-white px-1.5 py-0.5 rounded flex-shrink-0 ${SO_TYPE_COLORS[order.type] || "bg-gray-500"}`}>
-                {SO_TYPE_LABELS[order.type] || order.type}
-              </span>
+              {showTypeBadge && (
+                <span className={`text-[10px] font-medium text-white px-1.5 py-0.5 rounded flex-shrink-0 ${SO_TYPE_COLORS[order.type] || "bg-gray-500"}`}>
+                  {SO_TYPE_LABELS[order.type] || order.type}
+                </span>
+              )}
             </div>
             <span className="text-sm text-foreground truncate">
               {order.taskName || "—"}
