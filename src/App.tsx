@@ -61,9 +61,13 @@ const ResponsiblesEdit = lazy(() => import("@/pages/responsibles/[id]/edit"));
 const ResponsiblesPassword = lazy(() => import("@/pages/responsibles/[id]/password"));
 
 // Financial
+const FinancialRoot = lazy(() => import("@/pages/financial/root").then((module) => ({ default: module.FinancialRootPage })));
 const FinancialCustomersList = lazy(() => import("@/pages/financial/customers/list").then((module) => ({ default: module.FinancialCustomersListPage })));
 const FinancialCustomersDetails = lazy(() => import("@/pages/financial/customers/details/[id]").then((module) => ({ default: module.FinancialCustomersDetailsPage })));
 const FinancialCustomersEdit = lazy(() => import("@/pages/financial/customers/edit/[id]").then((module) => ({ default: module.FinancialCustomersEditPage })));
+const FinancialBilling = lazy(() => import("@/pages/financial/billing/list").then((module) => ({ default: module.BillingPage })));
+const FinancialBillingDetail = lazy(() => import("@/pages/financial/billing/details/[id]").then((module) => ({ default: module.BillingDetailPage })));
+const FinancialBudgetDetail = lazy(() => import("@/pages/financial/budget/details/[taskId]").then((module) => ({ default: module.FinancialBudgetDetailPage })));
 const FinancialNfseList = lazy(() => import("@/pages/financial/nfse/list").then((module) => ({ default: module.NfseListPage })));
 const FinancialNfseDetail = lazy(() => import("@/pages/financial/nfse/detail").then((module) => ({ default: module.NfseDetailPage })));
 const AdministrationCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
@@ -262,7 +266,7 @@ const ProductionTasksBatchEdit = lazy(() => import("@/pages/production/schedule/
 const ProductionTasksCreate = lazy(() => import("@/pages/production/schedule/create"));
 const ProductionTasksEdit = lazy(() => import("@/pages/production/schedule/edit/[id]").then((module) => ({ default: module.TaskEditPage })));
 const ProductionTasksDetails = lazy(() => import("@/pages/production/schedule/details/[id]").then((module) => ({ default: module.TaskDetailsPage })));
-const ProductionTaskQuote = lazy(() => import("@/pages/production/schedule/task-quote/[taskId]"));
+// ProductionTaskQuote removed - migrated to FinancialBudgetDetail
 const ProductionPreparation = lazy(() => import("@/pages/production/preparation").then((module) => ({ default: module.PreparationPage })));
 const ProductionGarages = lazy(() => import("@/pages/production/barracoes").then((module) => ({ default: module.GaragesPage })));
 
@@ -501,30 +505,7 @@ function App() {
                   }
                 />
 
-                <Route
-                  path={routes.production.preparation.quote(":taskId")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ProductionTaskQuote />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.production.history.quote(":taskId")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ProductionTaskQuote />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.production.schedule.quote(":taskId")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ProductionTaskQuote />
-                    </Suspense>
-                  }
-                />
+                {/* Old quote routes removed - migrated to /financeiro/orcamento */}
                 <Route
                   path={routes.production.preparation.root}
                   element={
@@ -1008,6 +989,14 @@ function App() {
 
                 {/* Financial routes (URL in Portuguese: /financeiro) */}
                 <Route
+                  path={routes.financial.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialRoot />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path="/financeiro/clientes"
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -1032,6 +1021,22 @@ function App() {
                   }
                 />
                 <Route
+                  path={routes.financial.billing.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialBilling />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.billing.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialBillingDetail />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path={routes.financial.nfse.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -1044,6 +1049,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <FinancialNfseDetail />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.budget.details(":taskId")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialBudgetDetail />
                     </Suspense>
                   }
                 />

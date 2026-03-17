@@ -351,11 +351,11 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     ? String(task.quote.budgetNumber).padStart(4, '0')
     : task.serialNumber || "0000";
 
-  // Generate payment and guarantee text (customPaymentText, paymentCondition, downPaymentDate now live on config)
+  // Generate payment and guarantee text (customPaymentText, paymentCondition now live on config)
   const paymentText = generatePaymentText({
     customPaymentText: firstConfig?.customPaymentText || null,
     paymentCondition: firstConfig?.paymentCondition,
-    downPaymentDate: firstConfig?.downPaymentDate,
+
     total: firstConfig?.total ?? task.quote.total,
   });
   const guaranteeText = generateGuaranteeText(task.quote);

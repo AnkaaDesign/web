@@ -902,8 +902,9 @@ function ForecastHistoryCollapsible({ taskId }: { taskId: string }) {
   const { data } = useForecastHistory(taskId);
   const entries = (data?.data ?? []) as any[];
 
-  // Only show when there are more than 1 entry (i.e., actual reschedules beyond the initial)
-  if (entries.length <= 1) return null;
+  // Show when there are actual reschedules (non-INITIAL entries)
+  const hasReschedules = entries.some((e: any) => e.source !== 'INITIAL');
+  if (!hasReschedules) return null;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -1410,14 +1411,14 @@ export const TaskDetailsPage = () => {
           label: 'Agenda',
           href: routes.production.preparation.root,
           editRoute: routes.production.preparation.edit,
-          quoteRoute: routes.production.preparation.quote,
+          quoteRoute: routes.financial.budget.details,
         };
       case 'historico':
         return {
           label: 'Histórico',
           href: routes.production.history.root,
           editRoute: routes.production.history.edit,
-          quoteRoute: routes.production.history.quote,
+          quoteRoute: routes.financial.budget.details,
         };
       case 'cronograma':
       default:
@@ -1425,7 +1426,7 @@ export const TaskDetailsPage = () => {
           label: 'Cronograma',
           href: routes.production.schedule.list,
           editRoute: routes.production.schedule.edit,
-          quoteRoute: routes.production.schedule.quote,
+          quoteRoute: routes.financial.budget.details,
         };
     }
   };
@@ -2154,7 +2155,12 @@ export const TaskDetailsPage = () => {
                         <IconCalendarTime className="h-4 w-4" />
                         Previsao de Liberacao
                       </span>
-                      <span className="text-sm font-semibold text-foreground">{formatDateTime(task.forecastDate)}</span>
+                      <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        {task.cleared && (
+                          <span className="text-xs font-medium text-blue-500 bg-blue-500/10 px-1.5 py-0.5 rounded">Liberado</span>
+                        )}
+                        {formatDateTime(task.forecastDate)}
+                      </span>
                     </div>
                     <ForecastHistoryCollapsible taskId={task.id} />
                   </div>
@@ -2635,7 +2641,7 @@ export const TaskDetailsPage = () => {
                           const configPaymentText = generatePaymentText({
                             customPaymentText: config.customPaymentText,
                             paymentCondition: config.paymentCondition,
-                            downPaymentDate: config.downPaymentDate,
+
                             total: configTotal,
                           });
 
@@ -2849,7 +2855,7 @@ export const TaskDetailsPage = () => {
                       const paymentText = generatePaymentText({
                         customPaymentText: config.customPaymentText,
                         paymentCondition: config.paymentCondition,
-                        downPaymentDate: config.downPaymentDate,
+
                         total: configTotal,
                       });
                       return paymentText ? (
@@ -2862,11 +2868,10 @@ export const TaskDetailsPage = () => {
                         </div>
                       ) : null;
                     }
-                    // Fallback to global quote (paymentCondition/downPaymentDate now live on config level)
+                    // Fallback to global quote (paymentCondition now lives on config level)
                     const paymentText = generatePaymentText({
                       customPaymentText: null,
                       paymentCondition: null,
-                      downPaymentDate: null,
                       total: typeof task.quote.total === 'number' ? task.quote.total : Number(task.quote.total) || 0,
                     });
                     return paymentText ? (

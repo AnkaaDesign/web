@@ -5,7 +5,6 @@ import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import {
   IconFileInvoice,
   IconBuilding,
-  IconNote,
   IconTruck,
   IconCreditCard,
   IconCalendar,
@@ -13,16 +12,16 @@ import {
   IconShieldCheck,
   IconPhoto,
 } from "@tabler/icons-react";
-import { formatCurrency } from "../../../../../utils";
+import { formatCurrency } from "@/utils";
 import {
   computeServiceDiscount,
   computeServiceNet,
-} from "../../../../../utils/task-quote-calculations";
+} from "@/utils/task-quote-calculations";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { getApiBaseUrl } from "@/config/api";
 
-interface QuoteStepReviewProps {
+interface BudgetStepReviewProps {
   disabled?: boolean;
   existingQuote?: any;
   userRole?: string;
@@ -31,14 +30,11 @@ interface QuoteStepReviewProps {
   layoutFiles?: Array<{ thumbnailUrl?: string; uploadedFileId?: string; id?: string }>;
 }
 
-export function QuoteStepReview({
-  disabled,
+export function BudgetStepReview({
   existingQuote,
-  userRole,
   selectedCustomers,
-  onStatusChange,
   layoutFiles,
-}: QuoteStepReviewProps) {
+}: BudgetStepReviewProps) {
   const { control } = useFormContext();
 
   const services = useWatch({ control, name: "services" });
@@ -258,7 +254,6 @@ export function QuoteStepReview({
                   const configPaymentText = generatePaymentText({
                     customPaymentText: config.customPaymentText,
                     paymentCondition: config.paymentCondition,
-                    downPaymentDate: config.downPaymentDate,
                     total: configTotal,
                   });
 
@@ -340,7 +335,6 @@ export function QuoteStepReview({
               const paymentText = generatePaymentText({
                 customPaymentText: config.customPaymentText,
                 paymentCondition: config.paymentCondition,
-                downPaymentDate: config.downPaymentDate,
                 total: configTotal,
               });
               if (!paymentText) return null;

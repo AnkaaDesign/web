@@ -154,22 +154,23 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
   // Get urgency color if within threshold and has incomplete orders
   const urgencyInfo = showIndicators && hasIncompleteOrders ? getUrgencyColor(daysUntil) : null;
 
-  // Blue triangle with check icon when forecast is today
+  // Blue triangle with check icon when task is cleared (released)
+  const isCleared = !!task.cleared;
   const isForecastToday = isToday(forecastDate);
   const isForecastPast = isPast(forecastDate);
-  const showBlueIndicator = showIndicators && isForecastToday && !hasIncompleteOrders;
+  const showBlueIndicator = showIndicators && isCleared && !hasIncompleteOrders;
 
-  // Red triangle when forecast is today AND has incomplete orders (blue font already indicates "today")
-  const showRedTodayWithIncompleteOrders = showIndicators && isForecastToday && hasIncompleteOrders;
+  // Red triangle when cleared AND has incomplete orders
+  const showRedTodayWithIncompleteOrders = showIndicators && isCleared && hasIncompleteOrders;
 
-  // Red triangle with alert icon when forecast is past AND has incomplete/missing orders (regardless of entry date)
-  const showRedOverdueWithIncompleteOrders = showIndicators && isForecastPast && !isForecastToday && hasIncompleteOrders;
+  // Red triangle with alert icon when forecast is past AND has incomplete/missing orders AND not cleared (regardless of entry date)
+  const showRedOverdueWithIncompleteOrders = showIndicators && isForecastPast && !isCleared && hasIncompleteOrders;
 
-  // Red triangle with alert icon when forecast is past AND entry date is not filled (no incomplete orders check)
-  const showRedOverdueNoEntryDate = showIndicators && isForecastPast && !task.entryDate && !isForecastToday && !hasIncompleteOrders;
+  // Red triangle with alert icon when forecast is past AND entry date is not filled AND not cleared (no incomplete orders check)
+  const showRedOverdueNoEntryDate = showIndicators && isForecastPast && !task.entryDate && !isCleared && !hasIncompleteOrders;
 
-  // Show urgency indicator when approaching forecast with incomplete orders (but not today or past)
-  const showUrgencyIndicator = showIndicators && urgencyInfo && !isForecastToday && !isForecastPast;
+  // Show urgency indicator when approaching forecast with incomplete orders (but not cleared or past)
+  const showUrgencyIndicator = showIndicators && urgencyInfo && !isCleared && !isForecastPast;
 
   // Check for manual reschedule history (most recent MANUAL entry)
   const lastManualReschedule = showIndicators
@@ -198,7 +199,7 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
             </div>
           </TooltipContent>
         </Tooltip>
-      ) : showIndicators && isForecastToday ? (
+      ) : showIndicators && isCleared ? (
         <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
             <span className="text-blue-500 font-medium cursor-help" title={dateTime}>
@@ -207,8 +208,8 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-xs">
             <div className="text-sm">
-              <div className="font-medium text-blue-500">Previsão para hoje</div>
-              <div className="text-muted-foreground">A data de liberação é hoje ({formatted})</div>
+              <div className="font-medium text-blue-500">Liberado</div>
+              <div className="text-muted-foreground">Tarefa liberada para retirada. Previsão: {formatted}</div>
             </div>
           </TooltipContent>
         </Tooltip>
@@ -218,7 +219,7 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
         </span>
       )}
 
-      {/* Red indicator for today with incomplete/missing orders (blue font already indicates "today") */}
+      {/* Red indicator for cleared task with incomplete/missing orders */}
       {showRedTodayWithIncompleteOrders && (
         <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
@@ -228,8 +229,8 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
           </TooltipTrigger>
           <TooltipContent side="left" className="max-w-xs">
             <div className="text-sm">
-              <div className="font-medium text-red-500">Liberação hoje - Ordens pendentes</div>
-              <div className="text-muted-foreground">A liberação é hoje ({formatted}). {ordersStatus.issueDescription}</div>
+              <div className="font-medium text-red-500">Liberado - Ordens pendentes</div>
+              <div className="text-muted-foreground">Tarefa liberada mas com ordens pendentes. {ordersStatus.issueDescription}</div>
             </div>
           </TooltipContent>
         </Tooltip>
@@ -255,7 +256,7 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
         </Tooltip>
       )}
 
-      {/* Blue indicator for today (without incomplete orders) - positioned flush with cell corner */}
+      {/* Blue indicator for cleared task (without incomplete orders) - positioned flush with cell corner */}
       {showBlueIndicator && (
         <Tooltip delayDuration={500}>
           <TooltipTrigger asChild>
@@ -265,8 +266,8 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
           </TooltipTrigger>
           <TooltipContent side="left" className="max-w-xs">
             <div className="text-sm">
-              <div className="font-medium">Previsão para hoje</div>
-              <div className="text-muted-foreground">A data de liberação é hoje ({formatted})</div>
+              <div className="font-medium">Liberado</div>
+              <div className="text-muted-foreground">Tarefa liberada para retirada. Previsão: {formatted}</div>
             </div>
           </TooltipContent>
         </Tooltip>

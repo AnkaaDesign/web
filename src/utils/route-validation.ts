@@ -315,7 +315,6 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/financeiro/producao/agenda": "/producao/agenda",
   "/financeiro/producao/historico-tarefas": "/producao/historico",
   // Simplified financial routes (cleaner menu structure)
-  "/financeiro": "/producao/agenda", // Default financial redirect
   "/financeiro/agenda": "/producao/agenda",
   "/financeiro/aerografia": "/producao/aerografia/listar",
 

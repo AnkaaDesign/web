@@ -230,7 +230,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                 customPaymentText: config.customPaymentText || null,
                 responsibleId: config.responsibleId || null,
                 paymentCondition: config.paymentCondition || null,
-                downPaymentDate: config.downPaymentDate || null,
+
               })) || [],
             },
           }

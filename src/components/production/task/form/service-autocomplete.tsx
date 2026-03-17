@@ -13,6 +13,7 @@ interface ServiceAutocompleteProps {
   showLabel?: boolean;
   /** Filter descriptions by service order type */
   type?: SERVICE_ORDER_TYPE;
+  className?: string;
 }
 
 export function ServiceAutocomplete({
@@ -23,6 +24,7 @@ export function ServiceAutocomplete({
   placeholder = "Selecione o serviço...",
   showLabel = true,
   type = SERVICE_ORDER_TYPE.COMMERCIAL,
+  className,
 }: ServiceAutocompleteProps) {
   // Get descriptions for the selected type from enums
   const descriptions = useMemo(() => {
@@ -53,7 +55,7 @@ export function ServiceAutocomplete({
               placeholder={placeholder}
               searchable={true}
               clearable={true}
-              className="w-full"
+              className={className || "w-full"}
             />
           </FormControl>
           <FormMessage />

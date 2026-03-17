@@ -1,44 +1,44 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import {
   IconArrowLeft,
   IconArrowRight,
   IconLoader2,
   IconCheck,
 } from "@tabler/icons-react";
-import { routes } from "../../../../constants";
-import { useTaskDetail } from "../../../../hooks";
+import { routes } from "@/constants";
+import { useTaskDetail } from "@/hooks";
 import {
   useTaskQuoteByTask,
   useCreateTaskQuote,
   useUpdateTaskQuote,
   taskQuoteKeys,
-} from "../../../../hooks/production/use-task-quote";
-import { taskQuoteService } from "../../../../api-client/task-quote";
+} from "@/hooks/production/use-task-quote";
+import { taskQuoteService } from "@/api-client/task-quote";
 import {
   canViewQuote,
   canEditQuote,
 } from "@/utils/permissions/quote-permissions";
-import { taskQuoteCreateNestedSchema } from "../../../../schemas/task-quote";
-import { useAuth } from "../../../../contexts/auth-context";
+import { useAuth } from "@/contexts/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "@/components/ui/sonner";
-import { uploadSingleFile } from "../../../../api-client/file";
-import { getCustomers } from "../../../../api-client";
+import { uploadSingleFile } from "@/api-client/file";
+import { getCustomers } from "@/api-client";
+import { customerService } from "@/api-client/customer";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import type { FileWithPreview } from "@/components/common/file";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
 
 // Step components
-import { QuoteStepInfo } from "@/components/production/task/quote/steps/quote-step-info";
-import { QuoteStepServices } from "@/components/production/task/quote/steps/quote-step-services";
-import { QuoteStepCustomerPayment } from "@/components/production/task/quote/steps/quote-step-customer-payment";
-import { QuoteStepReview } from "@/components/production/task/quote/steps/quote-step-review";
+import { BudgetStepInfo } from "@/components/financial/budget/steps/budget-step-info";
+import { BudgetStepServices } from "@/components/financial/budget/steps/budget-step-services";
+import { BudgetStepCustomerPayment } from "@/components/financial/budget/steps/budget-step-customer-payment";
+import { BudgetStepReview } from "@/components/financial/budget/steps/budget-step-review";
 
 function getDefaultExpiresAt() {
   const date = new Date();
@@ -47,39 +47,13 @@ function getDefaultExpiresAt() {
   return date;
 }
 
-export default function TaskQuotePage() {
+export const FinancialBudgetDetailPage = () => {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Determine the source section from the URL path for proper navigation
-  const pathSegments = location.pathname.split('/');
-  const routeSource = pathSegments[2]; // 'agenda', 'historico', or 'cronograma'
-  const routeConfig = useMemo(() => {
-    switch (routeSource) {
-      case 'historico':
-        return {
-          label: 'Histórico',
-          href: routes.production.history.root,
-          detailsRoute: routes.production.history.details,
-        };
-      case 'cronograma':
-        return {
-          label: 'Cronograma',
-          href: routes.production.schedule.list,
-          detailsRoute: routes.production.schedule.details,
-        };
-      case 'agenda':
-      default:
-        return {
-          label: 'Agenda',
-          href: routes.production.preparation.root,
-          detailsRoute: routes.production.preparation.details,
-        };
-    }
-  }, [routeSource]);
+  usePageTracker({ title: "Orçamento - Detalhes", icon: "file-invoice" });
 
   // Fetch task data
   const { data: taskResponse, isLoading: taskLoading } = useTaskDetail(
@@ -117,11 +91,6 @@ export default function TaskQuotePage() {
   const [selectedCustomers, setSelectedCustomers] = useState<Map<string, any>>(
     new Map(),
   );
-
-  // Dynamic label based on status
-  const quoteStatus = existingQuote?.status as TASK_QUOTE_STATUS | undefined;
-  const isDraftOrNone = !quoteStatus || quoteStatus === "PENDING";
-  const sectionLabel = isDraftOrNone ? "Orçamento" : "Faturamento";
 
   // Form - FLAT fields (no `quote.` prefix)
   const form = useForm({
@@ -173,12 +142,24 @@ export default function TaskQuotePage() {
           subtotal: c.subtotal ?? 0,
           total: c.total ?? 0,
           paymentCondition: c.paymentCondition || null,
-          downPaymentDate: c.downPaymentDate
-            ? new Date(c.downPaymentDate)
-            : null,
           customPaymentText: c.customPaymentText || null,
           generateInvoice: c.generateInvoice !== undefined ? c.generateInvoice : true,
           responsibleId: c.responsibleId || null,
+          customerData: {
+            corporateName: c.customer?.corporateName || "",
+            fantasyName: c.customer?.fantasyName || "",
+            cnpj: c.customer?.cnpj || "",
+            cpf: c.customer?.cpf || "",
+            address: c.customer?.address || "",
+            addressNumber: c.customer?.addressNumber || "",
+            addressComplement: c.customer?.addressComplement || "",
+            neighborhood: c.customer?.neighborhood || "",
+            city: c.customer?.city || "",
+            state: c.customer?.state || "",
+            zipCode: c.customer?.zipCode || "",
+            stateRegistration: c.customer?.stateRegistration || "",
+            streetType: c.customer?.streetType || null,
+          },
           installments:
             c.installments?.map((inst: any) => ({
               number: inst.number,
@@ -242,11 +223,9 @@ export default function TaskQuotePage() {
       const partialCustomers = existingQuote.customerConfigs
         .map((c: any) => c.customer)
         .filter(Boolean);
-      // Set partial data immediately so UI doesn't flash empty
       partialCustomers.forEach((c: any) => customersCache.current.set(c.id, c));
       setSelectedCustomers(new Map(partialCustomers.map((c: any) => [c.id, c])));
 
-      // Fetch full customer records (with address, stateRegistration, etc.)
       const customerIds = partialCustomers.map((c: any) => c.id);
       getCustomers({ where: { id: { in: customerIds } }, take: customerIds.length })
         .then((response) => {
@@ -272,7 +251,7 @@ export default function TaskQuotePage() {
         const customer = customersCache.current.get(config?.customerId);
         base.push({
           id: 3 + i,
-          name: "Pagamento",
+          name: `Cliente ${i + 1}`,
           description: customer?.fantasyName || "Cliente",
         });
       });
@@ -374,6 +353,30 @@ export default function TaskQuotePage() {
         }
       }
 
+      // Update customer data (address, CNPJ, etc.)
+      for (const config of data.customerConfigs || []) {
+        if (config.customerData && config.customerId) {
+          try {
+            await customerService.updateCustomer(config.customerId, {
+              corporateName: config.customerData.corporateName || undefined,
+              cnpj: config.customerData.cnpj || undefined,
+              cpf: config.customerData.cpf || undefined,
+              address: config.customerData.address || undefined,
+              addressNumber: config.customerData.addressNumber || undefined,
+              addressComplement: config.customerData.addressComplement || undefined,
+              neighborhood: config.customerData.neighborhood || undefined,
+              city: config.customerData.city || undefined,
+              state: config.customerData.state || undefined,
+              zipCode: config.customerData.zipCode || undefined,
+              stateRegistration: config.customerData.stateRegistration || undefined,
+              streetType: config.customerData.streetType || undefined,
+            });
+          } catch (err: any) {
+            toast.error(`Erro ao atualizar cliente: ${err?.message || "Erro desconhecido"}`);
+          }
+        }
+      }
+
       const quoteData: any = {
         taskId,
         expiresAt: data.expiresAt,
@@ -392,7 +395,6 @@ export default function TaskQuotePage() {
       };
 
       if (existingQuote?.id) {
-        // Don't send status on update — status is managed via the dedicated status change flow
         await updateQuoteMutation.mutateAsync({
           id: existingQuote.id,
           data: quoteData,
@@ -446,16 +448,9 @@ export default function TaskQuotePage() {
     [existingQuote, queryClient],
   );
 
-  // Build header info (must be before conditional returns)
+  // Build header info
   const taskName = task?.name || task?.truck?.plate || "Tarefa";
-  const taskDisplayName = [taskName, task?.serialNumber].filter(Boolean).join(" — ");
-  const headerSubtitle = useMemo(() => {
-    const parts: string[] = [];
-    const customerName = task?.customer?.corporateName || task?.customer?.fantasyName;
-    if (customerName) parts.push(customerName);
-    if (existingQuote?.budgetNumber) parts.push(`Orçamento Nº ${String(existingQuote.budgetNumber).padStart(4, '0')}`);
-    return parts.join(" — ");
-  }, [task?.customer, existingQuote?.budgetNumber]);
+  const taskDisplayName = [taskName, task?.serialNumber || task?.truck?.plate].filter(Boolean).join(" - ");
 
   // Loading state
   if (taskLoading || quoteLoading) {
@@ -473,7 +468,7 @@ export default function TaskQuotePage() {
         <p className="text-muted-foreground">Tarefa não encontrada.</p>
         <Button
           variant="outline"
-          onClick={() => navigate(routeConfig.detailsRoute(taskId!))}
+          onClick={() => navigate(-1)}
         >
           <IconArrowLeft className="h-4 w-4 mr-2" />
           Voltar
@@ -520,14 +515,12 @@ export default function TaskQuotePage() {
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
         variant="form"
-        title={`${sectionLabel} - ${taskDisplayName}`}
-        subtitle={headerSubtitle}
+        title={`Orçamento - ${taskDisplayName}`}
         breadcrumbs={[
           { label: "Início", href: routes.home },
-          { label: "Produção", href: routes.production.root },
-          { label: routeConfig.label, href: routeConfig.href },
-          { label: taskName, href: routeConfig.detailsRoute(taskId!) },
-          { label: sectionLabel },
+          { label: "Financeiro", href: routes.financial.root },
+          { label: "Orçamento" },
+          { label: taskName },
         ]}
         onBreadcrumbNavigate={(path) => navigate(path)}
         actions={[
@@ -578,7 +571,7 @@ export default function TaskQuotePage() {
       <div className="flex-1 overflow-y-auto pb-6">
         <FormProvider {...form}>
           {currentStep === 1 && (
-            <QuoteStepInfo
+            <BudgetStepInfo
               task={task}
               disabled={isSubmitting || !canEdit}
               layoutFiles={layoutFiles}
@@ -591,7 +584,7 @@ export default function TaskQuotePage() {
           )}
 
           {currentStep === 2 && (
-            <QuoteStepServices
+            <BudgetStepServices
               task={task}
               disabled={isSubmitting || !canEdit}
               selectedCustomers={selectedCustomers}
@@ -605,7 +598,7 @@ export default function TaskQuotePage() {
               ? customersCache.current.get(config.customerId)
               : null;
             return (
-              <QuoteStepCustomerPayment
+              <BudgetStepCustomerPayment
                 key={`customer-config-${configIndex}`}
                 configIndex={configIndex}
                 customer={customer}
@@ -616,7 +609,7 @@ export default function TaskQuotePage() {
           })()}
 
           {currentStep === totalSteps && (
-            <QuoteStepReview
+            <BudgetStepReview
               disabled={isSubmitting || !canEdit}
               existingQuote={existingQuote}
               userRole={userRole}
@@ -629,4 +622,6 @@ export default function TaskQuotePage() {
       </div>
     </div>
   );
-}
+};
+
+export default FinancialBudgetDetailPage;

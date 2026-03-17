@@ -2012,8 +2012,10 @@ export enum FAVORITE_PAGES {
   ADMINISTRACAO_MENSAGENS_CRIAR = "/administracao/mensagens/criar",
   ADMINISTRACAO_MENSAGENS_EDITAR = "/administracao/mensagens/editar/:id",
 
-  // Financeiro - List Pages
+  // Financeiro - Dashboard & List Pages
+  FINANCEIRO_DASHBOARD = "/financeiro",
   FINANCEIRO_CLIENTES_LISTAR = "/financeiro/clientes",
+  FINANCEIRO_FATURAMENTO = "/financeiro/faturamento",
 
   // Human Resources - List Pages
   RECURSOS_HUMANOS_CARGOS_LISTAR = "/recursos-humanos/cargos",
@@ -2141,7 +2143,8 @@ export enum RESPONSIBLE_ROLE {
 
 // Payment condition enum - controls payment structure
 export enum PAYMENT_CONDITION {
-  CASH = "CASH",
+  CASH_5 = "CASH_5",
+  CASH_40 = "CASH_40",
   INSTALLMENTS_2 = "INSTALLMENTS_2",
   INSTALLMENTS_3 = "INSTALLMENTS_3",
   INSTALLMENTS_4 = "INSTALLMENTS_4",

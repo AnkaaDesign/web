@@ -115,6 +115,14 @@ export const routes = {
       edit: (id: string) => `/financeiro/clientes/editar/${id}`,
       root: "/financeiro/clientes",
     },
+    billing: {
+      root: "/financeiro/faturamento",
+      details: (id: string) => `/financeiro/faturamento/detalhes/${id}`,
+    },
+    budget: {
+      root: "/financeiro/orcamento",
+      details: (taskId: string) => `/financeiro/orcamento/detalhes/${taskId}`,
+    },
     nfse: {
       detail: (id: number) => `/financeiro/notas-fiscais/${id}`,
       root: "/financeiro/notas-fiscais",
@@ -472,7 +480,8 @@ export const routes = {
       root: "/producao/historico",
       details: (id: string) => `/producao/historico/detalhes/${id}`,
       edit: (id: string) => `/producao/historico/editar/${id}`,
-      quote: (taskId: string) => `/producao/historico/detalhes/${taskId}/orcamento`,
+      /** @deprecated Use routes.financial.budget.details instead */
+      quote: (taskId: string) => `/financeiro/orcamento/detalhes/${taskId}`,
     },
     observations: {
       create: "/producao/observacoes/cadastrar",
@@ -490,14 +499,16 @@ export const routes = {
       edit: (id: string) => `/producao/cronograma/editar/${id}`,
       list: "/producao/cronograma",
       root: "/producao/cronograma",
-      quote: (taskId: string) => `/producao/cronograma/detalhes/${taskId}/orcamento`,
+      /** @deprecated Use routes.financial.budget.details instead */
+      quote: (taskId: string) => `/financeiro/orcamento/detalhes/${taskId}`,
     },
     preparation: {
       root: "/producao/agenda",
       create: "/producao/agenda/cadastrar",
       details: (id: string) => `/producao/agenda/detalhes/${id}`,
       edit: (id: string) => `/producao/agenda/editar/${id}`,
-      quote: (taskId: string) => `/producao/agenda/detalhes/${taskId}/orcamento`,
+      /** @deprecated Use routes.financial.budget.details instead */
+      quote: (taskId: string) => `/financeiro/orcamento/detalhes/${taskId}`,
     },
     garages: {
       root: "/producao/barracoes",

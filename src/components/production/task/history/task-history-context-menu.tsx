@@ -372,12 +372,17 @@ export function TaskHistoryContextMenu({
 
   const handleLiberar = async () => {
     try {
-      // Update PREPARATION and WAITING_PRODUCTION tasks to set forecast date to today
+      // Update PREPARATION and WAITING_PRODUCTION tasks to mark as cleared (released)
       for (const t of tasks) {
         if (t.status === TASK_STATUS.PREPARATION || t.status === TASK_STATUS.WAITING_PRODUCTION) {
+          // If task has no forecast date yet, set it to now along with cleared
+          const data: Record<string, any> = { cleared: true };
+          if (!t.forecastDate) {
+            data.forecastDate = new Date();
+          }
           await update({
             id: t.id,
-            data: { forecastDate: new Date() },
+            data,
           });
         }
       }
@@ -386,8 +391,8 @@ export function TaskHistoryContextMenu({
         isBulk ? "Tarefas liberadas" : "Tarefa liberada",
         {
           description: isBulk
-            ? `${tasks.length} tarefa(s) com previsão atualizada para hoje`
-            : "Previsão atualizada para hoje",
+            ? `${tasks.length} tarefa(s) liberada(s) com sucesso`
+            : "Tarefa liberada com sucesso",
         }
       );
     } catch (error) {
@@ -395,7 +400,7 @@ export function TaskHistoryContextMenu({
         console.error("Error releasing task(s):", error);
       }
       toast.error("Erro ao liberar tarefa(s)", {
-        description: "Não foi possível atualizar a previsão. Tente novamente.",
+        description: "Não foi possível liberar a tarefa. Tente novamente.",
       });
     }
     setDropdownOpen(false);
@@ -570,12 +575,19 @@ export function TaskHistoryContextMenu({
             </div>
           )}
 
-          {/* Liberar action - For PREPARATION/WAITING_PRODUCTION tasks and ADMIN/LOGISTIC/COMMERCIAL users */}
+          {/* Liberado action - For PREPARATION/WAITING_PRODUCTION tasks and ADMIN/LOGISTIC/COMMERCIAL users */}
           {(hasPreparationTasks || hasWaitingProductionTasks) && canLiberar && (
-            <DropdownMenuItem onClick={handleLiberar} className="text-blue-600 hover:text-white">
-              <IconCalendarCheck className="mr-2 h-4 w-4" />
-              <span className="truncate">Liberar</span>
-            </DropdownMenuItem>
+            tasks.every((t) => t.cleared) ? (
+              <DropdownMenuItem disabled className="text-blue-600 opacity-70">
+                <IconCalendarCheck className="mr-2 h-4 w-4" />
+                <span className="truncate">Liberado</span>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={handleLiberar} className="text-blue-600 hover:text-white">
+                <IconCalendarCheck className="mr-2 h-4 w-4" />
+                <span className="truncate">Liberado</span>
+              </DropdownMenuItem>
+            )
           )}
 
           {/* Dar Entrada action - Only for PREPARATION/WAITING_PRODUCTION tasks and ADMIN/LOGISTIC users */}
@@ -629,7 +641,7 @@ export function TaskHistoryContextMenu({
           {/* Quote - ADMIN, FINANCIAL, COMMERCIAL (single selection only) */}
           {canViewQuote(user?.sector?.privileges || "") && !isBulk && (
             <DropdownMenuItem onClick={() => {
-              navigate(routes.production.history.quote(task.id));
+              navigate(routes.financial.budget.details(task.id));
               setDropdownOpen(false);
             }}>
               <IconReceipt className="mr-2 h-4 w-4" />

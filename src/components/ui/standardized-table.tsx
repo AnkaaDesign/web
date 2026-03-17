@@ -144,7 +144,7 @@ export function StandardizedTable<T>({
 
                 {/* Data columns */}
                 {columns.map((column) => (
-                  <TableHead key={column.key} className={cn("whitespace-nowrap text-foreground font-medium text-sm p-0 bg-muted !border-r-0", column.className)}>
+                  <TableHead key={column.key} style={column.width ? { width: typeof column.width === "number" ? `${column.width}px` : column.width } : undefined} className={cn("whitespace-nowrap text-foreground font-medium text-sm p-0 bg-muted !border-r-0", column.className)}>
                     {column.sortable && onSort ? (
                       <button
                         onClick={() => onSort(column.key)}
@@ -233,6 +233,7 @@ export function StandardizedTable<T>({
                       {columns.map((column) => (
                         <TableCell
                           key={column.key}
+                          style={column.width ? { width: typeof column.width === "number" ? `${column.width}px` : column.width } : undefined}
                           className={cn(
                             column.className,
                             "p-0 !border-r-0 overflow-hidden",

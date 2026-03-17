@@ -482,19 +482,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
     children: [
       {
-        id: "clientes",
-        title: "Clientes",
-        icon: "users",
-        path: "/administracao/clientes",
-        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
-        children: [
-          { id: "clientes-cadastrar", title: "Cadastrar", icon: "plus", path: "/administracao/clientes/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
-          { id: "clientes-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/clientes/detalhes/:id", isDynamic: true },
-          { id: "clientes-editar", title: "Editar", icon: "edit", path: "/administracao/clientes/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
-          { id: "responsaveis", title: "Responsáveis", icon: "users", path: "/administracao/clientes/responsaveis", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
-        ],
-      },
-      {
         id: "colaboradores",
         title: "Colaboradores",
         icon: "user",
@@ -522,13 +509,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         icon: "message",
         path: "/pessoal/mensagens",
         requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
-      },
-      {
-        id: "notas-fiscais",
-        title: "Notas Fiscais",
-        icon: "receipt",
-        path: "/financeiro/notas-fiscais",
-        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
       },
       {
         id: "notificacoes-admin",
@@ -564,6 +544,46 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "setores-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/setores/detalhes/:id", isDynamic: true },
           { id: "setores-editar", title: "Editar", icon: "edit", path: "/administracao/setores/editar/:id", isDynamic: true },
         ],
+      },
+    ],
+  },
+
+  // FINANCEIRO
+  {
+    id: "financeiro",
+    title: "Financeiro",
+    icon: "financial",
+    path: "/financeiro",
+    requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+    children: [
+      {
+        id: "clientes-financeiro-menu",
+        title: "Clientes",
+        icon: "users",
+        path: "/financeiro/clientes",
+        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          { id: "clientes-financeiro-cadastrar", title: "Cadastrar", icon: "plus", path: "/financeiro/clientes/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+          { id: "clientes-financeiro-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/clientes/detalhes/:id", isDynamic: true },
+          { id: "clientes-financeiro-editar", title: "Editar", icon: "edit", path: "/financeiro/clientes/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+        ],
+      },
+      {
+        id: "faturamento",
+        title: "Faturamento",
+        icon: "fileInvoice",
+        path: "/financeiro/faturamento",
+        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          { id: "faturamento-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/faturamento/detalhes/:id", isDynamic: true },
+        ],
+      },
+      {
+        id: "notas-fiscais",
+        title: "Notas Fiscais",
+        icon: "receipt",
+        path: "/financeiro/notas-fiscais",
+        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
       },
     ],
   },
@@ -833,17 +853,10 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
   },
   {
-    id: "agenda-financeiro",
-    title: "Agenda",
-    icon: "preparation",
-    path: "/producao/agenda",
-    requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
-  },
-  {
-    id: "clientes-financeiro",
-    title: "Clientes",
-    icon: "users",
-    path: "/administracao/clientes",
+    id: "faturamento-financeiro",
+    title: "Faturamento",
+    icon: "fileInvoice",
+    path: "/financeiro/faturamento",
     requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
   },
   {

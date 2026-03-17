@@ -7,6 +7,7 @@ import type {
   ProductionDashboardResponse,
   UnifiedDashboardResponse,
   HomeDashboardResponse,
+  FinancialDashboardResponse,
 } from "../types";
 import type {
   InventoryDashboardQueryFormData,
@@ -16,6 +17,7 @@ import type {
   ProductionDashboardQueryFormData,
   UnifiedDashboardQueryFormData,
   HomeDashboardQueryFormData,
+  FinancialDashboardQueryFormData,
 } from "../schemas";
 
 export const dashboardService = {
@@ -65,6 +67,14 @@ export const dashboardService = {
   getUnifiedDashboard: (params?: UnifiedDashboardQueryFormData) =>
     apiClient
       .get<UnifiedDashboardResponse>("/dashboards/unified", {
+        params,
+      })
+      .then((res) => res.data),
+
+  // Financial Dashboard
+  getFinancialDashboard: (params?: FinancialDashboardQueryFormData) =>
+    apiClient
+      .get<FinancialDashboardResponse>("/dashboards/financial", {
         params,
       })
       .then((res) => res.data),

@@ -213,7 +213,7 @@ export function PublicBudgetPage() {
   const paymentText = generatePaymentText({
     customPaymentText: activeConfig?.customPaymentText || null,
     paymentCondition: activeConfig?.paymentCondition,
-    downPaymentDate: activeConfig?.downPaymentDate,
+
     total: activeConfig?.total ?? quote.total,
   });
   const guaranteeText = generateGuaranteeText(quote);
@@ -548,7 +548,7 @@ export function PublicBudgetPage() {
                         const configPaymentText = generatePaymentText({
                           customPaymentText: config.customPaymentText || null,
                           paymentCondition: config.paymentCondition,
-                          downPaymentDate: config.downPaymentDate,
+
                           total: config.total ?? 0,
                         });
                         if (!configPaymentText) return null;

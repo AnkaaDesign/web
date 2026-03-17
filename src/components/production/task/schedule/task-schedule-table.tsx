@@ -446,7 +446,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
 
         case "quote":
           if (tasks.length === 1) {
-            navigate(routes.production.schedule.quote(tasks[0].id));
+            navigate(routes.financial.budget.details(tasks[0].id));
           }
           break;
 

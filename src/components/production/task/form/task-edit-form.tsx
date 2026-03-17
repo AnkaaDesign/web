@@ -460,6 +460,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     responsibles: "responsibles",
     // Dates
     forecastDate: "dates",
+    cleared: "dates",
     entryDate: "dates",
     term: "dates",
     startedAt: "dates",

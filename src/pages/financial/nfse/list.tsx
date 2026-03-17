@@ -5,6 +5,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES, routes } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useNfseList } from "@/hooks/financial/use-nfse";
+import { useCancelNfse } from "@/hooks/production/use-invoice";
 import type { ElotechNfseListItem } from "@/types/invoice";
 import { formatCurrency, formatDate } from "@/utils";
 import { Badge } from "@/components/ui/badge";
@@ -24,12 +25,32 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
+import { toast } from "@/components/ui/sonner";
+import {
   IconRefresh,
   IconFileInvoice,
   IconFilter,
   IconX,
   IconCalendar,
   IconHash,
+  IconExternalLink,
+  IconBan,
 } from "@tabler/icons-react";
 
 // ── Helpers ────────────────────────────────────────────────
@@ -45,6 +66,12 @@ function getCurrentMonthRange() {
 }
 
 const { start: defaultStart, end: defaultEnd } = getCurrentMonthRange();
+
+const CANCEL_REASONS = [
+  { code: "1", label: "Erro na emissão" },
+  { code: "2", label: "Serviço não prestado" },
+  { code: "4", label: "Duplicidade da nota" },
+];
 
 const SITUACAO_OPTIONS = [
   { value: "all", label: "Todas" },
@@ -351,6 +378,26 @@ export function NfseListPage() {
   const [searchText, setSearchText] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    item: ElotechNfseListItem;
+  } | null>(null);
+
+  // Cancel dialog state
+  const [cancelTarget, setCancelTarget] = useState<ElotechNfseListItem | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelReasonCode, setCancelReasonCode] = useState("1");
+  const cancelNfse = useCancelNfse();
+
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
+
   usePageTracker({ title: "Notas Fiscais - Financeiro", icon: "receipt" });
 
   // Pagination via URL state (0-based page)
@@ -427,6 +474,69 @@ export function NfseListPage() {
     return c;
   }, [filters]);
 
+  // Context menu handler
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, item: ElotechNfseListItem) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.clientX, y: e.clientY, item });
+    },
+    [],
+  );
+
+  // Open in new tab
+  const handleOpenNewTab = useCallback(() => {
+    if (contextMenu) {
+      window.open(routes.financial.nfse.detail(contextMenu.item.id), "_blank");
+      setContextMenu(null);
+    }
+  }, [contextMenu]);
+
+  // Open cancel dialog
+  const handleOpenCancelDialog = useCallback(() => {
+    if (contextMenu) {
+      setCancelTarget(contextMenu.item);
+      setCancelReason("");
+      setCancelReasonCode("1");
+      setContextMenu(null);
+    }
+  }, [contextMenu]);
+
+  // Submit cancel
+  const handleConfirmCancel = useCallback(() => {
+    if (!cancelTarget) return;
+    if (!cancelReason.trim() || cancelReason.trim().length < 15) {
+      toast.error(
+        "Motivo do cancelamento é obrigatório e deve ter no mínimo 15 caracteres.",
+      );
+      return;
+    }
+    if (!cancelTarget.invoiceId || !cancelTarget.nfseDocumentId) return;
+
+    cancelNfse.mutate(
+      {
+        invoiceId: cancelTarget.invoiceId,
+        nfseDocumentId: cancelTarget.nfseDocumentId,
+        data: {
+          reason: cancelReason,
+          reasonCode: Number(cancelReasonCode),
+        },
+      },
+      {
+        onSuccess: () => {
+          setCancelTarget(null);
+          setCancelReason("");
+          setCancelReasonCode("1");
+          refetch();
+        },
+      },
+    );
+  }, [cancelTarget, cancelReason, cancelReasonCode, cancelNfse, refetch]);
+
+  // Can cancel: not already cancelled, has invoiceId and nfseDocumentId
+  const canCancelItem = (item: ElotechNfseListItem) =>
+    item.emitida && !item.cancelada && !!item.invoiceId && !!item.nfseDocumentId;
+
   return (
     <PrivilegeRoute
       requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}
@@ -488,6 +598,7 @@ export function NfseListPage() {
                   data={items}
                   getItemKey={(item) => String(item.id)}
                   onRowClick={(item) => navigate(routes.financial.nfse.detail(item.id))}
+                  onContextMenu={handleContextMenu}
                   isLoading={isLoading}
                   error={isError ? true : undefined}
                   emptyMessage="Nenhuma nota fiscal encontrada"
@@ -519,6 +630,98 @@ export function NfseListPage() {
         filters={filters}
         onApply={handleFilterApply}
       />
+
+      {/* Context Menu */}
+      <DropdownMenu
+        open={!!contextMenu}
+        onOpenChange={(open) => !open && setContextMenu(null)}
+      >
+        <PositionedDropdownMenuContent
+          position={contextMenu}
+          isOpen={!!contextMenu}
+          className="w-56 ![position:fixed]"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <DropdownMenuItem onClick={handleOpenNewTab}>
+            <IconExternalLink className="mr-2 h-4 w-4" />
+            Abrir em nova aba
+          </DropdownMenuItem>
+
+          {contextMenu && canCancelItem(contextMenu.item) && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleOpenCancelDialog}
+                className="text-destructive"
+              >
+                <IconBan className="mr-2 h-4 w-4" />
+                Cancelar NFS-e
+              </DropdownMenuItem>
+            </>
+          )}
+        </PositionedDropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Cancel NFS-e Dialog */}
+      <Dialog
+        open={!!cancelTarget}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar NFS-e</DialogTitle>
+            <DialogDescription>
+              Informe o motivo do cancelamento da NFS-e nº{" "}
+              {cancelTarget?.numeroNotaFiscal}. Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Motivo</label>
+              <Select
+                value={cancelReasonCode}
+                onValueChange={setCancelReasonCode}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CANCEL_REASONS.map((r) => (
+                    <SelectItem key={r.code} value={r.code}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">
+                Justificativa
+              </label>
+              <Input
+                value={cancelReason}
+                onChange={(value) => setCancelReason(String(value ?? ""))}
+                placeholder="Descreva o motivo do cancelamento..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelTarget(null)}
+            >
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmCancel}
+              disabled={cancelNfse.isPending}
+            >
+              {cancelNfse.isPending ? "Cancelando..." : "Confirmar Cancelamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PrivilegeRoute>
   );
 }

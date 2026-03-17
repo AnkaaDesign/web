@@ -25,7 +25,8 @@ function getInstallmentCount(condition: PAYMENT_CONDITION | string | null): numb
   if (!condition) return 0;
 
   const countMap: Record<string, number> = {
-    CASH: 1,
+    CASH_5: 1,
+    CASH_40: 1,
     INSTALLMENTS_2: 2,
     INSTALLMENTS_3: 3,
     INSTALLMENTS_4: 4,
@@ -40,13 +41,11 @@ function getInstallmentCount(condition: PAYMENT_CONDITION | string | null): numb
 
 /**
  * Payment data needed for generating payment text.
- * paymentCondition and downPaymentDate now live on customer configs,
- * so callers must extract them before calling this function.
+ * Due dates are calculated from task.finishedAt at BILLING_APPROVED time.
  */
 interface PaymentTextData {
   customPaymentText: string | null;
   paymentCondition?: string | null;
-  downPaymentDate?: Date | string | null;
   total: number;
 }
 
@@ -55,10 +54,9 @@ interface PaymentTextData {
  * If customPaymentText is provided, it overrides the auto-generated text
  *
  * Payment structure:
- * - CASH: 1 payment (à vista)
- * - INSTALLMENTS_2: 2 payments (entrada + 20 days)
- * - INSTALLMENTS_3: 3 payments (entrada + 20 + 40 days)
- * - etc. (always 20 days interval between payments)
+ * - CASH_5: 1 payment, 5 days from task completion
+ * - CASH_40: 1 payment, 40 days from task completion
+ * - INSTALLMENTS_N: N payments, first at 5 days from task completion, subsequent +20 days
  */
 export function generatePaymentText(quote: PaymentTextData): string {
   // If custom text is provided, use it
@@ -71,30 +69,25 @@ export function generatePaymentText(quote: PaymentTextData): string {
     return '';
   }
 
+  const total = quote.total;
+
+  // CASH_5: single payment, 5 days from completion
+  if (quote.paymentCondition === 'CASH_5') {
+    return `Pagamento à vista no valor de ${formatCurrency(total)} para 5 dias a partir da finalização do serviço.`;
+  }
+
+  // CASH_40: single payment, 40 days from completion
+  if (quote.paymentCondition === 'CASH_40') {
+    return `Pagamento à vista no valor de ${formatCurrency(total)} para 40 dias a partir da finalização do serviço.`;
+  }
+
   const installmentCount = getInstallmentCount(quote.paymentCondition);
   if (installmentCount === 0) return '';
 
-  const total = quote.total;
   const installmentValue = Math.round((total / installmentCount) * 100) / 100;
   const word = numberToWord(installmentCount);
 
-  // Format the down payment date if available
-  const dateText = quote.downPaymentDate
-    ? ` em ${formatDate(new Date(quote.downPaymentDate))}`
-    : '';
-
-  // Single payment (à vista)
-  if (installmentCount === 1) {
-    return `Pagamento à vista no valor de ${formatCurrency(total)}${dateText}.`;
-  }
-
-  // Two payments (Entrada + 20)
-  if (installmentCount === 2) {
-    return `Fica acertado o pagamento em 2 (${word}) parcelas de ${formatCurrency(installmentValue)}, a primeira${dateText} e a segunda em 20 dias a contar da primeira parcela.`;
-  }
-
-  // Multiple payments - build the payment schedule description
-  return `Fica acertado o pagamento em ${installmentCount} (${word}) parcelas de ${formatCurrency(installmentValue)}, a primeira${dateText} e as demais a cada 20 dias a contar da primeira parcela.`;
+  return `Fica acertado o pagamento em ${installmentCount} (${word}) parcelas de ${formatCurrency(installmentValue)}, com entrada para 5 dias a partir da finalização do serviço e as demais a cada 20 dias.`;
 }
 
 /**

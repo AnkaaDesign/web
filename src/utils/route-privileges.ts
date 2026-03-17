@@ -34,12 +34,14 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/administracao/notificacoes": "ADMIN",
 
   // Financeiro - Financial sector routes
-  "/financeiro": "FINANCIAL",
-  "/financeiro/*": "FINANCIAL",
+  "/financeiro": ["FINANCIAL", "ADMIN"],
+  "/financeiro/*": ["FINANCIAL", "ADMIN"],
   "/financeiro/clientes": ["FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN"], // Financial, Logistic, and Production Manager customers list page (team leaders check at component level)
   "/financeiro/clientes/detalhes/:id": ["FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN"], // Financial, Logistic, and Production Manager customer details
   "/financeiro/clientes/editar/:id": ["FINANCIAL", "ADMIN"], // Only Financial and Admin can edit
   "/financeiro/clientes/cadastrar": ["FINANCIAL", "ADMIN"], // Only Financial and Admin can create
+  "/financeiro/faturamento": ["FINANCIAL", "ADMIN"],
+  "/financeiro/faturamento/detalhes/:id": ["FINANCIAL", "ADMIN"],
   "/financeiro/producao": "FINANCIAL", // Redirects to /producao
   "/financeiro/producao/aerografia": "FINANCIAL", // Redirects to /producao/aerografia/listar
   "/financeiro/producao/cronograma": "FINANCIAL", // Redirects to /producao/cronograma (tasks)
@@ -147,7 +149,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // [routes.production.schedule.create]: ["PRODUCTION", "WAREHOUSE"], // Removed - tasks are now created in the "in preparation" page
   [routes.production.schedule.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL", "ADMIN"], // Task detail page
   [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PLOTTING", "COMMERCIAL", "ADMIN"], // DESIGNER, FINANCIAL, LOGISTIC, PRODUCTION_MANAGER, PLOTTING can edit with restrictions
-  [routes.production.preparation.root]: ["DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // PRODUCTION and WAREHOUSE excluded from preparation
+  [routes.production.preparation.root]: ["DESIGNER", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // PRODUCTION, WAREHOUSE, and FINANCIAL excluded from preparation (FINANCIAL uses /financeiro/faturamento)
   [routes.production.preparation.create]: ["PRODUCTION", "DESIGNER", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Preparation task create - WAREHOUSE excluded
   [routes.production.preparation.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // Preparation task detail - WAREHOUSE excluded
   "/producao/agenda/detalhes/:id": ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL", "ADMIN"], // Agenda details
