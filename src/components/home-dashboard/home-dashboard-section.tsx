@@ -6,6 +6,7 @@ import { LowStockList } from "./low-stock-list";
 import { CompletedTasksList } from "./completed-tasks-list";
 import { AwaitingApprovalTasksList } from "./awaiting-approval-tasks-list";
 import { AwaitingQuoteApprovalList } from "./awaiting-quote-approval-list";
+import { AwaitingBudgetApprovalList } from "./awaiting-budget-approval-list";
 import { TimeEntriesCard } from "./time-entries-card";
 
 interface HomeDashboardSectionProps {
@@ -27,6 +28,7 @@ export function HomeDashboardSection({ data, sector, showTimeEntries, isSectionV
     (data.completedTasks && data.completedTasks.length > 0) ||
     (data.tasksAwaitingPaymentApproval && data.tasksAwaitingPaymentApproval.length > 0) ||
     (data.tasksAwaitingQuoteApproval && data.tasksAwaitingQuoteApproval.length > 0) ||
+    (data.tasksAwaitingBudgetApproval && data.tasksAwaitingBudgetApproval.length > 0) ||
     showTimeEntries;
 
   if (!hasContent) return null;
@@ -69,6 +71,10 @@ export function HomeDashboardSection({ data, sector, showTimeEntries, isSectionV
 
       {isVisible("tasksAwaitingQuoteApproval") && data.tasksAwaitingQuoteApproval && data.tasksAwaitingQuoteApproval.length > 0 && (
         <AwaitingQuoteApprovalList tasks={data.tasksAwaitingQuoteApproval} />
+      )}
+
+      {isVisible("tasksAwaitingBudgetApproval") && data.tasksAwaitingBudgetApproval && data.tasksAwaitingBudgetApproval.length > 0 && (
+        <AwaitingBudgetApprovalList tasks={data.tasksAwaitingBudgetApproval} />
       )}
 
       {isVisible("lowStockItems") && data.lowStockItems && data.lowStockItems.length > 0 && (

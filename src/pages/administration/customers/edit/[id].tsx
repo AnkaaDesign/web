@@ -51,11 +51,11 @@ export const EditCustomerPage = () => {
         const response = await updateCustomer({ id: id!, data: changedFields as any });
 
         if (response?.data?.id) {
-          navigate(routes.administration.customers.details(id));
+          navigate(routes.financial.customers.details(id));
         }
       } else {
         // No changes, just navigate back
-        navigate(routes.administration.customers.details(id));
+        navigate(routes.financial.customers.details(id));
       }
     } catch (error: any) {
       // Error is already handled by the API client and mutation
@@ -63,7 +63,7 @@ export const EditCustomerPage = () => {
   };
 
   const handleCancel = () => {
-    navigate(routes.administration.customers.details(id!));
+    navigate(routes.financial.customers.details(id!));
   };
 
   // Loading state
@@ -116,9 +116,9 @@ export const EditCustomerPage = () => {
             icon={IconUsers}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Administração", href: routes.administration.root },
-              { label: "Clientes", href: routes.administration.customers.root },
-              { label: customer.fantasyName, href: routes.administration.customers.details(id!) },
+              { label: "Financeiro", href: routes.financial.root },
+              { label: "Clientes", href: routes.financial.customers.root },
+              { label: customer.fantasyName, href: routes.financial.customers.details(id!) },
               { label: "Editar" },
             ]}
             actions={actions}

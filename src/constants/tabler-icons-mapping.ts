@@ -191,6 +191,7 @@ export const TABLER_ICONS = {
   files: "IconFiles",
   document: "IconFileText",
   fileInvoice: "IconFileInvoice", // Alias for favorites icon mapping
+  fileDescription: "IconFileDescription",
   archive: "IconArchive",
 
   // System Management

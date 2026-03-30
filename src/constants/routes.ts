@@ -3,13 +3,6 @@
 export const routes = {
   // Administration - Administração - Administration
   administration: {
-    customers: {
-      batchEdit: "/administracao/clientes/editar-em-lote",
-      create: "/administracao/clientes/cadastrar",
-      details: (id: string) => `/administracao/clientes/detalhes/${id}`,
-      edit: (id: string) => `/administracao/clientes/editar/${id}`,
-      root: "/administracao/clientes",
-    },
     collaborators: {
       batchEdit: "/administracao/colaboradores/editar-em-lote",
       create: "/administracao/colaboradores/cadastrar",
@@ -85,22 +78,22 @@ export const routes = {
     root: "/pintura/catalogo-basico",
   },
 
-  // Customers - Alias for administration customers for backward compatibility
+  // Customers - Alias for financial customers
   customers: {
-    batchEdit: "/administracao/clientes/editar-em-lote",
-    create: "/administracao/clientes/cadastrar",
-    details: (id: string) => `/administracao/clientes/detalhes/${id}`,
-    edit: (id: string) => `/administracao/clientes/editar/${id}`,
-    root: "/administracao/clientes",
+    batchEdit: "/financeiro/clientes/editar-em-lote",
+    create: "/financeiro/clientes/cadastrar",
+    details: (id: string) => `/financeiro/clientes/detalhes/${id}`,
+    edit: (id: string) => `/financeiro/clientes/editar/${id}`,
+    root: "/financeiro/clientes",
   },
 
   // Responsibles - Responsáveis - Customer Responsibles Management
   responsibles: {
-    create: "/administracao/clientes/responsaveis/cadastrar",
-    details: (id: string) => `/administracao/clientes/responsaveis/detalhes/${id}`,
-    edit: (id: string) => `/administracao/clientes/responsaveis/editar/${id}`,
-    password: (id: string) => `/administracao/clientes/responsaveis/senha/${id}`,
-    root: "/administracao/clientes/responsaveis",
+    create: "/financeiro/clientes/responsaveis/cadastrar",
+    details: (id: string) => `/financeiro/clientes/responsaveis/detalhes/${id}`,
+    edit: (id: string) => `/financeiro/clientes/responsaveis/editar/${id}`,
+    password: (id: string) => `/financeiro/clientes/responsaveis/senha/${id}`,
+    root: "/financeiro/clientes/responsaveis",
   },
 
   // Favorites - Favoritos - User Favorites

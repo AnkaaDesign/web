@@ -10,20 +10,8 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // Home - All authenticated users can access (all privileges)
   "/": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
 
-  // Administração - Admin access with specific granular permissions
+  // Administração - Admin access
   "/administracao": "ADMIN",
-  "/administracao/clientes": ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL"], // BASIC allows all authenticated, but specific access for Financial, Logistic, and Production Manager
-  [routes.administration.customers.details(":id")]: ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL"], // Customer details using function
-  "/administracao/clientes/detalhes/:id": ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "COMMERCIAL"], // Financial, Logistic, and Production Manager can view customer details - explicit pattern
-  [routes.administration.customers.edit(":id")]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER"], // Financial, Commercial, Logistic, Production Manager, and Admin can edit customers
-  "/administracao/clientes/editar/:id": ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER"], // Financial, Commercial, Logistic, Production Manager, and Admin can edit customers - explicit pattern
-  [routes.administration.customers.create]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER"], // Financial, Commercial, Logistic, Production Manager, and Admin can create customers
-  // Responsibles - Admin and Commercial can manage responsibles
-  [routes.responsibles.root]: ["ADMIN", "COMMERCIAL"],
-  [routes.responsibles.create]: ["ADMIN", "COMMERCIAL"],
-  [routes.responsibles.details(":id")]: ["ADMIN", "COMMERCIAL"],
-  [routes.responsibles.edit(":id")]: ["ADMIN", "COMMERCIAL"],
-  [routes.responsibles.password(":id")]: ["ADMIN", "COMMERCIAL"],
 
   // Servidor - Server management routes (mostly admin, file manager also accessible to commercial)
   "/servidor/gerenciador-de-arquivos": ["ADMIN", "COMMERCIAL"],
@@ -34,14 +22,23 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/administracao/notificacoes": "ADMIN",
 
   // Financeiro - Financial sector routes
-  "/financeiro": ["FINANCIAL", "ADMIN"],
-  "/financeiro/*": ["FINANCIAL", "ADMIN"],
-  "/financeiro/clientes": ["FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN"], // Financial, Logistic, and Production Manager customers list page (team leaders check at component level)
-  "/financeiro/clientes/detalhes/:id": ["FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN"], // Financial, Logistic, and Production Manager customer details
-  "/financeiro/clientes/editar/:id": ["FINANCIAL", "ADMIN"], // Only Financial and Admin can edit
-  "/financeiro/clientes/cadastrar": ["FINANCIAL", "ADMIN"], // Only Financial and Admin can create
-  "/financeiro/faturamento": ["FINANCIAL", "ADMIN"],
-  "/financeiro/faturamento/detalhes/:id": ["FINANCIAL", "ADMIN"],
+  "/financeiro": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
+  "/financeiro/*": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
+  "/financeiro/clientes": ["FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "COMMERCIAL"],
+  "/financeiro/clientes/detalhes/:id": ["FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "COMMERCIAL"],
+  "/financeiro/clientes/editar/:id": ["FINANCIAL", "ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER"],
+  "/financeiro/clientes/cadastrar": ["FINANCIAL", "ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER"],
+  "/financeiro/clientes/editar-em-lote": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
+  "/financeiro/clientes/responsaveis": ["ADMIN", "COMMERCIAL"],
+  "/financeiro/clientes/responsaveis/cadastrar": ["ADMIN", "COMMERCIAL"],
+  "/financeiro/clientes/responsaveis/detalhes/:id": ["ADMIN", "COMMERCIAL"],
+  "/financeiro/clientes/responsaveis/editar/:id": ["ADMIN", "COMMERCIAL"],
+  "/financeiro/faturamento": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
+  "/financeiro/faturamento/detalhes/:id": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
+  "/financeiro/orcamento": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
+  "/financeiro/orcamento/detalhes/:id": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
+  "/financeiro/notas-fiscais": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
+  "/financeiro/notas-fiscais/:id": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
   "/financeiro/producao": "FINANCIAL", // Redirects to /producao
   "/financeiro/producao/aerografia": "FINANCIAL", // Redirects to /producao/aerografia/listar
   "/financeiro/producao/cronograma": "FINANCIAL", // Redirects to /producao/cronograma (tasks)
@@ -222,7 +219,6 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   [routes.myTeam.calculations]: "TEAM_LEADER",
 
   // Fallback patterns (for broader route matching)
-  // Note: Specific routes for /administracao/clientes are defined above, wildcards won't override them
   "/administracao/*": "ADMIN",
   [`${routes.inventory.root}/*`]: "WAREHOUSE",
   "/pintura/*": ["WAREHOUSE", "DESIGNER", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "TEAM_LEADER", "ADMIN"], // PRODUCTION excluded from paint routes

@@ -18,7 +18,7 @@ export const CreateCustomerPage = () => {
       const response = await createCustomer.mutateAsync(data);
 
       if (response?.data?.id) {
-        navigate(routes.administration.customers.details(response.data.id));
+        navigate(routes.financial.customers.details(response.data.id));
       }
     } catch (error: any) {
       // Error is already handled by the API client and mutation
@@ -29,7 +29,7 @@ export const CreateCustomerPage = () => {
   };
 
   const handleCancel = () => {
-    navigate(routes.administration.customers.root);
+    navigate(routes.financial.customers.root);
   };
 
   const actions = [
@@ -61,8 +61,8 @@ export const CreateCustomerPage = () => {
             favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_CADASTRAR}
             breadcrumbs={[
               { label: "Início", href: routes.home },
-              { label: "Administração", href: routes.administration.root },
-              { label: "Clientes", href: routes.administration.customers.root },
+              { label: "Financeiro", href: routes.financial.root },
+              { label: "Clientes", href: routes.financial.customers.root },
               { label: "Cadastrar" },
             ]}
             actions={actions}

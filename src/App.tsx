@@ -51,8 +51,6 @@ const TestNotificationWorkflow = lazy(() => import("@/pages/test-notification-wo
 // Administration
 const Administration = lazy(() => import("@/pages/administration/root").then((module) => ({ default: module.AdministrationRootPage })));
 
-const AdministrationCustomers = lazy(() => import("@/pages/administration/customers/list").then((module) => ({ default: module.CustomerListPage })));
-
 // Responsibles
 const ResponsiblesList = lazy(() => import("@/pages/responsibles/index"));
 const ResponsiblesNew = lazy(() => import("@/pages/responsibles/new"));
@@ -67,13 +65,12 @@ const FinancialCustomersDetails = lazy(() => import("@/pages/financial/customers
 const FinancialCustomersEdit = lazy(() => import("@/pages/financial/customers/edit/[id]").then((module) => ({ default: module.FinancialCustomersEditPage })));
 const FinancialBilling = lazy(() => import("@/pages/financial/billing/list").then((module) => ({ default: module.BillingPage })));
 const FinancialBillingDetail = lazy(() => import("@/pages/financial/billing/details/[id]").then((module) => ({ default: module.BillingDetailPage })));
+const FinancialBudgetList = lazy(() => import("@/pages/financial/budget/list").then((module) => ({ default: module.BudgetListPage })));
 const FinancialBudgetDetail = lazy(() => import("@/pages/financial/budget/details/[taskId]").then((module) => ({ default: module.FinancialBudgetDetailPage })));
 const FinancialNfseList = lazy(() => import("@/pages/financial/nfse/list").then((module) => ({ default: module.NfseListPage })));
 const FinancialNfseDetail = lazy(() => import("@/pages/financial/nfse/detail").then((module) => ({ default: module.NfseDetailPage })));
-const AdministrationCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
-const AdministrationCustomersEdit = lazy(() => import("@/pages/administration/customers/edit/[id]").then((module) => ({ default: module.EditCustomerPage })));
-const AdministrationCustomersDetails = lazy(() => import("@/pages/administration/customers/details/[id]").then((module) => ({ default: module.CustomerDetailsPage })));
-const AdministrationCustomersBatchEdit = lazy(() => import("@/pages/administration/customers/batch-edit").then((module) => ({ default: module.CustomerBatchEditPage })));
+const FinancialCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
+const FinancialCustomersBatchEdit = lazy(() => import("@/pages/administration/customers/batch-edit").then((module) => ({ default: module.CustomerBatchEditPage })));
 
 const AdministrationCollaboratorsList = lazy(() => import("@/pages/administration/collaborators/list").then((module) => ({ default: module.default })));
 const AdministrationCollaboratorsCreate = lazy(() => import("@/pages/administration/collaborators/create").then((module) => ({ default: module.default })));
@@ -651,47 +648,6 @@ function App() {
                 />
 
 
-                <Route
-                  path={routes.administration.customers.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <AdministrationCustomers />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.administration.customers.create}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <AdministrationCustomersCreate />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.administration.customers.edit(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <AdministrationCustomersEdit />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.administration.customers.details(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <AdministrationCustomersDetails />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.administration.customers.batchEdit}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <AdministrationCustomersBatchEdit />
-                    </Suspense>
-                  }
-                />
-
                 {/* Responsibles Routes */}
                 <Route
                   path={routes.responsibles.root}
@@ -997,10 +953,18 @@ function App() {
                   }
                 />
                 <Route
-                  path="/financeiro/clientes"
+                  path={routes.financial.customers.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <FinancialCustomersList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.customers.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialCustomersCreate />
                     </Suspense>
                   }
                 />
@@ -1017,6 +981,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <FinancialCustomersEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.customers.batchEdit}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialCustomersBatchEdit />
                     </Suspense>
                   }
                 />
@@ -1049,6 +1021,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <FinancialNfseDetail />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.budget.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialBudgetList />
                     </Suspense>
                   }
                 />

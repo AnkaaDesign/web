@@ -141,6 +141,19 @@ export const BillingDetailPage = () => {
 
   // Dynamic steps based on customer configs
   const customerConfigs = form.watch("customerConfigs") || [];
+
+  // Skip to summary step when invoices already exist (past internal approach)
+  const hasInitializedStep = useRef(false);
+  useEffect(() => {
+    if (hasInitializedStep.current) return;
+    if (invoices.length > 0 && customerConfigs.length > 0) {
+      // 2 base steps + N customer steps + 1 summary step
+      const summaryStep = 2 + customerConfigs.length + 1;
+      setCurrentStep(summaryStep);
+      hasInitializedStep.current = true;
+    }
+  }, [invoices, customerConfigs]);
+
   const steps = useMemo(() => {
     const base = [
       { id: 1, name: "Informações", description: "Dados da tarefa e clientes" },
@@ -421,7 +434,7 @@ export const BillingDetailPage = () => {
   const sectionLabel = "Faturamento";
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="form"

@@ -80,7 +80,7 @@ export function NfseDetailPage() {
   if (error) {
     return (
       <PrivilegeRoute
-        requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}
+        requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL]}
       >
         <div className="flex flex-col items-center justify-center h-full gap-4">
           <p className="text-destructive">Erro ao carregar NFS-e</p>
@@ -98,7 +98,7 @@ export function NfseDetailPage() {
   if (isLoading) {
     return (
       <PrivilegeRoute
-        requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}
+        requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL]}
       >
         <div className="flex flex-col items-center justify-center h-full">
           <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -164,7 +164,7 @@ export function NfseDetailPage() {
 
   return (
     <PrivilegeRoute
-      requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}
+      requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL]}
     >
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader

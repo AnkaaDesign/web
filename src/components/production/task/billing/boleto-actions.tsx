@@ -4,6 +4,7 @@ import {
   IconRefresh,
   IconX,
   IconDownload,
+  IconEye,
   IconLoader2,
   IconCalendarEvent,
 } from '@tabler/icons-react';
@@ -73,14 +74,39 @@ export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
     );
   };
 
-  const handleDownloadPdf = async () => {
-    setIsDownloading(true);
+  const [isViewing, setIsViewing] = useState(false);
+
+  const fetchBoletoPdf = async () => {
+    const response = await invoiceService.getBoletoPdf(installmentId);
+    return new Blob([response.data], { type: 'application/pdf' });
+  };
+
+  const handleViewPdf = async () => {
+    setIsViewing(true);
     try {
-      const response = await invoiceService.getBoletoPdf(installmentId);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const blob = await fetchBoletoPdf();
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (error) {
+      console.error('Failed to view boleto PDF:', error);
+    } finally {
+      setIsViewing(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    setIsDownloading(true);
+    try {
+      const blob = await fetchBoletoPdf();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `boleto-${installmentId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Failed to download boleto PDF:', error);
     } finally {
@@ -101,20 +127,36 @@ export function BoletoActions({ installmentId, bankSlip }: BoletoActionsProps) {
     <>
       <div className="flex items-center gap-1">
         {canDownloadPdf && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDownloadPdf}
-            disabled={isDownloading}
-            title="Ver Boleto PDF"
-            className="h-7 w-7 p-0"
-          >
-            {isDownloading ? (
-              <IconLoader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <IconDownload className="h-4 w-4" />
-            )}
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleViewPdf}
+              disabled={isViewing}
+              title="Visualizar Boleto"
+              className="h-7 w-7 p-0"
+            >
+              {isViewing ? (
+                <IconLoader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <IconEye className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDownloadPdf}
+              disabled={isDownloading}
+              title="Baixar Boleto"
+              className="h-7 w-7 p-0"
+            >
+              {isDownloading ? (
+                <IconLoader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <IconDownload className="h-4 w-4" />
+              )}
+            </Button>
+          </>
         )}
 
         {canChangeDueDate && (

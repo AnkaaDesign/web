@@ -52,7 +52,7 @@ export const CustomerBatchEditPage = () => {
   const allCustomersFound = customers.length === customerIds.length;
 
   const handleCancel = () => {
-    navigate(routes.administration.customers.root);
+    navigate(routes.financial.customers.root);
   };
 
   if (customerIds.length === 0) {
@@ -124,7 +124,7 @@ export const CustomerBatchEditPage = () => {
                   Voltar para Lista
                 </Button>
                 {customers.length > 0 && (
-                  <Button onClick={() => navigate(routes.administration.customers.root)}>
+                  <Button onClick={() => navigate(routes.financial.customers.root)}>
                     <IconUsers className="mr-2 h-4 w-4" />
                     Ir para Lista de Clientes
                   </Button>
@@ -168,8 +168,8 @@ export const CustomerBatchEditPage = () => {
         favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
         breadcrumbs={[
           { label: "Início", href: "/" },
-          { label: "Administração", href: routes.administration.root },
-          { label: "Clientes", href: routes.administration.customers.root },
+          { label: "Financeiro", href: routes.financial.root },
+          { label: "Clientes", href: routes.financial.customers.root },
           { label: "Editar em Lote" },
         ]}
         actions={actions}

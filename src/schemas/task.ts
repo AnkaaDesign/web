@@ -1477,12 +1477,15 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   details: task.details,
   entryDate: task.entryDate,
   term: task.term,
+  forecastDate: task.forecastDate,
   startedAt: task.startedAt,
   finishedAt: task.finishedAt,
   cleared: task.cleared ?? false,
   paintId: task.paintId,
   customerId: task.customerId,
   sectorId: task.sectorId,
+  // Responsibles relationship
+  responsibleIds: task.responsibles?.map((r: any) => r.id),
   // Many-to-many relations (arrays)
   reimbursementIds: task.reimbursements?.map((reimbursement) => reimbursement.id),
   reimbursementInvoiceIds: task.reimbursementInvoices?.map((reimbursementInvoice) => reimbursementInvoice.id),

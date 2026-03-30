@@ -53,10 +53,10 @@ const VALID_ROUTES = [
 
   // Administration routes
   routes.administration.root,
-  routes.administration.customers.root,
-  routes.administration.customers.create,
-  routes.administration.customers.edit(":id"),
-  routes.administration.customers.details(":id"),
+  routes.financial.customers.root,
+  routes.financial.customers.create,
+  routes.financial.customers.edit(":id"),
+  routes.financial.customers.details(":id"),
   routes.administration.collaborators.root,
   routes.administration.collaborators.create,
   routes.administration.collaborators.edit(":id"),
@@ -248,7 +248,7 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/pintura/catalogo-basico/detalhes/:id": "/pintura/catalogo/:id",
 
   // Administration route mappings
-  "/administracao/clientes/listar": "/administracao/clientes",
+  "/administracao/clientes/listar": "/financeiro/clientes",
   "/administracao/colaboradores/listar": "/administracao/colaboradores",
   "/administracao/registros-de-alteracoes/listar": "/servidor/registros-de-alteracoes",
   "/administracao/registros-de-alteracoes": "/servidor/registros-de-alteracoes",

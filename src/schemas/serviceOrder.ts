@@ -601,4 +601,6 @@ export const mapServiceOrderToFormData = createMapToFormDataHelper<ServiceOrder,
   startedAt: serviceOrder.startedAt,
   approvedAt: serviceOrder.approvedAt,
   finishedAt: serviceOrder.finishedAt,
+  checkinFileIds: (serviceOrder as any).checkinFiles?.map((f: any) => f.id),
+  checkoutFileIds: (serviceOrder as any).checkoutFiles?.map((f: any) => f.id),
 }));

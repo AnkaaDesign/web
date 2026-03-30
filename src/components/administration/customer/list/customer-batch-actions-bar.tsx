@@ -40,11 +40,11 @@ export function CustomerBatchActionsBar({ selectedCustomers, onSelectionClear, o
   const handleBatchEdit = () => {
     if (selectedCount === 1) {
       // Single customer - navigate to edit page
-      navigate(routes.administration.customers.edit(selectedCustomers[0].id));
+      navigate(routes.financial.customers.edit(selectedCustomers[0].id));
     } else {
       // Multiple customers - navigate to batch edit page
       const ids = selectedCustomers.map((customer) => customer.id).join(",");
-      navigate(`${routes.administration.customers.batchEdit}?ids=${ids}`);
+      navigate(`${routes.financial.customers.batchEdit}?ids=${ids}`);
     }
   };
 

@@ -610,6 +610,7 @@ export const FinancialBudgetDetailPage = () => {
 
           {currentStep === totalSteps && (
             <BudgetStepReview
+              task={task}
               disabled={isSubmitting || !canEdit}
               existingQuote={existingQuote}
               userRole={userRole}

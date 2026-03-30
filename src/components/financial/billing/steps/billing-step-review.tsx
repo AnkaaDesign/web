@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,13 +11,23 @@ import { generatePaymentText } from "@/utils/quote-text-generators";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
 import { InstallmentStatusBadge } from "@/components/production/task/billing/installment-status-badge";
 import { BankSlipStatusBadge } from "@/components/production/task/billing/bank-slip-status-badge";
+import { BoletoActions } from "@/components/production/task/billing/boleto-actions";
 import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
+import { NfseActions } from "@/components/production/task/billing/nfse-actions";
+import { NfseEnrichedInfo } from "@/components/production/task/billing/nfse-enriched-info";
 import { SECTOR_PRIVILEGES } from "@/constants";
 import { canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
 import type { Invoice } from "@/types/invoice";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
-import { IconFileInvoice, IconCurrencyReal, IconBuilding, IconTruck, IconCreditCard, IconReceipt } from "@tabler/icons-react";
+import { IconFileInvoice, IconCurrencyReal, IconBuilding, IconTruck, IconCreditCard, IconReceipt, IconDownload, IconEye, IconLoader2 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { invoiceService } from "@/api-client/invoice";
+import { nfseService } from "@/api-client/nfse";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
+
+const STATUSES_REQUIRING_COMPLETE_DATA = ["VERIFIED_BY_FINANCIAL", "BILLING_APPROVED"];
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
@@ -94,21 +104,63 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
 
   const canChangeStatus = canUpdateQuoteStatus(userPrivilege);
 
+  // Validate customer data completeness for statuses that require it
+  const validateCustomerDataForStatus = useCallback((targetStatus: string): boolean => {
+    if (!STATUSES_REQUIRING_COMPLETE_DATA.includes(targetStatus)) return true;
+
+    for (let i = 0; i < customerConfigs.length; i++) {
+      const config = customerConfigs[i];
+      const data = config.customerData || {};
+      const errors: string[] = [];
+      if (!data.cnpj && !data.cpf) errors.push("CNPJ ou CPF");
+      if (!data.fantasyName?.trim()) errors.push("Nome Fantasia");
+      if (!data.corporateName?.trim()) errors.push("Razão Social");
+      if (!data.zipCode?.trim()) errors.push("CEP");
+      if (!data.city?.trim()) errors.push("Cidade");
+      if (!data.state?.trim()) errors.push("Estado");
+      if (!data.address?.trim()) errors.push("Logradouro");
+      if (!data.addressNumber?.trim()) errors.push("Número");
+      if (!data.neighborhood?.trim()) errors.push("Bairro");
+      if (!config.paymentCondition) errors.push("Condição de Pagamento");
+      if (errors.length > 0) {
+        const name = data.fantasyName || data.corporateName || `Cliente ${i + 1}`;
+        toast.error(`${name} — campos obrigatórios não preenchidos`, {
+          description: errors.join(", "),
+        });
+        return false;
+      }
+    }
+
+    // Multi-customer: all services must have invoiceToCustomerId
+    if (customerConfigs.length >= 2) {
+      const unassigned = validServices.filter((s: any) => !s.invoiceToCustomerId);
+      if (unassigned.length > 0) {
+        toast.error("Serviços sem cliente atribuído", {
+          description: "Todos os serviços devem ter um cliente selecionado em 'Faturar Para'",
+        });
+        return false;
+      }
+    }
+
+    return true;
+  }, [customerConfigs, validServices]);
+
   return (
     <div className="space-y-6">
-      {/* Status */}
+      {/* Task Info Summary — with inline status */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm flex items-center gap-2">
-              <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-              Status do Faturamento
+              <IconTruck className="h-4 w-4 text-muted-foreground" />
+              Resumo da Tarefa
             </CardTitle>
             {canChangeStatus ? (
               <Combobox
                 value={currentStatus}
                 onValueChange={(v) => {
                   if (v && typeof v === "string") {
+                    if (!validateCustomerDataForStatus(v)) return;
                     setValue("status", v, { shouldDirty: true });
                   }
                 }}
@@ -127,16 +179,6 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             )}
           </div>
         </CardHeader>
-      </Card>
-
-      {/* Task Info Summary */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <IconTruck className="h-4 w-4 text-muted-foreground" />
-            Resumo da Tarefa
-          </CardTitle>
-        </CardHeader>
         <CardContent>
           <div className="space-y-1">
             <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
@@ -147,6 +189,12 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Cliente</span>
                 <span className="text-sm font-medium">{task.customer.corporateName || task.customer.fantasyName}</span>
+              </div>
+            )}
+            {task.truck?.plate && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm text-muted-foreground">Placa</span>
+                <span className="text-sm font-medium">{task.truck.plate}</span>
               </div>
             )}
             {task.serialNumber && (
@@ -351,24 +399,33 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                         {/* Boletos */}
                         {installments.length > 0 && (
                           <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm font-semibold">
-                              <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
-                              Boletos
+                            <div className="flex items-center justify-between text-sm font-semibold">
+                              <div className="flex items-center gap-2">
+                                <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
+                                Boletos
+                              </div>
+                              <DownloadAllBoletosButton installments={installments} />
                             </div>
                             <div className="divide-y divide-border/50 rounded-md border border-border/50 overflow-hidden">
                               {installments.map((installment: any) => (
                                 <div key={installment.id} className="px-3 py-2 hover:bg-muted/40 transition-colors">
-                                  <div className="flex items-center gap-3 flex-wrap">
-                                    <span className="text-xs text-muted-foreground">
-                                      {formatDate(installment.dueDate)}
-                                    </span>
-                                    <span className="text-xs font-medium">
-                                      {formatCurrency(installment.amount)}
-                                    </span>
-                                    <InstallmentStatusBadge status={installment.status} size="sm" />
-                                    {installment.bankSlip && (
-                                      <BankSlipStatusBadge status={installment.bankSlip.status} size="sm" />
-                                    )}
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+                                      <span className="text-xs text-muted-foreground">
+                                        {formatDate(installment.dueDate)}
+                                      </span>
+                                      <span className="text-xs font-medium">
+                                        {formatCurrency(installment.amount)}
+                                      </span>
+                                      <InstallmentStatusBadge status={installment.status} size="sm" />
+                                      {installment.bankSlip && (
+                                        <BankSlipStatusBadge status={installment.bankSlip.status} size="sm" />
+                                      )}
+                                    </div>
+                                    <BoletoActions
+                                      installmentId={installment.id}
+                                      bankSlip={installment.bankSlip}
+                                    />
                                   </div>
                                 </div>
                               ))}
@@ -383,18 +440,32 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                             NFS-e
                           </div>
                           <div className="rounded-md border border-border/50 px-3 py-2">
-                            <div className="flex items-center gap-3">
-                              {activeNfse ? (
-                                <NfseStatusBadge status={activeNfse.status} size="sm" />
-                              ) : (
-                                <span className="text-xs text-muted-foreground">Não emitida</span>
-                              )}
-                              {nfseDocuments.length > 1 && (
-                                <span className="text-xs text-muted-foreground">
-                                  ({nfseDocuments.length} emissões)
-                                </span>
-                              )}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                {activeNfse ? (
+                                  <NfseStatusBadge status={activeNfse.status} size="sm" />
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">Não emitida</span>
+                                )}
+                                {nfseDocuments.length > 1 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({nfseDocuments.length} emissões)
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {activeNfse?.elotechNfseId && (
+                                  <NfsePdfButtons elotechNfseId={activeNfse.elotechNfseId} />
+                                )}
+                                <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                              </div>
                             </div>
+                            {activeNfse?.elotechNfseId && (
+                              <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} />
+                            )}
+                            {activeNfse?.status === 'ERROR' && activeNfse.errorMessage && (
+                              <p className="text-xs text-destructive mt-1">{activeNfse.errorMessage}</p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -454,5 +525,141 @@ function ServiceTableRow({ service }: { service: any }) {
         )}
       </td>
     </tr>
+  );
+}
+
+function DownloadAllBoletosButton({ installments }: { installments: any[] }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const downloadable = installments.filter(
+    (inst) => inst.bankSlip && (inst.bankSlip.status === 'ACTIVE' || inst.bankSlip.status === 'OVERDUE'),
+  );
+
+  if (downloadable.length < 2) return null;
+
+  const handleDownloadAll = async () => {
+    setIsDownloading(true);
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+
+      for (const inst of downloadable) {
+        const res = await invoiceService.getBoletoPdf(inst.id);
+        const blob = res.data instanceof Blob
+          ? res.data
+          : new Blob([res.data], { type: 'application/pdf' });
+        zip.file(`boleto-parcela-${inst.number}.pdf`, blob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `boletos.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently fail
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleDownloadAll}
+      disabled={isDownloading}
+      title="Baixar todos os boletos"
+      className="h-7 px-2 text-xs gap-1"
+    >
+      {isDownloading ? (
+        <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <IconDownload className="h-3.5 w-3.5" />
+      )}
+      Baixar todos
+    </Button>
+  );
+}
+
+function NfsePdfButtons({ elotechNfseId }: { elotechNfseId: number }) {
+  const [isViewing, setIsViewing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const fetchPdf = async () => {
+    const res = await nfseService.getPdf(elotechNfseId);
+    return res.data instanceof Blob
+      ? res.data
+      : new Blob([res.data], { type: 'application/pdf' });
+  };
+
+  const handleView = async () => {
+    setIsViewing(true);
+    try {
+      const blob = await fetchPdf();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch {
+      // silently fail
+    } finally {
+      setIsViewing(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const blob = await fetchPdf();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nfse-${elotechNfseId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently fail
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleView}
+        disabled={isViewing}
+        title="Visualizar NFS-e"
+        className="h-7 w-7 p-0"
+      >
+        {isViewing ? (
+          <IconLoader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <IconEye className="h-4 w-4" />
+        )}
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleDownload}
+        disabled={isDownloading}
+        title="Baixar NFS-e"
+        className="h-7 w-7 p-0"
+      >
+        {isDownloading ? (
+          <IconLoader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <IconDownload className="h-4 w-4" />
+        )}
+      </Button>
+    </>
   );
 }

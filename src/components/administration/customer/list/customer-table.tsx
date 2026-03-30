@@ -374,7 +374,7 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
                     ) : (
                       <>
                         <div className="text-sm mb-4">Comece cadastrando o primeiro cliente.</div>
-                        <Button onClick={() => navigate(routes.administration.customers.create)} variant="outline">
+                        <Button onClick={() => navigate(routes.financial.customers.create)} variant="outline">
                           <IconPlus className="h-4 w-4 mr-2" />
                           Cadastrar Cliente
                         </Button>

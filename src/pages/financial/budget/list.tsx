@@ -4,18 +4,18 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
-import { BillingTable } from "@/components/financial/billing/billing-table";
-import { BillingFilterSheet, defaultBillingFilters } from "@/components/financial/billing/billing-filter-sheet";
-import type { BillingFilters } from "@/components/financial/billing/billing-filter-sheet";
+import { BudgetTable } from "@/components/financial/budget/budget-table";
+import { BudgetFilterSheet, defaultBudgetFilters } from "@/components/financial/budget/budget-filter-sheet";
+import type { BudgetFilters } from "@/components/financial/budget/budget-filter-sheet";
 import { SECTOR_PRIVILEGES, FAVORITE_PAGES, routes } from "@/constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
-import { IconFileInvoice, IconFilter } from "@tabler/icons-react";
+import { IconFileDescription, IconFilter } from "@tabler/icons-react";
 
-export const BillingPage = () => {
+export const BudgetListPage = () => {
   usePageTracker({
-    title: "Faturamento",
-    icon: "file-invoice",
+    title: "Orçamentos",
+    icon: "file-description",
   });
 
   const {
@@ -28,10 +28,10 @@ export const BillingPage = () => {
     searchParamName: "search",
   });
 
-  const [filters, setFilters] = useState<BillingFilters>(defaultBillingFilters);
+  const [filters, setFilters] = useState<BudgetFilters>(defaultBudgetFilters);
   const [showFilters, setShowFilters] = useState(false);
 
-  const handleFilterApply = useCallback((newFilters: BillingFilters) => {
+  const handleFilterApply = useCallback((newFilters: BudgetFilters) => {
     setFilters(newFilters);
   }, []);
 
@@ -39,7 +39,6 @@ export const BillingPage = () => {
     let c = 0;
     if (filters.finishedFrom) c++;
     if (filters.finishedTo) c++;
-    if (filters.quoteStatus && filters.quoteStatus !== "all") c++;
     if (filters.customerId) c++;
     return c;
   }, [filters]);
@@ -51,13 +50,13 @@ export const BillingPage = () => {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"
-          title="Faturamento"
-          icon={IconFileInvoice}
-          favoritePage={FAVORITE_PAGES.FINANCEIRO_FATURAMENTO}
+          title="Orçamentos"
+          icon={IconFileDescription}
+          favoritePage={FAVORITE_PAGES.FINANCEIRO_ORCAMENTO}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Financeiro", href: routes.financial.root },
-            { label: "Faturamento" },
+            { label: "Orçamentos" },
           ]}
           className="flex-shrink-0"
         />
@@ -91,7 +90,7 @@ export const BillingPage = () => {
               </div>
 
               {/* Table */}
-              <BillingTable
+              <BudgetTable
                 searchingFor={searchingFor}
                 filters={filters}
               />
@@ -101,7 +100,7 @@ export const BillingPage = () => {
       </div>
 
       {/* Filter Sheet */}
-      <BillingFilterSheet
+      <BudgetFilterSheet
         open={showFilters}
         onOpenChange={setShowFilters}
         filters={filters}
@@ -111,4 +110,4 @@ export const BillingPage = () => {
   );
 };
 
-export default BillingPage;
+export default BudgetListPage;

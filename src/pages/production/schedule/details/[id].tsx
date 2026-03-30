@@ -126,6 +126,7 @@ import {
   IconFolderCheck,
   IconCameraCheck,
   IconCameraBolt,
+  IconEye,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -1887,7 +1888,7 @@ export const TaskDetailsPage = () => {
                   {canAccessCustomerPages ? (
                     <span
                       className="text-sm font-semibold text-foreground text-right cursor-pointer hover:text-primary hover:underline transition-colors"
-                      onClick={() => navigate(routes.administration.customers.details(task.customer!.id))}
+                      onClick={() => navigate(routes.financial.customers.details(task.customer!.id))}
                     >
                       {task.customer.corporateName || task.customer.fantasyName}
                     </span>
@@ -2107,7 +2108,7 @@ export const TaskDetailsPage = () => {
                           {canAccessCustomerPages && c.customerId ? (
                             <span
                               className="text-sm font-semibold text-foreground text-right cursor-pointer hover:text-primary hover:underline transition-colors"
-                              onClick={() => navigate(routes.administration.customers.details(c.customerId))}
+                              onClick={() => navigate(routes.financial.customers.details(c.customerId))}
                             >
                               {name}
                             </span>
@@ -2425,7 +2426,7 @@ export const TaskDetailsPage = () => {
                               {canAccessCustomerPages && item.invoiceToCustomer?.id ? (
                                 <span
                                   className="cursor-pointer hover:text-primary hover:underline transition-colors"
-                                  onClick={() => navigate(routes.administration.customers.details(item.invoiceToCustomer!.id))}
+                                  onClick={() => navigate(routes.financial.customers.details(item.invoiceToCustomer!.id))}
                                 >
                                   {item.invoiceToCustomer.corporateName || item.invoiceToCustomer.fantasyName}
                                 </span>
@@ -2449,30 +2450,36 @@ export const TaskDetailsPage = () => {
                     };
 
                     // Group by customer when "Completo" with 2+ customers — 2-column layout
+                    // Use customerConfigs order to ensure consistent "Cliente N" numbering with billing section
                     if (!quoteCustomerFilter && (task.quote?.customerConfigs?.length ?? 0) >= 2) {
-                      const customerGroups = new Map<string, { name: string; services: typeof filteredServices }>();
-
+                      const servicesByCustomer = new Map<string, typeof filteredServices>();
                       for (const item of filteredServices) {
                         const customerId = item.invoiceToCustomer?.id || '__unassigned__';
-                        const customerName = item.invoiceToCustomer?.corporateName || item.invoiceToCustomer?.fantasyName || 'Sem cliente';
-                        if (!customerGroups.has(customerId)) {
-                          customerGroups.set(customerId, { name: customerName, services: [] });
+                        if (!servicesByCustomer.has(customerId)) {
+                          servicesByCustomer.set(customerId, []);
                         }
-                        customerGroups.get(customerId)!.services.push(item);
+                        servicesByCustomer.get(customerId)!.push(item);
                       }
+
+                      // Follow customerConfigs order for consistent numbering
+                      const orderedGroups = task.quote!.customerConfigs!.map((config) => ({
+                        customerId: config.customerId,
+                        name: config.customer?.corporateName || config.customer?.fantasyName || 'Sem cliente',
+                        services: servicesByCustomer.get(config.customerId) || [],
+                      }));
 
                       return (
                         <div className="grid grid-cols-1 md:grid-cols-2 items-stretch gap-3">
-                          {Array.from(customerGroups.entries()).map(([customerId, group], groupIndex) => (
-                            <div key={customerId} className="border border-border dark:border-border/30 rounded-lg overflow-hidden">
+                          {orderedGroups.map((group, groupIndex) => (
+                            <div key={group.customerId} className="border border-border dark:border-border/30 rounded-lg overflow-hidden">
                               <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/40 border-b border-border dark:border-border/30">
                                 <IconBuilding className="h-4 w-4 text-muted-foreground" />
                                 <span className="text-sm font-semibold">
                                   <span className="text-muted-foreground font-medium">Cliente {groupIndex + 1}:</span>{" "}
-                                  {canAccessCustomerPages && customerId !== '__unassigned__' ? (
+                                  {canAccessCustomerPages && group.customerId !== '__unassigned__' ? (
                                     <span
                                       className="cursor-pointer hover:text-primary hover:underline transition-colors"
-                                      onClick={() => navigate(routes.administration.customers.details(customerId))}
+                                      onClick={() => navigate(routes.financial.customers.details(group.customerId))}
                                     >
                                       {group.name}
                                     </span>
@@ -2653,7 +2660,7 @@ export const TaskDetailsPage = () => {
                                 {canAccessCustomerPages && config.customerId ? (
                                   <span
                                     className="cursor-pointer hover:text-primary hover:underline transition-colors"
-                                    onClick={() => navigate(routes.administration.customers.details(config.customerId))}
+                                    onClick={() => navigate(routes.financial.customers.details(config.customerId))}
                                   >
                                     {config.customer?.corporateName || config.customer?.fantasyName || 'Cliente'}
                                   </span>
@@ -2734,17 +2741,6 @@ export const TaskDetailsPage = () => {
                                                 bankSlip={installment.bankSlip}
                                               />
                                             </div>
-                                            {installment.bankSlip?.pdfFile && (
-                                              <div className="mt-1.5">
-                                                <FileItem
-                                                  file={installment.bankSlip.pdfFile as unknown as CustomFile}
-                                                  viewMode="list"
-                                                  onPreview={(file) => fileViewerContext?.actions.viewFile(file)}
-                                                  onDownload={(file) => fileViewerContext?.actions.downloadFile(file)}
-                                                  showActions
-                                                />
-                                              </div>
-                                            )}
                                           </div>
                                         ))}
                                       </div>
@@ -2775,7 +2771,7 @@ export const TaskDetailsPage = () => {
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                   {activeNfse?.elotechNfseId && (
-                                                    <NfseDownloadButton elotechNfseId={activeNfse.elotechNfseId} />
+                                                    <NfsePdfButtons elotechNfseId={activeNfse.elotechNfseId} />
                                                   )}
                                                   <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
                                                 </div>
@@ -2990,7 +2986,7 @@ export const TaskDetailsPage = () => {
                                   </div>
                                   <div className="flex items-center gap-1">
                                     {activeNfse?.elotechNfseId && activeNfse.status === 'AUTHORIZED' && (
-                                      <NfseDownloadButton elotechNfseId={activeNfse.elotechNfseId} />
+                                      <NfsePdfButtons elotechNfseId={activeNfse.elotechNfseId} />
                                     )}
                                     <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
                                   </div>
@@ -4403,19 +4399,43 @@ function DownloadAllBoletosButton({ installments }: { installments: any[] }) {
   );
 }
 
-function NfseDownloadButton({ elotechNfseId }: { elotechNfseId: number }) {
+function NfsePdfButtons({ elotechNfseId }: { elotechNfseId: number }) {
+  const [isViewing, setIsViewing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  const fetchPdf = async () => {
+    const res = await nfseService.getPdf(elotechNfseId);
+    return res.data instanceof Blob
+      ? res.data
+      : new Blob([res.data], { type: 'application/pdf' });
+  };
+
+  const handleView = async () => {
+    setIsViewing(true);
+    try {
+      const blob = await fetchPdf();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch {
+      // silently fail
+    } finally {
+      setIsViewing(false);
+    }
+  };
 
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      const res = await nfseService.getPdf(elotechNfseId);
-      const blob = res.data instanceof Blob
-        ? res.data
-        : new Blob([res.data], { type: 'application/pdf' });
+      const blob = await fetchPdf();
       const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nfse-${elotechNfseId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch {
       // silently fail
     } finally {
@@ -4424,20 +4444,36 @@ function NfseDownloadButton({ elotechNfseId }: { elotechNfseId: number }) {
   };
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={handleDownload}
-      disabled={isDownloading}
-      title="Ver NFS-e PDF"
-      className="h-7 w-7 p-0"
-    >
-      {isDownloading ? (
-        <IconLoader2 className="h-4 w-4 animate-spin" />
-      ) : (
-        <IconDownload className="h-4 w-4" />
-      )}
-    </Button>
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleView}
+        disabled={isViewing}
+        title="Visualizar NFS-e"
+        className="h-7 w-7 p-0"
+      >
+        {isViewing ? (
+          <IconLoader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <IconEye className="h-4 w-4" />
+        )}
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleDownload}
+        disabled={isDownloading}
+        title="Baixar NFS-e"
+        className="h-7 w-7 p-0"
+      >
+        {isDownloading ? (
+          <IconLoader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <IconDownload className="h-4 w-4" />
+        )}
+      </Button>
+    </>
   );
 }
 

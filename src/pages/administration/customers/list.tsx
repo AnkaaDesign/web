@@ -28,13 +28,13 @@ export const CustomerListPage = () => {
           variant="list"
           title="Clientes"
           favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração", href: routes.administration.root }, { label: "Clientes" }]}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Financeiro", href: routes.financial.root }, { label: "Clientes" }]}
           actions={canCreate ? [
             {
               key: "create",
               label: "Cadastrar",
               icon: IconPlus,
-              onClick: () => navigate(routes.administration.customers.create),
+              onClick: () => navigate(routes.financial.customers.create),
               variant: "default" as const,
             },
           ] : []}

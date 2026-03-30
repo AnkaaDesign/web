@@ -157,7 +157,7 @@ export function CustomerBatchEditTable({ customers, onCancel: _onCancel, onSubmi
         setShowResultDialog(true);
       } else {
         // Even if we don't have detailed results, navigate back on apparent success
-        navigate(routes.administration.customers.root);
+        navigate(routes.financial.customers.root);
       }
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
@@ -180,7 +180,7 @@ export function CustomerBatchEditTable({ customers, onCancel: _onCancel, onSubmi
       setBatchResult(null);
       // If there were no failures, navigate back to list
       if (batchResult && batchResult.totalFailed === 0 && batchResult.totalSuccess > 0) {
-        navigate(routes.administration.customers.root);
+        navigate(routes.financial.customers.root);
       }
     }
   };

@@ -8,11 +8,11 @@ type RouteUser = User | AuthUser;
 /**
  * Get customer detail route based on user's sector
  * - Financial users go to /financeiro/clientes/detalhes/:id
- * - Admin and other users go to /administracao/clientes/detalhes/:id
+ * - Admin and other users go to /financeiro/clientes/detalhes/:id
  */
 export function getCustomerDetailRoute(customerId: string, user: RouteUser | null | undefined): string {
   if (!user) {
-    return routes.administration.customers.details(customerId);
+    return routes.financial.customers.details(customerId);
   }
 
   // Check if user is from financial sector (and not admin)
@@ -23,7 +23,7 @@ export function getCustomerDetailRoute(customerId: string, user: RouteUser | nul
     return routes.financial.customers.details(customerId);
   }
 
-  return routes.administration.customers.details(customerId);
+  return routes.financial.customers.details(customerId);
 }
 
 /**
@@ -31,7 +31,7 @@ export function getCustomerDetailRoute(customerId: string, user: RouteUser | nul
  */
 export function getCustomerEditRoute(customerId: string, user: RouteUser | null | undefined): string {
   if (!user) {
-    return routes.administration.customers.edit(customerId);
+    return routes.financial.customers.edit(customerId);
   }
 
   const isFinancialOnly =
@@ -41,7 +41,7 @@ export function getCustomerEditRoute(customerId: string, user: RouteUser | null 
     return routes.financial.customers.edit(customerId);
   }
 
-  return routes.administration.customers.edit(customerId);
+  return routes.financial.customers.edit(customerId);
 }
 
 /**
@@ -49,7 +49,7 @@ export function getCustomerEditRoute(customerId: string, user: RouteUser | null 
  */
 export function getCustomerListRoute(user: RouteUser | null | undefined): string {
   if (!user) {
-    return routes.administration.customers.root;
+    return routes.financial.customers.root;
   }
 
   const isFinancialOnly =
@@ -59,5 +59,5 @@ export function getCustomerListRoute(user: RouteUser | null | undefined): string
     return routes.financial.customers.root;
   }
 
-  return routes.administration.customers.root;
+  return routes.financial.customers.root;
 }

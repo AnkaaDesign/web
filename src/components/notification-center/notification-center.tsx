@@ -49,8 +49,8 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   Employee: "/recursos-humanos/funcionarios/detalhes",
 
   // Customer routes
-  CUSTOMER: "/administracao/clientes/detalhes",
-  Customer: "/administracao/clientes/detalhes",
+  CUSTOMER: "/financeiro/clientes/detalhes",
+  Customer: "/financeiro/clientes/detalhes",
 
   // Supplier routes
   SUPPLIER: "/estoque/fornecedores/detalhes",

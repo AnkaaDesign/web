@@ -30,6 +30,7 @@ const ALL_HOME_SECTIONS: Record<string, SectionConfig> = {
   completedTasks: { id: "completedTasks", label: "Tarefas Concluídas", defaultVisible: true, fields: [] },
   tasksAwaitingPaymentApproval: { id: "tasksAwaitingPaymentApproval", label: "Aguardando Aprovação de Pagamento", defaultVisible: true, fields: [] },
   tasksAwaitingQuoteApproval: { id: "tasksAwaitingQuoteApproval", label: "Aguardando Aprovação Interna", defaultVisible: true, fields: [] },
+  tasksAwaitingBudgetApproval: { id: "tasksAwaitingBudgetApproval", label: "Orçamentos Aguardando Aprovação", defaultVisible: true, fields: [] },
   timeEntries: { id: "timeEntries", label: "Ponto da Semana", defaultVisible: true, fields: [] },
   recentMessages: { id: "recentMessages", label: "Mensagens Recentes", defaultVisible: true, fields: [] },
 };
@@ -89,6 +90,9 @@ export function HomePage() {
     }
     if (dashboardData?.tasksAwaitingQuoteApproval && dashboardData.tasksAwaitingQuoteApproval.length > 0) {
       sections.push(ALL_HOME_SECTIONS.tasksAwaitingQuoteApproval);
+    }
+    if (dashboardData?.tasksAwaitingBudgetApproval && dashboardData.tasksAwaitingBudgetApproval.length > 0) {
+      sections.push(ALL_HOME_SECTIONS.tasksAwaitingBudgetApproval);
     }
     if (dashboardData?.lowStockItems && dashboardData.lowStockItems.length > 0) {
       sections.push(ALL_HOME_SECTIONS.lowStockItems);

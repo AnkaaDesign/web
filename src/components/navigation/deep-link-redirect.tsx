@@ -19,7 +19,7 @@ const DEEP_LINK_ROUTES: Record<string, (id: string) => string> = {
   // Users/Employees
   user: (id) => routes.administration.collaborators.details(id),
   // Customers
-  customer: (id) => routes.administration.customers.details(id),
+  customer: (id) => routes.financial.customers.details(id),
   // Suppliers
   supplier: (id) => routes.inventory.suppliers.details(id),
   // Notifications

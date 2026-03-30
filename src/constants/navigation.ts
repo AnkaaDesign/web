@@ -554,18 +554,19 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Financeiro",
     icon: "financial",
     path: "/financeiro",
-    requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+    requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
     children: [
       {
         id: "clientes-financeiro-menu",
         title: "Clientes",
         icon: "users",
         path: "/financeiro/clientes",
-        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
         children: [
           { id: "clientes-financeiro-cadastrar", title: "Cadastrar", icon: "plus", path: "/financeiro/clientes/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
           { id: "clientes-financeiro-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/clientes/detalhes/:id", isDynamic: true },
           { id: "clientes-financeiro-editar", title: "Editar", icon: "edit", path: "/financeiro/clientes/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+          { id: "responsaveis-financeiro", title: "Responsáveis", icon: "users", path: "/financeiro/clientes/responsaveis", requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL] },
         ],
       },
       {
@@ -573,7 +574,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Faturamento",
         icon: "fileInvoice",
         path: "/financeiro/faturamento",
-        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
         children: [
           { id: "faturamento-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/faturamento/detalhes/:id", isDynamic: true },
         ],
@@ -583,7 +584,17 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Notas Fiscais",
         icon: "receipt",
         path: "/financeiro/notas-fiscais",
-        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
+      },
+      {
+        id: "orcamento",
+        title: "Orçamentos",
+        icon: "fileDescription",
+        path: "/financeiro/orcamento",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL],
+        children: [
+          { id: "orcamento-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/orcamento/detalhes/:id", isDynamic: true },
+        ],
       },
     ],
   },
@@ -853,6 +864,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
   },
   {
+    id: "clientes-financeiro",
+    title: "Clientes",
+    icon: "users",
+    path: "/financeiro/clientes",
+    requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
+  },
+  {
     id: "faturamento-financeiro",
     title: "Faturamento",
     icon: "fileInvoice",
@@ -878,6 +896,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Notas Fiscais",
     icon: "receipt",
     path: "/financeiro/notas-fiscais",
+    requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
+  },
+  {
+    id: "orcamento-financeiro",
+    title: "Orçamentos",
+    icon: "fileDescription",
+    path: "/financeiro/orcamento",
     requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
   },
 
@@ -909,7 +934,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
     id: "clientes-logistic",
     title: "Clientes",
     icon: "users",
-    path: "/administracao/clientes",
+    path: "/financeiro/clientes",
     requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
   },
   {
@@ -964,22 +989,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     path: "/pintura/catalogo-basico",
     requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
     children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo/detalhes/:id", isDynamic: true }],
-  },
-  {
-    id: "clientes-commercial",
-    title: "Clientes",
-    icon: "users",
-    path: "/administracao/clientes",
-    requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
-    children: [
-      {
-        id: "responsaveis-commercial",
-        title: "Responsáveis",
-        icon: "users",
-        path: "/administracao/clientes/responsaveis",
-        requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
-      },
-    ],
   },
   {
     id: "cronograma-commercial",

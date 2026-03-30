@@ -7,5 +7,6 @@ export { LowStockList } from "./low-stock-list";
 export { CompletedTasksList } from "./completed-tasks-list";
 export { AwaitingApprovalTasksList } from "./awaiting-approval-tasks-list";
 export { AwaitingQuoteApprovalList } from "./awaiting-quote-approval-list";
+export { AwaitingBudgetApprovalList } from "./awaiting-budget-approval-list";
 export { RecentMessagesList } from "./recent-messages-list";
 export { TimeEntriesCard } from "./time-entries-card";

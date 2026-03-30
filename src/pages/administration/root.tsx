@@ -260,7 +260,7 @@ export const AdministrationRootPage = () => {
                 <QuickAccessCard
                   title="Clientes"
                   icon={LucideBuildingBank}
-                  onClick={() => navigate(routes.administration.customers.root)}
+                  onClick={() => navigate(routes.financial.customers.root)}
                   count={data?.customerAnalysis?.totalCustomers?.value ?? 0}
                   color="green"
                 />

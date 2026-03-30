@@ -61,14 +61,14 @@ export const CustomerDetailsPage = () => {
   const { deleteAsync, deleteMutation } = useCustomerMutations();
 
   if (!id) {
-    return <Navigate to={routes.administration.customers.root} replace />;
+    return <Navigate to={routes.financial.customers.root} replace />;
   }
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <p className="text-destructive mb-4">Erro ao carregar cliente</p>
-        <Navigate to={routes.administration.customers.root} replace />
+        <Navigate to={routes.financial.customers.root} replace />
       </div>
     );
   }
@@ -82,13 +82,13 @@ export const CustomerDetailsPage = () => {
   }
 
   if (!customer) {
-    return <Navigate to={routes.administration.customers.root} replace />;
+    return <Navigate to={routes.financial.customers.root} replace />;
   }
 
   const handleDelete = async () => {
     try {
       await deleteAsync(id);
-      navigate(routes.administration.customers.root);
+      navigate(routes.financial.customers.root);
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error deleting customer:", error);
@@ -105,8 +105,8 @@ export const CustomerDetailsPage = () => {
           title={customer.fantasyName}
           breadcrumbs={[
             { label: "Início", href: "/" },
-            { label: "Administração" },
-            { label: "Clientes", href: routes.administration.customers.root },
+            { label: "Financeiro" },
+            { label: "Clientes", href: routes.financial.customers.root },
             { label: customer.fantasyName },
           ]}
           actions={[
@@ -121,7 +121,7 @@ export const CustomerDetailsPage = () => {
               key: "edit",
               label: "Editar",
               icon: IconEdit,
-              onClick: () => navigate(routes.administration.customers.edit(id)),
+              onClick: () => navigate(routes.financial.customers.edit(id)),
             },
             ...(canDeleteCustomers(user) ? [{
               key: "delete",

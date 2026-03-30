@@ -276,13 +276,13 @@ export function CustomerList({ className }: CustomerListProps) {
       // Single customer - navigate to edit page (context-aware)
       const editRoute = isFinancialSection
         ? routes.financial.customers.edit(customers[0].id)
-        : routes.administration.customers.edit(customers[0].id);
+        : routes.financial.customers.edit(customers[0].id);
       navigate(editRoute);
     } else {
       // Multiple customers - navigate to batch edit page
       // Note: batch edit is only available in administration section
       const ids = customers.map((customer) => customer.id).join(",");
-      navigate(`${routes.administration.customers.batchEdit}?ids=${ids}`);
+      navigate(`${routes.financial.customers.batchEdit}?ids=${ids}`);
     }
   };
 

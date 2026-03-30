@@ -4,7 +4,7 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub,
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { IconExternalLink, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter, IconReceipt } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
-import { routes, TASK_STATUS, SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
+import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
 import type { Task } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
@@ -319,41 +319,7 @@ export function TaskHistoryContextMenu({
 
   const handleFinish = async () => {
     try {
-      // First, validate ALL tasks before making any updates
-      for (const t of tasks) {
-        if (t.status === TASK_STATUS.IN_PRODUCTION) {
-          const taskName = t.name || t.serialNumber || t.truck?.plate || 'Tarefa';
-
-          // Get all PRODUCTION service orders for this task
-          const productionServiceOrders = t.serviceOrders?.filter(
-            (service) => service && service.type === SERVICE_ORDER_TYPE.PRODUCTION
-          ) || [];
-
-          // REQUIREMENT 1: Task MUST have at least one production service order
-          if (productionServiceOrders.length === 0) {
-            toast.error("Não é possível finalizar", {
-              description: `${taskName}: A tarefa deve ter pelo menos uma ordem de serviço de produção antes de finalizar.`,
-            });
-            setDropdownOpen(false);
-            return;
-          }
-
-          // REQUIREMENT 2: ALL production service orders must be COMPLETED
-          const hasIncompleteProduction = productionServiceOrders.some(
-            (service) => !service.status || service.status !== SERVICE_ORDER_STATUS.COMPLETED
-          );
-
-          if (hasIncompleteProduction) {
-            toast.error("Não é possível finalizar", {
-              description: `${taskName}: Todas as ordens de serviço de produção devem estar concluídas antes de finalizar a tarefa.`,
-            });
-            setDropdownOpen(false);
-            return;
-          }
-        }
-      }
-
-      // If validation passed for all tasks, proceed with updates
+      // Finish all IN_PRODUCTION tasks — the API auto-completes any remaining production SOs
       for (const t of tasks) {
         if (t.status === TASK_STATUS.IN_PRODUCTION) {
           await update({

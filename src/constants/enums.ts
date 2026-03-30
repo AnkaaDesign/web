@@ -1990,8 +1990,8 @@ export enum FAVORITE_PAGES {
 
   // Administration - List Pages
   ADMINISTRACAO_COMISSOES_LISTAR = "/administracao/comissoes",
-  ADMINISTRACAO_CLIENTES_LISTAR = "/administracao/clientes",
-  ADMINISTRACAO_RESPONSAVEIS_LISTAR = "/administracao/clientes/responsaveis",
+  ADMINISTRACAO_CLIENTES_LISTAR = "/financeiro/clientes",
+  ADMINISTRACAO_RESPONSAVEIS_LISTAR = "/financeiro/clientes/responsaveis",
   ADMINISTRACAO_COLABORADORES_LISTAR = "/administracao/colaboradores",
   ADMINISTRACAO_ORCAMENTOS_LISTAR = "/administracao/orcamentos",
   ADMINISTRACAO_REGISTROS_ALTERACOES_LISTAR = "/administracao/registros-de-alteracoes",
@@ -2002,7 +2002,7 @@ export enum FAVORITE_PAGES {
   ADMINISTRACAO_FOLHA_DE_PAGAMENTO = "/recursos-humanos/folha-de-pagamento",
 
   // Administration - Create Pages
-  ADMINISTRACAO_CLIENTES_CADASTRAR = "/administracao/clientes/cadastrar",
+  ADMINISTRACAO_CLIENTES_CADASTRAR = "/financeiro/clientes/cadastrar",
   ADMINISTRACAO_COLABORADORES_CADASTRAR = "/administracao/colaboradores/cadastrar",
   ADMINISTRACAO_ORCAMENTOS_CADASTRAR = "/administracao/orcamentos/cadastrar",
   ADMINISTRACAO_ARQUIVOS_CADASTRAR = "/administracao/arquivos/upload",
@@ -2016,6 +2016,7 @@ export enum FAVORITE_PAGES {
   FINANCEIRO_DASHBOARD = "/financeiro",
   FINANCEIRO_CLIENTES_LISTAR = "/financeiro/clientes",
   FINANCEIRO_FATURAMENTO = "/financeiro/faturamento",
+  FINANCEIRO_ORCAMENTO = "/financeiro/orcamento",
 
   // Human Resources - List Pages
   RECURSOS_HUMANOS_CARGOS_LISTAR = "/recursos-humanos/cargos",

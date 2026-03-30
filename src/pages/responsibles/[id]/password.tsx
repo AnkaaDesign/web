@@ -134,8 +134,8 @@ export default function UpdatePasswordPage() {
           icon={IconLock}
           breadcrumbs={[
             { label: 'Início', href: routes.home },
-            { label: 'Administração', href: routes.administration.root },
-            { label: 'Clientes', href: routes.administration.customers.root },
+            { label: 'Financeiro', href: routes.financial.root },
+            { label: 'Clientes', href: routes.financial.customers.root },
             { label: 'Responsáveis', href: routes.responsibles.root },
             { label: responsible.name, href: routes.responsibles.edit(id!) },
             { label: 'Alterar Senha' },
