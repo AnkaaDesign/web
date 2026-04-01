@@ -15,7 +15,7 @@ import { IconFilter, IconX, IconCalendar, IconBuilding } from "@tabler/icons-rea
 import { getCustomers } from "@/api-client/customer";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 
-// Only billing-relevant statuses (PENDING and SETTLED excluded from default view)
+// Billing-relevant statuses (only PENDING excluded from default view)
 const QUOTE_STATUS_OPTIONS = [
   { value: "BUDGET_APPROVED", label: "Orçamento Aprovado" },
   { value: "VERIFIED_BY_FINANCIAL", label: "Verificado pelo Financeiro" },
@@ -23,6 +23,7 @@ const QUOTE_STATUS_OPTIONS = [
   { value: "UPCOMING", label: "A Vencer" },
   { value: "DUE", label: "Vencido" },
   { value: "PARTIAL", label: "Parcial" },
+  { value: "SETTLED", label: "Liquidado" },
 ];
 
 export interface BillingFilters {

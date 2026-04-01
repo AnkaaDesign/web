@@ -244,8 +244,8 @@ const renderFavoriteIcon = (fav: any, size: number = 20) => {
     return (
       <div className="relative">
         {mainIcon}
-        <div className="absolute -top-1.5 -right-1.5 bg-white dark:bg-gray-800 rounded-full p-0.5">
-          <IconPlus size={10} className="text-green-600" strokeWidth={3} />
+        <div className="absolute -top-1.5 -right-1.5 bg-white dark:bg-gray-200 rounded-full p-0.5">
+          <IconPlus size={10} className="text-green-600 dark:text-green-700" strokeWidth={3} />
         </div>
       </div>
     );

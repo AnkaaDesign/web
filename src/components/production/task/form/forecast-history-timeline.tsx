@@ -72,7 +72,8 @@ export function ForecastHistoryTimeline({ taskId }: ForecastHistoryTimelineProps
     );
   }
 
-  const entries = (data?.data ?? []) as TaskForecastHistory[];
+  // Filter out entries where previousDate is null — setting a forecast for the first time is not a reschedule
+  const entries = ((data?.data ?? []) as TaskForecastHistory[]).filter(e => e.previousDate);
 
   if (entries.length === 0) {
     return (

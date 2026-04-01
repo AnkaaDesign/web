@@ -10,9 +10,16 @@ import type { BudgetFilters } from "@/components/financial/budget/budget-filter-
 import { SECTOR_PRIVILEGES, FAVORITE_PAGES, routes } from "@/constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
-import { IconFileDescription, IconFilter } from "@tabler/icons-react";
+import { IconFileDescription, IconFilter, IconPlus } from "@tabler/icons-react";
+import { useNavigate } from "react-router-dom";
+import { canEditQuote } from "@/utils/permissions/quote-permissions";
+import { useAuth } from "@/contexts/auth-context";
 
 export const BudgetListPage = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditQuote(user?.sector?.privileges || "");
+
   usePageTracker({
     title: "Orçamentos",
     icon: "file-description",
@@ -59,6 +66,15 @@ export const BudgetListPage = () => {
             { label: "Orçamentos" },
           ]}
           className="flex-shrink-0"
+          actions={canEdit ? [
+            {
+              key: "create",
+              label: "Cadastrar",
+              icon: IconPlus,
+              onClick: () => navigate(routes.financial.budget.create),
+              variant: "default",
+            },
+          ] : []}
         />
 
         <div className="flex-1 min-h-0 pb-6 flex flex-col">

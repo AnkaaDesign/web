@@ -13,12 +13,17 @@ interface TrendCardProps {
   className?: string;
 }
 
-export function TrendCard({ title, value, trend = "stable", percentage = 0, icon: Icon, subtitle, className }: TrendCardProps) {
-  const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
+export function TrendCard({ title, value, trend, percentage, icon: Icon, subtitle, className }: TrendCardProps) {
+  // Only show trend badge when there is real trend data (non-zero percentage or explicit up/down trend)
+  const hasTrendData = (percentage !== undefined && percentage !== null && percentage !== 0) || (trend === "up" || trend === "down");
+  const effectiveTrend = trend ?? "stable";
+  const effectivePercentage = percentage ?? 0;
 
-  const trendColorClass = trend === "up" ? "text-green-600 dark:text-green-400" : trend === "down" ? "text-red-600 dark:text-red-400" : "text-gray-600 dark:text-gray-400";
+  const TrendIcon = effectiveTrend === "up" ? TrendingUp : effectiveTrend === "down" ? TrendingDown : Minus;
 
-  const trendBgClass = trend === "up" ? "bg-green-500/10 dark:bg-green-400/20" : trend === "down" ? "bg-red-500/10 dark:bg-red-400/20" : "bg-neutral-500/10 dark:bg-neutral-400/20";
+  const trendColorClass = effectiveTrend === "up" ? "text-green-600 dark:text-green-400" : effectiveTrend === "down" ? "text-red-600 dark:text-red-400" : "text-gray-600 dark:text-gray-400";
+
+  const trendBgClass = effectiveTrend === "up" ? "bg-green-500/10 dark:bg-green-400/20" : effectiveTrend === "down" ? "bg-red-500/10 dark:bg-red-400/20" : "bg-neutral-500/10 dark:bg-neutral-400/20";
 
   return (
     <Card className={cn("hover:shadow-sm transition-shadow", className)}>
@@ -27,10 +32,10 @@ export function TrendCard({ title, value, trend = "stable", percentage = 0, icon
           <div className="p-1.5 bg-neutral-500/10 dark:bg-neutral-400/20 rounded">
             <Icon className="w-3.5 h-3.5 text-neutral-700 dark:text-neutral-300" />
           </div>
-          {percentage !== undefined && (
+          {hasTrendData && (
             <div className={cn("flex items-center gap-0.5 px-1.5 py-0.5 rounded-full", trendBgClass, trendColorClass)}>
               <TrendIcon className="w-2.5 h-2.5" />
-              <span className="text-xs font-medium">{Math.abs(percentage)}%</span>
+              <span className="text-xs font-medium">{Math.abs(effectivePercentage)}%</span>
             </div>
           )}
         </div>

@@ -5,7 +5,8 @@ import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { formatDate, formatChassis, formatCNPJ } from "@/utils";
-import { IconTruck, IconUsers, IconAlertTriangle } from "@tabler/icons-react";
+import { IconTruck, IconUsers, IconAlertTriangle, IconTrash } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
 import { getCustomers } from "@/api-client/customer";
 
 interface BillingStepInfoProps {
@@ -240,6 +241,19 @@ export function BillingStepInfo({ task, disabled, customersCache }: BillingStepI
                       <Badge variant="approved" className="whitespace-nowrap">
                         Dados completos
                       </Badge>
+                    )}
+                    {!disabled && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          const updated = customerConfigs.filter((c: any) => c.customerId !== config.customerId);
+                          setValue("customerConfigs", updated, { shouldDirty: true });
+                        }}
+                      >
+                        <IconTrash className="h-4 w-4" />
+                      </Button>
                     )}
                   </div>
                 );

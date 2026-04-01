@@ -1,9 +1,7 @@
 import type { Task } from "@/types";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
-import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { formatDate, formatCurrency } from "@/utils";
-import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
 
 const renderDate = (date: Date | string | null | undefined) => {
   if (!date) return <span className="text-muted-foreground">-</span>;
@@ -16,7 +14,7 @@ export function createBudgetColumns(): StandardizedColumn<Task>[] {
       key: "name",
       header: "LOGOMARCA",
       sortable: true,
-      width: "18%",
+      width: "20%",
       render: (task) => (
         <TruncatedTextWithTooltip
           text={task.name}
@@ -39,7 +37,7 @@ export function createBudgetColumns(): StandardizedColumn<Task>[] {
       key: "invoiceToCustomers",
       header: "CLIENTES",
       sortable: false,
-      width: "30%",
+      width: "28%",
       render: (task) => {
         const configs = task.quote?.customerConfigs;
         if (!configs || configs.length === 0) return <span className="text-muted-foreground">-</span>;
@@ -63,17 +61,24 @@ export function createBudgetColumns(): StandardizedColumn<Task>[] {
       },
     },
     {
-      key: "finishedAt",
-      header: "FINALIZADO EM",
+      key: "forecastDate",
+      header: "PREVISÃO",
       sortable: true,
-      width: "9%",
-      render: (task) => renderDate(task.finishedAt),
+      width: "10%",
+      render: (task) => renderDate(task.forecastDate),
+    },
+    {
+      key: "term",
+      header: "PRAZO",
+      sortable: true,
+      width: "10%",
+      render: (task) => renderDate(task.term),
     },
     {
       key: "quoteTotal",
       header: "VALOR",
       sortable: false,
-      width: "10%",
+      width: "12%",
       render: (task) => {
         const total = task.quote?.total;
         if (!total) return <span className="text-muted-foreground">-</span>;
@@ -82,17 +87,6 @@ export function createBudgetColumns(): StandardizedColumn<Task>[] {
             {formatCurrency(Number(total))}
           </span>
         );
-      },
-    },
-    {
-      key: "quote.statusOrder",
-      header: "STATUS",
-      sortable: true,
-      width: "14%",
-      render: (task) => {
-        const status = task.quote?.status;
-        if (!status) return <span className="text-muted-foreground">-</span>;
-        return <QuoteStatusBadge status={status as TASK_QUOTE_STATUS} size="sm" />;
       },
     },
   ];

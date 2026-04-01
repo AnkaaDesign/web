@@ -32,7 +32,6 @@ import { useSuppliers } from "../../../../hooks";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Separator } from "@/components/ui/separator";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
-import { AdminUserSelector } from "@/components/administration/user/form/user-selector";
 import { SECTOR_PRIVILEGES } from "../../../../constants";
 
 interface OrderEditFormProps {
@@ -1453,108 +1452,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                           </div>
                         </div>
 
-                        {/* Payment Method */}
-                        <div className="space-y-4">
-                          <Separator />
-                          <div className="space-y-4">
-                            <Label className="text-sm font-medium flex items-center gap-2">
-                              <IconCreditCard className="h-4 w-4" />
-                              Método de Pagamento
-                            </Label>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              {/* Payment Responsible */}
-                              <div className="space-y-2">
-                                <AdminUserSelector
-                                  control={form.control}
-                                  name="paymentResponsibleId"
-                                  label="Responsável pelo Pagamento"
-                                  placeholder="Selecione o responsável"
-                                  initialUser={order?.paymentResponsible}
-                                  includeSectorPrivileges={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}
-                                />
-                              </div>
-
-                              {/* Payment Method Selector */}
-                              <div className="space-y-2">
-                                <Label className="text-sm text-muted-foreground">Forma de Pagamento</Label>
-                                <Combobox
-                                  value={form.watch("paymentMethod") || ""}
-                                  onValueChange={(value) => {
-                                    const stringValue = Array.isArray(value) ? value[0] : value;
-                                    form.setValue("paymentMethod", stringValue || null, { shouldDirty: true });
-                                    // Clear conditional fields when payment method changes
-                                    if (stringValue !== "PIX") {
-                                      form.setValue("paymentPix", null, { shouldDirty: true });
-                                    }
-                                    if (stringValue !== "BANK_SLIP") {
-                                      form.setValue("paymentDueDays", null, { shouldDirty: true });
-                                    }
-                                  }}
-                                  options={[
-                                    { value: "PIX", label: "Pix" },
-                                    { value: "BANK_SLIP", label: "Boleto" },
-                                    { value: "CREDIT_CARD", label: "Cartão de Crédito" },
-                                  ]}
-                                  placeholder="Selecione (opcional)"
-                                  emptyText="Nenhuma opção"
-                                  className="h-10 w-full"
-                                />
-                              </div>
-
-                              {/* PIX Key - Show only when PIX is selected */}
-                              {form.watch("paymentMethod") === "PIX" && (
-                                <div className="space-y-2">
-                                  <Label className="text-sm text-muted-foreground">Chave Pix</Label>
-                                  <Input
-                                    placeholder={
-                                      suppliers.find(s => s.id === supplierId)?.pix
-                                        ? `Padrão do fornecedor: ${suppliers.find(s => s.id === supplierId)?.pix}`
-                                        : "CPF, CNPJ, E-mail, Telefone ou Chave Aleatória"
-                                    }
-                                    value={form.watch("paymentPix") || suppliers.find(s => s.id === supplierId)?.pix || ""}
-                                    onChange={(value) => {
-                                      // Input component passes value directly, not an event
-                                      form.setValue("paymentPix", (value as string) || null, { shouldDirty: true });
-                                    }}
-                                    onBlur={() => {
-                                      const currentValue = form.getValues("paymentPix");
-                                      if (currentValue) {
-                                        const formatted = formatPixKey(currentValue);
-                                        form.setValue("paymentPix", formatted, { shouldDirty: true });
-                                      }
-                                    }}
-                                    transparent
-                                    className="h-10 w-full"
-                                  />
-                                </div>
-                              )}
-
-                              {/* Due Days - Show only when BANK_SLIP is selected */}
-                              {form.watch("paymentMethod") === "BANK_SLIP" && (
-                                <div className="space-y-2">
-                                  <Label className="text-sm text-muted-foreground">Prazo de Vencimento</Label>
-                                  <Combobox
-                                    value={form.watch("paymentDueDays")?.toString() || ""}
-                                    onValueChange={(value) => {
-                                      const stringValue = Array.isArray(value) ? value[0] : value;
-                                      form.setValue("paymentDueDays", stringValue ? parseInt(stringValue) : null, { shouldDirty: true });
-                                    }}
-                                    options={[
-                                      { value: "30", label: "30 dias" },
-                                      { value: "60", label: "60 dias" },
-                                      { value: "90", label: "90 dias" },
-                                      { value: "120", label: "120 dias" },
-                                    ]}
-                                    placeholder="Selecione o prazo"
-                                    emptyText="Nenhum prazo"
-                                    className="h-10 w-full"
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
                         {/* File uploads */}
                         <div className="space-y-4">
                           <Separator />
@@ -1693,53 +1590,201 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
                 {currentStep === 3 && (
                   <div className="space-y-6">
-                    {/* Summary Card */}
-                    <Card className="w-full">
-                      <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                          <span className="flex items-center gap-2">
-                            <IconShoppingCart className="h-5 w-5" />
-                            Resumo do Pedido
-                          </span>
-                          <Button type="button" variant="outline" size="sm" onClick={exportToPDF} className="gap-2">
-                            <IconDownload className="h-4 w-4" />
-                            Baixar PDF
-                          </Button>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
-                          <div>
-                            <span className="text-sm font-medium text-muted-foreground">Descrição:</span>
-                            <p className="mt-1 font-medium">{description}</p>
+                    {/* Order Summary Header */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-semibold text-foreground">Revisão do Pedido</h2>
+                        <p className="text-sm text-muted-foreground mt-1">Confirme os detalhes antes de finalizar</p>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={exportToPDF} className="gap-2 text-muted-foreground hover:text-foreground">
+                        <IconDownload className="h-4 w-4" />
+                        Exportar PDF
+                      </Button>
+                    </div>
+
+                    {/* Info + Payment side by side */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Order Info Card */}
+                      <Card className="h-full">
+                        <CardHeader className="pb-4">
+                          <CardTitle className="flex items-center gap-2">
+                            <IconClipboardList className="h-5 w-5" />
+                            Informações do Pedido
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0 space-y-3">
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Descrição</span>
+                            <span className="text-sm font-semibold text-foreground truncate ml-4 text-right">{description || "-"}</span>
                           </div>
-                          <div>
-                            <span className="text-sm font-medium text-muted-foreground">Fornecedor:</span>
-                            <p className="mt-1 font-medium">{supplierId ? suppliers.find((s) => s.id === supplierId)?.fantasyName || "-" : "-"}</p>
+
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Fornecedor</span>
+                            <span className="text-sm font-semibold text-foreground truncate ml-4 text-right">
+                              {supplierId ? suppliers.find((s) => s.id === supplierId)?.fantasyName || "-" : "-"}
+                            </span>
                           </div>
-                          <div>
-                            <span className="text-sm font-medium text-muted-foreground">Previsão:</span>
-                            <p className="mt-1 font-medium">{forecast ? formatDate(forecast) : "-"}</p>
+
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Previsão de Entrega</span>
+                            <span className="text-sm font-semibold text-foreground">{forecast ? formatDate(forecast) : "-"}</span>
                           </div>
-                          <div>
-                            <span className="text-sm font-medium text-muted-foreground">Quantidade de Itens:</span>
-                            <p className="mt-1 font-medium">
+
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Itens</span>
+                            <span className="text-sm font-semibold text-foreground">
                               {itemCount} {itemCount === 1 ? "item" : "itens"}
-                            </p>
+                            </span>
                           </div>
-                          <div>
-                            <span className="text-sm font-medium text-muted-foreground">Valor Total:</span>
-                            <p className="mt-1 font-medium">{formatCurrency(totalPrice)}</p>
+
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Valor Total</span>
+                            <span className="text-sm font-semibold text-primary">{formatCurrency(totalPrice)}</span>
                           </div>
+
                           {notes && (
-                            <div className="md:col-span-3">
-                              <span className="text-sm font-medium text-muted-foreground">Observações:</span>
-                              <p className="mt-1">{notes}</p>
+                            <div className="bg-muted/50 rounded-lg px-4 py-3">
+                              <span className="text-sm text-muted-foreground block mb-1">Observações</span>
+                              <p className="text-sm text-foreground whitespace-pre-wrap">{notes}</p>
                             </div>
                           )}
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
+
+                      {/* Payment Method Card */}
+                      <Card className="h-full">
+                        <CardHeader className="pb-4">
+                          <CardTitle className="flex items-center gap-2">
+                            <IconCreditCard className="h-5 w-5" />
+                            Método de Pagamento
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0 space-y-3">
+                          {/* Payment Responsible */}
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
+                            <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Responsável</span>
+                            <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
+                              <Combobox
+                                async={true}
+                                queryKey={["users", "active", "paymentResponsible", SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}
+                                queryFn={async (searchTerm: string, page = 1) => {
+                                  const { getUsers } = await import("../../../../api-client");
+                                  const response = await getUsers({
+                                    where: { isActive: true },
+                                    statuses: ["EXPERIENCE_PERIOD_1", "EXPERIENCE_PERIOD_2", "EFFECTED"],
+                                    orderBy: { name: "asc" },
+                                    page,
+                                    take: 50,
+                                    select: { id: true, name: true },
+                                    ...(searchTerm?.trim() ? { searchingFor: searchTerm.trim() } : {}),
+                                    includeSectorPrivileges: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+                                  } as any);
+                                  return {
+                                    data: (response.data || []).map((u: any) => ({ value: u.id, label: u.name })),
+                                    hasMore: response.meta?.hasNextPage || false,
+                                  };
+                                }}
+                                initialOptions={order?.paymentResponsible ? [{ value: order.paymentResponsible.id, label: order.paymentResponsible.name }] : []}
+                                value={form.watch("paymentResponsibleId") || ""}
+                                onValueChange={(value) => {
+                                  const stringValue = Array.isArray(value) ? value[0] : value;
+                                  form.setValue("paymentResponsibleId", stringValue || undefined, { shouldDirty: true });
+                                }}
+                                placeholder="Selecione o responsável"
+                                emptyText="Nenhum usuário encontrado"
+                                clearable
+                                searchable
+                                minSearchLength={0}
+                                pageSize={50}
+                                debounceMs={300}
+                                className="h-8 w-full"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Payment Method Selector */}
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
+                            <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Forma de Pagamento</span>
+                            <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
+                              <Combobox
+                                value={form.watch("paymentMethod") || ""}
+                                onValueChange={(value) => {
+                                  const stringValue = Array.isArray(value) ? value[0] : value;
+                                  form.setValue("paymentMethod", stringValue || null, { shouldDirty: true });
+                                  if (stringValue !== "PIX") {
+                                    form.setValue("paymentPix", null, { shouldDirty: true });
+                                  }
+                                  if (stringValue !== "BANK_SLIP") {
+                                    form.setValue("paymentDueDays", null, { shouldDirty: true });
+                                  }
+                                }}
+                                options={[
+                                  { value: "PIX", label: "Pix" },
+                                  { value: "BANK_SLIP", label: "Boleto" },
+                                  { value: "CREDIT_CARD", label: "Cartão de Crédito" },
+                                ]}
+                                placeholder="Selecione (opcional)"
+                                emptyText="Nenhuma opção"
+                                className="h-8 w-full"
+                              />
+                            </div>
+                          </div>
+
+                          {/* PIX Key - Show only when PIX is selected */}
+                          {form.watch("paymentMethod") === "PIX" && (
+                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
+                              <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Chave Pix</span>
+                              <div className="flex-1 max-w-[55%]">
+                                <Input
+                                  placeholder={
+                                    suppliers.find(s => s.id === supplierId)?.pix
+                                      ? `Padrão: ${suppliers.find(s => s.id === supplierId)?.pix}`
+                                      : "CPF, CNPJ, E-mail, Telefone..."
+                                  }
+                                  value={form.watch("paymentPix") || suppliers.find(s => s.id === supplierId)?.pix || ""}
+                                  onChange={(value) => {
+                                    form.setValue("paymentPix", (value as string) || null, { shouldDirty: true });
+                                  }}
+                                  onBlur={() => {
+                                    const currentValue = form.getValues("paymentPix");
+                                    if (currentValue) {
+                                      const formatted = formatPixKey(currentValue);
+                                      form.setValue("paymentPix", formatted, { shouldDirty: true });
+                                    }
+                                  }}
+                                  className="h-8 w-full border-neutral-500"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Due Days - Show only when BANK_SLIP is selected */}
+                          {form.watch("paymentMethod") === "BANK_SLIP" && (
+                            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
+                              <span className="text-sm text-muted-foreground whitespace-nowrap mr-4">Prazo de Vencimento</span>
+                              <div className="flex-1 max-w-[55%] [&_button]:border-neutral-500">
+                                <Combobox
+                                  value={form.watch("paymentDueDays")?.toString() || ""}
+                                  onValueChange={(value) => {
+                                    const stringValue = Array.isArray(value) ? value[0] : value;
+                                    form.setValue("paymentDueDays", stringValue ? parseInt(stringValue) : null, { shouldDirty: true });
+                                  }}
+                                  options={[
+                                    { value: "30", label: "30 dias" },
+                                    { value: "60", label: "60 dias" },
+                                    { value: "90", label: "90 dias" },
+                                    { value: "120", label: "120 dias" },
+                                  ]}
+                                  placeholder="Selecione o prazo"
+                                  emptyText="Nenhum prazo"
+                                  className="h-8 w-full"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
 
                     {/* Items Table */}
                     <Card className="w-full">

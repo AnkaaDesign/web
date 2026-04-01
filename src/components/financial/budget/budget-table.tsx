@@ -30,7 +30,7 @@ export function BudgetTable({ className, searchingFor, filters }: BudgetTablePro
     getSortOrder,
   } = useTableState({
     defaultPageSize: 40,
-    defaultSort: [{ column: "finishedAt", direction: "desc" }],
+    defaultSort: [{ column: "term", direction: "asc" }],
     sortStorageKey: "budget-table-sort",
     useUrlForSort: true,
   });

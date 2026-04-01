@@ -48,6 +48,7 @@ import { nfseService } from "@/api-client/nfse";
 import type { Invoice } from "@/types/invoice";
 import { taskQuoteService } from "@/api-client/task-quote";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
+import { isTaskQuoteBillingPhase } from "@/constants/enum-labels";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { getApiBaseUrl, rewriteCdnUrl } from "@/utils/file";
 import { exportDossiePdf } from "@/utils/dossie-pdf-generator";
@@ -1165,14 +1166,6 @@ export const TaskDetailsPage = () => {
     fileViewerContext.actions.viewFiles(projectFilesList, index);
   };
 
-  // Handler for dossiê file viewing (scoped to a service order's checkin+checkout files)
-  const handleDossieFileClick = useCallback((serviceOrder: any, file: CustomFile) => {
-    if (!fileViewerContext) return;
-    const allFiles = [...(serviceOrder.checkinFiles || []), ...(serviceOrder.checkoutFiles || [])];
-    const index = allFiles.findIndex((f: any) => f.id === file.id);
-    fileViewerContext.actions.viewFiles(allFiles, index >= 0 ? index : 0);
-  }, [fileViewerContext]);
-
   // Handler for artworks collection viewing
   const handleArtworkFileClick = (file: any) => {
     if (!fileViewerContext) return;
@@ -1287,6 +1280,27 @@ export const TaskDetailsPage = () => {
   });
 
   const task = response?.data;
+
+  // Handler for dossiê file viewing — shows ALL dossiê files across all service orders
+  // Order: SO1 checkin, SO1 checkout, SO2 checkin, SO2 checkout, ...
+  const handleDossieFileClick = useCallback((_serviceOrder: any, file: CustomFile) => {
+    if (!fileViewerContext || !task?.serviceOrders) return;
+    const productionSOs = (task.serviceOrders as any[])
+      .filter((so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && (so.checkinFiles?.length > 0 || so.checkoutFiles?.length > 0))
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const allFiles: any[] = [];
+    for (const so of productionSOs) {
+      const checkin = so.checkinFiles || [];
+      const checkout = so.checkoutFiles || [];
+      const maxLen = Math.max(checkin.length, checkout.length);
+      for (let i = 0; i < maxLen; i++) {
+        if (i < checkin.length) allFiles.push(checkin[i]);
+        if (i < checkout.length) allFiles.push(checkout[i]);
+      }
+    }
+    const index = allFiles.findIndex((f: any) => f.id === file.id);
+    fileViewerContext.actions.viewFiles(allFiles, index >= 0 ? index : 0);
+  }, [fileViewerContext, task?.serviceOrders]);
 
   // Filter artworks based on user permissions - only show approved artworks to non-privileged users
   const filteredArtworks = useMemo(() => {
@@ -2249,7 +2263,11 @@ export const TaskDetailsPage = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => navigate(breadcrumbConfig.quoteRoute(task.id))}
+                              onClick={() => navigate(
+                                isTaskQuoteBillingPhase(task.quote?.status)
+                                  ? routes.financial.billing.details(task.id)
+                                  : routes.financial.budget.details(task.id)
+                              )}
                               className="gap-2"
                             >
                               <IconEdit className="h-4 w-4" />
@@ -2292,10 +2310,10 @@ export const TaskDetailsPage = () => {
                               SETTLED: 'Liquidado',
                             };
 
-                            // Build options: all statuses the user can transition to + current
+                            // Task detail page only allows PENDING and BUDGET_APPROVED transitions
+                            // Further status changes must be done in the financial billing page
                             const allStatuses: TASK_QUOTE_STATUS[] = [
-                              'PENDING', 'BUDGET_APPROVED', 'VERIFIED_BY_FINANCIAL', 'BILLING_APPROVED',
-                              'UPCOMING', 'DUE', 'PARTIAL', 'SETTLED',
+                              'PENDING', 'BUDGET_APPROVED',
                             ];
                             const userPrivilege = currentUser?.sector?.privileges || '';
                             const statusOptions: ComboboxOption[] = allStatuses
@@ -4055,7 +4073,7 @@ export const TaskDetailsPage = () => {
                       </p>
                     </CardHeader>
                     <CardContent className="pt-0 flex-1">
-                      <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
                         {serviceOrdersWithFiles.map((serviceOrder: any) => {
                           const isOutrosWithObservation = serviceOrder.description === 'Outros' && !!serviceOrder.observation;
                           const displayDescription = isOutrosWithObservation ? serviceOrder.observation : serviceOrder.description;
@@ -4082,7 +4100,7 @@ export const TaskDetailsPage = () => {
                                 )}
                               </div>
 
-                              {/* Check-in / Check-out Content - stacked vertically */}
+                              {/* Check-in / Check-out Content */}
                               <div className="px-3 py-3 space-y-5">
                                 {/* Check-in */}
                                 <div className="space-y-2">
@@ -4092,7 +4110,7 @@ export const TaskDetailsPage = () => {
                                     <span className="text-[11px] text-muted-foreground">{checkinFiles.length}</span>
                                   </div>
                                   {checkinFiles.length > 0 ? (
-                                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                                    <div className="flex gap-1.5 flex-wrap">
                                       {checkinFiles.map((file: any) => {
                                         const src = file.thumbnailUrl
                                           ? (file.thumbnailUrl.startsWith('/api') ? `${apiUrl}${file.thumbnailUrl}` : file.thumbnailUrl)
@@ -4125,7 +4143,7 @@ export const TaskDetailsPage = () => {
                                     <span className="text-[11px] text-muted-foreground">{checkoutFiles.length}</span>
                                   </div>
                                   {checkoutFiles.length > 0 ? (
-                                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                                    <div className="flex gap-1.5 flex-wrap">
                                       {checkoutFiles.map((file: any) => {
                                         const src = file.thumbnailUrl
                                           ? (file.thumbnailUrl.startsWith('/api') ? `${apiUrl}${file.thumbnailUrl}` : file.thumbnailUrl)
@@ -4173,7 +4191,7 @@ export const TaskDetailsPage = () => {
                   task.truck?.rightSideLayoutId,
                   task.truck?.backSideLayoutId,
                 ].filter(Boolean) as string[]}
-                quoteId={task.quote?.id}
+                quoteId={canViewQuoteSection ? task.quote?.id : undefined}
                 className="lg:w-1/2 animate-in fade-in-50 duration-1300"
                 maxHeight="45rem"
               />

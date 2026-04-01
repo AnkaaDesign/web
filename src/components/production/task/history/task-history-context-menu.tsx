@@ -5,7 +5,7 @@ import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdo
 import { IconExternalLink, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter, IconReceipt } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
-import { getTaskQuoteDisplayLabel } from "@/constants/enum-labels";
+import { getTaskQuoteDisplayLabel, isTaskQuoteBillingPhase } from "@/constants/enum-labels";
 import type { Task } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
 import { SetStatusModal } from "../schedule/set-status-modal";
@@ -607,7 +607,10 @@ export function TaskHistoryContextMenu({
           {/* Quote - ADMIN, FINANCIAL, COMMERCIAL (single selection only) */}
           {canViewQuote(user?.sector?.privileges || "") && !isBulk && (
             <DropdownMenuItem onClick={() => {
-              navigate(routes.financial.budget.details(task.id));
+              const route = isTaskQuoteBillingPhase(task.quote?.status)
+                ? routes.financial.billing.details(task.id)
+                : routes.financial.budget.details(task.id);
+              navigate(route);
               setDropdownOpen(false);
             }}>
               <IconReceipt className="mr-2 h-4 w-4" />

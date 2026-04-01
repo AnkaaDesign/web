@@ -1565,12 +1565,14 @@ const ChangelogTimelineItem = ({
                 if (changelog.field === "statusOrder") return false;
                 if (changelog.field === "colorOrder") return false;
 
-                // Filter out financial fields for non-FINANCIAL/ADMIN users
+                // Filter out financial fields for non-FINANCIAL/COMMERCIAL/ADMIN users
                 const financialFields = [
                   "quoteId",
+                  "pricingId",
                   "budgetIds",
                   "invoiceIds",
                   "receiptIds",
+                  "bankSlipIds",
                   "price",
                   "cost",
                   "value",
@@ -1580,8 +1582,9 @@ const ChangelogTimelineItem = ({
                   "profit",
                 ];
                 const canViewFinancialFields =
+                  userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
                   userSectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
-                  userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
+                  userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL;
                 if (
                   !canViewFinancialFields &&
                   changelog.field &&
@@ -1593,12 +1596,13 @@ const ChangelogTimelineItem = ({
                 }
 
                 // Filter out restricted fields (forecastDate, responsibles) for users who can't view them
-                // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER can see these
+                // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, PRODUCTION_MANAGER, DESIGNER can see these
                 const canViewRestrictedFields =
                   userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
                   userSectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
                   userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
                   userSectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
+                  userSectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER ||
                   userSectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
                 const restrictedFields = [
                   "forecastDate",
@@ -2404,8 +2408,8 @@ const ChangelogTimelineItem = ({
                                 </>
                               );
                             })()
-                          ) : changelog.field === "quoteId" ? (
-                            // Special handling for quoteId - show quote info elegantly with items
+                          ) : changelog.field === "quoteId" || changelog.field === "pricingId" ? (
+                            // Special handling for quoteId/pricingId - show quote info elegantly with items
                             (() => {
                               const parseValue = (val: any) => {
                                 if (val === null || val === undefined)
@@ -2858,7 +2862,13 @@ export function TaskWithServiceOrdersChangelog({
     enabled: layoutIds.length > 0,
   });
 
-  // Fetch task quote changelogs
+  // Determine if user can view quote data (ADMIN, FINANCIAL, COMMERCIAL only)
+  const canViewQuoteData =
+    userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+    userSectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
+    userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL;
+
+  // Fetch task quote changelogs (only for authorized sectors)
   const {
     data: quoteChangelogsResponse,
     isLoading: quoteLoading,
@@ -2876,10 +2886,10 @@ export function TaskWithServiceOrdersChangelog({
       createdAt: "desc",
     },
     take: limit,
-    enabled: !!quoteId,
+    enabled: !!quoteId && canViewQuoteData,
   });
 
-  // Fetch task quote item changelogs (per-item granular tracking)
+  // Fetch task quote item changelogs (per-item granular tracking, only for authorized sectors)
   const {
     data: quoteItemChangelogsResponse,
     isLoading: quoteItemLoading,
@@ -2897,7 +2907,7 @@ export function TaskWithServiceOrdersChangelog({
       createdAt: "desc",
     },
     take: limit,
-    enabled: !!quoteId,
+    enabled: !!quoteId && canViewQuoteData,
   });
 
   // Combine and sort all changelogs
@@ -2915,10 +2925,14 @@ export function TaskWithServiceOrdersChangelog({
     // Only include layout logs if the query is enabled (has layout IDs)
     const layoutLogs =
       layoutIds.length > 0 ? layoutChangelogsResponse?.data || [] : [];
-    // Only include quote logs if the query is enabled (has quote ID)
-    const quoteLogs = quoteId ? quoteChangelogsResponse?.data || [] : [];
-    // Only include quote item logs if the query is enabled (has quote ID)
-    const quoteItemLogs = quoteId ? quoteItemChangelogsResponse?.data || [] : [];
+    // Only include quote logs if the query is enabled (has quote ID) AND user has permission
+    const canViewQuoteLogs =
+      userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+      userSectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
+      userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL;
+    const quoteLogs = quoteId && canViewQuoteLogs ? quoteChangelogsResponse?.data || [] : [];
+    // Only include quote item logs if the query is enabled (has quote ID) AND user has permission
+    const quoteItemLogs = quoteId && canViewQuoteLogs ? quoteItemChangelogsResponse?.data || [] : [];
 
     // Build a map of service order entityId -> type from CREATE actions
     const serviceOrderTypeMap = new Map<string, SERVICE_ORDER_TYPE>();
@@ -3048,6 +3062,7 @@ export function TaskWithServiceOrdersChangelog({
     layoutIds,
     quoteId,
     visibleServiceOrderTypes,
+    userSectorPrivilege,
   ]);
 
   // Extract all entity IDs that need to be fetched for resolution

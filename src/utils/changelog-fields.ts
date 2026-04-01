@@ -139,17 +139,25 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
   [CHANGE_LOG_ENTITY_TYPE.ORDER]: {
     orderId: "ID do Pedido",
     orderItemId: "ID do Item do Pedido",
+    description: "Descrição",
     totalAmount: "Valor Total",
     scheduledFor: "Agendado para",
     deliveryDate: "Data de Entrega",
     receivedDate: "Data de Recebimento",
-    forecast: "Previsão",
+    forecast: "Previsão de Entrega",
     status: "Status",
     status_transition: "Status",
     statusOrder: "Ordem do Status",
+    budgets: "Orçamentos",
     budgetIds: "Orçamentos",
+    invoices: "Notas Fiscais",
     invoiceIds: "Notas Fiscais",
-    receiptIds: "Recibos",
+    receipts: "Comprovantes",
+    receiptIds: "Comprovantes",
+    reimbursements: "Reembolsos",
+    reimbursementIds: "Reembolsos",
+    invoiceReimbursements: "NFEs de Reembolso",
+    invoiceReimbursementIds: "NFEs de Reembolso",
     supplierId: "Fornecedor",
     orderScheduleId: "Agendamento do Pedido",
     orderRuleId: "Regra do Pedido",
@@ -161,8 +169,12 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "budget.filename": "Nome do Orçamento",
     "nfe.filename": "Nome da NFe",
     "receipt.filename": "Nome do Recibo",
+    paymentMethod: "Método de Pagamento",
+    paymentPix: "Chave Pix",
+    paymentDueDays: "Prazo de Vencimento",
     paymentResponsibleId: "Responsável pelo Pagamento",
     paymentAssignedById: "Atribuído por",
+    items: "Itens do Pedido",
   },
   [CHANGE_LOG_ENTITY_TYPE.ORDER_ITEM]: {
     orderId: "Pedido",
@@ -302,6 +314,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     services: "Serviços", // Legacy - for historical changelog records
     serviceOrders: "Ordens de Serviço",
     quoteId: "Orçamento",
+    pricingId: "Orçamento",
     airbrushings: "Aerografias",
     cuts: "Recortes",
     cutRequest: "Solicitações de Corte",
@@ -1133,14 +1146,29 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   if ((field === "status" || field === "status_transition") && entityType === CHANGE_LOG_ENTITY_TYPE.ORDER && typeof value === "string") {
     const orderStatusLabels: Record<string, string> = {
       CREATED: "Criado",
-      PARTIALLY_FULFILLED: "Parcialmente Pedido",
-      FULFILLED: "Pedido",
+      PARTIALLY_FULFILLED: "Parcialmente Feito",
+      FULFILLED: "Feito",
       OVERDUE: "Atrasado",
       PARTIALLY_RECEIVED: "Parcialmente Recebido",
       RECEIVED: "Recebido",
       CANCELLED: "Cancelado",
     };
     return orderStatusLabels[value] || value;
+  }
+
+  // Handle order payment method
+  if (field === "paymentMethod" && entityType === CHANGE_LOG_ENTITY_TYPE.ORDER && typeof value === "string") {
+    const paymentMethodLabels: Record<string, string> = {
+      PIX: "Pix",
+      BANK_SLIP: "Boleto",
+      CREDIT_CARD: "Cartão de Crédito",
+    };
+    return paymentMethodLabels[value] || value;
+  }
+
+  // Handle order payment due days
+  if (field === "paymentDueDays" && entityType === CHANGE_LOG_ENTITY_TYPE.ORDER && typeof value === "number") {
+    return `${value} ${value === 1 ? "dia" : "dias"}`;
   }
 
   // Handle external withdrawal status
@@ -1282,7 +1310,15 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   // Handle task quote fields
   if (entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE) {
     if ((field === "status" || field === "status_transition") && typeof value === "string") {
-      return TASK_QUOTE_STATUS_LABELS[value as TASK_QUOTE_STATUS] || value;
+      // Legacy status values from before quote status refactor
+      const legacyQuoteStatusLabels: Record<string, string> = {
+        DRAFT: "Rascunho",
+        APPROVED: "Aprovado",
+        REJECTED: "Rejeitado",
+        CANCELLED: "Cancelado",
+        EXPIRED: "Expirado",
+      };
+      return TASK_QUOTE_STATUS_LABELS[value as TASK_QUOTE_STATUS] || legacyQuoteStatusLabels[value] || value;
     }
     if (field === "discountType" && typeof value === "string") {
       return DISCOUNT_TYPE_LABELS[value as DISCOUNT_TYPE] || value;
@@ -1301,6 +1337,13 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     }
     if (field === "simultaneousTasks" && typeof value === "number") {
       return `${value} ${value === 1 ? "tarefa" : "tarefas"}`;
+    }
+  }
+
+  // Handle task quote item fields (per-item granular tracking)
+  if (entityType === CHANGE_LOG_ENTITY_TYPE.TASK_QUOTE_ITEM) {
+    if (field === "amount" && (typeof value === "number" || (typeof value === "string" && !isNaN(Number(value))))) {
+      return formatCurrency(Number(value));
     }
   }
 

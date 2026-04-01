@@ -126,7 +126,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       offset={8}
       style={{
         '--width': '280px',
-        right: `${sidebarWidth}px`,
+        right: `${sidebarWidth + 12}px`,
       } as React.CSSProperties}
       toastOptions={{
         style: {
@@ -146,6 +146,17 @@ const Toaster = ({ ...props }: ToasterProps) => {
  * All toast types (success, error, warning, info) use this same layout.
  * zIndex controls layering — API toasts use TOAST_Z_API, notification toasts use TOAST_Z_NOTIFICATION.
  */
+// Short header labels per toast type — used when the title is too long and gets moved to the body
+const TOAST_TYPE_HEADERS: Record<keyof typeof TOAST_STYLES, string> = {
+  success: 'Sucesso',
+  error: 'Erro',
+  warning: 'Atenção',
+  info: 'Info',
+};
+
+// Max chars before the title is considered "long" and moved to description
+const TITLE_MAX_LENGTH = 40;
+
 function renderCustomToast(
   _id: string | number,
   type: keyof typeof TOAST_STYLES,
@@ -156,10 +167,18 @@ function renderCustomToast(
 ) {
   const style = TOAST_STYLES[type];
 
+  // If title is long and there's no description, move title text to the body
+  let displayTitle = title;
+  let displayDescription = description;
+  if (!description && title.length > TITLE_MAX_LENGTH) {
+    displayTitle = TOAST_TYPE_HEADERS[type];
+    displayDescription = title;
+  }
+
   return (
     <div
-      className={`w-full rounded-lg border p-4 shadow-sm relative overflow-hidden ${style.colors}`}
-      style={{ width: 280, maxHeight: 128, zIndex }}
+      className={`w-full rounded-lg border p-4 shadow-sm relative ${style.colors}`}
+      style={{ width: 280, zIndex }}
     >
       <button
         className="absolute top-2 right-2 p-0.5 rounded-full opacity-60 hover:opacity-100 transition-opacity"
@@ -173,9 +192,9 @@ function renderCustomToast(
       <div className="flex items-start gap-2 pr-5">
         {style.icon}
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-sm truncate">{title}</div>
-          {description && (
-            <div className="text-sm opacity-80 mt-1 line-clamp-3">{description}</div>
+          <div className="font-medium text-sm">{displayTitle}</div>
+          {displayDescription && (
+            <div className="text-sm opacity-80 mt-1 line-clamp-4">{displayDescription}</div>
           )}
           {action && (
             <button
@@ -253,13 +272,13 @@ const toast = {
     return sonnerToast.custom(
       (_id) => (
         <div
-          className="w-full rounded-lg border p-4 shadow-sm relative overflow-hidden bg-muted/95 text-foreground border-border"
-          style={{ width: 280, maxHeight: 128, zIndex: TOAST_Z_API }}
+          className="w-full rounded-lg border p-4 shadow-sm relative bg-muted/95 text-foreground border-border"
+          style={{ width: 280, zIndex: TOAST_Z_API }}
         >
           <div className="flex items-start gap-2">
             <IconLoader className="h-4 w-4 shrink-0 animate-spin" />
             <div className="min-w-0 flex-1">
-              <div className="font-medium text-sm truncate">{title}</div>
+              <div className="font-medium text-sm">{title}</div>
               {desc && <div className="text-sm opacity-80 mt-1 line-clamp-3">{desc}</div>}
             </div>
           </div>

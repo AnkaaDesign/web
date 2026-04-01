@@ -12,7 +12,6 @@ import {
   COMMISSION_STATUS,
   COMMISSION_STATUS_LABELS,
   TASK_STATUS,
-  SERVICE_ORDER_STATUS,
   SERVICE_ORDER_TYPE,
   SERVICE_ORDER_TYPE_LABELS,
   SERVICE_ORDER_TYPE_COLUMN_LABELS,
@@ -23,7 +22,7 @@ import { canViewServiceOrderType } from "../../../../utils/permissions/service-o
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { ServiceOrderCell } from "./service-order-cell";
-import { IconCheck, IconAlertTriangle, IconCalendarEvent } from "@tabler/icons-react";
+import { IconCalendarEvent } from "@tabler/icons-react";
 import { QuoteStatusBadge } from "../quote/quote-status-badge";
 
 // Helper function to render date in single-line format: dd/mm/yy hh:mm
@@ -48,81 +47,12 @@ const isToday = (date: Date): boolean => {
     date.getFullYear() === today.getFullYear();
 };
 
-// Helper function to check if a date is in the past
 const isPast = (date: Date): boolean => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const checkDate = new Date(date);
   checkDate.setHours(0, 0, 0, 0);
   return checkDate < today;
-};
-
-// Helper function to calculate days until a date
-const getDaysUntil = (date: Date): number => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const targetDate = new Date(date);
-  targetDate.setHours(0, 0, 0, 0);
-  const diffTime = targetDate.getTime() - today.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-};
-
-// Helper function to get detailed status of commercial and artwork service orders
-const getCommercialArtworkOrdersStatus = (task: Task): {
-  hasIssue: boolean;
-  commercialMissing: boolean;
-  commercialIncomplete: boolean;
-  artworkMissing: boolean;
-  artworkIncomplete: boolean;
-  issueDescription: string;
-} => {
-  const incompleteStatuses = [
-    SERVICE_ORDER_STATUS.PENDING,
-    SERVICE_ORDER_STATUS.IN_PROGRESS,
-    SERVICE_ORDER_STATUS.WAITING_APPROVE
-  ];
-
-  // Check commercial service orders
-  const commercialOrders = task.serviceOrders?.filter(so => so.type === SERVICE_ORDER_TYPE.COMMERCIAL) || [];
-  const commercialMissing = commercialOrders.length === 0;
-  const commercialIncomplete = !commercialMissing && commercialOrders.some(so => so.status && incompleteStatuses.includes(so.status));
-
-  // Check artwork service orders
-  const artworkOrders = task.serviceOrders?.filter(so => so.type === SERVICE_ORDER_TYPE.ARTWORK) || [];
-  const artworkMissing = artworkOrders.length === 0;
-  const artworkIncomplete = !artworkMissing && artworkOrders.some(so => so.status && incompleteStatuses.includes(so.status));
-
-  const hasIssue = commercialMissing || commercialIncomplete || artworkMissing || artworkIncomplete;
-
-  // Build issue description
-  const issues: string[] = [];
-  if (commercialMissing) issues.push('Ordem comercial ausente');
-  if (commercialIncomplete) issues.push('Ordem comercial incompleta');
-  if (artworkMissing) issues.push('Ordem de arte ausente');
-  if (artworkIncomplete) issues.push('Ordem de arte incompleta');
-
-  return {
-    hasIssue,
-    commercialMissing,
-    commercialIncomplete,
-    artworkMissing,
-    artworkIncomplete,
-    issueDescription: issues.join('. ') + (issues.length > 0 ? '.' : ''),
-  };
-};
-
-// Helper function to get urgency color based on days until forecast
-const getUrgencyColor = (daysUntil: number): { color: string; colorClass: string; label: string } | null => {
-  if (daysUntil <= 3) {
-    return { color: 'rgb(239, 68, 68)', colorClass: 'text-red-500', label: '3 dias ou menos' }; // red-500
-  }
-  if (daysUntil <= 7) {
-    return { color: 'rgb(249, 115, 22)', colorClass: 'text-orange-500', label: '7 dias ou menos' }; // orange-500
-  }
-  if (daysUntil <= 10) {
-    return { color: 'rgb(234, 179, 8)', colorClass: 'text-yellow-500', label: '10 dias ou menos' }; // yellow-500
-  }
-  return null;
 };
 
 // Helper function to render forecast date with indicators (only for preparation route)
@@ -144,44 +74,20 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
   // Only show indicators for preparation route
   const showIndicators = navigationRoute === 'preparation';
 
-  // Get detailed status of commercial and artwork service orders
-  const ordersStatus = getCommercialArtworkOrdersStatus(task);
-  const hasIncompleteOrders = ordersStatus.hasIssue;
-
-  // Calculate days until forecast
-  const daysUntil = getDaysUntil(forecastDate);
-
-  // Get urgency color if within threshold and has incomplete orders
-  const urgencyInfo = showIndicators && hasIncompleteOrders ? getUrgencyColor(daysUntil) : null;
-
-  // Blue triangle with check icon when task is cleared (released)
   const isCleared = !!task.cleared;
   const isForecastToday = isToday(forecastDate);
   const isForecastPast = isPast(forecastDate);
-  const showBlueIndicator = showIndicators && isCleared && !hasIncompleteOrders;
 
-  // Red triangle when cleared AND has incomplete orders
-  const showRedTodayWithIncompleteOrders = showIndicators && isCleared && hasIncompleteOrders;
-
-  // Red triangle with alert icon when forecast is past AND has incomplete/missing orders AND not cleared (regardless of entry date)
-  const showRedOverdueWithIncompleteOrders = showIndicators && isForecastPast && !isCleared && hasIncompleteOrders;
-
-  // Red triangle with alert icon when forecast is past AND entry date is not filled AND not cleared (no incomplete orders check)
-  const showRedOverdueNoEntryDate = showIndicators && isForecastPast && !task.entryDate && !isCleared && !hasIncompleteOrders;
-
-  // Show urgency indicator when approaching forecast with incomplete orders (but not cleared or past)
-  const showUrgencyIndicator = showIndicators && urgencyInfo && !isCleared && !isForecastPast;
+  // Green text when entryDate is filled (vehicle has entered) and task is not completed
+  const hasEntryDate = !!task.entryDate && task.status !== TASK_STATUS.COMPLETED;
 
   // Check for manual reschedule history (most recent MANUAL entry)
   const lastManualReschedule = showIndicators
     ? task.forecastHistory
-        ?.filter(h => h.source === 'MANUAL')
+        ?.filter(h => h.source === 'MANUAL' && h.previousDate)
         ?.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())?.[0]
     : undefined;
-  const hasBeenRescheduled = !!lastManualReschedule;
-
-  // Green text when entryDate is filled (vehicle has entered) and task is not completed
-  const hasEntryDate = !!task.entryDate && task.status !== TASK_STATUS.COMPLETED;
+  const hasBeenRescheduled = !!lastManualReschedule && !isCleared;
 
   return (
     <>
@@ -213,98 +119,38 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
             </div>
           </TooltipContent>
         </Tooltip>
+      ) : showIndicators && isForecastPast ? (
+        <Tooltip delayDuration={500}>
+          <TooltipTrigger asChild>
+            <span className="text-red-500 font-medium cursor-help" title={dateTime}>
+              {dateTimeLine}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              <div className="font-medium text-red-500">Previsão vencida</div>
+              <div className="text-muted-foreground">A previsão ({formatted}) já passou</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      ) : showIndicators && isForecastToday ? (
+        <Tooltip delayDuration={500}>
+          <TooltipTrigger asChild>
+            <span className="text-yellow-500 font-medium cursor-help" title={dateTime}>
+              {dateTimeLine}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              <div className="font-medium text-yellow-500">Previsão para hoje</div>
+              <div className="text-muted-foreground">A previsão é para hoje ({formatted})</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       ) : (
         <span title={dateTime}>
           {dateTimeLine}
         </span>
-      )}
-
-      {/* Red indicator for cleared task with incomplete/missing orders */}
-      {showRedTodayWithIncompleteOrders && (
-        <Tooltip delayDuration={500}>
-          <TooltipTrigger asChild>
-            <div className="absolute top-0 right-0 z-[5] w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
-              <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="max-w-xs">
-            <div className="text-sm">
-              <div className="font-medium text-red-500">Liberado - Ordens pendentes</div>
-              <div className="text-muted-foreground">Tarefa liberada mas com ordens pendentes. {ordersStatus.issueDescription}</div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      )}
-
-      {/* Urgency indicator for approaching forecast with incomplete/missing orders */}
-      {showUrgencyIndicator && urgencyInfo && (
-        <Tooltip delayDuration={500}>
-          <TooltipTrigger asChild>
-            <div
-              className="absolute top-0 right-0 z-[5] w-0 h-0 border-l-[28px] border-l-transparent pointer-events-auto cursor-help"
-              style={{ borderTop: `28px solid ${urgencyInfo.color}` }}
-            >
-              <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="max-w-xs">
-            <div className="text-sm">
-              <div className={`font-medium ${urgencyInfo.colorClass}`}>Liberação em {daysUntil} {daysUntil === 1 ? 'dia' : 'dias'}</div>
-              <div className="text-muted-foreground">A liberação ({formatted}) está próxima. {ordersStatus.issueDescription}</div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      )}
-
-      {/* Blue indicator for cleared task (without incomplete orders) - positioned flush with cell corner */}
-      {showBlueIndicator && (
-        <Tooltip delayDuration={500}>
-          <TooltipTrigger asChild>
-            <div className="absolute top-0 right-0 z-[5] w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-blue-500 pointer-events-auto cursor-help">
-              <IconCheck className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="max-w-xs">
-            <div className="text-sm">
-              <div className="font-medium">Liberado</div>
-              <div className="text-muted-foreground">Tarefa liberada para retirada. Previsão: {formatted}</div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      )}
-
-      {/* Red indicator for overdue with incomplete/missing orders - positioned flush with cell corner */}
-      {showRedOverdueWithIncompleteOrders && (
-        <Tooltip delayDuration={500}>
-          <TooltipTrigger asChild>
-            <div className="absolute top-0 right-0 z-[5] w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
-              <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="max-w-xs">
-            <div className="text-sm">
-              <div className="font-medium text-red-500">Liberação atrasada - Ordens pendentes</div>
-              <div className="text-muted-foreground">A liberação ({formatted}) já passou. {ordersStatus.issueDescription}</div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      )}
-
-      {/* Red indicator for overdue without entry date (when no incomplete orders) - positioned flush with cell corner */}
-      {showRedOverdueNoEntryDate && (
-        <Tooltip delayDuration={500}>
-          <TooltipTrigger asChild>
-            <div className="absolute top-0 right-0 z-[5] w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
-              <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="left" className="max-w-xs">
-            <div className="text-sm">
-              <div className="font-medium text-red-500">Liberação atrasada</div>
-              <div className="text-muted-foreground">A liberação ({formatted}) já passou e a data de entrada ainda não foi preenchida</div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
       )}
 
       {/* Reschedule indicator - top-right corner flag when forecast has been manually rescheduled */}

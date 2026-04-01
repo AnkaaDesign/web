@@ -81,6 +81,7 @@ export const TABLER_ICONS = {
   history: "IconHistory", // Better represents historical data
   hourglass: "IconHourglass",
   file: "IconFile",
+  fileDescription: "IconFileDescription",
 
   // ==================== INVENTORY MANAGEMENT ====================
   // Products and Items
@@ -607,7 +608,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
     path: "/estatisticas",
     requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
     children: [
-      { id: "stats-administracao", title: "Administração", icon: "cog", path: "/estatisticas/administracao" },
+      {
+        id: "stats-administracao",
+        title: "Administração",
+        icon: "cog",
+        path: "/estatisticas/administracao",
+        children: [
+          { id: "stats-admin-visao-geral", title: "Visão Geral", icon: "chartBar", path: "/estatisticas/administracao/visao-geral" },
+        ],
+      },
       {
         id: "stats-estoque",
         title: "Estoque",
@@ -620,8 +629,46 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "stats-estoque-top-itens", title: "Top Itens", icon: "trophy", path: "/estatisticas/estoque/top-itens" },
         ],
       },
-      { id: "stats-producao", title: "Produção", icon: "building", path: "/estatisticas/producao" },
-      { id: "stats-recursos-humanos", title: "Recursos Humanos", icon: "users", path: "/estatisticas/recursos-humanos" },
+      {
+        id: "stats-producao",
+        title: "Produção",
+        icon: "building",
+        path: "/estatisticas/producao",
+        children: [
+          { id: "stats-producao-rendimento", title: "Rendimento", icon: "chartBar", path: "/estatisticas/producao/rendimento" },
+          { id: "stats-producao-gargalos", title: "Gargalos", icon: "alertTriangle", path: "/estatisticas/producao/gargalos" },
+          { id: "stats-producao-receita", title: "Receita", icon: "dollarSign", path: "/estatisticas/producao/receita" },
+        ],
+      },
+      {
+        id: "stats-financeiro",
+        title: "Financeiro",
+        icon: "dollarSign",
+        path: "/estatisticas/financeiro",
+        children: [
+          { id: "stats-financeiro-cobrancas", title: "Cobranças", icon: "chartBar", path: "/estatisticas/financeiro/cobrancas" },
+          { id: "stats-financeiro-boletos", title: "Boletos", icon: "fileText", path: "/estatisticas/financeiro/boletos" },
+        ],
+      },
+      {
+        id: "stats-recursos-humanos",
+        title: "Recursos Humanos",
+        icon: "users",
+        path: "/estatisticas/recursos-humanos",
+        children: [
+          { id: "stats-rh-folha", title: "Folha de Pagamento", icon: "chartBar", path: "/estatisticas/recursos-humanos/folha" },
+          { id: "stats-rh-equipe", title: "Equipe", icon: "users", path: "/estatisticas/recursos-humanos/equipe" },
+        ],
+      },
+      {
+        id: "stats-pintura",
+        title: "Pintura",
+        icon: "brush",
+        path: "/estatisticas/pintura",
+        children: [
+          { id: "stats-pintura-producao", title: "Produção de Tintas", icon: "chartBar", path: "/estatisticas/pintura/producao" },
+        ],
+      },
     ],
   },
 

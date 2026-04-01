@@ -4,12 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { OrderStatusBadge } from "../common/order-status-badge";
 import { OrderTotalBadge } from "../common/order-total-calculator";
-import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFileInvoice, IconReceipt, IconFileText, IconId, IconCreditCard, IconCopy, IconQrcode, IconUser } from "@tabler/icons-react";
+import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFileText, IconId, IconCreditCard, IconCopy, IconQrcode, IconUser } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { formatDate, formatDateTime, formatCNPJ } from "../../../../utils";
+import { formatDate, formatDateTime, formatCNPJ, formatPixKey } from "../../../../utils";
 import type { Order } from "../../../../types";
 import { PAYMENT_METHOD_LABELS } from "../../../../constants";
-import { FilePreviewCard } from "@/components/common/file";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 import { toast } from "@/components/ui/sonner";
 
@@ -201,7 +200,7 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
                         Copiar
                       </Button>
                     </div>
-                    <p className="text-sm font-semibold text-foreground font-mono break-all">{order.paymentPix}</p>
+                    <p className="text-sm font-semibold text-foreground font-mono break-all">{formatPixKey(order.paymentPix!)}</p>
                   </div>
                 )}
 
@@ -217,57 +216,6 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
           </>
         )}
 
-        {/* File Attachments */}
-        {((order.budgets && order.budgets.length > 0) || (order.invoices && order.invoices.length > 0) || (order.receipts && order.receipts.length > 0)) && (
-          <>
-            <Separator className="bg-border" />
-            <div className="space-y-6">
-              <h3 className="text-base font-semibold text-foreground">Documentos Anexados</h3>
-
-              {order.budgets && order.budgets.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="text-sm font-semibold">Orçamento</h4>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {order.budgets.map((budget, index) => (
-                      <FilePreviewCard key={budget.id} file={budget} index={index} size="md" showMetadata={true} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {order.invoices && order.invoices.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="text-sm font-semibold">Nota Fiscal</h4>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {order.invoices.map((invoice, index) => (
-                      <FilePreviewCard key={invoice.id} file={invoice} index={index} size="md" showMetadata={true} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {order.receipts && order.receipts.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <IconReceipt className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="text-sm font-semibold">Recibo</h4>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {order.receipts.map((receipt, index) => (
-                      <FilePreviewCard key={receipt.id} file={receipt} index={index} size="md" showMetadata={true} />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        )}
       </CardContent>
     </Card>
   );

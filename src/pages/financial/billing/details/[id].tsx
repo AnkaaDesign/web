@@ -18,7 +18,17 @@ import { SECTOR_PRIVILEGES, routes } from "@/constants";
 import { canUpdateQuoteStatus, canEditQuote } from "@/utils/permissions/quote-permissions";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { toast } from "@/components/ui/sonner";
-import { IconArrowLeft, IconArrowRight, IconCheck, IconLoader2, IconFileInvoice } from "@tabler/icons-react";
+import { IconArrowLeft, IconArrowRight, IconCheck, IconLoader2, IconFileInvoice, IconAlertCircle } from "@tabler/icons-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
 
 export const BillingDetailPage = () => {
@@ -36,6 +46,7 @@ export const BillingDetailPage = () => {
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
+  const [billingApprovalDialogOpen, setBillingApprovalDialogOpen] = useState(false);
 
   // Fetch task with billing-related includes
   const { data: taskResponse, isLoading: isTaskLoading } = useTaskDetail(id!, {
@@ -44,6 +55,13 @@ export const BillingDetailPage = () => {
       customer: { include: { logo: true } },
       truck: true,
       responsibles: true,
+      serviceOrders: {
+        include: {
+          checkinFiles: true,
+          checkoutFiles: true,
+        },
+        orderBy: { position: "asc" },
+      },
       quote: {
         include: {
           services: true,
@@ -253,32 +271,12 @@ export const BillingDetailPage = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   }, []);
 
-  // Save handler - conditionally validates based on target status
-  const handleSave = useCallback(async () => {
+  // Core save logic (called directly or after confirmation dialog)
+  const executeSave = useCallback(async () => {
     if (!quote?.id || !task?.id) return;
 
     const formData = form.getValues();
     const targetStatus = formData.status;
-
-    // Basic validation always required
-    const configs = formData.customerConfigs || [];
-    const services = formData.services || [];
-    if (configs.length === 0) {
-      setCurrentStep(1);
-      toast.error("Selecione pelo menos um cliente para faturamento");
-      return;
-    }
-    const validServices = services.filter((s: any) => s.description?.trim());
-    if (validServices.length === 0) {
-      setCurrentStep(2);
-      toast.error("Adicione pelo menos um serviço");
-      return;
-    }
-
-    // If status requires complete data, validate all customer fields
-    if (STATUSES_REQUIRING_COMPLETE_DATA.includes(targetStatus)) {
-      if (!validateCustomerData()) return;
-    }
 
     setIsSaving(true);
 
@@ -357,7 +355,43 @@ export const BillingDetailPage = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [quote?.id, task?.id, quote?.status, form, queryClient, navigate, validateCustomerData]);
+  }, [quote?.id, task?.id, quote?.status, form, queryClient, navigate]);
+
+  // Save handler - validates and shows confirmation for BILLING_APPROVED
+  const handleSave = useCallback(async () => {
+    if (!quote?.id || !task?.id) return;
+
+    const formData = form.getValues();
+    const targetStatus = formData.status;
+
+    // Basic validation always required
+    const configs = formData.customerConfigs || [];
+    const services = formData.services || [];
+    if (configs.length === 0) {
+      setCurrentStep(1);
+      toast.error("Selecione pelo menos um cliente para faturamento");
+      return;
+    }
+    const validServices = services.filter((s: any) => s.description?.trim());
+    if (validServices.length === 0) {
+      setCurrentStep(2);
+      toast.error("Adicione pelo menos um serviço");
+      return;
+    }
+
+    // If status requires complete data, validate all customer fields
+    if (STATUSES_REQUIRING_COMPLETE_DATA.includes(targetStatus)) {
+      if (!validateCustomerData()) return;
+    }
+
+    // Show confirmation dialog for BILLING_APPROVED (triggers invoice/boleto/NFS-e generation)
+    if (targetStatus === "BILLING_APPROVED" && targetStatus !== quote.status) {
+      setBillingApprovalDialogOpen(true);
+      return;
+    }
+
+    await executeSave();
+  }, [quote?.id, task?.id, quote?.status, form, validateCustomerData, executeSave]);
 
   // Loading state
   if (isTaskLoading) {
@@ -486,6 +520,71 @@ export const BillingDetailPage = () => {
           </FormProvider>
         </div>
       </div>
+
+      {/* Billing Approval Confirmation Dialog */}
+      <AlertDialog open={billingApprovalDialogOpen} onOpenChange={setBillingApprovalDialogOpen}>
+        <AlertDialogContent className="max-w-lg border-red-500 border-2">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+                <IconAlertCircle className="h-7 w-7 text-red-600 dark:text-red-400" />
+              </div>
+              <AlertDialogTitle className="text-xl text-red-700 dark:text-red-400">
+                Faturamento Aprovado - Ação Irreversível
+              </AlertDialogTitle>
+            </div>
+          </AlertDialogHeader>
+
+          <div className="rounded-lg border-2 border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-4 my-2 space-y-3">
+            <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+              Ao confirmar, as seguintes ações serão executadas automaticamente:
+            </p>
+            <ul className="text-sm text-red-700 dark:text-red-400 space-y-2 list-none">
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 font-bold">1.</span>
+                <span><strong>Faturas</strong> serão geradas para cada cliente vinculado ao orçamento</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 font-bold">2.</span>
+                <span><strong>Boletos bancários</strong> serão emitidos automaticamente no Sicredi para cada parcela</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-0.5 font-bold">3.</span>
+                <span><strong>Notas Fiscais (NFS-e)</strong> serão emitidas automaticamente para cada fatura</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 my-1">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              Verifique antes de confirmar:
+            </p>
+            <ul className="text-sm text-amber-700 dark:text-amber-400 mt-1 space-y-1 list-disc list-inside">
+              <li>Valores, descontos e condições de pagamento estão corretos?</li>
+              <li>Os dados do(s) cliente(s) estão atualizados (CNPJ/CPF, endereço)?</li>
+              <li>As parcelas e datas de vencimento estão configuradas?</li>
+            </ul>
+          </div>
+
+          <AlertDialogDescription className="text-sm text-muted-foreground mt-1">
+            Essa ação não pode ser desfeita facilmente. Boletos e notas fiscais emitidos precisarão ser cancelados manualmente caso haja algum erro.
+          </AlertDialogDescription>
+
+          <AlertDialogFooter className="mt-2">
+            <AlertDialogCancel disabled={isSaving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isSaving}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async () => {
+                setBillingApprovalDialogOpen(false);
+                await executeSave();
+              }}
+            >
+              {isSaving ? "Processando..." : "Confirmar Faturamento Aprovado"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PrivilegeRoute>
   );
 };

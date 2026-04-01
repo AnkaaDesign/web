@@ -2017,6 +2017,7 @@ export enum FAVORITE_PAGES {
   FINANCEIRO_CLIENTES_LISTAR = "/financeiro/clientes",
   FINANCEIRO_FATURAMENTO = "/financeiro/faturamento",
   FINANCEIRO_ORCAMENTO = "/financeiro/orcamento",
+  FINANCEIRO_ORCAMENTO_CADASTRAR = "/financeiro/orcamento/cadastrar",
 
   // Human Resources - List Pages
   RECURSOS_HUMANOS_CARGOS_LISTAR = "/recursos-humanos/cargos",

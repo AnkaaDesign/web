@@ -30,7 +30,7 @@ export function BillingTable({ className, searchingFor, filters }: BillingTableP
     getSortOrder,
   } = useTableState({
     defaultPageSize: 40,
-    defaultSort: [{ column: "finishedAt", direction: "desc" }],
+    defaultSort: [{ column: "quote.statusOrder", direction: "desc" }],
     sortStorageKey: "billing-table-sort",
     useUrlForSort: true,
   });

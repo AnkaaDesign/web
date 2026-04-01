@@ -63,6 +63,7 @@ import {
   getFieldLabel,
   formatFieldValue,
   getActionLabel,
+  formatCurrency,
 } from "../../utils";
 import { useChangeLogs } from "../../hooks";
 import { cn } from "@/lib/utils";
@@ -866,6 +867,45 @@ const ChangelogTimelineItem = ({
               </div>
             )}
 
+            {/* Order Details */}
+            {entityType === CHANGE_LOG_ENTITY_TYPE.ORDER &&
+              entityDetails && (
+                <div className="space-y-2 mb-3">
+                  {entityDetails.description && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Descrição: </span>
+                      <span className="text-foreground font-medium">
+                        {entityDetails.description}
+                      </span>
+                    </div>
+                  )}
+                  {entityDetails.status && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Status: </span>
+                      <span className="text-foreground font-medium">
+                        {({ CREATED: "Criado", PARTIALLY_FULFILLED: "Parcialmente Feito", FULFILLED: "Feito", OVERDUE: "Atrasado", PARTIALLY_RECEIVED: "Parcialmente Recebido", RECEIVED: "Recebido", CANCELLED: "Cancelado" } as Record<string, string>)[entityDetails.status] || entityDetails.status}
+                      </span>
+                    </div>
+                  )}
+                  {entityDetails.paymentMethod && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Pagamento: </span>
+                      <span className="text-foreground font-medium">
+                        {({ PIX: "Pix", BANK_SLIP: "Boleto", CREDIT_CARD: "Cartão de Crédito" } as Record<string, string>)[entityDetails.paymentMethod] || entityDetails.paymentMethod}
+                      </span>
+                    </div>
+                  )}
+                  {entityDetails.notes && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Observações: </span>
+                      <span className="text-foreground font-medium">
+                        {entityDetails.notes}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
             {/* Layout Details with SVG Visualization - Show all layouts in group horizontally */}
             {entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT && (
               <div className="flex flex-row flex-wrap gap-3 mb-3">
@@ -1195,8 +1235,173 @@ const ChangelogTimelineItem = ({
               );
             })()}
 
-          {/* Field changes (generic - not SERVICE_ORDER) */}
-          {entityType !== CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER && (
+          {/* ORDER UPDATE - Special handling for order status transitions and field changes */}
+          {entityType === CHANGE_LOG_ENTITY_TYPE.ORDER &&
+            firstChange.action === CHANGE_LOG_ACTION.UPDATE &&
+            (() => {
+              const orderStatusLabels: Record<string, string> = {
+                CREATED: "Criado",
+                PARTIALLY_FULFILLED: "Parcialmente Feito",
+                FULFILLED: "Feito",
+                OVERDUE: "Atrasado",
+                PARTIALLY_RECEIVED: "Parcialmente Recebido",
+                RECEIVED: "Recebido",
+                CANCELLED: "Cancelado",
+              };
+
+              const paymentMethodLabels: Record<string, string> = {
+                PIX: "Pix",
+                BANK_SLIP: "Boleto",
+                CREDIT_CARD: "Cartão de Crédito",
+              };
+
+              // Group related field changes intelligently
+              const statusChange = changelogGroup.find(
+                (c) => c.field === "status" || c.field === "status_transition",
+              );
+              const doneAtChange = changelogGroup.find(
+                (c) => c.field === "doneAt",
+              );
+              const otherChanges = changelogGroup.filter(
+                (c) =>
+                  c.field &&
+                  ![
+                    "status",
+                    "status_transition",
+                    "statusOrder",
+                    "doneAt",
+                  ].includes(c.field),
+              );
+
+              // Build status transition summary
+              let statusSummary: {
+                title: string;
+                timestamp?: string;
+              } | null = null;
+
+              if (statusChange) {
+                const newStatus = statusChange.newValue;
+                const oldStatus = statusChange.oldValue;
+                const newStatusLabel =
+                  orderStatusLabels[newStatus as string] || String(newStatus);
+                const oldStatusLabel =
+                  orderStatusLabels[oldStatus as string] || String(oldStatus);
+
+                statusSummary = {
+                  title: `${oldStatusLabel} → ${newStatusLabel}`,
+                };
+
+                // Add timestamp if doneAt changed
+                if (doneAtChange?.newValue) {
+                  let dateValue = doneAtChange.newValue;
+                  if (
+                    typeof dateValue === "string" &&
+                    dateValue.startsWith('"') &&
+                    dateValue.endsWith('"')
+                  ) {
+                    try {
+                      dateValue = JSON.parse(dateValue);
+                    } catch (e) {
+                      // use as-is
+                    }
+                  }
+                  statusSummary.timestamp = formatDateTime(dateValue);
+                }
+              }
+
+              return (
+                <div className="space-y-3">
+                  {/* Status transition summary */}
+                  {statusSummary && (
+                    <div className="mb-3 p-3 bg-muted/50 rounded-lg">
+                      <div className="font-medium text-foreground">
+                        Status: {statusSummary.title}
+                      </div>
+                      {statusSummary.timestamp && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          <IconClock className="inline h-3.5 w-3.5 mr-1" />
+                          {statusSummary.timestamp}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Other field changes */}
+                  {otherChanges.length > 0 && (
+                    <div className="space-y-2">
+                      {otherChanges.map((changelog) => {
+                        const fieldLabel = getFieldLabel(changelog.field, entityType);
+
+                        // Format old/new values
+                        const formatOrderValue = (val: any, field: string | null) => {
+                          if (val === null || val === undefined) return "Nenhum";
+
+                          // Payment method enum
+                          if (field === "paymentMethod" && typeof val === "string") {
+                            return paymentMethodLabels[val] || val;
+                          }
+
+                          // Payment due days
+                          if (field === "paymentDueDays" && typeof val === "number") {
+                            return `${val} ${val === 1 ? "dia" : "dias"}`;
+                          }
+
+                          // Date fields
+                          if (
+                            (field === "forecast" || field === "deliveryDate" || field === "receivedDate" || field === "scheduledFor") &&
+                            val
+                          ) {
+                            let dateValue = val;
+                            if (typeof dateValue === "string" && dateValue.startsWith('"') && dateValue.endsWith('"')) {
+                              try { dateValue = JSON.parse(dateValue); } catch (e) { /* use as-is */ }
+                            }
+                            return formatDateTime(dateValue);
+                          }
+
+                          // Currency fields
+                          if (field === "totalAmount" && typeof val === "number") {
+                            return formatCurrency(val);
+                          }
+
+                          // Supplier ID - resolve from entity details
+                          if (field === "supplierId" && typeof val === "string" && entityDetails?.suppliers?.has(val)) {
+                            return entityDetails.suppliers.get(val) || "Fornecedor";
+                          }
+
+                          // User IDs - resolve from entity details
+                          if ((field === "paymentResponsibleId" || field === "paymentAssignedById") && typeof val === "string" && entityDetails?.users?.has(val)) {
+                            const user = entityDetails.users.get(val);
+                            return (typeof user === "object" && user !== null && "name" in user) ? user.name : user || "Usuário";
+                          }
+
+                          return formatValueWithEntity(val, field, changelog.metadata);
+                        };
+
+                        return (
+                          <div key={changelog.id} className="text-sm">
+                            <span className="text-muted-foreground">
+                              {fieldLabel}:{" "}
+                            </span>
+                            {changelog.oldValue !== null && changelog.oldValue !== undefined && (
+                              <span className="text-red-600 dark:text-red-400 line-through mr-2">
+                                {formatOrderValue(changelog.oldValue, changelog.field)}
+                              </span>
+                            )}
+                            <span className="text-green-600 dark:text-green-400 font-medium">
+                              {formatOrderValue(changelog.newValue, changelog.field)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+          {/* Field changes (generic - not SERVICE_ORDER, not ORDER UPDATE) */}
+          {entityType !== CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER &&
+           !(entityType === CHANGE_LOG_ENTITY_TYPE.ORDER && firstChange.action === CHANGE_LOG_ACTION.UPDATE) && (
             <div className="space-y-3">
               {changelogGroup
                 .filter((changelog) => {

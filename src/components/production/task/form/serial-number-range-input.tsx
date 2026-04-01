@@ -13,6 +13,7 @@ interface SerialNumberRangeInputProps {
 export function SerialNumberRangeInput({ control, disabled }: SerialNumberRangeInputProps) {
   const [inputValue, setInputValue] = useState<string>("");
   const removedNumbersRef = useRef<Set<number>>(new Set());
+  const justCommittedRef = useRef(false);
 
   // Watch the serial numbers array
   const watchedSerialNumbers = useWatch({
@@ -42,6 +43,10 @@ export function SerialNumberRangeInput({ control, disabled }: SerialNumberRangeI
   };
 
   const handleGenerateRange = () => {
+    if (justCommittedRef.current) {
+      justCommittedRef.current = false;
+      return;
+    }
     const trimmedValue = inputValue.trim();
     if (!trimmedValue) return;
 
@@ -76,9 +81,12 @@ export function SerialNumberRangeInput({ control, disabled }: SerialNumberRangeI
     );
 
     // Add new numbers
-    numbersToAdd.forEach(num => {
-      append(num as any);
-    });
+    if (numbersToAdd.length > 0) {
+      numbersToAdd.forEach(num => {
+        append(num as any);
+      });
+      justCommittedRef.current = true;
+    }
 
     // Clear input
     setInputValue("");
@@ -117,6 +125,7 @@ export function SerialNumberRangeInput({ control, disabled }: SerialNumberRangeI
                     handleInputChange(newValue);
                   }}
                   onKeyDown={handleKeyDown}
+                  onBlur={handleGenerateRange}
                   placeholder={disabled ? "Desabilitado (remova placas extras)" : "Digite um número (ex: 5) ou intervalo (ex: 5 10) e pressione Enter"}
                   disabled={disabled}
                   transparent={true}

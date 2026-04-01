@@ -230,28 +230,17 @@ export const ProductionRootPage = () => {
       };
     });
 
-    // Get garage occupancy data - since garageUtilization is not in the API response,
-    // we'll use placeholder data or derive it from truck positions if available
-    // Filter out individual truck entries and only keep garage/position aggregates
-    const truckPositions = data.truckMetrics?.trucksByPosition || [];
-    const isAggregatedData = truckPositions.length <= 10 &&
-      truckPositions.some((item: any) =>
-        item.name?.toLowerCase().includes('barracão') ||
-        item.name?.toLowerCase().includes('pátio') ||
-        item.name?.toLowerCase().includes('patio')
-      );
-
-    const garageOccupancy = isAggregatedData
-      ? truckPositions.map((item: any) => ({
-          label: item.name || "Barracão",
-          value: item.value || 0,
-        }))
-      : [
-          { label: "Pátio", value: 0 },
-          { label: "Barracão 1", value: 0 },
-          { label: "Barracão 2", value: 0 },
-          { label: "Barracão 3", value: 0 },
-        ];
+    // Get garage occupancy from the garageUtilization data (real counts per garage)
+    const spotsByGarage = data.garageUtilization?.spotsByGarage;
+    const garageOccupancy = spotsByGarage?.labels?.map((label: string, index: number) => ({
+      label,
+      value: spotsByGarage.datasets?.[0]?.data?.[index] ?? 0,
+    })) ?? [
+      { label: "Pátio", value: 0 },
+      { label: "Barracão 1", value: 0 },
+      { label: "Barracão 2", value: 0 },
+      { label: "Barracão 3", value: 0 },
+    ];
 
     return {
       tasksByType:
@@ -265,11 +254,14 @@ export const ProductionRootPage = () => {
   };
 
   // Helper function to get trend from dashboard metric
+  // Only show trend if the API actually provides trend data (changePercent !== undefined)
   const getTrend = (metric?: { trend?: "up" | "down" | "stable"; changePercent?: number }) => {
-    if (!metric) return { trend: "stable" as const, percentage: 0 };
+    if (!metric || metric.changePercent === undefined || metric.changePercent === null) {
+      return { trend: undefined, percentage: undefined };
+    }
     return {
       trend: metric.trend ?? ("stable" as const),
-      percentage: Math.abs(metric.changePercent ?? 0),
+      percentage: Math.abs(metric.changePercent),
     };
   };
 
@@ -446,7 +438,7 @@ export const ProductionRootPage = () => {
                   title="Barracões"
                   icon={Building2}
                   onClick={() => navigate(routes.production.garages.root)}
-                  count={dashboard?.data?.truckMetrics?.totalTrucks?.value || 0}
+                  count={dashboard?.data?.garageUtilization?.occupiedSpots?.value || 0}
                   color="red"
                 />
               </div>
@@ -487,10 +479,10 @@ export const ProductionRootPage = () => {
                   title="Utilização de Barracões"
                   activities={[
                     {
-                      item: `${dashboard?.data?.truckMetrics?.totalTrucks?.value || 0}/18`,
+                      item: `${dashboard?.data?.garageUtilization?.occupiedSpots?.value || 0}/${dashboard?.data?.garageUtilization?.totalParkingSpots?.value || 18}`,
                       info: "Vagas ocupadas",
                       quantity: `${dashboard?.data?.truckMetrics?.trucksInProduction?.value || 0} em produção`,
-                      time: "Capacidade: 2 por faixa",
+                      time: `Utilização: ${Math.round(dashboard?.data?.garageUtilization?.utilizationRate?.value || 0)}%`,
                     },
                   ]}
                   icon={Gauge}
@@ -528,14 +520,12 @@ export const ProductionRootPage = () => {
                   subtitle="Trabalhos totais"
                 />
                 <TrendCard
-                  title="Receita Total"
+                  title="Faturado"
                   value={formatCurrency(
-                    dashboard?.data?.revenueAnalysis?.revenueByMonth?.reduce((sum, point) => sum + point.value, 0) || 0
+                    dashboard?.data?.revenueAnalysis?.invoicedRevenue?.value || 0
                   )}
-                  trend="stable"
-                  percentage={0}
                   icon={DollarSign}
-                  subtitle="Faturamento"
+                  subtitle="Tarefas concluídas"
                 />
               </div>
             </div>
@@ -590,7 +580,7 @@ export const ProductionRootPage = () => {
                   type="REVENUE"
                   data={
                     dashboard?.data?.revenueAnalysis?.revenueBySector?.datasets?.[0]?.data?.map((value, index) => {
-                      const totalRevenue = dashboard?.data?.revenueAnalysis?.revenueByMonth?.reduce((sum, point) => sum + point.value, 0) || 1;
+                      const totalRevenue = dashboard?.data?.revenueAnalysis?.invoicedRevenue?.value || 1;
                       return {
                         label: dashboard.data?.revenueAnalysis?.revenueBySector?.labels?.[index] ?? `Setor ${index + 1}`,
                         value: value ?? 0,
@@ -602,6 +592,31 @@ export const ProductionRootPage = () => {
                   }
                   icon={DollarSign}
                   onDetailsClick={() => navigate(routes.production.schedule.root)}
+                />
+              </div>
+            </div>
+
+            {/* Revenue Breakdown - Expected vs Faturado vs Recebido */}
+            <div>
+              <h3 className="text-lg font-semibold text-foreground mb-4">Visão Financeira</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <TrendCard
+                  title="Receita Esperada"
+                  value={formatCurrency(dashboard?.data?.revenueAnalysis?.expectedRevenue?.value || 0)}
+                  icon={CalendarDays}
+                  subtitle="Orçamentos ativos (não cancelados)"
+                />
+                <TrendCard
+                  title="Faturado"
+                  value={formatCurrency(dashboard?.data?.revenueAnalysis?.invoicedRevenue?.value || 0)}
+                  icon={ClipboardList}
+                  subtitle="Tarefas concluídas"
+                />
+                <TrendCard
+                  title="Recebido"
+                  value={formatCurrency(dashboard?.data?.revenueAnalysis?.receivedRevenue?.value || 0)}
+                  icon={DollarSign}
+                  subtitle="Pagamentos confirmados"
                 />
               </div>
             </div>

@@ -1,8 +1,8 @@
 import { useAuth } from "../contexts/auth-context";
 import { useFavorites } from "../contexts/favorites-context";
 import { SECTOR_PRIVILEGES } from "../constants";
-import { getIconInfoByPath } from "../utils";
-import { IconStar } from "@tabler/icons-react";
+import { getIconInfoByPath, isPageCadastrar } from "../utils";
+import { IconStar, IconPlus } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import { usePageTracker } from "../hooks/common/use-page-tracker";
@@ -173,14 +173,22 @@ export function HomePage() {
             {favorites.map((fav) => {
               const iconInfo = getIconInfoByPath(fav.path);
               const IconComponent = iconInfo.icon;
+              const isCadastrar = isPageCadastrar(fav.path);
               return (
                 <div
                   key={fav.id}
                   className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] rounded-lg bg-secondary border border-border p-4"
                   onClick={() => navigate(fav.path)}
                 >
-                  <div className={`${iconInfo.color} text-white p-3 rounded-lg inline-block mb-2`}>
-                    <IconComponent className="h-6 w-6" />
+                  <div className="relative inline-block mb-2">
+                    <div className={`${iconInfo.color} text-white p-3 rounded-lg`}>
+                      <IconComponent className="h-6 w-6" />
+                    </div>
+                    {isCadastrar && (
+                      <div className="absolute -top-1.5 -right-1.5 bg-white dark:bg-gray-200 rounded-full p-0.5">
+                        <IconPlus size={12} className="text-green-600 dark:text-green-700" strokeWidth={3} />
+                      </div>
+                    )}
                   </div>
                   <h3 className="font-semibold text-sm text-secondary-foreground">{fav.title}</h3>
                 </div>

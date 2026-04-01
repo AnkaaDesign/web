@@ -51,6 +51,7 @@ interface BudgetStepReviewProps {
   selectedCustomers: Map<string, any>;
   onStatusChange?: (status: string) => void;
   layoutFiles?: Array<{ thumbnailUrl?: string; uploadedFileId?: string; id?: string }>;
+  isCreateMode?: boolean;
 }
 
 export function BudgetStepReview({
@@ -61,6 +62,7 @@ export function BudgetStepReview({
   onStatusChange,
   layoutFiles,
   disabled,
+  isCreateMode,
 }: BudgetStepReviewProps) {
   const navigate = useNavigate();
   const { control, setValue } = useFormContext();
@@ -76,6 +78,24 @@ export function BudgetStepReview({
   const totalValue = useWatch({ control, name: "total" });
   const expiresAt = useWatch({ control, name: "expiresAt" });
   const layoutFileId = useWatch({ control, name: "layoutFileId" });
+
+  // In create mode, read task fields directly from the form
+  const formPlates = useWatch({ control, name: "plates" });
+  const formSerialNumbers = useWatch({ control, name: "serialNumbers" });
+  const formName = useWatch({ control, name: "name" });
+
+  // Merge task prop with form-derived task data in create mode
+  const resolvedTask = useMemo(() => {
+    if (!isCreateMode) return task;
+    const plates = Array.isArray(formPlates) ? formPlates.filter(Boolean) : [];
+    const serialNumbers = Array.isArray(formSerialNumbers) ? formSerialNumbers.filter((v: any) => v != null) : [];
+    return {
+      ...task,
+      name: task?.name || formName || undefined,
+      serialNumber: task?.serialNumber || (serialNumbers.length > 0 ? serialNumbers.join(", ") : undefined),
+      truck: task?.truck || (plates.length > 0 ? { plate: plates.join(", ") } : undefined),
+    };
+  }, [isCreateMode, task, formPlates, formSerialNumbers, formName]);
 
   const [customerFilter, setCustomerFilter] = useState<string>("all");
 
@@ -157,79 +177,81 @@ export function BudgetStepReview({
               <IconTruck className="h-4 w-4 text-muted-foreground" />
               Resumo da Tarefa
             </CardTitle>
-            <div className="flex items-center gap-2">
-              {publicBudgetUrl && (
-                <Button
-                  variant="outline"
-                  size="default"
-                  onClick={() => window.open(publicBudgetUrl, "_blank")}
-                  className="gap-1.5 h-9"
-                >
-                  <IconExternalLink className="h-3.5 w-3.5" />
-                  Visualizar
-                </Button>
-              )}
-              {canChangeStatus ? (
-                <Combobox
-                  value={currentStatus}
-                  onValueChange={(v) => {
-                    if (v && typeof v === "string") {
-                      setValue("status", v, { shouldDirty: true });
-                      onStatusChange?.(v);
-                    }
-                  }}
-                  options={STATUS_OPTIONS.map((s) => ({
-                    ...s,
-                    disabled: s.value === currentStatus,
-                  }))}
-                  searchable={false}
-                  clearable={false}
-                  disabled={disabled}
-                  className="w-[220px]"
-                  triggerClassName={cn("font-medium h-9", getStatusTriggerClass(currentStatus))}
-                />
-              ) : (
-                <QuoteStatusBadge status={currentStatus as TASK_QUOTE_STATUS} size="lg" />
-              )}
-            </div>
+            {!isCreateMode && (
+              <div className="flex items-center gap-2">
+                {publicBudgetUrl && (
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={() => window.open(publicBudgetUrl, "_blank")}
+                    className="gap-1.5 h-9"
+                  >
+                    <IconExternalLink className="h-3.5 w-3.5" />
+                    Visualizar
+                  </Button>
+                )}
+                {canChangeStatus ? (
+                  <Combobox
+                    value={currentStatus}
+                    onValueChange={(v) => {
+                      if (v && typeof v === "string") {
+                        setValue("status", v, { shouldDirty: true });
+                        onStatusChange?.(v);
+                      }
+                    }}
+                    options={STATUS_OPTIONS.map((s) => ({
+                      ...s,
+                      disabled: s.value === currentStatus,
+                    }))}
+                    searchable={false}
+                    clearable={false}
+                    disabled={disabled}
+                    className="w-[220px]"
+                    triggerClassName={cn("font-medium h-9", getStatusTriggerClass(currentStatus))}
+                  />
+                ) : (
+                  <QuoteStatusBadge status={currentStatus as TASK_QUOTE_STATUS} size="lg" />
+                )}
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-1">
-            {task?.name && (
+            {resolvedTask?.name && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Logomarca</span>
-                <span className="text-sm font-medium">{task.name}</span>
+                <span className="text-sm font-medium">{resolvedTask.name}</span>
               </div>
             )}
-            {task?.customer && (
+            {resolvedTask?.customer && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Cliente</span>
-                <span className="text-sm font-medium">{task.customer.corporateName || task.customer.fantasyName}</span>
+                <span className="text-sm font-medium">{resolvedTask.customer.corporateName || resolvedTask.customer.fantasyName}</span>
               </div>
             )}
-            {task?.truck?.plate && (
+            {resolvedTask?.truck?.plate && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Placa</span>
-                <span className="text-sm font-medium">{task.truck.plate}</span>
+                <span className="text-sm font-medium">{resolvedTask.truck.plate}</span>
               </div>
             )}
-            {task?.serialNumber && (
+            {resolvedTask?.serialNumber && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Nº de Série</span>
-                <span className="text-sm font-medium">{task.serialNumber}</span>
+                <span className="text-sm font-medium">{resolvedTask.serialNumber}</span>
               </div>
             )}
-            {task?.truck?.chassisNumber && (
+            {resolvedTask?.truck?.chassisNumber && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Chassi</span>
-                <span className="text-sm font-mono font-medium">{formatChassis(task.truck.chassisNumber)}</span>
+                <span className="text-sm font-mono font-medium">{formatChassis(resolvedTask.truck.chassisNumber)}</span>
               </div>
             )}
-            {task?.finishedAt && (
+            {resolvedTask?.finishedAt && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Finalizado em</span>
-                <span className="text-sm font-medium">{formatDate(task.finishedAt)}</span>
+                <span className="text-sm font-medium">{formatDate(resolvedTask.finishedAt)}</span>
               </div>
             )}
           </div>

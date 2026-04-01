@@ -23,6 +23,7 @@ import { SetStatusModal } from "./set-status-modal";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { toast } from "@/components/ui/sonner";
+import { isTaskQuoteBillingPhase } from "@/constants/enum-labels";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -446,7 +447,10 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
 
         case "quote":
           if (tasks.length === 1) {
-            navigate(routes.financial.budget.details(tasks[0].id));
+            const quoteRoute = isTaskQuoteBillingPhase(tasks[0].quote?.status)
+              ? routes.financial.billing.details(tasks[0].id)
+              : routes.financial.budget.details(tasks[0].id);
+            navigate(quoteRoute);
           }
           break;
 

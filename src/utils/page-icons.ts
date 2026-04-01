@@ -33,6 +33,7 @@ import {
   IconMessageCircle,
   IconHome,
   IconChartBar,
+  IconFileDescription,
 } from "@tabler/icons-react";
 import type { Icon } from "@tabler/icons-react";
 import { FAVORITE_PAGES } from '@constants';
@@ -219,6 +220,8 @@ const PATH_PREFIX_ICON_MAP: Array<{ prefix: string; icon: Icon; color: string }>
 
   // Administração
   { prefix: "/administracao/comissoes", icon: IconCoins, color: "bg-green-500" },
+  { prefix: "/financeiro/orcamento", icon: IconFileDescription, color: "bg-green-600" },
+  { prefix: "/financeiro/faturamento", icon: IconFileInvoice, color: "bg-amber-600" },
   { prefix: "/financeiro/clientes", icon: IconUsers, color: "bg-orange-500" },
   { prefix: "/administracao/colaboradores", icon: IconUsers, color: "bg-purple-500" },
   { prefix: "/administracao/orcamentos", icon: IconFileInvoice, color: "bg-blue-500" },
@@ -361,6 +364,9 @@ export function getPageIconName(path: string): string {
     "/administracao/comissoes": "coins",
     "/financeiro/clientes": "users",
     "/financeiro/clientes/cadastrar": "users",
+    "/financeiro/orcamento": "file-description",
+    "/financeiro/orcamento/cadastrar": "file-description",
+    "/financeiro/faturamento": "file-invoice",
     "/administracao/colaboradores": "user",
     "/administracao/colaboradores/cadastrar": "user",
     "/administracao/orcamentos": "file-invoice",

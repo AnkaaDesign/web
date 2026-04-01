@@ -66,6 +66,7 @@ const FinancialCustomersEdit = lazy(() => import("@/pages/financial/customers/ed
 const FinancialBilling = lazy(() => import("@/pages/financial/billing/list").then((module) => ({ default: module.BillingPage })));
 const FinancialBillingDetail = lazy(() => import("@/pages/financial/billing/details/[id]").then((module) => ({ default: module.BillingDetailPage })));
 const FinancialBudgetList = lazy(() => import("@/pages/financial/budget/list").then((module) => ({ default: module.BudgetListPage })));
+const FinancialBudgetCreate = lazy(() => import("@/pages/financial/budget/create").then((module) => ({ default: module.FinancialBudgetCreatePage })));
 const FinancialBudgetDetail = lazy(() => import("@/pages/financial/budget/details/[taskId]").then((module) => ({ default: module.FinancialBudgetDetailPage })));
 const FinancialNfseList = lazy(() => import("@/pages/financial/nfse/list").then((module) => ({ default: module.NfseListPage })));
 const FinancialNfseDetail = lazy(() => import("@/pages/financial/nfse/detail").then((module) => ({ default: module.NfseDetailPage })));
@@ -205,6 +206,32 @@ const InventoryStatisticsTrends = lazy(() => import("@/pages/inventory/statistic
 
 // Order Statistics
 const OrderStatistics = lazy(() => import("@/pages/order/statistics/orders").then((module) => ({ default: module.OrderStatisticsPage })));
+
+// Production Statistics
+const ProductionThroughputStatistics = lazy(() => import("@/pages/production/statistics/throughput").then((module) => ({ default: module.default })));
+const ProductionBottlenecksStatistics = lazy(() => import("@/pages/production/statistics/bottlenecks").then((module) => ({ default: module.default })));
+const ProductionRevenueStatistics = lazy(() => import("@/pages/production/statistics/revenue").then((module) => ({ default: module.default })));
+
+// Financial Statistics
+const FinancialCollectionStatistics = lazy(() => import("@/pages/financial/statistics/collection").then((module) => ({ default: module.default })));
+const FinancialBankSlipsStatistics = lazy(() => import("@/pages/financial/statistics/bank-slips").then((module) => ({ default: module.default })));
+
+// HR Statistics
+const HRPayrollStatistics = lazy(() => import("@/pages/human-resources/statistics/payroll").then((module) => ({ default: module.default })));
+const HRTeamPerformanceStatistics = lazy(() => import("@/pages/human-resources/statistics/team-performance").then((module) => ({ default: module.default })));
+
+// Paint Statistics
+const PaintProductionStatistics = lazy(() => import("@/pages/painting/statistics/production").then((module) => ({ default: module.default })));
+
+// Administration Statistics
+const AdministrationOverviewStatistics = lazy(() => import("@/pages/administration/statistics/overview").then((module) => ({ default: module.default })));
+
+// Statistics Hub Pages
+const StatisticsHub = lazy(() => import("@/pages/statistics/index").then((module) => ({ default: module.default })));
+const ProductionStatisticsHub = lazy(() => import("@/pages/production/statistics/index").then((module) => ({ default: module.default })));
+const FinancialStatisticsHub = lazy(() => import("@/pages/financial/statistics/index").then((module) => ({ default: module.default })));
+const HRStatisticsHub = lazy(() => import("@/pages/human-resources/statistics/index").then((module) => ({ default: module.default })));
+const PaintStatisticsHub = lazy(() => import("@/pages/painting/statistics/index").then((module) => ({ default: module.default })));
 
 // Personal
 const Personal = lazy(() => import("@/pages/personal/root").then((module) => ({ default: module.Personal })));
@@ -1033,6 +1060,14 @@ function App() {
                   }
                 />
                 <Route
+                  path={routes.financial.budget.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialBudgetCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path={routes.financial.budget.details(":taskId")}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -1041,7 +1076,79 @@ function App() {
                   }
                 />
 
-                {/* Statistics routes - Under Construction */}
+                {/* Statistics Hub Pages */}
+                <Route
+                  path={routes.statistics.root}
+                  element={<Suspense fallback={<PageLoader />}><StatisticsHub /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.production.root}
+                  element={<Suspense fallback={<PageLoader />}><ProductionStatisticsHub /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.financial.root}
+                  element={<Suspense fallback={<PageLoader />}><FinancialStatisticsHub /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.humanResources.root}
+                  element={<Suspense fallback={<PageLoader />}><HRStatisticsHub /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.painting.root}
+                  element={<Suspense fallback={<PageLoader />}><PaintStatisticsHub /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.administration.root}
+                  element={<Suspense fallback={<PageLoader />}><AdministrationOverviewStatistics /></Suspense>}
+                />
+
+                {/* Production Statistics routes */}
+                <Route
+                  path={routes.statistics.production.throughput}
+                  element={<Suspense fallback={<PageLoader />}><ProductionThroughputStatistics /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.production.bottlenecks}
+                  element={<Suspense fallback={<PageLoader />}><ProductionBottlenecksStatistics /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.production.revenue}
+                  element={<Suspense fallback={<PageLoader />}><ProductionRevenueStatistics /></Suspense>}
+                />
+
+                {/* Financial Statistics routes */}
+                <Route
+                  path={routes.statistics.financial.collection}
+                  element={<Suspense fallback={<PageLoader />}><FinancialCollectionStatistics /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.financial.bankSlips}
+                  element={<Suspense fallback={<PageLoader />}><FinancialBankSlipsStatistics /></Suspense>}
+                />
+
+                {/* HR Statistics routes */}
+                <Route
+                  path={routes.statistics.humanResources.payroll}
+                  element={<Suspense fallback={<PageLoader />}><HRPayrollStatistics /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.humanResources.teamPerformance}
+                  element={<Suspense fallback={<PageLoader />}><HRTeamPerformanceStatistics /></Suspense>}
+                />
+
+                {/* Paint Statistics routes */}
+                <Route
+                  path={routes.statistics.painting.production}
+                  element={<Suspense fallback={<PageLoader />}><PaintProductionStatistics /></Suspense>}
+                />
+
+                {/* Administration Statistics routes */}
+                <Route
+                  path={routes.statistics.administration.overview}
+                  element={<Suspense fallback={<PageLoader />}><AdministrationOverviewStatistics /></Suspense>}
+                />
+
+                {/* Statistics routes - Under Construction (catch-all for unimplemented) */}
                 <Route
                   path="/estatisticas/*"
                   element={

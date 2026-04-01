@@ -491,6 +491,14 @@ export interface ProductionDashboardData {
     customersByType: DashboardChartData; // CPF vs CNPJ
     customersByCity: DashboardChartData;
   };
+  garageUtilization: {
+    totalGarages: DashboardMetric;
+    totalLanes: DashboardMetric;
+    totalParkingSpots: DashboardMetric;
+    occupiedSpots: DashboardMetric;
+    utilizationRate: DashboardMetric;
+    spotsByGarage: DashboardChartData;
+  };
   truckMetrics: {
     totalTrucks: DashboardMetric;
     trucksInProduction: DashboardMetric;
@@ -512,6 +520,11 @@ export interface ProductionDashboardData {
     averageAirbrushTime: DashboardMetric;
   };
   revenueAnalysis: {
+    totalRevenue: DashboardMetric;
+    averageTaskValue: DashboardMetric;
+    expectedRevenue: DashboardMetric;
+    invoicedRevenue: DashboardMetric;
+    receivedRevenue: DashboardMetric;
     revenueByMonth: TimeSeriesDataPoint[];
     revenueBySector: DashboardChartData;
     revenueByCustomerType: DashboardChartData;

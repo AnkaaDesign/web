@@ -1790,6 +1790,8 @@ export const FAVORITE_PAGES_LABELS: Record<FAVORITE_PAGES, string> = {
 
   // Financeiro - List Pages
   [FAVORITE_PAGES.FINANCEIRO_CLIENTES_LISTAR]: "Clientes (Financeiro)",
+  [FAVORITE_PAGES.FINANCEIRO_ORCAMENTO]: "Orçamentos",
+  [FAVORITE_PAGES.FINANCEIRO_ORCAMENTO_CADASTRAR]: "Cadastrar Orçamento",
 
   // Personal - List Pages
   [FAVORITE_PAGES.PESSOAL_FERIADOS_LISTAR]: "Feriados",
@@ -1993,6 +1995,15 @@ export function getTaskQuoteDisplayLabel(status?: TASK_QUOTE_STATUS | string | n
     return 'Orçamento';
   }
   return 'Faturamento';
+}
+
+/**
+ * Returns whether the task quote is in the billing phase (past budget).
+ * PENDING or no status → false (budget/orçamento phase)
+ * BUDGET_APPROVED or later → true (billing/faturamento phase)
+ */
+export function isTaskQuoteBillingPhase(status?: TASK_QUOTE_STATUS | string | null): boolean {
+  return !!status && status !== TASK_QUOTE_STATUS.PENDING;
 }
 
 // =====================

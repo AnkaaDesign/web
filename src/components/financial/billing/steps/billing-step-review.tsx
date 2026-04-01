@@ -19,11 +19,13 @@ import { SECTOR_PRIVILEGES } from "@/constants";
 import { canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
 import type { Invoice } from "@/types/invoice";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
-import { IconFileInvoice, IconCurrencyReal, IconBuilding, IconTruck, IconCreditCard, IconReceipt, IconDownload, IconEye, IconLoader2 } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
+import { IconFileInvoice, IconCurrencyReal, IconBuilding, IconTruck, IconCreditCard, IconReceipt, IconDownload, IconEye, IconLoader2, IconFolderCheck, IconCameraCheck, IconCameraBolt } from "@tabler/icons-react";
+import { cn, getApiBaseUrl } from "@/lib/utils";
 import { useState } from "react";
 import { invoiceService } from "@/api-client/invoice";
 import { nfseService } from "@/api-client/nfse";
+import { SERVICE_ORDER_TYPE } from "@/constants/enums";
+import { useFileViewer } from "@/components/common/file";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 
@@ -67,6 +69,33 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   const currentStatus = useWatch({ control, name: "status" }) || "";
   const services = useWatch({ control, name: "services" }) || [];
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
+
+  // File viewer for dossiê images
+  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
+  try {
+    fileViewerContext = useFileViewer();
+  } catch {
+    // Context not available
+  }
+
+  const handleDossieFileClick = useCallback((file: any) => {
+    if (!fileViewerContext || !task?.serviceOrders) return;
+    const productionSOs = (task.serviceOrders as any[])
+      .filter((so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && (so.checkinFiles?.length > 0 || so.checkoutFiles?.length > 0))
+      .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+    const allFiles: any[] = [];
+    for (const so of productionSOs) {
+      const checkin = so.checkinFiles || [];
+      const checkout = so.checkoutFiles || [];
+      const maxLen = Math.max(checkin.length, checkout.length);
+      for (let i = 0; i < maxLen; i++) {
+        if (i < checkin.length) allFiles.push(checkin[i]);
+        if (i < checkout.length) allFiles.push(checkout[i]);
+      }
+    }
+    const index = allFiles.findIndex((f: any) => f.id === file.id);
+    fileViewerContext.actions.viewFiles(allFiles, index >= 0 ? index : 0);
+  }, [fileViewerContext, task?.serviceOrders]);
 
   const validServices = useMemo(
     () => services.filter((s: any) => s.description?.trim()),
@@ -166,7 +195,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 }}
                 options={STATUS_OPTIONS.map((s) => ({
                   ...s,
-                  disabled: s.value === currentStatus || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s.value === "BILLING_APPROVED"),
+                  disabled: s.value === currentStatus
+                    || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s.value === "BILLING_APPROVED")
+                    || (s.value === "BILLING_APPROVED" && currentStatus !== "VERIFIED_BY_FINANCIAL"),
                 }))}
                 searchable={false}
                 clearable={false}
@@ -477,6 +508,131 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
           })}
         </div>
       )}
+
+      {/* Dossiê — Proof of services with check-in/check-out photos */}
+      {(() => {
+        const serviceOrdersWithFiles = (task.serviceOrders || [])
+          .filter((so: any) => so.type === SERVICE_ORDER_TYPE.PRODUCTION && (so.checkinFiles?.length > 0 || so.checkoutFiles?.length > 0))
+          .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+
+        if (serviceOrdersWithFiles.length === 0) return null;
+
+        const totalDossieFiles = serviceOrdersWithFiles.reduce(
+          (sum: number, so: any) => sum + (so.checkinFiles?.length || 0) + (so.checkoutFiles?.length || 0), 0
+        );
+
+        const apiUrl = getApiBaseUrl();
+
+        return (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <IconFolderCheck className="h-4 w-4 text-muted-foreground" />
+                Dossiê
+                <Badge variant="secondary" className="ml-1">
+                  {totalDossieFiles} {totalDossieFiles === 1 ? 'foto' : 'fotos'}
+                </Badge>
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Registro fotográfico dos serviços por ordem de serviço
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-3 gap-4">
+                {serviceOrdersWithFiles.map((serviceOrder: any) => {
+                  const isOutrosWithObservation = serviceOrder.description === 'Outros' && !!serviceOrder.observation;
+                  const displayDescription = isOutrosWithObservation ? serviceOrder.observation : serviceOrder.description;
+                  const checkinFiles = serviceOrder.checkinFiles || [];
+                  const checkoutFiles = serviceOrder.checkoutFiles || [];
+
+                  return (
+                    <div key={serviceOrder.id} className="border border-border/30 rounded-lg overflow-hidden">
+                      {/* Service Order Header */}
+                      <div className="bg-muted/30 px-3 py-2 flex items-center gap-2 border-b border-border/30">
+                        <h4 className="text-xs font-semibold truncate">{displayDescription}</h4>
+                        {!isOutrosWithObservation && serviceOrder.observation && (
+                          <span className="text-[11px] text-muted-foreground truncate" title={serviceOrder.observation}>
+                            — {serviceOrder.observation}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Check-in / Check-out Content */}
+                      <div className="px-3 py-3 space-y-5">
+                        {/* Check-in */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1.5">
+                            <IconCameraCheck className="h-4 w-4 text-blue-500" />
+                            <span className="text-xs font-medium">Check-in</span>
+                            <span className="text-[11px] text-muted-foreground">{checkinFiles.length}</span>
+                          </div>
+                          {checkinFiles.length > 0 ? (
+                            <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+                              {checkinFiles.map((file: any) => {
+                                const src = file.thumbnailUrl
+                                  ? (file.thumbnailUrl.startsWith('/api') ? `${apiUrl}${file.thumbnailUrl}` : file.thumbnailUrl)
+                                  : `${apiUrl}/files/thumbnail/${file.id}`;
+                                return (
+                                  <button
+                                    key={file.id}
+                                    onClick={() => handleDossieFileClick(file)}
+                                    className="relative aspect-square rounded overflow-hidden border border-border/30 bg-muted hover:opacity-80 transition-opacity cursor-pointer"
+                                  >
+                                    <img
+                                      src={src}
+                                      alt={file.originalName || file.filename}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground italic">Nenhuma foto</p>
+                          )}
+                        </div>
+
+                        {/* Check-out */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1.5">
+                            <IconCameraBolt className="h-4 w-4 text-green-500" />
+                            <span className="text-xs font-medium">Check-out</span>
+                            <span className="text-[11px] text-muted-foreground">{checkoutFiles.length}</span>
+                          </div>
+                          {checkoutFiles.length > 0 ? (
+                            <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+                              {checkoutFiles.map((file: any) => {
+                                const src = file.thumbnailUrl
+                                  ? (file.thumbnailUrl.startsWith('/api') ? `${apiUrl}${file.thumbnailUrl}` : file.thumbnailUrl)
+                                  : `${apiUrl}/files/thumbnail/${file.id}`;
+                                return (
+                                  <button
+                                    key={file.id}
+                                    onClick={() => handleDossieFileClick(file)}
+                                    className="relative aspect-square rounded overflow-hidden border border-border/30 bg-muted hover:opacity-80 transition-opacity cursor-pointer"
+                                  >
+                                    <img
+                                      src={src}
+                                      alt={file.originalName || file.filename}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground italic">Nenhuma foto</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

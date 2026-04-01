@@ -1,5 +1,5 @@
 import { useFieldArray, useWatch } from "react-hook-form";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ interface PlateTagsInputProps {
 
 export function PlateTagsInput({ control, disabled }: PlateTagsInputProps) {
   const [newPlate, setNewPlate] = useState<string>("");
+  const justCommittedRef = useRef(false);
 
   // Watch the plates array
   const watchedPlates = useWatch({
@@ -28,12 +29,17 @@ export function PlateTagsInput({ control, disabled }: PlateTagsInputProps) {
   });
 
   const handleAddPlate = () => {
+    if (justCommittedRef.current) {
+      justCommittedRef.current = false;
+      return;
+    }
     const trimmedPlate = newPlate.trim().toUpperCase();
 
     // Simple validation: just check if not empty and not duplicate
     if (trimmedPlate && !plates.includes(trimmedPlate)) {
       append(trimmedPlate as any);
       setNewPlate("");
+      justCommittedRef.current = true;
     }
   };
 
@@ -69,6 +75,7 @@ export function PlateTagsInput({ control, disabled }: PlateTagsInputProps) {
                     handleAddPlate();
                   }
                 }}
+                onBlur={handleAddPlate}
                 placeholder={disabled ? "Desabilitado (remova números de série extras)" : "Digite uma placa e pressione Enter (ex: ABC1234)"}
                 disabled={disabled}
                 transparent={true}

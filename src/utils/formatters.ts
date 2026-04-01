@@ -222,14 +222,8 @@ export const detectPixKeyType = (key: string): PixKeyInfo => {
   // Remove all non-digit characters for numeric checks
   const numericOnly = cleaned.replace(/\D/g, "");
 
-  // CPF detection (11 digits)
-  if (numericOnly.length === 11 && !numericOnly.startsWith("55")) {
-    return {
-      type: "cpf",
-      formatted: formatCPF(numericOnly),
-      isValid: true
-    };
-  }
+  // Check if original input has phone formatting indicators (parentheses, plus sign)
+  const hasPhoneFormatting = cleaned.includes('(') || cleaned.startsWith('+');
 
   // CNPJ detection (14 digits)
   if (numericOnly.length === 14) {
@@ -250,8 +244,30 @@ export const detectPixKeyType = (key: string): PixKeyInfo => {
     };
   }
 
-  // Brazilian phone without country code: 2 digit area code + 8 or 9 digits = 10 or 11 digits
-  if (numericOnly.length === 11 || numericOnly.length === 10) {
+  // 11-digit numbers: distinguish between mobile phone and CPF
+  // Brazilian mobiles always have '9' as the first digit after the 2-digit area code (mandatory since 2016)
+  // Phone formatting indicators (parentheses, +) also indicate a phone number
+  if (numericOnly.length === 11) {
+    const isMobilePhone = numericOnly.charAt(2) === '9';
+
+    if (hasPhoneFormatting || isMobilePhone) {
+      return {
+        type: "phone",
+        formatted: formatBrazilianPhone(numericOnly),
+        isValid: true
+      };
+    }
+
+    // Not a phone pattern - treat as CPF
+    return {
+      type: "cpf",
+      formatted: formatCPF(numericOnly),
+      isValid: true
+    };
+  }
+
+  // Brazilian landline without country code: 2 digit area code + 8 digits = 10 digits
+  if (numericOnly.length === 10) {
     return {
       type: "phone",
       formatted: formatBrazilianPhone(numericOnly),

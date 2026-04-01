@@ -114,6 +114,7 @@ export const routes = {
     },
     budget: {
       root: "/financeiro/orcamento",
+      create: "/financeiro/orcamento/cadastrar",
       details: (taskId: string) => `/financeiro/orcamento/detalhes/${taskId}`,
     },
     nfse: {
@@ -549,8 +550,30 @@ export const routes = {
       topItems: "/estatisticas/estoque/principais-itens",
       trends: "/estatisticas/estoque/tendencias",
     },
-    production: "/estatisticas/producao",
-    financial: "/estatisticas/financeiro",
+    production: {
+      root: "/estatisticas/producao",
+      throughput: "/estatisticas/producao/rendimento",
+      bottlenecks: "/estatisticas/producao/gargalos",
+      revenue: "/estatisticas/producao/receita",
+    },
+    financial: {
+      root: "/estatisticas/financeiro",
+      collection: "/estatisticas/financeiro/cobrancas",
+      bankSlips: "/estatisticas/financeiro/boletos",
+    },
+    humanResources: {
+      root: "/estatisticas/recursos-humanos",
+      payroll: "/estatisticas/recursos-humanos/folha",
+      teamPerformance: "/estatisticas/recursos-humanos/equipe",
+    },
+    painting: {
+      root: "/estatisticas/pintura",
+      production: "/estatisticas/pintura/producao",
+    },
+    administration: {
+      root: "/estatisticas/administracao",
+      overview: "/estatisticas/administracao/visao-geral",
+    },
     // Advanced Analytics
     analytics: {
       root: "/estatisticas/analytics",
