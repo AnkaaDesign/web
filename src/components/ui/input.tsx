@@ -303,9 +303,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         return;
       }
 
+      // Don't overwrite user's input while they are actively typing
+      const isFocused = inputRef.current?.matches(":focus");
+
       // For currency, handle special formatting
       if (type === "currency") {
-        if (!inputRef.current?.matches(":focus")) {
+        if (!isFocused) {
           const cents = value !== null ? Math.round(Number(value) * 100) : 0;
 
           if (cents === 0) {
@@ -328,6 +331,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             }
           }
         }
+      } else if (isFocused && (type === "decimal" || type === "number")) {
+        // For decimal/number, don't overwrite while focused - let handleChange control the display
+        // This prevents min/max constraints from reformatting the value mid-typing
       } else {
         const formatted = formatValue(value, type, documentType);
         setInternalValue(formatted);
@@ -555,8 +561,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         // Allow decimal separator (comma or period)
         if (e.key === "," || e.key === ".") {
           const input = e.currentTarget;
-          // Only allow one decimal separator
-          if (input.value.includes(",") || input.value.includes(".")) {
+          const selStart = input.selectionStart ?? 0;
+          const selEnd = input.selectionEnd ?? 0;
+          // Get the text that will remain after the selection is replaced
+          const remainingText = input.value.slice(0, selStart) + input.value.slice(selEnd);
+          // Only allow one decimal separator in the remaining text
+          if (remainingText.includes(",") || remainingText.includes(".")) {
             e.preventDefault();
           }
           return;
@@ -903,13 +913,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           return;
         }
 
-        // Apply min/max constraints if provided
-        // Note: We constrain the value passed to onChange, but keep the displayValue as typed by the user
-        // The displayValue will be corrected on blur to match NaturalFloatInput behavior
+        // Don't apply min/max constraints during typing - let the user type freely
+        // Constraints will be applied on blur
+        // Only apply max constraint to prevent obviously invalid values
         let constrainedValue = numValue;
-        if (min !== undefined && constrainedValue < min) {
-          constrainedValue = min;
-        }
         if (max !== undefined && constrainedValue > max) {
           constrainedValue = max;
         }
@@ -1125,8 +1132,13 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       if (naturalTyping) {
         setShowCursor(true);
       }
-      // Don't auto-populate currency with 0,00 on focus anymore
-      // Let the user start typing from empty
+      // Select all text on focus for numeric inputs so user can immediately start typing a new value
+      if (type === "decimal" || type === "number" || type === "currency" || type === "percentage" || type === "integer" || type === "natural") {
+        // Use requestAnimationFrame to ensure selection happens after browser's default focus behavior
+        requestAnimationFrame(() => {
+          inputRef.current?.select();
+        });
+      }
     };
 
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {

@@ -7,36 +7,109 @@ import { Combobox } from "@/components/ui/combobox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { formatCurrency } from "@/utils";
+import { formatCurrency, formatDate } from "@/utils";
 import { computeServiceNet, computeCustomerConfigTotals } from "@/utils/task-quote-calculations";
 import { DISCOUNT_TYPE, SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
+import { routes } from "@/constants";
 import { ServiceAutocomplete } from "@/components/production/task/form/service-autocomplete";
-import { IconPlus, IconTrash, IconNote, IconCurrencyReal, IconAlertTriangle } from "@tabler/icons-react";
+import { useTaskQuoteSuggestion } from "@/hooks/production/use-task-quote";
+import {
+  IconPlus,
+  IconTrash,
+  IconNote,
+  IconCurrencyReal,
+  IconAlertTriangle,
+  IconBulb,
+  IconExternalLink,
+  IconChevronDown,
+  IconX,
+} from "@tabler/icons-react";
 import {
   getQuoteServicesToAddFromServiceOrders,
   type SyncServiceOrder,
 } from "@/utils/task-quote-service-order-sync";
 
+const ADJUSTMENT_PRESETS = [0, 5, 10, 15, 20];
+
 interface BudgetStepServicesProps {
   task: any;
   disabled?: boolean;
   selectedCustomers: Map<string, any>;
+  isCreateMode?: boolean;
 }
 
 export function BudgetStepServices({
   task,
   disabled,
   selectedCustomers,
+  isCreateMode,
 }: BudgetStepServicesProps) {
   const { control, setValue: setFormValue, getValues } = useFormContext();
-  const { fields, append, remove } = useFieldArray({ control, name: "services" });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: "services" });
   const services = useWatch({ control, name: "services" }) || [];
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
   const hasMultipleCustomers = customerConfigs.length >= 2;
   const [syncedOnMount, setSyncedOnMount] = useState(false);
 
-  // Observation modal state (single modal at component level, like billing)
+  // Suggestion state
+  const [adjustmentPercent, setAdjustmentPercent] = useState(0);
+  const [isCustomAdjustment, setIsCustomAdjustment] = useState(false);
+  const [customAdjustmentInput, setCustomAdjustmentInput] = useState("");
+  const [suggestionApplied, setSuggestionApplied] = useState(false);
+
+  // Watch form fields for suggestion query (only in create mode)
+  const watchedName = useWatch({ control, name: "name" });
+  const watchedCustomerId = useWatch({ control, name: "customerId" });
+  const watchedCategory = useWatch({ control, name: "category" });
+  const watchedImplementType = useWatch({ control, name: "implementType" });
+
+  const suggestionParams = useMemo(() => ({
+    name: watchedName || "",
+    customerId: watchedCustomerId || "",
+    category: watchedCategory || "",
+    implementType: watchedImplementType || "",
+  }), [watchedName, watchedCustomerId, watchedCategory, watchedImplementType]);
+
+  const {
+    data: suggestionApiResponse,
+  } = useTaskQuoteSuggestion(
+    isCreateMode ? suggestionParams : { name: "", customerId: "", category: "", implementType: "" },
+  );
+
+  // Hook unwraps axios .data, so suggestionApiResponse = { success, data, message }
+  const suggestion = suggestionApiResponse?.data || null;
+
+  // Detect if user manually typed in any real service row → dismiss ghost
+  const userHasManualServices = useMemo(() => {
+    return services.some((s: any) => s.description?.trim() || (s.amount && Number(s.amount) > 0));
+  }, [services]);
+
+  // Toolbar shows whenever a suggestion exists
+  const showSuggestionToolbar = !!(isCreateMode && suggestion?.services?.length);
+  // Ghost preview rows only when not yet applied and user hasn't manually typed
+  const showSuggestionPreview = showSuggestionToolbar && !suggestionApplied && !userHasManualServices;
+
+  // Compute suggested services with adjustment applied
+  const suggestedServices = useMemo(() => {
+    if (!suggestion?.services?.length) return [];
+    const multiplier = 1 + adjustmentPercent / 100;
+    return suggestion.services.map((svc: any) => ({
+      description: svc.description || "",
+      observation: svc.observation || null,
+      amount: Math.round((Number(svc.amount) || 0) * multiplier * 100) / 100,
+      invoiceToCustomerId: null,
+      discountType: svc.discountType || "NONE",
+      discountValue: svc.discountValue ? Math.round(Number(svc.discountValue) * 100) / 100 : null,
+      discountReference: svc.discountReference || null,
+    }));
+  }, [suggestion, adjustmentPercent]);
+
+  const suggestedTotal = useMemo(() => {
+    return suggestedServices.reduce((sum: number, s: any) => sum + (s.amount || 0), 0);
+  }, [suggestedServices]);
+
+  // Observation modal state
   const [observationModal, setObservationModal] = useState<{ index: number; value: string } | null>(null);
 
   // Customer options for invoice-to combobox
@@ -120,8 +193,87 @@ export function BudgetStepServices({
     setFormValue("total", total, { shouldDirty: false });
   }, [getValues, setFormValue]);
 
+  // Fill services from suggestion
+  const handleFillSuggestion = useCallback(() => {
+    if (!suggestedServices.length) return;
+
+    const newServices = suggestedServices.map((svc: any) => ({
+      description: svc.description,
+      observation: svc.observation,
+      amount: svc.amount,
+      invoiceToCustomerId: svc.invoiceToCustomerId,
+      discountType: svc.discountType,
+      discountValue: svc.discountValue,
+      discountReference: svc.discountReference,
+    }));
+
+    replace(newServices);
+    setSuggestionApplied(true);
+    setTimeout(recalculateTotals, 0);
+  }, [suggestedServices, replace, recalculateTotals]);
+
+  // Reset suggestion
+  const handleResetSuggestion = useCallback(() => {
+    replace([{
+      description: "",
+      observation: null,
+      amount: 0,
+      invoiceToCustomerId: null,
+      discountType: "NONE",
+      discountValue: null,
+      discountReference: null,
+    }]);
+    setSuggestionApplied(false);
+    setAdjustmentPercent(0);
+    setIsCustomAdjustment(false);
+    setCustomAdjustmentInput("");
+    setTimeout(recalculateTotals, 0);
+  }, [replace, recalculateTotals]);
+
+  // Combobox options for adjustment
+  const adjustmentOptions = useMemo(() => [
+    ...ADJUSTMENT_PRESETS.map((val) => ({
+      value: String(val),
+      label: val === 0 ? "Nenhum reajuste" : `Reajuste: ${val}%`,
+    })),
+    { value: "CUSTOM", label: "Reajuste personalizado" },
+  ], []);
+
+  // Handle adjustment combobox change
+  const handleAdjustmentSelect = useCallback((value: string) => {
+    if (value === "CUSTOM") {
+      setIsCustomAdjustment(true);
+      setCustomAdjustmentInput(adjustmentPercent > 0 ? String(adjustmentPercent) : "");
+    } else {
+      setIsCustomAdjustment(false);
+      setCustomAdjustmentInput("");
+      setAdjustmentPercent(Number(value) || 0);
+    }
+  }, [adjustmentPercent]);
+
+  // Handle custom adjustment input
+  const handleCustomAdjustmentChange = useCallback((value: string) => {
+    setCustomAdjustmentInput(value);
+    const parsed = parseFloat(value);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+      setAdjustmentPercent(parsed);
+    } else if (value === "") {
+      setAdjustmentPercent(0);
+    }
+  }, []);
+
+  // Reset suggestion applied state when suggestion source changes
+  useEffect(() => {
+    setSuggestionApplied(false);
+  }, [suggestion]);
+
   // Validate: any service with amount but no description
   const hasValidationIssue = services.some((s: any) => s.amount > 0 && !s.description?.trim());
+
+  // Grid class
+  const gridClass = hasMultipleCustomers
+    ? "grid-cols-[minmax(80px,1fr)_minmax(90px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]"
+    : "grid-cols-[minmax(100px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]";
 
   return (
     <div className="space-y-6">
@@ -142,12 +294,114 @@ export function BudgetStepServices({
             </Alert>
           )}
 
+          {/* Suggestion toolbar — always visible when suggestion exists */}
+          {showSuggestionToolbar && (
+            <div className="border border-border rounded-lg px-3 pt-2.5 pb-3 bg-muted/20">
+              <div className="flex items-start gap-4">
+                {/* Left column: title + orçamento button */}
+                <div className="flex flex-col gap-2 min-w-0">
+                  <div className="flex items-center gap-1.5 h-7">
+                    <IconBulb className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm font-medium">Sugestão</span>
+                  </div>
+                  {suggestion.task?.id ? (
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      className="h-7 text-xs w-fit"
+                      asChild
+                    >
+                      <a
+                        href={routes.production.history.details(suggestion.task.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <IconExternalLink className="h-3.5 w-3.5" />
+                        Orçamento de {formatDate(suggestion.taskCreatedAt || suggestion.createdAt)}
+                      </a>
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground h-7 flex items-center">
+                      Orçamento de {formatDate(suggestion.taskCreatedAt || suggestion.createdAt)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Right column: reajuste + action buttons — all fixed w-[220px] */}
+                <div className="ml-auto flex flex-col gap-2 w-[220px]">
+                  {/* Reajuste */}
+                  {isCustomAdjustment ? (
+                    <div className="flex items-center gap-1.5 h-7 w-[220px]">
+                      <input
+                        type="number"
+                        value={customAdjustmentInput}
+                        onChange={(e) => handleCustomAdjustmentChange(e.target.value)}
+                        placeholder="0"
+                        autoFocus
+                        className="h-7 flex-1 min-w-0 text-xs rounded-md border border-input bg-background px-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        min={0}
+                        max={100}
+                      />
+                      <span className="text-xs text-muted-foreground flex-shrink-0">%</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 flex-shrink-0"
+                        onClick={() => {
+                          setIsCustomAdjustment(false);
+                          if (!customAdjustmentInput) setAdjustmentPercent(0);
+                        }}
+                      >
+                        <IconX className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Combobox
+                      value={String(adjustmentPercent)}
+                      onValueChange={handleAdjustmentSelect}
+                      options={adjustmentOptions}
+                      searchable={false}
+                      clearable={false}
+                      className="h-7 w-[220px] text-xs"
+                    />
+                  )}
+
+                  {/* Action buttons — same fixed width */}
+                  <div className="flex items-center gap-2 w-[220px]">
+                    {(suggestionApplied || userHasManualServices) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs flex-1"
+                        onClick={handleResetSuggestion}
+                        disabled={disabled}
+                      >
+                        <IconX className="h-3.5 w-3.5" />
+                        Limpar
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      className="h-7 text-xs flex-1"
+                      onClick={handleFillSuggestion}
+                      disabled={disabled}
+                    >
+                      <IconBulb className="h-3.5 w-3.5" />
+                      {suggestionApplied || userHasManualServices ? "Preencher" : "Preencher Sugestão"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Header */}
-          <div className={`grid gap-2 text-xs font-semibold text-muted-foreground uppercase ${
-            hasMultipleCustomers
-              ? "grid-cols-[minmax(80px,1fr)_minmax(90px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]"
-              : "grid-cols-[minmax(100px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]"
-          }`}>
+          <div className={`grid gap-2 text-xs font-semibold text-muted-foreground uppercase ${gridClass}`}>
             <span className="px-2">Descrição</span>
             {hasMultipleCustomers && <span className="px-2">Cliente</span>}
             <span className="px-2">Valor</span>
@@ -157,7 +411,86 @@ export function BudgetStepServices({
             <span />
           </div>
 
-          {/* Service rows */}
+          {/* Ghost rows — look like real inputs but with placeholder styling */}
+          {showSuggestionPreview && suggestedServices.map((svc: any, idx: number) => (
+            <div
+              key={`suggestion-${idx}`}
+              className={`grid gap-2 items-center pointer-events-none ${gridClass}`}
+            >
+              {/* Description — mimics Combobox trigger */}
+              <div className="flex items-center gap-1 min-w-0">
+                <div className="flex-1 min-w-0 h-9 rounded-md border border-input bg-background flex items-center justify-between px-3">
+                  <span className="text-sm text-muted-foreground truncate">
+                    {svc.description}
+                  </span>
+                  <IconChevronDown className="h-4 w-4 shrink-0 opacity-50 ml-2" />
+                </div>
+                <div className="h-9 w-9 rounded-md border border-input bg-background flex items-center justify-center flex-shrink-0">
+                  <IconNote className="h-3.5 w-3.5 text-muted-foreground/50" />
+                </div>
+              </div>
+
+              {/* Customer */}
+              {hasMultipleCustomers && (
+                <div className="h-9 rounded-md border border-input bg-background flex items-center justify-between px-3">
+                  <span className="text-sm text-muted-foreground">Cliente</span>
+                  <IconChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                </div>
+              )}
+
+              {/* Amount */}
+              <div className="h-9 rounded-md border border-input bg-background flex items-center px-3">
+                <span className="text-sm text-muted-foreground">
+                  {formatCurrency(svc.amount)}
+                </span>
+              </div>
+
+              {/* Discount Type — mimics Combobox */}
+              <div className="h-9 rounded-md border border-input bg-background flex items-center justify-between px-3">
+                <span className="text-sm text-muted-foreground">
+                  {svc.discountType !== "NONE" ? DISCOUNT_TYPE_LABELS[svc.discountType as keyof typeof DISCOUNT_TYPE_LABELS] || "Nenhum" : "Nenhum"}
+                </span>
+                <IconChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+              </div>
+
+              {/* Discount Value */}
+              <div className="h-9 rounded-md border border-input bg-background flex items-center px-3">
+                <span className="text-sm text-muted-foreground">
+                  {svc.discountValue ? (svc.discountType === "PERCENTAGE" ? `${svc.discountValue}%` : formatCurrency(svc.discountValue)) : "R$ 0,00"}
+                </span>
+              </div>
+
+              {/* Discount Reference */}
+              <div className="h-9 rounded-md border border-input bg-background flex items-center px-3">
+                <span className="text-sm text-muted-foreground truncate">
+                  {svc.discountReference || "Referência"}
+                </span>
+              </div>
+
+              {/* Empty trash cell */}
+              <div className="h-9 w-9" />
+            </div>
+          ))}
+
+          {/* Suggested totals — same style as real totals but muted */}
+          {showSuggestionPreview && (
+            <div className="bg-muted/20 border border-border rounded-lg p-4 space-y-2 mt-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium text-muted-foreground">
+                  {formatCurrency(suggestedTotal)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-border">
+                <span className="text-base font-bold text-muted-foreground">TOTAL</span>
+                <span className="text-xl font-bold text-muted-foreground">
+                  {formatCurrency(suggestedTotal)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Real service rows */}
           {fields.map((field, index) => {
             const service = services[index];
             const discountType = service?.discountType || "NONE";
@@ -165,13 +498,8 @@ export function BudgetStepServices({
             return (
               <div
                 key={field.id}
-                className={`grid gap-2 items-center ${
-                  hasMultipleCustomers
-                    ? "grid-cols-[minmax(80px,1fr)_minmax(90px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]"
-                    : "grid-cols-[minmax(100px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]"
-                }`}
+                className={`grid gap-2 items-center ${gridClass}`}
               >
-                {/* Description + Observation button (same cell, like billing) */}
                 <div className="flex items-center gap-1 min-w-0">
                   <div className="flex-1 min-w-0 [&>.space-y-2]:space-y-0">
                     <ServiceAutocomplete
@@ -198,7 +526,6 @@ export function BudgetStepServices({
                   </button>
                 </div>
 
-                {/* Invoice To Customer */}
                 {hasMultipleCustomers && (
                   <Combobox
                     value={service?.invoiceToCustomerId || ""}
@@ -215,7 +542,6 @@ export function BudgetStepServices({
                   />
                 )}
 
-                {/* Amount */}
                 <Input
                   type="currency"
                   value={service?.amount || 0}
@@ -227,7 +553,6 @@ export function BudgetStepServices({
                   className="h-9"
                 />
 
-                {/* Discount Type */}
                 <Combobox
                   value={discountType}
                   onValueChange={(v) => {
@@ -246,7 +571,6 @@ export function BudgetStepServices({
                   className="h-9"
                 />
 
-                {/* Discount Value */}
                 <Input
                   type={discountType === "PERCENTAGE" ? "number" : "currency"}
                   value={service?.discountValue || 0}
@@ -260,7 +584,6 @@ export function BudgetStepServices({
                   {...(discountType === "PERCENTAGE" ? { min: 0, max: 100 } : {})}
                 />
 
-                {/* Discount Reference */}
                 <Input
                   value={service?.discountReference || ""}
                   onChange={(e) => {
@@ -272,7 +595,6 @@ export function BudgetStepServices({
                   className="h-9"
                 />
 
-                {/* Remove */}
                 {!disabled && (
                   <Button
                     type="button"
@@ -291,7 +613,6 @@ export function BudgetStepServices({
             );
           })}
 
-          {/* Add button */}
           {!disabled && (
             <Button
               type="button"
@@ -305,25 +626,27 @@ export function BudgetStepServices({
             </Button>
           )}
 
-          {/* Totals (inline in same card, like billing) */}
-          <div className="bg-muted/20 border border-border rounded-lg p-4 space-y-2 mt-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">
-                {formatCurrency(services.reduce((sum: number, s: any) => sum + (Number(s?.amount) || 0), 0))}
-              </span>
+          {/* Real totals (when not showing suggestion preview) */}
+          {!showSuggestionPreview && (
+            <div className="bg-muted/20 border border-border rounded-lg p-4 space-y-2 mt-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium">
+                  {formatCurrency(services.reduce((sum: number, s: any) => sum + (Number(s?.amount) || 0), 0))}
+                </span>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-border">
+                <span className="text-base font-bold">TOTAL</span>
+                <span className="text-xl font-bold text-primary">
+                  {formatCurrency(services.reduce((sum: number, s: any) => sum + computeServiceNet(s || {}), 0))}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center justify-between pt-2 border-t border-border">
-              <span className="text-base font-bold">TOTAL</span>
-              <span className="text-xl font-bold text-primary">
-                {formatCurrency(services.reduce((sum: number, s: any) => sum + computeServiceNet(s || {}), 0))}
-              </span>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Observation Modal (single modal at component level, like billing) */}
+      {/* Observation Modal */}
       <Dialog open={!!observationModal} onOpenChange={(open) => !open && setObservationModal(null)}>
         <DialogContent>
           <DialogHeader>

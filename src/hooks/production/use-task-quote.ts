@@ -9,6 +9,8 @@ export const taskQuoteKeys = {
   details: () => [...taskQuoteKeys.all, 'detail'] as const,
   detail: (id: string) => [...taskQuoteKeys.details(), id] as const,
   byTask: (taskId: string) => [...taskQuoteKeys.all, 'byTask', taskId] as const,
+  suggestion: (params: { name: string; customerId: string; category: string; implementType: string }) =>
+    [...taskQuoteKeys.all, 'suggestion', params] as const,
 };
 
 // Get all quotes
@@ -34,6 +36,23 @@ export function useTaskQuoteByTask(taskId: string) {
     queryKey: taskQuoteKeys.byTask(taskId),
     queryFn: () => taskQuoteService.getByTaskId(taskId),
     enabled: !!taskId,
+  });
+}
+
+// Get suggestion based on matching task fields
+export function useTaskQuoteSuggestion(params: {
+  name: string;
+  customerId: string;
+  category: string;
+  implementType: string;
+}) {
+  const enabled = !!(params.name && params.customerId && params.category && params.implementType);
+  return useQuery({
+    queryKey: taskQuoteKeys.suggestion(params),
+    queryFn: () => taskQuoteService.getSuggestion(params).then((res) => res.data),
+    enabled,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    retry: false,
   });
 }
 

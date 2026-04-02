@@ -541,8 +541,6 @@ export const routes = {
   statistics: {
     root: "/estatisticas",
     // Entity-specific statistics
-    administration: "/estatisticas/administracao",
-    humanResources: "/estatisticas/recursos-humanos",
     inventory: {
       root: "/estatisticas/estoque",
       consumption: "/estatisticas/estoque/consumo",

@@ -57,7 +57,11 @@ export const invoiceService = {
   emitNfse: (invoiceId: string) =>
     apiClient.post(`/invoices/${invoiceId}/nfse/emit`),
 
+  // Get NFS-e PDF
+  getNfsePdf: (invoiceId: string) =>
+    apiClient.get(`/invoices/${invoiceId}/nfse/pdf`, { responseType: 'blob' }),
+
   // Cancel NFS-e for invoice
-  cancelNfse: (invoiceId: string, data: any) =>
-    apiClient.put(`/invoices/${invoiceId}/nfse/cancel`, data),
+  cancelNfse: (invoiceId: string, nfseDocumentId: string, data: any) =>
+    apiClient.put(`/invoices/${invoiceId}/nfse/${nfseDocumentId}/cancel`, data),
 };

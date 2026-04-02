@@ -94,15 +94,15 @@ export function GaragesPage() {
       OR: [
         // Trucks with a garage spot assigned (any status, including completed)
         { truck: { spot: { not: null } } },
-        // Non-completed trucks with forecastDate <= maxCalendarDate (for patio display including future forecast)
+        // Cleared trucks with no spot yet (will show in yard for today)
+        {
+          cleared: true,
+          status: { in: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION] },
+        },
+        // Non-completed trucks with forecastDate <= maxCalendarDate (virtual yard for future days)
         {
           status: { in: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION] },
           forecastDate: { lte: maxCalendarDateStr },
-        },
-        // Non-completed trucks that already arrived (have entryDate) but may not have forecastDate
-        {
-          status: { in: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION] },
-          entryDate: { lte: todayStr },
         },
       ],
     },
@@ -115,6 +115,7 @@ export function GaragesPage() {
       finishedAt: true,
       entryDate: true,
       term: true,
+      cleared: true,
       truck: {
         select: {
           id: true,
@@ -228,36 +229,24 @@ export function GaragesPage() {
         return true;
       }
 
-      // YARD_WAIT trucks still need date/status checks below
-      // (trucks without dates or completed trucks should not clutter the yard)
+      // For trucks with YARD_WAIT spot (cleared trucks) — always include
+      if (spot === 'YARD_WAIT') {
+        if (task.status === TASK_STATUS.COMPLETED) return false;
+        return true;
+      }
 
-      // Yard trucks: include if forecastDate <= maxCalendarDate OR entryDate <= today, AND status is not COMPLETED
-      // The GarageView calendar filter handles per-day visibility
-      const forecastDate = (task as any).forecastDate;
-      const entryDate = (task as any).entryDate;
-      if (!forecastDate && !entryDate) return false;
-
-      // Must not have COMPLETED status for yard display
+      // For trucks with null spot — include for virtual yard display based on forecastDate
+      // These are not yet cleared, but we show them on future days where forecastDate matches
       if (task.status === TASK_STATUS.COMPLETED) return false;
 
-      // Show if truck already arrived (entryDate)
-      if (entryDate) {
-        const entry = new Date(entryDate);
-        entry.setHours(0, 0, 0, 0);
-        if (entry <= today) return true;
-      }
+      const forecastDate = (task as any).forecastDate;
+      if (!forecastDate) return false;
 
-      // Include trucks with forecastDate up to the max calendar day
-      // (calendar filter in GarageView will handle per-day display)
-      if (forecastDate) {
-        const forecast = new Date(forecastDate);
-        forecast.setHours(0, 0, 0, 0);
-        const maxDay = new Date(next5Days[next5Days.length - 1]);
-        maxDay.setHours(0, 0, 0, 0);
-        return forecast <= maxDay;
-      }
-
-      return false;
+      const forecast = new Date(forecastDate);
+      forecast.setHours(0, 0, 0, 0);
+      const maxDay = new Date(next5Days[next5Days.length - 1]);
+      maxDay.setHours(0, 0, 0, 0);
+      return forecast <= maxDay;
     });
 
     // Deduplicate: when multiple trucks share the same spot (stale data from old logic),
@@ -325,7 +314,7 @@ export function GaragesPage() {
       const pendingChange = pendingChanges.get(truck?.id);
       // Demoted trucks (duplicates at same spot) go to yard wait
       const isDemoted = demotedTaskIds.has(task.id);
-      // Trucks without a spot default to YARD_WAIT (arriving trucks)
+      // Trucks with null spot are shown in YARD_WAIT (virtual display for forecasted/cleared trucks)
       const dbSpot = truck?.spot || 'YARD_WAIT';
       const currentSpot = pendingChange
         ? pendingChange.newSpot
@@ -347,6 +336,7 @@ export function GaragesPage() {
         entryDate: (task as any).entryDate || null,
         term: (task as any).term || null,
         forecastDate: (task as any).forecastDate || null,
+        cleared: !!(task as any).cleared,
         finishedAt: (task as any).finishedAt || null,
         layoutInfo: layoutSections.length > 0 ? `${layoutSections.length} seções` : null,
         artworkInfo: null, // Can be enhanced later with artwork file count

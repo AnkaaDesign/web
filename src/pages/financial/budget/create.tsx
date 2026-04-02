@@ -755,6 +755,7 @@ export const FinancialBudgetCreatePage = () => {
               task={null}
               disabled={isSubmitting}
               selectedCustomers={selectedCustomers}
+              isCreateMode
             />
           </div>
 

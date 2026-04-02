@@ -36,6 +36,10 @@ export const taskQuoteService = {
   // Get expired
   getExpired: () => apiClient.get('/task-quotes/expired/list'),
 
+  // Get suggestion based on matching task fields
+  getSuggestion: (params: { name: string; customerId: string; category: string; implementType: string }) =>
+    apiClient.get('/task-quotes/suggest', { params }),
+
   // =====================
   // PUBLIC ENDPOINTS (No Authentication Required)
   // =====================

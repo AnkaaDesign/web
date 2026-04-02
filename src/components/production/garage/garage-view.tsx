@@ -121,6 +121,7 @@ export interface GarageTruck {
   entryDate?: string | null; // Task entry date
   term?: string | null; // Task deadline
   forecastDate?: string | null; // Forecast date - when truck is expected to arrive at company
+  cleared?: boolean; // Whether the task has been cleared (released) to come to the company
   finishedAt?: string | null; // Task completion date - null if not complete
   layoutInfo?: string | null; // Layout description
   artworkInfo?: string | null; // Artwork description
@@ -2113,15 +2114,6 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, onG
         // Garage trucks on future dates pass term check, show them
         if (isInGarage) return true;
 
-        // For yard/patio trucks: check arrival date range
-        // Truck shouldn't appear before its arrival/forecast date
-        const arrivalDateStr = truck.entryDate || truck.forecastDate;
-        if (arrivalDateStr) {
-          const arrivalDate = new Date(arrivalDateStr);
-          arrivalDate.setHours(0, 0, 0, 0);
-          if (checkDate < arrivalDate) return false;
-        }
-
         // If truck is already completed before selected date, don't show
         if (truck.finishedAt) {
           const finished = new Date(truck.finishedAt);
@@ -2129,7 +2121,21 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, onG
           if (finished < checkDate) return false;
         }
 
-        return true;
+        // For yard/patio trucks:
+        // - Today: only show cleared trucks (physically coming/present)
+        // - Future days: show trucks whose forecastDate <= that day (virtual forecast)
+        if (isToday) {
+          return !!truck.cleared;
+        }
+
+        // Future day: show if forecastDate <= selected day
+        if (truck.forecastDate) {
+          const forecast = new Date(truck.forecastDate);
+          forecast.setHours(0, 0, 0, 0);
+          return forecast <= checkDate;
+        }
+
+        return false;
       });
     }
 

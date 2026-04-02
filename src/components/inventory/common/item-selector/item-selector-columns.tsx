@@ -363,7 +363,7 @@ export const createItemSelectorColumns = (
             value={quantity || ""}
             onChange={(value) => {
               const numValue = typeof value === "string" ? parseFloat(value) : value;
-              if (numValue !== null && !isNaN(numValue) && numValue > 0) {
+              if (numValue !== null && !isNaN(numValue) && numValue >= 0) {
                 ctx?.onQuantityChange?.(item.id, numValue);
               }
             }}
