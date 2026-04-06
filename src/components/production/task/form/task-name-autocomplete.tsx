@@ -20,6 +20,7 @@ export function TaskNameAutocomplete({ control, disabled }: TaskNameAutocomplete
   const [shouldPreventOpen, setShouldPreventOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isSelectingRef = useRef(false);
 
   // Watch the form field value
   const formValue = useWatch({ control, name: "name" });
@@ -110,8 +111,10 @@ export function TaskNameAutocomplete({ control, disabled }: TaskNameAutocomplete
 
   const handleSelect = useCallback(
     (suggestion: string, onChange: (value: string) => void) => {
-      setInputValue(suggestion);
-      onChange(suggestion);
+      isSelectingRef.current = true;
+      const formatted = toTitleCase(suggestion);
+      setInputValue(formatted);
+      onChange(formatted);
       setIsOpen(false);
       setSelectedIndex(-1);
       setShouldPreventOpen(true);
@@ -121,7 +124,10 @@ export function TaskNameAutocomplete({ control, disabled }: TaskNameAutocomplete
         inputRef.current.blur();
       }
 
-      setTimeout(() => setShouldPreventOpen(false), 300);
+      setTimeout(() => {
+        setShouldPreventOpen(false);
+        isSelectingRef.current = false;
+      }, 300);
     },
     []
   );
@@ -206,8 +212,8 @@ export function TaskNameAutocomplete({ control, disabled }: TaskNameAutocomplete
                   }
                 }}
                 onBlur={() => {
-                  // Apply title case formatting when user finishes typing
-                  if (inputValue) {
+                  // Skip formatting if a selection just happened (blur was triggered by handleSelect)
+                  if (inputValue && !isSelectingRef.current) {
                     const formatted = toTitleCase(inputValue);
                     setInputValue(formatted);
                     field.onChange(formatted);

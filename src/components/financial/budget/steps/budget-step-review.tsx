@@ -179,6 +179,21 @@ export function BudgetStepReview({
             </CardTitle>
             {!isCreateMode && (
               <div className="flex items-center gap-2">
+                {task?.id && (
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={() => navigate(
+                      task.status === "COMPLETED" || task.status === "CANCELLED"
+                        ? routes.production.history.details(task.id)
+                        : routes.production.preparation.details(task.id)
+                    )}
+                    className="gap-1.5 h-9"
+                  >
+                    <IconExternalLink className="h-3.5 w-3.5" />
+                    Ver Tarefa
+                  </Button>
+                )}
                 {publicBudgetUrl && (
                   <Button
                     variant="outline"

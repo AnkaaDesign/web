@@ -21,10 +21,14 @@ import {
   IconX,
   IconArrowLeft,
   IconTruck,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import { formatCNPJ, formatDate, formatChassis } from "@/utils";
 import { getCustomers } from "@/api-client";
 import { getApiBaseUrl } from "@/config/api";
+import { routes } from "@/constants";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 
 interface ArtworkOption {
@@ -80,6 +84,7 @@ export function BudgetStepInfo({
 }: BudgetStepInfoProps) {
   const { setValue, getValues, control } = useFormContext();
   const fileViewer = useFileViewer();
+  const navigate = useNavigate();
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
   const [showLayoutUploadMode, setShowLayoutUploadMode] = useState(false);
   const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
@@ -368,10 +373,27 @@ export function BudgetStepInfo({
         {infoItems.length > 0 && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <IconTruck className="h-4 w-4 text-muted-foreground" />
-                Dados da Tarefa
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <IconTruck className="h-4 w-4 text-muted-foreground" />
+                  Dados da Tarefa
+                </CardTitle>
+                {task?.id && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(
+                      task.status === "COMPLETED" || task.status === "CANCELLED"
+                        ? routes.production.history.details(task.id)
+                        : routes.production.preparation.details(task.id)
+                    )}
+                    className="gap-1.5 h-8"
+                  >
+                    <IconExternalLink className="h-3.5 w-3.5" />
+                    Ver Tarefa
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-1">

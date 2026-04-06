@@ -20,15 +20,24 @@ export const taskQuoteService = {
   updateStatus: (id: string, status: string, reason?: string) =>
     apiClient.put(`/task-quotes/${id}/status`, { status, reason }),
 
-  // Approve
-  approve: (id: string) => apiClient.put(`/task-quotes/${id}/approve`),
+  // Budget Approve (customer approved the budget: PENDING → BUDGET_APPROVED)
+  approve: (id: string) => apiClient.put(`/task-quotes/${id}/budget-approve`),
 
-  // Reject
+  // Budget Approve (alias)
+  budgetApprove: (id: string) => apiClient.put(`/task-quotes/${id}/budget-approve`),
+
+  // Verify (financial verifies: BUDGET_APPROVED → VERIFIED_BY_FINANCIAL)
+  verify: (id: string) => apiClient.put(`/task-quotes/${id}/verify`),
+
+  // Internal Approve (final approval: VERIFIED_BY_FINANCIAL → BILLING_APPROVED)
+  internalApprove: (id: string) => apiClient.put(`/task-quotes/${id}/internal-approve`),
+
+  // Reject (sends back to PENDING with a reason)
   reject: (id: string, reason?: string) =>
-    apiClient.put(`/task-quotes/${id}/reject`, { reason }),
+    apiClient.put(`/task-quotes/${id}/status`, { status: 'PENDING', reason }),
 
-  // Cancel
-  cancel: (id: string) => apiClient.put(`/task-quotes/${id}/cancel`),
+  // Cancel (sends back to PENDING)
+  cancel: (id: string) => apiClient.put(`/task-quotes/${id}/status`, { status: 'PENDING' }),
 
   // Delete
   delete: (id: string) => apiClient.delete(`/task-quotes/${id}`),

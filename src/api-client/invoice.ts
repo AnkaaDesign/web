@@ -9,7 +9,7 @@ export const invoiceService = {
     apiClient.get(`/invoices/${id}`, {
       params: {
         include: {
-          installments: { include: { bankSlip: { include: { pdfFile: true } } } },
+          installments: { include: { bankSlip: { include: { pdfFile: true } }, receiptFile: true } },
           nfseDocuments: true,
           customer: true,
           task: true,
@@ -22,7 +22,7 @@ export const invoiceService = {
     apiClient.get(`/invoices/task/${taskId}`, {
       params: {
         include: {
-          installments: { include: { bankSlip: { include: { pdfFile: true } } } },
+          installments: { include: { bankSlip: { include: { pdfFile: true } }, receiptFile: true } },
           nfseDocuments: true,
           customer: true,
         },
@@ -37,9 +37,9 @@ export const invoiceService = {
   cancel: (id: string, data?: any) =>
     apiClient.put(`/invoices/${id}/cancel`, data),
 
-  // Regenerate boleto for installment
-  regenerateBoleto: (installmentId: string) =>
-    apiClient.post(`/invoices/${installmentId}/boleto/regenerate`),
+  // Regenerate boleto for installment (optionally with a new due date)
+  regenerateBoleto: (installmentId: string, newDueDate?: string) =>
+    apiClient.post(`/invoices/${installmentId}/boleto/regenerate`, newDueDate ? { newDueDate } : {}),
 
   // Cancel boleto for installment
   cancelBoleto: (installmentId: string, data?: any) =>
@@ -62,6 +62,18 @@ export const invoiceService = {
     apiClient.get(`/invoices/${invoiceId}/nfse/pdf`, { responseType: 'blob' }),
 
   // Cancel NFS-e for invoice
-  cancelNfse: (invoiceId: string, nfseDocumentId: string, data: any) =>
-    apiClient.put(`/invoices/${invoiceId}/nfse/${nfseDocumentId}/cancel`, data),
+  cancelNfse: (invoiceId: string, data: any) =>
+    apiClient.put(`/invoices/${invoiceId}/nfse/cancel`, data),
+
+  // Mark boleto as paid via PIX/cash
+  markBoletoPaid: (installmentId: string, data: { paymentMethod: string; receiptFileId?: string }) =>
+    apiClient.put(`/invoices/${installmentId}/boleto/mark-paid`, data),
+
+  // Update installment receipt
+  updateInstallmentReceipt: (installmentId: string, receiptFileId: string) =>
+    apiClient.put(`/invoices/${installmentId}/receipt`, { receiptFileId }),
+
+  // Get installment receipt file
+  getInstallmentReceipt: (installmentId: string) =>
+    apiClient.get(`/invoices/${installmentId}/receipt/download`, { responseType: 'blob' }),
 };

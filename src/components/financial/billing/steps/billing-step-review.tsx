@@ -19,7 +19,7 @@ import { SECTOR_PRIVILEGES } from "@/constants";
 import { canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
 import type { Invoice } from "@/types/invoice";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
-import { IconFileInvoice, IconCurrencyReal, IconBuilding, IconTruck, IconCreditCard, IconReceipt, IconDownload, IconEye, IconLoader2, IconFolderCheck, IconCameraCheck, IconCameraBolt } from "@tabler/icons-react";
+import { IconFileInvoice, IconCurrencyReal, IconBuilding, IconTruck, IconCreditCard, IconReceipt, IconDownload, IconEye, IconLoader2, IconFolderCheck, IconCameraCheck, IconCameraBolt, IconExternalLink } from "@tabler/icons-react";
 import { cn, getApiBaseUrl } from "@/lib/utils";
 import { useState } from "react";
 import { invoiceService } from "@/api-client/invoice";
@@ -28,10 +28,14 @@ import { SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { useFileViewer } from "@/components/common/file";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
+import { useNavigate } from "react-router-dom";
+import { routes } from "@/constants";
+import { exportDossiePdf } from "@/utils/dossie-pdf-generator";
 
 const STATUSES_REQUIRING_COMPLETE_DATA = ["VERIFIED_BY_FINANCIAL", "BILLING_APPROVED"];
 
-const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
+// All statuses — automatic ones are shown (so current value displays) but disabled
+const ALL_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
   { value: "BUDGET_APPROVED", label: "Orçamento Aprovado" },
   { value: "VERIFIED_BY_FINANCIAL", label: "Verificado pelo Financeiro" },
@@ -41,6 +45,9 @@ const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PARTIAL", label: "Parcial" },
   { value: "SETTLED", label: "Liquidado" },
 ];
+
+// Statuses that are set automatically and cannot be manually selected
+const AUTOMATIC_STATUSES = ["UPCOMING", "DUE", "PARTIAL"];
 
 const getStatusTriggerClass = (status: string) => {
   const map: Record<string, string> = {
@@ -62,9 +69,13 @@ interface BillingStepReviewProps {
   invoices?: Invoice[];
   userPrivilege?: string;
   disabled?: boolean;
+  isGenerating?: boolean;
+  /** When set, filters to show only this customer's data */
+  filterCustomerId?: string;
 }
 
-export function BillingStepReview({ task, customersCache, invoices = [], userPrivilege = "", disabled }: BillingStepReviewProps) {
+export function BillingStepReview({ task, customersCache, invoices = [], userPrivilege = "", disabled, isGenerating = false, filterCustomerId }: BillingStepReviewProps) {
+  const navigate = useNavigate();
   const { control, setValue } = useFormContext();
   const currentStatus = useWatch({ control, name: "status" }) || "";
   const services = useWatch({ control, name: "services" }) || [];
@@ -97,15 +108,32 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
     fileViewerContext.actions.viewFiles(allFiles, index >= 0 ? index : 0);
   }, [fileViewerContext, task?.serviceOrders]);
 
-  const validServices = useMemo(
+  const allValidServices = useMemo(
     () => services.filter((s: any) => s.description?.trim()),
     [services],
   );
+
+  // Filter by selected customer when filterCustomerId is set
+  const validServices = useMemo(() => {
+    if (!filterCustomerId) return allValidServices;
+    return allValidServices.filter((s: any) => s.invoiceToCustomerId === filterCustomerId || !s.invoiceToCustomerId);
+  }, [allValidServices, filterCustomerId]);
+
+  const filteredCustomerConfigs = useMemo(() => {
+    if (!filterCustomerId) return customerConfigs;
+    return customerConfigs.filter((c: any) => c.customerId === filterCustomerId);
+  }, [customerConfigs, filterCustomerId]);
+
+  const filteredInvoices = useMemo(() => {
+    if (!filterCustomerId) return invoices;
+    return invoices.filter((inv: any) => inv.customerId === filterCustomerId);
+  }, [invoices, filterCustomerId]);
+
   const subtotal = validServices.reduce((sum: number, s: any) => sum + (Number(s?.amount) || 0), 0);
   const total = validServices.reduce((sum: number, s: any) => sum + computeServiceNet(s || {}), 0);
   const discountAmount = Math.max(0, subtotal - total);
 
-  const hasMultipleCustomers = customerConfigs.length >= 2;
+  const hasMultipleCustomers = !filterCustomerId && customerConfigs.length >= 2;
 
   // Group services by customer for multi-customer view
   const customerGroups = useMemo(() => {
@@ -132,6 +160,22 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   }, [hasMultipleCustomers, validServices, customersCache, customerConfigs]);
 
   const canChangeStatus = canUpdateQuoteStatus(userPrivilege);
+
+  // Compute paid/total installment counts for PARTIAL badge
+  const installmentCounts = useMemo(() => {
+    let paid = 0;
+    let total = 0;
+    for (const inv of filteredInvoices) {
+      const insts = (inv as any).installments || [];
+      for (const inst of insts) {
+        if (inst.status !== 'CANCELLED') {
+          total++;
+          if (inst.status === 'PAID') paid++;
+        }
+      }
+    }
+    return { paid, total };
+  }, [invoices]);
 
   // Validate customer data completeness for statuses that require it
   const validateCustomerDataForStatus = useCallback((targetStatus: string): boolean => {
@@ -176,6 +220,19 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
 
   return (
     <div className="space-y-6">
+      {/* Generation progress banner */}
+      {isGenerating && (
+        <div className="flex items-center gap-3 rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
+          <IconLoader2 className="h-5 w-5 animate-spin text-blue-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-blue-500">Gerando faturas, boletos e NFS-e...</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Aguarde enquanto os documentos são processados. Esta página será atualizada automaticamente.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Task Info Summary — with inline status */}
       <Card>
         <CardHeader className="pb-3">
@@ -184,6 +241,22 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               <IconTruck className="h-4 w-4 text-muted-foreground" />
               Resumo da Tarefa
             </CardTitle>
+            <div className="flex items-center gap-2">
+            {task?.id && (
+              <Button
+                variant="outline"
+                size="default"
+                onClick={() => navigate(
+                  task.status === "COMPLETED" || task.status === "CANCELLED"
+                    ? routes.production.history.details(task.id)
+                    : routes.production.preparation.details(task.id)
+                )}
+                className="gap-1.5 h-9"
+              >
+                <IconExternalLink className="h-3.5 w-3.5" />
+                Ver Tarefa
+              </Button>
+            )}
             {canChangeStatus ? (
               <Combobox
                 value={currentStatus}
@@ -193,9 +266,10 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                     setValue("status", v, { shouldDirty: true });
                   }
                 }}
-                options={STATUS_OPTIONS.map((s) => ({
+                options={ALL_STATUS_OPTIONS.map((s) => ({
                   ...s,
                   disabled: s.value === currentStatus
+                    || AUTOMATIC_STATUSES.includes(s.value)
                     || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s.value === "BILLING_APPROVED")
                     || (s.value === "BILLING_APPROVED" && currentStatus !== "VERIFIED_BY_FINANCIAL"),
                 }))}
@@ -206,8 +280,14 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                 triggerClassName={cn("font-medium", getStatusTriggerClass(currentStatus))}
               />
             ) : (
-              <QuoteStatusBadge status={currentStatus as TASK_QUOTE_STATUS} size="lg" />
+              <QuoteStatusBadge
+                status={currentStatus as TASK_QUOTE_STATUS}
+                size="lg"
+                paidCount={installmentCounts.paid}
+                totalCount={installmentCounts.total}
+              />
             )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -342,8 +422,8 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
 
       {/* Per-Customer Summary Cards */}
       {customerConfigs.length > 0 && (
-        <div className={customerConfigs.length >= 2 ? "grid grid-cols-1 lg:grid-cols-2 gap-4" : "space-y-4"}>
-          {customerConfigs.map((config: any, i: number) => {
+        <div className={filteredCustomerConfigs.length >= 2 ? "grid grid-cols-1 lg:grid-cols-2 gap-4" : "space-y-4"}>
+          {filteredCustomerConfigs.map((config: any, i: number) => {
             const cached = customersCache.current.get(config.customerId);
             const name = config.customerData?.corporateName || config.customerData?.fantasyName || cached?.corporateName || cached?.fantasyName || "Cliente";
             const configTotal = Number(config.total) || 0;
@@ -423,7 +503,13 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                       ? [...configInvoice.installments].sort((a: any, b: any) => a.number - b.number)
                       : [];
                     const nfseDocuments = (configInvoice as any).nfseDocuments ?? [];
-                    const activeNfse = nfseDocuments.find((d: any) => d.status === "AUTHORIZED") ?? nfseDocuments[nfseDocuments.length - 1] ?? null;
+                    // Current NFSe: AUTHORIZED > PROCESSING > PENDING > ERROR (priority order)
+                    const activeNfse = nfseDocuments.find((d: any) => d.status === "AUTHORIZED")
+                      ?? nfseDocuments.find((d: any) => d.status === "PROCESSING")
+                      ?? nfseDocuments.find((d: any) => d.status === "PENDING")
+                      ?? nfseDocuments.find((d: any) => d.status === "ERROR")
+                      ?? null;
+                    const canceledNfses = nfseDocuments.filter((d: any) => d.status === "CANCELLED");
 
                     return (
                       <div className="mt-4 space-y-3">
@@ -448,14 +534,15 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                       <span className="text-xs font-medium">
                                         {formatCurrency(installment.amount)}
                                       </span>
-                                      <InstallmentStatusBadge status={installment.status} size="sm" />
-                                      {installment.bankSlip && (
-                                        <BankSlipStatusBadge status={installment.bankSlip.status} size="sm" />
-                                      )}
+                                      <UnifiedInstallmentBadge installment={installment} />
                                     </div>
                                     <BoletoActions
                                       installmentId={installment.id}
                                       bankSlip={installment.bankSlip}
+                                      dueDate={installment.dueDate}
+                                      installmentStatus={installment.status}
+                                      installmentPaymentMethod={installment.paymentMethod}
+                                      receiptFile={installment.receiptFile}
                                     />
                                   </div>
                                 </div>
@@ -470,34 +557,64 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                             <IconFileInvoice className="h-3.5 w-3.5 text-muted-foreground" />
                             NFS-e
                           </div>
-                          <div className="rounded-md border border-border/50 px-3 py-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                {activeNfse ? (
+                          {/* Active/Current NFS-e with cancel button inline */}
+                          {activeNfse && (
+                            <div className="rounded-md border border-border/50 px-3 py-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
                                   <NfseStatusBadge status={activeNfse.status} size="sm" />
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">Não emitida</span>
-                                )}
-                                {nfseDocuments.length > 1 && (
-                                  <span className="text-xs text-muted-foreground">
-                                    ({nfseDocuments.length} emissões)
-                                  </span>
-                                )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {activeNfse.elotechNfseId && (
+                                    <NfsePdfButtons elotechNfseId={activeNfse.elotechNfseId} />
+                                  )}
+                                  {/* Cancel button — only for authorized NFSe */}
+                                  {activeNfse.status === 'AUTHORIZED' && (
+                                    <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                                  )}
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1">
-                                {activeNfse?.elotechNfseId && (
-                                  <NfsePdfButtons elotechNfseId={activeNfse.elotechNfseId} />
-                                )}
-                                <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
-                              </div>
+                              {activeNfse.elotechNfseId && (
+                                <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} />
+                              )}
+                              {activeNfse.status === 'ERROR' && activeNfse.errorMessage && (
+                                <p className="text-xs text-destructive mt-1">{activeNfse.errorMessage}</p>
+                              )}
                             </div>
-                            {activeNfse?.elotechNfseId && (
-                              <NfseEnrichedInfo elotechNfseId={activeNfse.elotechNfseId} />
-                            )}
-                            {activeNfse?.status === 'ERROR' && activeNfse.errorMessage && (
-                              <p className="text-xs text-destructive mt-1">{activeNfse.errorMessage}</p>
-                            )}
-                          </div>
+                          )}
+                          {/* No NFS-e at all — show emit button */}
+                          {!activeNfse && canceledNfses.length === 0 && (
+                            <div className="rounded-md border border-border/50 px-3 py-2 flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground">Nao emitida</span>
+                              <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                            </div>
+                          )}
+                          {/* Canceled NFS-e entries — with reemit button on the last one */}
+                          {canceledNfses.map((doc: any, idx: number) => (
+                            <div
+                              key={doc.id}
+                              className="rounded-md border border-border/50 px-3 py-2 cursor-pointer hover:bg-muted/30 transition-colors"
+                              onClick={() => doc.elotechNfseId && navigate(routes.financial.nfse.detail(doc.elotechNfseId))}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <NfseStatusBadge status={doc.status} size="sm" />
+                                </div>
+                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                  {doc.elotechNfseId && (
+                                    <NfsePdfButtons elotechNfseId={doc.elotechNfseId} />
+                                  )}
+                                  {/* Reemit button — only on last cancelled when no active NFSe */}
+                                  {!activeNfse && idx === canceledNfses.length - 1 && (
+                                    <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
+                                  )}
+                                </div>
+                              </div>
+                              {doc.elotechNfseId && (
+                                <NfseEnrichedInfo elotechNfseId={doc.elotechNfseId} />
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     );
@@ -526,13 +643,37 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
         return (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <IconFolderCheck className="h-4 w-4 text-muted-foreground" />
-                Dossiê
-                <Badge variant="secondary" className="ml-1">
-                  {totalDossieFiles} {totalDossieFiles === 1 ? 'foto' : 'fotos'}
-                </Badge>
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <IconFolderCheck className="h-4 w-4 text-muted-foreground" />
+                  Dossiê
+                  <Badge variant="secondary" className="ml-1">
+                    {totalDossieFiles} {totalDossieFiles === 1 ? 'foto' : 'fotos'}
+                  </Badge>
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1.5"
+                  onClick={() => {
+                    try {
+                      const taskDisplayName = [task.name, task.serialNumber || task.truck?.plate].filter(Boolean).join(" - ");
+                      exportDossiePdf({
+                        taskDisplayName,
+                        customerName: task.customer?.fantasyName || task.customer?.corporateName,
+                        serialNumber: task.serialNumber,
+                        plate: task.truck?.plate,
+                        serviceOrders: serviceOrdersWithFiles,
+                      });
+                    } catch (err: any) {
+                      toast.error(err?.message || "Erro ao gerar dossiê");
+                    }
+                  }}
+                >
+                  <IconDownload className="h-3.5 w-3.5" />
+                  Baixar PDF
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Registro fotográfico dos serviços por ordem de serviço
               </p>
@@ -557,13 +698,13 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                         )}
                       </div>
 
-                      {/* Check-in / Check-out Content */}
+                      {/* Antes / Depois Content */}
                       <div className="px-3 py-3 space-y-5">
-                        {/* Check-in */}
+                        {/* Antes */}
                         <div className="space-y-2">
                           <div className="flex items-center gap-1.5">
                             <IconCameraCheck className="h-4 w-4 text-blue-500" />
-                            <span className="text-xs font-medium">Check-in</span>
+                            <span className="text-xs font-medium">Antes</span>
                             <span className="text-[11px] text-muted-foreground">{checkinFiles.length}</span>
                           </div>
                           {checkinFiles.length > 0 ? (
@@ -592,11 +733,11 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                           )}
                         </div>
 
-                        {/* Check-out */}
+                        {/* Depois */}
                         <div className="space-y-2">
                           <div className="flex items-center gap-1.5">
                             <IconCameraBolt className="h-4 w-4 text-green-500" />
-                            <span className="text-xs font-medium">Check-out</span>
+                            <span className="text-xs font-medium">Depois</span>
                             <span className="text-[11px] text-muted-foreground">{checkoutFiles.length}</span>
                           </div>
                           {checkoutFiles.length > 0 ? (
@@ -633,8 +774,78 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
           </Card>
         );
       })()}
+
     </div>
   );
+}
+
+// =====================
+// Unified Installment Badge
+// =====================
+
+function getPaymentMethodLabel(bankSlip: any, installment?: any): string {
+  // Check installment paymentMethod first (more reliable)
+  const instMethod = installment?.paymentMethod;
+  if (instMethod === 'BANK_SLIP') return 'Paga (Boleto)';
+  if (instMethod === 'PIX') return 'Paga (PIX)';
+  if (instMethod === 'CASH') return 'Paga (Dinheiro)';
+  if (instMethod === 'TRANSFER') return 'Paga (Transferência)';
+  if (instMethod === 'OTHER') return 'Paga (Outro)';
+  if (instMethod) return `Paga (${instMethod})`;
+
+  // Fallback to bankSlip sicrediStatus
+  const method = bankSlip?.sicrediStatus;
+  if (method === 'PAID_PIX') return 'Paga (PIX)';
+  if (method === 'PAID_CASH') return 'Paga (Dinheiro)';
+  if (method === 'PAID_TRANSFER') return 'Paga (Transferência)';
+  if (method?.startsWith('PAID_')) return 'Paga (por fora)';
+  return 'Paga (Boleto)';
+}
+
+function UnifiedInstallmentBadge({ installment }: { installment: any }) {
+  const bankSlip = installment.bankSlip;
+
+  // Paid (by bank slip or externally)
+  if (installment.status === 'PAID') {
+    return (
+      <Badge variant="green" size="sm" className="font-medium whitespace-nowrap">
+        {getPaymentMethodLabel(bankSlip, installment)}
+      </Badge>
+    );
+  }
+
+  // Bank slip error/rejected — blocking
+  if (bankSlip && ['ERROR', 'REJECTED'].includes(bankSlip.status)) {
+    return <Badge variant="destructive" size="sm" className="font-medium whitespace-nowrap">Erro</Badge>;
+  }
+
+  // Overdue
+  if (installment.status === 'OVERDUE' || bankSlip?.status === 'OVERDUE') {
+    return <Badge variant="destructive" size="sm" className="font-medium whitespace-nowrap">Vencida</Badge>;
+  }
+
+  // Cancelled
+  if (installment.status === 'CANCELLED') {
+    return <Badge variant="cancelled" size="sm" className="font-medium whitespace-nowrap">Cancelada</Badge>;
+  }
+
+  // Bank slip cancelled but installment not paid — cancelled
+  if (bankSlip?.status === 'CANCELLED') {
+    return <Badge variant="cancelled" size="sm" className="font-medium whitespace-nowrap">Cancelado</Badge>;
+  }
+
+  // Active bank slip
+  if (bankSlip?.status === 'ACTIVE') {
+    return <Badge variant="processing" size="sm" className="font-medium whitespace-nowrap">Aberto</Badge>;
+  }
+
+  // Creating/registering
+  if (bankSlip && ['CREATING', 'REGISTERING'].includes(bankSlip.status)) {
+    return <Badge variant="processing" size="sm" className="font-medium whitespace-nowrap">Processando</Badge>;
+  }
+
+  // Default: pending
+  return <Badge variant="pending" size="sm" className="font-medium whitespace-nowrap">Pendente</Badge>;
 }
 
 // =====================

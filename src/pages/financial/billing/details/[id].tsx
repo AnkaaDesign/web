@@ -15,10 +15,12 @@ import { BillingStepServices } from "@/components/financial/billing/steps/billin
 import { BillingStepCustomer } from "@/components/financial/billing/steps/billing-step-customer";
 import { BillingStepReview } from "@/components/financial/billing/steps/billing-step-review";
 import { SECTOR_PRIVILEGES, routes } from "@/constants";
+import { Combobox } from "@/components/ui/combobox";
+import { Button } from "@/components/ui/button";
 import { canUpdateQuoteStatus, canEditQuote } from "@/utils/permissions/quote-permissions";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { toast } from "@/components/ui/sonner";
-import { IconArrowLeft, IconArrowRight, IconCheck, IconLoader2, IconFileInvoice, IconAlertCircle } from "@tabler/icons-react";
+import { IconArrowLeft, IconArrowRight, IconCheck, IconLoader2, IconFileInvoice, IconAlertCircle, IconExternalLink } from "@tabler/icons-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -47,6 +49,8 @@ export const BillingDetailPage = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [billingApprovalDialogOpen, setBillingApprovalDialogOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [dossieCustomerId, setDossieCustomerId] = useState<string>("all");
 
   // Fetch task with billing-related includes
   const { data: taskResponse, isLoading: isTaskLoading } = useTaskDetail(id!, {
@@ -80,9 +84,31 @@ export const BillingDetailPage = () => {
   const task = taskResponse?.data;
   const quote = task?.quote;
 
-  // Fetch invoices for installments/bank slips/NFS-e
-  const { data: invoicesData } = useInvoicesByTask(id!);
+  // Fetch invoices for installments/bank slips/NFS-e — polls every 3s during generation
+  const { data: invoicesData } = useInvoicesByTask(id!, {
+    refetchInterval: isGenerating ? 3000 : false,
+  });
   const invoices = invoicesData?.data || [];
+
+  // Stop polling when all bank slips/NFSe are in terminal states
+  useEffect(() => {
+    if (!isGenerating || invoices.length === 0) return;
+    const allReady = invoices.every((inv: any) => {
+      const installments = inv.installments || [];
+      const nfseDocuments = inv.nfseDocuments || [];
+      const bankSlipsReady = installments.every((inst: any) => {
+        if (!inst.bankSlip) return true;
+        return !['CREATING', 'REGISTERING'].includes(inst.bankSlip.status);
+      });
+      const nfseReady = nfseDocuments.every((doc: any) =>
+        !['PENDING', 'PROCESSING'].includes(doc.status)
+      );
+      return bankSlipsReady && nfseReady;
+    });
+    if (allReady) {
+      setIsGenerating(false);
+    }
+  }, [isGenerating, invoices]);
 
   // Form setup
   const form = useForm({
@@ -221,10 +247,23 @@ export const BillingDetailPage = () => {
   const validateCustomerData = useCallback((): boolean => {
     const configs = form.getValues("customerConfigs") || [];
     const services = form.getValues("services") || [];
+    const targetStatus = form.getValues("status");
+    const validServices = services.filter((s: any) => s.description?.trim());
+
+    // For BILLING_APPROVED: no service may have negative amount (zero is allowed — service performed at no cost)
+    if (targetStatus === "BILLING_APPROVED") {
+      const negativeAmountServices = validServices.filter((s: any) => Number(s.amount) < 0);
+      if (negativeAmountServices.length > 0) {
+        setCurrentStep(2);
+        toast.error("Serviços com valor negativo", {
+          description: `${negativeAmountServices.length} serviço(s) com valor negativo. Os serviços não podem ter valor negativo para faturamento.`,
+        });
+        return false;
+      }
+    }
 
     // Multi-customer: all services must have invoiceToCustomerId
     if (configs.length >= 2) {
-      const validServices = services.filter((s: any) => s.description?.trim());
       const unassigned = validServices.filter((s: any) => !s.invoiceToCustomerId);
       if (unassigned.length > 0) {
         setCurrentStep(2);
@@ -270,6 +309,10 @@ export const BillingDetailPage = () => {
   const prevStep = useCallback(() => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   }, []);
+
+  const isReviewStepComputed = currentStep === steps.length;
+
+
 
   // Core save logic (called directly or after confirmation dialog)
   const executeSave = useCallback(async () => {
@@ -344,12 +387,24 @@ export const BillingDetailPage = () => {
         await taskQuoteService.updateStatus(quote.id, targetStatus as TASK_QUOTE_STATUS);
       }
 
-      // Invalidate caches
+      // Invalidate all billing-related caches
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboards'] });
 
-      toast.success("Faturamento atualizado com sucesso");
-      navigate(routes.financial.billing.root);
+      // If billing was just approved, stay on page and start polling for generation progress
+      const isBillingApproval = targetStatus === "BILLING_APPROVED" && targetStatus !== quote.status;
+      if (isBillingApproval) {
+        setIsGenerating(true);
+        toast.success("Faturamento aprovado! Gerando faturas, boletos e NFS-e...", {
+          description: "Aguarde a geração ser concluída.",
+          duration: 6000,
+        });
+      } else {
+        toast.success("Faturamento atualizado com sucesso");
+        navigate(routes.financial.billing.root);
+      }
     } catch (err: any) {
       toast.error(err?.message || "Erro ao salvar faturamento");
     } finally {
@@ -411,16 +466,8 @@ export const BillingDetailPage = () => {
     );
   }
 
-  // Build PageHeader actions (same pattern as budget form)
-  const actions: any[] = [
-    {
-      key: "cancel",
-      label: "Cancelar",
-      onClick: () => navigate(routes.financial.billing.root),
-      variant: "outline" as const,
-      disabled: isSaving,
-    },
-  ];
+  // Build PageHeader actions
+  const actions: any[] = [];
 
   if (currentStep > 1) {
     actions.push({
@@ -456,6 +503,7 @@ export const BillingDetailPage = () => {
     }
   }
 
+
   // Resolve current customer config for customer steps (between step 3 and totalSteps - 1)
   const isCustomerStep = currentStep >= 3 && currentStep < totalSteps;
   const isReviewStep = currentStep === totalSteps;
@@ -482,6 +530,42 @@ export const BillingDetailPage = () => {
           onBreadcrumbNavigate={(path) => navigate(path)}
           actions={actions}
           className="flex-shrink-0"
+          headerExtra={quote?.id && customerConfigs.length > 0 ? (
+            <>
+              {customerConfigs.length > 1 && (
+                <Combobox
+                  value={dossieCustomerId}
+                  onValueChange={(v) => setDossieCustomerId((v as string) || "all")}
+                  options={[
+                    { value: "all", label: "Completo" },
+                    ...customerConfigs.map((config: any, i: number) => {
+                      const cached = customersCache.current.get(config.customerId);
+                      const name = cached?.fantasyName || cached?.corporateName || `Cliente ${i + 1}`;
+                      return { value: config.customerId, label: name };
+                    }),
+                  ]}
+                  searchable={false}
+                  clearable={false}
+                  className="w-[260px]"
+                  triggerClassName="h-8 text-sm"
+                />
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 whitespace-nowrap"
+                onClick={() => {
+                  const custId = dossieCustomerId === "all" ? customerConfigs[0]?.customerId : dossieCustomerId;
+                  if (custId && quote?.id) {
+                    window.open(routes.customer.serviceReport(custId, quote.id), "_blank");
+                  }
+                }}
+              >
+                <IconExternalLink className="h-4 w-4" />
+                Ver Dossiê
+              </Button>
+            </>
+          ) : undefined}
         />
 
         <FormSteps steps={steps} currentStep={currentStep} className="flex-shrink-0" />
@@ -514,6 +598,8 @@ export const BillingDetailPage = () => {
                   invoices={invoices}
                   userPrivilege={userPrivilege}
                   disabled={!canEdit}
+                  isGenerating={isGenerating}
+                  filterCustomerId={dossieCustomerId !== "all" ? dossieCustomerId : undefined}
                 />
               )}
             </div>

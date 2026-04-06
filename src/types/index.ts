@@ -16,6 +16,7 @@ export * from "./ppe";
 export * from "./externalWithdrawal";
 export * from "./file";
 export * from "./holiday";
+export * from "./invoice";
 export * from "./item";
 export * from "./maintenance";
 export * from "./measure";

@@ -1,6 +1,7 @@
-import { formatDate } from "./index";
+import { formatCurrency, formatDate, toTitleCase } from "./index";
 import { getApiBaseUrl } from "@/config/api";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
+import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont } from "pdf-lib";
 
 interface ServiceOrderFiles {
   id: string;
@@ -11,378 +12,408 @@ interface ServiceOrderFiles {
   checkoutFiles: Array<{ id: string; filename: string; originalName?: string }>;
 }
 
-interface DossiePdfOptions {
-  taskDisplayName: string;
-  customerName?: string;
+interface ServiceItem {
+  id?: string;
+  description: string;
+  observation?: string | null;
+  amount: number;
+  discountType?: string | null;
+  discountValue?: number | null;
+  discountReference?: string | null;
+}
+
+export interface CompleteDossiePdfOptions {
+  documentTitle: string;
+  budgetNumber: string;
+  corporateName: string;
+  contactName: string;
   serialNumber?: string | null;
   plate?: string | null;
+  chassisNumber?: string | null;
+  finishedAt?: string | null;
+  services: ServiceItem[];
+  subtotal: number;
+  discountAmount: number;
+  total: number;
+  hasDiscount: boolean;
+  paymentText: string | null;
+  guaranteeText: string | null;
+  layoutImageUrl: string | null;
   serviceOrders: ServiceOrderFiles[];
+  bankSlipPdfUrls: string[];
+  nfsePdfUrls: string[];
 }
 
-/**
- * Generates and exports a Dossiê PDF with Antes (Check-in) / Depois (Check-out) photos
- * organized by service order. Each page has header, up to 2 service orders, and footer.
- * Opens a new window with print dialog for the user to save as PDF.
- */
-export async function exportDossiePdf({ taskDisplayName, customerName, serialNumber, plate, serviceOrders }: DossiePdfOptions): Promise<void> {
-  if (serviceOrders.length === 0) {
-    throw new Error("Nenhum registro fotográfico encontrado no dossiê");
+// A4 in points
+const W = 595.28;
+const H = 841.89;
+const ML = 62; // left margin
+const MR = 62; // right margin
+const MT = 40; // top margin
+const MB = 50; // bottom margin
+const CW = W - ML - MR; // content width
+
+// Parse hex color to rgb()
+function hexToRgb(hex: string) {
+  const h = hex.replace('#', '');
+  return rgb(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255);
+}
+
+const GREEN = hexToRgb(BRAND_COLORS.primaryGreen);
+const DARK = rgb(0.2, 0.2, 0.2);
+const GRAY = rgb(0.33, 0.33, 0.33);
+const RED = rgb(0.86, 0.15, 0.15);
+const WHITE = rgb(1, 1, 1);
+
+const C = { ...COMPANY_INFO, ...BRAND_COLORS };
+
+async function fetchImageBytes(url: string): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+async function embedImage(doc: PDFDocument, bytes: Uint8Array) {
+  // Try PNG first, fall back to JPG
+  try { return await doc.embedPng(bytes); } catch {}
+  try { return await doc.embedJpg(bytes); } catch {}
+  return null;
+}
+
+/** Draw text that wraps within maxWidth. Returns new Y position. */
+function drawWrappedText(page: PDFPage, text: string, x: number, y: number, font: PDFFont, size: number, color: ReturnType<typeof rgb>, maxWidth: number): number {
+  const words = text.split(' ');
+  let line = '';
+  let curY = y;
+
+  for (const word of words) {
+    const testLine = line ? `${line} ${word}` : word;
+    const testWidth = font.widthOfTextAtSize(testLine, size);
+    if (testWidth > maxWidth && line) {
+      page.drawText(line, { x, y: curY, size, font, color });
+      curY -= size * 1.4;
+      line = word;
+    } else {
+      line = testLine;
+    }
+  }
+  if (line) {
+    page.drawText(line, { x, y: curY, size, font, color });
+    curY -= size * 1.4;
+  }
+  return curY;
+}
+
+/** Draw the header (logo + title + date) and green line. Returns Y position after header. */
+async function drawHeader(page: PDFPage, doc: PDFDocument, font: PDFFont, fontBold: PDFFont, budgetNumber: string, finishedAt?: string | null): Promise<number> {
+  let y = H - MT;
+
+  // Logo
+  const logoBytes = await fetchImageBytes('/logo.png');
+  if (logoBytes) {
+    const logoImg = await embedImage(doc, logoBytes);
+    if (logoImg) {
+      const logoH = 42;
+      const logoW = logoH * (logoImg.width / logoImg.height);
+      page.drawImage(logoImg, { x: ML, y: y - logoH, width: logoW, height: logoH });
+    }
   }
 
+  // Right side: Dossiê number + date
+  const titleText = `Dossiê Nº ${budgetNumber}`;
+  const titleSize = 16;
+  const titleW = fontBold.widthOfTextAtSize(titleText, titleSize);
+  page.drawText(titleText, { x: W - MR - titleW, y: y - 14, size: titleSize, font: fontBold, color: DARK });
+
+  const dateText = `Emissão: ${formatDate(new Date())}`;
+  const dateSize = 9;
+  const dateW = font.widthOfTextAtSize(dateText, dateSize);
+  page.drawText(dateText, { x: W - MR - dateW, y: y - 28, size: dateSize, font, color: GRAY });
+
+  if (finishedAt) {
+    const finText = `Finalizado em: ${formatDate(finishedAt)}`;
+    const finW = font.widthOfTextAtSize(finText, dateSize);
+    page.drawText(finText, { x: W - MR - finW, y: y - 40, size: dateSize, font, color: GRAY });
+  }
+
+  y -= 52;
+
+  // Green line
+  page.drawRectangle({ x: ML, y, width: CW, height: 1, color: GREEN });
+  y -= 16;
+
+  return y;
+}
+
+/** Draw footer. Returns Y position of footer top (for content boundary). */
+function drawFooter(page: PDFPage, font: PDFFont, fontBold: PDFFont) {
+  const footerY = MB - 10;
+  // Green line
+  page.drawRectangle({ x: ML, y: footerY + 20, width: CW, height: 1, color: GREEN });
+  page.drawText(C.name, { x: ML, y: footerY + 8, size: 10, font: fontBold, color: GREEN });
+  page.drawText(C.address, { x: ML, y: footerY - 4, size: 8, font, color: GRAY });
+  page.drawText(`${C.phone} | ${C.website}`, { x: ML, y: footerY - 14, size: 8, font, color: GREEN });
+}
+
+export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): Promise<void> {
   const apiUrl = getApiBaseUrl();
-  const currentDate = formatDate(new Date());
-  const whatsappLink = `https://wa.me/${COMPANY_INFO.phoneClean}`;
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
 
-  // Vehicle info line
-  const vehicleInfo = [
-    serialNumber ? `Série: ${escapeHtml(serialNumber)}` : '',
-    plate ? `Placa: ${escapeHtml(plate)}` : '',
-  ].filter(Boolean).join(' | ');
+  // ═══════════════════════════════════════
+  // PAGE 1: Main dossiê info
+  // ═══════════════════════════════════════
+  const p1 = doc.addPage([W, H]);
+  let y = await drawHeader(p1, doc, font, fontBold, opts.budgetNumber, opts.finishedAt);
+  drawFooter(p1, font, fontBold);
 
-  // Build a single photo row — all images in one row, min 3 columns
-  const buildPhotoRow = (files: Array<{ id: string; filename: string; originalName?: string }>) => {
-    if (files.length === 0) return '';
-    const cols = Math.max(3, files.length);
-    const cells = files.map(file =>
-      `<div class="photo-cell"><img src="${apiUrl}/files/serve/${file.id}" alt="${escapeHtml(file.originalName || file.filename)}" class="photo-img" /></div>`
-    ).join('');
-    const spacers = Array(cols - files.length).fill('<div class="photo-cell photo-cell-spacer"></div>').join('');
-    return `<div class="photo-row" style="grid-template-columns: repeat(${cols}, 1fr);">${cells}${spacers}</div>`;
-  };
+  // Title "DOSSIÊ"
+  p1.drawText('DOSSIÊ', { x: ML, y, size: 14, font: fontBold, color: GREEN });
+  // Underline
+  const titleW = fontBold.widthOfTextAtSize('DOSSIÊ', 14);
+  p1.drawRectangle({ x: ML, y: y - 2, width: titleW, height: 0.5, color: GREEN });
+  y -= 24;
 
-  // Build a service order block
-  const buildServiceOrder = (so: ServiceOrderFiles) => {
-    const isOutrosWithObservation = so.description === 'Outros' && !!so.observation;
-    const displayDescription = isOutrosWithObservation ? so.observation : so.description;
-    const checkinFiles = so.checkinFiles || [];
-    const checkoutFiles = so.checkoutFiles || [];
+  // Customer name
+  const contactDisplay = opts.contactName || opts.corporateName;
+  p1.drawText(`À ${contactDisplay}`, { x: ML, y, size: 11, font: fontBold, color: GREEN });
+  y -= 16;
 
-    return `
-      <div class="service-order-block">
-        <div class="so-header">
-          <span class="so-title">${escapeHtml(displayDescription || 'Serviço')}</span>
-          ${!isOutrosWithObservation && so.observation ? `<span class="so-obs">${escapeHtml(so.observation)}</span>` : ''}
-        </div>
-        ${checkinFiles.length > 0 ? `
-          <div class="section-label antes-label">Antes (Check-in)</div>
-          ${buildPhotoRow(checkinFiles)}
-        ` : ''}
-        ${checkoutFiles.length > 0 ? `
-          <div class="section-label depois-label">Depois (Check-out)</div>
-          ${buildPhotoRow(checkoutFiles)}
-        ` : ''}
-      </div>
-    `;
-  };
+  // Intro text
+  let introText = 'Prezado(a) cliente, segue o dossiê referente aos serviços realizados';
+  const vehicleParts: string[] = [];
+  if (opts.serialNumber) vehicleParts.push(`nº de série: ${opts.serialNumber}`);
+  if (opts.plate) vehicleParts.push(`placa: ${opts.plate}`);
+  if (opts.chassisNumber) vehicleParts.push(`chassi: ${opts.chassisNumber}`);
+  if (vehicleParts.length) introText += ` no veículo ${vehicleParts.join(', ')}`;
+  introText += '.';
+  y = drawWrappedText(p1, introText, ML, y, font, 10, GRAY, CW);
+  y -= 12;
 
-  // Build header HTML
-  const buildHeader = (showTitle: boolean) => `
-    <header class="header">
-      <img src="/logo.png" alt="${escapeHtml(COMPANY_INFO.name)}" class="logo" />
-      <div class="header-right">
-        <div class="header-title">DOSSIÊ</div>
-        <div class="header-info">
-          <span class="header-info-label">Data:</span> ${currentDate}
-        </div>
-      </div>
-    </header>
-    <div class="header-line"></div>
-    ${showTitle ? `
-      <div class="document-title">${escapeHtml(taskDisplayName)}</div>
-      ${customerName ? `<div class="document-subtitle">${escapeHtml(customerName)}</div>` : ''}
-      ${vehicleInfo ? `<div class="vehicle-info"><strong>${vehicleInfo}</strong></div>` : ''}
-    ` : ''}
-  `;
+  // Services
+  p1.drawText('Serviços Realizados', { x: ML, y, size: 12, font: fontBold, color: GREEN });
+  y -= 18;
 
-  // Build footer HTML
-  const footerHtml = `
-    <footer class="footer">
-      <div class="footer-company">${COMPANY_INFO.name}</div>
-      <div class="footer-info">
-        ${COMPANY_INFO.address}<br />
-        <a href="${whatsappLink}" class="footer-link">${COMPANY_INFO.phone}</a> |
-        <a href="${COMPANY_INFO.websiteUrl}" class="footer-link">${COMPANY_INFO.website}</a>
-      </div>
-    </footer>
-  `;
+  for (let i = 0; i < opts.services.length; i++) {
+    const svc = opts.services[i];
+    const amount = Number(svc.amount) || 0;
+    const desc = toTitleCase(svc.description || '');
+    const obs = svc.observation || '';
+    const isOutros = svc.description?.trim().toLowerCase() === 'outros';
+    const displayDesc = isOutros && obs ? obs : obs ? `${desc} ${obs}` : desc;
 
-  // Paginate: 2 service orders per page
-  const pages: string[] = [];
-  for (let i = 0; i < serviceOrders.length; i += 2) {
-    const isFirstPage = i === 0;
-    const soBlocks = serviceOrders.slice(i, i + 2).map(buildServiceOrder).join('');
-    pages.push(`
-      <div class="page">
-        ${buildHeader(isFirstPage)}
-        <div class="page-content">
-          ${soBlocks}
-        </div>
-        ${footerHtml}
-      </div>
-    `);
+    let discount = 0;
+    if (svc.discountType === 'PERCENTAGE' && svc.discountValue) discount = Math.round((amount * svc.discountValue / 100) * 100) / 100;
+    else if (svc.discountType === 'FIXED_VALUE' && svc.discountValue) discount = Math.min(svc.discountValue || 0, amount);
+    const net = Math.max(0, amount - discount);
+    const priceText = discount > 0 ? formatCurrency(net) : formatCurrency(amount);
+
+    const svcText = `${i + 1} - ${displayDesc}`;
+    // Truncate if too long
+    const maxDescW = CW - 80;
+    let displaySvc = svcText;
+    while (font.widthOfTextAtSize(displaySvc, 10) > maxDescW && displaySvc.length > 20) {
+      displaySvc = displaySvc.slice(0, -1);
+    }
+
+    p1.drawText(displaySvc, { x: ML + 12, y, size: 10, font, color: DARK });
+    const priceW = font.widthOfTextAtSize(priceText, 10);
+    p1.drawText(priceText, { x: W - MR - priceW, y, size: 10, font, color: DARK });
+    y -= 14;
   }
 
-  const htmlContent = `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dossiê — ${escapeHtml(taskDisplayName)}</title>
-  <style>
-    @page {
-      size: A4;
-      margin: 0;
-    }
+  y -= 8;
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+  // Totals
+  if (opts.hasDiscount) {
+    const subLabel = 'Subtotal';
+    const subVal = formatCurrency(opts.subtotal);
+    p1.drawText(subLabel, { x: ML + 12, y, size: 10, font, color: GRAY });
+    const subW = font.widthOfTextAtSize(subVal, 10);
+    p1.drawText(subVal, { x: W - MR - subW, y, size: 10, font, color: GRAY });
+    y -= 14;
 
-    html, body {
-      width: 210mm;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      font-size: 10pt;
-      line-height: 1.3;
-      color: ${BRAND_COLORS.textDark};
-      background: #fff;
-    }
+    const discLabel = 'Desconto';
+    const discVal = `- ${formatCurrency(opts.discountAmount)}`;
+    p1.drawText(discLabel, { x: ML + 12, y, size: 10, font, color: RED });
+    const discW = font.widthOfTextAtSize(discVal, 10);
+    p1.drawText(discVal, { x: W - MR - discW, y, size: 10, font, color: RED });
+    y -= 14;
 
-    a { color: inherit; text-decoration: none; }
+    // Separator
+    p1.drawRectangle({ x: ML + 12, y: y + 10, width: CW - 12, height: 0.5, color: rgb(0.85, 0.85, 0.85) });
+  }
 
-    .page {
-      width: 210mm;
-      height: 297mm;
-      padding: 10mm 20mm 12mm 20mm;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      page-break-after: always;
-    }
+  const totalLabel = 'Total';
+  const totalVal = formatCurrency(opts.total);
+  p1.drawText(totalLabel, { x: ML + 12, y, size: 13, font: fontBold, color: DARK });
+  const totalW = fontBold.widthOfTextAtSize(totalVal, 13);
+  p1.drawText(totalVal, { x: W - MR - totalW, y, size: 13, font: fontBold, color: GREEN });
+  y -= 22;
 
-    .page:last-child {
-      page-break-after: auto;
-    }
+  // Payment conditions
+  if (opts.paymentText) {
+    p1.drawText('Condições de pagamento', { x: ML, y, size: 12, font: fontBold, color: GREEN });
+    y -= 16;
+    y = drawWrappedText(p1, opts.paymentText, ML, y, font, 10, GRAY, CW);
+    y -= 12;
+  }
 
-    /* Header */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 2mm;
-      flex-shrink: 0;
-    }
+  // Guarantee
+  if (opts.guaranteeText) {
+    p1.drawText('Garantias', { x: ML, y, size: 12, font: fontBold, color: GREEN });
+    y -= 16;
+    y = drawWrappedText(p1, opts.guaranteeText, ML, y, font, 10, GRAY, CW);
+    y -= 12;
+  }
 
-    .logo {
-      height: 14mm;
-      width: auto;
-    }
+  // ═══════════════════════════════════════
+  // PAGES 2+: Dossiê Fotográfico
+  // ═══════════════════════════════════════
+  const validSOs = opts.serviceOrders.filter(so => (so.checkinFiles?.length || 0) > 0 || (so.checkoutFiles?.length || 0) > 0);
 
-    .header-right {
-      text-align: right;
-    }
+  let soIndex = 0;
+  let soCountOnPage = 0;
+  let photoPage: PDFPage | null = null;
+  let py = 0;
+  const FOOTER_LIMIT = MB + 30;
 
-    .header-title {
-      font-size: 13pt;
-      font-weight: bold;
-      color: ${BRAND_COLORS.textDark};
-      margin-bottom: 1mm;
-    }
-
-    .header-info {
-      font-size: 9pt;
-      color: #333;
-      line-height: 1.4;
-    }
-
-    .header-info-label {
-      font-weight: bold;
-    }
-
-    .header-line {
-      height: 1px;
-      background: linear-gradient(to right, #888 0%, ${BRAND_COLORS.primaryGreen} 30%);
-      margin-bottom: 4mm;
-      flex-shrink: 0;
-    }
-
-    /* Document title */
-    .document-title {
-      font-size: 14pt;
-      font-weight: bold;
-      color: ${BRAND_COLORS.primaryGreen};
-      margin-bottom: 1mm;
-    }
-
-    .document-subtitle {
-      font-size: 10pt;
-      color: ${BRAND_COLORS.textGray};
-      margin-bottom: 2mm;
-    }
-
-    .vehicle-info {
-      font-size: 9pt;
-      color: ${BRAND_COLORS.textDark};
-      margin-bottom: 5mm;
-    }
-
-    .vehicle-info strong {
-      font-weight: 600;
-    }
-
-    /* Content */
-    .page-content {
-      flex: 1;
-    }
-
-    /* Service order block */
-    .service-order-block {
-      margin-bottom: 5mm;
-    }
-
-    .so-header {
-      background: ${BRAND_COLORS.primaryGreen};
-      color: #fff;
-      padding: 2mm 3mm;
-      border-radius: 1.5mm 1.5mm 0 0;
-      display: flex;
-      align-items: center;
-      gap: 3mm;
-    }
-
-    .so-title {
-      font-size: 10pt;
-      font-weight: 600;
-    }
-
-    .so-obs {
-      font-size: 8pt;
-      opacity: 0.85;
-      font-style: italic;
-    }
-
-    .section-label {
-      font-size: 8.5pt;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-      margin-bottom: 1.5mm;
-      margin-top: 2mm;
-    }
-
-    .antes-label {
-      color: #2563eb;
-    }
-
-    .depois-label {
-      color: #16a34a;
-    }
-
-    /* Photo row: CSS grid, columns set inline */
-    .photo-row {
-      display: grid;
-      gap: 1.5mm;
-      margin-bottom: 1.5mm;
-    }
-
-    .photo-cell {
-      aspect-ratio: 4/3;
-      overflow: hidden;
-      border-radius: 1mm;
-      border: 0.5px solid #e0e0e0;
-      background: #f9f9f9;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .photo-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .photo-cell-spacer {
-      border: none;
-      background: transparent;
-    }
-
-    /* Footer */
-    .footer {
-      padding-top: 2mm;
-      border-top: 1px solid;
-      border-image: linear-gradient(to right, #888 0%, ${BRAND_COLORS.primaryGreen} 30%) 1;
-      flex-shrink: 0;
-      margin-top: auto;
-    }
-
-    .footer-company {
-      font-size: 10pt;
-      font-weight: bold;
-      color: ${BRAND_COLORS.primaryGreen};
-      margin-bottom: 1mm;
-    }
-
-    .footer-info {
-      font-size: 8pt;
-      color: #333;
-      line-height: 1.5;
-    }
-
-    .footer-link {
-      color: ${BRAND_COLORS.primaryGreen};
-    }
-
-    @media print {
-      html, body {
-        width: 210mm;
-        height: auto;
-        print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
+  for (const so of validSOs) {
+    // Start new page every 2 service orders
+    if (!photoPage || soCountOnPage >= 2) {
+      photoPage = doc.addPage([W, H]);
+      py = await drawHeader(photoPage, doc, font, fontBold, opts.budgetNumber);
+      drawFooter(photoPage, font, fontBold);
+      if (soIndex === 0) {
+        photoPage.drawText('Dossiê Fotográfico', { x: ML, y: py, size: 12, font: fontBold, color: GREEN });
+        py -= 20;
       }
+      soCountOnPage = 0;
     }
-  </style>
-</head>
-<body>
-  ${pages.join('')}
-</body>
-</html>
-  `;
 
-  // Open print window
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    throw new Error("Não foi possível abrir a janela de impressão. Verifique se o bloqueador de pop-ups está desativado.");
+    // Build title
+    const baseDesc = so.description === 'Outros' && so.observation ? so.observation : (so.description || 'Serviço');
+    const fullDesc = so.observation && so.description !== 'Outros' ? `${baseDesc} ${so.observation}` : baseDesc;
+
+    const cardX = ML;
+    const cardW = CW;
+    const cardPad = 8; // inner padding
+    const contentW = cardW - cardPad * 2; // content area inside card
+    const cardStartY = py;
+
+    // Green header bar (top of card)
+    const barH = 20;
+    photoPage.drawRectangle({ x: cardX, y: py - barH, width: cardW, height: barH, color: GREEN });
+    photoPage.drawText(fullDesc, { x: cardX + 10, y: py - barH + 6, size: 10, font: fontBold, color: WHITE });
+    py -= barH + 10;
+
+    // Photos helper — draws inside the card padding
+    const drawPhotos = async (files: Array<{ id: string }>, label: string, labelColor: ReturnType<typeof rgb>) => {
+      if (!files.length || !photoPage) return;
+
+      photoPage.drawText(label, { x: cardX + cardPad, y: py, size: 8.5, font: fontBold, color: labelColor });
+      py -= 4;
+
+      const cols = Math.max(3, Math.min(files.length, 4));
+      const gap = 4;
+      const cellW = (contentW - (cols - 1) * gap) / cols;
+      const cellH = cellW * 0.75;
+
+      let col = 0;
+      let rowH = cellH;
+      for (const f of files) {
+        const imgBytes = await fetchImageBytes(`${apiUrl}/files/serve/${f.id}`);
+        if (imgBytes) {
+          const img = await embedImage(doc, imgBytes);
+          if (img && photoPage) {
+            const naturalH = cellW * (img.height / img.width);
+            rowH = Math.min(naturalH, cellH);
+            const x = cardX + cardPad + col * (cellW + gap);
+            photoPage.drawImage(img, { x, y: py - rowH, width: cellW, height: rowH });
+            col++;
+            if (col >= cols) { col = 0; py -= rowH + gap; }
+          }
+        }
+      }
+      if (col > 0) py -= rowH + gap;
+      py -= 8;
+    };
+
+    if (so.checkinFiles?.length) await drawPhotos(so.checkinFiles, 'ANTES', rgb(0.15, 0.39, 0.92));
+    if (so.checkoutFiles?.length) await drawPhotos(so.checkoutFiles, 'DEPOIS', rgb(0.09, 0.64, 0.26));
+
+    py -= 4;
+
+    // Draw card border (rectangle around the entire service order block)
+    const cardH = cardStartY - py;
+    photoPage.drawRectangle({
+      x: cardX,
+      y: py,
+      width: cardW,
+      height: cardH,
+      borderColor: rgb(0.85, 0.85, 0.85),
+      borderWidth: 0.75,
+      color: undefined,
+    } as any);
+
+    py -= 16; // spacing between cards
+    soCountOnPage++;
+    soIndex++;
   }
 
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
+  // ═══════════════════════════════════════
+  // PAGES N+: Bank slip PDFs (real PDF pages — selectable)
+  // ═══════════════════════════════════════
+  for (const url of opts.bankSlipPdfUrls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const srcDoc = await PDFDocument.load(await res.arrayBuffer());
+      const pages = await doc.copyPages(srcDoc, srcDoc.getPageIndices());
+      pages.forEach(p => doc.addPage(p));
+    } catch { /* skip */ }
+  }
 
-  // Wait for images to load before printing
-  printWindow.onload = () => {
-    const images = printWindow.document.querySelectorAll('img');
-    const imagePromises = Array.from(images).map(img => {
-      if (img.complete) return Promise.resolve();
-      return new Promise<void>((resolve) => {
-        img.onload = () => resolve();
-        img.onerror = () => resolve();
-      });
-    });
+  // ═══════════════════════════════════════
+  // PAGES N+: NFS-e PDFs (real PDF pages — selectable)
+  // ═══════════════════════════════════════
+  for (const url of opts.nfsePdfUrls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const srcDoc = await PDFDocument.load(await res.arrayBuffer());
+      const pages = await doc.copyPages(srcDoc, srcDoc.getPageIndices());
+      pages.forEach(p => doc.addPage(p));
+    } catch { /* skip */ }
+  }
 
-    Promise.all(imagePromises).then(() => {
-      printWindow.focus();
-      printWindow.print();
-      printWindow.onafterprint = () => {
-        printWindow.close();
-      };
-    });
-  };
+  // ═══════════════════════════════════════
+  // Download
+  // ═══════════════════════════════════════
+  const pdfBytes = await doc.save();
+  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  const downloadUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = `${opts.documentTitle}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(downloadUrl);
 }
 
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
+/** Legacy export */
+export async function exportDossiePdf(opts: { taskDisplayName: string; customerName?: string; serialNumber?: string | null; plate?: string | null; serviceOrders: ServiceOrderFiles[] }): Promise<void> {
+  await exportCompleteDossiePdf({
+    documentTitle: opts.taskDisplayName, budgetNumber: '0000', corporateName: opts.customerName || '', contactName: '',
+    serialNumber: opts.serialNumber, plate: opts.plate, chassisNumber: null, finishedAt: null,
+    services: [], subtotal: 0, discountAmount: 0, total: 0, hasDiscount: false,
+    paymentText: null, guaranteeText: null, layoutImageUrl: null, serviceOrders: opts.serviceOrders,
+    bankSlipPdfUrls: [], nfsePdfUrls: [],
+  });
 }

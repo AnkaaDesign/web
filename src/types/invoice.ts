@@ -33,6 +33,9 @@ export interface Installment {
   paidAmount: number;
   paidAt: Date | null;
   status: INSTALLMENT_STATUS;
+  paymentMethod?: string | null;
+  receiptFileId?: string | null;
+  receiptFile?: { id: string; filename: string; originalName: string; mimetype: string; path: string; size: number } | null;
   bankSlip?: BankSlip | null;
 }
 

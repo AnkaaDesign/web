@@ -5,9 +5,11 @@ import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { formatDate, formatChassis, formatCNPJ } from "@/utils";
-import { IconTruck, IconUsers, IconAlertTriangle, IconTrash } from "@tabler/icons-react";
+import { IconTruck, IconUsers, IconAlertTriangle, IconTrash, IconExternalLink } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { getCustomers } from "@/api-client/customer";
+import { useNavigate } from "react-router-dom";
+import { routes } from "@/constants";
 
 interface BillingStepInfoProps {
   task: any;
@@ -16,6 +18,7 @@ interface BillingStepInfoProps {
 }
 
 export function BillingStepInfo({ task, disabled, customersCache }: BillingStepInfoProps) {
+  const navigate = useNavigate();
   const { control, setValue, getValues } = useFormContext();
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
 
@@ -153,10 +156,27 @@ export function BillingStepInfo({ task, disabled, customersCache }: BillingStepI
       {/* Left: Task Overview - Read Only, stacked */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <IconTruck className="h-4 w-4 text-muted-foreground" />
-            Dados da Tarefa
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <IconTruck className="h-4 w-4 text-muted-foreground" />
+              Dados da Tarefa
+            </CardTitle>
+            {task?.id && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(
+                  task.status === "COMPLETED" || task.status === "CANCELLED"
+                    ? routes.production.history.details(task.id)
+                    : routes.production.preparation.details(task.id)
+                )}
+                className="gap-1.5 h-8"
+              >
+                <IconExternalLink className="h-3.5 w-3.5" />
+                Ver Tarefa
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-1">

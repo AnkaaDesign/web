@@ -56,6 +56,8 @@ interface BasePageHeaderProps {
   actions?: PageAction[];
   favoritePage?: FAVORITE_PAGES;
   onBreadcrumbNavigate?: (path: string) => void;
+  /** Custom JSX rendered inline with action buttons in the header */
+  headerExtra?: React.ReactNode;
 }
 
 // Entity-specific props for detail pages
@@ -526,7 +528,7 @@ function BatchSelectionInfo({ selection, progress }: { selection?: BatchPageHead
  * - Support for all page types in the application
  */
 export function PageHeader<T extends BaseEntity = BaseEntity>(props: PageHeaderProps<T>) {
-  const { title, subtitle, breadcrumbs, backButton, icon: Icon, className, variant = "default", mobileCollapsed = true, actions = [], favoritePage, onBreadcrumbNavigate, ...variantProps } = props;
+  const { title, subtitle, breadcrumbs, backButton, icon: Icon, className, variant = "default", mobileCollapsed = true, actions = [], favoritePage, onBreadcrumbNavigate, headerExtra, ...variantProps } = props;
 
   // Extract specific values to avoid variantProps dependency issues
   const entity = variant === "detail" && "entity" in variantProps ? (variantProps as EntityPageHeaderProps<T>).entity : undefined;
@@ -642,11 +644,12 @@ export function PageHeader<T extends BaseEntity = BaseEntity>(props: PageHeaderP
                   )}
                 </div>
 
-                {/* Action Buttons */}
-                {(primaryActions.length > 0 || secondaryActions.length > 0) && (
-                  <div className="flex items-start pt-1 flex-shrink-0">
+                {/* Action Buttons + Header Extra */}
+                {(primaryActions.length > 0 || secondaryActions.length > 0 || headerExtra) && (
+                  <div className="flex items-center pt-1 flex-shrink-0">
                     {/* Desktop Actions */}
                     <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+                      {headerExtra}
                       {secondaryActions.map((action) => (
                         <ActionButton key={action.key} action={action} />
                       ))}

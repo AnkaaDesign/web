@@ -103,6 +103,7 @@ export function TaskHistoryContextMenu({
 
   const isDesigner = user?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
   const isCommercial = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
+  const isProductionManager = user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
 
   // Users who can access advanced menu options: ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER
   const canAccessAdvancedMenu = isAdmin || isFinancialUser || isLogisticOrCommercial || isDesigner;
@@ -618,8 +619,8 @@ export function TaskHistoryContextMenu({
             </DropdownMenuItem>
           )}
 
-          {/* Set Sector action - Admin only, hidden for preparation route */}
-          {isAdmin && !isPreparationRoute && (
+          {/* Set Sector action - Admin and Production Manager */}
+          {(isAdmin || isProductionManager) && (
             <DropdownMenuItem
               onClick={handleSetSector}
               onSelect={(e) => e.preventDefault()}

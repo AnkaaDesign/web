@@ -6,9 +6,13 @@ interface QuoteStatusBadgeProps {
   status: TASK_QUOTE_STATUS;
   className?: string;
   size?: 'default' | 'sm' | 'lg';
+  /** For PARTIAL status: number of paid installments */
+  paidCount?: number;
+  /** For PARTIAL status: total number of installments */
+  totalCount?: number;
 }
 
-export function QuoteStatusBadge({ status, className, size = 'default' }: QuoteStatusBadgeProps) {
+export function QuoteStatusBadge({ status, className, size = 'default', paidCount, totalCount }: QuoteStatusBadgeProps) {
   const config: Record<TASK_QUOTE_STATUS, { label: string; variant: string }> = {
     PENDING: {
       label: 'Pendente',
@@ -46,9 +50,14 @@ export function QuoteStatusBadge({ status, className, size = 'default' }: QuoteS
 
   const { label, variant } = config[status] || { label: status, variant: 'secondary' };
 
+  // Show paid/total count for PARTIAL status
+  const displayLabel = status === 'PARTIAL' && paidCount != null && totalCount != null
+    ? `Parcial (${paidCount}/${totalCount})`
+    : label;
+
   return (
     <Badge variant={variant as any} size={size} className={cn('font-medium whitespace-nowrap', className)}>
-      {label}
+      {displayLabel}
     </Badge>
   );
 }

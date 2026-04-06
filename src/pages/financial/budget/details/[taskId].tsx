@@ -233,6 +233,30 @@ export const FinancialBudgetDetailPage = () => {
           if (fullCustomers.length > 0) {
             fullCustomers.forEach((c: any) => customersCache.current.set(c.id, c));
             setSelectedCustomers(new Map(fullCustomers.map((c: any) => [c.id, c])));
+
+            // Update form customerData with full customer info
+            const currentConfigs = form.getValues("customerConfigs");
+            currentConfigs.forEach((config: any, idx: number) => {
+              const full = fullCustomers.find((c: any) => c.id === config.customerId);
+              if (full) {
+                const d = config.customerData || {};
+                form.setValue(`customerConfigs.${idx}.customerData`, {
+                  corporateName: d.corporateName || full.corporateName || "",
+                  fantasyName: d.fantasyName || full.fantasyName || "",
+                  cnpj: d.cnpj || full.cnpj || "",
+                  cpf: d.cpf || full.cpf || "",
+                  address: d.address || full.address || "",
+                  addressNumber: d.addressNumber || full.addressNumber || "",
+                  addressComplement: d.addressComplement || full.addressComplement || "",
+                  neighborhood: d.neighborhood || full.neighborhood || "",
+                  city: d.city || full.city || "",
+                  state: d.state || full.state || "",
+                  zipCode: d.zipCode || full.zipCode || "",
+                  stateRegistration: d.stateRegistration || full.stateRegistration || "",
+                  streetType: d.streetType || full.streetType || null,
+                });
+              }
+            });
           }
         })
         .catch(() => { /* keep partial data */ });
@@ -519,7 +543,7 @@ export const FinancialBudgetDetailPage = () => {
         breadcrumbs={[
           { label: "Início", href: routes.home },
           { label: "Financeiro", href: routes.financial.root },
-          { label: "Orçamento" },
+          { label: "Orçamento", href: routes.financial.budget.root },
           { label: taskName },
         ]}
         onBreadcrumbNavigate={(path) => navigate(path)}
@@ -541,25 +565,28 @@ export const FinancialBudgetDetailPage = () => {
                 },
               ]
             : []),
-          ...(canEdit
+          ...(!isLastStep && canView
             ? [
-                isLastStep
-                  ? {
-                      key: "save",
-                      label: isSubmitting ? "Salvando..." : "Salvar",
-                      onClick: handleSubmit,
-                      variant: "default" as const,
-                      icon: isSubmitting ? IconLoader2 : IconCheck,
-                      disabled: isSubmitting,
-                      loading: isSubmitting,
-                    }
-                  : {
-                      key: "next",
-                      label: "Próximo",
-                      onClick: nextStep,
-                      variant: "default" as const,
-                      icon: IconArrowRight,
-                    },
+                {
+                  key: "next",
+                  label: "Próximo",
+                  onClick: nextStep,
+                  variant: "default" as const,
+                  icon: IconArrowRight,
+                },
+              ]
+            : []),
+          ...(isLastStep && canEdit
+            ? [
+                {
+                  key: "save",
+                  label: isSubmitting ? "Salvando..." : "Salvar",
+                  onClick: handleSubmit,
+                  variant: "default" as const,
+                  icon: isSubmitting ? IconLoader2 : IconCheck,
+                  disabled: isSubmitting,
+                  loading: isSubmitting,
+                },
               ]
             : []),
         ]}

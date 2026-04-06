@@ -36,6 +36,10 @@ export function InstallmentRow({ installment }: InstallmentRowProps) {
         <BoletoActions
           installmentId={installment.id}
           bankSlip={installment.bankSlip}
+          dueDate={installment.dueDate}
+          installmentStatus={installment.status}
+          installmentPaymentMethod={installment.paymentMethod}
+          receiptFile={installment.receiptFile}
         />
       </TableCell>
     </TableRow>

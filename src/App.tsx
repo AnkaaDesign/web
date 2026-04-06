@@ -117,6 +117,7 @@ const UnderConstruction = lazy(() => import("@/pages/under-construction"));
 
 // Public Pages (no authentication required)
 const PublicBudgetPage = lazy(() => import("@/pages/public/budget/[id]").then((module) => ({ default: module.PublicBudgetPage })));
+const PublicServiceReportPage = lazy(() => import("@/pages/public/service-report/[id]").then((module) => ({ default: module.PublicServiceReportPage })));
 
 // Inventory
 const Inventory = lazy(() => import("@/pages/inventory/root").then((module) => ({ default: module.InventoryRootPage })));
@@ -378,6 +379,14 @@ function App() {
               element={
                 <Suspense fallback={<PageLoader />}>
                   <PublicBudgetPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path={routes.customer.serviceReport(":customerId", ":id")}
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PublicServiceReportPage />
                 </Suspense>
               }
             />

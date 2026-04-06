@@ -35,6 +35,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
 
   // Permission checks
   const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  const isProductionManager = user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
   const isCommercial = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
   const isTeamLeaderUser = user ? isTeamLeader(user) : false;
   const canEdit = canEditTasks(user); // ADMIN, DESIGNER, FINANCIAL, LOGISTIC
@@ -108,7 +109,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           </DropdownMenuItem>
         )}
 
-        {isAdmin && (
+        {(isAdmin || isProductionManager) && (
           <DropdownMenuItem onClick={() => handleAction("setSector")}>
             <IconBuildingFactory2 className="mr-2 h-4 w-4" />
             {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}

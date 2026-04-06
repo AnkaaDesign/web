@@ -20,6 +20,33 @@ interface NavigationUser {
 }
 
 /**
+ * Sort menu items alphabetically by title
+ * Keeps "Inicio" (home) as the first item
+ * Recursively sorts children as well
+ */
+function sortMenuItemsAlphabetically(menuItems: MenuItem[]): MenuItem[] {
+  return [...menuItems]
+    .sort((a, b) => {
+      // "Inicio" (home) always comes first
+      if (a.id === 'home') return -1;
+      if (b.id === 'home') return 1;
+
+      // Sort alphabetically by title (case-insensitive)
+      return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+    })
+    .map(item => {
+      // Recursively sort children
+      if (item.children && item.children.length > 0) {
+        return {
+          ...item,
+          children: sortMenuItemsAlphabetically(item.children),
+        };
+      }
+      return item;
+    });
+}
+
+/**
  * Get filtered menu for a specific user and platform
  */
 export function getFilteredMenuForUser(menuItems: MenuItem[], user: NavigationUser | undefined, platform: "web" | "mobile"): MenuItem[] {
@@ -33,6 +60,9 @@ export function getFilteredMenuForUser(menuItems: MenuItem[], user: NavigationUs
   const isTeamLeader = Boolean(user?.ledSector?.id);
 
   filteredMenu = filterMenuByPrivilegesAndTeamLeader(filteredMenu, userPrivilege as SECTOR_PRIVILEGES | undefined, isTeamLeader);
+
+  // Sort menu items alphabetically (keeping "Inicio" first)
+  filteredMenu = sortMenuItemsAlphabetically(filteredMenu);
 
   return filteredMenu;
 }

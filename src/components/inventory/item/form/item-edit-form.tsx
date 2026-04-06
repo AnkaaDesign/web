@@ -48,6 +48,7 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
       ppeCA: item.ppeCA,
       ppeDeliveryMode: item.ppeDeliveryMode,
       ppeStandardQuantity: item.ppeStandardQuantity,
+      monthlyConsumptionTrendPercent: item.monthlyConsumptionTrendPercent,
     };
   }, [item]);
 

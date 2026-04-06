@@ -24,7 +24,7 @@ export default function CatalogListPage() {
   const actions: never[] = [];
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col px-4 pt-4">
         <div className="flex-shrink-0">
           <PageHeader
@@ -34,13 +34,11 @@ export default function CatalogListPage() {
             actions={actions}
           />
         </div>
-        <div className="flex-1 overflow-y-auto pb-6">
-          <div className="mt-4">
-            <PaintCatalogueList
-              className="h-full"
-              viewOnly={true}
-            />
-          </div>
+        <div className="flex-1 min-h-0 pb-6 flex flex-col mt-4">
+          <PaintCatalogueList
+            className="h-full"
+            viewOnly={true}
+          />
         </div>
       </div>
     </PrivilegeRoute>

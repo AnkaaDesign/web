@@ -1006,6 +1006,59 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
   },
 
+  // PRODUCTION_MANAGER - Direct menu items (flat structure, sorted alphabetically)
+  // Provides simplified navigation for production manager users with relevant sections
+  {
+    id: "agenda-production-manager",
+    title: "Agenda",
+    icon: "preparation",
+    path: "/producao/agenda",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  },
+  {
+    id: "barracoes-production-manager",
+    title: "Barracões",
+    icon: "warehouse",
+    path: "/producao/barracoes",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  },
+  {
+    id: "catalogo-production-manager",
+    title: "Catálogo",
+    icon: "palette",
+    path: "/pintura/catalogo-basico",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    children: [{ id: "catalogo-detalhes-pm", title: "Detalhes", icon: "eye", path: "/pintura/catalogo/detalhes/:id", isDynamic: true }],
+  },
+  {
+    id: "clientes-production-manager",
+    title: "Clientes",
+    icon: "users",
+    path: "/financeiro/clientes",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  },
+  {
+    id: "cronograma-production-manager",
+    title: "Cronograma",
+    icon: "calendarStats",
+    path: "/producao/cronograma",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  },
+  {
+    id: "historico-production-manager",
+    title: "Histórico",
+    icon: "history",
+    path: "/producao/historico",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  },
+  {
+    id: "minhas-mensagens-production-manager",
+    title: "Minhas Mensagens",
+    icon: "message",
+    path: "/pessoal/mensagens",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  },
+
   // COMMERCIAL - Direct menu items (flat structure, sorted alphabetically)
   // Provides simplified navigation for commercial users with relevant sections
   {

@@ -609,6 +609,7 @@ export const routes = {
   // Customer routes (public, no authentication required)
   customer: {
     budget: (customerId: string, budgetId: string) => `/cliente/${customerId}/orcamento/${budgetId}`,
+    serviceReport: (customerId: string, quoteId: string) => `/cliente/${customerId}/dossie/${quoteId}`,
     root: "/cliente",
   },
 } as const;
