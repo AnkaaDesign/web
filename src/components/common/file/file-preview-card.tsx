@@ -100,7 +100,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
     } else if (onDownload) {
       onDownload(file);
     } else {
-      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.12:3030";
+      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.18:3030";
       window.open(`${apiUrl}/files/${file.id}/download`, "_blank");
     }
   };
@@ -154,7 +154,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
               <img
                 ref={imgRef}
                 src={(() => {
-                  const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.12:3030";
+                  const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.18:3030";
                   let thumbnailSrc = "";
 
                   if (file.thumbnailUrl) {

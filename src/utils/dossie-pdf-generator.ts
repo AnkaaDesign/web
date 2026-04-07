@@ -281,8 +281,6 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
   let soCountOnPage = 0;
   let photoPage: PDFPage | null = null;
   let py = 0;
-  const FOOTER_LIMIT = MB + 30;
-
   for (const so of validSOs) {
     // Start new page every 2 service orders
     if (!photoPage || soCountOnPage >= 2) {
@@ -396,7 +394,7 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
   // Download
   // ═══════════════════════════════════════
   const pdfBytes = await doc.save();
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
   const downloadUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = downloadUrl;

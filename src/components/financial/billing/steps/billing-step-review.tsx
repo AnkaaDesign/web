@@ -3,14 +3,12 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
-import { Label } from "@/components/ui/label";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { formatCurrency, formatDate, formatChassis, formatCNPJ, formatCPF } from "@/utils";
 import { computeServiceDiscount, computeServiceNet } from "@/utils/task-quote-calculations";
 import { generatePaymentText } from "@/utils/quote-text-generators";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
-import { InstallmentStatusBadge } from "@/components/production/task/billing/installment-status-badge";
-import { BankSlipStatusBadge } from "@/components/production/task/billing/bank-slip-status-badge";
+import { DISCOUNT_TYPE } from "@/constants/enums";
 import { BoletoActions } from "@/components/production/task/billing/boleto-actions";
 import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
 import { NfseActions } from "@/components/production/task/billing/nfse-actions";
@@ -345,7 +343,6 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               return (
                 <div className="grid grid-cols-1 md:grid-cols-2 items-stretch gap-3">
                   {Array.from(customerGroups.entries()).map(([customerId, group], groupIndex) => {
-                    const groupSubtotal = group.services.reduce((sum: number, s: any) => sum + (Number(s?.amount) || 0), 0);
                     const groupTotal = group.services.reduce((sum: number, s: any) => sum + computeServiceNet(s || {}), 0);
 
                     return (
@@ -423,7 +420,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
       {/* Per-Customer Summary Cards */}
       {customerConfigs.length > 0 && (
         <div className={filteredCustomerConfigs.length >= 2 ? "grid grid-cols-1 lg:grid-cols-2 gap-4" : "space-y-4"}>
-          {filteredCustomerConfigs.map((config: any, i: number) => {
+          {filteredCustomerConfigs.map((config: any, _i: number) => {
             const cached = customersCache.current.get(config.customerId);
             const name = config.customerData?.corporateName || config.customerData?.fantasyName || cached?.corporateName || cached?.fantasyName || "Cliente";
             const configTotal = Number(config.total) || 0;
@@ -875,7 +872,7 @@ function ServiceTableRow({ service }: { service: any }) {
               {service.discountType === "PERCENTAGE"
                 ? `${service.discountValue}%`
                 : formatCurrency(discount)}{" "}
-              ({DISCOUNT_TYPE_LABELS[service.discountType]})
+              ({DISCOUNT_TYPE_LABELS[service.discountType as DISCOUNT_TYPE]})
               {service.discountReference && ` — ${service.discountReference}`}
             </p>
           )}

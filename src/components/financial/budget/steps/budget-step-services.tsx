@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatCurrency, formatDate } from "@/utils";
 import { computeServiceNet, computeCustomerConfigTotals } from "@/utils/task-quote-calculations";
-import { DISCOUNT_TYPE, SERVICE_ORDER_TYPE } from "@/constants/enums";
+import { SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
 import { routes } from "@/constants";
 import { ServiceAutocomplete } from "@/components/production/task/form/service-autocomplete";
@@ -240,7 +240,8 @@ export function BudgetStepServices({
   ], []);
 
   // Handle adjustment combobox change
-  const handleAdjustmentSelect = useCallback((value: string) => {
+  const handleAdjustmentSelect = useCallback((rawValue: string | string[] | null | undefined) => {
+    const value = Array.isArray(rawValue) ? rawValue[0] : rawValue ?? "";
     if (value === "CUSTOM") {
       setIsCustomAdjustment(true);
       setCustomAdjustmentInput(adjustmentPercent > 0 ? String(adjustmentPercent) : "");
@@ -586,8 +587,7 @@ export function BudgetStepServices({
 
                 <Input
                   value={service?.discountReference || ""}
-                  onChange={(e) => {
-                    const val = typeof e === "string" ? e : e?.target?.value || "";
+                  onChange={(val) => {
                     setFormValue(`services.${index}.discountReference`, val || null, { shouldDirty: true });
                   }}
                   disabled={disabled || discountType === "NONE"}

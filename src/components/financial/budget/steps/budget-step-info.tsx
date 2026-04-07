@@ -79,7 +79,7 @@ export function BudgetStepInfo({
   onLayoutFilesChange,
   artworks,
   customersCache,
-  selectedCustomers,
+  selectedCustomers: _selectedCustomers,
   setSelectedCustomers,
 }: BudgetStepInfoProps) {
   const { setValue, getValues, control } = useFormContext();

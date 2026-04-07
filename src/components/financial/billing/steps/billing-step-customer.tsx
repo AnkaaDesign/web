@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { DateTimeInput } from "@/components/ui/date-time-input";
 import { formatCurrency } from "@/utils";
 import { useCnpjLookup } from "@/hooks/common/use-cnpj-lookup";
 import { IconCreditCard, IconBuilding, IconIdBadge2 } from "@tabler/icons-react";
@@ -161,7 +160,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 <Input
                   type="cnpj"
                   value={customerData.cnpj ?? ""}
-                  onChange={(e) => handleCnpjChange(typeof e === "string" ? e : e?.target?.value || "")}
+                  onChange={(value) => handleCnpjChange(String(value ?? ""))}
                   placeholder="00.000.000/0000-00"
                   disabled={disabled}
                   transparent
@@ -171,7 +170,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 <Input
                   type="cpf"
                   value={customerData.cpf ?? ""}
-                  onChange={(e) => setCustomerField("cpf", typeof e === "string" ? e : e?.target?.value || "")}
+                  onChange={(value) => setCustomerField("cpf", String(value ?? ""))}
                   placeholder="000.000.000-00"
                   disabled={disabled}
                   transparent
@@ -190,7 +189,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
               <Label className="text-sm font-medium">Nome Fantasia <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.fantasyName || ""}
-                onChange={(e) => setCustomerField("fantasyName", typeof e === "string" ? e : e?.target?.value || "")}
+                onChange={(value) => setCustomerField("fantasyName", String(value ?? ""))}
                 placeholder="Nome Fantasia"
                 disabled={disabled}
               />
@@ -199,7 +198,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
               <Label className="text-sm font-medium">Razão Social <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.corporateName || ""}
-                onChange={(e) => setCustomerField("corporateName", typeof e === "string" ? e : e?.target?.value || "")}
+                onChange={(value) => setCustomerField("corporateName", String(value ?? ""))}
                 placeholder="Razão Social"
                 disabled={disabled}
               />
@@ -224,7 +223,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
               <Label className="text-sm font-medium">Inscrição Estadual</Label>
               <Input
                 value={customerData.stateRegistration || ""}
-                onChange={(e) => setCustomerField("stateRegistration", typeof e === "string" ? e : e?.target?.value || "")}
+                onChange={(value) => setCustomerField("stateRegistration", String(value ?? ""))}
                 placeholder="Ex: 123.456.789.012"
                 disabled={disabled}
               />
@@ -238,7 +237,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
               <Input
                 type="cep"
                 value={customerData.zipCode || ""}
-                onChange={(e) => setCustomerField("zipCode", typeof e === "string" ? e : e?.target?.value || "")}
+                onChange={(value) => setCustomerField("zipCode", String(value ?? ""))}
                 placeholder="00000-000"
                 disabled={disabled}
               />
@@ -247,7 +246,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
               <Label className="text-sm font-medium">Cidade <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.city || ""}
-                onChange={(e) => setCustomerField("city", typeof e === "string" ? e : e?.target?.value || "")}
+                onChange={(value) => setCustomerField("city", String(value ?? ""))}
                 placeholder="Cidade"
                 disabled={disabled}
               />
@@ -284,7 +283,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
               <Label className="text-sm font-medium">Logradouro <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.address || ""}
-                onChange={(e) => setCustomerField("address", typeof e === "string" ? e : e?.target?.value || "")}
+                onChange={(value) => setCustomerField("address", String(value ?? ""))}
                 placeholder="Rua, Avenida, etc."
                 disabled={disabled}
               />
@@ -293,7 +292,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
               <Label className="text-sm font-medium">Número <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.addressNumber || ""}
-                onChange={(e) => setCustomerField("addressNumber", typeof e === "string" ? e : e?.target?.value || "")}
+                onChange={(value) => setCustomerField("addressNumber", String(value ?? ""))}
                 placeholder="Nº"
                 disabled={disabled}
               />
@@ -306,7 +305,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
               <Label className="text-sm font-medium">Bairro <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.neighborhood || ""}
-                onChange={(e) => setCustomerField("neighborhood", typeof e === "string" ? e : e?.target?.value || "")}
+                onChange={(value) => setCustomerField("neighborhood", String(value ?? ""))}
                 placeholder="Bairro"
                 disabled={disabled}
               />
@@ -315,7 +314,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
               <Label className="text-sm font-medium">Complemento</Label>
               <Input
                 value={customerData.addressComplement || ""}
-                onChange={(e) => setCustomerField("addressComplement", typeof e === "string" ? e : e?.target?.value || "")}
+                onChange={(value) => setCustomerField("addressComplement", String(value ?? ""))}
                 placeholder="Apto, Sala, etc."
                 disabled={disabled}
               />

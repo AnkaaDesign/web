@@ -15,53 +15,6 @@ import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
 
 const COMPANY = { ...COMPANY_INFO, ...BRAND_COLORS };
 
-const getFileServeUrl = (file: { id: string } | null | undefined): string => {
-  if (!file?.id) return "";
-  return `${getApiBaseUrl()}/files/serve/${file.id}`;
-};
-
-/**
- * Compute a single unified status for an installment + bank slip combo.
- */
-function getUnifiedInstallmentStatus(inst: any): { label: string; className: string } {
-  const bankSlip = inst.bankSlip;
-  const isPaidExternally = inst.status === "PAID" && bankSlip?.status === "CANCELLED";
-
-  if (inst.status === "PAID") {
-    let paidLabel = "Paga";
-    if (isPaidExternally) {
-      const method = bankSlip?.sicrediStatus;
-      if (method === "PAID_PIX") paidLabel = "Paga (PIX)";
-      else if (method === "PAID_CASH") paidLabel = "Paga (Dinheiro)";
-      else if (method === "PAID_TRANSFER") paidLabel = "Paga (Transferência)";
-      else paidLabel = "Paga (por fora)";
-    }
-    return { label: paidLabel, className: "bg-green-100 text-green-700" };
-  }
-
-  if (bankSlip && ["ERROR", "REJECTED"].includes(bankSlip.status)) {
-    return { label: "Erro no Boleto", className: "bg-red-100 text-red-700" };
-  }
-
-  if (inst.status === "OVERDUE" || bankSlip?.status === "OVERDUE") {
-    return { label: "Vencida", className: "bg-red-100 text-red-700" };
-  }
-
-  if (inst.status === "CANCELLED") {
-    return { label: "Cancelada", className: "bg-gray-100 text-gray-500" };
-  }
-
-  if (bankSlip?.status === "ACTIVE") {
-    return { label: "Aguardando Pagamento", className: "bg-blue-100 text-blue-700" };
-  }
-
-  if (bankSlip && ["CREATING", "REGISTERING"].includes(bankSlip.status)) {
-    return { label: "Processando", className: "bg-amber-100 text-amber-700" };
-  }
-
-  return { label: "Pendente", className: "bg-amber-100 text-amber-700" };
-}
-
 export function PublicServiceReportPage() {
   const { id, customerId } = useParams<{ id: string; customerId: string }>();
   const [quote, setQuote] = useState<any>(null);

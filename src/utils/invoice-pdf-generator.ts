@@ -86,7 +86,7 @@ export function exportInvoicePdf(options: ServiceReportPdfOptions): void {
 
   // Payment conditions
   const paymentText = customerConfig?.customPaymentText
-    || generatePaymentText(customerConfig?.paymentCondition, task.finishedAt);
+    || generatePaymentText({ customPaymentText: null, paymentCondition: customerConfig?.paymentCondition, total: Number(invoice?.totalAmount ?? 0) });
   const paymentHtml = paymentText ? `
     <div class="section">
       <div class="section-title">Condições de Pagamento</div>

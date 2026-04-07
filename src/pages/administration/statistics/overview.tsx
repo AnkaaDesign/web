@@ -32,7 +32,6 @@ import {
   IconChecklist,
   IconArrowsSort,
   IconChartArea,
-  IconStack2,
   IconCalendar,
   IconNumbers,
   IconRuler,

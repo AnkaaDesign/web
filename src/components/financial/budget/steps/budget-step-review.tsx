@@ -23,12 +23,13 @@ import {
   computeServiceNet,
 } from "@/utils/task-quote-calculations";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
+import { DISCOUNT_TYPE } from "@/constants/enums";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { getApiBaseUrl } from "@/config/api";
 import { routes } from "@/constants";
 import { canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
 import { cn } from "@/lib/utils";
-import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
+import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
@@ -561,7 +562,7 @@ export function BudgetStepReview({
             Garantia
           </div>
           <p className="text-sm text-muted-foreground">
-            {generateGuaranteeText({ guaranteeYears, customGuaranteeText })}
+            {generateGuaranteeText({ guaranteeYears, customGuaranteeText } as TaskQuote)}
           </p>
         </div>
       )}
@@ -632,7 +633,7 @@ function ServiceTableRow({ service }: { service: any }) {
               {service.discountType === "PERCENTAGE"
                 ? `${service.discountValue}%`
                 : formatCurrency(discount)}{" "}
-              ({DISCOUNT_TYPE_LABELS[service.discountType]})
+              ({DISCOUNT_TYPE_LABELS[service.discountType as DISCOUNT_TYPE]})
               {service.discountReference &&
                 ` — ${service.discountReference}`}
             </p>

@@ -928,17 +928,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           return [];
         };
 
-        // Helper: Convert string numbers to actual numbers
-        const ensureNumber = (value: any): number | null => {
-          if (value === null || value === undefined || value === '') return null;
-          if (typeof value === 'number') return value;
-          if (typeof value === 'string') {
-            const num = parseFloat(value.replace(',', '.'));
-            return isNaN(num) ? null : num;
-          }
-          return null;
-        };
-
         // Ensure serviceOrders is an array
         if (changedData.serviceOrders) {
           changedData.serviceOrders = ensureArray(changedData.serviceOrders);

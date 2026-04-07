@@ -32,8 +32,6 @@ import { getCustomers } from "@/api-client";
 import { customerService } from "@/api-client/customer";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import type { FileWithPreview } from "@/components/common/file";
-import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
-
 // Step components
 import { BudgetStepInfo } from "@/components/financial/budget/steps/budget-step-info";
 import { BudgetStepServices } from "@/components/financial/budget/steps/budget-step-services";
@@ -590,7 +588,7 @@ export const FinancialBudgetDetailPage = () => {
               ]
             : []),
         ]}
-        onNavigateBack={() => navigate(-1)}
+        backButton={{ onClick: () => navigate(-1) }}
       />
 
       <FormSteps steps={steps} currentStep={currentStep} />

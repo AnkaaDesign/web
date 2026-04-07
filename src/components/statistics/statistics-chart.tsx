@@ -163,8 +163,8 @@ export function StatisticsChart({
 
     // SIMPLE MODE: single series
     const seriesData = data.map(item => ({
-      value: getItemValue(item),
       ...item, // pass through for tooltip access
+      value: getItemValue(item),
     }));
 
     const simpleTooltip = {

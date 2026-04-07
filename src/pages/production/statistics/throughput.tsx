@@ -18,7 +18,7 @@ import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useProductionThroughput, getComparisonType } from '@/hooks/production/use-production-analytics';
 import type { ProductionAnalyticsFilters, ProductionChartType } from '@/types/production-analytics';
 import { StatisticsChart } from '@/components/statistics/statistics-chart';
-import { CHART_COLORS, formatNumber, formatPercentage } from '@/types/statistics-common';
+import { formatNumber, formatPercentage } from '@/types/statistics-common';
 import type { YAxisMode } from '@/types/statistics-common';
 import { getSectors } from '@/api-client/sector';
 import { getCustomers } from '@/api-client/customer';
@@ -227,7 +227,7 @@ function ThroughputFilters({
     return {
       data: (response.data || []).map((customer) => ({
         value: customer.id,
-        label: customer.name,
+        label: customer.fantasyName,
       })),
       hasMore: response.meta?.hasNextPage || false,
     };

@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate } from './index';
+import { formatCurrency } from './index';
 import type { TaskQuote } from '../types/task-quote';
 import type { PAYMENT_CONDITION } from '../constants/enums';
 

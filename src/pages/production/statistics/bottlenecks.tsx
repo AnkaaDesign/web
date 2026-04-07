@@ -16,16 +16,13 @@ import { Combobox } from '@/components/ui/combobox';
 import { routes } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useProductionBottlenecks } from '@/hooks/production/use-production-analytics';
-import type { ProductionAnalyticsFilters, ProductionChartType } from '@/types/production-analytics';
+import type { ProductionAnalyticsFilters } from '@/types/production-analytics';
 import { StatisticsChart } from '@/components/statistics/statistics-chart';
 import { formatNumber, formatPercentage } from '@/types/statistics-common';
 import type { YAxisMode } from '@/types/statistics-common';
 import { getSectors } from '@/api-client/sector';
 import { sectorKeys } from '@/hooks/common/query-keys';
 import {
-  IconChartBar,
-  IconChartLine,
-  IconChartArea,
   IconFilter,
   IconDownload,
   IconRefresh,
@@ -52,8 +49,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 
 // =====================

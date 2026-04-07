@@ -15,7 +15,7 @@ import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { usePayrollTrends, getHrComparisonType } from '@/hooks/human-resources/use-hr-analytics';
 import type { HrAnalyticsFilters, HrChartType } from '@/types/hr-analytics';
 import { StatisticsChart } from '@/components/statistics/statistics-chart';
-import { CHART_COLORS, formatCurrency, formatPercentage, formatNumber } from '@/types/statistics-common';
+import { formatCurrency, formatPercentage, formatNumber } from '@/types/statistics-common';
 import type { YAxisMode } from '@/types/statistics-common';
 import { getSectors } from '@/api-client/sector';
 import { sectorKeys } from '@/hooks/common/query-keys';
@@ -40,7 +40,6 @@ import {
   IconNumbers,
   IconRuler,
   IconX,
-  IconInfoCircle,
   IconCalendarStats,
 } from '@tabler/icons-react';
 import { format, startOfDay, endOfDay, subMonths, startOfMonth, endOfMonth } from 'date-fns';
@@ -48,7 +47,6 @@ import { toast } from '@/components/ui/sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,

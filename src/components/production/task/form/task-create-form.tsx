@@ -171,8 +171,8 @@ export const TaskCreateForm = () => {
   const serialNumbers = useWatch({ control: form.control, name: "serialNumbers" }) || [];
   const customerIdValue = useWatch({ control: form.control, name: "customerId" });
 
-  // Watch service orders
-  const servicesValues = useWatch({ control: form.control, name: "serviceOrders" });
+  // Watch service orders (triggers re-render on change)
+  useWatch({ control: form.control, name: "serviceOrders" });
 
   // Accordion state
   const [openAccordion, setOpenAccordion] = useState<string | undefined>("basic-information");

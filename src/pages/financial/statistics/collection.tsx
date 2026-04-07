@@ -16,7 +16,7 @@ import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useCollectionAnalytics } from '@/hooks/financial/use-financial-analytics';
 import type { FinancialAnalyticsFilters, FinancialChartType } from '@/types/financial-analytics';
 import { StatisticsChart } from '@/components/statistics/statistics-chart';
-import { CHART_COLORS, formatCurrency, formatNumber, formatPercentage } from '@/types/statistics-common';
+import { CHART_COLORS, formatCurrency, formatPercentage } from '@/types/statistics-common';
 import type { YAxisMode } from '@/types/statistics-common';
 import { getCustomers } from '@/api-client/customer';
 import { customerKeys } from '@/hooks/common/query-keys';
@@ -174,7 +174,7 @@ function CollectionFilters({
     return {
       data: (response.data || []).map((customer) => ({
         value: customer.id,
-        label: customer.name,
+        label: customer.fantasyName,
       })),
       hasMore: response.meta?.hasNextPage || false,
     };

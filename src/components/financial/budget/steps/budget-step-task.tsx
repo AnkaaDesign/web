@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import {
   IconClipboardList,
@@ -16,8 +16,6 @@ import {
   IMPLEMENT_TYPE,
   TRUCK_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
-  SERVICE_ORDER_STATUS,
-  SERVICE_ORDER_TYPE,
   SECTOR_PRIVILEGES,
 } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
@@ -34,7 +32,7 @@ import { SerialNumberRangeInput } from "@/components/production/task/form/serial
 import { TaskNameAutocomplete } from "@/components/production/task/form/task-name-autocomplete";
 import { ServiceSelectorAutoGrouped } from "@/components/production/task/form/service-selector-auto-grouped";
 import { GeneralPaintingSelector } from "@/components/production/task/form/general-painting-selector";
-import { ResponsibleManager, validateResponsibleRows } from "@/components/administration/customer/responsible";
+import { ResponsibleManager } from "@/components/administration/customer/responsible";
 import { FileUploadField } from "@/components/common/file";
 import { ArtworkFileUploadField } from "@/components/production/task/form/artwork-file-upload-field";
 import type { FileWithPreview } from "@/components/common/file";

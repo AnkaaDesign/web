@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatCurrency } from "@/utils";
 import { computeServiceNet, computeCustomerConfigTotals } from "@/utils/task-quote-calculations";
-import { DISCOUNT_TYPE, DISCOUNT_TYPE_LABELS, SERVICE_ORDER_TYPE } from "@/constants";
+import { DISCOUNT_TYPE_LABELS, SERVICE_ORDER_TYPE } from "@/constants";
 import { ServiceAutocomplete } from "@/components/production/task/form/service-autocomplete";
 import { IconPlus, IconTrash, IconNote, IconCurrencyReal, IconAlertTriangle } from "@tabler/icons-react";
 
@@ -218,8 +218,8 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
                 {/* Discount Reference */}
                 <Input
                   value={service?.discountReference || ""}
-                  onChange={(e) => {
-                    const val = typeof e === "string" ? e : e?.target?.value || "";
+                  onChange={(value) => {
+                    const val = String(value ?? "");
                     setFormValue(`services.${index}.discountReference`, val || null, { shouldDirty: true });
                   }}
                   disabled={disabled || discountType === "NONE"}

@@ -65,7 +65,7 @@ function getDefaultRegenerateDate(dueDate?: string | Date | null, bankSlipDueDat
   return tomorrow;
 }
 
-export function BoletoActions({ installmentId, bankSlip, dueDate, installmentStatus, installmentPaymentMethod, receiptFile }: BoletoActionsProps) {
+export function BoletoActions({ installmentId, bankSlip, dueDate, installmentStatus, installmentPaymentMethod: _installmentPaymentMethod, receiptFile }: BoletoActionsProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDueDateDialog, setShowDueDateDialog] = useState(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);

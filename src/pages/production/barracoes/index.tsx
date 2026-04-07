@@ -72,12 +72,6 @@ export function GaragesPage() {
 
   // Fetch tasks with trucks for garage display
   // OR logic: include tasks where truck has a spot (any status), OR not completed with forecastDate <= maxCalendarDate
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    d.setHours(23, 59, 59, 999);
-    return d.toISOString();
-  }, []);
-
   // Max calendar date: last day shown in the date tabs (for fetching future forecast trucks)
   const maxCalendarDateStr = useMemo(() => {
     const lastDay = next5Days[next5Days.length - 1];

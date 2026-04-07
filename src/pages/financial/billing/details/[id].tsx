@@ -4,7 +4,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTaskDetail, useCurrentUser, taskKeys } from "@/hooks";
 import { useInvoicesByTask } from "@/hooks/production/use-invoice";
-import { useTaskQuoteByTask, useUpdateTaskQuote, taskQuoteKeys } from "@/hooks/production/use-task-quote";
+import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
 import { taskQuoteService } from "@/api-client/task-quote";
 import { customerService } from "@/api-client/customer";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -310,7 +310,6 @@ export const BillingDetailPage = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   }, []);
 
-  const isReviewStepComputed = currentStep === steps.length;
 
 
 

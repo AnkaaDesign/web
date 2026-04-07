@@ -33,7 +33,6 @@ import {
   IconCalendarStats,
   IconArrowsSort,
   IconChartArea,
-  IconStack2,
   IconUsers,
   IconCalendar,
   IconNumbers,
@@ -163,7 +162,7 @@ function BankSlipFilters({
     return {
       data: (response.data || []).map((customer) => ({
         value: customer.id,
-        label: customer.name,
+        label: customer.fantasyName,
       })),
       hasMore: response.meta?.hasNextPage || false,
     };
