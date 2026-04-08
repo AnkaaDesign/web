@@ -489,6 +489,12 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                         <span className="text-sm font-medium text-right max-w-[60%]">{paymentText}</span>
                       </div>
                     )}
+                    {config.orderNumber && (
+                      <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                        <span className="text-sm text-muted-foreground">N° do Pedido</span>
+                        <span className="text-sm font-medium">{config.orderNumber}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Installments / NFS-e */}

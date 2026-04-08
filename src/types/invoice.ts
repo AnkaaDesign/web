@@ -67,6 +67,7 @@ export interface NfseDocument {
   id: string;
   invoiceId: string;
   elotechNfseId: number | null;
+  nfseNumber: number | null;
   status: NFSE_STATUS;
   errorMessage: string | null;
   errorCount?: number;

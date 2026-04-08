@@ -551,12 +551,17 @@ export function PublicBudgetPage() {
 
                           total: config.total ?? 0,
                         });
-                        if (!configPaymentText) return null;
+                        if (!configPaymentText && !config.orderNumber) return null;
                         const customerName = config.customer?.corporateName || config.customer?.fantasyName || 'Cliente';
                         return (
                           <div key={config.id}>
                             <p className="text-sm font-semibold text-gray-800">{customerName}</p>
-                            <p className="text-gray-700">{configPaymentText}</p>
+                            {configPaymentText && <p className="text-gray-700">{configPaymentText}</p>}
+                            {config.orderNumber && (
+                              <p className="text-sm text-gray-600 mt-1">
+                                <span className="font-semibold">N° do Pedido:</span> {config.orderNumber}
+                              </p>
+                            )}
                           </div>
                         );
                       })}
@@ -564,13 +569,22 @@ export function PublicBudgetPage() {
                   </div>
                 );
               }
-              if (!paymentText) return null;
+              if (!paymentText && !activeConfig?.orderNumber) return null;
               return (
                 <div className="mb-6">
-                  <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
-                    Condições de pagamento
-                  </h3>
-                  <p className="text-gray-700">{paymentText}</p>
+                  {paymentText && (
+                    <>
+                      <h3 className="text-lg font-bold mb-2" style={{ color: COMPANY.primaryGreen }}>
+                        Condições de pagamento
+                      </h3>
+                      <p className="text-gray-700">{paymentText}</p>
+                    </>
+                  )}
+                  {activeConfig?.orderNumber && (
+                    <p className="text-sm text-gray-600 mt-2">
+                      <span className="font-semibold">N° do Pedido:</span> {activeConfig.orderNumber}
+                    </p>
+                  )}
                 </div>
               );
             })()}

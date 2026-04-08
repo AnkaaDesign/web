@@ -333,7 +333,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
           <CardDescription>Condições de pagamento e faturamento</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto_1fr_auto] gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto_1fr_1fr] gap-6">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Subtotal</Label>
               <Input value={formatCurrency(configSubtotal)} disabled className="bg-muted" />
@@ -377,6 +377,15 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 placeholder="Selecione..."
                 searchable={false}
                 clearable
+                disabled={disabled}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">N° do Pedido</Label>
+              <Input
+                value={config?.orderNumber || ""}
+                onChange={(value) => setConfigField("orderNumber", String(value ?? "") || null)}
+                placeholder="Ex: 12345"
                 disabled={disabled}
               />
             </div>

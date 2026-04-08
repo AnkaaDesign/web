@@ -142,6 +142,7 @@ export const FinancialBudgetDetailPage = () => {
           paymentCondition: c.paymentCondition || null,
           customPaymentText: c.customPaymentText || null,
           generateInvoice: c.generateInvoice !== undefined ? c.generateInvoice : true,
+          orderNumber: c.orderNumber || null,
           responsibleId: c.responsibleId || null,
           customerData: {
             corporateName: c.customer?.corporateName || "",

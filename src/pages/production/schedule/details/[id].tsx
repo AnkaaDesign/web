@@ -2722,6 +2722,12 @@ export const TaskDetailsPage = () => {
                                 </div>
                               )}
 
+                              {config.orderNumber && (
+                                <div className="text-sm text-muted-foreground">
+                                  N° do Pedido: <span className="font-medium text-foreground">{config.orderNumber}</span>
+                                </div>
+                              )}
+
                               {/* Boletos (from invoice data or fallback to simple parcelas) */}
                               {(() => {
                                 const configInvoice = invoices.find((inv) => inv.customerConfigId === config.id);
@@ -2873,13 +2879,23 @@ export const TaskDetailsPage = () => {
 
                         total: configTotal,
                       });
-                      return paymentText ? (
-                        <div className="bg-muted/30 rounded-lg p-4">
-                          <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
-                            <IconCreditCard className="h-4 w-4 text-muted-foreground" />
-                            Condições de Pagamento
-                          </div>
-                          <p className="text-sm text-muted-foreground">{paymentText}</p>
+                      const hasContent = paymentText || config.orderNumber;
+                      return hasContent ? (
+                        <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+                          {paymentText && (
+                            <>
+                              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                <IconCreditCard className="h-4 w-4 text-muted-foreground" />
+                                Condições de Pagamento
+                              </div>
+                              <p className="text-sm text-muted-foreground">{paymentText}</p>
+                            </>
+                          )}
+                          {config.orderNumber && (
+                            <div className="text-sm text-muted-foreground">
+                              N° do Pedido: <span className="font-medium text-foreground">{config.orderNumber}</span>
+                            </div>
+                          )}
                         </div>
                       ) : null;
                     }

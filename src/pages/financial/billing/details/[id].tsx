@@ -162,6 +162,7 @@ export const BillingDetailPage = () => {
 
         customPaymentText: config.customPaymentText || null,
         generateInvoice: config.generateInvoice !== false,
+        orderNumber: config.orderNumber || null,
         responsibleId: config.responsibleId || null,
         // Embedded customer data for NFS-e editing
         customerData: {
@@ -375,6 +376,7 @@ export const BillingDetailPage = () => {
 
           customPaymentText: c.customPaymentText || null,
           generateInvoice: c.generateInvoice !== false,
+          orderNumber: c.orderNumber || null,
           responsibleId: c.responsibleId || null,
         })),
       };

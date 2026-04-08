@@ -339,7 +339,7 @@ export function BudgetStepCustomerPayment({
           <CardDescription>Condições de pagamento e faturamento</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto_1fr_1fr] gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto_1fr_1fr_1fr] gap-6">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Subtotal</Label>
               <Input value={formatCurrency(configSubtotal)} disabled className="bg-muted" />
@@ -364,6 +364,15 @@ export function BudgetStepCustomerPayment({
                   {config?.generateInvoice !== false ? "Sim" : "Não"}
                 </span>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">N° do Pedido</Label>
+              <Input
+                value={config?.orderNumber || ""}
+                onChange={(value) => setConfigField("orderNumber", value || null)}
+                placeholder="Ex: PED-001"
+                disabled={disabled}
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium">Condição de Pagamento</Label>

@@ -505,6 +505,12 @@ export function BudgetStepReview({
                       <p className="text-sm text-muted-foreground">{configPaymentText}</p>
                     </div>
                   )}
+
+                  {config.orderNumber && (
+                    <div className="text-sm text-muted-foreground">
+                      N° do Pedido: <span className="font-medium text-foreground">{config.orderNumber}</span>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -524,14 +530,24 @@ export function BudgetStepReview({
             paymentCondition: config.paymentCondition,
             total: configTotal,
           });
-          if (!paymentText) return null;
+          const hasContent = paymentText || config.orderNumber;
+          if (!hasContent) return null;
           return (
-            <div className="bg-muted/30 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
-                <IconCreditCard className="h-4 w-4 text-muted-foreground" />
-                Condições de Pagamento
-              </div>
-              <p className="text-sm text-muted-foreground">{paymentText}</p>
+            <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+              {paymentText && (
+                <>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <IconCreditCard className="h-4 w-4 text-muted-foreground" />
+                    Condições de Pagamento
+                  </div>
+                  <p className="text-sm text-muted-foreground">{paymentText}</p>
+                </>
+              )}
+              {config.orderNumber && (
+                <div className="text-sm text-muted-foreground">
+                  N° do Pedido: <span className="font-medium text-foreground">{config.orderNumber}</span>
+                </div>
+              )}
             </div>
           );
         })()}
