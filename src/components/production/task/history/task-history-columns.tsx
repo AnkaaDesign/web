@@ -770,7 +770,8 @@ export const createTaskHistoryColumns = (options?: {
     sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
     sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
     sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
-    sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER
+    sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER ||
+    sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER
   );
 
   // Define sectors that can view commission field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
@@ -782,7 +783,7 @@ export const createTaskHistoryColumns = (options?: {
   );
 
   // Filter out restricted columns for users without permission
-  // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, and DESIGNER can see responsibles and forecastDate
+  // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER, and PRODUCTION_MANAGER can see responsibles and forecastDate
   if (!canViewRestrictedFields) {
     filteredColumns = filteredColumns.filter(col =>
       col.id !== 'responsibles' &&

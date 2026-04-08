@@ -1248,7 +1248,7 @@ export const taskCreateSchema = z
       }
     }
 
-    if (data.startedAt && data.finishedAt && data.finishedAt <= data.startedAt) {
+    if (data.startedAt && data.finishedAt && data.finishedAt < data.startedAt) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Data de finalização deve ser posterior à data de início",
@@ -1379,7 +1379,7 @@ export const taskUpdateSchema = z
       }
     }
 
-    if (data.startedAt && data.finishedAt && data.finishedAt <= data.startedAt) {
+    if (data.startedAt && data.finishedAt && data.finishedAt < data.startedAt) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Data de finalização deve ser posterior à data de início",

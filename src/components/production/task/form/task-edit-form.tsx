@@ -3068,7 +3068,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
                               disabled: isSubmitting || !canEditDates,
                               constraints: {
                                 maxDate: new Date(), // Cannot finish in the future
-                                minDate: form.watch("startedAt") || new Date("1900-01-01"), // Cannot finish before started
                               },
                               allowManualInput: true,
                             } as any}

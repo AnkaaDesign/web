@@ -57,6 +57,7 @@ import { useUnsavedChangesGuard } from "@/hooks/common/use-unsaved-changes-guard
 import { UnsavedChangesDialog } from "@/components/ui/unsaved-changes-dialog";
 import { toast } from "@/components/ui/sonner";
 import { uploadSingleFile } from "../../../../api-client/file";
+import { taskQuoteService } from "../../../../api-client/task-quote";
 
 // Extended form schema for the UI (superset of fields for the accordion form)
 const taskCreateFormSchema = z.object({
@@ -483,6 +484,27 @@ export const TaskCreateForm = () => {
                   firstCreatedRepIds = result.data.responsibles
                     .filter((r: any) => newResponsibles.some(nr => nr.name === r.name && nr.phone === r.phone))
                     .map((r: any) => r.id);
+                }
+              }
+
+              // Auto-create a minimal TaskQuote for the task (if it has a customer)
+              const createdTaskId = result.data?.id;
+              const effectiveCustomerId = customerId || result.data?.customerId;
+              if (createdTaskId && effectiveCustomerId) {
+                const expiresAt = new Date();
+                expiresAt.setDate(expiresAt.getDate() + 30);
+                try {
+                  await taskQuoteService.create({
+                    taskId: createdTaskId,
+                    subtotal: 0,
+                    total: 0,
+                    expiresAt: expiresAt.toISOString(),
+                    customerConfigs: [{ customerId: effectiveCustomerId, subtotal: 0, total: 0 }],
+                    services: [{ description: 'A definir', amount: 0 }],
+                  });
+                } catch {
+                  // Quote creation failure is non-blocking — task was created successfully
+                  toast.warning("Tarefa criada, mas não foi possível criar o orçamento automaticamente.");
                 }
               }
             } else {
