@@ -105,12 +105,15 @@ export function PublicServiceReportPage() {
     !selectedCustomerId || s.invoiceToCustomerId === selectedCustomerId || !s.invoiceToCustomerId
   );
   const subtotal = services.reduce((sum: number, s: any) => sum + (Number(s.amount) || 0), 0);
-  const discountAmount = services.reduce((sum: number, svc: any) => {
-    const amount = Number(svc.amount) || 0;
-    if (svc.discountType === "PERCENTAGE" && svc.discountValue) return sum + Math.round((amount * svc.discountValue / 100) * 100) / 100;
-    if (svc.discountType === "FIXED_VALUE" && svc.discountValue) return sum + Math.min(svc.discountValue, amount);
-    return sum;
-  }, 0);
+  // Discount from customer config (global customer discount)
+  const configDiscountType = activeConfig?.discountType;
+  const configDiscountValue = activeConfig?.discountValue != null ? Number(activeConfig.discountValue) : 0;
+  let discountAmount = 0;
+  if (configDiscountType === "PERCENTAGE" && configDiscountValue) {
+    discountAmount = Math.round((subtotal * configDiscountValue / 100) * 100) / 100;
+  } else if (configDiscountType === "FIXED_VALUE" && configDiscountValue) {
+    discountAmount = Math.min(configDiscountValue, subtotal);
+  }
   const total = Math.max(0, subtotal - discountAmount);
   const hasDiscount = discountAmount > 0.01;
 
@@ -167,6 +170,9 @@ export function PublicServiceReportPage() {
         discountAmount,
         total,
         hasDiscount,
+        discountType: configDiscountType || null,
+        discountValue: configDiscountValue || null,
+        discountReference: activeConfig?.discountReference || null,
         paymentText,
         guaranteeText,
         layoutImageUrl,
@@ -361,30 +367,14 @@ export function PublicServiceReportPage() {
                     const obs = svc.observation || "";
                     const isOutros = svc.description?.trim().toLowerCase() === "outros";
                     const displayDesc = isOutros && obs ? obs : obs ? `${desc} ${obs}` : desc;
-                    let discount = 0;
-                    if (svc.discountType === "PERCENTAGE" && svc.discountValue) discount = Math.round((amount * svc.discountValue / 100) * 100) / 100;
-                    else if (svc.discountType === "FIXED_VALUE" && svc.discountValue) discount = Math.min(svc.discountValue, amount);
-                    const net = Math.max(0, amount - discount);
 
                     return (
                       <tr key={svc.id || i} className="align-top">
                         <td className="text-gray-800 py-1 pr-2">
                           {i + 1} - {displayDesc}
-                          {discount > 0 && svc.discountReference && (
-                            <span className="text-xs text-gray-500 ml-1">
-                              ({svc.discountType === 'PERCENTAGE' ? `${svc.discountValue}%` : formatCurrency(discount)} desc. — Ref: {svc.discountReference})
-                            </span>
-                          )}
                         </td>
                         <td className="text-gray-800 font-normal whitespace-nowrap text-right py-1 pl-2">
-                          {discount > 0 ? (
-                            <>
-                              <span className="line-through text-gray-400 text-[10px] mr-1">{formatCurrency(amount)}</span>
-                              {formatCurrency(net)}
-                            </>
-                          ) : (
-                            formatCurrency(amount)
-                          )}
+                          {formatCurrency(amount)}
                         </td>
                       </tr>
                     );
@@ -401,7 +391,14 @@ export function PublicServiceReportPage() {
                       <span className="text-gray-800">{formatCurrency(subtotal)}</span>
                     </div>
                     <div className="flex justify-between items-baseline text-red-600">
-                      <span>Desconto</span>
+                      <span>
+                        {configDiscountType === 'PERCENTAGE' && configDiscountValue
+                          ? `Desconto (${configDiscountValue}%)`
+                          : 'Desconto'}
+                        {activeConfig?.discountReference && (
+                          <span className="text-gray-500 text-sm"> — {activeConfig.discountReference}</span>
+                        )}
+                      </span>
                       <span>- {formatCurrency(discountAmount)}</span>
                     </div>
                   </>

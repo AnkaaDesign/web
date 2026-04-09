@@ -5,6 +5,8 @@ import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { formatDate, formatChassis, formatCNPJ } from "@/utils";
+import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
+import type { TRUCK_CATEGORY, IMPLEMENT_TYPE } from "@/constants/enums";
 import { IconTruck, IconUsers, IconAlertTriangle, IconTrash, IconExternalLink } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { getCustomers } from "@/api-client/customer";
@@ -132,7 +134,7 @@ export function BillingStepInfo({ task, disabled, customersCache }: BillingStepI
   };
 
   // Build task info items - stacked, full width
-  const infoItems: { label: string; value: string }[] = [
+  const infoItems: { label: string; value: string; mono?: boolean }[] = [
     { label: "Logomarca", value: task.name },
   ];
   if (task.customer) {
@@ -145,7 +147,13 @@ export function BillingStepInfo({ task, disabled, customersCache }: BillingStepI
     infoItems.push({ label: "Placa", value: task.truck.plate });
   }
   if (task.truck?.chassisNumber) {
-    infoItems.push({ label: "Chassi", value: formatChassis(task.truck.chassisNumber) });
+    infoItems.push({ label: "Chassi", value: formatChassis(task.truck.chassisNumber), mono: true });
+  }
+  if (task.truck?.category) {
+    infoItems.push({ label: "Categoria", value: TRUCK_CATEGORY_LABELS[task.truck.category as TRUCK_CATEGORY] || task.truck.category });
+  }
+  if (task.truck?.implementType) {
+    infoItems.push({ label: "Implemento", value: IMPLEMENT_TYPE_LABELS[task.truck.implementType as IMPLEMENT_TYPE] || task.truck.implementType });
   }
   if (task.finishedAt) {
     infoItems.push({ label: "Finalizado em", value: formatDate(task.finishedAt) });
@@ -183,7 +191,7 @@ export function BillingStepInfo({ task, disabled, customersCache }: BillingStepI
             {infoItems.map((item) => (
               <div key={item.label} className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">{item.label}</span>
-                <span className="text-sm font-medium">{item.value}</span>
+                <span className={`text-sm font-medium ${item.mono ? '' : ''}`}>{item.value}</span>
               </div>
             ))}
           </div>

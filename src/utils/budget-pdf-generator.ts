@@ -393,6 +393,10 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     plate: task.truck?.plate || null,
     chassisNumber: task.truck?.chassisNumber || null,
     simultaneousTasks: task.quote.simultaneousTasks || null,
+    // Global customer discount from config
+    discountType: firstConfig?.discountType || null,
+    discountValue: firstConfig?.discountValue != null ? Number(firstConfig.discountValue) : null,
+    discountReference: firstConfig?.discountReference || null,
   });
 
   // Open print window
@@ -438,6 +442,10 @@ export interface BudgetHtmlData {
   chassisNumber: string | null;
   simultaneousTasks?: number | null;
   customerFilter?: string | null; // Customer ID to filter services by
+  // Global customer discount (from CustomerConfig)
+  discountType?: string | null;
+  discountValue?: number | null;
+  discountReference?: string | null;
 }
 
 /**
@@ -477,19 +485,16 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
     ? items.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0)
     : data.subtotal;
 
-  // Compute per-service discount totals
-  const perServiceDiscountAmount = items.reduce((sum: number, item: any) => {
-    const amount = typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0;
-    if (item.discountType === 'PERCENTAGE' && item.discountValue) {
-      return sum + Math.round((amount * item.discountValue / 100) * 100) / 100;
-    } else if (item.discountType === 'FIXED_VALUE' && item.discountValue) {
-      return sum + Math.min(item.discountValue, amount);
-    }
-    return sum;
-  }, 0);
+  // Compute global customer discount amount
+  const globalDiscountAmount = (() => {
+    if (!data.discountType || data.discountType === 'NONE' || !data.discountValue) return 0;
+    if (data.discountType === 'PERCENTAGE') return Math.round((displaySubtotal * data.discountValue / 100) * 100) / 100;
+    if (data.discountType === 'FIXED_VALUE') return Math.min(data.discountValue, displaySubtotal);
+    return 0;
+  })();
 
   // Calculate adaptive layout based on content
-  const hasDiscount = perServiceDiscountAmount > 0;
+  const hasDiscount = globalDiscountAmount > 0;
   const hasDeliveryTerm = !!(data.customDeliveryDays || data.termDate);
   const hasSimultaneousTasks = !!(data.customDeliveryDays && data.simultaneousTasks && data.simultaneousTasks > 1);
 
@@ -523,33 +528,20 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
         : observation
           ? `${description} ${observation}`
           : description;
-      // Per-service discount
-      const hasDisc = item.discountType && item.discountType !== 'NONE' && item.discountValue;
-      let discAmt = 0;
-      if (hasDisc) {
-        discAmt = item.discountType === 'PERCENTAGE'
-          ? Math.round((amount * item.discountValue / 100) * 100) / 100
-          : Math.min(item.discountValue, amount);
-      }
-      const netAmount = Math.max(0, amount - discAmt);
-      const discRefInline = hasDisc && item.discountReference
-        ? ` <span style="font-size: ${L.serviceFontSize - 2}pt; color: #888;">(${item.discountType === 'PERCENTAGE' ? `${item.discountValue}%` : formatCurrency(discAmt)} desc. — Ref: ${escapeHtml(item.discountReference)})</span>`
-        : '';
-      const valueHtml = hasDisc
-        ? `<span class="service-value" style="display: flex; flex-direction: column; align-items: flex-end;"><span style="text-decoration: line-through; color: #999; font-size: ${L.serviceFontSize - 2}pt; line-height: 1;">${formatCurrency(amount)}</span><span>${formatCurrency(netAmount)}</span></span>`
-        : `<span class="service-value">${formatCurrency(amount)}</span>`;
       return `
         <div class="service-item">
-          <span class="service-desc">${index + 1} - ${escapeHtml(descriptionWithObs)}${discRefInline}</span>
-          ${valueHtml}
+          <span class="service-desc">${index + 1} - ${escapeHtml(descriptionWithObs)}</span>
+          <span class="service-value">${formatCurrency(amount)}</span>
         </div>
       `;
     })
     .join("");
 
   // Generate totals section
-  const discountLabel = 'Desconto';
-  const discountAmount = perServiceDiscountAmount;
+  const discountLabel = data.discountType === 'PERCENTAGE' && data.discountValue
+    ? `Desconto (${data.discountValue}%)`
+    : 'Desconto';
+  const discountAmount = globalDiscountAmount;
 
   // Calculate display total when filtering
   const displayTotal = data.customerFilter

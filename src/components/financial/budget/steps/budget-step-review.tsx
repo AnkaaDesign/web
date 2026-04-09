@@ -18,12 +18,6 @@ import {
   IconExternalLink,
 } from "@tabler/icons-react";
 import { formatCurrency, formatDate, formatChassis } from "@/utils";
-import {
-  computeServiceDiscount,
-  computeServiceNet,
-} from "@/utils/task-quote-calculations";
-import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
-import { DISCOUNT_TYPE } from "@/constants/enums";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { getApiBaseUrl } from "@/config/api";
 import { routes } from "@/constants";
@@ -342,7 +336,7 @@ export function BudgetStepReview({
                           <span className="text-xs text-muted-foreground ml-auto">
                             {formatCurrency(
                               group.services.reduce(
-                                (sum: number, s: any) => sum + computeServiceNet(s || {}),
+                                (sum: number, s: any) => sum + (Number(s?.amount) || 0),
                                 0,
                               ),
                             )}
@@ -409,7 +403,7 @@ export function BudgetStepReview({
 
             {discountAmount > 0 && (
               <div className="flex items-center justify-between text-sm text-destructive">
-                <span>Desconto (serviços)</span>
+                <span>Desconto</span>
                 <span className="font-medium">
                   - {formatCurrency(discountAmount)}
                 </span>
@@ -486,7 +480,7 @@ export function BudgetStepReview({
 
                   {configDiscountAmount > 0 && (
                     <div className="flex items-center justify-between text-sm text-destructive">
-                      <span>Desconto (serviços)</span>
+                      <span>Desconto</span>
                       <span className="font-medium">- {formatCurrency(configDiscountAmount)}</span>
                     </div>
                   )}
@@ -617,16 +611,6 @@ function ServiceTableRow({ service }: { service: any }) {
     typeof service.amount === "number"
       ? service.amount
       : Number(service.amount) || 0;
-  const discount = computeServiceDiscount(
-    amount,
-    service.discountType,
-    service.discountValue,
-  );
-  const net = computeServiceNet({
-    amount,
-    discountType: service.discountType,
-    discountValue: service.discountValue,
-  });
   const isOutrosWithObservation =
     service.description === "Outros" && !!service.observation;
   const displayDescription = isOutrosWithObservation
@@ -643,30 +627,10 @@ function ServiceTableRow({ service }: { service: any }) {
               <span className="text-muted-foreground italic"> — {service.observation}</span>
             )}
           </span>
-          {discount > 0 && (
-            <p className="text-xs text-destructive leading-tight">
-              Desconto:{" "}
-              {service.discountType === "PERCENTAGE"
-                ? `${service.discountValue}%`
-                : formatCurrency(discount)}{" "}
-              ({DISCOUNT_TYPE_LABELS[service.discountType as DISCOUNT_TYPE]})
-              {service.discountReference &&
-                ` — ${service.discountReference}`}
-            </p>
-          )}
         </div>
       </td>
       <td className="px-4 py-1.5 text-sm text-right font-medium align-middle">
-        {discount > 0 ? (
-          <div>
-            <p className="text-xs text-muted-foreground line-through leading-tight">
-              {formatCurrency(amount)}
-            </p>
-            <p>{formatCurrency(net)}</p>
-          </div>
-        ) : (
-          formatCurrency(amount)
-        )}
+        {formatCurrency(amount)}
       </td>
     </tr>
   );

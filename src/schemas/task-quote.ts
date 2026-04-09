@@ -27,7 +27,7 @@ const preprocessMoney = (val: unknown): number | null | undefined => {
 export const taskQuoteStatusSchema = z.enum([
   'PENDING',
   'BUDGET_APPROVED',
-  'VERIFIED_BY_FINANCIAL',
+  'COMMERCIAL_APPROVED',
   'BILLING_APPROVED',
   'UPCOMING',
   'DUE',
@@ -62,10 +62,6 @@ export const taskQuoteServiceSchema = z.object({
   observation: z.string().max(2000).optional().nullable(),
   amount: moneySchema,
   invoiceToCustomerId: z.string().uuid('Cliente inválido').optional().nullable(),
-  // Per-service discount (moved from CustomerConfig)
-  discountType: discountTypeSchema.default('NONE').optional(),
-  discountValue: z.preprocess(preprocessMoney, z.number().optional().nullable()),
-  discountReference: z.string().max(500).optional().nullable(),
 });
 
 // Lenient service schema for nested creation (allows incomplete services during editing)
@@ -76,13 +72,6 @@ const taskQuoteServiceCreateSchema = z.object({
   // Amount might come as formatted currency string (e.g., "R$ 520,00")
   amount: z.preprocess(preprocessMoney, z.number().optional().nullable()),
   invoiceToCustomerId: z.string().uuid('Cliente inválido').optional().nullable(),
-  // Per-service discount
-  discountType: z.preprocess(
-    (val) => (val === null || val === undefined || val === '' ? 'NONE' : String(val)),
-    discountTypeSchema.default('NONE')
-  ),
-  discountValue: z.preprocess(preprocessMoney, z.number().optional().nullable()),
-  discountReference: z.string().max(500).optional().nullable(),
 });
 
 // Preprocess services array to filter out empty placeholder services
@@ -102,6 +91,13 @@ export const taskQuoteCustomerConfigSchema = z.object({
   customerId: z.string().uuid('Cliente inválido'),
   subtotal: z.preprocess(preprocessMoney, z.number().optional().nullable().default(0)),
   total: z.preprocess(preprocessMoney, z.number().optional().nullable().default(0)),
+  // Global customer discount
+  discountType: z.preprocess(
+    (val) => (val === null || val === undefined || val === '' ? 'NONE' : String(val)),
+    discountTypeSchema.default('NONE')
+  ),
+  discountValue: z.preprocess(preprocessMoney, z.number().optional().nullable()),
+  discountReference: z.string().max(500).optional().nullable(),
   paymentCondition: z.preprocess(
     (val) => (val === null || val === undefined || val === '' ? null : String(val)),
     paymentConditionSchema.optional().nullable()

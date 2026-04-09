@@ -2303,7 +2303,7 @@ export const TaskDetailsPage = () => {
                             const statusLabels: Record<TASK_QUOTE_STATUS, string> = {
                               PENDING: 'Pendente',
                               BUDGET_APPROVED: 'Orçamento Aprovado',
-                              VERIFIED_BY_FINANCIAL: 'Verificado pelo Financeiro',
+                              COMMERCIAL_APPROVED: 'Aprovado pelo Comercial',
                               BILLING_APPROVED: 'Faturamento Aprovado',
                               UPCOMING: 'A Vencer',
                               DUE: 'Vencido',
@@ -2330,7 +2330,7 @@ export const TaskDetailsPage = () => {
                                   return "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600";
                                 case 'BUDGET_APPROVED':
                                   return "bg-green-700 text-white hover:bg-green-800 border-green-800";
-                                case 'VERIFIED_BY_FINANCIAL':
+                                case 'COMMERCIAL_APPROVED':
                                   return "bg-blue-700 text-white hover:bg-blue-800 border-blue-800";
                                 case 'BILLING_APPROVED':
                                   return "bg-green-700 text-white hover:bg-green-800 border-green-800";
@@ -2397,15 +2397,8 @@ export const TaskDetailsPage = () => {
                       const isOutrosWithObservation = item.description === 'Outros' && !!item.observation;
                       const displayDescription = isOutrosWithObservation ? item.observation : item.description;
                       const amount = typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0;
-                      const hasServiceDiscount = item.discountType && item.discountType !== 'NONE' && item.discountValue;
-                      let serviceDiscountAmount = 0;
-                      if (hasServiceDiscount) {
-                        serviceDiscountAmount = item.discountType === 'PERCENTAGE'
-                          ? Math.round((amount * item.discountValue / 100) * 100) / 100
-                          : Math.min(item.discountValue, amount);
-                      }
                       return (
-                        <tr key={item.id || index} className="hover:bg-muted/30 transition-colors h-[3.75rem]">
+                        <tr key={item.id || index} className="hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-1.5 text-sm align-middle">
                             <div className="flex items-center gap-2">
                               <span>{displayDescription}</span>
@@ -2431,14 +2424,6 @@ export const TaskDetailsPage = () => {
                                 </HoverCard>
                               )}
                             </div>
-                            {hasServiceDiscount && (
-                              <p className="text-xs text-muted-foreground leading-tight">
-                                {item.discountReference && <>Ref: {item.discountReference} · </>}
-                                <span className="text-destructive">
-                                  -{item.discountType === 'PERCENTAGE' ? `${item.discountValue}%` : formatCurrency(serviceDiscountAmount)}
-                                </span>
-                              </p>
-                            )}
                           </td>
                           {showCustomerCol && (
                             <td className="px-4 py-1.5 text-sm text-muted-foreground align-middle">
@@ -2454,15 +2439,8 @@ export const TaskDetailsPage = () => {
                               )}
                             </td>
                           )}
-                          <td className="px-4 py-1.5 text-sm text-right align-middle">
-                            {hasServiceDiscount ? (
-                              <div className="inline-flex flex-col items-end">
-                                <span className="text-muted-foreground line-through text-xs leading-tight">{formatCurrency(amount)}</span>
-                                <span className="font-medium">{formatCurrency(Math.max(0, amount - serviceDiscountAmount))}</span>
-                              </div>
-                            ) : (
-                              <span className="font-medium">{formatCurrency(amount)}</span>
-                            )}
+                          <td className="px-4 py-1.5 text-sm text-right font-medium align-middle">
+                            {formatCurrency(amount)}
                           </td>
                         </tr>
                       );
@@ -2507,16 +2485,12 @@ export const TaskDetailsPage = () => {
                                   )}
                                 </span>
                                 <span className="text-xs text-muted-foreground ml-auto">
-                                  {formatCurrency(group.services.reduce((sum, s) => {
-                                    const amt = typeof s.amount === 'number' ? s.amount : Number(s.amount) || 0;
-                                    let disc = 0;
-                                    if ((s as any).discountType === 'PERCENTAGE' && (s as any).discountValue) {
-                                      disc = Math.round((amt * (s as any).discountValue / 100) * 100) / 100;
-                                    } else if ((s as any).discountType === 'FIXED_VALUE' && (s as any).discountValue) {
-                                      disc = Math.min((s as any).discountValue, amt);
-                                    }
-                                    return sum + Math.max(0, amt - disc);
-                                  }, 0))}
+                                  {formatCurrency(
+                                    (() => {
+                                      const config = task.quote?.customerConfigs?.find((c: any) => c.customerId === group.customerId);
+                                      return config?.total != null ? Number(config.total) : group.services.reduce((sum: number, s: any) => sum + (Number(s.amount) || 0), 0);
+                                    })()
+                                  )}
                                 </span>
                               </div>
                               <div>
@@ -2562,10 +2536,11 @@ export const TaskDetailsPage = () => {
                     const hasConfigs = configs.length > 0;
 
                     // Determine which discount/total source to use
-                    // Discounts are now per-service; config totals already reflect applied discounts
+                    // Discounts are on customerConfig level (global per customer)
                     let displaySubtotal: number;
                     let discountAmount = 0;
                     let displayTotal: number;
+                    let discountLabel = 'Desconto';
 
                     if (quoteCustomerFilter) {
                       // Specific customer filtered: use that config's data
@@ -2575,6 +2550,12 @@ export const TaskDetailsPage = () => {
                         displayTotal = typeof selectedConfig.total === 'number' ? selectedConfig.total : Number(selectedConfig.total) || 0;
                         if (displaySubtotal !== displayTotal) {
                           discountAmount = displaySubtotal - displayTotal;
+                          if (selectedConfig.discountType === 'PERCENTAGE' && selectedConfig.discountValue) {
+                            discountLabel = `Desconto (${selectedConfig.discountValue}%)`;
+                          }
+                          if (selectedConfig.discountReference) {
+                            discountLabel += ` — ${selectedConfig.discountReference}`;
+                          }
                         }
                       } else {
                         // Fallback: compute from filtered services + global discount
@@ -2592,7 +2573,6 @@ export const TaskDetailsPage = () => {
                       }
                     } else if (hasConfigs && configs.length === 1) {
                       // Single config: use that config's data
-                      // Discount is now per-service; config totals already have discounts applied
                       const config = configs[0];
                       let configSubtotal = typeof config.subtotal === 'number' ? config.subtotal : Number(config.subtotal) || 0;
                       if (configSubtotal === 0 && task.quote.services?.length > 0) {
@@ -2604,9 +2584,14 @@ export const TaskDetailsPage = () => {
                         configTotal = displaySubtotal;
                       }
                       displayTotal = configTotal;
-                      // Derive aggregate discount from subtotal - total difference
                       if (displaySubtotal !== displayTotal) {
                         discountAmount = displaySubtotal - displayTotal;
+                        if (config.discountType === 'PERCENTAGE' && config.discountValue) {
+                          discountLabel = `Desconto (${config.discountValue}%)`;
+                        }
+                        if (config.discountReference) {
+                          discountLabel += ` — ${config.discountReference}`;
+                        }
                       }
                     } else {
                       // No configs: fallback to global quote aggregates (no per-config discount)
@@ -2624,10 +2609,10 @@ export const TaskDetailsPage = () => {
                       </span>
                     </div>
 
-                    {/* Discount (if applicable — derived from per-service discounts) */}
+                    {/* Discount (from customer config) */}
                     {discountAmount > 0 && (
                       <div className="flex items-center justify-between text-sm text-destructive">
-                        <span>Desconto</span>
+                        <span>{discountLabel}</span>
                         <span className="font-medium">
                           - {formatCurrency(discountAmount)}
                         </span>
@@ -2662,8 +2647,14 @@ export const TaskDetailsPage = () => {
                         {configs.map((config, configIndex) => {
                           const configSubtotal = typeof config.subtotal === 'number' ? config.subtotal : Number(config.subtotal) || 0;
                           const configTotal = typeof config.total === 'number' ? config.total : Number(config.total) || 0;
-                          // Discount is now per-service; derive aggregate discount from subtotal vs total
                           const configDiscountAmount = Math.max(0, configSubtotal - configTotal);
+                          let configDiscountLabel = 'Desconto';
+                          if (config.discountType === 'PERCENTAGE' && config.discountValue) {
+                            configDiscountLabel = `Desconto (${config.discountValue}%)`;
+                          }
+                          if (config.discountReference) {
+                            configDiscountLabel += ` — ${config.discountReference}`;
+                          }
                           const configPaymentText = generatePaymentText({
                             customPaymentText: config.customPaymentText,
                             paymentCondition: config.paymentCondition,
@@ -2702,7 +2693,7 @@ export const TaskDetailsPage = () => {
 
                               {configDiscountAmount > 0 ? (
                                 <div className="flex items-center justify-between text-sm text-destructive">
-                                  <span>Desconto (serviços)</span>
+                                  <span>{configDiscountLabel}</span>
                                   <span className="font-medium">- {formatCurrency(configDiscountAmount)}</span>
                                 </div>
                               ) : null}

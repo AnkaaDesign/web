@@ -1207,6 +1207,15 @@ export const taskCreateSchema = z
     paintIds: z.array(z.string().uuid("Paint inválida")).optional(), // Maps to logoPaints
     observation: taskObservationCreateSchema.nullable().optional(),
     serviceOrders: taskServiceOrdersArraySchema, // Uses preprocessing to filter empty items
+    // Decoupled file IDs per service order — avoids injecting file state into serviceOrders array
+    // which could trigger the backend's service-order deletion logic
+    serviceOrderFiles: z.record(
+      z.string().uuid(),
+      z.object({
+        checkinFileIds: z.array(z.string().uuid("Arquivo de checkin inválido")).optional(),
+        checkoutFileIds: z.array(z.string().uuid("Arquivo de checkout inválido")).optional(),
+      })
+    ).optional(),
     truck: taskTruckCreateSchema.nullable().optional(),
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
@@ -1332,6 +1341,15 @@ export const taskUpdateSchema = z
     paintIds: z.array(z.string().uuid("Paint inválida")).optional(), // Maps to logoPaints
     observation: taskObservationCreateSchema.nullable().optional(),
     serviceOrders: taskServiceOrdersArraySchema, // Uses preprocessing to filter empty items
+    // Decoupled file IDs per service order — avoids injecting file state into serviceOrders array
+    // which could trigger the backend's service-order deletion logic
+    serviceOrderFiles: z.record(
+      z.string().uuid(),
+      z.object({
+        checkinFileIds: z.array(z.string().uuid("Arquivo de checkin inválido")).optional(),
+        checkoutFileIds: z.array(z.string().uuid("Arquivo de checkout inválido")).optional(),
+      })
+    ).optional(),
     truck: taskTruckCreateSchema.nullable().optional(),
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts

@@ -56,7 +56,6 @@ import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
 import { FileUploadField, FileSuggestions, type FileWithPreview } from "@/components/common/file";
 import { ArtworkFileUploadField } from "./artwork-file-upload-field";
-import { uploadFiles } from "../../../../api-client/file";
 import { getApiBaseUrl } from "@/config/api";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -356,10 +355,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
   const checkoutFilesByServiceOrderRef = useRef(checkoutFilesByServiceOrder);
   useEffect(() => { checkinFilesByServiceOrderRef.current = checkinFilesByServiceOrder; }, [checkinFilesByServiceOrder]);
   useEffect(() => { checkoutFilesByServiceOrderRef.current = checkoutFilesByServiceOrder; }, [checkoutFilesByServiceOrder]);
-
-  // Track pending pre-upload promises to prevent saving before uploads complete
-  const pendingCheckinUploadsRef = useRef(0);
-  const pendingCheckoutUploadsRef = useRef(0);
 
   // Sync baseFiles when task.baseFiles changes (after successful update or initial load)
   useEffect(() => {
@@ -1045,28 +1040,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           return;
         }
 
-        // CRITICAL: Wait for pending checkin/checkout pre-uploads to complete before saving
-        // Without this, saving before upload completes would send empty checkinFileIds/checkoutFileIds,
-        // causing the API to clear existing file associations via { set: [] }
-        if (pendingCheckinUploadsRef.current > 0 || pendingCheckoutUploadsRef.current > 0) {
-          console.log('[TaskEditForm] ⏳ Waiting for pending checkin/checkout pre-uploads...');
-          toast.info('Aguardando upload das fotos ser concluído...');
-          // Poll until uploads complete (check every 200ms, timeout after 30s)
-          const maxWait = 30000;
-          const pollInterval = 200;
-          let waited = 0;
-          while ((pendingCheckinUploadsRef.current > 0 || pendingCheckoutUploadsRef.current > 0) && waited < maxWait) {
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
-            waited += pollInterval;
-          }
-          if (pendingCheckinUploadsRef.current > 0 || pendingCheckoutUploadsRef.current > 0) {
-            console.log('[TaskEditForm] ❌ Pre-upload timed out');
-            toast.error('O upload das fotos está demorando. Tente novamente.');
-            return;
-          }
-          console.log('[TaskEditForm] ✅ Pre-uploads completed');
-        }
-
         // Filter out cuts without files (empty/default cuts)
         // Only cuts with files will be submitted
         const validCuts = cuts.filter((cut) => cut.file || cut.fileId);
@@ -1208,12 +1181,38 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           (a.artworkFiles && a.artworkFiles.some((f: any) => f instanceof File))
         );
 
-        // Note: checkin/checkout files are pre-uploaded per SO, their IDs are injected into serviceOrders data
-        // They should NOT trigger the FormData path since no binary files need to be sent
+        // Collect new checkin/checkout files across all service orders
+        const allNewCheckinFiles: { soId: string; file: File }[] = [];
+        const allNewCheckoutFiles: { soId: string; file: File }[] = [];
+        const latestCheckinFilesForCheck = checkinFilesByServiceOrderRef.current;
+        const latestCheckoutFilesForCheck = checkoutFilesByServiceOrderRef.current;
+
+        if (hasCheckinFileChanges) {
+          for (const [soId, files] of Object.entries(latestCheckinFilesForCheck)) {
+            for (const f of files) {
+              if (!f.uploaded && f instanceof File) {
+                allNewCheckinFiles.push({ soId, file: f });
+              }
+            }
+          }
+        }
+        if (hasCheckoutFileChanges) {
+          for (const [soId, files] of Object.entries(latestCheckoutFilesForCheck)) {
+            for (const f of files) {
+              if (!f.uploaded && f instanceof File) {
+                allNewCheckoutFiles.push({ soId, file: f });
+              }
+            }
+          }
+        }
+
+        const hasNewCheckinCheckoutFiles = allNewCheckinFiles.length > 0 || allNewCheckoutFiles.length > 0;
+
         const hasNewFiles = newArtworkFiles.length > 0 ||
                            newBaseFiles.length > 0 || newProjectFiles.length > 0 ||
                            hasCutFiles || hasAirbrushingFiles ||
-                           newObservationFiles.length > 0 || layoutPhotoFiles.length > 0;
+                           newObservationFiles.length > 0 || layoutPhotoFiles.length > 0 ||
+                           hasNewCheckinCheckoutFiles;
 
         let result;
 
@@ -1236,7 +1235,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           if (newProjectFiles.length > 0) {
             files.projectFiles = newProjectFiles.filter(f => f instanceof File) as File[];
           }
-          // Note: checkin/checkout files are pre-uploaded per service order, not sent as task-level multipart
+          // Add new checkin/checkout files as flat arrays + mapping metadata
+          if (allNewCheckinFiles.length > 0) {
+            files.soCheckinFiles = allNewCheckinFiles.map(entry => entry.file);
+          }
+          if (allNewCheckoutFiles.length > 0) {
+            files.soCheckoutFiles = allNewCheckoutFiles.map(entry => entry.file);
+          }
           if (newObservationFiles.length > 0) {
 
             files.observationFiles = newObservationFiles.filter(f => f instanceof File) as File[];
@@ -1399,28 +1404,64 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           if (hasProjectFileChanges || newProjectFiles.length > 0) {
             dataForFormData.projectFileIds = currentProjectFileIds;
           }
-          // Inject checkin/checkout file IDs into service orders data (per service order)
-          // Use refs to get the latest file state (avoids stale closure after waiting for uploads)
+          // Send checkin/checkout data via serviceOrderFiles (existing IDs) and _soFileMapping (new files)
           if (!isCommercialUser && (hasCheckinFileChanges || hasCheckoutFileChanges)) {
-            // Ensure serviceOrders is present — it may not be in changedData if only files changed
-            if (!dataForFormData.serviceOrders) {
-              const formSOs = form.getValues("serviceOrders") || [];
-              dataForFormData.serviceOrders = ensureArray(formSOs).filter((so: any) => so.id);
-            }
             const latestCheckinFiles = checkinFilesByServiceOrderRef.current;
             const latestCheckoutFiles = checkoutFilesByServiceOrderRef.current;
-            const serviceOrders = dataForFormData.serviceOrders as any[] || [];
-            for (const so of serviceOrders) {
-              if (so.id) {
-                if (hasCheckinFileChanges) {
-                  const soCheckinFiles = latestCheckinFiles[so.id] || [];
-                  so.checkinFileIds = soCheckinFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
+            const soFiles: Record<string, { checkinFileIds?: string[]; checkoutFileIds?: string[] }> = {};
+
+            // Get all service order IDs from the form
+            const formSOs = form.getValues("serviceOrders") || [];
+            for (const so of ensureArray(formSOs)) {
+              if (!so.id) continue;
+              const entry: { checkinFileIds?: string[]; checkoutFileIds?: string[] } = {};
+              if (hasCheckinFileChanges) {
+                const soCheckinFiles = latestCheckinFiles[so.id] || [];
+                entry.checkinFileIds = soCheckinFiles
+                  .filter((f: any) => f.uploaded && f.uploadedFileId)
+                  .map((f: any) => f.uploadedFileId);
+              }
+              if (hasCheckoutFileChanges) {
+                const soCheckoutFiles = latestCheckoutFiles[so.id] || [];
+                entry.checkoutFileIds = soCheckoutFiles
+                  .filter((f: any) => f.uploaded && f.uploadedFileId)
+                  .map((f: any) => f.uploadedFileId);
+              }
+              if (entry.checkinFileIds !== undefined || entry.checkoutFileIds !== undefined) {
+                soFiles[so.id] = entry;
+              }
+            }
+
+            // Send existing file IDs as JSON string (parsed by backend)
+            dataForFormData.serviceOrderFiles = JSON.stringify(soFiles);
+
+            // Build _soFileMapping for new files being uploaded via soCheckinFiles/soCheckoutFiles
+            if (hasNewCheckinCheckoutFiles) {
+              const fileMapping: { soId: string; type: 'checkin' | 'checkout'; count: number }[] = [];
+
+              // Build mapping entries that correspond to the flat file arrays
+              // Order MUST match how files were appended to soCheckinFiles / soCheckoutFiles above
+              if (allNewCheckinFiles.length > 0) {
+                const checkinBySo = new Map<string, number>();
+                for (const entry of allNewCheckinFiles) {
+                  checkinBySo.set(entry.soId, (checkinBySo.get(entry.soId) || 0) + 1);
                 }
-                if (hasCheckoutFileChanges) {
-                  const soCheckoutFiles = latestCheckoutFiles[so.id] || [];
-                  so.checkoutFileIds = soCheckoutFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
+                for (const [soId, count] of checkinBySo) {
+                  fileMapping.push({ soId, type: 'checkin', count });
                 }
               }
+              if (allNewCheckoutFiles.length > 0) {
+                const checkoutBySo = new Map<string, number>();
+                for (const entry of allNewCheckoutFiles) {
+                  checkoutBySo.set(entry.soId, (checkoutBySo.get(entry.soId) || 0) + 1);
+                }
+                for (const [soId, count] of checkoutBySo) {
+                  fileMapping.push({ soId, type: 'checkout', count });
+                }
+              }
+
+              dataForFormData._soFileMapping = JSON.stringify(fileMapping);
+              console.log('[TaskEditForm] 📤 FormData - _soFileMapping:', fileMapping);
             }
           }
           // Note: artworkStatuses will be added later (around line 1125) after processing
@@ -1764,29 +1805,38 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           if (hasProjectFileChanges) {
             (submitData as any).projectFileIds = [...currentProjectFileIds];
           }
-          // Inject checkin/checkout file IDs into service orders data (per service order)
+          // Send checkin/checkout file IDs via serviceOrderFiles (decoupled from serviceOrders)
           // Use refs to get the latest file state (avoids stale closure after waiting for uploads)
           if (!isCommercialUser && (hasCheckinFileChanges || hasCheckoutFileChanges)) {
-            // Ensure serviceOrders is present — it may not be in changedData if only files changed
-            if (!(submitData as any).serviceOrders) {
-              const formSOs = form.getValues("serviceOrders") || [];
-              (submitData as any).serviceOrders = ensureArray(formSOs).filter((so: any) => so.id);
-            }
             const latestCheckinFiles = checkinFilesByServiceOrderRef.current;
             const latestCheckoutFiles = checkoutFilesByServiceOrderRef.current;
-            const serviceOrders = (submitData as any).serviceOrders as any[] || [];
-            for (const so of serviceOrders) {
-              if (so.id) {
-                if (hasCheckinFileChanges) {
-                  const soCheckinFiles = latestCheckinFiles[so.id] || [];
-                  so.checkinFileIds = soCheckinFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
-                }
-                if (hasCheckoutFileChanges) {
-                  const soCheckoutFiles = latestCheckoutFiles[so.id] || [];
-                  so.checkoutFileIds = soCheckoutFiles.filter((f: any) => f.uploaded && f.uploadedFileId).map((f: any) => f.uploadedFileId);
-                }
+            const soFiles: Record<string, { checkinFileIds?: string[]; checkoutFileIds?: string[] }> = {};
+
+            // Get all service order IDs from the form
+            const formSOs = form.getValues("serviceOrders") || [];
+            for (const so of ensureArray(formSOs)) {
+              if (!so.id) continue;
+              const entry: { checkinFileIds?: string[]; checkoutFileIds?: string[] } = {};
+              if (hasCheckinFileChanges) {
+                const soCheckinFiles = latestCheckinFiles[so.id] || [];
+                entry.checkinFileIds = soCheckinFiles
+                  .filter((f: any) => f.uploaded && f.uploadedFileId)
+                  .map((f: any) => f.uploadedFileId);
+              }
+              if (hasCheckoutFileChanges) {
+                const soCheckoutFiles = latestCheckoutFiles[so.id] || [];
+                entry.checkoutFileIds = soCheckoutFiles
+                  .filter((f: any) => f.uploaded && f.uploadedFileId)
+                  .map((f: any) => f.uploadedFileId);
+              }
+              if (entry.checkinFileIds !== undefined || entry.checkoutFileIds !== undefined) {
+                soFiles[so.id] = entry;
               }
             }
+
+            // Send as a direct object (JSON body supports nested objects)
+            (submitData as any).serviceOrderFiles = soFiles;
+            // Do NOT inject into serviceOrders anymore!
           }
 
           // CRITICAL: Clean up malformed data before sending
@@ -2142,84 +2192,19 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
     setHasProjectFileChanges(true);
   };
 
-  // Pre-upload new files and return updated file list with uploaded IDs
-  const preUploadNewFiles = useCallback(async (
-    allFiles: FileWithPreview[],
-    fileContext: string,
-  ): Promise<FileWithPreview[]> => {
-    const newFiles = allFiles.filter(f => !f.uploaded && !f.error && f instanceof File);
-    if (newFiles.length === 0) return allFiles;
-
-    try {
-      const result = await uploadFiles(newFiles, {
-        fileContext,
-        entityId: task.id,
-        entityType: 'TASK',
-        customerName: task.customer?.fantasyName,
-      });
-
-      if (result?.data) {
-        // BatchFileUploadResponse.data has { success: File[], failed: [...] }
-        const uploadedRecords = result.data.success || (Array.isArray(result.data) ? result.data : [result.data]);
-        // Map uploaded records back to files by matching order
-        let uploadIdx = 0;
-        return allFiles.map(f => {
-          if (!f.uploaded && !f.error && f instanceof File && uploadIdx < uploadedRecords.length) {
-            const record = uploadedRecords[uploadIdx++];
-            return Object.assign(f, {
-              uploaded: true,
-              uploadProgress: 100,
-              uploadedFileId: record.id,
-              thumbnailUrl: record.thumbnailUrl,
-            });
-          }
-          return f;
-        });
-      }
-    } catch (err) {
-      console.error('[TaskEditForm] Pre-upload failed:', err);
-      toast.error('Erro ao enviar arquivo. Tente novamente.');
-    }
-    return allFiles;
-  }, [task.id, task.customer?.fantasyName]);
-
-  // Handle checkin files change per service order (with pre-upload)
-  const handleCheckinFilesChange = useCallback(async (serviceOrderId: string, files: FileWithPreview[]) => {
-    // Immediately update state (optimistic)
+  // Handle checkin files change per service order (files sent with form submission)
+  const handleCheckinFilesChange = useCallback((serviceOrderId: string, files: FileWithPreview[]) => {
     setCheckinFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: files }));
     setHasFileChanges(true);
     setHasCheckinFileChanges(true);
+  }, []);
 
-    // Pre-upload new files (track pending count)
-    pendingCheckinUploadsRef.current++;
-    try {
-      const uploaded = await preUploadNewFiles(files, 'serviceOrderCheckinFiles');
-      if (uploaded !== files) {
-        setCheckinFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: uploaded }));
-      }
-    } finally {
-      pendingCheckinUploadsRef.current--;
-    }
-  }, [preUploadNewFiles]);
-
-  // Handle checkout files change per service order (with pre-upload)
-  const handleCheckoutFilesChange = useCallback(async (serviceOrderId: string, files: FileWithPreview[]) => {
-    // Immediately update state (optimistic)
+  // Handle checkout files change per service order (files sent with form submission)
+  const handleCheckoutFilesChange = useCallback((serviceOrderId: string, files: FileWithPreview[]) => {
     setCheckoutFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: files }));
     setHasFileChanges(true);
     setHasCheckoutFileChanges(true);
-
-    // Pre-upload new files (track pending count)
-    pendingCheckoutUploadsRef.current++;
-    try {
-      const uploaded = await preUploadNewFiles(files, 'serviceOrderCheckoutFiles');
-      if (uploaded !== files) {
-        setCheckoutFilesByServiceOrder(prev => ({ ...prev, [serviceOrderId]: uploaded }));
-      }
-    } finally {
-      pendingCheckoutUploadsRef.current--;
-    }
-  }, [preUploadNewFiles]);
+  }, []);
 
   // Handle observation files change
   const handleObservationFilesChange = (files: FileWithPreview[]) => {

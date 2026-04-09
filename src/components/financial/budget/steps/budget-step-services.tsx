@@ -8,9 +8,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatCurrency, formatDate } from "@/utils";
-import { computeServiceNet, computeCustomerConfigTotals } from "@/utils/task-quote-calculations";
+import { computeConfigDiscount, computeCustomerConfigTotals } from "@/utils/task-quote-calculations";
 import { SERVICE_ORDER_TYPE } from "@/constants/enums";
-import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
+import { Label } from "@/components/ui/label";
 import { routes } from "@/constants";
 import { ServiceAutocomplete } from "@/components/production/task/form/service-autocomplete";
 import { useTaskQuoteSuggestion } from "@/hooks/production/use-task-quote";
@@ -99,9 +99,6 @@ export function BudgetStepServices({
       observation: svc.observation || null,
       amount: Math.round((Number(svc.amount) || 0) * multiplier * 100) / 100,
       invoiceToCustomerId: null,
-      discountType: svc.discountType || "NONE",
-      discountValue: svc.discountValue ? Math.round(Number(svc.discountValue) * 100) / 100 : null,
-      discountReference: svc.discountReference || null,
     }));
   }, [suggestion, adjustmentPercent]);
 
@@ -120,11 +117,6 @@ export function BudgetStepServices({
     }));
   }, [selectedCustomers]);
 
-  // Discount type options
-  const discountTypeOptions = Object.entries(DISCOUNT_TYPE_LABELS).map(([value, label]) => ({
-    value,
-    label,
-  }));
 
   // Service order sync on mount
   useEffect(() => {
@@ -149,9 +141,6 @@ export function BudgetStepServices({
             observation: svc.observation || null,
             amount: svc.amount ?? 0,
             invoiceToCustomerId: null,
-            discountType: "NONE",
-            discountValue: null,
-            discountReference: null,
           },
           { shouldFocus: false },
         );
@@ -166,9 +155,6 @@ export function BudgetStepServices({
       observation: null,
       amount: 0,
       invoiceToCustomerId: customerConfigs.length === 1 ? customerConfigs[0]?.customerId : null,
-      discountType: "NONE",
-      discountValue: null,
-      discountReference: null,
     });
   }, [append, customerConfigs]);
 
@@ -182,7 +168,7 @@ export function BudgetStepServices({
     let total = 0;
 
     const updatedConfigs = currentConfigs.map((config: any) => {
-      const result = computeCustomerConfigTotals(currentServices, config.customerId, isSingle);
+      const result = computeCustomerConfigTotals(currentServices, config.customerId, isSingle, config.discountType, config.discountValue);
       subtotal += result.subtotal;
       total += result.total;
       return { ...config, subtotal: result.subtotal, total: result.total };
@@ -202,9 +188,6 @@ export function BudgetStepServices({
       observation: svc.observation,
       amount: svc.amount,
       invoiceToCustomerId: svc.invoiceToCustomerId,
-      discountType: svc.discountType,
-      discountValue: svc.discountValue,
-      discountReference: svc.discountReference,
     }));
 
     replace(newServices);
@@ -219,9 +202,6 @@ export function BudgetStepServices({
       observation: null,
       amount: 0,
       invoiceToCustomerId: null,
-      discountType: "NONE",
-      discountValue: null,
-      discountReference: null,
     }]);
     setSuggestionApplied(false);
     setAdjustmentPercent(0);
@@ -273,8 +253,8 @@ export function BudgetStepServices({
 
   // Grid class
   const gridClass = hasMultipleCustomers
-    ? "grid-cols-[minmax(80px,1fr)_minmax(90px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]"
-    : "grid-cols-[minmax(100px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]";
+    ? "grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_200px_36px]"
+    : "grid-cols-[minmax(150px,1fr)_200px_36px]";
 
   return (
     <div className="space-y-6">
@@ -406,9 +386,6 @@ export function BudgetStepServices({
             <span className="px-2">Descrição</span>
             {hasMultipleCustomers && <span className="px-2">Cliente</span>}
             <span className="px-2">Valor</span>
-            <span className="px-2">Desconto</span>
-            <span className="px-2">Valor Desc.</span>
-            <span className="px-2">Ref. Desconto</span>
             <span />
           </div>
 
@@ -446,28 +423,6 @@ export function BudgetStepServices({
                 </span>
               </div>
 
-              {/* Discount Type — mimics Combobox */}
-              <div className="h-9 rounded-md border border-input bg-background flex items-center justify-between px-3">
-                <span className="text-sm text-muted-foreground">
-                  {svc.discountType !== "NONE" ? DISCOUNT_TYPE_LABELS[svc.discountType as keyof typeof DISCOUNT_TYPE_LABELS] || "Nenhum" : "Nenhum"}
-                </span>
-                <IconChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-              </div>
-
-              {/* Discount Value */}
-              <div className="h-9 rounded-md border border-input bg-background flex items-center px-3">
-                <span className="text-sm text-muted-foreground">
-                  {svc.discountValue ? (svc.discountType === "PERCENTAGE" ? `${svc.discountValue}%` : formatCurrency(svc.discountValue)) : "R$ 0,00"}
-                </span>
-              </div>
-
-              {/* Discount Reference */}
-              <div className="h-9 rounded-md border border-input bg-background flex items-center px-3">
-                <span className="text-sm text-muted-foreground truncate">
-                  {svc.discountReference || "Referência"}
-                </span>
-              </div>
-
               {/* Empty trash cell */}
               <div className="h-9 w-9" />
             </div>
@@ -494,7 +449,6 @@ export function BudgetStepServices({
           {/* Real service rows */}
           {fields.map((field, index) => {
             const service = services[index];
-            const discountType = service?.discountType || "NONE";
 
             return (
               <div
@@ -554,47 +508,6 @@ export function BudgetStepServices({
                   className="h-9"
                 />
 
-                <Combobox
-                  value={discountType}
-                  onValueChange={(v) => {
-                    const newType = String(v || "NONE");
-                    setFormValue(`services.${index}.discountType`, newType, { shouldDirty: true });
-                    if (newType === "NONE") {
-                      setFormValue(`services.${index}.discountValue`, null, { shouldDirty: true });
-                      setFormValue(`services.${index}.discountReference`, null, { shouldDirty: true });
-                    }
-                    setTimeout(recalculateTotals, 0);
-                  }}
-                  options={discountTypeOptions}
-                  searchable={false}
-                  clearable={false}
-                  disabled={disabled}
-                  className="h-9"
-                />
-
-                <Input
-                  type={discountType === "PERCENTAGE" ? "number" : "currency"}
-                  value={service?.discountValue || 0}
-                  onChange={(val) => {
-                    setFormValue(`services.${index}.discountValue`, val, { shouldDirty: true });
-                    setTimeout(recalculateTotals, 0);
-                  }}
-                  disabled={disabled || discountType === "NONE"}
-                  placeholder={discountType === "PERCENTAGE" ? "%" : "R$ 0,00"}
-                  className="h-9"
-                  {...(discountType === "PERCENTAGE" ? { min: 0, max: 100 } : {})}
-                />
-
-                <Input
-                  value={service?.discountReference || ""}
-                  onChange={(val) => {
-                    setFormValue(`services.${index}.discountReference`, val || null, { shouldDirty: true });
-                  }}
-                  disabled={disabled || discountType === "NONE"}
-                  placeholder="Referência"
-                  className="h-9"
-                />
-
                 {!disabled && (
                   <Button
                     type="button"
@@ -626,23 +539,99 @@ export function BudgetStepServices({
             </Button>
           )}
 
-          {/* Real totals (when not showing suggestion preview) */}
-          {!showSuggestionPreview && (
-            <div className="bg-muted/20 border border-border rounded-lg p-4 space-y-2 mt-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">
-                  {formatCurrency(services.reduce((sum: number, s: any) => sum + (Number(s?.amount) || 0), 0))}
-                </span>
+          {/* Real totals with discount controls (when not showing suggestion preview) */}
+          {!showSuggestionPreview && customerConfigs.map((config: any, configIndex: number) => {
+            const configSubtotal = Number(config?.subtotal) || 0;
+            const configTotal = Number(config?.total) || 0;
+            const discountType = config?.discountType || "NONE";
+            const discountAmount = computeConfigDiscount(configSubtotal, discountType, config?.discountValue);
+            const customerName = selectedCustomers.get(config.customerId)?.corporateName
+              || selectedCustomers.get(config.customerId)?.fantasyName
+              || "";
+
+            const setDiscountField = (field: string, value: any) => {
+              const configs = getValues("customerConfigs") || [];
+              const updated = configs.map((c: any, i: number) =>
+                i === configIndex ? { ...c, [field]: value } : c,
+              );
+              setFormValue("customerConfigs", updated, { shouldDirty: true });
+              setTimeout(recalculateTotals, 0);
+            };
+
+            return (
+              <div key={config.customerId || configIndex} className="bg-muted/20 border border-border rounded-lg p-4 space-y-3 mt-4">
+                {hasMultipleCustomers && (
+                  <span className="text-xs font-semibold text-muted-foreground uppercase">
+                    {customerName || `Cliente ${configIndex + 1}`}
+                  </span>
+                )}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">{formatCurrency(configSubtotal)}</span>
+                </div>
+
+                {/* Discount controls */}
+                <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border/50">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Desconto</Label>
+                    <Combobox
+                      value={discountType}
+                      onValueChange={(v) => {
+                        const newType = String(v || "NONE");
+                        setDiscountField("discountType", newType);
+                        if (newType === "NONE") {
+                          setDiscountField("discountValue", null);
+                          setDiscountField("discountReference", null);
+                        }
+                      }}
+                      options={[
+                        { value: "NONE", label: "Nenhum" },
+                        { value: "PERCENTAGE", label: "Porcentagem" },
+                        { value: "FIXED_VALUE", label: "Valor Fixo" },
+                      ]}
+                      searchable={false}
+                      clearable={false}
+                      disabled={disabled}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Valor Desc.</Label>
+                    <Input
+                      type={discountType === "PERCENTAGE" ? "number" : "currency"}
+                      value={config?.discountValue || 0}
+                      onChange={(val) => setDiscountField("discountValue", val)}
+                      disabled={disabled || discountType === "NONE"}
+                      placeholder={discountType === "PERCENTAGE" ? "%" : "R$ 0,00"}
+                      className="h-9"
+                      {...(discountType === "PERCENTAGE" ? { min: 0, max: 100 } : {})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Ref. Desconto</Label>
+                    <Input
+                      value={config?.discountReference || ""}
+                      onChange={(val) => setDiscountField("discountReference", val || null)}
+                      disabled={disabled || discountType === "NONE"}
+                      placeholder="Referência"
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+
+                {discountAmount > 0 && (
+                  <div className="flex items-center justify-between text-sm text-destructive">
+                    <span>Desconto</span>
+                    <span className="font-medium">- {formatCurrency(discountAmount)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <span className="text-base font-bold">TOTAL</span>
+                  <span className="text-xl font-bold text-primary">{formatCurrency(configTotal)}</span>
+                </div>
               </div>
-              <div className="flex items-center justify-between pt-2 border-t border-border">
-                <span className="text-base font-bold">TOTAL</span>
-                <span className="text-xl font-bold text-primary">
-                  {formatCurrency(services.reduce((sum: number, s: any) => sum + computeServiceNet(s || {}), 0))}
-                </span>
-              </div>
-            </div>
-          )}
+            );
+          })}
         </CardContent>
       </Card>
 

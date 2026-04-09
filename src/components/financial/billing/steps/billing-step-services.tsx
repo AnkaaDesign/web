@@ -8,8 +8,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatCurrency } from "@/utils";
-import { computeServiceNet, computeCustomerConfigTotals } from "@/utils/task-quote-calculations";
-import { DISCOUNT_TYPE_LABELS, SERVICE_ORDER_TYPE } from "@/constants";
+import { computeConfigDiscount, computeCustomerConfigTotals } from "@/utils/task-quote-calculations";
+import { SERVICE_ORDER_TYPE } from "@/constants/enums";
+import { Label } from "@/components/ui/label";
 import { ServiceAutocomplete } from "@/components/production/task/form/service-autocomplete";
 import { IconPlus, IconTrash, IconNote, IconCurrencyReal, IconAlertTriangle } from "@tabler/icons-react";
 
@@ -35,12 +36,6 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
     }));
   }, [customerConfigs]);
 
-  // Discount type options
-  const discountTypeOptions = Object.entries(DISCOUNT_TYPE_LABELS).map(([value, label]) => ({
-    value,
-    label,
-  }));
-
   // Add new service row
   const handleAddItem = useCallback(() => {
     append({
@@ -48,9 +43,6 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
       observation: null,
       amount: 0,
       invoiceToCustomerId: customerConfigs.length === 1 ? customerConfigs[0].customerId : null,
-      discountType: "NONE",
-      discountValue: null,
-      discountReference: null,
     });
   }, [append, customerConfigs]);
 
@@ -64,7 +56,13 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
     let total = 0;
 
     const updatedConfigs = currentConfigs.map((config: any) => {
-      const result = computeCustomerConfigTotals(currentServices, config.customerId, isSingle);
+      const result = computeCustomerConfigTotals(
+        currentServices,
+        config.customerId,
+        isSingle,
+        config.discountType,
+        config.discountValue,
+      );
       subtotal += result.subtotal;
       total += result.total;
       return { ...config, subtotal: result.subtotal, total: result.total };
@@ -100,30 +98,26 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
           {/* Header */}
           <div className={`grid gap-2 text-xs font-semibold text-muted-foreground uppercase ${
             hasMultipleCustomers
-              ? "grid-cols-[minmax(80px,1fr)_minmax(90px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]"
-              : "grid-cols-[minmax(100px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]"
+              ? "grid-cols-[minmax(100px,1fr)_minmax(90px,1fr)_180px_36px]"
+              : "grid-cols-[minmax(100px,1fr)_180px_36px]"
           }`}>
             <span className="px-2">Descrição</span>
             {hasMultipleCustomers && <span className="px-2">Cliente</span>}
             <span className="px-2">Valor</span>
-            <span className="px-2">Desconto</span>
-            <span className="px-2">Valor Desc.</span>
-            <span className="px-2">Ref. Desconto</span>
             <span />
           </div>
 
           {/* Service rows */}
           {fields.map((field, index) => {
             const service = services[index];
-            const discountType = service?.discountType || "NONE";
 
             return (
               <div
                 key={field.id}
                 className={`grid gap-2 items-center ${
                   hasMultipleCustomers
-                    ? "grid-cols-[minmax(80px,1fr)_minmax(90px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]"
-                    : "grid-cols-[minmax(100px,1fr)_180px_180px_180px_minmax(100px,1fr)_36px]"
+                    ? "grid-cols-[minmax(100px,1fr)_minmax(90px,1fr)_180px_36px]"
+                    : "grid-cols-[minmax(100px,1fr)_180px_36px]"
                 }`}
               >
                 {/* Description */}
@@ -182,51 +176,6 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
                   className="h-9"
                 />
 
-                {/* Discount Type */}
-                <Combobox
-                  value={discountType}
-                  onValueChange={(v) => {
-                    const newType = String(v || "NONE");
-                    setFormValue(`services.${index}.discountType`, newType, { shouldDirty: true });
-                    if (newType === "NONE") {
-                      setFormValue(`services.${index}.discountValue`, null, { shouldDirty: true });
-                      setFormValue(`services.${index}.discountReference`, null, { shouldDirty: true });
-                    }
-                    setTimeout(recalculateTotals, 0);
-                  }}
-                  options={discountTypeOptions}
-                  searchable={false}
-                  clearable={false}
-                  disabled={disabled}
-                  className="h-9"
-                />
-
-                {/* Discount Value */}
-                <Input
-                  type={discountType === "PERCENTAGE" ? "number" : "currency"}
-                  value={service?.discountValue || 0}
-                  onChange={(val) => {
-                    setFormValue(`services.${index}.discountValue`, val, { shouldDirty: true });
-                    setTimeout(recalculateTotals, 0);
-                  }}
-                  disabled={disabled || discountType === "NONE"}
-                  placeholder={discountType === "PERCENTAGE" ? "%" : "R$ 0,00"}
-                  className="h-9"
-                  {...(discountType === "PERCENTAGE" ? { min: 0, max: 100 } : {})}
-                />
-
-                {/* Discount Reference */}
-                <Input
-                  value={service?.discountReference || ""}
-                  onChange={(value) => {
-                    const val = String(value ?? "");
-                    setFormValue(`services.${index}.discountReference`, val || null, { shouldDirty: true });
-                  }}
-                  disabled={disabled || discountType === "NONE"}
-                  placeholder="Referência"
-                  className="h-9"
-                />
-
                 {/* Remove */}
                 {!disabled && (
                   <Button
@@ -260,21 +209,97 @@ export function BillingStepServices({ disabled }: BillingStepServicesProps) {
             </Button>
           )}
 
-          {/* Totals */}
-          <div className="bg-muted/20 border border-border rounded-lg p-4 space-y-2 mt-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">
-                {formatCurrency(services.reduce((sum: number, s: any) => sum + (Number(s?.amount) || 0), 0))}
-              </span>
-            </div>
-            <div className="flex items-center justify-between pt-2 border-t border-border">
-              <span className="text-base font-bold">TOTAL</span>
-              <span className="text-xl font-bold text-primary">
-                {formatCurrency(services.reduce((sum: number, s: any) => sum + computeServiceNet(s || {}), 0))}
-              </span>
-            </div>
-          </div>
+          {/* Totals with discount controls per customer config */}
+          {customerConfigs.map((config: any, configIndex: number) => {
+            const configSubtotal = Number(config?.subtotal) || 0;
+            const configTotal = Number(config?.total) || 0;
+            const discountType = config?.discountType || "NONE";
+            const discountAmount = computeConfigDiscount(configSubtotal, discountType, config?.discountValue);
+            const customerName = config?.customerData?.corporateName || config?.customerData?.fantasyName || "";
+
+            const setDiscountField = (field: string, value: any) => {
+              const configs = getValues("customerConfigs") || [];
+              const updated = configs.map((c: any, i: number) =>
+                i === configIndex ? { ...c, [field]: value } : c,
+              );
+              setFormValue("customerConfigs", updated, { shouldDirty: true });
+              setTimeout(recalculateTotals, 0);
+            };
+
+            return (
+              <div key={config.customerId || configIndex} className="bg-muted/20 border border-border rounded-lg p-4 space-y-3 mt-4">
+                {hasMultipleCustomers && (
+                  <span className="text-xs font-semibold text-muted-foreground uppercase">
+                    {customerName || `Cliente ${configIndex + 1}`}
+                  </span>
+                )}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">{formatCurrency(configSubtotal)}</span>
+                </div>
+
+                {/* Discount controls */}
+                <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border/50">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Desconto</Label>
+                    <Combobox
+                      value={discountType}
+                      onValueChange={(v) => {
+                        const newType = String(v || "NONE");
+                        setDiscountField("discountType", newType);
+                        if (newType === "NONE") {
+                          setDiscountField("discountValue", null);
+                          setDiscountField("discountReference", null);
+                        }
+                      }}
+                      options={[
+                        { value: "NONE", label: "Nenhum" },
+                        { value: "PERCENTAGE", label: "Porcentagem" },
+                        { value: "FIXED_VALUE", label: "Valor Fixo" },
+                      ]}
+                      searchable={false}
+                      clearable={false}
+                      disabled={disabled}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Valor Desc.</Label>
+                    <Input
+                      type={discountType === "PERCENTAGE" ? "number" : "currency"}
+                      value={config?.discountValue || 0}
+                      onChange={(val) => setDiscountField("discountValue", val)}
+                      disabled={disabled || discountType === "NONE"}
+                      placeholder={discountType === "PERCENTAGE" ? "%" : "R$ 0,00"}
+                      className="h-9"
+                      {...(discountType === "PERCENTAGE" ? { min: 0, max: 100 } : {})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Ref. Desconto</Label>
+                    <Input
+                      value={config?.discountReference || ""}
+                      onChange={(val) => setDiscountField("discountReference", val || null)}
+                      disabled={disabled || discountType === "NONE"}
+                      placeholder="Referência"
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+
+                {discountAmount > 0 && (
+                  <div className="flex items-center justify-between text-sm text-destructive">
+                    <span>Desconto</span>
+                    <span className="font-medium">- {formatCurrency(discountAmount)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <span className="text-base font-bold">TOTAL</span>
+                  <span className="text-xl font-bold text-primary">{formatCurrency(configTotal)}</span>
+                </div>
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 

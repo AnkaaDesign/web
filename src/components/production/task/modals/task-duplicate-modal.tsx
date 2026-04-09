@@ -212,9 +212,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                 description: item.description,
                 amount: Number(item.amount) || 0,
                 observation: item.observation || null,
-                discountType: item.discountType || 'NONE',
-                discountValue: item.discountValue != null ? Number(item.discountValue) : null,
-                discountReference: item.discountReference || null,
               })),
               subtotal: Number(sourceTask.quote.subtotal) || 0,
               total: Number(sourceTask.quote.total) || 0,
@@ -224,13 +221,16 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
               customForecastDays: sourceTask.quote.customForecastDays != null ? Number(sourceTask.quote.customForecastDays) : null,
               simultaneousTasks: sourceTask.quote.simultaneousTasks != null ? Number(sourceTask.quote.simultaneousTasks) : null,
               layoutFileId: sourceTask.quote.layoutFile?.id || sourceTask.quote.layoutFileId || null,
-              // customerConfigs duplicated (discount is now per-service, not per-config)
               customerConfigs: sourceTask.quote.customerConfigs?.map((config: any) => ({
                 customerId: config.customerId,
+                subtotal: Number(config.subtotal) || 0,
+                total: Number(config.total) || 0,
+                discountType: config.discountType || 'NONE',
+                discountValue: config.discountValue != null ? Number(config.discountValue) : null,
+                discountReference: config.discountReference || null,
                 customPaymentText: config.customPaymentText || null,
                 responsibleId: config.responsibleId || null,
                 paymentCondition: config.paymentCondition || null,
-
               })) || [],
             },
           }

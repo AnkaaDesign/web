@@ -149,15 +149,15 @@ export const BillingDetailPage = () => {
         observation: s.observation || null,
         amount: Number(s.amount) || 0,
         invoiceToCustomerId: s.invoiceToCustomerId || null,
-        discountType: s.discountType || "NONE",
-        discountValue: s.discountValue ? Number(s.discountValue) : null,
-        discountReference: s.discountReference || null,
       })),
       customerConfigs: (quote.customerConfigs || []).map((config: any) => ({
         id: config.id,
         customerId: config.customerId,
         subtotal: Number(config.subtotal) || 0,
         total: Number(config.total) || 0,
+        discountType: config.discountType || "NONE",
+        discountValue: config.discountValue != null ? Number(config.discountValue) : null,
+        discountReference: config.discountReference || null,
         paymentCondition: config.paymentCondition || null,
 
         customPaymentText: config.customPaymentText || null,
@@ -220,7 +220,7 @@ export const BillingDetailPage = () => {
   const totalSteps = steps.length;
 
   // Statuses that require complete customer data for NFS-e/boleto generation
-  const STATUSES_REQUIRING_COMPLETE_DATA = ["VERIFIED_BY_FINANCIAL", "BILLING_APPROVED"];
+  const STATUSES_REQUIRING_COMPLETE_DATA = ["COMMERCIAL_APPROVED", "BILLING_APPROVED"];
 
   // Step validation - only basic checks, no required field validation on step change
   const validateCurrentStep = useCallback(() => {
@@ -363,17 +363,16 @@ export const BillingDetailPage = () => {
             observation: s.observation || null,
             amount: Number(s.amount) || 0,
             invoiceToCustomerId: s.invoiceToCustomerId || null,
-            discountType: s.discountType || "NONE",
-            discountValue: s.discountValue ? Number(s.discountValue) : null,
-            discountReference: s.discountReference || null,
           })),
         customerConfigs: formData.customerConfigs.map((c: any) => ({
           ...(c.id && { id: c.id }),
           customerId: c.customerId,
           subtotal: Number(c.subtotal) || 0,
           total: Number(c.total) || 0,
+          discountType: c.discountType || "NONE",
+          discountValue: c.discountValue != null ? Number(c.discountValue) : null,
+          discountReference: c.discountReference || null,
           paymentCondition: c.paymentCondition || null,
-
           customPaymentText: c.customPaymentText || null,
           generateInvoice: c.generateInvoice !== false,
           orderNumber: c.orderNumber || null,

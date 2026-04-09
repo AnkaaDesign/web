@@ -488,9 +488,10 @@ export const TaskCreateForm = () => {
               }
 
               // Auto-create a minimal TaskQuote for the task (if it has a customer)
+              // Only COMMERCIAL and ADMIN can create quotes via the API
               const createdTaskId = result.data?.id;
               const effectiveCustomerId = customerId || result.data?.customerId;
-              if (createdTaskId && effectiveCustomerId) {
+              if (createdTaskId && effectiveCustomerId && (isCommercialUser || isAdminUser)) {
                 const expiresAt = new Date();
                 expiresAt.setDate(expiresAt.getDate() + 30);
                 try {

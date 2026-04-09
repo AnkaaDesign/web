@@ -22,8 +22,8 @@ export function QuoteStatusBadge({ status, className, size = 'default', paidCoun
       label: 'Orçamento Aprovado',
       variant: 'approved',
     },
-    VERIFIED_BY_FINANCIAL: {
-      label: 'Verificado pelo Financeiro',
+    COMMERCIAL_APPROVED: {
+      label: 'Aprovado pelo Comercial',
       variant: 'processing',
     },
     BILLING_APPROVED: {

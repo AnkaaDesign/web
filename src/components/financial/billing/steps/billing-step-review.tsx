@@ -5,10 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { formatCurrency, formatDate, formatChassis, formatCNPJ, formatCPF } from "@/utils";
-import { computeServiceDiscount, computeServiceNet } from "@/utils/task-quote-calculations";
+import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
+import type { TRUCK_CATEGORY, IMPLEMENT_TYPE } from "@/constants/enums";
 import { generatePaymentText } from "@/utils/quote-text-generators";
-import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
-import { DISCOUNT_TYPE } from "@/constants/enums";
 import { BoletoActions } from "@/components/production/task/billing/boleto-actions";
 import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
 import { NfseActions } from "@/components/production/task/billing/nfse-actions";
@@ -30,13 +29,13 @@ import { useNavigate } from "react-router-dom";
 import { routes } from "@/constants";
 import { exportDossiePdf } from "@/utils/dossie-pdf-generator";
 
-const STATUSES_REQUIRING_COMPLETE_DATA = ["VERIFIED_BY_FINANCIAL", "BILLING_APPROVED"];
+const STATUSES_REQUIRING_COMPLETE_DATA = ["COMMERCIAL_APPROVED", "BILLING_APPROVED"];
 
 // All statuses — automatic ones are shown (so current value displays) but disabled
 const ALL_STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
   { value: "BUDGET_APPROVED", label: "Orçamento Aprovado" },
-  { value: "VERIFIED_BY_FINANCIAL", label: "Verificado pelo Financeiro" },
+  { value: "COMMERCIAL_APPROVED", label: "Aprovado pelo Comercial" },
   { value: "BILLING_APPROVED", label: "Faturamento Aprovado" },
   { value: "UPCOMING", label: "A Vencer" },
   { value: "DUE", label: "Vencido" },
@@ -51,7 +50,7 @@ const getStatusTriggerClass = (status: string) => {
   const map: Record<string, string> = {
     PENDING: "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600",
     BUDGET_APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
-    VERIFIED_BY_FINANCIAL: "bg-blue-700 text-white hover:bg-blue-800 border-blue-800",
+    COMMERCIAL_APPROVED: "bg-blue-700 text-white hover:bg-blue-800 border-blue-800",
     BILLING_APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
     UPCOMING: "bg-amber-600 text-white hover:bg-amber-700 border-amber-700",
     DUE: "bg-red-600 text-white hover:bg-red-700 border-red-700",
@@ -128,7 +127,8 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   }, [invoices, filterCustomerId]);
 
   const subtotal = validServices.reduce((sum: number, s: any) => sum + (Number(s?.amount) || 0), 0);
-  const total = validServices.reduce((sum: number, s: any) => sum + computeServiceNet(s || {}), 0);
+  const totalFromConfigs = customerConfigs.reduce((sum: number, c: any) => sum + (Number(c?.total) || 0), 0);
+  const total = totalFromConfigs || subtotal;
   const discountAmount = Math.max(0, subtotal - total);
 
   const hasMultipleCustomers = !filterCustomerId && customerConfigs.length >= 2;
@@ -268,8 +268,8 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                   ...s,
                   disabled: s.value === currentStatus
                     || AUTOMATIC_STATUSES.includes(s.value)
-                    || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s.value === "BILLING_APPROVED")
-                    || (s.value === "BILLING_APPROVED" && currentStatus !== "VERIFIED_BY_FINANCIAL"),
+                    || (userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL && s.value === "BILLING_APPROVED")
+                    || (s.value === "BILLING_APPROVED" && currentStatus !== "COMMERCIAL_APPROVED"),
                 }))}
                 searchable={false}
                 clearable={false}
@@ -315,7 +315,19 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
             {task.truck?.chassisNumber && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">Chassi</span>
-                <span className="text-sm font-mono font-medium">{formatChassis(task.truck.chassisNumber)}</span>
+                <span className="text-sm font-medium">{formatChassis(task.truck.chassisNumber)}</span>
+              </div>
+            )}
+            {task.truck?.category && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm text-muted-foreground">Categoria</span>
+                <span className="text-sm font-medium">{TRUCK_CATEGORY_LABELS[task.truck.category as TRUCK_CATEGORY] || task.truck.category}</span>
+              </div>
+            )}
+            {task.truck?.implementType && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                <span className="text-sm text-muted-foreground">Implemento</span>
+                <span className="text-sm font-medium">{IMPLEMENT_TYPE_LABELS[task.truck.implementType as IMPLEMENT_TYPE] || task.truck.implementType}</span>
               </div>
             )}
             {task.finishedAt && (
@@ -343,7 +355,9 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               return (
                 <div className="grid grid-cols-1 md:grid-cols-2 items-stretch gap-3">
                   {Array.from(customerGroups.entries()).map(([customerId, group], groupIndex) => {
-                    const groupTotal = group.services.reduce((sum: number, s: any) => sum + computeServiceNet(s || {}), 0);
+                    const config = customerConfigs.find((c: any) => c.customerId === customerId);
+                    const groupSubtotal = group.services.reduce((sum: number, s: any) => sum + (Number(s?.amount) || 0), 0);
+                    const groupTotal = config?.total != null ? Number(config.total) : groupSubtotal;
 
                     return (
                       <div key={customerId} className="border border-border rounded-lg overflow-hidden">
@@ -403,12 +417,22 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               <span className="text-muted-foreground">Subtotal</span>
               <span className="font-medium">{formatCurrency(subtotal)}</span>
             </div>
-            {discountAmount > 0 && (
-              <div className="flex items-center justify-between text-sm text-destructive">
-                <span>Desconto (serviços)</span>
-                <span className="font-medium">- {formatCurrency(discountAmount)}</span>
-              </div>
-            )}
+            {discountAmount > 0 && (() => {
+              const firstConfig = customerConfigs[0];
+              let label = 'Desconto';
+              if (firstConfig?.discountType === 'PERCENTAGE' && firstConfig?.discountValue) {
+                label = `Desconto (${firstConfig.discountValue}%)`;
+              }
+              if (firstConfig?.discountReference) {
+                label += ` — ${firstConfig.discountReference}`;
+              }
+              return (
+                <div className="flex items-center justify-between text-sm text-destructive">
+                  <span>{label}</span>
+                  <span className="font-medium">- {formatCurrency(discountAmount)}</span>
+                </div>
+              );
+            })()}
             <div className="flex items-center justify-between pt-2 border-t border-border">
               <span className="text-base font-bold">TOTAL</span>
               <span className="text-xl font-bold text-primary">{formatCurrency(total)}</span>
@@ -857,13 +881,11 @@ function UnifiedInstallmentBadge({ installment }: { installment: any }) {
 
 function ServiceTableRow({ service }: { service: any }) {
   const amount = typeof service.amount === "number" ? service.amount : Number(service.amount) || 0;
-  const discount = computeServiceDiscount(amount, service.discountType, service.discountValue);
-  const net = computeServiceNet({ amount, discountType: service.discountType, discountValue: service.discountValue });
   const isOutrosWithObservation = service.description === "Outros" && !!service.observation;
   const displayDescription = isOutrosWithObservation ? service.observation : service.description;
 
   return (
-    <tr className="hover:bg-muted/30 transition-colors h-[3.75rem]">
+    <tr className="hover:bg-muted/30 transition-colors">
       <td className="px-4 py-1.5 text-sm align-middle">
         <div>
           <span>
@@ -872,27 +894,10 @@ function ServiceTableRow({ service }: { service: any }) {
               <span className="text-muted-foreground italic"> — {service.observation}</span>
             )}
           </span>
-          {discount > 0 && (
-            <p className="text-xs text-destructive leading-tight">
-              Desconto:{" "}
-              {service.discountType === "PERCENTAGE"
-                ? `${service.discountValue}%`
-                : formatCurrency(discount)}{" "}
-              ({DISCOUNT_TYPE_LABELS[service.discountType as DISCOUNT_TYPE]})
-              {service.discountReference && ` — ${service.discountReference}`}
-            </p>
-          )}
         </div>
       </td>
       <td className="px-4 py-1.5 text-sm text-right font-medium align-middle">
-        {discount > 0 ? (
-          <div>
-            <p className="text-xs text-muted-foreground line-through leading-tight">{formatCurrency(amount)}</p>
-            <p>{formatCurrency(net)}</p>
-          </div>
-        ) : (
-          formatCurrency(amount)
-        )}
+        {formatCurrency(amount)}
       </td>
     </tr>
   );

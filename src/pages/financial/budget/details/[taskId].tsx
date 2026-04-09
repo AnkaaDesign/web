@@ -110,9 +110,6 @@ export const FinancialBudgetDetailPage = () => {
           amount: null,
           observation: null,
           invoiceToCustomerId: null,
-          discountType: "NONE",
-          discountValue: null,
-          discountReference: null,
         },
       ] as any[],
     },
@@ -182,9 +179,6 @@ export const FinancialBudgetDetailPage = () => {
                     ? Number(item.amount)
                     : 0,
               invoiceToCustomerId: item.invoiceToCustomerId || null,
-              discountType: item.discountType || "NONE",
-              discountValue: item.discountValue != null ? Number(item.discountValue) : null,
-              discountReference: item.discountReference || null,
             }))
           : [
               {
@@ -192,9 +186,6 @@ export const FinancialBudgetDetailPage = () => {
                 amount: null,
                 observation: null,
                 invoiceToCustomerId: null,
-                discountType: "NONE",
-                discountValue: null,
-                discountReference: null,
               },
             ],
     });

@@ -29,7 +29,7 @@ export function canDeleteQuote(userRole: string): boolean {
 /**
  * Check if user can update task quote status.
  * ADMIN, FINANCIAL, and COMMERCIAL can update status.
- * FINANCIAL cannot set BILLING_APPROVED (only ADMIN/COMMERCIAL can).
+ * COMMERCIAL cannot set BILLING_APPROVED (only ADMIN/FINANCIAL can).
  */
 export function canUpdateQuoteStatus(userRole: string): boolean {
   return [
@@ -43,7 +43,7 @@ export function canUpdateQuoteStatus(userRole: string): boolean {
  * Valid status transitions for task quote.
  *
  * Typical flow:
- *   PENDING -> BUDGET_APPROVED -> VERIFIED_BY_FINANCIAL -> BILLING_APPROVED -> UPCOMING -> PARTIAL -> SETTLED
+ *   PENDING -> BUDGET_APPROVED -> COMMERCIAL_APPROVED -> BILLING_APPROVED -> UPCOMING -> PARTIAL -> SETTLED
  *
  * DUE status represents overdue installments:
  *   UPCOMING -> DUE (when installments become overdue)
@@ -60,8 +60,8 @@ export function canUpdateQuoteStatus(userRole: string): boolean {
  */
 const VALID_TRANSITIONS: Record<TASK_QUOTE_STATUS, TASK_QUOTE_STATUS[]> = {
   PENDING: ['BUDGET_APPROVED'],
-  BUDGET_APPROVED: ['VERIFIED_BY_FINANCIAL', 'PENDING'],
-  VERIFIED_BY_FINANCIAL: ['BILLING_APPROVED', 'BUDGET_APPROVED'],
+  BUDGET_APPROVED: ['COMMERCIAL_APPROVED', 'PENDING'],
+  COMMERCIAL_APPROVED: ['BILLING_APPROVED', 'BUDGET_APPROVED'],
   BILLING_APPROVED: ['UPCOMING'],
   UPCOMING: ['PARTIAL', 'DUE', 'BILLING_APPROVED'],
   DUE: ['PARTIAL', 'SETTLED', 'UPCOMING'],
@@ -82,8 +82,8 @@ export function getAvailableQuoteStatusTransitions(
 ): TASK_QUOTE_STATUS[] {
   const transitions = VALID_TRANSITIONS[currentStatus] || [];
 
-  // FINANCIAL cannot set BILLING_APPROVED
-  if (userRole === SECTOR_PRIVILEGES.FINANCIAL) {
+  // COMMERCIAL cannot set BILLING_APPROVED
+  if (userRole === SECTOR_PRIVILEGES.COMMERCIAL) {
     return transitions.filter((s) => s !== 'BILLING_APPROVED');
   }
 

@@ -26,10 +26,10 @@ export const taskQuoteService = {
   // Budget Approve (alias)
   budgetApprove: (id: string) => apiClient.put(`/task-quotes/${id}/budget-approve`),
 
-  // Verify (financial verifies: BUDGET_APPROVED → VERIFIED_BY_FINANCIAL)
-  verify: (id: string) => apiClient.put(`/task-quotes/${id}/verify`),
+  // Commercial approve (BUDGET_APPROVED → COMMERCIAL_APPROVED)
+  commercialApprove: (id: string) => apiClient.put(`/task-quotes/${id}/commercial-approve`),
 
-  // Internal Approve (final approval: VERIFIED_BY_FINANCIAL → BILLING_APPROVED)
+  // Internal Approve (final approval: COMMERCIAL_APPROVED → BILLING_APPROVED)
   internalApprove: (id: string) => apiClient.put(`/task-quotes/${id}/internal-approve`),
 
   // Reject (sends back to PENDING with a reason)

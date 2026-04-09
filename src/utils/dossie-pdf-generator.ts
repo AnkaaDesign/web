@@ -36,6 +36,9 @@ export interface CompleteDossiePdfOptions {
   discountAmount: number;
   total: number;
   hasDiscount: boolean;
+  discountType?: string | null;
+  discountValue?: number | null;
+  discountReference?: string | null;
   paymentText: string | null;
   guaranteeText: string | null;
   layoutImageUrl: string | null;
@@ -207,11 +210,7 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
     const isOutros = svc.description?.trim().toLowerCase() === 'outros';
     const displayDesc = isOutros && obs ? obs : obs ? `${desc} ${obs}` : desc;
 
-    let discount = 0;
-    if (svc.discountType === 'PERCENTAGE' && svc.discountValue) discount = Math.round((amount * svc.discountValue / 100) * 100) / 100;
-    else if (svc.discountType === 'FIXED_VALUE' && svc.discountValue) discount = Math.min(svc.discountValue || 0, amount);
-    const net = Math.max(0, amount - discount);
-    const priceText = discount > 0 ? formatCurrency(net) : formatCurrency(amount);
+    const priceText = formatCurrency(amount);
 
     const svcText = `${i + 1} - ${displayDesc}`;
     // Truncate if too long
@@ -238,7 +237,13 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
     p1.drawText(subVal, { x: W - MR - subW, y, size: 10, font, color: GRAY });
     y -= 14;
 
-    const discLabel = 'Desconto';
+    let discLabel = 'Desconto';
+    if (opts.discountType === 'PERCENTAGE' && opts.discountValue) {
+      discLabel = `Desconto (${opts.discountValue}%)`;
+    }
+    if (opts.discountReference) {
+      discLabel += ` — ${opts.discountReference}`;
+    }
     const discVal = `- ${formatCurrency(opts.discountAmount)}`;
     p1.drawText(discLabel, { x: ML + 12, y, size: 10, font, color: RED });
     const discW = font.widthOfTextAtSize(discVal, 10);

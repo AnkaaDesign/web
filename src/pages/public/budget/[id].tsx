@@ -158,6 +158,16 @@ export function PublicBudgetPage() {
     return filteredServices.reduce((sum, service) => sum + (Number(service.amount) || 0), 0);
   }, [filteredServices]);
 
+  // Compute discount from customer config level (must be before early returns)
+  const activeConfigForDiscount = quote?.customerConfigs?.find((c: any) => c.customerId === selectedCustomerId) || quote?.customerConfigs?.[0];
+  const computedDiscountAmount = useMemo(() => {
+    if (!activeConfigForDiscount) return 0;
+    const subtotal = typeof activeConfigForDiscount.subtotal === 'number' ? activeConfigForDiscount.subtotal : Number(activeConfigForDiscount.subtotal) || 0;
+    const total = typeof activeConfigForDiscount.total === 'number' ? activeConfigForDiscount.total : Number(activeConfigForDiscount.total) || 0;
+    return Math.max(0, Math.round((subtotal - total) * 100) / 100);
+  }, [activeConfigForDiscount]);
+  const hasDiscount = computedDiscountAmount > 0;
+
   // Loading state
   if (loading) {
     return (
@@ -218,21 +228,6 @@ export function PublicBudgetPage() {
   });
   const guaranteeText = generateGuaranteeText(quote);
 
-  // Compute per-service discount totals
-  const relevantServices = (quote.services || []).filter((s: any) =>
-    !selectedCustomerId || s.invoiceToCustomerId === selectedCustomerId || !s.invoiceToCustomerId
-  );
-  const computedDiscountAmount = relevantServices.reduce((sum: number, svc: any) => {
-    const amount = typeof svc.amount === 'number' ? svc.amount : Number(svc.amount) || 0;
-    if (svc.discountType === 'PERCENTAGE' && svc.discountValue) {
-      return sum + Math.round((amount * svc.discountValue / 100) * 100) / 100;
-    } else if (svc.discountType === 'FIXED_VALUE' && svc.discountValue) {
-      return sum + Math.min(svc.discountValue, amount);
-    }
-    return sum;
-  }, 0);
-  const hasDiscount = computedDiscountAmount > 0;
-
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
   const configSignature = activeConfig?.customerSignature;
   const hasExistingSignature = !!configSignature?.id;
@@ -243,9 +238,11 @@ export function PublicBudgetPage() {
 
   // Recalculate discount and total based on active filter
   const isCompleteViewGlobal = !selectedCustomerId && (quote?.customerConfigs?.length ?? 0) >= 2;
-  const displaySubtotal = selectedCustomerId ? filteredSubtotal : quote.subtotal;
+  const displaySubtotal = selectedCustomerId
+    ? (typeof activeConfig?.subtotal === 'number' ? activeConfig.subtotal : Number(activeConfig?.subtotal) || filteredSubtotal)
+    : quote.subtotal;
   const displayTotal = selectedCustomerId
-    ? Math.max(0, Math.round((displaySubtotal - computedDiscountAmount) * 100) / 100)
+    ? (typeof activeConfig?.total === 'number' ? activeConfig.total : Number(activeConfig?.total) || 0)
     : isCompleteViewGlobal
       ? quote.customerConfigs!.reduce((sum: number, c: any) => sum + (typeof c.total === 'number' ? c.total : Number(c.total) || 0), 0)
       : quote.total;
@@ -291,6 +288,9 @@ export function PublicBudgetPage() {
         chassisNumber: quote.task?.truck?.chassisNumber || null,
         simultaneousTasks: quote.simultaneousTasks || null,
         customerFilter: selectedCustomerId,
+        discountType: activeConfig?.discountType || null,
+        discountValue: activeConfig?.discountValue != null ? Number(activeConfig.discountValue) : null,
+        discountReference: activeConfig?.discountReference || null,
       });
       toast.success("PDF exportado!");
     } catch (err) {
@@ -422,23 +422,11 @@ export function PublicBudgetPage() {
                       : description;
                   const amount = Number(service.amount) || 0;
                   const svc = service as any;
-                  const hasDisc = svc.discountType && svc.discountType !== 'NONE' && svc.discountValue;
-                  let discAmt = 0;
-                  if (hasDisc) {
-                    discAmt = svc.discountType === 'PERCENTAGE'
-                      ? Math.round((amount * svc.discountValue / 100) * 100) / 100
-                      : Math.min(svc.discountValue, amount);
-                  }
                   const invoiceToName = svc.invoiceToCustomer?.corporateName || svc.invoiceToCustomer?.fantasyName;
                   return (
                     <tr key={service.id} className="align-top">
                       <td className="text-gray-800 py-1 pr-2">
                         {index + 1} - {displayText}
-                        {hasDisc && svc.discountReference && (
-                          <span className="text-xs text-gray-500 ml-1">
-                            ({svc.discountType === 'PERCENTAGE' ? `${svc.discountValue}%` : formatCurrency(discAmt)} desc. — Ref: {svc.discountReference})
-                          </span>
-                        )}
                       </td>
                       {isCompleteView && (
                         <td className="text-xs text-gray-500 whitespace-nowrap py-1 px-2">
@@ -446,14 +434,7 @@ export function PublicBudgetPage() {
                         </td>
                       )}
                       <td className="text-gray-800 font-normal whitespace-nowrap text-right py-1 pl-2">
-                        {hasDisc ? (
-                          <>
-                            <span className="line-through text-gray-400 text-[10px] mr-1">{formatCurrency(amount)}</span>
-                            {formatCurrency(Math.max(0, amount - discAmt))}
-                          </>
-                        ) : (
-                          formatCurrency(amount)
-                        )}
+                        {formatCurrency(amount)}
                       </td>
                     </tr>
                   );
@@ -491,7 +472,14 @@ export function PublicBudgetPage() {
                         <span className="text-gray-800">{formatCurrency(displaySubtotal)}</span>
                       </div>
                       <div className="flex justify-between items-baseline text-red-600">
-                        <span>Desconto</span>
+                        <span>
+                          {activeConfig?.discountType === 'PERCENTAGE' && activeConfig?.discountValue
+                            ? `Desconto (${activeConfig.discountValue}%)`
+                            : 'Desconto'}
+                          {activeConfig?.discountReference && (
+                            <span className="text-gray-500 text-sm"> — {activeConfig.discountReference}</span>
+                          )}
+                        </span>
                         <span>- {formatCurrency(computedDiscountAmount)}</span>
                       </div>
                     </>

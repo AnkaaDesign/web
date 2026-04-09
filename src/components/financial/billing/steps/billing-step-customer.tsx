@@ -135,78 +135,54 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
           <CardDescription>Informações do cliente para emissão de NFS-e</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Document Input - CPF/CNPJ switcher */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium">
-              {docType === "cnpj" ? (
-                <IconBuilding className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <IconIdBadge2 className="h-4 w-4 text-muted-foreground" />
-              )}
-              Documento
-              <span className="text-destructive">*</span>
-            </Label>
-            <div className="flex gap-2">
-              <Combobox
-                value={docType}
-                onValueChange={handleDocTypeChange}
-                options={DOC_TYPE_OPTIONS}
-                searchable={false}
-                clearable={false}
-                className="w-32"
-                disabled={disabled}
-              />
-              {docType === "cnpj" ? (
-                <Input
-                  type="cnpj"
-                  value={customerData.cnpj ?? ""}
-                  onChange={(value) => handleCnpjChange(String(value ?? ""))}
-                  placeholder="00.000.000/0000-00"
+          {/* Row 1: Document + Situação Cadastral + Inscrição Estadual */}
+          <div className="grid grid-cols-1 md:grid-cols-[auto_1fr_1fr_1fr] gap-4 items-end">
+            <div className="space-y-2 md:col-span-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                {docType === "cnpj" ? (
+                  <IconBuilding className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <IconIdBadge2 className="h-4 w-4 text-muted-foreground" />
+                )}
+                Documento
+                <span className="text-destructive">*</span>
+              </Label>
+              <div className="flex gap-2">
+                <Combobox
+                  value={docType}
+                  onValueChange={handleDocTypeChange}
+                  options={DOC_TYPE_OPTIONS}
+                  searchable={false}
+                  clearable={false}
+                  className="w-32"
                   disabled={disabled}
-                  transparent
-                  className="flex-1"
                 />
-              ) : (
-                <Input
-                  type="cpf"
-                  value={customerData.cpf ?? ""}
-                  onChange={(value) => setCustomerField("cpf", String(value ?? ""))}
-                  placeholder="000.000.000-00"
-                  disabled={disabled}
-                  transparent
-                  className="flex-1"
-                />
+                {docType === "cnpj" ? (
+                  <Input
+                    type="cnpj"
+                    value={customerData.cnpj ?? ""}
+                    onChange={(value) => handleCnpjChange(String(value ?? ""))}
+                    placeholder="00.000.000/0000-00"
+                    disabled={disabled}
+                    transparent
+                    className="flex-1"
+                  />
+                ) : (
+                  <Input
+                    type="cpf"
+                    value={customerData.cpf ?? ""}
+                    onChange={(value) => setCustomerField("cpf", String(value ?? ""))}
+                    placeholder="000.000.000-00"
+                    disabled={disabled}
+                    transparent
+                    className="flex-1"
+                  />
+                )}
+              </div>
+              {isLookingUpCnpj && (
+                <span className="text-xs text-primary animate-pulse">Buscando dados do CNPJ...</span>
               )}
             </div>
-            {isLookingUpCnpj && (
-              <span className="text-xs text-primary animate-pulse">Buscando dados do CNPJ...</span>
-            )}
-          </div>
-
-          {/* Fantasy Name + Corporate Name */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Nome Fantasia <span className="text-destructive">*</span></Label>
-              <Input
-                value={customerData.fantasyName || ""}
-                onChange={(value) => setCustomerField("fantasyName", String(value ?? ""))}
-                placeholder="Nome Fantasia"
-                disabled={disabled}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Razão Social <span className="text-destructive">*</span></Label>
-              <Input
-                value={customerData.corporateName || ""}
-                onChange={(value) => setCustomerField("corporateName", String(value ?? ""))}
-                placeholder="Razão Social"
-                disabled={disabled}
-              />
-            </div>
-          </div>
-
-          {/* Situação Cadastral + State Registration */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Situação Cadastral</Label>
               <Combobox
@@ -230,8 +206,30 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
             </div>
           </div>
 
-          {/* Address - Row 1: CEP + City + State */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Row 2: Fantasy Name + Corporate Name */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Nome Fantasia <span className="text-destructive">*</span></Label>
+              <Input
+                value={customerData.fantasyName || ""}
+                onChange={(value) => setCustomerField("fantasyName", String(value ?? ""))}
+                placeholder="Nome Fantasia"
+                disabled={disabled}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Razão Social <span className="text-destructive">*</span></Label>
+              <Input
+                value={customerData.corporateName || ""}
+                onChange={(value) => setCustomerField("corporateName", String(value ?? ""))}
+                placeholder="Razão Social"
+                disabled={disabled}
+              />
+            </div>
+          </div>
+
+          {/* Row 3: CEP + Cidade + UF + Tipo + Logradouro + Número */}
+          <div className="grid grid-cols-2 md:grid-cols-[120px_1fr_80px_120px_1fr_80px] gap-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium">CEP <span className="text-destructive">*</span></Label>
               <Input
@@ -252,7 +250,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Estado (UF) <span className="text-destructive">*</span></Label>
+              <Label className="text-sm font-medium">UF <span className="text-destructive">*</span></Label>
               <Combobox
                 value={customerData.state || ""}
                 onValueChange={(v) => setCustomerField("state", typeof v === "string" ? v : "")}
@@ -263,11 +261,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 disabled={disabled}
               />
             </div>
-          </div>
-
-          {/* Address - Row 2: Street Type (2/6) + Address (3/6) + Number (1/6) */}
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
-            <div className="md:col-span-2 space-y-2">
+            <div className="space-y-2">
               <Label className="text-sm font-medium">Tipo</Label>
               <Combobox
                 value={customerData.streetType || ""}
@@ -279,7 +273,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 disabled={disabled}
               />
             </div>
-            <div className="md:col-span-3 space-y-2">
+            <div className="space-y-2">
               <Label className="text-sm font-medium">Logradouro <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.address || ""}
@@ -288,8 +282,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                 disabled={disabled}
               />
             </div>
-            <div className="md:col-span-1 space-y-2">
-              <Label className="text-sm font-medium">Número <span className="text-destructive">*</span></Label>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Nº <span className="text-destructive">*</span></Label>
               <Input
                 value={customerData.addressNumber || ""}
                 onChange={(value) => setCustomerField("addressNumber", String(value ?? ""))}
@@ -299,8 +293,8 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
             </div>
           </div>
 
-          {/* Address - Row 3: Neighborhood + Complement */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Row 4: Bairro + Complemento */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Bairro <span className="text-destructive">*</span></Label>
               <Input
