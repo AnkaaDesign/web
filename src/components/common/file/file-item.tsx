@@ -206,12 +206,14 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
     }
   };
 
+  const showingThumbnail = showThumbnail && hasThumbnail && !thumbnailError;
+
   return (
     <>
       <div
         className={cn(
           "group relative overflow-hidden transition-all duration-300 rounded-lg hover:shadow-sm cursor-pointer border border-border",
-          "w-full max-w-[200px]",
+          showingThumbnail ? "w-full max-w-[200px]" : "w-16 h-16",
           className
         )}
         onClick={handleClick}
@@ -222,9 +224,9 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
         {/* Thumbnail/Icon Area */}
         <div
           className="flex items-center justify-center rounded-lg bg-muted/30"
-          style={{ height: "8rem" }}
+          style={showingThumbnail ? { height: "8rem" } : { height: "100%" }}
         >
-          {showThumbnail && hasThumbnail && !thumbnailError ? (
+          {showingThumbnail ? (
             <div className="relative w-full h-full">
               {thumbnailLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-muted/30 rounded-md">
@@ -249,13 +251,13 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload: _o
               />
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center justify-center w-full h-full">
               <FileTypeIcon filename={file.filename} mimeType={file.mimetype} size="lg" />
             </div>
           )}
 
           {/* Hover Overlay with File Info */}
-          {isHovered && (showFilename || showFileSize) && (
+          {isHovered && showingThumbnail && (showFilename || showFileSize) && (
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-all duration-300">
               <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
                 <div className="flex items-center justify-between gap-2">

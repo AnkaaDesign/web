@@ -877,7 +877,6 @@ export const FinancialBudgetDetailPage = () => {
 
           <div style={{ display: currentStep === 2 ? undefined : "none" }}>
             <BudgetStepInfo
-              task={task}
               disabled={isSubmitting || !canEdit}
               layoutFiles={layoutFiles}
               onLayoutFilesChange={setLayoutFiles}

@@ -20,15 +20,10 @@ import {
   IconUpload,
   IconX,
   IconArrowLeft,
-  IconTruck,
-  IconExternalLink,
 } from "@tabler/icons-react";
-import { formatCNPJ, formatDate, formatChassis } from "@/utils";
+import { formatCNPJ } from "@/utils";
 import { getCustomers } from "@/api-client";
 import { getApiBaseUrl } from "@/config/api";
-import { routes } from "@/constants";
-import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 
 interface ArtworkOption {
@@ -43,7 +38,6 @@ interface ArtworkOption {
 }
 
 interface BudgetStepInfoProps {
-  task?: any;
   disabled?: boolean;
   layoutFiles: FileWithPreview[];
   onLayoutFilesChange: (files: FileWithPreview[]) => void;
@@ -73,7 +67,6 @@ const GUARANTEE_OPTIONS = [
 ] as const;
 
 export function BudgetStepInfo({
-  task,
   disabled,
   layoutFiles,
   onLayoutFilesChange,
@@ -84,7 +77,6 @@ export function BudgetStepInfo({
 }: BudgetStepInfoProps) {
   const { setValue, getValues, control } = useFormContext();
   const fileViewer = useFileViewer();
-  const navigate = useNavigate();
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
   const [showLayoutUploadMode, setShowLayoutUploadMode] = useState(false);
   const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
@@ -355,61 +347,10 @@ export function BudgetStepInfo({
     );
   }, []);
 
-  // Build task info items (matching billing pattern)
-  const infoItems: { label: string; value: string }[] = task ? [
-    { label: "Logomarca", value: task.name || "-" },
-    ...(task.customer ? [{ label: "Cliente", value: task.customer.corporateName || task.customer.fantasyName }] : []),
-    ...(task.serialNumber ? [{ label: "Nº de Série", value: task.serialNumber }] : []),
-    ...(task.truck?.plate ? [{ label: "Placa", value: task.truck.plate }] : []),
-    ...(task.truck?.chassisNumber ? [{ label: "Chassi", value: formatChassis(task.truck.chassisNumber) }] : []),
-    ...(task.finishedAt ? [{ label: "Finalizado em", value: formatDate(task.finishedAt) }] : []),
-  ] : [];
-
   return (
     <div className="space-y-4">
-      {/* Top: Task Info (left) + Customer Selection (right) */}
-      <div className={`grid grid-cols-1 ${infoItems.length > 0 ? "lg:grid-cols-2" : ""} gap-4`}>
-        {/* Left: Task Overview - Read Only (only when task exists) */}
-        {infoItems.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <IconTruck className="h-4 w-4 text-muted-foreground" />
-                  Dados da Tarefa
-                </CardTitle>
-                {task?.id && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(
-                      task.status === "COMPLETED" || task.status === "CANCELLED"
-                        ? routes.production.history.details(task.id)
-                        : routes.production.preparation.details(task.id)
-                    )}
-                    className="gap-1.5 h-8"
-                  >
-                    <IconExternalLink className="h-3.5 w-3.5" />
-                    Ver Tarefa
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                {infoItems.map((item) => (
-                  <div key={item.label} className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                    <span className="text-sm text-muted-foreground">{item.label}</span>
-                    <span className="text-sm font-medium">{item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Right: Invoice-To Customers */}
-        <Card>
+      {/* Invoice-To Customers */}
+      <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <IconUsers className="h-4 w-4 text-muted-foreground" />
@@ -476,7 +417,6 @@ export function BudgetStepInfo({
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* Validity, Guarantee, Forecast, Simultaneous Tasks */}
       <Card>
