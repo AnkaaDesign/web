@@ -52,7 +52,7 @@ const taskBatchEditSchema = z.object({
             .nullable()
             .optional(),
           details: createDescriptionSchema(1, 1000, false).nullable().optional(),
-          entryDate: nullableDate.optional(),
+          forecastDate: nullableDate.optional(),
           term: nullableDate.optional(),
           startedAt: nullableDate.optional(),
           finishedAt: nullableDate.optional(),
@@ -108,7 +108,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                 plate: task.truck?.plate || "",
                 chassisNumber: task.truck?.chassisNumber || "",
                 details: task.details || "",
-                entryDate: task.entryDate ? new Date(task.entryDate) : null,
+                forecastDate: task.forecastDate ? new Date(task.forecastDate) : null,
                 term: task.term ? new Date(task.term) : null,
                 startedAt: task.startedAt ? new Date(task.startedAt) : null,
                 finishedAt: task.finishedAt ? new Date(task.finishedAt) : null,
@@ -139,7 +139,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
           plate: task.truck?.plate || "",
           chassisNumber: task.truck?.chassisNumber || "",
           details: task.details || "",
-          entryDate: task.entryDate ? new Date(task.entryDate) : null,
+          forecastDate: task.forecastDate ? new Date(task.forecastDate) : null,
           term: task.term ? new Date(task.term) : null,
           startedAt: task.startedAt ? new Date(task.startedAt) : null,
           finishedAt: task.finishedAt ? new Date(task.finishedAt) : null,
@@ -168,7 +168,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
           task.data.customerId !== originalTask.customerId ||
           task.data.sectorId !== originalTask.sectorId ||
           task.data.paintId !== originalTask.generalPainting?.id ||
-          task.data.entryDate?.toISOString() !== originalTask.entryDate ||
+          task.data.forecastDate?.toISOString() !== originalTask.forecastDate?.toISOString() ||
           task.data.term?.toISOString() !== originalTask.term ||
           task.data.startedAt?.toISOString() !== originalTask.startedAt ||
           task.data.finishedAt?.toISOString() !== originalTask.finishedAt;
@@ -265,7 +265,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                     <div className="px-3 py-2">Pintura Geral</div>
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-32">
-                    <div className="px-3 py-2">Data Entrada</div>
+                    <div className="px-3 py-2">Previsão</div>
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-40">
                     <div className="px-3 py-2">Prazo</div>
@@ -341,7 +341,7 @@ export function TaskBatchEditTable({ tasks, onCancel: _onCancel, onSubmit: _onSu
                         </TableCell>
                         <TableCell className="w-32 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <DateCell control={form.control} name={`tasks.${index}.data.entryDate`} placeholder="Data de entrada" />
+                            <DateCell control={form.control} name={`tasks.${index}.data.forecastDate`} placeholder="Data de previsão" />
                           </div>
                         </TableCell>
                         <TableCell className="w-40 p-0 !border-r-0">

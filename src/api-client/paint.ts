@@ -515,19 +515,16 @@ export class PaintFormulaComponentService {
   // Formulation Test Operations
   // =====================
 
-  async deductForFormulationTest(data: {
-    itemId: string;
-    weight: number;
-    formulaPaintId?: string;
-  }): Promise<{
+  async deductForFormulationTest(
+    data: { itemId: string; weight: number; formulaPaintId?: string },
+    options?: { suppressToast?: boolean },
+  ): Promise<{
     success: boolean;
     message: string;
-    data: {
-      unitsDeducted: number;
-      remainingQuantity: number;
-    };
+    data: { unitsDeducted: number; remainingQuantity: number };
   }> {
-    const response = await apiClient.post(`${this.basePath}/deduct-for-test`, data);
+    const config = options?.suppressToast ? ({ metadata: { suppressToast: true } } as any) : undefined;
+    const response = await apiClient.post(`${this.basePath}/deduct-for-test`, data, config);
     return response.data;
   }
 }

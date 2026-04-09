@@ -2,8 +2,8 @@ import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/compo
 import { toast } from "@/components/ui/sonner";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { formatDate, formatDateTime, getDurationBetweenDates } from "../../../../utils";
-import { TASK_STATUS, TASK_STATUS_LABELS, COMMISSION_STATUS_LABELS, COMMISSION_STATUS } from "../../../../constants";
+import { formatDate, formatDateTime, getDurationBetweenDates, formatCurrency, formatTaskMeasures } from "../../../../utils";
+import { TASK_STATUS, TASK_STATUS_LABELS, COMMISSION_STATUS_LABELS, COMMISSION_STATUS, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS, TASK_QUOTE_STATUS_LABELS, TASK_QUOTE_STATUS } from "../../../../constants";
 import { taskService } from "../../../../api-client";
 
 // Format date as dd/mm/yy for PDF export
@@ -118,23 +118,32 @@ interface TaskExportProps {
   selectedItems?: Set<string>;
 }
 
-// Column configuration for export - matching task-history-columns.tsx structure
+// Column configuration for export - IDs must match task-history-columns.tsx column IDs exactly
 const EXPORT_COLUMNS: ExportColumn<Task>[] = [
-  { id: "name", label: "Título", getValue: (task: Task) => task.name },
-  { id: "status", label: "Status", getValue: (task: Task) => TASK_STATUS_LABELS[task.status] || task.status },
+  { id: "name", label: "Logomarca", getValue: (task: Task) => task.name },
   { id: "customer.fantasyName", label: "Razão Social", getValue: (task: Task) => task.customer?.corporateName || task.customer?.fantasyName || "" },
-  { id: "identificador", label: "Identificador", getValue: (task: Task) => task.serialNumber || task.truck?.plate || "" },
+  { id: "responsibles", label: "Responsáveis", getValue: (task: Task) => task.responsibles?.map((r) => r.name).join(", ") || "" },
+  { id: "measures", label: "Medidas", getValue: (task: Task) => formatTaskMeasures(task) },
+  { id: "generalPainting", label: "Pintura Geral", getValue: (task: Task) => task.generalPainting?.name || "" },
   { id: "sector.name", label: "Setor", getValue: (task: Task) => task.sector?.name || "" },
+  { id: "identificador", label: "Identificador", getValue: (task: Task) => task.serialNumber || task.truck?.plate || "" },
+  { id: "chassisNumber", label: "Nº Chassi", getValue: (task: Task) => task.truck?.chassisNumber || "" },
   {
-    id: "serviceOrders",
-    label: "Serviços",
-    getValue: (task: Task) => task.serviceOrders?.map((s) => s.service?.name || s.description || "").join(", ") || "",
+    id: "truckCategory",
+    label: "Categoria do Caminhão",
+    getValue: (task: Task) => (task.truck?.category ? TRUCK_CATEGORY_LABELS[task.truck.category] || task.truck.category : ""),
   },
-  { id: "entryDate", label: "Data de Entrada", getValue: (task: Task) => (task.entryDate ? formatDate(new Date(task.entryDate)) : "") },
-  { id: "forecastDate", label: "Previsão", getValue: (task: Task) => (task.forecastDate ? formatDate(new Date(task.forecastDate)) : "") },
-  { id: "term", label: "Prazo", getValue: (task: Task) => (task.term ? formatDate(new Date(task.term)) : "") },
+  {
+    id: "implementType",
+    label: "Tipo de Implemento",
+    getValue: (task: Task) => (task.truck?.implementType ? IMPLEMENT_TYPE_LABELS[task.truck.implementType] || task.truck.implementType : ""),
+  },
+  { id: "forecastDate", label: "Previsão", getValue: (task: Task) => (task.forecastDate ? formatDateTime(new Date(task.forecastDate)) : "") },
+  { id: "entryDate", label: "Data de Entrada", getValue: (task: Task) => (task.entryDate ? formatDateTime(new Date(task.entryDate)) : "") },
   { id: "startedAt", label: "Iniciado em", getValue: (task: Task) => (task.startedAt ? formatDateTime(new Date(task.startedAt)) : "") },
   { id: "finishedAt", label: "Finalizado em", getValue: (task: Task) => (task.finishedAt ? formatDateTime(new Date(task.finishedAt)) : "") },
+  { id: "term", label: "Prazo", getValue: (task: Task) => (task.term ? formatDate(new Date(task.term)) : "") },
+  { id: "createdAt", label: "Criado em", getValue: (task: Task) => formatDate(new Date(task.createdAt)) },
   {
     id: "duration",
     label: "Duração",
@@ -145,23 +154,31 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
       return "";
     },
   },
+  { id: "price", label: "Valor Total", getValue: (task: Task) => (task.quote?.total ? formatCurrency(task.quote.total) : "") },
   {
-    id: "createdBy.name",
-    label: "Criado por",
+    id: "paymentStatus",
+    label: "Status Faturamento",
     getValue: (task: Task) => {
-      return task.createdBy?.name || "";
+      const status = task.quote?.status as TASK_QUOTE_STATUS | undefined;
+      return status ? TASK_QUOTE_STATUS_LABELS[status] || status : "";
     },
   },
-  { id: "observation", label: "Observação", getValue: (task: Task) => task.observation?.description || "" },
-  { id: "generalPainting.name", label: "Pintura Geral", getValue: (task: Task) => task.generalPainting?.name || "" },
-  { id: "details", label: "Detalhes", getValue: (task: Task) => task.details || "" },
+  {
+    id: "invoiceToCustomers",
+    label: "Faturar Para",
+    getValue: (task: Task) => {
+      const configs = (task as any).quote?.customerConfigs;
+      if (!configs || configs.length === 0) return "";
+      return configs.map((c: any) => c.customer?.corporateName || c.customer?.fantasyName || "").filter(Boolean).join(", ");
+    },
+  },
   { id: "commission", label: "Comissão", getValue: (task: Task) => task.commission ? COMMISSION_STATUS_LABELS[task.commission] || task.commission : "" },
-  { id: "createdAt", label: "Criado em", getValue: (task: Task) => formatDate(new Date(task.createdAt)) },
-  { id: "updatedAt", label: "Atualizado em", getValue: (task: Task) => formatDate(new Date(task.updatedAt)) },
+  { id: "details", label: "Detalhes", getValue: (task: Task) => task.details || "" },
+  { id: "observation", label: "Observação", getValue: (task: Task) => task.observation?.description || "" },
 ];
 
 // Default visible columns for agenda
-const DEFAULT_VISIBLE_COLUMNS = new Set(["name", "customer.fantasyName", "identificador", "forecastDate", "serviceOrders"]);
+const DEFAULT_VISIBLE_COLUMNS = new Set(["name", "customer.fantasyName", "identificador", "forecastDate"]);
 
 export function TaskExport({ className, filters = {}, currentItems = [], totalRecords = 0, visibleColumns, selectedItems }: TaskExportProps) {
   const fetchAllItems = async (): Promise<Task[]> => {

@@ -3,7 +3,7 @@ import { PaintForm } from "@/components/painting/form/paint-form";
 import type { PaintFormRef } from "@/components/painting/form/paint-form";
 import { usePaintFormulaMutations, usePaintType } from "../../../hooks";
 import { createPaint } from "../../../api-client";
-import { paintFormulaComponentService } from "../../../api-client/paint";
+import { paintFormulaComponentService, notify } from "../../../api-client";
 import { routes, FAVORITE_PAGES } from "../../../constants";
 import type { PaintCreateFormData, PaintFormulaCreateFormData } from "../../../schemas";
 import type { PaintFormula } from "../../../types";
@@ -88,28 +88,23 @@ export function CatalogCreatePage() {
         }
       }
 
-      // Deduct stock for all formula components after successful creation
-      if (formulas && formulas.length > 0) {
-        for (const formula of formulas) {
-          const validComponents = formula.components?.filter((c) => {
-            const weight = c.weightInGrams || c.weight || 0;
-            return c.itemId && weight > 0;
-          }) || [];
+      // Deduct stock for all formula components — run in parallel, one summary toast at the end
+      const allDeductComponents = (formulas || []).flatMap((formula) =>
+        (formula.components || [])
+          .filter((c) => { const w = c.weightInGrams || c.weight || 0; return c.itemId && w > 0; })
+          .map((c) => ({ itemId: c.itemId, weight: c.weightInGrams || c.weight || 0 }))
+      );
 
-          for (const component of validComponents) {
-            const weight = component.weightInGrams || component.weight || 0;
-            if (weight > 0 && component.itemId) {
-              try {
-                await paintFormulaComponentService.deductForFormulationTest({
-                  itemId: component.itemId,
-                  weight,
-                });
-              } catch {
-                // Stock deduction is best-effort, don't block navigation
-              }
-            }
-          }
-        }
+      if (allDeductComponents.length > 0) {
+        await Promise.allSettled(
+          allDeductComponents.map((c) =>
+            paintFormulaComponentService.deductForFormulationTest(
+              { itemId: c.itemId, weight: c.weight },
+              { suppressToast: true },
+            )
+          )
+        );
+        notify.success("Estoque atualizado", `${allDeductComponents.length} componente(s) deduzido(s) do estoque`);
       }
 
       navigate(routes.painting.catalog.root, { replace: true });

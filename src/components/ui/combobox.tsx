@@ -92,6 +92,9 @@ interface ComboboxProps<TData = ComboboxOption> {
 
   // Fixed content rendered between search and scrollable list
   fixedTopContent?: React.ReactNode | ((searchTerm: string) => React.ReactNode);
+
+  // Open on mount (for auto-opening newly added rows)
+  defaultOpen?: boolean;
 }
 
 export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
@@ -136,8 +139,9 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   showCount = true,
   hideDefaultBadges = false,
   fixedTopContent,
+  defaultOpen = false,
 }: ComboboxProps<TData>) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [search, setSearch] = useState("");
 
   // Log search state changes - commented to reduce noise

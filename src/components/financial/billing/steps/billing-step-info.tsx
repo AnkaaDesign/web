@@ -4,23 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
-import { formatDate, formatChassis, formatCNPJ } from "@/utils";
-import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
-import type { TRUCK_CATEGORY, IMPLEMENT_TYPE } from "@/constants/enums";
-import { IconTruck, IconUsers, IconAlertTriangle, IconTrash, IconExternalLink } from "@tabler/icons-react";
+import { formatCNPJ } from "@/utils";
+import { IconUsers, IconAlertTriangle, IconTrash } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { getCustomers } from "@/api-client/customer";
-import { useNavigate } from "react-router-dom";
-import { routes } from "@/constants";
 
 interface BillingStepInfoProps {
-  task: any;
+  task?: any;
   disabled?: boolean;
   customersCache: React.MutableRefObject<Map<string, any>>;
 }
 
-export function BillingStepInfo({ task, disabled, customersCache }: BillingStepInfoProps) {
-  const navigate = useNavigate();
+export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoProps) {
   const { control, setValue, getValues } = useFormContext();
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
 
@@ -133,72 +128,9 @@ export function BillingStepInfo({ task, disabled, customersCache }: BillingStepI
     return { valid: missing.length === 0 };
   };
 
-  // Build task info items - stacked, full width
-  const infoItems: { label: string; value: string; mono?: boolean }[] = [
-    { label: "Logomarca", value: task.name },
-  ];
-  if (task.customer) {
-    infoItems.push({ label: "Cliente", value: task.customer.corporateName || task.customer.fantasyName });
-  }
-  if (task.serialNumber) {
-    infoItems.push({ label: "Nº de Série", value: task.serialNumber });
-  }
-  if (task.truck?.plate) {
-    infoItems.push({ label: "Placa", value: task.truck.plate });
-  }
-  if (task.truck?.chassisNumber) {
-    infoItems.push({ label: "Chassi", value: formatChassis(task.truck.chassisNumber), mono: true });
-  }
-  if (task.truck?.category) {
-    infoItems.push({ label: "Categoria", value: TRUCK_CATEGORY_LABELS[task.truck.category as TRUCK_CATEGORY] || task.truck.category });
-  }
-  if (task.truck?.implementType) {
-    infoItems.push({ label: "Implemento", value: IMPLEMENT_TYPE_LABELS[task.truck.implementType as IMPLEMENT_TYPE] || task.truck.implementType });
-  }
-  if (task.finishedAt) {
-    infoItems.push({ label: "Finalizado em", value: formatDate(task.finishedAt) });
-  }
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* Left: Task Overview - Read Only, stacked */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <IconTruck className="h-4 w-4 text-muted-foreground" />
-              Dados da Tarefa
-            </CardTitle>
-            {task?.id && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate(
-                  task.status === "COMPLETED" || task.status === "CANCELLED"
-                    ? routes.production.history.details(task.id)
-                    : routes.production.preparation.details(task.id)
-                )}
-                className="gap-1.5 h-8"
-              >
-                <IconExternalLink className="h-3.5 w-3.5" />
-                Ver Tarefa
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-1">
-            {infoItems.map((item) => (
-              <div key={item.label} className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                <span className="text-sm text-muted-foreground">{item.label}</span>
-                <span className={`text-sm font-medium ${item.mono ? '' : ''}`}>{item.value}</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Right: Invoice-To Customers */}
+    <div>
+      {/* Invoice-To Customers */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -293,3 +225,4 @@ export function BillingStepInfo({ task, disabled, customersCache }: BillingStepI
     </div>
   );
 }
+

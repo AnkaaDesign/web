@@ -10,6 +10,8 @@ import {
   IconUser,
   IconNotes,
   IconInfoCircle,
+  IconHash,
+  IconId,
 } from "@tabler/icons-react";
 import {
   TRUCK_CATEGORY,
@@ -33,6 +35,7 @@ import { TaskNameAutocomplete } from "@/components/production/task/form/task-nam
 import { ServiceSelectorAutoGrouped } from "@/components/production/task/form/service-selector-auto-grouped";
 import { GeneralPaintingSelector } from "@/components/production/task/form/general-painting-selector";
 import { ResponsibleManager } from "@/components/administration/customer/responsible";
+import { Input } from "@/components/ui/input";
 import { FileUploadField } from "@/components/common/file";
 import { ArtworkFileUploadField } from "@/components/production/task/form/artwork-file-upload-field";
 import type { FileWithPreview } from "@/components/common/file";
@@ -40,6 +43,7 @@ import type { ResponsibleRowData } from "@/types/responsible";
 
 interface BudgetStepTaskProps {
   disabled?: boolean;
+  isEditMode?: boolean;
   responsibleRows: ResponsibleRowData[];
   onResponsibleRowsChange: (rows: ResponsibleRowData[]) => void;
   showResponsibleErrors: boolean;
@@ -52,6 +56,7 @@ interface BudgetStepTaskProps {
 
 export function BudgetStepTask({
   disabled,
+  isEditMode = false,
   responsibleRows,
   onResponsibleRowsChange,
   showResponsibleErrors,
@@ -87,15 +92,16 @@ export function BudgetStepTask({
     }
   }, [openAccordion, scrollToAccordion]);
 
-  // Calculate how many tasks will be created
+  // Calculate how many tasks will be created (create mode only)
   const taskCount = useMemo(() => {
+    if (isEditMode) return 1;
     const platesCount = plates.length;
     const serialNumbersCount = serialNumbers.length;
     if (platesCount > 0 && serialNumbersCount > 0) return platesCount * serialNumbersCount;
     if (platesCount > 0) return platesCount;
     if (serialNumbersCount > 0) return serialNumbersCount;
     return 1;
-  }, [plates, serialNumbers]);
+  }, [isEditMode, plates, serialNumbers]);
 
   return (
     <div className={openAccordion === 'base-files' || openAccordion === 'artworks' ? 'pb-64' : ''}>
@@ -191,19 +197,90 @@ export function BudgetStepTask({
                 </div>
 
                 {/* Plates + Serial Numbers */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <SerialNumberRangeInput
-                    control={control}
-                    disabled={disabled || plates.length > 1}
-                  />
-                  <PlateTagsInput
-                    control={control}
-                    disabled={disabled || serialNumbers.length > 1}
-                  />
-                </div>
+                {isEditMode ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <FormField
+                      control={control}
+                      name="serialNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <IconHash className="h-4 w-4" />
+                            Número de Série
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              value={field.value || ""}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              placeholder="Ex: ABC-123"
+                              disabled={disabled}
+                              className="bg-transparent"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={control}
+                      name="plate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <IconTruck className="h-4 w-4" />
+                            Placa
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              value={field.value || ""}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              placeholder="Ex: ABC-1234"
+                              disabled={disabled}
+                              className="bg-transparent"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={control}
+                      name="chassisNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <IconId className="h-4 w-4" />
+                            Chassi
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              value={field.value || ""}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              placeholder="Ex: 9BW..."
+                              disabled={disabled}
+                              className="bg-transparent font-mono"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <SerialNumberRangeInput
+                      control={control}
+                      disabled={disabled || plates.length > 1}
+                    />
+                    <PlateTagsInput
+                      control={control}
+                      disabled={disabled || serialNumbers.length > 1}
+                    />
+                  </div>
+                )}
 
-                {/* Task Count Preview */}
-                {plates.length > 0 && serialNumbers.length > 0 && taskCount > 1 && (
+                {/* Task Count Preview - create mode only */}
+                {!isEditMode && plates.length > 0 && serialNumbers.length > 0 && taskCount > 1 && (
                   <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                     <div className="flex items-start gap-3">
                       <IconInfoCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />

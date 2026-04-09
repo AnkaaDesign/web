@@ -7,8 +7,11 @@ import {
   IconLoader2,
   IconCheck,
 } from "@tabler/icons-react";
-import { routes } from "@/constants";
-import { useTaskDetail } from "@/hooks";
+import {
+  routes,
+  IMPLEMENT_TYPE,
+} from "@/constants";
+import { useTaskDetail, useTaskMutations } from "@/hooks";
 import {
   useTaskQuoteByTask,
   useCreateTaskQuote,
@@ -20,6 +23,7 @@ import {
   canViewQuote,
   canEditQuote,
 } from "@/utils/permissions/quote-permissions";
+import { validateResponsibleRows } from "@/components/administration/customer/responsible";
 import { useAuth } from "@/contexts/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/page-header";
@@ -32,7 +36,10 @@ import { getCustomers } from "@/api-client";
 import { customerService } from "@/api-client/customer";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import type { FileWithPreview } from "@/components/common/file";
+import type { ResponsibleRowData } from "@/types/responsible";
+import { ResponsibleRole } from "@/types/responsible";
 // Step components
+import { BudgetStepTask } from "@/components/financial/budget/steps/budget-step-task";
 import { BudgetStepInfo } from "@/components/financial/budget/steps/budget-step-info";
 import { BudgetStepServices } from "@/components/financial/budget/steps/budget-step-services";
 import { BudgetStepCustomerPayment } from "@/components/financial/budget/steps/budget-step-customer-payment";
@@ -75,6 +82,7 @@ export const FinancialBudgetDetailPage = () => {
   // Mutations
   const createQuoteMutation = useCreateTaskQuote();
   const updateQuoteMutation = useUpdateTaskQuote();
+  const { updateAsync: updateTaskAsync } = useTaskMutations();
 
   // Permissions
   const userRole = user?.sector?.privileges || "";
@@ -90,10 +98,49 @@ export const FinancialBudgetDetailPage = () => {
     new Map(),
   );
 
-  // Form - FLAT fields (no `quote.` prefix)
+  // Task-specific state
+  const [showResponsibleErrors, setShowResponsibleErrors] = useState(false);
+  const [responsibleRows, setResponsibleRows] = useState<ResponsibleRowData[]>([]);
+  const [artworkFiles, setArtworkFiles] = useState<FileWithPreview[]>([]);
+  const [artworkStatuses, setArtworkStatuses] = useState<Record<string, string>>({});
+
+  const handleArtworkFilesChange = useCallback((files: FileWithPreview[]) => {
+    setArtworkFiles(files);
+  }, []);
+
+  const handleArtworkStatusChange = useCallback((fileId: string, status: string) => {
+    setArtworkStatuses((prev) => ({ ...prev, [fileId]: status }));
+  }, []);
+
+  const handleResponsibleRowsChange = useCallback(
+    (rows: ResponsibleRowData[]) => {
+      setResponsibleRows(rows);
+      if (showResponsibleErrors && validateResponsibleRows(rows)) {
+        setShowResponsibleErrors(false);
+      }
+    },
+    [showResponsibleErrors],
+  );
+
+  // Form - task fields + quote fields (flat, no prefix)
   const form = useForm({
     mode: "onChange",
     defaultValues: {
+      // Task fields
+      name: "" as string,
+      customerId: "" as string,
+      plate: "" as string,
+      serialNumber: "" as string,
+      chassisNumber: "" as string,
+      category: "" as string,
+      implementType: IMPLEMENT_TYPE.REFRIGERATED as string,
+      forecastDate: null as Date | null,
+      term: null as Date | null,
+      details: "" as string,
+      paintId: null as string | null,
+      paintIds: [] as string[],
+      serviceOrders: [] as any[],
+      // Quote fields
       expiresAt: getDefaultExpiresAt(),
       status: "PENDING" as string,
       subtotal: 0,
@@ -115,11 +162,53 @@ export const FinancialBudgetDetailPage = () => {
     },
   });
 
-  // Populate form with existing quote data
+  // Populate form when task or quote data loads
   useEffect(() => {
-    if (!existingQuote) return;
+    if (!task) return;
+
+    const taskFields = {
+      name: task.name || "",
+      customerId: task.customerId || "",
+      plate: task.truck?.plate || "",
+      serialNumber: task.serialNumber || "",
+      chassisNumber: task.truck?.chassisNumber || "",
+      category: task.truck?.category || "",
+      implementType: task.truck?.implementType || IMPLEMENT_TYPE.REFRIGERATED,
+      forecastDate: task.forecastDate ? new Date(task.forecastDate) : null,
+      term: task.term ? new Date(task.term) : null,
+      details: task.details || "",
+      serviceOrders: task.serviceOrders || [],
+      paintId: task.paintId || null,
+      paintIds: task.paintIds?.map((p: any) => p.id || p) || [],
+    };
+
+    if (!existingQuote) {
+      form.reset({
+        ...taskFields,
+        expiresAt: getDefaultExpiresAt(),
+        status: "PENDING",
+        subtotal: 0,
+        total: 0,
+        guaranteeYears: null,
+        customGuaranteeText: null,
+        customForecastDays: null,
+        layoutFileId: null,
+        simultaneousTasks: null,
+        customerConfigs: [],
+        services: [
+          {
+            description: "",
+            amount: null,
+            observation: null,
+            invoiceToCustomerId: null,
+          },
+        ],
+      });
+      return;
+    }
 
     form.reset({
+      ...taskFields,
       expiresAt: existingQuote.expiresAt
         ? new Date(existingQuote.expiresAt)
         : getDefaultExpiresAt(),
@@ -138,7 +227,8 @@ export const FinancialBudgetDetailPage = () => {
           total: c.total ?? 0,
           paymentCondition: c.paymentCondition || null,
           customPaymentText: c.customPaymentText || null,
-          generateInvoice: c.generateInvoice !== undefined ? c.generateInvoice : true,
+          generateInvoice:
+            c.generateInvoice !== undefined ? c.generateInvoice : true,
           orderNumber: c.orderNumber || null,
           responsibleId: c.responsibleId || null,
           customerData: {
@@ -213,58 +303,129 @@ export const FinancialBudgetDetailPage = () => {
       const partialCustomers = existingQuote.customerConfigs
         .map((c: any) => c.customer)
         .filter(Boolean);
-      partialCustomers.forEach((c: any) => customersCache.current.set(c.id, c));
-      setSelectedCustomers(new Map(partialCustomers.map((c: any) => [c.id, c])));
+      partialCustomers.forEach((c: any) =>
+        customersCache.current.set(c.id, c),
+      );
+      setSelectedCustomers(
+        new Map(partialCustomers.map((c: any) => [c.id, c])),
+      );
 
       const customerIds = partialCustomers.map((c: any) => c.id);
-      getCustomers({ where: { id: { in: customerIds } }, take: customerIds.length })
+      getCustomers({
+        where: { id: { in: customerIds } },
+        take: customerIds.length,
+      })
         .then((response) => {
           const fullCustomers = response.data || [];
           if (fullCustomers.length > 0) {
-            fullCustomers.forEach((c: any) => customersCache.current.set(c.id, c));
-            setSelectedCustomers(new Map(fullCustomers.map((c: any) => [c.id, c])));
+            fullCustomers.forEach((c: any) =>
+              customersCache.current.set(c.id, c),
+            );
+            setSelectedCustomers(
+              new Map(fullCustomers.map((c: any) => [c.id, c])),
+            );
 
             // Update form customerData with full customer info
             const currentConfigs = form.getValues("customerConfigs");
             currentConfigs.forEach((config: any, idx: number) => {
-              const full = fullCustomers.find((c: any) => c.id === config.customerId);
+              const full = fullCustomers.find(
+                (c: any) => c.id === config.customerId,
+              );
               if (full) {
                 const d = config.customerData || {};
-                form.setValue(`customerConfigs.${idx}.customerData`, {
-                  corporateName: d.corporateName || full.corporateName || "",
-                  fantasyName: d.fantasyName || full.fantasyName || "",
-                  cnpj: d.cnpj || full.cnpj || "",
-                  cpf: d.cpf || full.cpf || "",
-                  address: d.address || full.address || "",
-                  addressNumber: d.addressNumber || full.addressNumber || "",
-                  addressComplement: d.addressComplement || full.addressComplement || "",
-                  neighborhood: d.neighborhood || full.neighborhood || "",
-                  city: d.city || full.city || "",
-                  state: d.state || full.state || "",
-                  zipCode: d.zipCode || full.zipCode || "",
-                  stateRegistration: d.stateRegistration || full.stateRegistration || "",
-                  streetType: d.streetType || full.streetType || null,
-                });
+                form.setValue(
+                  `customerConfigs.${idx}.customerData`,
+                  {
+                    corporateName: d.corporateName || full.corporateName || "",
+                    fantasyName: d.fantasyName || full.fantasyName || "",
+                    cnpj: d.cnpj || full.cnpj || "",
+                    cpf: d.cpf || full.cpf || "",
+                    address: d.address || full.address || "",
+                    addressNumber:
+                      d.addressNumber || full.addressNumber || "",
+                    addressComplement:
+                      d.addressComplement || full.addressComplement || "",
+                    neighborhood: d.neighborhood || full.neighborhood || "",
+                    city: d.city || full.city || "",
+                    state: d.state || full.state || "",
+                    zipCode: d.zipCode || full.zipCode || "",
+                    stateRegistration:
+                      d.stateRegistration || full.stateRegistration || "",
+                    streetType: d.streetType || full.streetType || null,
+                  },
+                );
               }
             });
           }
         })
-        .catch(() => { /* keep partial data */ });
+        .catch(() => {
+          /* keep partial data */
+        });
     }
-  }, [existingQuote, form]);
+  }, [task, existingQuote]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Initialize task-specific state (responsibles, artworks) when task loads
+  useEffect(() => {
+    if (!task) return;
+
+    // Responsibles
+    if (task.responsibles?.length > 0) {
+      setResponsibleRows(
+        task.responsibles.map((r: any) => ({
+          id: r.id,
+          name: r.name || "",
+          phone: r.phone || "",
+          email: r.email || "",
+          role: (r.role || "COMMERCIAL") as ResponsibleRole,
+          isActive: r.isActive ?? true,
+          isNew: false,
+          isEditing: false,
+          isSaving: false,
+          error: null,
+        })),
+      );
+    }
+
+    // Artworks
+    if (task.artworks?.length > 0) {
+      const artworkFilesList = task.artworks.map((artwork: any) => {
+        const file = artwork.file || artwork;
+        return {
+          id: file.id,
+          name: file.filename || file.originalName || "arquivo",
+          size: file.size || 0,
+          type: file.mimetype || "image/jpeg",
+          lastModified: Date.now(),
+          uploaded: true,
+          uploadProgress: 100,
+          uploadedFileId: file.id,
+          thumbnailUrl: file.thumbnailUrl,
+        } as FileWithPreview;
+      });
+      setArtworkFiles(artworkFilesList);
+
+      const statuses: Record<string, string> = {};
+      task.artworks.forEach((artwork: any) => {
+        const fileId = (artwork.file || artwork).id;
+        if (artwork.status) statuses[fileId] = artwork.status;
+      });
+      setArtworkStatuses(statuses);
+    }
+  }, [task]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dynamic steps based on customer count
   const customerConfigs = form.watch("customerConfigs");
   const steps = useMemo(() => {
     const base = [
-      { id: 1, name: "Informações", description: "Dados da tarefa e clientes" },
-      { id: 2, name: "Serviços", description: "Serviços e preços" },
+      { id: 1, name: "Tarefa", description: "Dados da tarefa" },
+      { id: 2, name: "Informações", description: "Prazos e clientes" },
+      { id: 3, name: "Serviços", description: "Serviços e preços" },
     ];
     if (Array.isArray(customerConfigs)) {
       customerConfigs.forEach((config: any, i: number) => {
         const customer = customersCache.current.get(config?.customerId);
         base.push({
-          id: 3 + i,
+          id: 4 + i,
           name: `Cliente ${i + 1}`,
           description: customer?.fantasyName || "Cliente",
         });
@@ -292,6 +453,18 @@ export const FinancialBudgetDetailPage = () => {
     const data = form.getValues();
     switch (currentStep) {
       case 1: {
+        const hasIdentifier =
+          data.name ||
+          data.customerId ||
+          data.plate ||
+          data.serialNumber;
+        if (!hasIdentifier) {
+          toast.error("Preencha: Nome, Cliente, Placa ou Nº de série.");
+          return false;
+        }
+        return true;
+      }
+      case 2: {
         if (!data.customerConfigs || data.customerConfigs.length === 0) {
           toast.error("Selecione pelo menos um cliente.");
           return false;
@@ -302,7 +475,7 @@ export const FinancialBudgetDetailPage = () => {
         }
         return true;
       }
-      case 2: {
+      case 3: {
         const validServices = (data.services || []).filter(
           (s: any) => s.description?.trim(),
         );
@@ -334,24 +507,37 @@ export const FinancialBudgetDetailPage = () => {
 
     setIsSubmitting(true);
     try {
-      // Filter empty services
-      const validServices = (data.services || []).filter(
-        (item: any) => item.description && item.description.trim().length > 0,
-      );
-
-      if (validServices.length === 0) {
-        toast.error("Adicione pelo menos um serviço ao orçamento.");
-        setIsSubmitting(false);
-        return;
+      // 1. Upload new artwork files
+      const uploadedArtworkIds: string[] = [];
+      const remappedArtworkStatuses: Record<string, string> = {};
+      for (const file of artworkFiles) {
+        if (file.uploaded && file.uploadedFileId) {
+          uploadedArtworkIds.push(file.uploadedFileId);
+          if (artworkStatuses[file.id]) {
+            remappedArtworkStatuses[file.uploadedFileId] =
+              artworkStatuses[file.id];
+          }
+        } else if (!file.error) {
+          try {
+            const response = await uploadSingleFile(file, {
+              fileContext: "artwork",
+            });
+            if (response.success && response.data) {
+              uploadedArtworkIds.push(response.data.id);
+              if (artworkStatuses[file.id]) {
+                remappedArtworkStatuses[response.data.id] =
+                  artworkStatuses[file.id];
+              }
+            }
+          } catch (error: any) {
+            toast.error(
+              `Erro ao enviar artwork ${file.name}: ${error.message}`,
+            );
+          }
+        }
       }
 
-      if (!data.expiresAt) {
-        toast.error("A data de validade é obrigatória.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Upload new layout files
+      // 2. Upload new layout files
       let layoutFileId = data.layoutFileId;
       const newLayoutFiles = layoutFiles.filter((f) => !f.uploaded);
       if (newLayoutFiles.length > 0) {
@@ -367,7 +553,69 @@ export const FinancialBudgetDetailPage = () => {
         }
       }
 
-      // Update customer data (address, CNPJ, etc.)
+      // 3. Build responsible data
+      const existingRepIds = responsibleRows
+        .filter((row) => !row.isNew && row.id && !row.id.startsWith("temp-"))
+        .map((row) => row.id);
+      const newResponsibles = responsibleRows
+        .filter(
+          (row) => row.isNew && row.name?.trim() && row.phone?.trim(),
+        )
+        .map((row) => ({
+          name: row.name.trim(),
+          phone: row.phone.trim(),
+          email: row.email?.trim() || undefined,
+          role: row.role,
+          isActive: row.isActive,
+          customerId: data.customerId || undefined,
+        }));
+
+      // 4. Update task
+      const serviceOrders = (data.serviceOrders || []).filter(
+        (so: any) => so?.description?.trim()?.length >= 3,
+      );
+      const taskUpdateData: any = {
+        name: data.name || undefined,
+        customerId: data.customerId || undefined,
+        details: data.details || undefined,
+        forecastDate: data.forecastDate || undefined,
+        term: data.term || undefined,
+        paintId: data.paintId || null,
+        paintIds:
+          data.paintIds && data.paintIds.length > 0
+            ? data.paintIds
+            : undefined,
+        serialNumber: data.serialNumber || null,
+        serviceOrders: serviceOrders.length > 0 ? serviceOrders : undefined,
+        artworkIds:
+          uploadedArtworkIds.length > 0 ? uploadedArtworkIds : undefined,
+        artworkStatuses:
+          Object.keys(remappedArtworkStatuses).length > 0
+            ? remappedArtworkStatuses
+            : undefined,
+        responsibleIds:
+          existingRepIds.length > 0 ? existingRepIds : undefined,
+        newResponsibles:
+          newResponsibles.length > 0 ? newResponsibles : undefined,
+        truck: {
+          plate: data.plate || undefined,
+          chassisNumber: data.chassisNumber || undefined,
+          category: data.category || undefined,
+          implementType: data.implementType || undefined,
+        },
+      };
+
+      try {
+        await updateTaskAsync({ id: taskId, data: taskUpdateData });
+      } catch (error: any) {
+        toast.error(
+          error?.response?.data?.message || "Erro ao atualizar tarefa.",
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 5. Update customer data (address, CNPJ, etc.)
       for (const config of data.customerConfigs || []) {
         if (config.customerData && config.customerId) {
           try {
@@ -376,19 +624,41 @@ export const FinancialBudgetDetailPage = () => {
               cnpj: config.customerData.cnpj || undefined,
               cpf: config.customerData.cpf || undefined,
               address: config.customerData.address || undefined,
-              addressNumber: config.customerData.addressNumber || undefined,
-              addressComplement: config.customerData.addressComplement || undefined,
+              addressNumber:
+                config.customerData.addressNumber || undefined,
+              addressComplement:
+                config.customerData.addressComplement || undefined,
               neighborhood: config.customerData.neighborhood || undefined,
               city: config.customerData.city || undefined,
               state: config.customerData.state || undefined,
               zipCode: config.customerData.zipCode || undefined,
-              stateRegistration: config.customerData.stateRegistration || undefined,
+              stateRegistration:
+                config.customerData.stateRegistration || undefined,
               streetType: config.customerData.streetType || undefined,
             });
           } catch (err: any) {
-            toast.error(`Erro ao atualizar cliente: ${err?.message || "Erro desconhecido"}`);
+            toast.error(
+              `Erro ao atualizar cliente: ${err?.message || "Erro desconhecido"}`,
+            );
           }
         }
+      }
+
+      // 6. Validate and save quote
+      const validServices = (data.services || []).filter(
+        (item: any) => item.description && item.description.trim().length > 0,
+      );
+
+      if (validServices.length === 0) {
+        toast.error("Adicione pelo menos um serviço ao orçamento.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!data.expiresAt) {
+        toast.error("A data de validade é obrigatória.");
+        setIsSubmitting(false);
+        return;
       }
 
       const quoteData: any = {
@@ -421,12 +691,12 @@ export const FinancialBudgetDetailPage = () => {
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
       toast.success(
         existingQuote
-          ? "Orçamento atualizado com sucesso!"
-          : "Orçamento criado com sucesso!",
+          ? "Tarefa e orçamento atualizados com sucesso!"
+          : "Tarefa e orçamento criados com sucesso!",
       );
       navigate(-1);
     } catch (error: any) {
-      console.error("Error saving quote:", error);
+      console.error("Error saving budget:", error);
       toast.error(
         error?.response?.data?.message || "Erro ao salvar orçamento.",
       );
@@ -438,9 +708,13 @@ export const FinancialBudgetDetailPage = () => {
     taskId,
     existingQuote,
     layoutFiles,
+    artworkFiles,
+    artworkStatuses,
+    responsibleRows,
     queryClient,
     createQuoteMutation,
     updateQuoteMutation,
+    updateTaskAsync,
     navigate,
   ]);
 
@@ -464,7 +738,9 @@ export const FinancialBudgetDetailPage = () => {
 
   // Build header info
   const taskName = task?.name || task?.truck?.plate || "Tarefa";
-  const taskDisplayName = [taskName, task?.serialNumber || task?.truck?.plate].filter(Boolean).join(" - ");
+  const taskDisplayName = [taskName, task?.serialNumber || task?.truck?.plate]
+    .filter(Boolean)
+    .join(" - ");
 
   // Loading state
   if (taskLoading || quoteLoading) {
@@ -480,10 +756,7 @@ export const FinancialBudgetDetailPage = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
         <p className="text-muted-foreground">Tarefa não encontrada.</p>
-        <Button
-          variant="outline"
-          onClick={() => navigate(-1)}
-        >
+        <Button variant="outline" onClick={() => navigate(-1)}>
           <IconArrowLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>
@@ -580,14 +853,29 @@ export const FinancialBudgetDetailPage = () => {
               ]
             : []),
         ]}
-        backButton={{ onClick: () => navigate(-1) }}
       />
 
       <FormSteps steps={steps} currentStep={currentStep} />
 
       <div className="flex-1 overflow-y-auto pb-6">
         <FormProvider {...form}>
-          {currentStep === 1 && (
+          {/* Steps 1–3 stay mounted (hidden via CSS) to preserve useFieldArray state */}
+          <div style={{ display: currentStep === 1 ? undefined : "none" }}>
+            <BudgetStepTask
+              isEditMode
+              disabled={isSubmitting || !canEdit}
+              responsibleRows={responsibleRows}
+              onResponsibleRowsChange={handleResponsibleRowsChange}
+              showResponsibleErrors={showResponsibleErrors}
+              baseFiles={[]}
+              onBaseFilesChange={() => {}}
+              artworkFiles={artworkFiles}
+              onArtworkFilesChange={handleArtworkFilesChange}
+              onArtworkStatusChange={handleArtworkStatusChange}
+            />
+          </div>
+
+          <div style={{ display: currentStep === 2 ? undefined : "none" }}>
             <BudgetStepInfo
               task={task}
               disabled={isSubmitting || !canEdit}
@@ -598,32 +886,35 @@ export const FinancialBudgetDetailPage = () => {
               selectedCustomers={selectedCustomers}
               setSelectedCustomers={setSelectedCustomers}
             />
-          )}
+          </div>
 
-          {currentStep === 2 && (
+          <div style={{ display: currentStep === 3 ? undefined : "none" }}>
             <BudgetStepServices
               task={task}
               disabled={isSubmitting || !canEdit}
               selectedCustomers={selectedCustomers}
             />
-          )}
+          </div>
 
-          {currentStep > 2 && currentStep <= 2 + customerCount && (() => {
-            const configIndex = currentStep - 3;
-            const config = customerConfigs?.[configIndex];
-            const customer = config
-              ? customersCache.current.get(config.customerId)
-              : null;
-            return (
-              <BudgetStepCustomerPayment
-                key={`customer-config-${configIndex}`}
-                configIndex={configIndex}
-                customer={customer}
-                disabled={isSubmitting || !canEdit}
-                taskResponsibles={task?.responsibles}
-              />
-            );
-          })()}
+          {/* Dynamic customer steps */}
+          {currentStep > 3 &&
+            currentStep <= 3 + customerCount &&
+            (() => {
+              const configIndex = currentStep - 4;
+              const config = customerConfigs?.[configIndex];
+              const customer = config
+                ? customersCache.current.get(config.customerId)
+                : null;
+              return (
+                <BudgetStepCustomerPayment
+                  key={`customer-config-${configIndex}`}
+                  configIndex={configIndex}
+                  customer={customer}
+                  disabled={isSubmitting || !canEdit}
+                  taskResponsibles={task?.responsibles}
+                />
+              );
+            })()}
 
           {currentStep === totalSteps && (
             <BudgetStepReview

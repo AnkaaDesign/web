@@ -150,8 +150,9 @@ export function groupSequentialTasks(
     const runTasks = tasks.slice(runStart, runEnd);
 
     if (runLength >= minGroupSize) {
-      // Sort the group by serial number for display
-      const groupTasks = sortBySerialNumber(runTasks);
+      // Preserve the API sort order within the group (do not re-sort by serial number,
+      // as that would override whatever column sort the user has applied)
+      const groupTasks = runTasks;
       const firstTask = groupTasks[0];
       const restTasks = groupTasks.slice(1);
       const groupId = `group-${firstTask.id}`;

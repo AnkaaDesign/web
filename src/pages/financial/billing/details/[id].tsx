@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
-import { useTaskDetail, useCurrentUser, taskKeys } from "@/hooks";
+import { useTaskDetail, useCurrentUser, useTaskMutations, taskKeys } from "@/hooks";
 import { useInvoicesByTask } from "@/hooks/production/use-invoice";
 import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
 import { taskQuoteService } from "@/api-client/task-quote";
@@ -10,17 +10,25 @@ import { customerService } from "@/api-client/customer";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
-import { BillingStepInfo } from "@/components/financial/billing/steps/billing-step-info";
+import { BillingStepTask } from "@/components/financial/billing/steps/billing-step-task";
 import { BillingStepServices } from "@/components/financial/billing/steps/billing-step-services";
 import { BillingStepCustomer } from "@/components/financial/billing/steps/billing-step-customer";
 import { BillingStepReview } from "@/components/financial/billing/steps/billing-step-review";
-import { SECTOR_PRIVILEGES, routes } from "@/constants";
+import { SECTOR_PRIVILEGES, IMPLEMENT_TYPE, routes } from "@/constants";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { canUpdateQuoteStatus, canEditQuote } from "@/utils/permissions/quote-permissions";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { toast } from "@/components/ui/sonner";
-import { IconArrowLeft, IconArrowRight, IconCheck, IconLoader2, IconFileInvoice, IconAlertCircle, IconExternalLink } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconArrowRight,
+  IconCheck,
+  IconLoader2,
+  IconFileInvoice,
+  IconAlertCircle,
+  IconExternalLink,
+} from "@tabler/icons-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -52,13 +60,15 @@ export const BillingDetailPage = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [dossieCustomerId, setDossieCustomerId] = useState<string>("all");
 
+  // Mutations
+  const { updateAsync: updateTaskAsync } = useTaskMutations();
+
   // Fetch task with billing-related includes
   const { data: taskResponse, isLoading: isTaskLoading } = useTaskDetail(id!, {
     enabled: !!id,
     include: {
       customer: { include: { logo: true } },
       truck: true,
-      responsibles: true,
       serviceOrders: {
         include: {
           checkinFiles: true,
@@ -84,7 +94,7 @@ export const BillingDetailPage = () => {
   const task = taskResponse?.data;
   const quote = task?.quote;
 
-  // Fetch invoices for installments/bank slips/NFS-e — polls every 3s during generation
+  // Fetch invoices — polls every 3s during generation
   const { data: invoicesData } = useInvoicesByTask(id!, {
     refetchInterval: isGenerating ? 3000 : false,
   });
@@ -98,22 +108,31 @@ export const BillingDetailPage = () => {
       const nfseDocuments = inv.nfseDocuments || [];
       const bankSlipsReady = installments.every((inst: any) => {
         if (!inst.bankSlip) return true;
-        return !['CREATING', 'REGISTERING'].includes(inst.bankSlip.status);
+        return !["CREATING", "REGISTERING"].includes(inst.bankSlip.status);
       });
-      const nfseReady = nfseDocuments.every((doc: any) =>
-        !['PENDING', 'PROCESSING'].includes(doc.status)
+      const nfseReady = nfseDocuments.every(
+        (doc: any) => !["PENDING", "PROCESSING"].includes(doc.status),
       );
       return bankSlipsReady && nfseReady;
     });
-    if (allReady) {
-      setIsGenerating(false);
-    }
+    if (allReady) setIsGenerating(false);
   }, [isGenerating, invoices]);
 
-  // Form setup
+  // Form — billing-relevant task fields + quote fields
   const form = useForm({
     mode: "onChange",
     defaultValues: {
+      // Task fields (billing-relevant subset)
+      name: "" as string,
+      customerId: "" as string,
+      plate: "" as string,
+      serialNumber: "" as string,
+      chassisNumber: "" as string,
+      category: "" as string,
+      implementType: IMPLEMENT_TYPE.REFRIGERATED as string,
+      details: "" as string,
+      finishedAt: null as Date | null,
+      // Quote fields
       status: "" as string,
       expiresAt: null as Date | null,
       subtotal: 0,
@@ -125,9 +144,36 @@ export const BillingDetailPage = () => {
     },
   });
 
-  // Populate form when quote data loads
+  // Populate form when task/quote data loads
   useEffect(() => {
-    if (!quote) return;
+    if (!task) return;
+
+    const taskFields = {
+      name: task.name || "",
+      customerId: task.customerId || "",
+      plate: task.truck?.plate || "",
+      serialNumber: task.serialNumber || "",
+      chassisNumber: task.truck?.chassisNumber || "",
+      category: task.truck?.category || "",
+      implementType: task.truck?.implementType || IMPLEMENT_TYPE.REFRIGERATED,
+      details: task.details || "",
+      finishedAt: task.finishedAt ? new Date(task.finishedAt) : null,
+    };
+
+    if (!quote) {
+      form.reset({
+        ...taskFields,
+        status: "",
+        expiresAt: null,
+        subtotal: 0,
+        total: 0,
+        services: [],
+        customerConfigs: [],
+        guaranteeYears: null,
+        customGuaranteeText: null,
+      });
+      return;
+    }
 
     // Cache customer data
     quote.customerConfigs?.forEach((config: any) => {
@@ -137,6 +183,7 @@ export const BillingDetailPage = () => {
     });
 
     form.reset({
+      ...taskFields,
       status: quote.status || "PENDING",
       expiresAt: quote.expiresAt ? new Date(quote.expiresAt) : null,
       subtotal: Number(quote.subtotal) || 0,
@@ -156,15 +203,14 @@ export const BillingDetailPage = () => {
         subtotal: Number(config.subtotal) || 0,
         total: Number(config.total) || 0,
         discountType: config.discountType || "NONE",
-        discountValue: config.discountValue != null ? Number(config.discountValue) : null,
+        discountValue:
+          config.discountValue != null ? Number(config.discountValue) : null,
         discountReference: config.discountReference || null,
         paymentCondition: config.paymentCondition || null,
-
         customPaymentText: config.customPaymentText || null,
         generateInvoice: config.generateInvoice !== false,
         orderNumber: config.orderNumber || null,
         responsibleId: config.responsibleId || null,
-        // Embedded customer data for NFS-e editing
         customerData: {
           corporateName: config.customer?.corporateName || "",
           fantasyName: config.customer?.fantasyName || "",
@@ -182,12 +228,12 @@ export const BillingDetailPage = () => {
         },
       })),
     });
-  }, [quote, form]);
+  }, [task, quote]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Dynamic steps based on customer configs
+  // Dynamic steps: Tarefa → Serviços → Cliente(s) → Resumo
   const customerConfigs = form.watch("customerConfigs") || [];
 
-  // Skip to summary step when invoices already exist (past internal approach)
+  // Skip to summary step when invoices already exist
   const hasInitializedStep = useRef(false);
   useEffect(() => {
     if (hasInitializedStep.current) return;
@@ -201,17 +247,17 @@ export const BillingDetailPage = () => {
 
   const steps = useMemo(() => {
     const base = [
-      { id: 1, name: "Informações", description: "Dados da tarefa e clientes" },
+      { id: 1, name: "Tarefa", description: "Dados da tarefa e faturamento" },
       { id: 2, name: "Serviços", description: "Serviços e preços" },
     ];
     customerConfigs.forEach((config: any, i: number) => {
       const cached = customersCache.current.get(config.customerId);
-      const name = config.customerData?.fantasyName || config.customerData?.corporateName || cached?.fantasyName || "Cliente";
-      base.push({
-        id: 3 + i,
-        name: `Cliente ${i + 1}`,
-        description: name,
-      });
+      const name =
+        config.customerData?.fantasyName ||
+        config.customerData?.corporateName ||
+        cached?.fantasyName ||
+        "Cliente";
+      base.push({ id: 3 + i, name: `Cliente ${i + 1}`, description: name });
     });
     base.push({ id: base.length + 1, name: "Resumo", description: "Revisão final" });
     return base;
@@ -219,10 +265,12 @@ export const BillingDetailPage = () => {
 
   const totalSteps = steps.length;
 
-  // Statuses that require complete customer data for NFS-e/boleto generation
-  const STATUSES_REQUIRING_COMPLETE_DATA = ["COMMERCIAL_APPROVED", "BILLING_APPROVED"];
+  const STATUSES_REQUIRING_COMPLETE_DATA = [
+    "COMMERCIAL_APPROVED",
+    "BILLING_APPROVED",
+  ];
 
-  // Step validation - only basic checks, no required field validation on step change
+  // Step validation
   const validateCurrentStep = useCallback(() => {
     if (currentStep === 1) {
       const configs = form.getValues("customerConfigs") || [];
@@ -244,26 +292,26 @@ export const BillingDetailPage = () => {
     return true;
   }, [currentStep, form]);
 
-  // Validate customer required fields - only called when status requires it
+  // Validate customer required fields — only called when status requires it
   const validateCustomerData = useCallback((): boolean => {
     const configs = form.getValues("customerConfigs") || [];
     const services = form.getValues("services") || [];
     const targetStatus = form.getValues("status");
     const validServices = services.filter((s: any) => s.description?.trim());
 
-    // For BILLING_APPROVED: no service may have negative amount (zero is allowed — service performed at no cost)
     if (targetStatus === "BILLING_APPROVED") {
-      const negativeAmountServices = validServices.filter((s: any) => Number(s.amount) < 0);
+      const negativeAmountServices = validServices.filter(
+        (s: any) => Number(s.amount) < 0,
+      );
       if (negativeAmountServices.length > 0) {
         setCurrentStep(2);
         toast.error("Serviços com valor negativo", {
-          description: `${negativeAmountServices.length} serviço(s) com valor negativo. Os serviços não podem ter valor negativo para faturamento.`,
+          description: `${negativeAmountServices.length} serviço(s) com valor negativo. Serviços não podem ter valor negativo para faturamento.`,
         });
         return false;
       }
     }
 
-    // Multi-customer: all services must have invoiceToCustomerId
     if (configs.length >= 2) {
       const unassigned = validServices.filter((s: any) => !s.invoiceToCustomerId);
       if (unassigned.length > 0) {
@@ -275,7 +323,6 @@ export const BillingDetailPage = () => {
       }
     }
 
-    // Validate each customer config
     for (let i = 0; i < configs.length; i++) {
       const config = configs[i];
       const data = config.customerData || {};
@@ -311,10 +358,7 @@ export const BillingDetailPage = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   }, []);
 
-
-
-
-  // Core save logic (called directly or after confirmation dialog)
+  // Core save logic
   const executeSave = useCallback(async () => {
     if (!quote?.id || !task?.id) return;
 
@@ -322,9 +366,25 @@ export const BillingDetailPage = () => {
     const targetStatus = formData.status;
 
     setIsSaving(true);
-
     try {
-      // 1. Update customer data (address, CNPJ, etc. for NFS-e)
+      // 1. Update billing-relevant task fields
+      const taskUpdateData: any = {
+        name: formData.name || undefined,
+        customerId: formData.customerId || undefined,
+        details: formData.details || undefined,
+        finishedAt: formData.finishedAt || undefined,
+        serialNumber: formData.serialNumber || null,
+        truck: {
+          plate: formData.plate || undefined,
+          chassisNumber: formData.chassisNumber || undefined,
+          category: formData.category || undefined,
+          implementType: formData.implementType || undefined,
+        },
+      };
+
+      await updateTaskAsync({ id: task.id, data: taskUpdateData });
+
+      // 2. Update customer data for NFS-e
       for (const config of formData.customerConfigs) {
         if (config.customerData && config.customerId) {
           try {
@@ -348,7 +408,7 @@ export const BillingDetailPage = () => {
         }
       }
 
-      // 2. Update quote data
+      // 3. Update quote data
       const quotePayload: any = {
         expiresAt: formData.expiresAt,
         subtotal: formData.subtotal,
@@ -382,19 +442,18 @@ export const BillingDetailPage = () => {
 
       await taskQuoteService.update(quote.id, quotePayload);
 
-      // 3. Update status if changed
+      // 4. Update status if changed
       if (targetStatus && targetStatus !== quote.status) {
         await taskQuoteService.updateStatus(quote.id, targetStatus as TASK_QUOTE_STATUS);
       }
 
-      // Invalidate all billing-related caches
       queryClient.invalidateQueries({ queryKey: taskKeys.all });
       queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboards'] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboards"] });
 
-      // If billing was just approved, stay on page and start polling for generation progress
-      const isBillingApproval = targetStatus === "BILLING_APPROVED" && targetStatus !== quote.status;
+      const isBillingApproval =
+        targetStatus === "BILLING_APPROVED" && targetStatus !== quote.status;
       if (isBillingApproval) {
         setIsGenerating(true);
         toast.success("Faturamento aprovado! Gerando faturas, boletos e NFS-e...", {
@@ -410,16 +469,23 @@ export const BillingDetailPage = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [quote?.id, task?.id, quote?.status, form, queryClient, navigate]);
+  }, [
+    quote?.id,
+    quote?.status,
+    task?.id,
+    form,
+    queryClient,
+    updateTaskAsync,
+    navigate,
+  ]);
 
-  // Save handler - validates and shows confirmation for BILLING_APPROVED
+  // Save handler — validates and shows confirmation for BILLING_APPROVED
   const handleSave = useCallback(async () => {
     if (!quote?.id || !task?.id) return;
 
     const formData = form.getValues();
     const targetStatus = formData.status;
 
-    // Basic validation always required
     const configs = formData.customerConfigs || [];
     const services = formData.services || [];
     if (configs.length === 0) {
@@ -434,12 +500,10 @@ export const BillingDetailPage = () => {
       return;
     }
 
-    // If status requires complete data, validate all customer fields
     if (STATUSES_REQUIRING_COMPLETE_DATA.includes(targetStatus)) {
       if (!validateCustomerData()) return;
     }
 
-    // Show confirmation dialog for BILLING_APPROVED (triggers invoice/boleto/NFS-e generation)
     if (targetStatus === "BILLING_APPROVED" && targetStatus !== quote.status) {
       setBillingApprovalDialogOpen(true);
       return;
@@ -468,7 +532,6 @@ export const BillingDetailPage = () => {
 
   // Build PageHeader actions
   const actions: any[] = [];
-
   if (currentStep > 1) {
     actions.push({
       key: "prev",
@@ -479,7 +542,6 @@ export const BillingDetailPage = () => {
       disabled: isSaving,
     });
   }
-
   if (canEdit) {
     if (currentStep < totalSteps) {
       actions.push({
@@ -503,24 +565,31 @@ export const BillingDetailPage = () => {
     }
   }
 
-
-  // Resolve current customer config for customer steps (between step 3 and totalSteps - 1)
+  // Customer steps are between step 3 and (totalSteps - 1) inclusive
   const isCustomerStep = currentStep >= 3 && currentStep < totalSteps;
   const isReviewStep = currentStep === totalSteps;
-  const customerStepIndex = currentStep - 3; // 0-based index into customerConfigs
+  const customerStepIndex = currentStep - 3; // 0-based
   const currentConfig = isCustomerStep ? customerConfigs[customerStepIndex] : null;
-  const currentCustomer = currentConfig ? customersCache.current.get(currentConfig.customerId) : null;
+  const currentCustomer = currentConfig
+    ? customersCache.current.get(currentConfig.customerId)
+    : null;
 
-  // Dynamic title matching budget form pattern
-  const taskDisplayName = [task.name, task.serialNumber || task.truck?.plate].filter(Boolean).join(" - ");
-  const sectionLabel = "Faturamento";
+  const taskDisplayName = [task.name, task.serialNumber || task.truck?.plate]
+    .filter(Boolean)
+    .join(" - ");
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL]}>
+    <PrivilegeRoute
+      requiredPrivilege={[
+        SECTOR_PRIVILEGES.FINANCIAL,
+        SECTOR_PRIVILEGES.ADMIN,
+        SECTOR_PRIVILEGES.COMMERCIAL,
+      ]}
+    >
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="form"
-          title={`${sectionLabel} - ${taskDisplayName}`}
+          title={`Faturamento - ${taskDisplayName}`}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Financeiro", href: routes.financial.root },
@@ -530,79 +599,93 @@ export const BillingDetailPage = () => {
           onBreadcrumbNavigate={(path) => navigate(path)}
           actions={actions}
           className="flex-shrink-0"
-          headerExtra={quote?.id && customerConfigs.length > 0 ? (
-            <>
-              {customerConfigs.length > 1 && (
-                <Combobox
-                  value={dossieCustomerId}
-                  onValueChange={(v) => setDossieCustomerId((v as string) || "all")}
-                  options={[
-                    { value: "all", label: "Completo" },
-                    ...customerConfigs.map((config: any, i: number) => {
-                      const cached = customersCache.current.get(config.customerId);
-                      const name = cached?.fantasyName || cached?.corporateName || `Cliente ${i + 1}`;
-                      return { value: config.customerId, label: name };
-                    }),
-                  ]}
-                  searchable={false}
-                  clearable={false}
-                  className="w-[260px]"
-                  triggerClassName="h-8 text-sm"
-                />
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 whitespace-nowrap"
-                onClick={() => {
-                  const custId = dossieCustomerId === "all" ? customerConfigs[0]?.customerId : dossieCustomerId;
-                  if (custId && quote?.id) {
-                    window.open(routes.customer.serviceReport(custId, quote.id), "_blank");
-                  }
-                }}
-              >
-                <IconExternalLink className="h-4 w-4" />
-                Ver Dossiê
-              </Button>
-            </>
-          ) : undefined}
+          headerExtra={
+            quote?.id && customerConfigs.length > 0 ? (
+              <>
+                {customerConfigs.length > 1 && (
+                  <Combobox
+                    value={dossieCustomerId}
+                    onValueChange={(v) => setDossieCustomerId((v as string) || "all")}
+                    options={[
+                      { value: "all", label: "Completo" },
+                      ...customerConfigs.map((config: any, i: number) => {
+                        const cached = customersCache.current.get(config.customerId);
+                        const name =
+                          cached?.fantasyName ||
+                          cached?.corporateName ||
+                          `Cliente ${i + 1}`;
+                        return { value: config.customerId, label: name };
+                      }),
+                    ]}
+                    searchable={false}
+                    clearable={false}
+                    className="w-[260px]"
+                    triggerClassName="h-8 text-sm"
+                  />
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 whitespace-nowrap"
+                  onClick={() => {
+                    const custId =
+                      dossieCustomerId === "all"
+                        ? customerConfigs[0]?.customerId
+                        : dossieCustomerId;
+                    if (custId && quote?.id) {
+                      window.open(
+                        routes.customer.serviceReport(custId, quote.id),
+                        "_blank",
+                      );
+                    }
+                  }}
+                >
+                  <IconExternalLink className="h-4 w-4" />
+                  Ver Dossiê
+                </Button>
+              </>
+            ) : undefined
+          }
         />
 
         <FormSteps steps={steps} currentStep={currentStep} className="flex-shrink-0" />
 
         <div className="flex-1 overflow-y-auto pb-6">
           <FormProvider {...form}>
-            <div>
-              {currentStep === 1 && (
-                <BillingStepInfo
-                  task={task}
-                  disabled={!canEdit}
-                  customersCache={customersCache}
-                />
-              )}
-              {currentStep === 2 && (
-                <BillingStepServices disabled={!canEdit} />
-              )}
-              {isCustomerStep && currentConfig && (
-                <BillingStepCustomer
-                  key={currentConfig.customerId || customerStepIndex}
-                  configIndex={customerStepIndex}
-                  customer={currentCustomer}
-                  disabled={!canEdit}
-                />
-              )}
-              {isReviewStep && (
-                <BillingStepReview
-                  task={task}
-                  customersCache={customersCache}
-                  invoices={invoices}
-                  userPrivilege={userPrivilege}
-                  disabled={!canEdit}
-                  isGenerating={isGenerating}
-                  filterCustomerId={dossieCustomerId !== "all" ? dossieCustomerId : undefined}
-                />
-              )}
+            {/* Steps 1–2 stay mounted (hidden via CSS) to preserve useFieldArray state */}
+            <div style={{ display: currentStep === 1 ? undefined : "none" }}>
+              <BillingStepTask
+                disabled={!canEdit}
+                customersCache={customersCache}
+              />
             </div>
+
+            <div style={{ display: currentStep === 2 ? undefined : "none" }}>
+              <BillingStepServices disabled={!canEdit} />
+            </div>
+
+            {isCustomerStep && currentConfig && (
+              <BillingStepCustomer
+                key={currentConfig.customerId || customerStepIndex}
+                configIndex={customerStepIndex}
+                customer={currentCustomer}
+                disabled={!canEdit}
+              />
+            )}
+
+            {isReviewStep && (
+              <BillingStepReview
+                task={task}
+                customersCache={customersCache}
+                invoices={invoices}
+                userPrivilege={userPrivilege}
+                disabled={!canEdit}
+                isGenerating={isGenerating}
+                filterCustomerId={
+                  dossieCustomerId !== "all" ? dossieCustomerId : undefined
+                }
+              />
+            )}
           </FormProvider>
         </div>
       </div>
@@ -653,7 +736,8 @@ export const BillingDetailPage = () => {
           </div>
 
           <AlertDialogDescription className="text-sm text-muted-foreground mt-1">
-            Essa ação não pode ser desfeita facilmente. Boletos e notas fiscais emitidos precisarão ser cancelados manualmente caso haja algum erro.
+            Essa ação não pode ser desfeita facilmente. Boletos e notas fiscais emitidos precisarão
+            ser cancelados manualmente caso haja algum erro.
           </AlertDialogDescription>
 
           <AlertDialogFooter className="mt-2">

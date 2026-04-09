@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useEffect, useRef, useMemo, useCallback, useState } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import { IconTrash, IconPlus } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,9 @@ export function FormulaComponentsEditor({ className, availableItems = [] }: Form
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const lastRowRef = useRef<HTMLDivElement>(null);
 
+  // Track which newly-appended row index should auto-open its combobox
+  const [pendingAutoOpenIndex, setPendingAutoOpenIndex] = useState<number | null>(null);
+
   // Stable ref callback to store input refs in array
   const setInputRef = useCallback((index: number) => {
     return (el: HTMLInputElement | null) => {
@@ -37,6 +40,34 @@ export function FormulaComponentsEditor({ className, availableItems = [] }: Form
   const selectedItemIds = useMemo(() => {
     return allComponents.map((comp: { itemId: string }) => comp.itemId).filter(Boolean);
   }, [allComponents]);
+
+  // Combined: initial row append + clear item pre-selection.
+  // Handles two cases:
+  //   Case A – availableItems already loaded when component mounts (step entered after type/brand chosen):
+  //            append the first row immediately pre-filled with the clear item.
+  //   Case B – availableItems arrive after the empty row already exists:
+  //            fill the empty first row with the clear item.
+  useEffect(() => {
+    const clearItem = availableItems.find((item) =>
+      item.name.toLowerCase().startsWith("clear ")
+    );
+
+    if (fields.length === 0) {
+      // Append with clear pre-filled (or empty if items not loaded yet)
+      append({ itemId: clearItem?.id || "", weightInGrams: 0, rawInput: "" });
+      if (clearItem) {
+        setTimeout(() => { inputRefs.current[0]?.focus(); }, 150);
+      }
+      return;
+    }
+
+    // First row already exists but is empty — fill with clear item when items arrive
+    const firstComponent = allComponents[0];
+    if (firstComponent && !firstComponent.itemId && clearItem) {
+      setValue("components.0.itemId", clearItem.id);
+      setTimeout(() => { inputRefs.current[0]?.focus(); }, 150);
+    }
+  }, [fields.length, availableItems]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filter and sort items by unicode, excluding already selected ones
   const getFilteredItemsForRow = (currentRowIndex: number) => {
@@ -75,13 +106,6 @@ export function FormulaComponentsEditor({ className, availableItems = [] }: Form
       label: item.uniCode ? `${item.uniCode} - ${item.name}` : item.name,
     }));
   };
-
-  // Add initial empty row if no components exist
-  useEffect(() => {
-    if (fields.length === 0) {
-      append({ itemId: "", weightInGrams: 0, rawInput: "" });
-    }
-  }, []);
 
   const handleAmountChange = (index: number, value: string, previousValue: string) => {
     // Allow empty string for clearing
@@ -143,11 +167,8 @@ export function FormulaComponentsEditor({ className, availableItems = [] }: Form
       if (field === "input") {
         if (index === fields.length - 1) {
           // Last row - create new one
+          setPendingAutoOpenIndex(fields.length);
           append({ itemId: "", weightInGrams: 0, rawInput: "" });
-          setTimeout(() => {
-            const comboboxButton = lastRowRef.current?.querySelector('[role="combobox"]') as HTMLButtonElement;
-            comboboxButton?.focus();
-          }, 100);
         } else {
           // Move to next row's combobox
           const nextCombobox = document.querySelectorAll('[role="combobox"]')[index + 1] as HTMLButtonElement;
@@ -165,11 +186,8 @@ export function FormulaComponentsEditor({ className, availableItems = [] }: Form
 
     if (e.key === "Tab" && !e.shiftKey && field === "input" && index === fields.length - 1) {
       e.preventDefault();
+      setPendingAutoOpenIndex(fields.length);
       append({ itemId: "", weightInGrams: 0, rawInput: "" });
-      setTimeout(() => {
-        const comboboxButton = lastRowRef.current?.querySelector('[role="combobox"]') as HTMLButtonElement;
-        comboboxButton?.focus();
-      }, 100);
     }
   };
 
@@ -227,6 +245,7 @@ export function FormulaComponentsEditor({ className, availableItems = [] }: Form
                     emptyText="Nenhum item disponível"
                     searchable={true}
                     className="w-full bg-transparent"
+                    defaultOpen={pendingAutoOpenIndex === index}
                   />
                 </div>
 
@@ -307,11 +326,8 @@ export function FormulaComponentsEditor({ className, availableItems = [] }: Form
         variant="outline"
         size="sm"
         onClick={() => {
+          setPendingAutoOpenIndex(fields.length);
           append({ itemId: "", weightInGrams: 0, rawInput: "" });
-          setTimeout(() => {
-            const comboboxButton = lastRowRef.current?.querySelector('[role="combobox"]') as HTMLButtonElement;
-            comboboxButton?.focus();
-          }, 100);
         }}
         className="w-full"
       >

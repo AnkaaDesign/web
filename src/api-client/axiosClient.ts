@@ -759,7 +759,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         // Only show success if the response indicates success
         const isSuccess = (response.data?.success as boolean | undefined) !== false; // Show success unless explicitly false
 
-        if (!isBatchOperation && !isMarkViewed && !isNotificationEndpoint && !isCopyFromOperation && isSuccess) {
+        if (!isBatchOperation && !isMarkViewed && !isNotificationEndpoint && !isCopyFromOperation && isSuccess && !metadata?.suppressToast) {
           const message = response.data?.message || getSuccessMessage(config.method);
           notify.success("Sucesso", message);
         }
