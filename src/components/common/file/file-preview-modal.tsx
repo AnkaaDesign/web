@@ -1,4 +1,6 @@
 import * as React from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getPaints } from "../../../api-client";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -11,6 +13,9 @@ import {
   IconRotateClockwise,
   IconRotate2,
   IconMaximize,
+  IconColorPicker,
+  IconCopy,
+  IconCheck,
 } from "@tabler/icons-react";
 import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -94,6 +99,25 @@ export function FilePreviewModal({
   const [panX, setPanX] = React.useState(0);
   const [panY, setPanY] = React.useState(0);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
+
+  // Color picker state
+  const [pickedColor, setPickedColor] = React.useState<{ r: number; g: number; b: number } | null>(null);
+  const [showColorModal, setShowColorModal] = React.useState(false);
+  const [copiedField, setCopiedField] = React.useState<string | null>(null);
+  const [isPickerRunning, setIsPickerRunning] = React.useState(false);
+  const eyeDropperSupported = typeof window !== "undefined" && "EyeDropper" in window;
+
+  // Best paint match query
+  const pickedColorHex = pickedColor
+    ? `#${pickedColor.r.toString(16).padStart(2, "0")}${pickedColor.g.toString(16).padStart(2, "0")}${pickedColor.b.toString(16).padStart(2, "0")}`.toUpperCase()
+    : null;
+  const { data: paintMatchData, isLoading: isPaintMatchLoading } = useQuery({
+    queryKey: ["paint-match", pickedColorHex],
+    queryFn: () => getPaints({ similarColor: pickedColorHex!, limit: 1 }),
+    enabled: !!pickedColorHex,
+    staleTime: 1000 * 60 * 5,
+  });
+  const bestPaintMatch = paintMatchData?.data?.[0] ?? null;
 
   // Touch and gesture states
   const [touchState, setTouchState] = React.useState<TouchState | null>(null);
@@ -251,6 +275,36 @@ export function FilePreviewModal({
   const handleFitToScreen = React.useCallback(() => {
     handleResetZoom();
   }, [handleResetZoom]);
+
+  // Activate the native EyeDropper API — works on any screen content (images, PDFs, HTML, etc.)
+  // Supported in Chrome/Edge 95+. Falls back gracefully on unsupported browsers.
+  const handleActivateColorPicker = React.useCallback(async () => {
+    if (!eyeDropperSupported) return;
+    setIsPickerRunning(true);
+    try {
+      const eyeDropper = new (window as any).EyeDropper();
+      const result = await eyeDropper.open();
+      // result.sRGBHex is "#rrggbb"
+      const hex = result.sRGBHex as string;
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      setPickedColor({ r, g, b });
+      setShowColorModal(true);
+    } catch {
+      // User pressed Escape or browser denied — no-op
+    } finally {
+      setIsPickerRunning(false);
+    }
+  }, [eyeDropperSupported]);
+
+  // Copy color value to clipboard with temporary confirmation
+  const handleCopyColor = React.useCallback((label: string, value: string) => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopiedField(label);
+      setTimeout(() => setCopiedField(null), 1500);
+    });
+  }, []);
 
   // Rotation functions
   const handleRotateRight = React.useCallback(() => {
@@ -513,6 +567,11 @@ export function FilePreviewModal({
           event.preventDefault();
           handleToggleFullscreen();
           break;
+        case "p":
+        case "P":
+          event.preventDefault();
+          handleActivateColorPicker();
+          break;
       }
     };
 
@@ -530,6 +589,7 @@ export function FilePreviewModal({
     handleRotateLeft,
     handleRotateRight,
     handleToggleFullscreen,
+    handleActivateColorPicker,
     enableRotation,
   ]);
 
@@ -715,6 +775,44 @@ export function FilePreviewModal({
                 </div>
               )}
 
+
+              {/* Color Picker + Swatch — available for any file type */}
+              {!isVideo && (
+                <div className="flex items-center gap-1 bg-black/90 backdrop-blur-xl rounded-xl p-1 border border-white/20 shadow-2xl">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "h-9 w-9 transition-colors",
+                      isPickerRunning
+                        ? "text-yellow-300 bg-yellow-400/20"
+                        : eyeDropperSupported
+                        ? "text-white hover:bg-white/20"
+                        : "text-white/30 cursor-not-allowed",
+                    )}
+                    onClick={handleActivateColorPicker}
+                    disabled={!eyeDropperSupported || isPickerRunning}
+                    title={
+                      !eyeDropperSupported
+                        ? "EyeDropper não suportado neste navegador (use Chrome/Edge)"
+                        : isPickerRunning
+                        ? "Clique em qualquer lugar da tela para capturar a cor..."
+                        : "Conta-gotas — captura cor de qualquer conteúdo na tela (P)"
+                    }
+                  >
+                    <IconColorPicker className="h-4 w-4" />
+                  </Button>
+                  {/* Color swatch — shown after a color is picked; click to open detail modal */}
+                  {pickedColor && (
+                    <button
+                      className="h-9 w-9 rounded-lg border-2 border-white/40 shadow-inner hover:scale-110 hover:border-white/70 transition-all flex-shrink-0"
+                      style={{ backgroundColor: `rgb(${pickedColor.r}, ${pickedColor.g}, ${pickedColor.b})` }}
+                      onClick={() => setShowColorModal(true)}
+                      title="Ver detalhes da cor capturada"
+                    />
+                  )}
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex items-center gap-1 bg-black/90 backdrop-blur-xl rounded-xl p-1 border border-white/20 shadow-2xl">
@@ -1028,6 +1126,108 @@ export function FilePreviewModal({
             </div>
           )}
         </div>
+
+        {/* Color Info Modal */}
+        {showColorModal && pickedColor && (
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowColorModal(false)}
+          >
+            <div
+              className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl p-6 w-80 mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Cor selecionada</h3>
+                <button
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
+                  onClick={() => setShowColorModal(false)}
+                >
+                  <IconX className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Large color swatch */}
+              <div
+                className="w-full h-28 rounded-xl mb-5 shadow-inner border border-black/10 dark:border-white/10"
+                style={{ backgroundColor: `rgb(${pickedColor.r}, ${pickedColor.g}, ${pickedColor.b})` }}
+              />
+
+              {/* Color codes with copy */}
+              <div className="space-y-2">
+                {(() => {
+                  const hex = `#${pickedColor.r.toString(16).padStart(2, "0").toUpperCase()}${pickedColor.g.toString(16).padStart(2, "0").toUpperCase()}${pickedColor.b.toString(16).padStart(2, "0").toUpperCase()}`;
+                  const rgb = `${pickedColor.r}, ${pickedColor.g}, ${pickedColor.b}`;
+                  const k = 1 - Math.max(pickedColor.r, pickedColor.g, pickedColor.b) / 255;
+                  const kScale = k < 1 ? 1 - k : 1;
+                  const c = Math.round((k < 1 ? (1 - pickedColor.r / 255 - k) / kScale : 0) * 100);
+                  const m = Math.round((k < 1 ? (1 - pickedColor.g / 255 - k) / kScale : 0) * 100);
+                  const y = Math.round((k < 1 ? (1 - pickedColor.b / 255 - k) / kScale : 0) * 100);
+                  const cmyk = `${c}%, ${m}%, ${y}%, ${Math.round(k * 100)}%`;
+
+                  return [
+                    { label: "HEX", value: hex },
+                    { label: "RGB", value: rgb },
+                    { label: "CMYK", value: cmyk },
+                  ].map(({ label, value }) => (
+                    <div
+                      key={label}
+                      className="flex items-center justify-between bg-gray-50 dark:bg-zinc-800 rounded-lg px-3 py-2"
+                    >
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 w-8">{label}</span>
+                      <span className="text-sm font-mono text-gray-800 dark:text-gray-100 flex-1 ml-2 truncate">
+                        {value}
+                      </span>
+                      <button
+                        className="ml-2 flex-shrink-0 text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
+                        onClick={() => handleCopyColor(label, value)}
+                        title={`Copiar ${label}`}
+                      >
+                        {copiedField === label ? (
+                          <IconCheck className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <IconCopy className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  ));
+                })()}
+              </div>
+
+              {/* Best paint match */}
+              <div className="mt-3 pt-3 border-t border-gray-100 dark:border-zinc-800">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Tinta mais próxima</p>
+                {isPaintMatchLoading ? (
+                  <div className="flex items-center gap-2 text-gray-400 dark:text-gray-500 text-sm py-1">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    <span>Buscando...</span>
+                  </div>
+                ) : bestPaintMatch ? (
+                  <div className="flex items-center gap-3 bg-gray-50 dark:bg-zinc-800 rounded-lg px-3 py-2">
+                    <div
+                      className="h-8 w-8 rounded-md flex-shrink-0 border border-black/10 dark:border-white/10"
+                      style={{ backgroundColor: bestPaintMatch.hex || undefined }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{bestPaintMatch.name}</p>
+                      {bestPaintMatch.code && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{bestPaintMatch.code}</p>
+                      )}
+                    </div>
+                    <span className="text-xs font-mono text-gray-400 dark:text-gray-500 flex-shrink-0">
+                      {bestPaintMatch.hex}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Nenhuma tinta similar encontrada.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Screen Reader Description */}
         <div id="file-preview-description" className="sr-only">
