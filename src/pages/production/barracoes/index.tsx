@@ -331,6 +331,7 @@ export function GaragesPage() {
         term: (task as any).term || null,
         forecastDate: (task as any).forecastDate || null,
         cleared: !!(task as any).cleared,
+      spotIsExplicit: !!(truck?.spot), // true when truck has an actual DB spot (not defaulted)
         finishedAt: (task as any).finishedAt || null,
         layoutInfo: layoutSections.length > 0 ? `${layoutSections.length} seções` : null,
         artworkInfo: null, // Can be enhanced later with artwork file count

@@ -372,7 +372,6 @@ export const BillingDetailPage = () => {
         name: formData.name || undefined,
         customerId: formData.customerId || undefined,
         details: formData.details || undefined,
-        finishedAt: formData.finishedAt || undefined,
         serialNumber: formData.serialNumber || null,
         truck: {
           plate: formData.plate || undefined,

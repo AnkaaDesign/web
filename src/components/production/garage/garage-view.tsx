@@ -122,6 +122,7 @@ export interface GarageTruck {
   term?: string | null; // Task deadline
   forecastDate?: string | null; // Forecast date - when truck is expected to arrive at company
   cleared?: boolean; // Whether the task has been cleared (released) to come to the company
+  spotIsExplicit?: boolean; // Whether the truck has an explicit DB spot (vs defaulted to YARD_WAIT for display)
   finishedAt?: string | null; // Task completion date - null if not complete
   layoutInfo?: string | null; // Layout description
   artworkInfo?: string | null; // Artwork description
@@ -2122,9 +2123,10 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, onG
         }
 
         // For yard/patio trucks:
-        // - Today: only show cleared trucks (physically coming/present)
+        // - Today: show cleared trucks OR trucks with an explicit DB spot (physically present)
         // - Future days: show trucks whose forecastDate <= that day (virtual forecast)
         if (isToday) {
+          if (truck.spotIsExplicit) return true;
           return !!truck.cleared;
         }
 

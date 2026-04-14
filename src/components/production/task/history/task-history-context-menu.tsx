@@ -380,7 +380,7 @@ export function TaskHistoryContextMenu({
         if (t.status === TASK_STATUS.PREPARATION || t.status === TASK_STATUS.WAITING_PRODUCTION) {
           await update({
             id: t.id,
-            data: { entryDate: new Date() },
+            data: { entryDate: new Date(), cleared: true },
           });
         }
       }

@@ -983,7 +983,7 @@ export function FilePreviewModal({
                           isEPS && currentFile.thumbnailUrl
                           ? currentFile.thumbnailUrl.startsWith("http")
                             ? rewriteCdnUrl(currentFile.thumbnailUrl)
-                            : `${baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || ''}/files/thumbnail/${currentFile.id}?size=large`
+                            : `${baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || ''}/files/thumbnail/${currentFile.id}?size=large&v=2`
                           : // Use direct file URL for all other images
                             getFileUrl(currentFile, baseUrl)
                       }
@@ -1063,7 +1063,7 @@ export function FilePreviewModal({
                     const apiUrl = baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || '';
                     thumbnailSrc = file.thumbnailUrl && file.thumbnailUrl.startsWith("http")
                       ? rewriteCdnUrl(file.thumbnailUrl)
-                      : `${apiUrl}/files/thumbnail/${file.id}?size=small`;
+                      : `${apiUrl}/files/thumbnail/${file.id}?size=small&v=2`;
                   } else {
                     // For regular images, use the thumbnail utility or direct URL
                     thumbnailSrc = getFileThumbnailUrl(file, "small", baseUrl) || getFileUrl(file, baseUrl);

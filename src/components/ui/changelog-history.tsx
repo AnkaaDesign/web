@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { getApiBaseUrl } from "@/config/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -123,7 +124,7 @@ const LogoDisplay = ({
   }
 
   // Use the same API URL configuration as the API client
-  const apiUrl = import.meta.env.VITE_API_URL || "http://192.168.10.169:3030";
+  const apiUrl = getApiBaseUrl();
   // Use thumbnail endpoint for file previews, serve endpoint for logos
   const imageUrl = useThumbnail
     ? `${apiUrl}/files/thumbnail/${logoId}`

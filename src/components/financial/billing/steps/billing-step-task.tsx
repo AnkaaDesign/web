@@ -216,7 +216,7 @@ export function BillingStepTask({
             />
           </div>
 
-          {/* Finished At */}
+          {/* Finished At — read-only, never sent in update payload */}
           <FormField
             control={control}
             name="finishedAt"
@@ -234,7 +234,7 @@ export function BillingStepTask({
                     Finalizado em
                   </span>
                 }
-                disabled={disabled}
+                disabled={true}
               />
             )}
           />

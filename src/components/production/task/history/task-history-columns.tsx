@@ -792,7 +792,8 @@ export const createTaskHistoryColumns = (options?: {
   }
 
   // Filter out commission column for users without permission (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only)
-  if (!canViewCommissionField) {
+  // Only apply when sectorPrivilege is explicitly provided; without it, keep the column visible
+  if (sectorPrivilege && !canViewCommissionField) {
     filteredColumns = filteredColumns.filter(col => col.id !== 'commission');
   }
 

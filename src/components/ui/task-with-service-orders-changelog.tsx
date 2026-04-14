@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { getApiBaseUrl } from "@/config/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -103,7 +104,7 @@ const LogoDisplay = ({
     );
   }
 
-  const apiUrl = import.meta.env.VITE_API_URL || "http://192.168.10.169:3030";
+  const apiUrl = getApiBaseUrl();
   const imageUrl = useThumbnail
     ? `${apiUrl}/files/thumbnail/${logoId}`
     : `${apiUrl}/files/serve/${logoId}`;

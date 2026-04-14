@@ -98,30 +98,18 @@ export function BonusTasksList({
           </div>
           {/* Commission summary badges - responsive layout */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Badge variant={getBadgeVariant(COMMISSION_STATUS.FULL_COMMISSION, "COMMISSION_STATUS") as any}>
-                Comissão Integral
-              </Badge>
-              <span className="text-sm font-semibold">{commissionStats.fullCommission}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={getBadgeVariant(COMMISSION_STATUS.PARTIAL_COMMISSION, "COMMISSION_STATUS") as any}>
-                Comissão Parcial
-              </Badge>
-              <span className="text-sm font-semibold">{commissionStats.partialCommission}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={getBadgeVariant(COMMISSION_STATUS.NO_COMMISSION, "COMMISSION_STATUS") as any}>
-                Sem Comissão
-              </Badge>
-              <span className="text-sm font-semibold">{commissionStats.noCommission}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={getBadgeVariant(COMMISSION_STATUS.SUSPENDED_COMMISSION, "COMMISSION_STATUS") as any}>
-                Comissão Suspensa
-              </Badge>
-              <span className="text-sm font-semibold">{commissionStats.suspendedCommission}</span>
-            </div>
+            <Badge variant={getBadgeVariant(COMMISSION_STATUS.FULL_COMMISSION, "COMMISSION_STATUS") as any}>
+              Comissão Integral: {commissionStats.fullCommission}
+            </Badge>
+            <Badge variant={getBadgeVariant(COMMISSION_STATUS.PARTIAL_COMMISSION, "COMMISSION_STATUS") as any}>
+              Comissão Parcial: {commissionStats.partialCommission}
+            </Badge>
+            <Badge variant={getBadgeVariant(COMMISSION_STATUS.NO_COMMISSION, "COMMISSION_STATUS") as any}>
+              Sem Comissão: {commissionStats.noCommission}
+            </Badge>
+            <Badge variant={getBadgeVariant(COMMISSION_STATUS.SUSPENDED_COMMISSION, "COMMISSION_STATUS") as any}>
+              Comissão Suspensa: {commissionStats.suspendedCommission}
+            </Badge>
           </div>
         </CardTitle>
       </CardHeader>

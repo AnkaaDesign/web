@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { File as AnkaaFile } from "../../../types";
 import { formatFileSize, getFileCategory, getFileDisplayName, getFileDownloadUrl, getFileUrl, isImageFile, rewriteCdnUrl } from "../../../utils/file";
+import { getApiBaseUrl } from "@/config/api";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { IconPhoto, IconFileText, IconVideo, IconMusic, IconFileZip, IconFile, IconVectorBezier, IconEye } from "@tabler/icons-react";
@@ -100,8 +101,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
     } else if (onDownload) {
       onDownload(file);
     } else {
-      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.18:3030";
-      window.open(`${apiUrl}/files/${file.id}/download`, "_blank");
+      window.open(`${getApiBaseUrl()}/files/${file.id}/download`, "_blank");
     }
   };
 
@@ -154,7 +154,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
               <img
                 ref={imgRef}
                 src={(() => {
-                  const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.18:3030";
+                  const apiUrl = getApiBaseUrl();
                   let thumbnailSrc = "";
 
                   if (file.thumbnailUrl) {
@@ -168,7 +168,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
                   } else if (isImage) {
                     thumbnailSrc = `${apiUrl}/files/serve/${file.id}`;
                   } else if (isPdf || isEps) {
-                    thumbnailSrc = `${apiUrl}/files/thumbnail/${file.id}`;
+                    thumbnailSrc = `${apiUrl}/files/thumbnail/${file.id}?v=2`;
                   } else {
                     thumbnailSrc = getFileUrl(file);
                   }

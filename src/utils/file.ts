@@ -191,6 +191,10 @@ export { getApiBaseUrl };
 /** CDN domains that serve files (won't resolve on LAN without internet) */
 const CDN_DOMAINS = ['arquivos.ankaadesign.com.br', 'arquivos.ankaa.app'];
 
+// Production API domains — thumbnailUrl and other API links stored in the DB point here.
+// On LAN these must be rewritten to the local API proxy (no internet/NAT hairpinning needed).
+const API_DOMAINS = ['api.ankaadesign.com.br', 'api.ankaa.live', 'test.api.ankaadesign.com.br'];
+
 /**
  * Check if a URL points to a CDN domain that may not resolve on LAN
  */
@@ -198,6 +202,19 @@ const isCdnUrl = (url: string): boolean => {
   try {
     const hostname = new URL(url).hostname;
     return CDN_DOMAINS.some(d => hostname === d);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Check if a URL points to a production API domain stored in the DB
+ * (e.g. thumbnailUrl = "https://api.ankaadesign.com.br/files/thumbnail/...")
+ */
+const isProductionApiUrl = (url: string): boolean => {
+  try {
+    const hostname = new URL(url).hostname;
+    return API_DOMAINS.some(d => hostname === d);
   } catch {
     return false;
   }
@@ -222,18 +239,31 @@ const isOnLocalNetwork = (): boolean => {
 /**
  * Rewrite a CDN URL to use the local API's static file serving route.
  * CDN URL: https://arquivos.ankaadesign.com.br/24/3/12/uuid.jpg
- * Local:   http://192.168.0.11:3030/files/storage/24/3/12/uuid.jpg
+ * Local:   http://192.168.10.180/api/files/storage/24/3/12/uuid.jpg
  *
- * Returns the original URL if not a CDN URL or not on local network.
+ * Also rewrites production API URLs (thumbnailUrl, etc.) to the local proxy:
+ * API URL: https://api.ankaadesign.com.br/files/thumbnail/uuid
+ * Local:   http://192.168.10.180/api/files/thumbnail/uuid
+ *
+ * Returns the original URL if not applicable or not on local network.
  */
 export const rewriteCdnUrl = (url: string): string => {
-  if (!isOnLocalNetwork() || !isCdnUrl(url)) {
-    return url;
-  }
+  if (!isOnLocalNetwork()) return url;
   try {
     const parsed = new URL(url);
     const apiUrl = getApiBaseUrl();
-    return `${apiUrl}/files/storage${parsed.pathname}`;
+    if (isCdnUrl(url)) {
+      // CDN files are served via the static /files/storage/ route on the API
+      // ?v=2 busts any 404s previously cached when the nginx X-Accel-Redirect was misconfigured
+      return `${apiUrl}/files/storage${parsed.pathname}?v=2`;
+    }
+    if (isProductionApiUrl(url)) {
+      // Production API paths (thumbnails, serve, etc.) map directly to the local proxy
+      // ?v=2 busts any 404s previously cached when the nginx X-Accel-Redirect was misconfigured
+      const sep = parsed.search ? '&' : '?';
+      return `${apiUrl}${parsed.pathname}${parsed.search}${sep}v=2`;
+    }
+    return url;
   } catch {
     return url;
   }
@@ -276,7 +306,9 @@ export const getFileUrl = (file: File, baseUrl?: string): string => {
 
   // Database file - use API endpoint
   const apiUrl = baseUrl || getApiBaseUrl();
-  return `${apiUrl}/files/serve/${file.id}`;
+  // ?v=2 on LAN: busts 404s cached when nginx X-Accel-Redirect locations were missing
+  const bust = isOnLocalNetwork() ? '?v=2' : '';
+  return `${apiUrl}/files/serve/${file.id}${bust}`;
 };
 
 export const getFileDownloadUrl = (file: File, baseUrl?: string): string => {
@@ -301,7 +333,7 @@ export const getFileThumbnailUrl = (file: File, size: "small" | "medium" | "larg
 
   // Database file - use API endpoint
   const apiUrl = baseUrl || getApiBaseUrl();
-  return `${apiUrl}/files/thumbnail/${file.id}?size=${size}`;
+  return `${apiUrl}/files/thumbnail/${file.id}?size=${size}&v=2`;
 };
 
 // =====================
