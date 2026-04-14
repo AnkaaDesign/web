@@ -675,9 +675,8 @@ function ServiceRow({
       // Designer can CREATE artwork, but can only UPDATE artwork
       return [SERVICE_ORDER_TYPE.ARTWORK];
     }
-    if (userPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
-      // Logistic can CREATE production, artwork, commercial, logistic
-      // but can only UPDATE logistic and production
+    if (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER) {
+      // Production manager can create all service order types
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
         SERVICE_ORDER_TYPE.COMMERCIAL,
