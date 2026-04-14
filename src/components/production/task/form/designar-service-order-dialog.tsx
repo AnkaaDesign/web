@@ -60,11 +60,10 @@ export function DesignarServiceOrderDialog({
         return SERVICE_ORDER_TYPE.COMMERCIAL;
       case SECTOR_PRIVILEGES.FINANCIAL:
         return SERVICE_ORDER_TYPE.COMMERCIAL;
-      case SECTOR_PRIVILEGES.LOGISTIC:
-        return SERVICE_ORDER_TYPE.LOGISTIC;
       case SECTOR_PRIVILEGES.DESIGNER:
         return SERVICE_ORDER_TYPE.ARTWORK;
       case SECTOR_PRIVILEGES.PRODUCTION:
+      case SECTOR_PRIVILEGES.PRODUCTION_MANAGER:
       case SECTOR_PRIVILEGES.ADMIN:
       default:
         return SERVICE_ORDER_TYPE.PRODUCTION;
@@ -89,6 +88,15 @@ export function DesignarServiceOrderDialog({
         SERVICE_ORDER_TYPE.ARTWORK,
       ];
     }
+    if (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER) {
+      // Production manager can create all service order types
+      return [
+        SERVICE_ORDER_TYPE.PRODUCTION,
+        SERVICE_ORDER_TYPE.COMMERCIAL,
+        SERVICE_ORDER_TYPE.LOGISTIC,
+        SERVICE_ORDER_TYPE.ARTWORK,
+      ];
+    }
     if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
       // Financial users can create COMMERCIAL and LOGISTIC service orders
       return [
@@ -99,18 +107,11 @@ export function DesignarServiceOrderDialog({
     if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
       return [SERVICE_ORDER_TYPE.ARTWORK];
     }
-    if (userPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
-      return [
-        SERVICE_ORDER_TYPE.PRODUCTION,
-        SERVICE_ORDER_TYPE.COMMERCIAL,
-        SERVICE_ORDER_TYPE.LOGISTIC,
-        SERVICE_ORDER_TYPE.ARTWORK,
-      ];
-    }
     if (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION) {
       return [SERVICE_ORDER_TYPE.PRODUCTION];
     }
-    // Default: all types
+    // LOGISTIC and other sectors cannot create service orders via this dialog
+    // Default: all types (fallback for ADMIN-equivalent roles)
     return [
       SERVICE_ORDER_TYPE.PRODUCTION,
       SERVICE_ORDER_TYPE.COMMERCIAL,

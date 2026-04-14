@@ -72,12 +72,16 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     const isAssignedToCurrentUser = assignedToId === currentUserId;
 
     // Allow editing of new service orders (ones without an id) so users can set type and description
-    // EXCEPT for DESIGNER users who can only edit ARTWORK service orders
+    // EXCEPT for DESIGNER users (ARTWORK only) and LOGISTIC users (cannot create)
     const isNewServiceOrder = !serviceOrder.id || (typeof serviceOrder.id === 'string' && serviceOrder.id.startsWith('temp-'));
     if (isNewServiceOrder) {
       // DESIGNER users can only edit new service orders if they're ARTWORK type
       if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
         return type === SERVICE_ORDER_TYPE.ARTWORK;
+      }
+      // LOGISTIC users cannot create service orders
+      if (userPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
+        return false;
       }
       return true;
     }
@@ -95,8 +99,12 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
         return type === SERVICE_ORDER_TYPE.COMMERCIAL && (isNotAssigned || isAssignedToCurrentUser);
 
       case SECTOR_PRIVILEGES.LOGISTIC:
-        // Can edit LOGISTIC and PRODUCTION service orders if not assigned or assigned to them
-        return (type === SERVICE_ORDER_TYPE.LOGISTIC || type === SERVICE_ORDER_TYPE.PRODUCTION) && (isNotAssigned || isAssignedToCurrentUser);
+        // Can ONLY edit service orders explicitly assigned to them (cannot edit unassigned orders)
+        return (type === SERVICE_ORDER_TYPE.LOGISTIC || type === SERVICE_ORDER_TYPE.PRODUCTION) && isAssignedToCurrentUser;
+
+      case SECTOR_PRIVILEGES.PRODUCTION_MANAGER:
+        // Can edit PRODUCTION and LOGISTIC service orders when not assigned or assigned to them
+        return (type === SERVICE_ORDER_TYPE.PRODUCTION || type === SERVICE_ORDER_TYPE.LOGISTIC) && (isNotAssigned || isAssignedToCurrentUser);
 
       case SECTOR_PRIVILEGES.DESIGNER:
         // Can edit ARTWORK service orders if not assigned or assigned to them
@@ -126,7 +134,11 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
       case SECTOR_PRIVILEGES.FINANCIAL:
         return type === SERVICE_ORDER_TYPE.COMMERCIAL && (isNotAssigned || isAssignedToCurrentUser);
       case SECTOR_PRIVILEGES.LOGISTIC:
-        return (type === SERVICE_ORDER_TYPE.LOGISTIC || type === SERVICE_ORDER_TYPE.PRODUCTION) && (isNotAssigned || isAssignedToCurrentUser);
+        // Can ONLY change status on service orders explicitly assigned to them
+        return (type === SERVICE_ORDER_TYPE.LOGISTIC || type === SERVICE_ORDER_TYPE.PRODUCTION) && isAssignedToCurrentUser;
+      case SECTOR_PRIVILEGES.PRODUCTION_MANAGER:
+        // Can change status on PRODUCTION and LOGISTIC service orders
+        return (type === SERVICE_ORDER_TYPE.PRODUCTION || type === SERVICE_ORDER_TYPE.LOGISTIC) && (isNotAssigned || isAssignedToCurrentUser);
       case SECTOR_PRIVILEGES.DESIGNER:
         return type === SERVICE_ORDER_TYPE.ARTWORK && (isNotAssigned || isAssignedToCurrentUser);
       default:
@@ -381,7 +393,7 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
           variant="outline"
           size="sm"
           onClick={handleAddService}
-          disabled={disabled || userPrivilege === SECTOR_PRIVILEGES.DESIGNER}
+          disabled={disabled || userPrivilege === SECTOR_PRIVILEGES.DESIGNER || userPrivilege === SECTOR_PRIVILEGES.LOGISTIC}
           className="flex-1"
         >
           <IconPlus className="h-4 w-4 mr-2" />
