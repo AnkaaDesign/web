@@ -141,19 +141,37 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
 
       // ── Text layer (selection layer) using official pdfjs TextLayer ───────
       //
-      // Using pdfjs's own TextLayer instead of manual span positioning because:
-      //   • It uses the exact same font-metric ascent tables that pdfjs uses
-      //     when rendering glyphs — so spans land precisely under their glyphs.
-      //   • It handles writing-mode, RTL, ligatures, and composite fonts.
-      //   • It produces DOM order that matches visual reading order (pdfjs
-      //     sorts internally).
+      // We fetch text content manually (getTextContent, not streamTextContent)
+      // so we can filter before passing it to TextLayer.
       //
-      // The class "pdf-text-layer" (not pdfjs's "textLayer") prevents the
-      // viewer CSS's `overflow:clip` from hiding ::selection highlights.
+      // Filter: drop any text item whose screen-space width exceeds 70 % of
+      // the page width.  These are almost always mispositioned metadata items —
+      // authentication URLs, digital-signature blobs, etc. — that government
+      // PDF generators (NFS-e, DANFE, boleto) place at coordinates that overlap
+      // visible form content.  Keeping them in the text layer causes two bugs:
+      //   1. They intercept mouse events over the labels they straddle.
+      //   2. When selected, the ::selection highlight spans the full width,
+      //      making it look like the whole page is selected.
+      //
+      // item.width is in PDF user-space units; multiplying by `scale` gives the
+      // screen-space width in CSS pixels — no DOM measurement needed.
+      const rawContent = await page.getTextContent();
+      if (cancelled) return;
+
+      const filteredContent = {
+        ...rawContent,
+        items: rawContent.items.filter((raw) => {
+          // TextMarkedContent items have no width — keep them
+          if (!("width" in raw)) return true;
+          const w = (raw as { width: number }).width * scale;
+          return w <= containerWidth * 0.7;
+        }),
+      };
+
       textLayerEl.innerHTML = "";
 
       const tl = new TextLayer({
-        textContentSource: page.streamTextContent(),
+        textContentSource: filteredContent,
         container: textLayerEl,
         viewport: vp,
       });
@@ -164,30 +182,6 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
       } catch (e: any) {
         // AbortException is thrown when cancel() is called — not an error
         if (e?.name === "AbortException") return;
-      }
-
-      if (cancelled) return;
-
-      // ── Post-process: prevent wide spans from occluding short labels ──────
-      //
-      // Some government PDFs (e.g. NFS-e) embed authentication URLs as text
-      // items whose PDF coordinates happen to land on top of visible form
-      // labels ("DADE:", "Valor:", etc.).  These URL spans are much wider than
-      // a typical label — they cover 70 %+ of the page width — so they
-      // intercept mouse-hit-tests before the short label span underneath can.
-      //
-      // Fix: after render, measure every span's screen width.  Any span wider
-      // than 70 % of the container gets z-index:0, pushing it behind normal
-      // content spans (z-index:1 from our CSS).  The URL remains selectable
-      // wherever it doesn't overlap other content, but labels on top of it
-      // are no longer shadowed.
-      const containerRect = textLayerEl.getBoundingClientRect();
-      if (containerRect.width > 0) {
-        for (const div of tl.textDivs) {
-          if (div.getBoundingClientRect().width > containerRect.width * 0.7) {
-            (div as HTMLElement).style.zIndex = "0";
-          }
-        }
       }
     };
 
