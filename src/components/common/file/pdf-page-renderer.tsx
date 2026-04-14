@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { pdfjs } from "react-pdf";
+import { TextLayer } from "pdfjs-dist";
 import { IconLoader2 } from "@tabler/icons-react";
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
@@ -8,35 +9,65 @@ type PDFDocumentProxy = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>
 type PDFPageProxy = Awaited<ReturnType<PDFDocumentProxy["getPage"]>>;
 
 /**
- * Affine transform matrix in PDF/CSS notation: [a, b, c, d, tx, ty]
+ * Inject the minimum CSS that pdfjs TextLayer needs.
  *
- *  | a  c  tx |
- *  | b  d  ty |
- *  | 0  0   1 |
- */
-type Matrix = [number, number, number, number, number, number];
-
-/**
- * Concatenate two affine transforms — equivalent to the matrix product m1 × m2.
+ * Why not import pdfjs-dist/web/pdf_viewer.css?
+ *   • It ships `overflow:clip` on .textLayer, which silently hides ::selection
+ *     highlights for any span that sits outside the clipping box.
+ *   • Importing the full viewer CSS brings in hundreds of rules we don't need.
  *
- * To convert a point from text-space to screen-space:
- *   screen = viewport.transform × item.transform × point
- * → combined = concatTransform(viewport.transform, item.transform)
+ * What we inject here is the structural minimum, with overflow:visible so every
+ * span's highlight is always visible regardless of position.
  */
-function concatTransform(m1: Matrix, m2: Matrix): Matrix {
-  return [
-    m1[0] * m2[0] + m1[2] * m2[1],  // a
-    m1[1] * m2[0] + m1[3] * m2[1],  // b
-    m1[0] * m2[2] + m1[2] * m2[3],  // c
-    m1[1] * m2[2] + m1[3] * m2[3],  // d
-    m1[0] * m2[4] + m1[2] * m2[5] + m1[4],  // tx
-    m1[1] * m2[4] + m1[3] * m2[5] + m1[5],  // ty
-  ];
-}
-
-interface PdfTextItem {
-  str: string;
-  transform: number[];
+let cssInjected = false;
+function ensureTextLayerCss() {
+  if (cssInjected || typeof document === "undefined") return;
+  cssInjected = true;
+  const style = document.createElement("style");
+  style.textContent = `
+    .pdf-text-layer {
+      position: absolute;
+      inset: 0;
+      overflow: visible;    /* must NOT be clip/hidden — kills ::selection highlights */
+      opacity: 1;
+      line-height: 1;
+      -webkit-text-size-adjust: none;
+      forced-color-adjust: none;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .pdf-text-layer :is(span, br) {
+      color: transparent;
+      position: absolute;
+      white-space: pre;
+      cursor: text;
+      transform-origin: 0% 0%;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .pdf-text-layer > :not(.markedContent),
+    .pdf-text-layer .markedContent span:not(.markedContent) {
+      z-index: 1;
+    }
+    .pdf-text-layer span.markedContent {
+      top: 0;
+      height: 0;
+    }
+    .pdf-text-layer span[role="img"] {
+      user-select: none;
+      -webkit-user-select: none;
+      cursor: default;
+    }
+    .pdf-text-layer :is(span, br)::selection {
+      background-color: rgba(0, 0, 255, 0.25);
+      color: transparent;
+    }
+    .pdf-text-layer :is(span, br)::-moz-selection {
+      background-color: rgba(0, 0, 255, 0.25);
+      color: transparent;
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 // ─── PageCanvas ──────────────────────────────────────────────────────────────
@@ -50,18 +81,26 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<ReturnType<PDFPageProxy["render"]> | null>(null);
+  const textLayerInstanceRef = useRef<TextLayer | null>(null);
   const [dims, setDims] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
+    ensureTextLayerCss();
+  }, []);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
-    const textLayer = textLayerRef.current;
-    if (!canvas || !textLayer || containerWidth <= 0) return;
+    const textLayerEl = textLayerRef.current;
+    if (!canvas || !textLayerEl || containerWidth <= 0) return;
 
     let cancelled = false;
 
     const run = async () => {
+      // Cancel previous tasks
       renderTaskRef.current?.cancel();
       renderTaskRef.current = null;
+      textLayerInstanceRef.current?.cancel();
+      textLayerInstanceRef.current = null;
 
       // Scale page to fill containerWidth exactly
       const baseVp = page.getViewport({ scale: 1 });
@@ -91,117 +130,32 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
 
       if (cancelled) return;
 
-      // ── Text layer (selection layer) ──────────────────────────────────────
-      const textContent = await page.getTextContent();
-      if (cancelled) return;
-
-      // viewport.transform maps PDF user-space → CSS pixel-space.
-      // For an upright A4 page at scale s it is: [s, 0, 0, −s, 0, pageH·s]
-      const vt = vp.transform as Matrix;
-
-      /**
-       * Fraction of em-height above the baseline (ascenders).
-       * pdfjs uses DEFAULT_FONT_ASCENT = 0.8 internally.
-       */
-      const ASCENT_FRAC = 0.8;
-
-      interface SpanData {
-        str: string;
-        /** CSS left (px) */
-        left: number;
-        /** CSS top (px)  =  baseline_y − ascent */
-        top: number;
-        /**
-         * Raw screen-Y of the glyph baseline (= tx[5] from the combined
-         * transform).  Used ONLY for sorting — NOT for CSS positioning.
-         *
-         * Why baseline and not top?
-         * Items on the same physical line share an identical baseline but may
-         * have different font sizes → different ascents → different `top` values.
-         * Sorting by `top` would wrongly split same-line items into separate
-         * groups.  Sorting by `baseline` keeps them together regardless of size.
-         */
-        baseline: number;
-        fontHeight: number;
-        angle: number;
-      }
-
-      const spans: SpanData[] = [];
-
-      for (const raw of textContent.items) {
-        const item = raw as PdfTextItem;
-        if (!item.str) continue;
-
-        // Combined transform: text-space → screen-space
-        const tx = concatTransform(vt, item.transform as Matrix);
-
-        // Font height = magnitude of the y-column vector [c, d]
-        // (the y-column tells us how a unit vector in text-space y maps to screen)
-        const fontHeight = Math.hypot(tx[2], tx[3]);
-        if (fontHeight < 1) continue;
-
-        // Rotation angle of the text baseline (0° for standard horizontal text)
-        const angle = Math.atan2(tx[1], tx[0]);
-
-        // tx[4], tx[5] = screen position of the glyph origin = baseline-left.
-        // CSS positions the element by its TOP-left corner, so we subtract the
-        // ascent.  For rotated text the ascent vector also rotates.
-        const ascent = fontHeight * ASCENT_FRAC;
-        const left   = tx[4] + (angle !== 0 ? ascent * Math.sin(angle) : 0);
-        const top    = tx[5] - (angle !== 0 ? ascent * Math.cos(angle) : ascent);
-
-        spans.push({ str: item.str, left, top, baseline: tx[5], fontHeight, angle });
-      }
-
-      // ── Sort into visual reading order ────────────────────────────────────
+      // ── Text layer (selection layer) using official pdfjs TextLayer ───────
       //
-      // PDFs store text in arbitrary draw order (content-stream order).
-      // Browser text-selection extends through DOM order, not visual order.
-      // Without re-sorting, dragging the cursor jumps to visually unrelated text.
+      // Using pdfjs's own TextLayer instead of manual span positioning because:
+      //   • It uses the exact same font-metric ascent tables that pdfjs uses
+      //     when rendering glyphs — so spans land precisely under their glyphs.
+      //   • It handles writing-mode, RTL, ligatures, and composite fonts.
+      //   • It produces DOM order that matches visual reading order (pdfjs
+      //     sorts internally).
       //
-      // Sort primary:   by BASELINE (tx[5]) — see SpanData.baseline comment above.
-      // Sort secondary: left→right within each line.
-      //
-      // Line-grouping tolerance = 30 % of the MEDIAN font height.
-      //   • Median (not mean) is robust against a few large headers skewing things.
-      //   • 30 % is tight enough to separate adjacent lines (typical leading ≥ 120 %)
-      //     but loose enough to absorb sub-pixel baseline jitter and minor super/
-      //     subscript shifts that still belong to the same logical line.
-      const sortedHeights = spans.map(s => s.fontHeight).sort((a, b) => a - b);
-      const medianH = sortedHeights[Math.floor(sortedHeights.length / 2)] ?? 12;
-      const tol = medianH * 0.3;
+      // The class "pdf-text-layer" (not pdfjs's "textLayer") prevents the
+      // viewer CSS's `overflow:clip` from hiding ::selection highlights.
+      textLayerEl.innerHTML = "";
 
-      spans.sort((a, b) => {
-        const dBaseline = a.baseline - b.baseline;
-        return Math.abs(dBaseline) > tol ? dBaseline : a.left - b.left;
+      const tl = new TextLayer({
+        textContentSource: page.streamTextContent(),
+        container: textLayerEl,
+        viewport: vp,
       });
+      textLayerInstanceRef.current = tl;
 
-      // ── Append spans via DocumentFragment (single reflow) ─────────────────
-      textLayer.innerHTML = "";
-      const frag = document.createDocumentFragment();
-
-      for (const s of spans) {
-        const el = document.createElement("span");
-        el.textContent = s.str;
-        // cssText avoids repeated style-property writes / partial reflows.
-        el.style.cssText =
-          "position:absolute;" +
-          `left:${s.left}px;` +
-          `top:${s.top}px;` +
-          `font-size:${s.fontHeight}px;` +
-          "font-family:sans-serif;" +
-          "line-height:1;" +
-          "color:transparent;" +
-          "white-space:pre;" +
-          "cursor:text;" +
-          "transform-origin:left top;" +
-          (s.angle !== 0 ? `transform:rotate(${s.angle}rad);` : "") +
-          "user-select:text;" +
-          "-webkit-user-select:text;";
-        frag.appendChild(el);
+      try {
+        await tl.render();
+      } catch (e: any) {
+        // AbortException is thrown when cancel() is called — not an error
+        if (e?.name === "AbortException") return;
       }
-
-      textLayer.appendChild(frag);
     };
 
     run();
@@ -209,33 +163,25 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
       cancelled = true;
       renderTaskRef.current?.cancel();
       renderTaskRef.current = null;
+      textLayerInstanceRef.current?.cancel();
+      textLayerInstanceRef.current = null;
     };
   }, [page, containerWidth]);
 
   return (
-    // overflow:hidden here clips anything that genuinely exits the page area.
+    // overflow:hidden clips anything genuinely exiting the page area (e.g. a
+    // mis-positioned annotation), but the text layer itself is overflow:visible
+    // so ::selection highlights on its spans are never clipped.
     <div style={{ position: "relative", width: dims.width || containerWidth, height: dims.height || 0, overflow: "hidden" }}>
       {/*
-        pointer-events:none on the canvas ensures mouse events reach the text
-        layer sitting on top of it; without this, the canvas absorbs mousedown
-        before drag-selection can start.
+        pointer-events:none on the canvas lets mouse events reach the text
+        layer on top; without this the canvas absorbs mousedown before
+        drag-selection can start.
       */}
       <canvas ref={canvasRef} style={{ display: "block", pointerEvents: "none" }} />
       <div
         ref={textLayerRef}
-        style={{
-          position: "absolute",
-          inset: 0,
-          // overflow:visible (not hidden!) so that ::selection highlights are
-          // rendered at each span's actual CSS position.  With overflow:hidden,
-          // any span whose computed left/top falls outside the inset box has its
-          // highlight silently clipped — the text is still selected (DOM range
-          // includes it) but the user sees no blue highlight, making it look
-          // like the selection failed.
-          overflow: "visible",
-          userSelect: "text",
-          WebkitUserSelect: "text",
-        }}
+        className="pdf-text-layer"
       />
     </div>
   );
@@ -250,8 +196,8 @@ export interface PdfPageRendererProps {
 
 /**
  * Renders every page of a remote PDF inline via pdfjs canvas rendering.
- * A transparent, correctly-ordered text layer sits on top of each canvas
- * so that text can be selected and copied without any browser-specific hacks.
+ * A transparent, correctly-positioned text layer (via pdfjs's own TextLayer
+ * class) sits on top of each canvas so that text can be selected and copied.
  */
 export function PdfPageRenderer({ url, className }: PdfPageRendererProps) {
   const containerRef   = useRef<HTMLDivElement>(null);
