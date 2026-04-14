@@ -596,30 +596,6 @@ export const ProductionRootPage = () => {
               </div>
             </div>
 
-            {/* Revenue Breakdown - Expected vs Faturado vs Recebido */}
-            <div>
-              <h3 className="text-lg font-semibold text-foreground mb-4">Visão Financeira</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <TrendCard
-                  title="Receita Esperada"
-                  value={formatCurrency(dashboard?.data?.revenueAnalysis?.expectedRevenue?.value || 0)}
-                  icon={CalendarDays}
-                  subtitle="Orçamentos ativos (não cancelados)"
-                />
-                <TrendCard
-                  title="Faturado"
-                  value={formatCurrency(dashboard?.data?.revenueAnalysis?.invoicedRevenue?.value || 0)}
-                  icon={ClipboardList}
-                  subtitle="Tarefas concluídas"
-                />
-                <TrendCard
-                  title="Recebido"
-                  value={formatCurrency(dashboard?.data?.revenueAnalysis?.receivedRevenue?.value || 0)}
-                  icon={DollarSign}
-                  subtitle="Pagamentos confirmados"
-                />
-              </div>
-            </div>
             </CardContent>
           </Card>
         </div>

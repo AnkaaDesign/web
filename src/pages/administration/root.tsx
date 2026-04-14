@@ -19,6 +19,8 @@ import {
   Clock as LucideClock,
   UserX as LucideUserX,
   Mail as LucideMail,
+  MessageSquare as LucideMessageSquare,
+  Settings as LucideSettings,
   Shield as LucideShield,
   PieChart as LucidePieChart,
   Users2 as LucideUsersGroup,
@@ -258,13 +260,6 @@ export const AdministrationRootPage = () => {
                   color="blue"
                 />
                 <QuickAccessCard
-                  title="Clientes"
-                  icon={LucideBuildingBank}
-                  onClick={() => navigate(routes.financial.customers.root)}
-                  count={data?.customerAnalysis?.totalCustomers?.value ?? 0}
-                  color="green"
-                />
-                <QuickAccessCard
                   title="Setores"
                   icon={LucideBuilding}
                   onClick={() => navigate(routes.administration.sectors.root)}
@@ -277,6 +272,20 @@ export const AdministrationRootPage = () => {
                   onClick={() => navigate(routes.administration.notifications.root)}
                   count={data?.notificationMetrics?.totalNotifications?.value ?? 0}
                   color="red"
+                />
+                <QuickAccessCard
+                  title="Config. Notificações"
+                  icon={LucideSettings}
+                  onClick={() => navigate(routes.administration.notifications.configurations.root)}
+                  count={data?.notificationMetrics?.totalNotificationConfigs?.value ?? 0}
+                  color="orange"
+                />
+                <QuickAccessCard
+                  title="Mensagens"
+                  icon={LucideMessageSquare}
+                  onClick={() => navigate(routes.administration.messages.root)}
+                  count={data?.totalMessages ?? 0}
+                  color="green"
                 />
               </div>
             </div>

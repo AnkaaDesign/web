@@ -346,6 +346,19 @@ export function Painting() {
                   icon={FlaskRound}
                   color="purple"
                 />
+                <RecentActivitiesCard
+                  title="Tintas Populares"
+                  activities={
+                    data?.trends?.popularColors?.slice(0, 5).map((color) => ({
+                      item: color.paintName,
+                      info: color.paintCode,
+                      quantity: `${color.productionCount}x`,
+                      time: "uso geral",
+                    })) || []
+                  }
+                  icon={Palette}
+                  color="green"
+                />
               </div>
             </div>
 

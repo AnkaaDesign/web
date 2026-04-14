@@ -1,8 +1,8 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, ORDER_STATUS_LABELS, STOCK_LEVEL } from "../../constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, ORDER_STATUS_LABELS, STOCK_LEVEL, ACTIVITY_OPERATION } from "../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { useInventoryDashboard, useOrders, useBorrows, usePpeDeliveries, useItems, useSuppliers, useActivities } from "../../hooks";
+import { useInventoryDashboard, useOrders, useBorrows, useItems, useSuppliers, useActivities } from "../../hooks";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency } from "../../utils";
 import { useState, useMemo } from "react";
@@ -110,13 +110,12 @@ export const InventoryRootPage = () => {
 
   const { data: activitiesData } = useActivities(activitiesQuery);
 
-  // Fetch recent orders that are not received (with time filter)
+  // Fetch recent orders that are not received (no date filter — show all pending)
   const { data: ordersData } = useOrders({
     where: {
       status: {
         not: "RECEIVED",
       },
-      ...(getDateFilter && { createdAt: getDateFilter }),
     },
     orderBy: { createdAt: "desc" },
     take: 10,
@@ -146,10 +145,25 @@ export const InventoryRootPage = () => {
     // No status filter - includes all suppliers regardless of status
   });
 
-  // Fetch PPE deliveries count (EPIs) - all deliveries regardless of time
-  const { data: ppeDeliveriesData } = usePpeDeliveries({
+  // Fetch PPE items count (EPI items registered in inventory)
+  const { data: ppeItemsData } = useItems({
     take: 1, // We only need the count, not the actual data
-    // No filters - shows all PPE deliveries regardless of status or time
+    isPpe: true, // Only items configured as PPE
+  });
+
+  // Fetch recent inbound/outbound activities (no period filter — always show latest)
+  const { data: recentInboundData } = useActivities({
+    limit: 10,
+    where: { operation: ACTIVITY_OPERATION.INBOUND },
+    orderBy: { createdAt: "desc" },
+    include: { item: true, user: true },
+  });
+
+  const { data: recentOutboundData } = useActivities({
+    limit: 10,
+    where: { operation: ACTIVITY_OPERATION.OUTBOUND },
+    orderBy: { createdAt: "desc" },
+    include: { item: true, user: true },
   });
 
   // Transform recent activities for the component
@@ -178,82 +192,34 @@ export const InventoryRootPage = () => {
     }));
   };
 
-  // Get inbound activities (entradas) - get the 10 most recent INBOUND activities
+  // Get inbound activities (entradas) - always show latest regardless of period
   const getInboundActivities = (): Activity[] => {
-    if (!dashboard?.data?.stockMovements?.recentActivities || dashboard.data.stockMovements.recentActivities.length === 0) {
-      return [
-        {
-          item: "Nenhuma entrada",
-          info: "Período selecionado",
-          quantity: "",
-          time: "✓",
-        },
-      ];
+    if (!recentInboundData?.data?.length) {
+      return [{ item: "Nenhuma entrada", info: "Sem registros", quantity: "", time: "✓" }];
     }
 
-    const inboundActivities = dashboard.data.stockMovements.recentActivities.filter((activity) => activity.operation === "INBOUND");
-
-    if (inboundActivities.length === 0) {
-      return [
-        {
-          item: "Nenhuma entrada",
-          info: "Período selecionado",
-          quantity: "",
-          time: "✓",
-        },
-      ];
-    }
-
-    // Take up to 10 most recent inbound activities
-    return inboundActivities.slice(0, 10).map((activity) => ({
-      item: activity.itemName || "Item desconhecido",
-      info: activity.userName || "Sistema",
+    return recentInboundData.data.map((activity) => ({
+      item: activity.item?.name || "Item desconhecido",
+      info: activity.user?.name || "Sistema",
       quantity: `+${activity.quantity || 0}`,
       time: activity.createdAt
-        ? new Date(activity.createdAt).toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
+        ? new Date(activity.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
         : "--:--",
     }));
   };
 
-  // Get outbound activities (saídas) - get the 10 most recent OUTBOUND activities
+  // Get outbound activities (saídas) - always show latest regardless of period
   const getOutboundActivities = (): Activity[] => {
-    if (!dashboard?.data?.stockMovements?.recentActivities || dashboard.data.stockMovements.recentActivities.length === 0) {
-      return [
-        {
-          item: "Nenhuma saída",
-          info: "Período selecionado",
-          quantity: "",
-          time: "✓",
-        },
-      ];
+    if (!recentOutboundData?.data?.length) {
+      return [{ item: "Nenhuma saída", info: "Sem registros", quantity: "", time: "✓" }];
     }
 
-    const outboundActivities = dashboard.data.stockMovements.recentActivities.filter((activity) => activity.operation === "OUTBOUND");
-
-    if (outboundActivities.length === 0) {
-      return [
-        {
-          item: "Nenhuma saída",
-          info: "Período selecionado",
-          quantity: "",
-          time: "✓",
-        },
-      ];
-    }
-
-    // Take up to 10 most recent outbound activities
-    return outboundActivities.slice(0, 10).map((activity) => ({
-      item: activity.itemName || "Item desconhecido",
-      info: activity.userName || "Sistema",
+    return recentOutboundData.data.map((activity) => ({
+      item: activity.item?.name || "Item desconhecido",
+      info: activity.user?.name || "Sistema",
       quantity: `-${activity.quantity || 0}`,
       time: activity.createdAt
-        ? new Date(activity.createdAt).toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
+        ? new Date(activity.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
         : "--:--",
     }));
   };
@@ -273,7 +239,11 @@ export const InventoryRootPage = () => {
 
     return ordersData.data.slice(0, 10).map((order) => {
       // Calculate total from items if not available on order
-      const totalPrice = order.items?.reduce((sum, item) => sum + (item.price || 0), 0) || 0;
+      const totalPrice =
+        order.items?.reduce((sum, item) => {
+          const unitPrice = (item.price || 0) + (item.icms || 0) + (item.ipi || 0);
+          return sum + unitPrice * (item.orderedQuantity || 1);
+        }, 0) || 0;
 
       return {
         item: order.description || "Sem descrição",
@@ -534,7 +504,7 @@ export const InventoryRootPage = () => {
                   title="EPIs"
                   icon={ShieldCheck}
                   onClick={() => navigate(routes.inventory.ppe.root)}
-                  count={ppeDeliveriesData?.meta?.totalRecords}
+                  count={ppeItemsData?.meta?.totalRecords}
                   color="teal"
                 />
               </div>

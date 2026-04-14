@@ -13,6 +13,7 @@ interface ActivityPatternCardProps {
   icon: LucideIcon;
   className?: string;
   color?: "blue" | "green" | "purple" | "orange" | "red" | "yellow";
+  formatValue?: (value: number) => string;
 }
 
 const colorMap = {
@@ -24,7 +25,7 @@ const colorMap = {
   yellow: "bg-yellow-600 dark:bg-yellow-500",
 };
 
-export function ActivityPatternCard({ title, data, icon: Icon, className, color = "blue", labelWidth = "w-36" }: ActivityPatternCardProps & { labelWidth?: string }) {
+export function ActivityPatternCard({ title, data, icon: Icon, className, color = "blue", labelWidth = "w-36", formatValue }: ActivityPatternCardProps & { labelWidth?: string }) {
   const maxValue = Math.max(...data.map((d) => d.value), 1);
 
   return (
@@ -46,7 +47,9 @@ export function ActivityPatternCard({ title, data, icon: Icon, className, color 
                   style={{ width: `${(item.value / maxValue) * 100}%` }}
                 />
               </div>
-              <span className="text-xs font-medium text-foreground w-10 text-right">{item.value}</span>
+              <span className="text-xs font-medium text-foreground w-16 text-right truncate" title={formatValue ? formatValue(item.value) : String(item.value)}>
+                {formatValue ? formatValue(item.value) : item.value}
+              </span>
             </div>
           ))}
         </div>

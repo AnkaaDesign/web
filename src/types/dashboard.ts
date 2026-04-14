@@ -295,6 +295,7 @@ export interface AdministrationDashboardData {
     notificationsByImportance: DashboardChartData;
     sentNotifications: DashboardMetric; // sentAt is not null
     notificationsByType: DashboardChartData;
+    totalNotificationConfigs: DashboardMetric;
   };
   userMetrics: {
     totalUsers: DashboardMetric;
@@ -340,6 +341,7 @@ export interface AdministrationDashboardData {
     type?: string;
     timestamp: Date | string;
   }>;
+  totalMessages: number;
 }
 
 export interface AdministrationDashboardResponse {

@@ -1,6 +1,13 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD } from "../../constants";
+import {
+  SECTOR_PRIVILEGES,
+  routes,
+  FAVORITE_PAGES,
+  DASHBOARD_TIME_PERIOD,
+  TASK_QUOTE_STATUS_LABELS,
+  INVOICE_STATUS_LABELS,
+} from "../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useFinancialDashboard } from "../../hooks";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +31,7 @@ import {
   Activity as LucideActivity,
   ClipboardList as LucideClipboardList,
   FileCheck as LucideFileCheck,
+  Banknote as LucideBanknote,
 } from "lucide-react";
 import {
   TrendCard,
@@ -32,13 +40,13 @@ import {
   AnalysisCard,
   ActivityPatternCard,
   RecentActivitiesCard,
-  DashboardSection,
   TimePeriodSelector,
   type AnalysisData,
   type Activity,
 } from "@/components/dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("pt-BR", {
@@ -135,7 +143,11 @@ export const FinancialRootPage = () => {
         <div className="h-full flex flex-col bg-background">
           {headerContent}
           <div className="flex-1 overflow-y-auto px-4 pb-6">
-            <LoadingSkeleton />
+            <Card>
+              <CardContent className="p-6">
+                <LoadingSkeleton />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </PrivilegeRoute>
@@ -148,9 +160,13 @@ export const FinancialRootPage = () => {
         <div className="h-full flex flex-col bg-background">
           {headerContent}
           <div className="flex-1 overflow-y-auto px-4 pb-6">
-            <Alert variant="destructive">
-              <AlertDescription>Erro ao carregar dashboard: {error.message}</AlertDescription>
-            </Alert>
+            <Card>
+              <CardContent className="p-6">
+                <Alert variant="destructive">
+                  <AlertDescription>Erro ao carregar dashboard: {error.message}</AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </PrivilegeRoute>
@@ -242,25 +258,75 @@ export const FinancialRootPage = () => {
     });
   };
 
-  // --- Recent Activities ---
-  const getRecentActivities = (): Activity[] => {
+  // --- Recent Activities helpers ---
+  const formatActivityTime = (timestamp: Date | string) =>
+    new Date(timestamp).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+
+  const getActivitiesByType = (type: string): Activity[] => {
     if (!data?.recentActivities?.length) return [];
-    return data.recentActivities.map((activity) => ({
-      item: activity.title,
-      info: activity.description,
-      quantity: activity.type ?? "",
-      time: new Date(activity.timestamp).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }),
-    }));
+    return data.recentActivities
+      .filter((a) => a.type === type)
+      .slice(0, 5)
+      .map((activity) => ({
+        item: activity.title,
+        info: activity.description,
+        quantity: "",
+        time: formatActivityTime(activity.timestamp),
+      }));
   };
+
+  const recentInvoices = getActivitiesByType("invoice");
+  const recentBankSlips = getActivitiesByType("bankSlip");
+  const recentPayments = getActivitiesByType("payment");
+  const recentNfse = getActivitiesByType("nfse");
+  const recentQuotes = getActivitiesByType("quote");
 
   return (
     <PrivilegeRoute requiredPrivilege={requiredPrivilege}>
       <div className="h-full flex flex-col bg-background">
         {headerContent}
 
-        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-4 pb-6">
+          <Card>
+            <CardContent className="p-6 space-y-6">
+          {/* Quick Access — first row */}
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Acesso Rápido</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <QuickAccessCard
+                title="Clientes"
+                icon={LucideUsers}
+                onClick={() => navigate(routes.financial.customers.root)}
+                count={data?.customerAnalysis?.topCustomers?.length ?? 0}
+                color="blue"
+              />
+              <QuickAccessCard
+                title="Faturamento"
+                icon={LucideFileText}
+                onClick={() => navigate(routes.financial.billing.root)}
+                count={totalInvoices}
+                color="green"
+              />
+              <QuickAccessCard
+                title="Notas Fiscais"
+                icon={LucideReceipt}
+                onClick={() => navigate(routes.financial.nfse.root)}
+                count={totalNfse}
+                color="purple"
+              />
+              <QuickAccessCard
+                title="Orcamentos"
+                icon={LucideClipboardList}
+                onClick={() => navigate(routes.financial.budget.root)}
+                count={totalQuotes}
+                color="orange"
+              />
+            </div>
+          </div>
+
           {/* Financial Health KPIs */}
-          <DashboardSection title="Saude Financeira">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Saúde Financeira</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <TrendCard
                 title="Taxa de Recebimento"
@@ -295,44 +361,11 @@ export const FinancialRootPage = () => {
                 subtitle={`${data?.quoteMetrics?.approvedQuotes?.value ?? 0} aprovados`}
               />
             </div>
-          </DashboardSection>
-
-          {/* Quick Access */}
-          <DashboardSection title="Acesso Rapido">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <QuickAccessCard
-                title="Clientes"
-                icon={LucideUsers}
-                onClick={() => navigate(routes.financial.customers.root)}
-                count={data?.customerAnalysis?.topCustomers?.length ?? 0}
-                color="blue"
-              />
-              <QuickAccessCard
-                title="Faturamento"
-                icon={LucideFileText}
-                onClick={() => navigate(routes.financial.billing.root)}
-                count={totalInvoices}
-                color="green"
-              />
-              <QuickAccessCard
-                title="Notas Fiscais"
-                icon={LucideReceipt}
-                onClick={() => navigate(routes.financial.nfse.root)}
-                count={totalNfse}
-                color="purple"
-              />
-              <QuickAccessCard
-                title="Orcamentos"
-                icon={LucideClipboardList}
-                onClick={() => navigate(routes.financial.budget.root)}
-                count={totalQuotes}
-                color="orange"
-              />
-            </div>
-          </DashboardSection>
+          </div>
 
           {/* Revenue Metrics */}
-          <DashboardSection title="Metricas de Receita">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Métricas de Receita</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <TrendCard
                 title="Total Faturado"
@@ -375,10 +408,48 @@ export const FinancialRootPage = () => {
                 subtitle={`de ${totalNfse} notas emitidas`}
               />
             </div>
-          </DashboardSection>
+          </div>
+
+          {/* Atividades Recentes — dedicated row */}
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Atividades Recentes</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <RecentActivitiesCard
+                title="Faturamentos Recentes"
+                activities={recentInvoices}
+                icon={LucideFileText}
+                color="blue"
+              />
+              <RecentActivitiesCard
+                title="Boletos Recentes"
+                activities={recentBankSlips}
+                icon={LucideCreditCard}
+                color="orange"
+              />
+              <RecentActivitiesCard
+                title="Pagamentos Recentes"
+                activities={recentPayments}
+                icon={LucideBanknote}
+                color="green"
+              />
+              <RecentActivitiesCard
+                title="Notas Fiscais Recentes"
+                activities={recentNfse}
+                icon={LucideReceipt}
+                color="purple"
+              />
+              <RecentActivitiesCard
+                title="Orcamentos Aprovados"
+                activities={recentQuotes}
+                icon={LucideClipboardList}
+                color="blue"
+              />
+            </div>
+          </div>
 
           {/* Invoice Status Distribution */}
-          <DashboardSection title="Status das Faturas">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Status das Faturas</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {invoiceStatusData.map((status, index) => (
                 <StatusCard
@@ -392,11 +463,12 @@ export const FinancialRootPage = () => {
                 />
               ))}
             </div>
-          </DashboardSection>
+          </div>
 
           {/* Bank Slips & NFS-e Status — side by side */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <DashboardSection title="Status dos Boletos">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground mb-4">Status dos Boletos</h3>
               <div className="grid grid-cols-3 gap-4">
                 {bankSlipStatusData.map((status, index) => (
                   <StatusCard
@@ -410,9 +482,10 @@ export const FinancialRootPage = () => {
                   />
                 ))}
               </div>
-            </DashboardSection>
+            </div>
 
-            <DashboardSection title="Status das NFS-e">
+            <div>
+              <h3 className="text-lg font-semibold text-foreground mb-4">Status das NFS-e</h3>
               <div className="grid grid-cols-3 gap-4">
                 {nfseStatusData.map((status, index) => (
                   <StatusCard
@@ -426,36 +499,12 @@ export const FinancialRootPage = () => {
                   />
                 ))}
               </div>
-            </DashboardSection>
+            </div>
           </div>
 
-          {/* Quote Metrics */}
-          <DashboardSection title="Orcamentos">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatusCard
-                status="Total"
-                quantity={totalQuotes}
-                total={totalQuotes}
-                icon={LucideClipboardList}
-                color="blue"
-                unit="orcamentos"
-              />
-              {quoteStatusData.map((status, index) => (
-                <StatusCard
-                  key={index}
-                  status={status.status}
-                  quantity={status.quantity}
-                  total={status.total}
-                  icon={status.icon}
-                  color={status.color}
-                  unit="orcamentos"
-                />
-              ))}
-            </div>
-          </DashboardSection>
-
           {/* Activity Patterns */}
-          <DashboardSection title="Padroes de Atividade">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Padrões de Atividade</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <ActivityPatternCard
                 title="Faturamento por Cliente"
@@ -467,12 +516,14 @@ export const FinancialRootPage = () => {
                 }
                 icon={LucideUsers}
                 color="blue"
+                formatValue={formatCurrency}
+                labelWidth="w-32"
               />
               <ActivityPatternCard
                 title="Status dos Orcamentos"
                 data={
                   data?.quotesByStatus?.labels?.map((label, index) => ({
-                    label: label,
+                    label: TASK_QUOTE_STATUS_LABELS[label as keyof typeof TASK_QUOTE_STATUS_LABELS] || label,
                     value: data.quotesByStatus.datasets[0]?.data[index] || 0,
                   })) || []
                 }
@@ -483,7 +534,7 @@ export const FinancialRootPage = () => {
                 title="Faturas por Status"
                 data={
                   data?.invoicesByStatus?.labels?.map((label, index) => ({
-                    label: label,
+                    label: INVOICE_STATUS_LABELS[label as keyof typeof INVOICE_STATUS_LABELS] || label,
                     value: data.invoicesByStatus.datasets[0]?.data[index] || 0,
                   })) || []
                 }
@@ -491,40 +542,30 @@ export const FinancialRootPage = () => {
                 color="purple"
               />
             </div>
-          </DashboardSection>
-
-          {/* Analysis & Recent Activities */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <DashboardSection title="Analises">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <AnalysisCard
-                    title="Receita por Cliente"
-                    type="REVENUE"
-                    data={getCustomerAnalysis()}
-                    icon={LucidePieChart}
-                    onDetailsClick={() => navigate(routes.financial.customers.root)}
-                  />
-                  <AnalysisCard
-                    title="Faturamento Mensal"
-                    type="REVENUE"
-                    data={getMonthlyRevenueAnalysis()}
-                    icon={LucideChartBar}
-                    onDetailsClick={() => navigate(routes.financial.billing.root)}
-                  />
-                </div>
-              </DashboardSection>
-            </div>
-
-            <DashboardSection title="Atividades Recentes">
-              <RecentActivitiesCard
-                title="Ultimas Movimentacoes"
-                activities={getRecentActivities()}
-                icon={LucideActivity}
-                color="blue"
-              />
-            </DashboardSection>
           </div>
+
+          {/* Analysis */}
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Análises</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <AnalysisCard
+                title="Receita por Cliente"
+                type="REVENUE"
+                data={getCustomerAnalysis()}
+                icon={LucidePieChart}
+                onDetailsClick={() => navigate(routes.financial.customers.root)}
+              />
+              <AnalysisCard
+                title="Faturamento Mensal"
+                type="REVENUE"
+                data={getMonthlyRevenueAnalysis()}
+                icon={LucideChartBar}
+                onDetailsClick={() => navigate(routes.financial.billing.root)}
+              />
+            </div>
+          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </PrivilegeRoute>
