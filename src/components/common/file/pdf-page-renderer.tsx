@@ -213,11 +213,12 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
   }, [page, containerWidth]);
 
   return (
-    <div style={{ position: "relative", width: dims.width || containerWidth, height: dims.height || 0 }}>
+    // overflow:hidden here clips anything that genuinely exits the page area.
+    <div style={{ position: "relative", width: dims.width || containerWidth, height: dims.height || 0, overflow: "hidden" }}>
       {/*
-        pointer-events:none on the canvas is critical.
-        Without it the canvas element can absorb mouse-down/move events before
-        they reach the text layer above it, breaking drag-to-select.
+        pointer-events:none on the canvas ensures mouse events reach the text
+        layer sitting on top of it; without this, the canvas absorbs mousedown
+        before drag-selection can start.
       */}
       <canvas ref={canvasRef} style={{ display: "block", pointerEvents: "none" }} />
       <div
@@ -225,7 +226,13 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
         style={{
           position: "absolute",
           inset: 0,
-          overflow: "hidden",
+          // overflow:visible (not hidden!) so that ::selection highlights are
+          // rendered at each span's actual CSS position.  With overflow:hidden,
+          // any span whose computed left/top falls outside the inset box has its
+          // highlight silently clipped — the text is still selected (DOM range
+          // includes it) but the user sees no blue highlight, making it look
+          // like the selection failed.
+          overflow: "visible",
           userSelect: "text",
           WebkitUserSelect: "text",
         }}
