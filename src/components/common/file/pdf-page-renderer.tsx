@@ -102,28 +102,25 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
         const fontHeight = Math.hypot(tx[2], tx[3]);
         if (fontHeight < 1) continue;
 
-        // Horizontal scale ratio (text may be wider/narrower than a square em)
-        const fontWidth = Math.hypot(tx[0], tx[1]);
-        const scaleX = fontWidth / fontHeight;
-
         // Rotation angle (0 for standard horizontal text)
         const angle = Math.atan2(tx[1], tx[0]);
 
-        // tx[4], tx[5] is the origin of the text glyph in screen space.
-        // PDF glyph origin = bottom-left; CSS origin = top-left, so subtract fontHeight.
-        const x = tx[4];
-        const y = tx[5] - fontHeight;
+        // tx[4], tx[5] is the glyph origin (baseline) in screen space.
+        // CSS top = top of the em-box. The ascent is ~80% of fontHeight (pdfjs DEFAULT_FONT_ASCENT).
+        // Using the correct ascent factor prevents line-to-line vertical overlap,
+        // which is the main cause of selection jumping between unrelated text.
+        const ascent = fontHeight * 0.8;
+        const x = angle === 0 ? tx[4] : tx[4] + ascent * Math.sin(angle);
+        const y = angle === 0 ? tx[5] - ascent : tx[5] - ascent * Math.cos(angle);
 
         const span = document.createElement("span");
         span.textContent = item.str;
 
-        const transform =
-          angle !== 0
-            ? `rotate(${angle}rad) scaleX(${scaleX})`
-            : scaleX !== 1
-              ? `scaleX(${scaleX})`
-              : "";
-
+        // Do NOT use scaleX CSS transform — transforms don't affect the layout/hit-test box,
+        // so a scaleX-transformed span has a mismatched clickable area vs its visual size.
+        // This causes the browser to select the wrong span when dragging.
+        // We accept a minor width mismatch for condensed/expanded fonts in exchange for
+        // correct, stable text selection behaviour.
         Object.assign(span.style, {
           position: "absolute",
           left: `${x}px`,
@@ -134,8 +131,8 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
           color: "transparent",
           whiteSpace: "pre",
           cursor: "text",
+          transform: angle !== 0 ? `rotate(${angle}rad)` : "none",
           transformOrigin: "left top",
-          transform: transform || "none",
           userSelect: "text",
           WebkitUserSelect: "text",
         });
