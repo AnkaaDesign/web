@@ -22,7 +22,7 @@ export function AwaitingQuoteApprovalList({ tasks }: AwaitingQuoteApprovalListPr
     <DashboardCardList
       title="Faturamento Aguardando Aprovação"
       icon={<IconFileCheck className="h-4 w-4 text-blue-500" />}
-      viewAllLink="/financeiro/orcamento"
+      viewAllLink="/financeiro/faturamento"
       emptyMessage="Nenhuma tarefa aguardando aprovação de faturamento"
       isEmpty={tasks.length === 0}
       footer={
@@ -48,7 +48,7 @@ export function AwaitingQuoteApprovalList({ tasks }: AwaitingQuoteApprovalListPr
           <div
             key={task.id}
             className={`grid grid-cols-[1.2fr_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.7fr)] gap-x-3 items-center px-4 py-2 hover:bg-secondary/50 cursor-pointer border-b border-border last:border-b-0 transition-colors ${index % 2 === 1 ? "bg-muted/30" : ""}`}
-            onClick={() => navigate(`/financeiro/orcamento/detalhes/${task.id}`)}
+            onClick={() => navigate(`/financeiro/faturamento/detalhes/${task.id}`)}
           >
             <span className="text-sm text-foreground truncate">
               {task.name || "Sem Nome"}
