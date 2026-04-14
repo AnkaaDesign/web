@@ -92,35 +92,55 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
 
       const viewportTransform = viewport.transform as Matrix;
 
+      // Pre-compute positions for all items, then sort by visual reading order
+      // (top→bottom, left→right). PDFs store text in content-stream order which
+      // is arbitrary — if spans are appended in that order, browser text selection
+      // extends through DOM order and jumps to visually unrelated text.
+      interface PreparedItem {
+        str: string;
+        x: number;
+        y: number;
+        fontHeight: number;
+        angle: number;
+      }
+
+      const prepared: PreparedItem[] = [];
+
       for (const rawItem of textContent.items) {
         const item = rawItem as TextItem;
         if (!item.str) continue;
 
         const tx = multiplyTransform(viewportTransform, item.transform as Matrix);
-
-        // Font height = magnitude of the y-axis column vector
         const fontHeight = Math.hypot(tx[2], tx[3]);
         if (fontHeight < 1) continue;
 
-        // Rotation angle (0 for standard horizontal text)
         const angle = Math.atan2(tx[1], tx[0]);
-
-        // tx[4], tx[5] is the glyph origin (baseline) in screen space.
-        // CSS top = top of the em-box. The ascent is ~80% of fontHeight (pdfjs DEFAULT_FONT_ASCENT).
-        // Using the correct ascent factor prevents line-to-line vertical overlap,
-        // which is the main cause of selection jumping between unrelated text.
         const ascent = fontHeight * 0.8;
         const x = angle === 0 ? tx[4] : tx[4] + ascent * Math.sin(angle);
         const y = angle === 0 ? tx[5] - ascent : tx[5] - ascent * Math.cos(angle);
 
-        const span = document.createElement("span");
-        span.textContent = item.str;
+        prepared.push({ str: item.str, x, y, fontHeight, angle });
+      }
 
-        // Do NOT use scaleX CSS transform — transforms don't affect the layout/hit-test box,
-        // so a scaleX-transformed span has a mismatched clickable area vs its visual size.
-        // This causes the browser to select the wrong span when dragging.
-        // We accept a minor width mismatch for condensed/expanded fonts in exchange for
-        // correct, stable text selection behaviour.
+      // Sort top-to-bottom, then left-to-right within the same line.
+      // Use half the average font height as the same-line tolerance.
+      const avgFontHeight = prepared.length
+        ? prepared.reduce((s, p) => s + p.fontHeight, 0) / prepared.length
+        : 12;
+      const lineTolerance = avgFontHeight * 0.5;
+
+      prepared.sort((a, b) => {
+        const yDiff = a.y - b.y;
+        if (Math.abs(yDiff) > lineTolerance) return yDiff;
+        return a.x - b.x;
+      });
+
+      for (const { str, x, y, fontHeight, angle } of prepared) {
+        const span = document.createElement("span");
+        span.textContent = str;
+
+        // Do NOT use scaleX CSS transform — transforms don't affect the layout/hit-test
+        // box, so a scaleX span has a mismatched clickable area causing selection jumps.
         Object.assign(span.style, {
           position: "absolute",
           left: `${x}px`,
