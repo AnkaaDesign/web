@@ -165,6 +165,30 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
         // AbortException is thrown when cancel() is called — not an error
         if (e?.name === "AbortException") return;
       }
+
+      if (cancelled) return;
+
+      // ── Post-process: prevent wide spans from occluding short labels ──────
+      //
+      // Some government PDFs (e.g. NFS-e) embed authentication URLs as text
+      // items whose PDF coordinates happen to land on top of visible form
+      // labels ("DADE:", "Valor:", etc.).  These URL spans are much wider than
+      // a typical label — they cover 70 %+ of the page width — so they
+      // intercept mouse-hit-tests before the short label span underneath can.
+      //
+      // Fix: after render, measure every span's screen width.  Any span wider
+      // than 70 % of the container gets z-index:0, pushing it behind normal
+      // content spans (z-index:1 from our CSS).  The URL remains selectable
+      // wherever it doesn't overlap other content, but labels on top of it
+      // are no longer shadowed.
+      const containerRect = textLayerEl.getBoundingClientRect();
+      if (containerRect.width > 0) {
+        for (const div of tl.textDivs) {
+          if (div.getBoundingClientRect().width > containerRect.width * 0.7) {
+            (div as HTMLElement).style.zIndex = "0";
+          }
+        }
+      }
     };
 
     run();
