@@ -10,7 +10,7 @@ const TextLayer = (pdfjs as any).TextLayer as new (params: {
   textContentSource: ReturnType<PDFPageProxy["streamTextContent"]> | Awaited<ReturnType<PDFPageProxy["getTextContent"]>>;
   container: HTMLElement;
   viewport: ReturnType<PDFPageProxy["getViewport"]>;
-}) => { render(): Promise<void>; cancel(): void };
+}) => { render(): Promise<void>; cancel(): void; readonly textDivs: HTMLElement[] };
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
 
@@ -18,15 +18,22 @@ type PDFDocumentProxy = Awaited<ReturnType<typeof pdfjs.getDocument>["promise"]>
 type PDFPageProxy = Awaited<ReturnType<PDFDocumentProxy["getPage"]>>;
 
 /**
- * Inject the minimum CSS that pdfjs TextLayer needs.
+ * Inject the minimum CSS for the pdfjs text layer.
  *
- * Why not import pdfjs-dist/web/pdf_viewer.css?
- *   • It ships `overflow:clip` on .textLayer, which silently hides ::selection
- *     highlights for any span that sits outside the clipping box.
- *   • Importing the full viewer CSS brings in hundreds of rules we don't need.
+ * KEY FACTS about pdfjs v5 TextLayer positioning (from reading the source):
  *
- * What we inject here is the structural minimum, with overflow:visible so every
- * span's highlight is always visible regardless of position.
+ *   • span.style.left  = `${(100 * left  / pageWidth).toFixed(2)}%`
+ *   • span.style.top   = `${(100 * top   / pageHeight).toFixed(2)}%`
+ *   • span.style.fontSize = `calc(var(--total-scale-factor) * Npx)`
+ *   • span.style.transform = `scaleX(N)` (to match PDF advance width)
+ *
+ * The `%` positions are relative to the container's OWN dimensions.
+ * `--total-scale-factor` MUST be set on the container (= viewport.scale) or
+ * all font sizes default to the browser built-in (~16 px), inflating every
+ * span's hit box and making clicks land on wrong spans.
+ *
+ * We use class `.pdf-text-layer` (not pdfjs's `.textLayer`) to avoid the
+ * viewer CSS's `overflow:clip` which silently hides ::selection highlights.
  */
 let cssInjected = false;
 function ensureTextLayerCss() {
@@ -37,7 +44,7 @@ function ensureTextLayerCss() {
     .pdf-text-layer {
       position: absolute;
       inset: 0;
-      overflow: visible;    /* must NOT be clip/hidden — kills ::selection highlights */
+      overflow: visible;
       opacity: 1;
       line-height: 1;
       -webkit-text-size-adjust: none;
@@ -90,7 +97,7 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<ReturnType<PDFPageProxy["render"]> | null>(null);
-  const textLayerInstanceRef = useRef<TextLayer | null>(null);
+  const textLayerInstanceRef = useRef<ReturnType<typeof TextLayer> | null>(null);
   const [dims, setDims] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -105,13 +112,12 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
     let cancelled = false;
 
     const run = async () => {
-      // Cancel previous tasks
       renderTaskRef.current?.cancel();
       renderTaskRef.current = null;
       textLayerInstanceRef.current?.cancel();
       textLayerInstanceRef.current = null;
 
-      // Scale page to fill containerWidth exactly
+      // ── Viewport ──────────────────────────────────────────────────────────
       const baseVp = page.getViewport({ scale: 1 });
       const scale  = containerWidth / baseVp.width;
       const vp     = page.getViewport({ scale });
@@ -139,36 +145,51 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
 
       if (cancelled) return;
 
-      // ── Text layer (selection layer) using official pdfjs TextLayer ───────
+      // ── Text layer ────────────────────────────────────────────────────────
       //
-      // We fetch text content manually (getTextContent, not streamTextContent)
-      // so we can filter before passing it to TextLayer.
+      // Pre-filter text content before handing it to TextLayer.
       //
-      // Filter: drop any text item whose screen-space width exceeds 70 % of
-      // the page width.  These are almost always mispositioned metadata items —
-      // authentication URLs, digital-signature blobs, etc. — that government
-      // PDF generators (NFS-e, DANFE, boleto) place at coordinates that overlap
-      // visible form content.  Keeping them in the text layer causes two bugs:
-      //   1. They intercept mouse events over the labels they straddle.
-      //   2. When selected, the ::selection highlight spans the full width,
-      //      making it look like the whole page is selected.
-      //
-      // item.width is in PDF user-space units; multiplying by `scale` gives the
-      // screen-space width in CSS pixels — no DOM measurement needed.
+      // Why: government PDFs (NFS-e, DANFE, boleto) embed authentication URLs
+      // and other metadata as text items whose PDF coordinates land on top of
+      // visible form labels.  We strip two categories:
+      //   1. Items whose string contains a URL scheme — these are almost never
+      //      the text the user wants to select and they reliably cause overlap.
+      //   2. Items whose screen-space width exceeds 50 % of the page — long
+      //      base64 blobs, certificate hashes, etc.
       const rawContent = await page.getTextContent();
       if (cancelled) return;
 
       const filteredContent = {
         ...rawContent,
         items: rawContent.items.filter((raw) => {
-          // TextMarkedContent items have no width — keep them
-          if (!("width" in raw)) return true;
-          const w = (raw as { width: number }).width * scale;
-          return w <= containerWidth * 0.7;
+          if (!("str" in raw) || !("width" in raw)) return true;
+          const item = raw as { str: string; width: number };
+          if (/https?:\/\//.test(item.str)) return false;
+          if (item.width * scale > containerWidth * 0.5) return false;
+          return true;
         }),
       };
 
       textLayerEl.innerHTML = "";
+
+      // ── CRITICAL: set --total-scale-factor ───────────────────────────────
+      //
+      // pdfjs v5 TextLayer sets every span's font-size as:
+      //   calc(var(--total-scale-factor) * <N>px)
+      // where <N> is the font height in PDF user-space units.
+      //
+      // Without this variable the browser falls back to the inherited font
+      // size (~16 px), inflating every span's hit-box.  A URL span that
+      // should be 8 px tall becomes 16 px and overhangs adjacent labels —
+      // that is why clicking on "DADE:" was selecting the authentication URL.
+      //
+      // The correct value is viewport.scale = containerWidth / pageWidth.
+      // (pdfjs uses `--total-scale-factor` so the same HTML can be re-scaled
+      // by updating one CSS variable rather than touching every inline style.)
+      textLayerEl.style.setProperty("--total-scale-factor", String(scale));
+      // Used by setLayerDimensions when CSS `round()` is supported:
+      textLayerEl.style.setProperty("--scale-round-x", "1px");
+      textLayerEl.style.setProperty("--scale-round-y", "1px");
 
       const tl = new TextLayer({
         textContentSource: filteredContent,
@@ -180,8 +201,49 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
       try {
         await tl.render();
       } catch (e: any) {
-        // AbortException is thrown when cancel() is called — not an error
         if (e?.name === "AbortException") return;
+      }
+
+      if (cancelled) return;
+
+      // ── Post-render: visual sort + z-index ───────────────────────────────
+      //
+      // pdfjs renders spans in PDF content-stream order, which is often not
+      // visual reading order.  Browser selection extends in DOM order, so
+      // drag-selection across lines can jump to unrelated text.
+      //
+      // Fix 1 — re-sort all leaf spans into visual reading order (top-to-bottom,
+      //   left-to-right).  style.left/top are percentage strings like "15.23%";
+      //   parseFloat correctly extracts the number for comparison.
+      //
+      // Fix 2 — assign z-index inversely by string length so short labels
+      //   ("DADE:", "R$") win hit-tests over long strings that might partially
+      //   overlap them after filtering.
+      const leafSpans = Array.from(
+        textLayerEl.querySelectorAll<HTMLElement>("span:not(.markedContent)")
+      );
+
+      // Sort by visual position
+      const LINE_TOLERANCE = 1.0; // % of page height; spans within this are "same line"
+      leafSpans.sort((a, b) => {
+        const aTop  = parseFloat(a.style.top)  || 0;
+        const bTop  = parseFloat(b.style.top)  || 0;
+        const aLeft = parseFloat(a.style.left) || 0;
+        const bLeft = parseFloat(b.style.left) || 0;
+        const dy = aTop - bTop;
+        return Math.abs(dy) > LINE_TOLERANCE ? dy : aLeft - bLeft;
+      });
+      // Re-append in sorted order (moves spans to top-level if nested in markedContent)
+      for (const span of leafSpans) textLayerEl.appendChild(span);
+
+      // Assign z-index by length: short labels on top
+      for (const span of leafSpans) {
+        const len = (span.textContent ?? "").length;
+        span.style.zIndex =
+          len <= 3  ? "6" :
+          len <= 10 ? "5" :
+          len <= 25 ? "3" :
+          len <= 50 ? "2" : "1";
       }
     };
 
@@ -196,20 +258,9 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
   }, [page, containerWidth]);
 
   return (
-    // overflow:hidden clips anything genuinely exiting the page area (e.g. a
-    // mis-positioned annotation), but the text layer itself is overflow:visible
-    // so ::selection highlights on its spans are never clipped.
     <div style={{ position: "relative", width: dims.width || containerWidth, height: dims.height || 0, overflow: "hidden" }}>
-      {/*
-        pointer-events:none on the canvas lets mouse events reach the text
-        layer on top; without this the canvas absorbs mousedown before
-        drag-selection can start.
-      */}
       <canvas ref={canvasRef} style={{ display: "block", pointerEvents: "none" }} />
-      <div
-        ref={textLayerRef}
-        className="pdf-text-layer"
-      />
+      <div ref={textLayerRef} className="pdf-text-layer" />
     </div>
   );
 }
@@ -223,8 +274,8 @@ export interface PdfPageRendererProps {
 
 /**
  * Renders every page of a remote PDF inline via pdfjs canvas rendering.
- * A transparent, correctly-positioned text layer (via pdfjs's own TextLayer
- * class) sits on top of each canvas so that text can be selected and copied.
+ * A transparent, correctly-positioned text layer sits on top of each canvas
+ * so that text can be selected and copied.
  */
 export function PdfPageRenderer({ url, className }: PdfPageRendererProps) {
   const containerRef   = useRef<HTMLDivElement>(null);
@@ -233,7 +284,6 @@ export function PdfPageRenderer({ url, className }: PdfPageRendererProps) {
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
 
-  // Measure available width
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -245,7 +295,6 @@ export function PdfPageRenderer({ url, className }: PdfPageRendererProps) {
     return () => ro.disconnect();
   }, []);
 
-  // Fetch & parse PDF
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
