@@ -164,8 +164,13 @@ function PageCanvas({ page, containerWidth }: PageCanvasProps) {
         items: rawContent.items.filter((raw) => {
           if (!("str" in raw) || !("width" in raw)) return true;
           const item = raw as { str: string; width: number };
+          // Remove authentication URLs — these appear in NFS-e / boleto PDFs as
+          // invisible text items whose PDF coordinates overlap visible form labels.
           if (/https?:\/\//.test(item.str)) return false;
-          if (item.width * scale > containerWidth * 0.5) return false;
+          // Remove truly full-page items (base64 blobs, certificate hashes).
+          // 90 % threshold: preserves headers, titles and long descriptions that
+          // legitimately span most of the page; only strips pathological outliers.
+          if (item.width * scale > containerWidth * 0.9) return false;
           return true;
         }),
       };
