@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { pdfjs } from "react-pdf";
-import { TextLayer } from "pdfjs-dist";
 import { IconLoader2 } from "@tabler/icons-react";
+
+// TextLayer is exported by pdfjs-dist (a transitive dep via react-pdf).
+// We access it through the pdfjs namespace to avoid adding pdfjs-dist as a
+// direct dependency and to guarantee version alignment.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const TextLayer = (pdfjs as any).TextLayer as new (params: {
+  textContentSource: ReturnType<PDFPageProxy["streamTextContent"]> | Awaited<ReturnType<PDFPageProxy["getTextContent"]>>;
+  container: HTMLElement;
+  viewport: ReturnType<PDFPageProxy["getViewport"]>;
+}) => { render(): Promise<void>; cancel(): void };
 
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
 
