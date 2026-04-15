@@ -883,10 +883,14 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     startedById: "Iniciado por",
     approvedById: "Aprovado por",
     completedById: "Concluído por",
+    pausedById: "Pausado por",
     startedAt: "Iniciado em",
     approvedAt: "Aprovado em",
     finishedAt: "Finalizado em",
     completedAt: "Concluído em",
+    pausedAt: "Pausado em",
+    lastStartedAt: "Último início",
+    totalActiveTimeSeconds: "Tempo ativo (seg)",
     userId: "Responsável",
     notes: "Observações",
     // Nested relationship fields
@@ -1190,6 +1194,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     const serviceOrderStatusLabels: Record<string, string> = {
       PENDING: "Pendente",
       IN_PROGRESS: "Em Andamento",
+      PAUSED: "Pausado",
       WAITING_APPROVE: "Aguardando Aprovação",
       COMPLETED: "Concluído",
       CANCELLED: "Cancelado",

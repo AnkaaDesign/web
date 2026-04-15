@@ -933,9 +933,6 @@ export const TaskDetailsPage = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<TASK_STATUS | null>(null);
-  const [serviceOrderCompletionDialogOpen, setServiceOrderCompletionDialogOpen] = useState(false);
-  const [pendingServiceOrder, setPendingServiceOrder] = useState<any>(null);
-  const [nextServiceOrderToStart, setNextServiceOrderToStart] = useState<any>(null);
   const [filesViewMode, setFilesViewMode] = useState<FileViewMode>("grid");
   const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("grid");
   const [quoteCustomerFilter, setQuoteCustomerFilter] = useState<string | null>(null);
@@ -1658,55 +1655,9 @@ export const TaskDetailsPage = () => {
       }
 
       await updateServiceOrder({ id: serviceOrderId, data: updateData });
-
-      // If completing a service order, check if there's a next one of the SAME TYPE to start
-      if (newStatus === SERVICE_ORDER_STATUS.COMPLETED) {
-        // Filter service orders by the same type as the one being completed
-        const sameTypeServiceOrders = task?.serviceOrders
-          ?.filter((so) => so.type === serviceOrder.type)
-          ?.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-
-        const currentIndex = sameTypeServiceOrders?.findIndex((s) => s.id === serviceOrderId) ?? -1;
-        const nextServiceOrder = sameTypeServiceOrders?.[currentIndex + 1];
-
-        // Only show prompt if there's a next service order of the same type that's pending
-        if (nextServiceOrder && nextServiceOrder.status === SERVICE_ORDER_STATUS.PENDING) {
-          setPendingServiceOrder(serviceOrder);
-          setNextServiceOrderToStart(nextServiceOrder);
-          setServiceOrderCompletionDialogOpen(true);
-        }
-      }
     } catch (error) {
       console.error("Error updating service order status:", error);
     }
-  };
-
-  // Confirm starting next service order
-  const confirmStartNextServiceOrder = async () => {
-    if (!nextServiceOrderToStart) return;
-
-    try {
-      await updateServiceOrder({
-        id: nextServiceOrderToStart.id,
-        data: {
-          status: SERVICE_ORDER_STATUS.IN_PROGRESS,
-          startedAt: new Date(),
-        },
-      });
-
-      setServiceOrderCompletionDialogOpen(false);
-      setPendingServiceOrder(null);
-      setNextServiceOrderToStart(null);
-    } catch (error) {
-      console.error("Error starting next service order:", error);
-    }
-  };
-
-  // Decline starting next service order
-  const declineStartNextServiceOrder = () => {
-    setServiceOrderCompletionDialogOpen(false);
-    setPendingServiceOrder(null);
-    setNextServiceOrderToStart(null);
   };
 
   // Loading state
@@ -3226,44 +3177,91 @@ export const TaskDetailsPage = () => {
                             );
                           }
 
-                          // Determine available status options based on service order type and user role
+                          // Determine available status options based on service order type, user role, and CURRENT STATUS (state machine)
                           const isArtworkServiceOrder = serviceOrder.type === SERVICE_ORDER_TYPE.ARTWORK;
                           const isDesignerUser = userSectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
-                          // Build status options based on service order type:
-                          // - ARTWORK: PENDING, IN_PROGRESS, WAITING_APPROVE, COMPLETED (approval workflow)
-                          //   - DESIGNER can only set up to WAITING_APPROVE (admin must approve to COMPLETED)
-                          // - OTHER TYPES (PRODUCTION, FINANCIAL, COMMERCIAL, LOGISTIC): PENDING, IN_PROGRESS, COMPLETED
-                          //   - NO WAITING_APPROVE (simple workflow without approval step)
-                          // - CANCELLED: Only available to ADMIN for any type
-                          const statusOptions: ComboboxOption[] = [
-                            { value: SERVICE_ORDER_STATUS.PENDING, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.PENDING] },
-                            { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.IN_PROGRESS] },
-                          ];
+                          const isAdminUser = userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
+                          const currentSOStatus = serviceOrder.status as SERVICE_ORDER_STATUS | null;
 
-                          // Add WAITING_APPROVE ONLY for ARTWORK service orders (approval workflow)
-                          // This status is NOT available for PRODUCTION, FINANCIAL, COMMERCIAL, or LOGISTIC
-                          if (isArtworkServiceOrder) {
-                            statusOptions.push({
-                              value: SERVICE_ORDER_STATUS.WAITING_APPROVE,
-                              label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.WAITING_APPROVE],
-                            });
-                          }
+                          // State-machine: options depend on current status; current state keeps its name, transitions use action verbs.
+                          const statusOptions: ComboboxOption[] = [];
 
-                          // Add COMPLETED - but NOT for DESIGNER on ARTWORK service orders
-                          // (designers must use WAITING_APPROVE and admin must approve to COMPLETED)
-                          if (!(isArtworkServiceOrder && isDesignerUser)) {
-                            statusOptions.push({
-                              value: SERVICE_ORDER_STATUS.COMPLETED,
-                              label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.COMPLETED],
-                            });
-                          }
-
-                          // Add CANCELLED for users with cancel permission (FINANCIAL, COMMERCIAL, ADMIN)
-                          if (canCancelServiceOrder(userSectorPrivilege)) {
-                            statusOptions.push({
-                              value: SERVICE_ORDER_STATUS.CANCELLED,
-                              label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.CANCELLED],
-                            });
+                          if (currentSOStatus === SERVICE_ORDER_STATUS.PENDING) {
+                            // Pendente → can only Iniciar. Admin can Cancelar.
+                            statusOptions.push(
+                              { value: SERVICE_ORDER_STATUS.PENDING, label: "Pendente" },
+                              { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: "Iniciar" },
+                            );
+                            if (isAdminUser) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.CANCELLED, label: "Cancelar" });
+                            }
+                          } else if (currentSOStatus === SERVICE_ORDER_STATUS.IN_PROGRESS) {
+                            // Em Andamento → can Pausar, (artwork) Enviar para Aprovação, Concluir, (cancel-capable) Cancelar.
+                            statusOptions.push(
+                              { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: "Em Andamento" },
+                              { value: SERVICE_ORDER_STATUS.PAUSED, label: "Pausar" },
+                            );
+                            if (isArtworkServiceOrder) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.WAITING_APPROVE, label: "Enviar para Aprovação" });
+                            }
+                            if (!(isArtworkServiceOrder && isDesignerUser)) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" });
+                            }
+                            if (isAdminUser) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.PENDING, label: "Voltar para Pendente" });
+                            }
+                            if (canCancelServiceOrder(userSectorPrivilege)) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.CANCELLED, label: "Cancelar" });
+                            }
+                          } else if (currentSOStatus === SERVICE_ORDER_STATUS.PAUSED) {
+                            // Pausado → can Continuar (resume to IN_PROGRESS), Concluir, (cancel-capable) Cancelar.
+                            statusOptions.push(
+                              { value: SERVICE_ORDER_STATUS.PAUSED, label: "Pausado" },
+                              { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: "Continuar" },
+                              { value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" },
+                            );
+                            if (isAdminUser) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.PENDING, label: "Voltar para Pendente" });
+                            }
+                            if (canCancelServiceOrder(userSectorPrivilege)) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.CANCELLED, label: "Cancelar" });
+                            }
+                          } else if (currentSOStatus === SERVICE_ORDER_STATUS.WAITING_APPROVE) {
+                            // Aguardando Aprovação → Admin: Aprovar / Reprovar. Designer: Retirar. Others: read-only (badge shown above).
+                            statusOptions.push({ value: SERVICE_ORDER_STATUS.WAITING_APPROVE, label: "Aguardando Aprovação" });
+                            if (isAdminUser) {
+                              statusOptions.push(
+                                { value: SERVICE_ORDER_STATUS.COMPLETED, label: "Aprovar" },
+                                { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: "Reprovar" },
+                              );
+                            } else if (!isDesignerUser) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Aprovar" });
+                            } else {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: "Retirar Envio" });
+                            }
+                            if (canCancelServiceOrder(userSectorPrivilege)) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.CANCELLED, label: "Cancelar" });
+                            }
+                          } else if (currentSOStatus === SERVICE_ORDER_STATUS.COMPLETED) {
+                            // Concluído → terminal. Admin can Reabrir.
+                            statusOptions.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluído" });
+                            if (isAdminUser) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: "Reabrir" });
+                            }
+                          } else if (currentSOStatus === SERVICE_ORDER_STATUS.CANCELLED) {
+                            // Cancelado → terminal. Admin can Restaurar.
+                            statusOptions.push({ value: SERVICE_ORDER_STATUS.CANCELLED, label: "Cancelado" });
+                            if (isAdminUser) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.PENDING, label: "Restaurar" });
+                            }
+                          } else {
+                            // Fallback
+                            statusOptions.push(
+                              { value: SERVICE_ORDER_STATUS.PENDING, label: "Pendente" },
+                              { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: "Iniciar" },
+                              { value: SERVICE_ORDER_STATUS.PAUSED, label: "Pausar" },
+                              { value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" },
+                            );
                           }
 
                           // Get trigger style based on current status (matching badge colors)
@@ -3273,6 +3271,8 @@ export const TaskDetailsPage = () => {
                                 return "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600";
                               case SERVICE_ORDER_STATUS.IN_PROGRESS:
                                 return "bg-blue-700 text-white hover:bg-blue-800 border-blue-800";
+                              case SERVICE_ORDER_STATUS.PAUSED:
+                                return "bg-yellow-500 text-white hover:bg-yellow-600 border-yellow-600";
                               case SERVICE_ORDER_STATUS.WAITING_APPROVE:
                                 return "bg-purple-600 text-white hover:bg-purple-700 border-purple-700";
                               case SERVICE_ORDER_STATUS.COMPLETED:
@@ -4343,28 +4343,6 @@ export const TaskDetailsPage = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Service Order Completion Dialog */}
-        <AlertDialog open={serviceOrderCompletionDialogOpen} onOpenChange={setServiceOrderCompletionDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Ordem de Serviço Finalizada</AlertDialogTitle>
-              <AlertDialogDescription>
-                A ordem de serviço "{pendingServiceOrder?.description}" foi finalizada com sucesso!
-                {nextServiceOrderToStart && (
-                  <>
-                    <br />
-                    <br />
-                    Deseja iniciar a próxima ordem de serviço: "{nextServiceOrderToStart.description}"?
-                  </>
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={declineStartNextServiceOrder}>{nextServiceOrderToStart ? "Não, manter pendente" : "OK"}</AlertDialogCancel>
-              {nextServiceOrderToStart && <AlertDialogAction onClick={confirmStartNextServiceOrder}>Sim, iniciar próxima</AlertDialogAction>}
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
     </PrivilegeRoute>
   );
 };

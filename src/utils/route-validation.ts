@@ -89,7 +89,11 @@ const VALID_ROUTES = [
   routes.statistics.financial.bankSlips,
   routes.statistics.painting.root,
   routes.statistics.painting.production,
-  routes.statistics.inventory,
+  routes.statistics.inventory.root,
+  routes.statistics.inventory.consumption,
+  routes.statistics.inventory.orders,
+  routes.statistics.inventory.topItems,
+  routes.statistics.inventory.trends,
 
   // Inventory routes
   routes.inventory.root,

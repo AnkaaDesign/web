@@ -450,6 +450,19 @@ export const routes = {
       root: "/pessoal/minhas-advertencias",
     },
     root: "/pessoal",
+    // Production Manager "Pessoal" section - company/team-wide views
+    pmWarnings: {
+      root: "/pessoal/advertencias",
+    },
+    pmCalculations: {
+      root: "/pessoal/calculos-ponto",
+    },
+    pmVacations: {
+      root: "/pessoal/ferias-equipe",
+    },
+    pmSchedules: {
+      root: "/pessoal/horarios",
+    },
   },
 
   // Production - Produção - Production Management

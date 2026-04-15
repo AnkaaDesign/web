@@ -345,7 +345,7 @@ export function ServerFileManagerPage() {
   const [fileDisplayMode, setFileDisplayMode] = useState<FileViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const hasAccess = user?.sector?.privileges ? hasAnyPrivilege(user as any, [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL]) : false;
+  const hasAccess = user?.sector?.privileges ? hasAnyPrivilege(user as any, [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]) : false;
 
   usePageTracker({
     title: "Gerenciador de Arquivos",

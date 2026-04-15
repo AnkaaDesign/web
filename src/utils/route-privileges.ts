@@ -10,12 +10,15 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // Home - All authenticated users can access (all privileges)
   "/": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
 
-  // Administração - Admin access
+  // Administração - Admin access (messages also accessible to production manager)
   "/administracao": "ADMIN",
+  "/administracao/mensagens": ["ADMIN", "PRODUCTION_MANAGER"],
+  "/administracao/mensagens/criar": ["ADMIN", "PRODUCTION_MANAGER"],
+  "/administracao/mensagens/*": ["ADMIN", "PRODUCTION_MANAGER"],
 
-  // Servidor - Server management routes (mostly admin, file manager also accessible to commercial)
-  "/servidor/gerenciador-de-arquivos": ["ADMIN", "COMMERCIAL"],
-  "/servidor/gerenciador-de-arquivos/*": ["ADMIN", "COMMERCIAL"],
+  // Servidor - Server management routes (mostly admin, file manager also accessible to commercial and production manager)
+  "/servidor/gerenciador-de-arquivos": ["ADMIN", "COMMERCIAL", "PRODUCTION_MANAGER"],
+  "/servidor/gerenciador-de-arquivos/*": ["ADMIN", "COMMERCIAL", "PRODUCTION_MANAGER"],
 
   "/administracao/registros-de-alteracoes": "ADMIN",
   "/administracao/arquivos": "ADMIN",

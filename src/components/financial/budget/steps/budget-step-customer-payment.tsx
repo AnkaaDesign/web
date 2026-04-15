@@ -1,27 +1,24 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import { DateTimeInput } from "@/components/ui/date-time-input";
 import { formatCurrency } from "@/utils";
 import { useCnpjLookup } from "@/hooks/common/use-cnpj-lookup";
 import { RESPONSIBLE_ROLE_LABELS } from "@/types/responsible";
 import { IconCreditCard, IconBuilding, IconIdBadge2 } from "@tabler/icons-react";
-
-const PAYMENT_CONDITION_OPTIONS = [
-  { value: "CASH_5", label: "À vista (5 dias)" },
-  { value: "CASH_40", label: "À vista (40 dias)" },
-  { value: "INSTALLMENTS_2", label: "Entrada + 20" },
-  { value: "INSTALLMENTS_3", label: "Entrada + 20/40" },
-  { value: "INSTALLMENTS_4", label: "Entrada + 20/40/60" },
-  { value: "INSTALLMENTS_5", label: "Entrada + 20/40/60/80" },
-  { value: "INSTALLMENTS_6", label: "Entrada + 20/40/60/80/100" },
-  { value: "INSTALLMENTS_7", label: "Entrada + 20/40/60/80/100/120" },
-  { value: "CUSTOM", label: "Personalizado" },
-];
+import {
+  legacyToConfig,
+  configToTypeValue,
+  PAYMENT_TYPE_OPTIONS,
+  VENCIMENTO_OPTIONS,
+  ENTRADA_OPTIONS,
+  INSTALLMENT_STEP_OPTIONS,
+} from "@/components/financial/payment-config-field";
+import type { PaymentConfig } from "@/schemas/task-quote";
 
 const STREET_TYPE_OPTIONS = [
   { value: "STREET", label: "Rua" },
@@ -63,17 +60,64 @@ export function BudgetStepCustomerPayment({
   const config = useWatch({ control, name: `customerConfigs.${configIndex}` });
   const customerData = config?.customerData || {};
 
-  const [showCustomPayment, setShowCustomPayment] = useState(false);
   const [docType, setDocType] = useState<"cnpj" | "cpf">(() => {
     if (customerData.cpf && !customerData.cnpj) return "cpf";
     return "cnpj";
   });
 
-  useEffect(() => {
-    if (config?.customPaymentText || config?.paymentCondition === "CUSTOM") {
-      setShowCustomPayment(true);
+  const paymentConfig: PaymentConfig | null =
+    config?.paymentConfig ?? legacyToConfig(config?.paymentCondition);
+  const paymentType = paymentConfig?.type ?? null;
+  const typeValue = configToTypeValue(paymentConfig);
+  const [showDateInput, setShowDateInput] = useState(() => !!paymentConfig?.specificDate);
+
+  const setPaymentConfig = useCallback((next: PaymentConfig | null) => {
+    setFormValue(`customerConfigs.${configIndex}.paymentConfig`, next, { shouldDirty: true });
+    setFormValue(`customerConfigs.${configIndex}.paymentCondition`, null);
+  }, [setFormValue, configIndex]);
+
+  const patchPayment = useCallback((partial: Partial<PaymentConfig>) => {
+    setPaymentConfig({ ...(paymentConfig as PaymentConfig), ...partial } as PaymentConfig);
+  }, [setPaymentConfig, paymentConfig]);
+
+  const handleTypeChange = useCallback((v: string | string[] | null | undefined) => {
+    const val = typeof v === "string" ? v : "";
+    if (!val) { setPaymentConfig(null); setShowDateInput(false); return; }
+    if (val === "CASH") {
+      setShowDateInput(!!paymentConfig?.specificDate);
+      setPaymentConfig({ type: "CASH", cashDays: paymentConfig?.cashDays ?? 5, specificDate: paymentConfig?.specificDate });
+      return;
     }
-  }, [config?.customPaymentText, config?.paymentCondition]);
+    const m = val.match(/^INST_(\d+)$/);
+    if (m) {
+      setShowDateInput(!!paymentConfig?.specificDate);
+      setPaymentConfig({
+        type: "INSTALLMENTS",
+        installmentCount: Number(m[1]),
+        installmentStep: paymentConfig?.installmentStep ?? 20,
+        entryDays: paymentConfig?.entryDays ?? 5,
+        specificDate: paymentConfig?.specificDate,
+      });
+    }
+  }, [setPaymentConfig, paymentConfig]);
+
+  const vencimentoValue = paymentConfig?.specificDate ? "CUSTOM" : String(paymentConfig?.cashDays ?? "");
+  const handleVencimentoChange = useCallback((v: string | string[] | null | undefined) => {
+    const val = typeof v === "string" ? v : "";
+    if (!val) { patchPayment({ cashDays: undefined, specificDate: undefined }); setShowDateInput(false); return; }
+    if (val === "CUSTOM") { setShowDateInput(true); return; }
+    patchPayment({ cashDays: Number(val) as any, specificDate: undefined });
+    setShowDateInput(false);
+  }, [patchPayment]);
+
+  const entradaValue = paymentConfig?.specificDate ? "CUSTOM" : String(paymentConfig?.entryDays ?? "");
+  const handleEntradaChange = useCallback((v: string | string[] | null | undefined) => {
+    const val = typeof v === "string" ? v : "";
+    if (!val) { patchPayment({ entryDays: undefined, specificDate: undefined }); setShowDateInput(false); return; }
+    if (val === "CUSTOM") { setShowDateInput(true); return; }
+    patchPayment({ entryDays: Number(val), specificDate: undefined });
+    setShowDateInput(false);
+  }, [patchPayment]);
 
   // Default budget responsible to the first task responsible (only on mount)
   const hasAutoDefaulted = useRef(false);
@@ -338,34 +382,32 @@ export function BudgetStepCustomerPayment({
           </CardTitle>
           <CardDescription>Condições de pagamento e faturamento</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto_1fr_1fr_1fr] gap-6">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Subtotal</Label>
+        <CardContent>
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="space-y-1.5 flex-1 min-w-[100px]">
+              <Label className="text-sm text-muted-foreground">Subtotal</Label>
               <Input value={formatCurrency(configSubtotal)} disabled className="bg-muted" />
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium font-bold">Total</Label>
+            <div className="space-y-1.5 flex-1 min-w-[100px]">
+              <Label className="text-sm font-bold">Total</Label>
               <Input
                 value={formatCurrency(configTotal)}
                 disabled
-                className="bg-transparent text-lg font-bold text-primary border-primary"
+                className="bg-transparent font-bold text-primary border-primary"
               />
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium whitespace-nowrap">Gerar Nota Fiscal</Label>
-              <div className="flex items-center gap-3 border border-input rounded-md px-3 py-2 h-10">
+            <div className="space-y-1.5 min-w-[90px]">
+              <Label className="text-sm font-medium whitespace-nowrap">Gerar NF</Label>
+              <div className="flex items-center gap-2 border border-input rounded-md px-3 py-2 h-9">
                 <Switch
                   checked={config?.generateInvoice !== false}
                   onCheckedChange={(checked) => setConfigField("generateInvoice", checked)}
                   disabled={disabled}
                 />
-                <span className="text-sm">
-                  {config?.generateInvoice !== false ? "Sim" : "Não"}
-                </span>
+                <span className="text-sm">{config?.generateInvoice !== false ? "Sim" : "Não"}</span>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5 flex-1 min-w-[100px]">
               <Label className="text-sm font-medium">N° do Pedido</Label>
               <Input
                 value={config?.orderNumber || ""}
@@ -374,29 +416,96 @@ export function BudgetStepCustomerPayment({
                 disabled={disabled}
               />
             </div>
-            <div className="space-y-2">
+            {/* ── Condição de Pagamento (type) ── */}
+            <div className="space-y-1.5 flex-1 min-w-[130px]">
               <Label className="text-sm font-medium">Condição de Pagamento</Label>
               <Combobox
-                value={config?.paymentCondition || ""}
-                onValueChange={(v) => {
-                  const val = typeof v === "string" ? v : "";
-                  setConfigField("paymentCondition", val || null);
-                  if (val === "CUSTOM") {
-                    setShowCustomPayment(true);
-                  } else {
-                    setShowCustomPayment(false);
-                    setConfigField("customPaymentText", null);
-                  }
-                }}
-                options={PAYMENT_CONDITION_OPTIONS}
+                value={typeValue}
+                onValueChange={handleTypeChange}
+                options={PAYMENT_TYPE_OPTIONS}
                 placeholder="Selecione..."
                 searchable={false}
                 clearable
                 disabled={disabled}
               />
             </div>
+            {/* ── À vista: Vencimento ── */}
+            {paymentType === "CASH" && (
+              <div className="space-y-1.5 flex-1 min-w-[100px]">
+                <Label className="text-sm font-medium">Vencimento</Label>
+                <Combobox
+                  value={vencimentoValue}
+                  onValueChange={handleVencimentoChange}
+                  options={VENCIMENTO_OPTIONS}
+                  placeholder="Dias..."
+                  searchable={false}
+                  clearable={false}
+                  disabled={disabled}
+                />
+              </div>
+            )}
+            {/* ── Parcelado: Intervalo ── */}
+            {paymentType === "INSTALLMENTS" && (
+              <div className="space-y-1.5 flex-1 min-w-[100px]">
+                <Label className="text-sm font-medium">Intervalo</Label>
+                <Combobox
+                  value={String(paymentConfig?.installmentStep ?? 20)}
+                  onValueChange={(v) => patchPayment({ installmentStep: Number(v) })}
+                  options={INSTALLMENT_STEP_OPTIONS}
+                  placeholder="Intervalo..."
+                  searchable={false}
+                  clearable={false}
+                  disabled={disabled}
+                />
+              </div>
+            )}
+            {/* ── Parcelado: Entrada ── */}
+            {paymentType === "INSTALLMENTS" && (
+              <div className="space-y-1.5 flex-1 min-w-[100px]">
+                <Label className="text-sm font-medium">Entrada</Label>
+                <Combobox
+                  value={entradaValue}
+                  onValueChange={handleEntradaChange}
+                  options={ENTRADA_OPTIONS}
+                  placeholder="Dias..."
+                  searchable={false}
+                  clearable={false}
+                  disabled={disabled}
+                />
+              </div>
+            )}
+            {/* ── Data específica ── */}
+            {paymentType && showDateInput && (
+              <div className="space-y-1.5 flex-1 min-w-[130px]">
+                <Label className="text-sm font-medium">Data específica</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={
+                    paymentConfig?.specificDate
+                      ? (() => {
+                          const [y, m, d] = paymentConfig.specificDate.split("-").map(Number);
+                          return new Date(y, m - 1, d, 13, 0, 0);
+                        })()
+                      : null
+                  }
+                  onChange={(date) => {
+                    if (!date || !(date instanceof Date)) {
+                      patchPayment({ specificDate: undefined });
+                      return;
+                    }
+                    const yyyy = date.getFullYear();
+                    const mm = String(date.getMonth() + 1).padStart(2, "0");
+                    const dd = String(date.getDate()).padStart(2, "0");
+                    patchPayment({ specificDate: `${yyyy}-${mm}-${dd}` });
+                  }}
+                  disabled={disabled}
+                  hideLabel
+                  showClearButton
+                />
+              </div>
+            )}
             {taskResponsibles && taskResponsibles.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-1.5 flex-1 min-w-[130px]">
                 <Label className="text-sm font-medium">Responsável</Label>
                 <Combobox
                   value={config?.responsibleId || ""}
@@ -416,20 +525,6 @@ export function BudgetStepCustomerPayment({
               </div>
             )}
           </div>
-
-          {showCustomPayment && (
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Condições Personalizadas</Label>
-              <Textarea
-                value={config?.customPaymentText || ""}
-                onChange={(e) => setConfigField("customPaymentText", e.target.value || null)}
-                rows={3}
-                placeholder="Descreva as condições de pagamento personalizadas..."
-                disabled={disabled}
-                className="min-h-[80px]"
-              />
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>

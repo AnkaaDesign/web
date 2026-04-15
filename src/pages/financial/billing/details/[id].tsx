@@ -207,6 +207,7 @@ export const BillingDetailPage = () => {
           config.discountValue != null ? Number(config.discountValue) : null,
         discountReference: config.discountReference || null,
         paymentCondition: config.paymentCondition || null,
+        paymentConfig: (config.paymentConfig as any) || null,
         customPaymentText: config.customPaymentText || null,
         generateInvoice: config.generateInvoice !== false,
         orderNumber: config.orderNumber || null,
@@ -227,8 +228,9 @@ export const BillingDetailPage = () => {
           streetType: config.customer?.streetType || null,
         },
       })),
-    });
-  }, [task, quote]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, { keepDirtyValues: true }); // preserve user edits on background refetch
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id, quote?.id]); // use IDs — object refs change on every refetch and would wipe unsaved edits
 
   // Dynamic steps: Tarefa → Serviços → Cliente(s) → Resumo
   const customerConfigs = form.watch("customerConfigs") || [];
@@ -326,6 +328,8 @@ export const BillingDetailPage = () => {
     for (let i = 0; i < configs.length; i++) {
       const config = configs[i];
       const data = config.customerData || {};
+      const paymentConfig = form.getValues(`customerConfigs.${i}.paymentConfig` as any);
+      const paymentCondition = form.getValues(`customerConfigs.${i}.paymentCondition` as any);
       const errors: string[] = [];
       if (!data.cnpj && !data.cpf) errors.push("CNPJ ou CPF");
       if (!data.fantasyName?.trim()) errors.push("Nome Fantasia");
@@ -336,7 +340,7 @@ export const BillingDetailPage = () => {
       if (!data.address?.trim()) errors.push("Logradouro");
       if (!data.addressNumber?.trim()) errors.push("Número");
       if (!data.neighborhood?.trim()) errors.push("Bairro");
-      if (!config.paymentCondition) errors.push("Condição de Pagamento");
+      if (!paymentCondition && !(paymentConfig as any)?.type) errors.push("Condição de Pagamento");
       if (errors.length > 0) {
         setCurrentStep(3 + i);
         const name = data.fantasyName || data.corporateName || `Cliente ${i + 1}`;
@@ -432,6 +436,7 @@ export const BillingDetailPage = () => {
           discountValue: c.discountValue != null ? Number(c.discountValue) : null,
           discountReference: c.discountReference || null,
           paymentCondition: c.paymentCondition || null,
+          paymentConfig: c.paymentConfig ?? null,
           customPaymentText: c.customPaymentText || null,
           generateInvoice: c.generateInvoice !== false,
           orderNumber: c.orderNumber || null,
@@ -663,14 +668,19 @@ export const BillingDetailPage = () => {
               <BillingStepServices disabled={!canEdit} />
             </div>
 
-            {isCustomerStep && currentConfig && (
-              <BillingStepCustomer
-                key={currentConfig.customerId || customerStepIndex}
-                configIndex={customerStepIndex}
-                customer={currentCustomer}
-                disabled={!canEdit}
-              />
-            )}
+            {/* Customer steps — always mounted (hidden via CSS) so form values survive navigation */}
+            {customerConfigs.map((config: any, i: number) => {
+              const cachedCustomer = customersCache.current.get(config.customerId);
+              return (
+                <div key={config.customerId || i} style={{ display: currentStep === 3 + i ? undefined : "none" }}>
+                  <BillingStepCustomer
+                    configIndex={i}
+                    customer={cachedCustomer}
+                    disabled={!canEdit}
+                  />
+                </div>
+              );
+            })}
 
             {isReviewStep && (
               <BillingStepReview

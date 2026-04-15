@@ -25,6 +25,10 @@ export interface ServiceOrder extends BaseEntity {
   startedAt: Date | null;
   approvedAt: Date | null;
   finishedAt: Date | null;
+  pausedAt: Date | null;
+  pausedById: string | null;
+  lastStartedAt: Date | null;
+  totalActiveTimeSeconds: number;
   // File IDs for create/update
   checkinFileIds?: string[];
   checkoutFileIds?: string[];
@@ -36,6 +40,7 @@ export interface ServiceOrder extends BaseEntity {
   startedBy?: User;
   approvedBy?: User;
   completedBy?: User;
+  pausedBy?: User;
   service?: {
     name: string;
   };
@@ -102,6 +107,10 @@ export interface ServiceOrderOrderBy {
   startedAt?: ORDER_BY_DIRECTION;
   approvedAt?: ORDER_BY_DIRECTION;
   finishedAt?: ORDER_BY_DIRECTION;
+  pausedAt?: ORDER_BY_DIRECTION;
+  pausedById?: ORDER_BY_DIRECTION;
+  lastStartedAt?: ORDER_BY_DIRECTION;
+  totalActiveTimeSeconds?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
   task?: TaskOrderBy;

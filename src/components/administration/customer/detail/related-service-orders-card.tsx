@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { IconClipboardList, IconAlertCircle, IconCircleCheckFilled, IconClock, IconLoader, IconX } from "@tabler/icons-react";
+import { IconClipboardList, IconAlertCircle, IconCircleCheckFilled, IconClock, IconLoader, IconPlayerPause, IconX } from "@tabler/icons-react";
 import type { Customer, ServiceOrder } from "../../../../types";
 import { formatDate, formatDateTime } from "../../../../utils";
 import { SERVICE_ORDER_STATUS, SERVICE_ORDER_STATUS_LABELS } from "../../../../constants";
@@ -32,6 +32,11 @@ const SERVICE_ORDER_STATUS_CONFIG: Record<
     icon: IconLoader,
     color: "text-blue-500",
     badgeClass: "bg-blue-500 hover:bg-blue-600 text-white border-blue-500",
+  },
+  [SERVICE_ORDER_STATUS.PAUSED]: {
+    icon: IconPlayerPause,
+    color: "text-yellow-500",
+    badgeClass: "bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500",
   },
   [SERVICE_ORDER_STATUS.COMPLETED]: {
     icon: IconCircleCheckFilled,
@@ -66,9 +71,10 @@ export function RelatedServiceOrdersCard({ customer, className }: RelatedService
       // Priority for active statuses
       const statusPriority: Record<string, number> = {
         [SERVICE_ORDER_STATUS.IN_PROGRESS]: 1,
-        [SERVICE_ORDER_STATUS.PENDING]: 2,
-        [SERVICE_ORDER_STATUS.COMPLETED]: 3,
-        [SERVICE_ORDER_STATUS.CANCELLED]: 4,
+        [SERVICE_ORDER_STATUS.PAUSED]: 2,
+        [SERVICE_ORDER_STATUS.PENDING]: 3,
+        [SERVICE_ORDER_STATUS.COMPLETED]: 4,
+        [SERVICE_ORDER_STATUS.CANCELLED]: 5,
       };
 
       const aPriority = a.status ? (statusPriority[a.status] ?? 5) : 5;
@@ -158,7 +164,7 @@ export function RelatedServiceOrdersCard({ customer, className }: RelatedService
 
         {/* Status Summary */}
         <div className="flex flex-wrap gap-2 mb-4">
-          {[SERVICE_ORDER_STATUS.PENDING, SERVICE_ORDER_STATUS.IN_PROGRESS, SERVICE_ORDER_STATUS.COMPLETED, SERVICE_ORDER_STATUS.CANCELLED].map((status: string) => {
+          {[SERVICE_ORDER_STATUS.PENDING, SERVICE_ORDER_STATUS.IN_PROGRESS, SERVICE_ORDER_STATUS.PAUSED, SERVICE_ORDER_STATUS.COMPLETED, SERVICE_ORDER_STATUS.CANCELLED].map((status: string) => {
             const count = statistics.statusCounts[status] || 0;
             const config = SERVICE_ORDER_STATUS_CONFIG[status];
             return (

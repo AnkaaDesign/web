@@ -354,8 +354,8 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
   // Generate payment and guarantee text (customPaymentText, paymentCondition now live on config)
   const paymentText = generatePaymentText({
     customPaymentText: firstConfig?.customPaymentText || null,
+    paymentConfig: (firstConfig as any)?.paymentConfig || null,
     paymentCondition: firstConfig?.paymentCondition,
-
     total: firstConfig?.total ?? task.quote.total,
   });
   const guaranteeText = generateGuaranteeText(task.quote);

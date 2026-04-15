@@ -59,7 +59,6 @@ export function HomePage() {
   const needsTimeEntries = currentPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
     currentPrivilege === SECTOR_PRIVILEGES.DESIGNER ||
     currentPrivilege === SECTOR_PRIVILEGES.PRODUCTION ||
-    currentPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER ||
     currentPrivilege === SECTOR_PRIVILEGES.WAREHOUSE;
 
   const dashboardData = dashboardResponse?.data;

@@ -155,6 +155,7 @@ export const useMySecullumCalculations = (params?: {
     queryKey: [...secullumKeys.all, 'my-calculations', params],
     queryFn: () => secullumService.getMyCalculations(params),
     staleTime: 5 * 60 * 1000,
+    retry: 0,
     enabled: !!params && !!params.startDate && !!params.endDate,
   });
 };

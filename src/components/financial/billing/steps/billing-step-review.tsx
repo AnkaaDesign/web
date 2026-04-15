@@ -192,7 +192,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
       if (!data.address?.trim()) errors.push("Logradouro");
       if (!data.addressNumber?.trim()) errors.push("Número");
       if (!data.neighborhood?.trim()) errors.push("Bairro");
-      if (!config.paymentCondition) errors.push("Condição de Pagamento");
+      if (!config.paymentCondition && !(config.paymentConfig as any)?.type) errors.push("Condição de Pagamento");
       if (errors.length > 0) {
         const name = data.fantasyName || data.corporateName || `Cliente ${i + 1}`;
         toast.error(`${name} — campos obrigatórios não preenchidos`, {

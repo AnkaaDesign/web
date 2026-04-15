@@ -1045,6 +1045,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   },
   {
+    id: "gerenciador-de-arquivos-production-manager",
+    title: "Gerenciador de Arquivos",
+    icon: "fileManager",
+    path: "/servidor/gerenciador-de-arquivos",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  },
+  {
     id: "historico-production-manager",
     title: "Histórico",
     icon: "history",
@@ -1052,11 +1059,38 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   },
   {
+    id: "mensagens-production-manager",
+    title: "Mensagens",
+    icon: "messagePlus",
+    path: "/administracao/mensagens",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    children: [
+      { id: "mensagens-criar-pm", title: "Criar", icon: "plus", path: "/administracao/mensagens/criar" },
+      { id: "mensagens-detalhes-pm", title: "Detalhes", icon: "eye", path: "/administracao/mensagens/:id", isDynamic: true },
+      { id: "mensagens-editar-pm", title: "Editar", icon: "edit", path: "/administracao/mensagens/:id/editar", isDynamic: true },
+    ],
+  },
+  {
     id: "minhas-mensagens-production-manager",
     title: "Minhas Mensagens",
     icon: "message",
     path: "/pessoal/mensagens",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  },
+  // Pessoal - Company/team HR data section (exclusively for PRODUCTION_MANAGER)
+  {
+    id: "pessoal-production-manager",
+    title: "Pessoal",
+    icon: "users",
+    path: "/pessoal/advertencias",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    children: [
+      { id: "pessoal-pm-advertencias", title: "Advertências", icon: "alertTriangle", path: "/pessoal/advertencias" },
+      { id: "pessoal-pm-calculos", title: "Cálculos de Ponto", icon: "deviceIpadDollar", path: "/pessoal/calculos-ponto" },
+      { id: "pessoal-pm-feriados", title: "Feriados", icon: "holiday", path: "/pessoal/feriados" },
+      { id: "pessoal-pm-ferias", title: "Férias", icon: "calendarWeek", path: "/pessoal/ferias-equipe" },
+      { id: "pessoal-pm-horarios", title: "Horários", icon: "clock", path: "/pessoal/horarios" },
+    ],
   },
 
   // COMMERCIAL - Direct menu items (flat structure, sorted alphabetically)

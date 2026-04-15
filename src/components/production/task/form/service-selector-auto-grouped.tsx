@@ -34,6 +34,40 @@ interface ServiceSelectorProps {
   onProductionReorder?: (descriptions: string[]) => void;
 }
 
+/**
+ * Returns an action-oriented label for a status option in the combobox.
+ * - When current === target: the option is the current state → show state name.
+ * - Otherwise: the option is a transition → show an action verb.
+ */
+function getStatusOptionLabel(current: SERVICE_ORDER_STATUS | string, target: SERVICE_ORDER_STATUS, userPrivilege?: string): string {
+  if (current === target) return SERVICE_ORDER_STATUS_LABELS[target] ?? target;
+
+  switch (target) {
+    case SERVICE_ORDER_STATUS.IN_PROGRESS:
+      if (current === SERVICE_ORDER_STATUS.PAUSED) return "Continuar";
+      if (current === SERVICE_ORDER_STATUS.COMPLETED) return "Reabrir";
+      if (current === SERVICE_ORDER_STATUS.WAITING_APPROVE) {
+        // Designers withdraw their own submission; others (admin) reject/reprove
+        return userPrivilege === SECTOR_PRIVILEGES.DESIGNER ? "Retirar Envio" : "Reprovar";
+      }
+      return "Iniciar";
+    case SERVICE_ORDER_STATUS.PAUSED:
+      return "Pausar";
+    case SERVICE_ORDER_STATUS.WAITING_APPROVE:
+      return "Enviar para Aprovação";
+    case SERVICE_ORDER_STATUS.COMPLETED:
+      if (current === SERVICE_ORDER_STATUS.WAITING_APPROVE) return "Aprovar";
+      return "Concluir";
+    case SERVICE_ORDER_STATUS.CANCELLED:
+      return "Cancelar";
+    case SERVICE_ORDER_STATUS.PENDING:
+      if (current === SERVICE_ORDER_STATUS.CANCELLED) return "Restaurar";
+      return "Voltar para Pendente";
+    default:
+      return SERVICE_ORDER_STATUS_LABELS[target] ?? target;
+  }
+}
+
 export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege, isTeamLeader = false, onItemDeleted, isAccordionOpen, onProductionReorder }: ServiceSelectorProps) {
   const { fields, append, remove, replace } = useFieldArray({
     control,
@@ -575,58 +609,141 @@ function ServiceRow({
   // Check if observation has content
   const hasObservation = Boolean(currentObservation && currentObservation.trim());
 
-  // Determine which status options are available based on type and user privilege
-  // IMPORTANT: WAITING_APPROVE status is ONLY available for ARTWORK service orders
-  // This is because only artwork has the designer → admin approval workflow
+  // Determine which status options are available based on current status, type and user privilege.
+  // This is a strict state-machine: transitions are only valid from the current state.
+  // PAUSED is only reachable from IN_PROGRESS; IN_PROGRESS (resume) is only shown from PAUSED.
   const getAvailableStatuses = useMemo(() => {
-    // For new service orders (no id), only PENDING is allowed
+    // New service orders always start as PENDING
     const isNewServiceOrder = !serviceOrderId || (typeof serviceOrderId === 'string' && serviceOrderId.startsWith('temp-'));
     if (isNewServiceOrder) {
       return [SERVICE_ORDER_STATUS.PENDING];
     }
 
     const isArtworkType = selectedType === SERVICE_ORDER_TYPE.ARTWORK;
+    const isAdmin = userPrivilege === SECTOR_PRIVILEGES.ADMIN;
+    const isDesigner = userPrivilege === SECTOR_PRIVILEGES.DESIGNER;
 
-    // Admin can set any status, but WAITING_APPROVE only for ARTWORK
-    if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) {
-      if (isArtworkType) {
-        // ARTWORK: All statuses including WAITING_APPROVE (approval workflow)
+    // State-machine transitions keyed on the current status
+    switch (currentStatus) {
+
+      // ── PENDING ──────────────────────────────────────────────────────────
+      // Can only be started (→ IN_PROGRESS). Admin can also cancel.
+      case SERVICE_ORDER_STATUS.PENDING:
+        if (isAdmin) return [
+          SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.CANCELLED,
+        ];
         return [
           SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+        ];
+
+      // ── IN_PROGRESS ───────────────────────────────────────────────────────
+      // Can be paused, completed, or (artwork) sent for approval.
+      // Admin can also roll back to PENDING or cancel.
+      case SERVICE_ORDER_STATUS.IN_PROGRESS:
+        if (isAdmin) {
+          return isArtworkType ? [
+            SERVICE_ORDER_STATUS.PENDING,
+            SERVICE_ORDER_STATUS.IN_PROGRESS,
+            SERVICE_ORDER_STATUS.PAUSED,
+            SERVICE_ORDER_STATUS.WAITING_APPROVE,
+            SERVICE_ORDER_STATUS.COMPLETED,
+            SERVICE_ORDER_STATUS.CANCELLED,
+          ] : [
+            SERVICE_ORDER_STATUS.PENDING,
+            SERVICE_ORDER_STATUS.IN_PROGRESS,
+            SERVICE_ORDER_STATUS.PAUSED,
+            SERVICE_ORDER_STATUS.COMPLETED,
+            SERVICE_ORDER_STATUS.CANCELLED,
+          ];
+        }
+        if (isArtworkType && isDesigner) return [
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.PAUSED,
+          SERVICE_ORDER_STATUS.WAITING_APPROVE,
+        ];
+        // Regular sector users: pause or complete
+        return [
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.PAUSED,
+          SERVICE_ORDER_STATUS.COMPLETED,
+        ];
+
+      // ── PAUSED ────────────────────────────────────────────────────────────
+      // Can be resumed (→ IN_PROGRESS) or completed. PAUSED is shown as current.
+      // Admin can also roll back to PENDING or cancel.
+      case SERVICE_ORDER_STATUS.PAUSED:
+        if (isAdmin) {
+          return isArtworkType ? [
+            SERVICE_ORDER_STATUS.PENDING,
+            SERVICE_ORDER_STATUS.IN_PROGRESS,
+            SERVICE_ORDER_STATUS.PAUSED,
+            SERVICE_ORDER_STATUS.WAITING_APPROVE,
+            SERVICE_ORDER_STATUS.COMPLETED,
+            SERVICE_ORDER_STATUS.CANCELLED,
+          ] : [
+            SERVICE_ORDER_STATUS.PENDING,
+            SERVICE_ORDER_STATUS.IN_PROGRESS,
+            SERVICE_ORDER_STATUS.PAUSED,
+            SERVICE_ORDER_STATUS.COMPLETED,
+            SERVICE_ORDER_STATUS.CANCELLED,
+          ];
+        }
+        if (isArtworkType && isDesigner) return [
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.PAUSED,
+          SERVICE_ORDER_STATUS.WAITING_APPROVE,
+        ];
+        return [
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.PAUSED,
+          SERVICE_ORDER_STATUS.COMPLETED,
+        ];
+
+      // ── WAITING_APPROVE ───────────────────────────────────────────────────
+      // Artwork approval gate. Admin approves (→ COMPLETED) or rejects (→ IN_PROGRESS).
+      // Designer can withdraw (→ IN_PROGRESS). No PAUSED from this state.
+      case SERVICE_ORDER_STATUS.WAITING_APPROVE:
+        if (isAdmin) return [
           SERVICE_ORDER_STATUS.IN_PROGRESS,
           SERVICE_ORDER_STATUS.WAITING_APPROVE,
           SERVICE_ORDER_STATUS.COMPLETED,
           SERVICE_ORDER_STATUS.CANCELLED,
         ];
-      } else {
-        // Non-ARTWORK: All statuses EXCEPT WAITING_APPROVE (simple workflow)
-        return [
-          SERVICE_ORDER_STATUS.PENDING,
+        if (isDesigner) return [
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.WAITING_APPROVE,
+        ];
+        return [SERVICE_ORDER_STATUS.WAITING_APPROVE];
+
+      // ── COMPLETED ─────────────────────────────────────────────────────────
+      // Terminal state for non-admins. Admin can reopen (→ IN_PROGRESS) or cancel.
+      case SERVICE_ORDER_STATUS.COMPLETED:
+        if (isAdmin) return [
           SERVICE_ORDER_STATUS.IN_PROGRESS,
           SERVICE_ORDER_STATUS.COMPLETED,
           SERVICE_ORDER_STATUS.CANCELLED,
         ];
-      }
-    }
+        return [SERVICE_ORDER_STATUS.COMPLETED];
 
-    // ARTWORK type has special two-step approval - designer can only go to WAITING_APPROVE
-    if (isArtworkType && userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
-      return [
-        SERVICE_ORDER_STATUS.PENDING,
-        SERVICE_ORDER_STATUS.IN_PROGRESS,
-        SERVICE_ORDER_STATUS.WAITING_APPROVE,
-        // Note: No COMPLETED - designer must submit for admin approval
-        // Note: No CANCELLED - only admin can cancel
-      ];
-    }
+      // ── CANCELLED ─────────────────────────────────────────────────────────
+      // Terminal state. Admin can restore to PENDING.
+      case SERVICE_ORDER_STATUS.CANCELLED:
+        if (isAdmin) return [
+          SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.CANCELLED,
+        ];
+        return [SERVICE_ORDER_STATUS.CANCELLED];
 
-    // For other users/types, return simple workflow statuses (no WAITING_APPROVE, no CANCELLED)
-    return [
-      SERVICE_ORDER_STATUS.PENDING,
-      SERVICE_ORDER_STATUS.IN_PROGRESS,
-      SERVICE_ORDER_STATUS.COMPLETED,
-    ];
-  }, [serviceOrderId, userPrivilege, selectedType]);
+      default:
+        return [
+          SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+        ];
+    }
+  }, [serviceOrderId, userPrivilege, selectedType, currentStatus]);
 
   // Determine if status field should be shown as combobox (editable) or badge (read-only)
   // For PRODUCTION sector users who are NOT team leaders: show as badge (read-only)
@@ -787,7 +904,7 @@ function ServiceRow({
                   disabled={disabled}
                   options={getAvailableStatuses.map((status) => ({
                     value: status,
-                    label: SERVICE_ORDER_STATUS_LABELS[status],
+                    label: getStatusOptionLabel(currentStatus, status, userPrivilege),
                   }))}
                   placeholder="Status"
                   searchable={false}

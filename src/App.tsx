@@ -245,6 +245,11 @@ const PersonalMyLoans = lazy(() => import("@/pages/personal/my-loans").then((mod
 const PersonalMyActivities = lazy(() => import("@/pages/personal/my-activities").then((module) => ({ default: module.MyActivitiesPage })));
 const PersonalMyWarnings = lazy(() => import("@/pages/personal/my-warnings").then((module) => ({ default: module.MyWarningsPage })));
 const PersonalMyTimeEntries = lazy(() => import("@/pages/personal/my-time-entries").then((module) => ({ default: module.MyTimeEntriesPage })));
+// Production Manager Pessoal section (company/team-wide views)
+const PmWarnings = lazy(() => import("@/pages/personal/pm-warnings").then((module) => ({ default: module.PmWarningsPage })));
+const PmCalculations = lazy(() => import("@/pages/personal/pm-calculations").then((module) => ({ default: module.PmCalculationsPage })));
+const PmVacations = lazy(() => import("@/pages/personal/pm-vacations").then((module) => ({ default: module.PmVacationsPage })));
+const PmSchedules = lazy(() => import("@/pages/personal/pm-schedules").then((module) => ({ default: module.PmSchedulesPage })));
 
 // Painting (Pintura)
 const Paint = lazy(() => import("@/pages/painting/root").then((module) => ({ default: module.Painting })));
@@ -1824,6 +1829,40 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PersonalMyTimeEntries />
+                    </Suspense>
+                  }
+                />
+
+                {/* Production Manager Pessoal routes */}
+                <Route
+                  path={routes.personal.pmWarnings.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PmWarnings />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personal.pmCalculations.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PmCalculations />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personal.pmVacations.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PmVacations />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personal.pmSchedules.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PmSchedules />
                     </Suspense>
                   }
                 />

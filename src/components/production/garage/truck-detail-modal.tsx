@@ -359,12 +359,14 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
                       const completed = productionSOs.filter((so: any) => so.status === SO_STATUS.COMPLETED).length;
                       const waitingApprove = productionSOs.filter((so: any) => so.status === SO_STATUS.WAITING_APPROVE).length;
                       const inProgress = productionSOs.filter((so: any) => so.status === SO_STATUS.IN_PROGRESS).length;
+                      const paused = productionSOs.filter((so: any) => so.status === SO_STATUS.PAUSED).length;
                       const pending = productionSOs.filter((so: any) => so.status === SO_STATUS.PENDING).length;
                       const cancelled = productionSOs.filter((so: any) => so.status === SO_STATUS.CANCELLED).length;
 
                       const pCompleted = (completed / totalCount) * 100;
                       const pWaiting = (waitingApprove / totalCount) * 100;
                       const pProgress = (inProgress / totalCount) * 100;
+                      const pPaused = (paused / totalCount) * 100;
                       const pPending = (pending / totalCount) * 100;
                       const pCancelled = (cancelled / totalCount) * 100;
 
@@ -373,8 +375,9 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
                           {completed > 0 && <div className="absolute h-full bg-green-700 transition-all duration-300" style={{ left: '0%', width: `${pCompleted}%` }} />}
                           {waitingApprove > 0 && <div className="absolute h-full bg-purple-600 transition-all duration-300" style={{ left: `${pCompleted}%`, width: `${pWaiting}%` }} />}
                           {inProgress > 0 && <div className="absolute h-full bg-blue-700 transition-all duration-300" style={{ left: `${pCompleted + pWaiting}%`, width: `${pProgress}%` }} />}
-                          {pending > 0 && <div className="absolute h-full bg-neutral-500 transition-all duration-300" style={{ left: `${pCompleted + pWaiting + pProgress}%`, width: `${pPending}%` }} />}
-                          {cancelled > 0 && <div className="absolute h-full bg-red-700 transition-all duration-300" style={{ left: `${pCompleted + pWaiting + pProgress + pPending}%`, width: `${pCancelled}%` }} />}
+                          {paused > 0 && <div className="absolute h-full bg-yellow-500 transition-all duration-300" style={{ left: `${pCompleted + pWaiting + pProgress}%`, width: `${pPaused}%` }} />}
+                          {pending > 0 && <div className="absolute h-full bg-neutral-500 transition-all duration-300" style={{ left: `${pCompleted + pWaiting + pProgress + pPaused}%`, width: `${pPending}%` }} />}
+                          {cancelled > 0 && <div className="absolute h-full bg-red-700 transition-all duration-300" style={{ left: `${pCompleted + pWaiting + pProgress + pPaused + pPending}%`, width: `${pCancelled}%` }} />}
                           <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                               {completedCount}/{totalCount}

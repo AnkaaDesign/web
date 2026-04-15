@@ -222,8 +222,8 @@ export function PublicBudgetPage() {
   const customDeliveryDays = quote.customForecastDays || null;
   const paymentText = generatePaymentText({
     customPaymentText: activeConfig?.customPaymentText || null,
+    paymentConfig: (activeConfig as any)?.paymentConfig || null,
     paymentCondition: activeConfig?.paymentCondition,
-
     total: activeConfig?.total ?? quote.total,
   });
   const guaranteeText = generateGuaranteeText(quote);
@@ -535,8 +535,8 @@ export function PublicBudgetPage() {
                       {quote.customerConfigs!.map((config: any) => {
                         const configPaymentText = generatePaymentText({
                           customPaymentText: config.customPaymentText || null,
+                          paymentConfig: config.paymentConfig || null,
                           paymentCondition: config.paymentCondition,
-
                           total: config.total ?? 0,
                         });
                         if (!configPaymentText && !config.orderNumber) return null;

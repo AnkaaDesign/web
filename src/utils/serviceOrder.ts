@@ -40,6 +40,7 @@ export function getServiceOrderStatusColor(status: SERVICE_ORDER_STATUS): BadgeV
   const statusColorMap: Record<SERVICE_ORDER_STATUS, BadgeVariant> = {
     [SERVICE_ORDER_STATUS.PENDING]: "gray",
     [SERVICE_ORDER_STATUS.IN_PROGRESS]: "blue",
+    [SERVICE_ORDER_STATUS.PAUSED]: "yellow",
     [SERVICE_ORDER_STATUS.WAITING_APPROVE]: "purple",
     [SERVICE_ORDER_STATUS.COMPLETED]: "green",
     [SERVICE_ORDER_STATUS.CANCELLED]: "red",
@@ -47,3 +48,37 @@ export function getServiceOrderStatusColor(status: SERVICE_ORDER_STATUS): BadgeV
 
   return statusColorMap[status] || "default";
 }
+
+export const isServiceOrderPaused = (serviceOrder: Pick<ServiceOrder, "status">): boolean => {
+  return serviceOrder.status === SERVICE_ORDER_STATUS.PAUSED;
+};
+
+export const canPauseServiceOrder = (serviceOrder: Pick<ServiceOrder, "status">): boolean => {
+  return serviceOrder.status === SERVICE_ORDER_STATUS.IN_PROGRESS;
+};
+
+export const canResumeServiceOrder = (serviceOrder: Pick<ServiceOrder, "status">): boolean => {
+  return serviceOrder.status === SERVICE_ORDER_STATUS.PAUSED;
+};
+
+export const getServiceOrderTotalActiveTimeSeconds = (
+  serviceOrder: Pick<ServiceOrder, "status" | "lastStartedAt" | "totalActiveTimeSeconds">
+): number => {
+  const accumulated = serviceOrder.totalActiveTimeSeconds || 0;
+  if (serviceOrder.status === SERVICE_ORDER_STATUS.IN_PROGRESS && serviceOrder.lastStartedAt) {
+    const now = new Date();
+    const sessionSeconds = Math.floor(
+      (now.getTime() - new Date(serviceOrder.lastStartedAt).getTime()) / 1000
+    );
+    return accumulated + sessionSeconds;
+  }
+  return accumulated;
+};
+
+export const formatActiveTime = (totalSeconds: number): string => {
+  if (totalSeconds <= 0) return "0min";
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}min`;
+  return `${minutes}min`;
+};

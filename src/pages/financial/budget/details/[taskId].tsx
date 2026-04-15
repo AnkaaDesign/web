@@ -226,6 +226,7 @@ export const FinancialBudgetDetailPage = () => {
           subtotal: c.subtotal ?? 0,
           total: c.total ?? 0,
           paymentCondition: c.paymentCondition || null,
+          paymentConfig: c.paymentConfig ?? null,
           customPaymentText: c.customPaymentText || null,
           generateInvoice:
             c.generateInvoice !== undefined ? c.generateInvoice : true,
@@ -278,7 +279,7 @@ export const FinancialBudgetDetailPage = () => {
                 invoiceToCustomerId: null,
               },
             ],
-    });
+    }, { keepDirtyValues: true });
 
     // Set layout files
     if (existingQuote.layoutFile) {
@@ -362,7 +363,8 @@ export const FinancialBudgetDetailPage = () => {
           /* keep partial data */
         });
     }
-  }, [task, existingQuote]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.id, existingQuote?.id]); // use IDs — object refs change on every refetch and would wipe unsaved edits
 
   // Initialize task-specific state (responsibles, artworks) when task loads
   useEffect(() => {
