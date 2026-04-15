@@ -2728,11 +2728,11 @@ export const TaskDetailsPage = () => {
                                     : [];
                                   return (
                                     <div className="pt-2 space-y-2">
-                                      {/* Boletos */}
+                                      {/* Parcelas */}
                                       <div className="flex items-center justify-between text-sm font-semibold text-foreground">
                                         <div className="flex items-center gap-2">
                                           <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
-                                          Boletos
+                                          Parcelas
                                         </div>
                                         <DownloadAllBoletosButton installments={invoiceInstallments} />
                                       </div>
@@ -2755,6 +2755,7 @@ export const TaskDetailsPage = () => {
                                               <BoletoActions
                                                 installmentId={installment.id}
                                                 bankSlip={installment.bankSlip}
+                                                installmentStatus={installment.status}
                                               />
                                             </div>
                                           </div>
@@ -2938,13 +2939,13 @@ export const TaskDetailsPage = () => {
 
                     return (
                       <div className="bg-muted/30 rounded-lg p-4 space-y-3">
-                        {/* Boletos */}
+                        {/* Parcelas */}
                         {invoiceInstallments.length > 0 && (
                           <>
                             <div className="flex items-center justify-between text-sm font-semibold text-foreground">
                               <div className="flex items-center gap-2">
                                 <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
-                                Boletos
+                                Parcelas
                               </div>
                               <DownloadAllBoletosButton installments={invoiceInstallments} />
                             </div>
@@ -2967,6 +2968,7 @@ export const TaskDetailsPage = () => {
                                     <BoletoActions
                                       installmentId={installment.id}
                                       bankSlip={installment.bankSlip}
+                                      installmentStatus={installment.status}
                                     />
                                   </div>
                                   {installment.bankSlip?.pdfFile && (

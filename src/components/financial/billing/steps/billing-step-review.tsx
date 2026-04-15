@@ -540,13 +540,13 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
 
                     return (
                       <div className="mt-4 space-y-3">
-                        {/* Boletos */}
+                        {/* Parcelas */}
                         {installments.length > 0 && (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between text-sm font-semibold">
                               <div className="flex items-center gap-2">
                                 <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
-                                Boletos
+                                Parcelas
                               </div>
                               <DownloadAllBoletosButton installments={installments} />
                             </div>
