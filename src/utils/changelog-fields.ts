@@ -1374,8 +1374,10 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       THREE_QUARTER: "3/4",
       RIGID: "Toco",
       TRUCK: "Caminhão",
-      SEMI_TRAILER: "Carreta",
+      SEMI_TRAILER: "Semirreboque",
+      SEMI_TRAILER_2_AXLES: "Semirreboque 2 Eixos",
       B_DOUBLE: "Bitrem",
+      BITRUCK: "Bitruck",
     };
     return truckCategoryLabels[value] || value;
   }
