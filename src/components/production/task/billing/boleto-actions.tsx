@@ -332,7 +332,9 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
   const canCancel = bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canDownloadPdf = bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canChangeDueDate = bankSlip && (bankSlip.status === 'OVERDUE' || bankSlip.status === 'ACTIVE');
-  const canMarkPaid = bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
+  // Allow mark-as-paid whenever the installment itself is unpaid (ACTIVE or OVERDUE),
+  // regardless of whether a bankSlip exists — the API handles the null-bankSlip case gracefully.
+  const canMarkPaid = installmentStatus === 'ACTIVE' || installmentStatus === 'OVERDUE';
 
   // Receipt actions: only for paid installments
   const showReceiptView = isPaid && hasReceipt;
