@@ -223,7 +223,7 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
                               <div className="flex items-center gap-2">
                                 <IconReceipt className="h-3.5 w-3.5 text-muted-foreground" />
                                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                                  Boletos
+                                  Parcelas
                                 </span>
                               </div>
                               {installments.some((inst) => inst.bankSlip && (inst.bankSlip.status === 'ACTIVE' || inst.bankSlip.status === 'OVERDUE')) && (
