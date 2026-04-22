@@ -234,6 +234,12 @@ export interface LiveBonus {
   averageTaskPerUser?: number;
   isLive: true;
   totalTasks?: number;
+  /** Set when the atestado penalty was waived due to no prior atestado in 90 days. */
+  atestadoForgiven?: boolean;
+  /** ISO8601 timestamp of when the cached live calc was produced (SWR). */
+  lastCalculatedAt?: string;
+  /** True when the live response was served from the stale SWR tier (age > 30 min). */
+  isStale?: boolean;
   tasks?: Task[];
   users?: User[];
   bonusDiscounts?: BonusDiscount[];

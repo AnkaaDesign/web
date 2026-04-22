@@ -837,22 +837,20 @@ const ChangelogTimelineItem = ({
                   </>
                 )}
 
-                {/* Layout Details - Show all layouts in group horizontally */}
+                {/* Layout Details - Show side, measurements and doors per side */}
                 {entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT && (
-                  <div className="flex flex-row flex-wrap gap-3 my-2">
+                  <div className="flex flex-col gap-3 my-2">
                     {changelogGroup
                       .map((layoutChange) => {
-                        let layoutDetails: any = null;
-                        try {
-                          if (layoutChange.newValue) {
-                            layoutDetails =
-                              typeof layoutChange.newValue === "string"
-                                ? JSON.parse(layoutChange.newValue)
-                                : layoutChange.newValue;
+                        const parseValue = (v: any) => {
+                          if (!v) return null;
+                          try {
+                            return typeof v === "string" ? JSON.parse(v) : v;
+                          } catch {
+                            return null;
                           }
-                        } catch (e) {
-                          return null;
-                        }
+                        };
+                        const layoutDetails = parseValue(layoutChange.newValue);
 
                         if (
                           !layoutDetails?.layoutSections ||
@@ -861,7 +859,6 @@ const ChangelogTimelineItem = ({
                           return null;
                         }
 
-                        // Calculate dimensions
                         const height = Math.round(
                           (layoutDetails.height || 0) * 100,
                         );
@@ -871,43 +868,45 @@ const ChangelogTimelineItem = ({
                             0,
                           ),
                         );
+                        const doorCount = layoutDetails.layoutSections.filter(
+                          (s: any) => s.isDoor,
+                        ).length;
 
-                        // Detect side from reason - backend uses "lado left/right/back" format
                         const reason = layoutChange.reason?.toLowerCase() || "";
-                        const sideName =
+                        const isLeft =
                           reason.includes("lado left") ||
-                          reason.includes("leftside")
-                            ? "Lado Motorista"
-                            : reason.includes("lado right") ||
-                                reason.includes("rightside")
-                              ? "Lado Sapo"
-                              : reason.includes("lado back") ||
-                                  reason.includes("backside") ||
-                                  reason.includes("traseira")
-                                ? "Traseira"
-                                : "Layout";
+                          reason.includes("leftside");
+                        const isRight =
+                          reason.includes("lado right") ||
+                          reason.includes("rightside");
+                        const isBack =
+                          reason.includes("lado back") ||
+                          reason.includes("backside") ||
+                          reason.includes("traseira");
 
-                        // Determine sort order: left=1, right=2, back=3, other=4
-                        const sortOrder =
-                          reason.includes("lado left") ||
-                          reason.includes("leftside")
-                            ? 1
-                            : reason.includes("lado right") ||
-                                reason.includes("rightside")
-                              ? 2
-                              : reason.includes("lado back") ||
-                                  reason.includes("backside") ||
-                                  reason.includes("traseira")
-                                ? 3
-                                : 4;
+                        const sideName = isLeft
+                          ? "Lado Motorista"
+                          : isRight
+                            ? "Lado Sapo"
+                            : isBack
+                              ? "Traseira"
+                              : "Layout";
+
+                        const sortOrder = isLeft
+                          ? 1
+                          : isRight
+                            ? 2
+                            : isBack
+                              ? 3
+                              : 4;
 
                         return {
                           layoutChange,
-                          layoutDetails,
                           sideName,
                           sortOrder,
                           totalWidth,
                           height,
+                          doorCount,
                         };
                       })
                       .filter(Boolean)
@@ -918,19 +917,41 @@ const ChangelogTimelineItem = ({
                           sideName,
                           totalWidth,
                           height,
-                        }: any) => (
-                          <div
-                            key={layoutChange.id}
-                            className="border dark:border-border rounded-lg px-2.5 py-1.5 bg-muted/30 inline-flex items-center gap-2"
-                          >
-                            <span className="text-xs font-medium">
-                              {sideName}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {totalWidth}cm × {height}cm
-                            </span>
-                          </div>
-                        ),
+                          doorCount,
+                        }: any) => {
+                          const doorLabel =
+                            doorCount === 0
+                              ? "0 portas"
+                              : doorCount === 1
+                                ? "1 porta"
+                                : `${doorCount} portas`;
+                          return (
+                            <div
+                              key={layoutChange.id}
+                              className="border border-border/60 rounded-lg p-3 bg-muted/20"
+                            >
+                              <div className="text-sm font-semibold text-foreground mb-1.5">
+                                {sideName}
+                              </div>
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">
+                                  Antes:{" "}
+                                </span>
+                                <span className="text-red-500 dark:text-red-400 font-medium">
+                                  Nenhum
+                                </span>
+                              </div>
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">
+                                  Depois:{" "}
+                                </span>
+                                <span className="text-green-600 dark:text-green-400 font-medium">
+                                  {totalWidth}cm × {height}cm — {doorLabel}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        },
                       )}
                   </div>
                 )}

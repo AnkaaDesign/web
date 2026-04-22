@@ -1,7 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useMemo } from "react";
+import { useParams, useLocation } from "react-router-dom";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { bonusService } from "../../../api-client";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { bonusKeys } from "@/hooks/common/query-keys";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,13 +66,33 @@ function InfoRow({ label, value, className }: { label: string; value: React.Reac
   );
 }
 
+// Attempts to recover a cached bonus summary from list queries so the header
+// can render instantly (stage 1) without waiting for any network call.
+function findCachedBonusFromLists(queryClient: ReturnType<typeof useQueryClient>, id: string): any | null {
+  const cache = queryClient.getQueryCache();
+  // Look across any cached bonuses list/payroll queries for a matching id.
+  const queries = cache.findAll({ queryKey: bonusKeys.all });
+  for (const q of queries) {
+    const state = q.state.data as any;
+    if (!state) continue;
+    // Shape 1: paginated list { data: [...] }
+    const candidates: any[] = Array.isArray(state?.data)
+      ? state.data
+      : Array.isArray(state)
+      ? state
+      : Array.isArray(state?.bonuses)
+      ? state.bonuses
+      : [];
+    const found = candidates.find((b) => b?.id === id || b?.userId === id);
+    if (found) return found;
+  }
+  return null;
+}
+
 export default function BonusDetailPage() {
   const { id } = useParams<BonusDetailPageParams>();
-
-  // State for bonus data
-  const [bonus, setBonus] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const location = useLocation();
+  const queryClient = useQueryClient();
 
   // Track page access
   usePageTracker({
@@ -78,60 +100,88 @@ export default function BonusDetailPage() {
     icon: "currency-dollar",
   });
 
-  // Fetch bonus data - Backend handles both regular UUIDs and live IDs transparently
-  // The data structure is identical regardless of whether bonus is saved or calculated live
-  useEffect(() => {
-    if (!id) {
-      setError('ID do bônus não fornecido');
-      setLoading(false);
-      return;
+  // =====================================================
+  // Stage 1 — instant header from cache / route state
+  // =====================================================
+  // Look for a previously fetched bonus in react-query cache (list page) or
+  // rely on route state passed via navigate(..., { state: {...} }).
+  const routeStateBonus = (location.state as any)?.bonus ?? null;
+  const cachedBonus = useMemo(() => {
+    if (!id) return null;
+    if (routeStateBonus && (routeStateBonus.id === id || routeStateBonus.userId === id)) {
+      return routeStateBonus;
     }
+    return findCachedBonusFromLists(queryClient, id);
+  }, [id, routeStateBonus, queryClient]);
 
-    const fetchBonus = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        // Single endpoint handles both live IDs and regular UUIDs
-        // Backend's findByIdOrLive parses live IDs and returns consistent data format
-        const response = await bonusService.getById(id, {
-          include: {
-            user: {
-              include: {
-                position: true,
-                sector: true,
-              },
+  // =====================================================
+  // Stage 3 — full live calculation via getById
+  // =====================================================
+  const {
+    data: bonus,
+    isLoading: isBonusLoading,
+    error: bonusError,
+  } = useQuery<any>({
+    queryKey: bonusKeys.detail(id || "", { full: true }),
+    enabled: !!id,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const response = await bonusService.getById(id!, {
+        include: {
+          user: {
+            include: {
+              position: true,
+              sector: true,
             },
-            tasks: {
-              include: {
-                customer: true,
-                sector: true,
-              },
-            },
-            bonusDiscounts: true,
-            bonusExtras: true,
-            users: true,
           },
-        });
+          tasks: {
+            include: {
+              customer: true,
+              sector: true,
+            },
+          },
+          bonusDiscounts: true,
+          bonusExtras: true,
+          users: true,
+        },
+      });
+      const responseData = response.data as any;
+      return responseData?.data ?? responseData;
+    },
+  });
 
-        const responseData = response.data;
+  // Use the live bonus once available; otherwise fall back to the cached one
+  // so header/financial summary can render earlier.
+  const activeBonus: any = bonus ?? cachedBonus;
 
-        // API wraps the bonus in { success, data, message }
-        const bonusData = (responseData as any)?.data ?? responseData;
-        if (bonusData) {
-          setBonus(bonusData);
-        } else {
-          setError('Bônus não encontrado.');
-        }
-      } catch (err: any) {
-        setError(err?.response?.data?.message || 'Erro ao carregar bônus.');
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Derive year/month early for stage 2 — prefer live data, fall back to cache.
+  const year = activeBonus?.year as number | undefined;
+  const month = activeBonus?.month as number | undefined;
 
-    fetchBonus();
-  }, [id]);
+  // =====================================================
+  // Stage 2 — cheap period stats (no Secullum)
+  // =====================================================
+  const { data: periodStats } = useQuery<any>({
+    queryKey: ["bonus", "period-stats", year, month],
+    enabled: !!year && !!month,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const response = await bonusService.getPeriodTaskStats(year!, month!);
+      const responseData = response.data as any;
+      return responseData?.data ?? responseData;
+    },
+  });
+
+  const errorMessage: string | null = useMemo(() => {
+    if (!id) return 'ID do bônus não fornecido';
+    if (bonusError) {
+      return (bonusError as any)?.response?.data?.message || 'Erro ao carregar bônus.';
+    }
+    if (!isBonusLoading && !bonus && !cachedBonus) {
+      return null; // will fall through to "not found" below once load settles
+    }
+    return null;
+  }, [id, bonusError, isBonusLoading, bonus, cachedBonus]);
 
   // Calculate final bonus amount (extras + base - discounts)
   const calculateFinalAmount = useMemo(() => {
@@ -170,31 +220,38 @@ export default function BonusDetailPage() {
     return Math.max(0, finalAmount);
   }, [bonus]);
 
-  // Get task statistics - use pre-calculated values from API
-  // API returns identical structure for live and saved bonuses
+  // Get task statistics - prefer full bonus data, otherwise use cheap periodStats.
   const taskStats = useMemo(() => {
     const tasks = bonus?.tasks || [];
     const users = bonus?.users || [];
 
-    // Total raw tasks count
-    const totalRawTasks = tasks.length;
+    const totalRawTasksFromBonus = tasks.length;
+    const totalRawTasks = bonus
+      ? totalRawTasksFromBonus
+      : (periodStats?.totalRawTasks ?? periodStats?.totalTasks ?? 0);
 
-    // Use weightedTasks from API (period total - same for all users)
-    const totalPonderedTasks = bonus?.weightedTasks
+    const totalPonderedTasksFromBonus = bonus?.weightedTasks
       ? (typeof bonus.weightedTasks === 'object' && bonus.weightedTasks?.toNumber
         ? bonus.weightedTasks.toNumber()
         : Number(bonus.weightedTasks) || 0)
       : 0;
+    const totalPonderedTasks = bonus
+      ? totalPonderedTasksFromBonus
+      : (periodStats?.weightedTasks ?? periodStats?.totalPonderedTasks ?? 0);
 
-    // Total collaborators from users relation
-    const totalCollaborators = users.length || 1;
+    const totalCollaboratorsFromBonus = users.length || 1;
+    const totalCollaborators = bonus
+      ? totalCollaboratorsFromBonus
+      : (periodStats?.totalCollaborators ?? periodStats?.totalEligibleUsers ?? 0);
 
-    // Use averageTaskPerUser from API (period average - same for all users)
-    const averageTasksPerUser = bonus?.averageTaskPerUser
+    const averageTasksPerUserFromBonus = bonus?.averageTaskPerUser
       ? (typeof bonus.averageTaskPerUser === 'object' && bonus.averageTaskPerUser?.toNumber
         ? bonus.averageTaskPerUser.toNumber()
         : Number(bonus.averageTaskPerUser) || 0)
       : 0;
+    const averageTasksPerUser = bonus
+      ? averageTasksPerUserFromBonus
+      : (periodStats?.averageTasksPerUser ?? periodStats?.averageTaskPerUser ?? 0);
 
     return {
       totalRawTasks,
@@ -203,9 +260,9 @@ export default function BonusDetailPage() {
       averageTasksPerUser,
       tasks,
     };
-  }, [bonus?.tasks, bonus?.users, bonus?.weightedTasks, bonus?.averageTaskPerUser]);
+  }, [bonus, periodStats]);
 
-  // Validation
+  // Validation — hard error out only when we truly have no id.
   if (!id) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
@@ -217,86 +274,20 @@ export default function BonusDetailPage() {
     );
   }
 
-  if (loading) {
-    return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="space-y-6">
-          {/* Header skeleton */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-64" />
-              <Skeleton className="h-4 w-48" />
-            </div>
-            <div className="flex gap-2">
-              <Skeleton className="h-9 w-24" />
-              <Skeleton className="h-9 w-24" />
-            </div>
-          </div>
-
-          {/* Cards skeleton */}
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* General Info Card skeleton */}
-            <Card>
-              <CardHeader className="pb-4">
-                <Skeleton className="h-5 w-40" />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Skeleton className="h-12 w-full rounded-lg" />
-                <Skeleton className="h-12 w-full rounded-lg" />
-                <Skeleton className="h-12 w-full rounded-lg" />
-                <Skeleton className="h-12 w-full rounded-lg" />
-                <Skeleton className="h-12 w-full rounded-lg" />
-              </CardContent>
-            </Card>
-
-            {/* Financial Card skeleton */}
-            <Card>
-              <CardHeader className="pb-4">
-                <Skeleton className="h-5 w-24" />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-6 w-full" />
-                <Separator className="my-2" />
-                <Skeleton className="h-6 w-full" />
-                <Skeleton className="h-10 w-full rounded-lg mt-2" />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Tasks table skeleton */}
-          <Card>
-            <CardHeader className="pb-4">
-              <Skeleton className="h-5 w-40" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </PrivilegeRoute>
-    );
-  }
-
-  if (error) {
+  // Hard error only when the live fetch explicitly failed AND we have no cache.
+  if (bonusError && !cachedBonus) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
         <Alert variant="destructive">
           <IconAlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{errorMessage || 'Erro ao carregar bônus.'}</AlertDescription>
         </Alert>
       </PrivilegeRoute>
     );
   }
 
-  if (!bonus) {
+  // Not found only after load completed with nothing returned.
+  if (!isBonusLoading && !bonus && !cachedBonus) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
         <Alert variant="destructive">
@@ -307,22 +298,25 @@ export default function BonusDetailPage() {
     );
   }
 
-  // Extract data - use position from bonus if available (saved at bonus creation time)
-  const user = bonus.user;
-  const userName = user?.name || 'Funcionário';
-  const monthName = getMonthName(bonus.month);
-  const year = bonus.year || new Date().getFullYear();
-  const title = `${userName} - ${monthName} ${year}`;
+  // =====================================================
+  // Header data — use best available (cached or live)
+  // =====================================================
+  const user = activeBonus?.user;
+  const userName = user?.name || activeBonus?.userName || 'Funcionário';
+  const monthName = getMonthName(activeBonus?.month);
+  const displayYear = activeBonus?.year || new Date().getFullYear();
+  const title = activeBonus
+    ? `${userName} - ${monthName} ${displayYear}`
+    : 'Carregando bônus…';
 
-  // Use position/sector saved at bonus creation, fallback to user's current
-  const position = bonus.position || user?.position;
+  const position = activeBonus?.position || user?.position;
   const sector = user?.sector;
 
   const breadcrumbs = [
     { label: "Início", href: routes.home },
     { label: "Recursos Humanos" },
     { label: "Bônus", href: routes.humanResources.bonus.root },
-    { label: title },
+    { label: activeBonus ? title : 'Detalhes' },
   ];
 
   const handleRefresh = () => {
@@ -333,13 +327,70 @@ export default function BonusDetailPage() {
     window.print();
   };
 
-  const hasExtras = bonus.bonusExtras && bonus.bonusExtras.length > 0;
-  const hasDiscounts = bonus.bonusDiscounts && bonus.bonusDiscounts.length > 0;
+  const hasExtras = !!(bonus?.bonusExtras && bonus.bonusExtras.length > 0);
+  const hasDiscounts = !!(bonus?.bonusDiscounts && bonus.bonusDiscounts.length > 0);
   const finalBonusValue = calculateFinalAmount;
+
+  // The server flags this when the response came from the stale SWR tier.
+  const isStale = !!bonus?.isStale;
+
+  // Skeleton blocks used while stage 3 is still loading.
+  const financialSkeleton = (
+    <CardContent className="space-y-2">
+      <Skeleton className="h-6 w-full" />
+      <Skeleton className="h-6 w-full" />
+      <Skeleton className="h-6 w-full" />
+      <Skeleton className="h-6 w-full" />
+      <Separator className="my-2" />
+      <Skeleton className="h-6 w-full" />
+      <Skeleton className="h-10 w-full rounded-lg mt-2" />
+    </CardContent>
+  );
+
+  const tasksSkeleton = (
+    <Card>
+      <CardHeader className="pb-4">
+        <Skeleton className="h-5 w-40" />
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 relative">
+        {/* Freshness indicator — amber "atualizando…" when served from the stale
+            SWR tier, otherwise a subtle "Atualizado às HH:mm" whenever we know
+            when the calc was produced. Helps admins trust the number on screen. */}
+        {(isStale || bonus?.lastCalculatedAt) && (
+          <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+            {isStale ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-300">
+                <IconRefresh className="h-3 w-3 animate-spin" />
+                atualizando…
+              </span>
+            ) : bonus?.lastCalculatedAt ? (
+              <span
+                className="text-xs text-muted-foreground"
+                title={new Date(bonus.lastCalculatedAt).toLocaleString("pt-BR")}
+              >
+                Atualizado às{" "}
+                {new Date(bonus.lastCalculatedAt).toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            ) : null}
+          </div>
+        )}
+
         <PageHeader
           variant="detail"
           title={title}
@@ -362,7 +413,7 @@ export default function BonusDetailPage() {
 
         {/* Info Cards - 2 columns */}
         <div className="grid gap-4 md:grid-cols-2">
-          {/* General Info Card */}
+          {/* General Info Card — stage 1: render immediately from cached user */}
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="text-base flex items-center gap-2">
@@ -371,15 +422,27 @@ export default function BonusDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <InfoRow label="Colaborador" value={userName} />
-              <InfoRow label="Cargo" value={position?.name || "-"} />
-              <InfoRow label="Setor" value={sector?.name || "-"} />
-              <InfoRow label="Nível de Performance" value={bonus.performanceLevel || 0} />
-              <InfoRow label="Período" value={`${monthName}/${year}`} />
+              {activeBonus ? (
+                <>
+                  <InfoRow label="Colaborador" value={userName} />
+                  <InfoRow label="Cargo" value={position?.name || "-"} />
+                  <InfoRow label="Setor" value={sector?.name || "-"} />
+                  <InfoRow label="Nível de Performance" value={activeBonus.performanceLevel || 0} />
+                  <InfoRow label="Período" value={`${monthName}/${displayYear}`} />
+                </>
+              ) : (
+                <>
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                </>
+              )}
             </CardContent>
           </Card>
 
-          {/* Financial Card */}
+          {/* Financial Card — stage 2 populates counts, stage 3 populates values */}
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="text-base flex items-center gap-2">
@@ -387,69 +450,103 @@ export default function BonusDetailPage() {
                 Valores
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between py-1">
-                <span className="text-sm text-muted-foreground">Total de Tarefas</span>
-                <span className="text-sm font-medium">{taskStats.totalRawTasks}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-sm text-muted-foreground">Tarefas Ponderadas</span>
-                <span className="text-sm font-medium">{formatDecimal(taskStats.totalPonderedTasks)}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-sm text-muted-foreground">Colaboradores</span>
-                <span className="text-sm font-medium">{taskStats.totalCollaborators}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-sm text-muted-foreground">Média por Colaborador</span>
-                <span className="text-sm font-medium">{formatDecimal(taskStats.averageTasksPerUser)}</span>
-              </div>
-              <Separator className="my-2" />
-              <div className="flex justify-between py-1">
-                <span className="text-sm text-muted-foreground">Bônus Base</span>
-                <span className="text-sm font-medium">{formatBonusAmount(bonus.baseBonus)}</span>
-              </div>
-              {hasExtras && bonus.bonusExtras!.map((extra: any) => {
-                const percentageValue = Number(extra.percentage) || 0;
-                const hasPercentage = percentageValue > 0;
-                return (
-                  <div key={extra.id} className="flex justify-between py-1">
-                    <span className="text-sm text-muted-foreground">{extra.reference}</span>
-                    <span className="text-sm font-medium text-emerald-600">
-                      +{hasPercentage
-                        ? `${percentageValue}%`
-                        : formatCurrency(Number(extra.value) || 0)}
-                    </span>
-                  </div>
-                );
-              })}
-              {hasDiscounts && bonus.bonusDiscounts!.map((discount: any) => {
-                const percentageValue = Number(discount.percentage) || 0;
-                const hasPercentage = percentageValue > 0;
-                return (
-                  <div key={discount.id} className="flex justify-between py-1">
-                    <span className="text-sm text-muted-foreground">{discount.reference}</span>
-                    <span className="text-sm font-medium text-destructive">
-                      -{hasPercentage
-                        ? `${percentageValue}%`
-                        : formatCurrency(Number(discount.value) || 0)}
-                    </span>
-                  </div>
-                );
-              })}
-              <div className="flex justify-between py-2 bg-green-50 dark:bg-green-950/20 rounded-lg px-3 mt-2">
-                <span className="text-sm font-medium text-muted-foreground">Bônus Final</span>
-                <span className="text-lg font-bold text-green-600">{formatCurrency(finalBonusValue)}</span>
-              </div>
-            </CardContent>
+            {isBonusLoading && !bonus && !periodStats ? (
+              financialSkeleton
+            ) : (
+              <CardContent className="space-y-2">
+                <div className="flex justify-between py-1">
+                  <span className="text-sm text-muted-foreground">Total de Tarefas</span>
+                  <span className="text-sm font-medium">{taskStats.totalRawTasks}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-sm text-muted-foreground">Tarefas Ponderadas</span>
+                  <span className="text-sm font-medium">{formatDecimal(taskStats.totalPonderedTasks)}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-sm text-muted-foreground">Colaboradores</span>
+                  <span className="text-sm font-medium">{taskStats.totalCollaborators}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-sm text-muted-foreground">Média por Colaborador</span>
+                  <span className="text-sm font-medium">{formatDecimal(taskStats.averageTasksPerUser)}</span>
+                </div>
+                <Separator className="my-2" />
+                {bonus ? (
+                  <>
+                    <div className="flex justify-between py-1">
+                      <span className="text-sm text-muted-foreground">Bônus Base</span>
+                      <span className="text-sm font-medium">{formatBonusAmount(bonus.baseBonus)}</span>
+                    </div>
+                    {hasExtras && bonus.bonusExtras!.map((extra: any) => {
+                      const percentageValue = Number(extra.percentage) || 0;
+                      const hasPercentage = percentageValue > 0;
+                      return (
+                        <div key={extra.id} className="flex justify-between py-1">
+                          <span className="text-sm text-muted-foreground">{extra.reference}</span>
+                          <span className="text-sm font-medium text-emerald-600">
+                            +{hasPercentage
+                              ? `${percentageValue}%`
+                              : formatCurrency(Number(extra.value) || 0)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {hasDiscounts && bonus.bonusDiscounts!.map((discount: any) => {
+                      const percentageValue = Number(discount.percentage) || 0;
+                      const hasPercentage = percentageValue > 0;
+                      return (
+                        <div key={discount.id} className="flex justify-between py-1">
+                          <span className="text-sm text-muted-foreground">{discount.reference}</span>
+                          <span className="text-sm font-medium text-destructive">
+                            -{hasPercentage
+                              ? `${percentageValue}%`
+                              : formatCurrency(Number(discount.value) || 0)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {/* Atestado forgiveness — when the user had atestado in this period but
+                        no prior atestado in the rolling 90 days, we waive the penalty.
+                        Show this as an informational row (no discount %) so the bonus is
+                        traceable in review. */}
+                    {bonus?.atestadoForgiven && (
+                      <div className="flex justify-between py-1">
+                        <span className="text-sm text-emerald-700 dark:text-emerald-400">
+                          Atestado{" "}
+                          {bonus?.secullumAnalysis?.atestadoTierLabel
+                            ? `(${bonus.secullumAnalysis.atestadoTierLabel})`
+                            : ""}{" "}
+                          — perdoado
+                        </span>
+                        <span className="text-xs text-muted-foreground italic">sem desconto</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between py-2 bg-green-50 dark:bg-green-950/20 rounded-lg px-3 mt-2">
+                      <span className="text-sm font-medium text-muted-foreground">Bônus Final</span>
+                      <span className="text-lg font-bold text-green-600">{formatCurrency(finalBonusValue)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-10 w-full rounded-lg mt-2" />
+                  </>
+                )}
+              </CardContent>
+            )}
           </Card>
         </div>
 
-        {/* Tasks Table - Full featured like customer detail */}
-        <BonusTasksList
-          tasks={taskStats.tasks}
-          title="Tarefas do Período"
-        />
+        {/* Tasks Table — stage 3 only */}
+        {bonus ? (
+          <BonusTasksList
+            tasks={taskStats.tasks}
+            title="Tarefas do Período"
+          />
+        ) : (
+          tasksSkeleton
+        )}
       </div>
     </PrivilegeRoute>
   );
