@@ -15,7 +15,11 @@ export function canCreateQuote(userRole: string): boolean {
 }
 
 export function canEditQuote(userRole: string): boolean {
-  return [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL].includes(userRole as SECTOR_PRIVILEGES_TYPE);
+  return [
+    SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.FINANCIAL,
+    SECTOR_PRIVILEGES.COMMERCIAL,
+  ].includes(userRole as SECTOR_PRIVILEGES_TYPE);
 }
 
 export function canApproveQuote(userRole: string): boolean {
@@ -85,6 +89,11 @@ export function getAvailableQuoteStatusTransitions(
   // COMMERCIAL cannot set BILLING_APPROVED
   if (userRole === SECTOR_PRIVILEGES.COMMERCIAL) {
     return transitions.filter((s) => s !== 'BILLING_APPROVED');
+  }
+
+  // FINANCIAL cannot set COMMERCIAL_APPROVED (that step belongs to the commercial sector)
+  if (userRole === SECTOR_PRIVILEGES.FINANCIAL) {
+    return transitions.filter((s) => s !== 'COMMERCIAL_APPROVED');
   }
 
   return transitions;

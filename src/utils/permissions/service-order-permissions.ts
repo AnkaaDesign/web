@@ -157,13 +157,16 @@ export function canEditServiceOrderOfType(
 }
 
 /**
- * Check if user can cancel any service order
- * FINANCIAL, COMMERCIAL, and ADMIN can cancel service orders
+ * Check if user can cancel service orders.
+ * - ADMIN: can cancel any SO
+ * - PRODUCTION_MANAGER: can cancel PRODUCTION and LOGISTIC SOs
+ * - COMMERCIAL / FINANCIAL: can cancel COMMERCIAL SOs
  */
 export function canCancelServiceOrder(sectorPrivilege: SECTOR_PRIVILEGES | undefined): boolean {
   if (!sectorPrivilege) return false;
   return sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
          sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
+         sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER ||
          sectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
 }
 
@@ -182,18 +185,20 @@ export function canCompleteArtworkServiceOrder(sectorPrivilege: SECTOR_PRIVILEGE
  * Returns array of statuses the user is allowed to set
  *
  * Status availability by service order type:
- * - ARTWORK: PENDING, IN_PROGRESS, WAITING_APPROVE, COMPLETED (approval workflow)
- * - PRODUCTION, COMMERCIAL, LOGISTIC: PENDING, IN_PROGRESS, COMPLETED (simple workflow)
+ * - ARTWORK: PENDING, IN_PROGRESS, PAUSED, WAITING_APPROVE, COMPLETED (approval workflow)
+ * - PRODUCTION, COMMERCIAL, LOGISTIC: PENDING, IN_PROGRESS, PAUSED, COMPLETED (simple workflow)
  *
  * IMPORTANT:
- * - CANCELLED is available to users who can cancel (ADMIN, COMMERCIAL, FINANCIAL)
+ * - CANCELLED is available to users who can cancel (ADMIN, PRODUCTION_MANAGER, COMMERCIAL, FINANCIAL)
+ * - PAUSED is NOT available to PRODUCTION sector team leaders (must ask PM or admin)
  * - WAITING_APPROVE is ONLY for ARTWORK (designer → admin approval workflow)
  * - DESIGNER can only set WAITING_APPROVE, not COMPLETED (admin approves)
  * - Users who can EDIT the SO type get base statuses even if they can't cancel
  */
 export function getAllowedServiceOrderStatuses(
   sectorPrivilege: SECTOR_PRIVILEGES | undefined,
-  serviceOrderType: SERVICE_ORDER_TYPE
+  serviceOrderType: SERVICE_ORDER_TYPE,
+  isTeamLeader?: boolean,
 ): SERVICE_ORDER_STATUS[] {
   if (!sectorPrivilege) return [];
 
@@ -201,13 +206,15 @@ export function getAllowedServiceOrderStatuses(
   if (!canEditServiceOrderOfType(sectorPrivilege, serviceOrderType)) return [];
 
   const canCancel = canCancelServiceOrder(sectorPrivilege);
+  // PRODUCTION sector team leaders cannot pause — they must ask a PM or admin
+  const canPause = !(sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader);
 
   // ARTWORK has special approval workflow with WAITING_APPROVE status
   if (serviceOrderType === SERVICE_ORDER_TYPE.ARTWORK) {
     const artworkStatuses: SERVICE_ORDER_STATUS[] = [
       SERVICE_ORDER_STATUS.PENDING,
       SERVICE_ORDER_STATUS.IN_PROGRESS,
-      SERVICE_ORDER_STATUS.PAUSED,
+      ...(canPause ? [SERVICE_ORDER_STATUS.PAUSED] : []),
       SERVICE_ORDER_STATUS.WAITING_APPROVE,
       SERVICE_ORDER_STATUS.COMPLETED,
     ];
@@ -233,7 +240,7 @@ export function getAllowedServiceOrderStatuses(
   const simpleStatuses: SERVICE_ORDER_STATUS[] = [
     SERVICE_ORDER_STATUS.PENDING,
     SERVICE_ORDER_STATUS.IN_PROGRESS,
-    SERVICE_ORDER_STATUS.PAUSED,
+    ...(canPause ? [SERVICE_ORDER_STATUS.PAUSED] : []),
     SERVICE_ORDER_STATUS.COMPLETED,
   ];
 

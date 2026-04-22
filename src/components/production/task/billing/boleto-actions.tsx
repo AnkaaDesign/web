@@ -339,7 +339,8 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
   // Receipt actions: only for paid installments
   const showReceiptView = isPaid && hasReceipt;
   const showAttachReceipt = isPaid && !hasReceipt;
-  const showBoletoPdfForPaid = isPaidByBankSlip && !hasReceipt;
+  // Sicredi removes the PDF after payment; only show if we have a locally stored copy
+  const showBoletoPdfForPaid = isPaidByBankSlip && !hasReceipt && !!bankSlip?.pdfFileId;
 
   const hasAnyAction = canRegenerate || canCancel || canDownloadPdf || canChangeDueDate || canMarkPaid || showBoletoPdfForPaid || showReceiptView || showAttachReceipt;
 

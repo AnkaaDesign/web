@@ -622,14 +622,23 @@ function ServiceRow({
     const isArtworkType = selectedType === SERVICE_ORDER_TYPE.ARTWORK;
     const isAdmin = userPrivilege === SECTOR_PRIVILEGES.ADMIN;
     const isDesigner = userPrivilege === SECTOR_PRIVILEGES.DESIGNER;
+    // Sector team leader: can start, voltar para pendente, concluir — but NOT pause or cancel
+    const isProductionSectorLeader = userPrivilege === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader;
+    // Production manager: full set including pause and cancel for PRODUCTION/LOGISTIC SOs
+    const isProductionManager = userPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
 
     // State-machine transitions keyed on the current status
     switch (currentStatus) {
 
       // ── PENDING ──────────────────────────────────────────────────────────
-      // Can only be started (→ IN_PROGRESS). Admin can also cancel.
+      // Can only be started (→ IN_PROGRESS). Admin/PM can also cancel.
       case SERVICE_ORDER_STATUS.PENDING:
         if (isAdmin) return [
+          SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.CANCELLED,
+        ];
+        if (isProductionManager) return [
           SERVICE_ORDER_STATUS.PENDING,
           SERVICE_ORDER_STATUS.IN_PROGRESS,
           SERVICE_ORDER_STATUS.CANCELLED,
@@ -641,7 +650,8 @@ function ServiceRow({
 
       // ── IN_PROGRESS ───────────────────────────────────────────────────────
       // Can be paused, completed, or (artwork) sent for approval.
-      // Admin can also roll back to PENDING or cancel.
+      // Admin/PM can also roll back to PENDING or cancel.
+      // Sector leaders can roll back to PENDING or complete, but NOT pause.
       case SERVICE_ORDER_STATUS.IN_PROGRESS:
         if (isAdmin) {
           return isArtworkType ? [
@@ -664,6 +674,19 @@ function ServiceRow({
           SERVICE_ORDER_STATUS.PAUSED,
           SERVICE_ORDER_STATUS.WAITING_APPROVE,
         ];
+        if (isProductionManager) return [
+          SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.PAUSED,
+          SERVICE_ORDER_STATUS.COMPLETED,
+          SERVICE_ORDER_STATUS.CANCELLED,
+        ];
+        // Sector team leaders: start, voltar para pendente, concluir — no pause, no cancel
+        if (isProductionSectorLeader) return [
+          SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.COMPLETED,
+        ];
         // Regular sector users: pause or complete
         return [
           SERVICE_ORDER_STATUS.IN_PROGRESS,
@@ -673,7 +696,8 @@ function ServiceRow({
 
       // ── PAUSED ────────────────────────────────────────────────────────────
       // Can be resumed (→ IN_PROGRESS) or completed. PAUSED is shown as current.
-      // Admin can also roll back to PENDING or cancel.
+      // Admin/PM can also roll back to PENDING or cancel.
+      // Sector leaders can resume or complete (they see PAUSED as read-only current state).
       case SERVICE_ORDER_STATUS.PAUSED:
         if (isAdmin) {
           return isArtworkType ? [
@@ -695,6 +719,20 @@ function ServiceRow({
           SERVICE_ORDER_STATUS.IN_PROGRESS,
           SERVICE_ORDER_STATUS.PAUSED,
           SERVICE_ORDER_STATUS.WAITING_APPROVE,
+        ];
+        if (isProductionManager) return [
+          SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.PAUSED,
+          SERVICE_ORDER_STATUS.COMPLETED,
+          SERVICE_ORDER_STATUS.CANCELLED,
+        ];
+        // Sector team leaders: can resume, go back to pending, or complete — but PAUSED stays as current label
+        if (isProductionSectorLeader) return [
+          SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.PAUSED,
+          SERVICE_ORDER_STATUS.COMPLETED,
         ];
         return [
           SERVICE_ORDER_STATUS.IN_PROGRESS,
@@ -719,9 +757,14 @@ function ServiceRow({
         return [SERVICE_ORDER_STATUS.WAITING_APPROVE];
 
       // ── COMPLETED ─────────────────────────────────────────────────────────
-      // Terminal state for non-admins. Admin can reopen (→ IN_PROGRESS) or cancel.
+      // Terminal state for non-admins. Admin/PM can reopen (→ IN_PROGRESS) or cancel.
       case SERVICE_ORDER_STATUS.COMPLETED:
         if (isAdmin) return [
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.COMPLETED,
+          SERVICE_ORDER_STATUS.CANCELLED,
+        ];
+        if (isProductionManager) return [
           SERVICE_ORDER_STATUS.IN_PROGRESS,
           SERVICE_ORDER_STATUS.COMPLETED,
           SERVICE_ORDER_STATUS.CANCELLED,
@@ -729,9 +772,13 @@ function ServiceRow({
         return [SERVICE_ORDER_STATUS.COMPLETED];
 
       // ── CANCELLED ─────────────────────────────────────────────────────────
-      // Terminal state. Admin can restore to PENDING.
+      // Terminal state. Admin/PM can restore to PENDING.
       case SERVICE_ORDER_STATUS.CANCELLED:
         if (isAdmin) return [
+          SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.CANCELLED,
+        ];
+        if (isProductionManager) return [
           SERVICE_ORDER_STATUS.PENDING,
           SERVICE_ORDER_STATUS.CANCELLED,
         ];
@@ -743,7 +790,7 @@ function ServiceRow({
           SERVICE_ORDER_STATUS.IN_PROGRESS,
         ];
     }
-  }, [serviceOrderId, userPrivilege, selectedType, currentStatus]);
+  }, [serviceOrderId, userPrivilege, isTeamLeader, selectedType, currentStatus]);
 
   // Determine if status field should be shown as combobox (editable) or badge (read-only)
   // For PRODUCTION sector users who are NOT team leaders: show as badge (read-only)

@@ -10,7 +10,8 @@
       "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter \"git rm --cached --ignore-unmatch .env.production .env.test\" --prune-empty --tag-name-filter cat -- --all)",
       "Bash(git push:*)",
       "Bash(find:*)",
-      "Bash(npx pnpm build:*)"
+      "Bash(npx pnpm build:*)",
+      "Bash(git:*)"
     ],
     "deny": [],
     "ask": []

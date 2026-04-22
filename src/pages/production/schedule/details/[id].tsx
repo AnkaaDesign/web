@@ -2272,7 +2272,7 @@ export const TaskDetailsPage = () => {
                               .map((s) => ({
                                 value: s,
                                 label: statusLabels[s],
-                                disabled: s === quoteStatus || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s === 'BILLING_APPROVED'),
+                                disabled: s === quoteStatus,
                               }));
 
                             const getQuoteStatusTriggerClass = (status: TASK_QUOTE_STATUS) => {

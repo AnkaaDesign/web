@@ -269,6 +269,7 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                   disabled: s.value === currentStatus
                     || AUTOMATIC_STATUSES.includes(s.value)
                     || (userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL && s.value === "BILLING_APPROVED")
+                    || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s.value === "COMMERCIAL_APPROVED")
                     || (s.value === "BILLING_APPROVED" && currentStatus !== "COMMERCIAL_APPROVED"),
                 }))}
                 searchable={false}
