@@ -565,7 +565,7 @@ export function formatTimeSinceStatusChangeCompact(user: User): string | null {
  * For exp1: days since exp1StartAt
  * For exp2: (exp1 duration) + (days into exp2)
  *   - exp1 duration is calculated from exp1StartAt to exp1EndAt (or exp2StartAt if exp1EndAt not available)
- *   - if neither is available, assumes standard 45 days for exp1
+ *   - if neither is available, assumes standard 30 days for exp1
  *   - days into exp2 is calculated from exp2StartAt (or exp1EndAt) to now
  */
 export function getDaysSinceExperienceStart(user: User): number | null {
@@ -579,7 +579,7 @@ export function getDaysSinceExperienceStart(user: User): number | null {
   }
 
   if (user.status === USER_STATUS.EXPERIENCE_PERIOD_2) {
-    let exp1Duration = 45; // Default to 45 days if we can't calculate
+    let exp1Duration = 30; // Default to 30 days if we can't calculate
     let exp2Start: Date | null = null;
 
     // Calculate exp1 duration if we have the dates

@@ -59,9 +59,11 @@ const isCompleteDate = (segs: SegmentedValue, mode: "date" | "time" | "datetime"
   const h = parseInt(segs.hour, 10);
   const mi = parseInt(segs.minute, 10);
 
-  const hasValidDate = !isNaN(d) && d >= 1 && d <= 31 &&
-                       !isNaN(m) && m >= 1 && m <= 12 &&
-                       !isNaN(y) && y >= 1900 && y <= 2100;
+  const validMonth = !isNaN(m) && m >= 1 && m <= 12;
+  const validYear = !isNaN(y) && y >= 1900 && y <= 2100;
+  // Use actual days in the given month/year (handles Feb 28/29, 30-day months, etc.)
+  const daysInMonth = validMonth && validYear ? new Date(y, m, 0).getDate() : 31;
+  const hasValidDate = !isNaN(d) && d >= 1 && d <= daysInMonth && validMonth && validYear;
   const hasValidTime = !isNaN(h) && h >= 0 && h <= 23 &&
                        !isNaN(mi) && mi >= 0 && mi <= 59;
 
@@ -81,6 +83,10 @@ const segmentsToDate = (segs: SegmentedValue, mode: "date" | "time" | "datetime"
     const m = parseInt(segs.month, 10);
     const y = parseInt(segs.year, 10);
     date.setFullYear(y, m - 1, d);
+    // Safety: verify JavaScript didn't silently overflow (redundant with isCompleteDate but defensive)
+    if (date.getDate() !== d || date.getMonth() !== m - 1 || date.getFullYear() !== y) {
+      return null;
+    }
   }
 
   if (mode !== "date") {
@@ -214,7 +220,7 @@ const NaturalDateTimeInput = React.forwardRef<HTMLInputElement, NaturalDateTimeI
     const getDisplayValue = React.useCallback((): string => {
       const formatSegment = (val: string, placeholder: string, length: number): string => {
         if (!val) return placeholder;
-        return val.padStart(length, placeholder[0]);
+        return val.padStart(length, "0");
       };
 
       if (mode === "date") {
@@ -256,14 +262,17 @@ const NaturalDateTimeInput = React.forwardRef<HTMLInputElement, NaturalDateTimeI
 
       switch (segment) {
         case "day":
-          if (num < 1) return "";
+          if (num < 0) return "";
           if (num > 31) return "31";
-          return num.toString();
+          // "00" typed as two digits → clamp to "01"
+          if (val.length === 2 && num === 0) return "01";
+          return val;
 
         case "month":
-          if (num < 1) return "";
+          if (num < 0) return "";
           if (num > 12) return "12";
-          return num.toString();
+          if (val.length === 2 && num === 0) return "01";
+          return val;
 
         case "year":
           // Allow partial input, only constrain when complete
@@ -271,19 +280,20 @@ const NaturalDateTimeInput = React.forwardRef<HTMLInputElement, NaturalDateTimeI
             if (num < 1900) return "1900";
             if (num > 2100) return "2100";
           }
-          return num.toString();
+          return val;
 
-        case "hour":
+        case "hour": {
           if (num < 0) return "";
           const maxHour = format24Hours ? 23 : 12;
-          if (num > maxHour) return maxHour.toString();
-          return num.toString();
+          if (num > maxHour) return maxHour.toString().padStart(2, "0");
+          return val;
+        }
 
         case "minute":
         case "second":
           if (num < 0) return "";
           if (num > 59) return "59";
-          return num.toString();
+          return val;
 
         default:
           return val;
@@ -590,9 +600,15 @@ const NaturalDateTimeInput = React.forwardRef<HTMLInputElement, NaturalDateTimeI
           }
         }
 
-        // Pad all non-empty segments with leading zeros
-        if (newSegments.day) newSegments.day = newSegments.day.padStart(2, "0");
-        if (newSegments.month) newSegments.month = newSegments.month.padStart(2, "0");
+        // Pad all non-empty segments with leading zeros; clamp "0" day/month to "01"
+        if (newSegments.day) {
+          const d = parseInt(newSegments.day, 10);
+          newSegments.day = (isNaN(d) || d < 1 ? 1 : d).toString().padStart(2, "0");
+        }
+        if (newSegments.month) {
+          const m = parseInt(newSegments.month, 10);
+          newSegments.month = (isNaN(m) || m < 1 ? 1 : m).toString().padStart(2, "0");
+        }
         if (newSegments.hour) newSegments.hour = newSegments.hour.padStart(2, "0");
         if (newSegments.minute) newSegments.minute = newSegments.minute.padStart(2, "0");
         if (newSegments.second) newSegments.second = newSegments.second.padStart(2, "0");

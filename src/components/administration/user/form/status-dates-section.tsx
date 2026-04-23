@@ -33,7 +33,7 @@ function adjustToFridayIfWeekend(date: Date): Date {
 
 /**
  * Calculates all status-related dates based on exp1StartAt
- * Each experience period is 45 days
+ * First experience period is 30 days, second is 50 days
  * End dates are adjusted to Friday if they fall on weekends
  * Effective hire date (effectedAt) is 1 day after exp2EndAt
  */
@@ -50,15 +50,15 @@ function calculateStatusDates(exp1StartAt: Date | null) {
   // Normalize to start of day to avoid timezone issues
   const normalizedStart = startOfDay(exp1StartAt);
 
-  // Calculate exp1 end date (45 days from start, so end is on day 46) and adjust to Friday if weekend
-  const rawExp1EndAt = addDays(normalizedStart, 45);
+  // Calculate exp1 end date (30 days from start, so end is on day 31) and adjust to Friday if weekend
+  const rawExp1EndAt = addDays(normalizedStart, 30);
   const exp1EndAt = adjustToFridayIfWeekend(rawExp1EndAt);
 
   // exp2 starts the day after exp1 ends
   const exp2StartAt = addDays(exp1EndAt, 1);
 
-  // Calculate exp2 end date (45 days) and adjust to Friday if weekend
-  const rawExp2EndAt = addDays(exp2StartAt, 45);
+  // Calculate exp2 end date (50 days) and adjust to Friday if weekend
+  const rawExp2EndAt = addDays(exp2StartAt, 50);
   const exp2EndAt = adjustToFridayIfWeekend(rawExp2EndAt);
 
   // Effective hire date is 1 day after exp2 ends
@@ -173,7 +173,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
           <div className="space-y-4">
             <h4 className="text-sm font-semibold flex items-center gap-2">
               <IconCalendar className="h-4 w-4" />
-              Experiência 1 (45 dias)
+              Experiência 1 (30 dias)
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
               <FormField
@@ -226,7 +226,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
           <div className="space-y-4">
             <h4 className="text-sm font-semibold flex items-center gap-2">
               <IconCalendar className="h-4 w-4" />
-              Experiência 2 (45 dias)
+              Experiência 2 (50 dias)
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
               <FormField
