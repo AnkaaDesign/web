@@ -410,9 +410,10 @@ export function BudgetStepCustomerPayment({
             <div className="space-y-1.5 flex-1 min-w-[100px]">
               <Label className="text-sm font-medium">N° do Pedido</Label>
               <Input
-                value={config?.orderNumber || ""}
-                onChange={(value) => setConfigField("orderNumber", value || null)}
-                placeholder="Ex: PED-001"
+                type="natural"
+                value={config?.orderNumber ? (parseInt(config.orderNumber.replace(/\D/g, ''), 10) || undefined) : undefined}
+                onChange={(value) => setConfigField("orderNumber", value != null ? String(value) : null)}
+                placeholder="Ex: 12345"
                 disabled={disabled}
               />
             </div>

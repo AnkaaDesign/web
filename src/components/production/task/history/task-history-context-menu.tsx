@@ -105,12 +105,12 @@ export function TaskHistoryContextMenu({
   const isCommercial = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
   const isProductionManager = user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION_MANAGER;
 
-  // Users who can access advanced menu options: ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER
-  const canAccessAdvancedMenu = isAdmin || isFinancialUser || isLogisticOrCommercial || isDesigner;
+  // Users who can access advanced menu options: ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER, PRODUCTION_MANAGER
+  const canAccessAdvancedMenu = isAdmin || isFinancialUser || isLogisticOrCommercial || isDesigner || isProductionManager;
 
   // Per-item advanced menu permissions
-  const canAccessArtworks = isAdmin || isCommercial || isDesigner;
-  const canAccessCutPlan = isAdmin || isDesigner;
+  const canAccessArtworks = isAdmin || isCommercial || isDesigner || isProductionManager;
+  const canAccessCutPlan = isAdmin || isDesigner || isProductionManager;
   const canAccessPaints = canAccessAdvancedMenu && !isDesigner;
 
   // Users who can cancel tasks: ADMIN, LOGISTIC, FINANCIAL, COMMERCIAL

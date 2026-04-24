@@ -68,7 +68,7 @@ export function legacyToConfig(condition: string | null | undefined): PaymentCon
 export function configToTypeValue(config: PaymentConfig | null | undefined): string {
   if (!config) return "";
   if (config.type === "CASH") return "CASH";
-  if (config.type === "INSTALLMENTS") return `INST_${config.installmentCount}`;
+  if (config.type === "INSTALLMENTS" && config.installmentCount) return `INST_${config.installmentCount}`;
   return "";
 }
 

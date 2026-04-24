@@ -226,6 +226,7 @@ export const BillingDetailPage = () => {
           zipCode: config.customer?.zipCode || "",
           stateRegistration: config.customer?.stateRegistration || "",
           streetType: config.customer?.streetType || null,
+          registrationStatus: config.customer?.registrationStatus || null,
         },
       })),
     }, { keepDirtyValues: true }); // preserve user edits on background refetch
@@ -404,6 +405,7 @@ export const BillingDetailPage = () => {
               zipCode: config.customerData.zipCode || undefined,
               stateRegistration: config.customerData.stateRegistration || undefined,
               streetType: config.customerData.streetType || undefined,
+              registrationStatus: config.customerData.registrationStatus ?? undefined,
             });
           } catch (err: any) {
             toast.error(`Erro ao atualizar cliente: ${err?.message || "Erro desconhecido"}`);
@@ -661,6 +663,7 @@ export const BillingDetailPage = () => {
               <BillingStepTask
                 disabled={!canEdit}
                 customersCache={customersCache}
+                initialCustomer={task?.customer}
               />
             </div>
 

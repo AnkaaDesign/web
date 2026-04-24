@@ -57,8 +57,11 @@ interface BillingStepCustomerProps {
 }
 
 export function BillingStepCustomer({ configIndex, customer, disabled }: BillingStepCustomerProps) {
-  const { control, setValue: setFormValue } = useFormContext();
-  const config = useWatch({ control, name: `customerConfigs.${configIndex}` });
+  const { control, setValue: setFormValue, getValues } = useFormContext();
+  // useWatch returns undefined on the very first render (before subscription fires);
+  // fall back to getValues() which reads the form store synchronously.
+  const watchedConfig = useWatch({ control, name: `customerConfigs.${configIndex}` });
+  const config = watchedConfig ?? getValues(`customerConfigs.${configIndex}`) ?? null;
   const customerData = config?.customerData || {};
 
   const [docType, setDocType] = useState<"cnpj" | "cpf">(() => {
@@ -70,7 +73,10 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
     config?.paymentConfig ?? legacyToConfig(config?.paymentCondition);
   const paymentType = paymentConfig?.type ?? null;
   const typeValue = configToTypeValue(paymentConfig);
-  const [showDateInput, setShowDateInput] = useState(() => !!paymentConfig?.specificDate);
+  const [showDateInput, setShowDateInput] = useState(false);
+  // Sync showDateInput when form data loads asynchronously (specificDate may not be set at mount)
+  const hasSpecificDate = !!paymentConfig?.specificDate;
+  if (hasSpecificDate && !showDateInput) setShowDateInput(true);
 
   const setPaymentConfig = useCallback((next: PaymentConfig | null) => {
     setFormValue(`customerConfigs.${configIndex}.paymentConfig`, next, { shouldDirty: true });
@@ -398,8 +404,9 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
             <div className="space-y-1.5 flex-1 min-w-[100px]">
               <Label className="text-sm font-medium">N° do Pedido</Label>
               <Input
-                value={config?.orderNumber || ""}
-                onChange={(value) => setConfigField("orderNumber", String(value ?? "") || null)}
+                type="natural"
+                value={config?.orderNumber ? (parseInt(config.orderNumber.replace(/\D/g, ''), 10) || undefined) : undefined}
+                onChange={(value) => setConfigField("orderNumber", value != null ? String(value) : null)}
                 placeholder="Ex: 12345"
                 disabled={disabled}
               />

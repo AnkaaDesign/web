@@ -277,6 +277,25 @@ export async function exportCompleteDossiePdf(opts: CompleteDossiePdfOptions): P
     y -= 12;
   }
 
+  // Layout image
+  if (opts.layoutImageUrl) {
+    const layoutBytes = await fetchImageBytes(opts.layoutImageUrl);
+    if (layoutBytes) {
+      const layoutImg = await embedImage(doc, layoutBytes);
+      if (layoutImg) {
+        p1.drawText('Layout Aprovado', { x: ML, y, size: 12, font: fontBold, color: GREEN });
+        y -= 16;
+        const fullImgH = CW * (layoutImg.height / layoutImg.width);
+        const availableH = y - (MB + 20);
+        const scale = fullImgH > availableH ? availableH / fullImgH : 1;
+        const imgW = CW * scale;
+        const imgH = fullImgH * scale;
+        p1.drawImage(layoutImg, { x: ML, y: y - imgH, width: imgW, height: imgH });
+        y -= imgH + 12;
+      }
+    }
+  }
+
   // ═══════════════════════════════════════
   // PAGES 2+: Dossiê Fotográfico
   // ═══════════════════════════════════════

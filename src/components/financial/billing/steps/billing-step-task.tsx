@@ -37,11 +37,13 @@ import { BillingStepInfo } from "./billing-step-info";
 interface BillingStepTaskProps {
   disabled?: boolean;
   customersCache: React.MutableRefObject<Map<string, any>>;
+  initialCustomer?: any;
 }
 
 export function BillingStepTask({
   disabled,
   customersCache,
+  initialCustomer,
 }: BillingStepTaskProps) {
   const { control } = useFormContext();
 
@@ -80,7 +82,7 @@ export function BillingStepTask({
                 </FormItem>
               )}
             />
-            <CustomerSelector control={control} disabled={disabled} />
+            <CustomerSelector control={control} disabled={disabled} initialCustomer={initialCustomer} />
           </div>
 
           {/* Category + Implement Type */}
