@@ -32,11 +32,11 @@ export function parseMarkdownToInlineFormat(text: string): InlineFormat[] {
   let currentIndex = 0;
 
   // Combined regex to match all formatting patterns
-  // Order matters: links first (most specific), then bold/underline, then italic
+  // Order matters: color first (avoid conflicts), then links (most specific), then bold/underline, then italic
   // Using [\s\S] instead of . to match any character including newlines
   // Using *? for non-greedy matching to avoid over-matching
   // Allowing spaces around content: ** text ** or **text**
-  const formatRegex = /(\[([^\]]+)\]\(([^)]+)\))|(\*\*([^*]+?)\*\*)|(__([^_]+?)__)|(\*([^*]+?)\*)/g;
+  const formatRegex = /(\{c:#([0-9a-fA-F]{3,6})\}([\s\S]*?)\{\/c\})|(\[([^\]]+)\]\(([^)]+)\))|(\*\*([^*]+?)\*\*)|(__([^_]+?)__)|(\*([^*]+?)\*)/g;
 
   let match: RegExpExecArray | null;
 
@@ -51,9 +51,25 @@ export function parseMarkdownToInlineFormat(text: string): InlineFormat[] {
 
     // Determine which pattern matched and add formatted content
     if (match[1]) {
+      // Color: {c:#RRGGBB}text{/c}
+      const colorHex = `#${match[2]}`;
+      const colorContent = match[3];
+      if (colorContent.trim()) {
+        result.push({
+          type: 'color',
+          content: colorContent,
+          color: colorHex,
+        });
+      } else {
+        result.push({
+          type: 'text',
+          content: match[0],
+        });
+      }
+    } else if (match[4]) {
       // Link: [text](url)
-      const linkText = match[2].trim();
-      const linkUrl = match[3].trim();
+      const linkText = match[5].trim();
+      const linkUrl = match[6].trim();
       // Only add link if both text and URL are non-empty
       if (linkText && linkUrl) {
         result.push({
@@ -68,9 +84,9 @@ export function parseMarkdownToInlineFormat(text: string): InlineFormat[] {
           content: match[0],
         });
       }
-    } else if (match[4]) {
+    } else if (match[7]) {
       // Bold: **text**
-      const boldText = match[5];
+      const boldText = match[8];
       // Skip if content is only whitespace
       if (boldText.trim()) {
         result.push({
@@ -84,25 +100,23 @@ export function parseMarkdownToInlineFormat(text: string): InlineFormat[] {
           content: match[0],
         });
       }
-    } else if (match[6]) {
-      // Underline: __text__ (treating as bold since InlineFormat doesn't have underline)
-      const underlineText = match[7];
-      // Skip if content is only whitespace
+    } else if (match[9]) {
+      // Underline: __text__
+      const underlineText = match[10];
       if (underlineText.trim()) {
         result.push({
-          type: 'bold',
+          type: 'underline',
           content: underlineText,
         });
       } else {
-        // Empty underline markers - treat as plain text
         result.push({
           type: 'text',
           content: match[0],
         });
       }
-    } else if (match[8]) {
+    } else if (match[11]) {
       // Italic: *text*
-      const italicText = match[9];
+      const italicText = match[12];
       // Skip if content is only whitespace
       if (italicText.trim()) {
         result.push({
@@ -148,6 +162,8 @@ export function stripMarkdownFormatting(text: string): string {
   if (!text) return '';
 
   return text
+    // Remove color {c:#hex}text{/c} -> text
+    .replace(/\{c:#[0-9a-fA-F]{3,6}\}(.*?)\{\/c\}/g, '$1')
     // Remove links [text](url) -> text
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     // Remove bold **text** -> text
@@ -179,7 +195,7 @@ export function hasMarkdownFormatting(text: string): boolean {
  */
 export function wrapWithMarkdown(
   text: string,
-  format: 'bold' | 'italic' | 'underline' | 'link',
+  format: 'bold' | 'italic' | 'underline' | 'link' | 'color',
   url?: string
 ): string {
   if (!text) return '';
@@ -193,6 +209,8 @@ export function wrapWithMarkdown(
       return `__${text}__`;
     case 'link':
       return url ? `[${text}](${url})` : text;
+    case 'color':
+      return url ? `{c:${url}}${text}{/c}` : text;
     default:
       return text;
   }
@@ -207,7 +225,7 @@ export function wrapWithMarkdown(
  */
 export function removeMarkdownFormat(
   text: string,
-  format: 'bold' | 'italic' | 'underline' | 'link'
+  format: 'bold' | 'italic' | 'underline' | 'link' | 'color'
 ): string {
   if (!text) return '';
 
@@ -220,6 +238,8 @@ export function removeMarkdownFormat(
       return text.replace(/__([^_]+)__/g, '$1');
     case 'link':
       return text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+    case 'color':
+      return text.replace(/\{c:#[0-9a-fA-F]{3,6}\}(.*?)\{\/c\}/g, '$1');
     default:
       return text;
   }

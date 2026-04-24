@@ -4,7 +4,9 @@ export type InlineFormat =
   | { type: 'text'; content: string }
   | { type: 'bold'; content: string }
   | { type: 'italic'; content: string }
-  | { type: 'link'; content: string; url: string };
+  | { type: 'underline'; content: string }
+  | { type: 'link'; content: string; url: string }
+  | { type: 'color'; content: string; color: string };
 
 export type MessageBlock =
   | HeadingBlock

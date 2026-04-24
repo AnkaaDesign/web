@@ -16,7 +16,7 @@ export const SpacerBlockEditor = ({ block, onUpdate }: SpacerBlockEditorProps) =
   return (
     <div className="space-y-3">
       <div>
-        <Label className="text-xs">Altura do Espaço</Label>
+        <Label className="text-xs text-muted-foreground mb-1">Altura do Espaço</Label>
         <Combobox
           value={block.height || 'md'}
           onValueChange={(value) => onUpdate({ height: value as any })}

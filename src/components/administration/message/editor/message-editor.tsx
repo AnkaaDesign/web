@@ -35,7 +35,12 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
   }>({
     title: initialData?.title || '',
     targeting: initialData?.targeting || { type: 'specific' as const, userIds: [], sectorIds: [], positionIds: [] },
-    scheduling: initialData?.scheduling || {},
+    scheduling: initialData?.scheduling || (() => {
+      const today = new Date();
+      const endDate = new Date(today);
+      endDate.setDate(endDate.getDate() + 7);
+      return { startDate: today, endDate };
+    })(),
   });
 
   // Update state when initialData changes (for edit mode)
@@ -111,10 +116,10 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
   }, [isValid, isDirty, canPreview, onFormStateChange]);
 
   useEffect(() => {
-    const canGoNext = currentStep < STEPS.length;
+    const canGoNext = currentStep < STEPS.length && (currentStep !== 1 || step1Valid);
     const canGoPrev = currentStep > 1;
     onStepChange?.(currentStep, STEPS.length, canGoNext, canGoPrev);
-  }, [currentStep, onStepChange]);
+  }, [currentStep, step1Valid, onStepChange]);
 
   const handleSubmitDraft = () => {
     if (!isValid) {
@@ -153,7 +158,7 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStep
   };
 
   const handleNext = () => {
-    if (currentStep < STEPS.length) {
+    if (currentStep < STEPS.length && (currentStep !== 1 || step1Valid)) {
       setCurrentStep(currentStep + 1);
     }
   };

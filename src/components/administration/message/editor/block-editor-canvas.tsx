@@ -4,10 +4,11 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import type { DragEndEvent } from "@dnd-kit/core";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { IconPlus } from "@tabler/icons-react";
+import { IconPlus, IconLayoutGrid } from "@tabler/icons-react";
 import { BlockEditor } from "./block-editor";
 import { BlockTypeSelector } from "./block-type-selector";
-import type { ContentBlock, BlockType } from "./types";
+import { MessageTemplates } from "./message-templates";
+import type { ContentBlock, BlockType, DecoratorVariant } from "./types";
 
 interface BlockEditorCanvasProps {
   blocks: ContentBlock[];
@@ -17,6 +18,7 @@ interface BlockEditorCanvasProps {
 export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasProps) => {
   const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [insertIndex, setInsertIndex] = useState<number | null>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -36,8 +38,8 @@ export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasP
     }
   };
 
-  const handleAddBlock = (type: BlockType) => {
-    const newBlock: ContentBlock = createEmptyBlock(type);
+  const handleAddBlock = (type: BlockType, initialDecoratorVariant?: DecoratorVariant) => {
+    const newBlock: ContentBlock = createEmptyBlock(type, initialDecoratorVariant);
 
     if (insertIndex !== null) {
       const newBlocks = [...blocks];
@@ -65,8 +67,17 @@ export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasP
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Editor de Conteúdo</CardTitle>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowTemplates(true)}
+          className="gap-2"
+        >
+          <IconLayoutGrid className="h-4 w-4" />
+          Exemplos
+        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {blocks.length === 0 && (
@@ -117,12 +128,19 @@ export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasP
           }}
           onSelect={handleAddBlock}
         />
+
+        <MessageTemplates
+          open={showTemplates}
+          onOpenChange={setShowTemplates}
+          onSelect={(newBlocks) => onBlocksChange(newBlocks)}
+          hasExistingBlocks={blocks.length > 0}
+        />
       </CardContent>
     </Card>
   );
 };
 
-function createEmptyBlock(type: BlockType): ContentBlock {
+function createEmptyBlock(type: BlockType, initialDecoratorVariant?: DecoratorVariant): ContentBlock {
   const id = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   switch (type) {
@@ -150,6 +168,10 @@ function createEmptyBlock(type: BlockType): ContentBlock {
       return { id, type, icon: 'IconCheck', size: 'md', color: 'text-foreground', alignment: 'center' };
     case 'row':
       return { id, type, blocks: [], columns: 2, gap: 'md', verticalAlign: 'top' };
+    case 'decorator':
+      return { id, type: 'decorator', variant: initialDecoratorVariant || 'footer-wave-dark' };
+    case 'company-asset':
+      return { id, type: 'company-asset', asset: 'logo', size: '75%', alignment: 'center' };
     default:
       return { id, type: 'paragraph', content: '', fontSize: 'base', fontWeight: 'normal' };
   }

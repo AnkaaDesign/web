@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { bonusService } from "../../../api-client";
@@ -14,12 +14,14 @@ import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { formatCurrency } from "../../../utils";
 import { cn } from "@/lib/utils";
 import { BonusTasksList } from "@/components/human-resources/bonus/detail";
+import { BonusRulesModal } from "@/components/human-resources/bonus/bonus-rules-modal";
 import {
   IconCurrencyReal,
   IconAlertCircle,
   IconRefresh,
   IconFileDownload,
   IconUser,
+  IconInfoCircle,
 } from "@tabler/icons-react";
 
 interface BonusDetailPageParams extends Record<string, string | undefined> {
@@ -55,6 +57,15 @@ const formatBonusAmount = (amount: any): string => {
   if (amount?.toNumber) return formatCurrency(amount.toNumber());
   return formatCurrency(0);
 };
+
+// Parses "Label (total) — dd/mm (hh:mm), dd/mm (hh:mm)" into { label, dates }
+function parseDiscountReference(reference: string): { label: string; dates: string[] } {
+  const parts = reference.split(" — ");
+  if (parts.length < 2) return { label: reference, dates: [] };
+  const label = parts[0];
+  const dates = parts[1].split(", ").map((d) => d.trim()).filter(Boolean);
+  return { label, dates };
+}
 
 // Info row component for consistent styling
 function InfoRow({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
@@ -93,6 +104,13 @@ export default function BonusDetailPage() {
   const { id } = useParams<BonusDetailPageParams>();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const [rulesModalOpen, setRulesModalOpen] = useState(false);
+  const [rulesHighlightRef, setRulesHighlightRef] = useState<string | undefined>();
+
+  const openRulesModal = (reference?: string) => {
+    setRulesHighlightRef(reference);
+    setRulesModalOpen(true);
+  };
 
   // Track page access
   usePageTracker({
@@ -397,6 +415,13 @@ export default function BonusDetailPage() {
           breadcrumbs={breadcrumbs}
           actions={[
             {
+              key: "rules",
+              label: "Regras",
+              icon: IconInfoCircle,
+              onClick: () => openRulesModal(),
+              variant: "outline",
+            },
+            {
               key: "refresh",
               label: "Atualizar",
               icon: IconRefresh,
@@ -481,28 +506,58 @@ export default function BonusDetailPage() {
                       const percentageValue = Number(extra.percentage) || 0;
                       const hasPercentage = percentageValue > 0;
                       return (
-                        <div key={extra.id} className="flex justify-between py-1">
-                          <span className="text-sm text-muted-foreground">{extra.reference}</span>
+                        <button
+                          key={extra.id}
+                          type="button"
+                          onClick={() => openRulesModal(extra.reference)}
+                          className="flex justify-between py-1 w-full text-left rounded hover:bg-muted/60 px-1 -mx-1 transition-colors group"
+                          title="Ver regra"
+                        >
+                          <span className="text-sm text-muted-foreground group-hover:text-foreground flex items-center gap-1">
+                            {extra.reference}
+                            <IconInfoCircle className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                          </span>
                           <span className="text-sm font-medium text-emerald-600">
                             +{hasPercentage
                               ? `${percentageValue}%`
                               : formatCurrency(Number(extra.value) || 0)}
                           </span>
-                        </div>
+                        </button>
                       );
                     })}
                     {hasDiscounts && bonus.bonusDiscounts!.map((discount: any) => {
                       const percentageValue = Number(discount.percentage) || 0;
                       const hasPercentage = percentageValue > 0;
+                      const { label, dates } = parseDiscountReference(discount.reference || "");
                       return (
-                        <div key={discount.id} className="flex justify-between py-1">
-                          <span className="text-sm text-muted-foreground">{discount.reference}</span>
-                          <span className="text-sm font-medium text-destructive">
-                            -{hasPercentage
-                              ? `${percentageValue}%`
-                              : formatCurrency(Number(discount.value) || 0)}
-                          </span>
-                        </div>
+                        <button
+                          key={discount.id}
+                          type="button"
+                          onClick={() => openRulesModal(discount.reference)}
+                          className="w-full text-left rounded hover:bg-muted/60 px-1 -mx-1 py-1 transition-colors group"
+                          title="Ver regra"
+                        >
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-sm text-muted-foreground group-hover:text-foreground flex items-center gap-1">
+                              {label}
+                              <IconInfoCircle className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-50 transition-opacity" />
+                            </span>
+                            <span className="text-sm font-medium text-destructive shrink-0">
+                              -{hasPercentage
+                                ? `${percentageValue}%`
+                                : formatCurrency(Number(discount.value) || 0)}
+                            </span>
+                          </div>
+                          {dates.length > 0 && (
+                            <div className="mt-0.5 pl-0.5 flex flex-col gap-0.5">
+                              {dates.map((date, i) => (
+                                <span key={i} className="text-xs text-muted-foreground/70">
+                                  {date}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </button>
                       );
                     })}
                     {/* Atestado forgiveness — when the user had atestado in this period but
@@ -548,6 +603,12 @@ export default function BonusDetailPage() {
           tasksSkeleton
         )}
       </div>
+
+      <BonusRulesModal
+        open={rulesModalOpen}
+        onClose={() => setRulesModalOpen(false)}
+        highlightReference={rulesHighlightRef}
+      />
     </PrivilegeRoute>
   );
 }

@@ -20,7 +20,7 @@ export const IconBlockEditor = ({ block, onUpdate }: IconBlockEditorProps) => {
   return (
     <div className="space-y-3">
       <div>
-        <Label className="text-xs">Ícone</Label>
+        <Label className="text-xs text-muted-foreground mb-1">Ícone</Label>
         <Button
           variant="outline"
           className="w-full h-20 flex flex-col gap-2"
@@ -39,7 +39,7 @@ export const IconBlockEditor = ({ block, onUpdate }: IconBlockEditorProps) => {
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <Label className="text-xs">Tamanho</Label>
+          <Label className="text-xs text-muted-foreground mb-1">Tamanho</Label>
           <Combobox
             value={block.size || 'md'}
             onValueChange={(value) => onUpdate({ size: value as any })}
@@ -56,7 +56,7 @@ export const IconBlockEditor = ({ block, onUpdate }: IconBlockEditorProps) => {
         </div>
 
         <div>
-          <Label className="text-xs">Alinhamento</Label>
+          <Label className="text-xs text-muted-foreground mb-1">Alinhamento</Label>
           <Combobox
             value={block.alignment || 'center'}
             onValueChange={(value) => onUpdate({ alignment: value as any })}
@@ -73,7 +73,7 @@ export const IconBlockEditor = ({ block, onUpdate }: IconBlockEditorProps) => {
       </div>
 
       <div>
-        <Label className="text-xs">Cor</Label>
+        <Label className="text-xs text-muted-foreground mb-1">Cor</Label>
         <Combobox
           value={Array.isArray(block.color) ? (block.color[0] || 'text-foreground') : (block.color || 'text-foreground')}
           onValueChange={(value) => onUpdate({ color: (Array.isArray(value) ? value[0] : value) ?? undefined })}

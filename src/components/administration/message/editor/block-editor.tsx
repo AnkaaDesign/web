@@ -12,6 +12,8 @@ import { DividerBlockEditor } from "./blocks/divider-block-editor";
 import { SpacerBlockEditor } from "./blocks/spacer-block-editor";
 import { IconBlockEditor } from "./blocks/icon-block-editor";
 import { RowBlockEditor } from "./blocks/row-block-editor";
+import { DecoratorBlockEditor } from "./blocks/decorator-block-editor";
+import { CompanyAssetBlockEditor } from "./blocks/company-asset-block-editor";
 import type { ContentBlock } from "./types";
 
 interface BlockEditorProps {
@@ -57,15 +59,54 @@ export const BlockEditor = ({ block, onUpdate, onDelete }: BlockEditorProps) => 
         return <IconBlockEditor block={block} onUpdate={onUpdate} />;
       case 'row':
         return <RowBlockEditor block={block} onUpdate={onUpdate} />;
+      case 'decorator':
+        return <DecoratorBlockEditor block={block} onUpdate={onUpdate} />;
+      case 'company-asset':
+        return <CompanyAssetBlockEditor block={block as any} onUpdate={onUpdate} />;
       default:
         return null;
     }
   };
 
+  const isDecorator = block.type === 'decorator';
+  const isCompanyAsset = block.type === 'company-asset';
+
+  if (isDecorator) {
+    return (
+      <div ref={setNodeRef} style={style} className={cn("group relative", isDragging && "opacity-50")}>
+        <Card className="border border-border/50 hover:border-primary/60 transition-colors overflow-hidden">
+          {/* Overlaid controls */}
+          <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              {...attributes}
+              {...listeners}
+              className="p-1 bg-background/80 hover:bg-muted rounded cursor-grab active:cursor-grabbing backdrop-blur-sm"
+            >
+              <IconGripVertical className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 bg-background/80 text-destructive hover:text-destructive backdrop-blur-sm"
+              onClick={onDelete}
+              title="Remover bloco"
+            >
+              <IconTrash className="h-4 w-4" />
+            </Button>
+          </div>
+          {/* Edge-to-edge decorator content */}
+          <div className="w-full">
+            {renderBlockContent()}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div ref={setNodeRef} style={style} className={cn("group relative", isDragging && "opacity-50")}>
-      <Card className="border-2 border-transparent hover:border-primary/20 transition-colors">
-        <div className="flex items-start gap-2 p-3">
+      <Card className="border border-border/50 hover:border-primary/60 transition-colors">
+        <div className={cn("flex items-start gap-2 p-3", isCompanyAsset && "py-5")}>
           {/* Drag Handle */}
           <button
             {...attributes}

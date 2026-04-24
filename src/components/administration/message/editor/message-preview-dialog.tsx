@@ -4,13 +4,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
-import { IconDeviceDesktop, IconDeviceMobile } from "@tabler/icons-react";
+import { IconDeviceDesktop, IconDeviceMobile, IconFileDownload } from "@tabler/icons-react";
 import * as TablerIcons from "@tabler/icons-react";
-import type { MessageFormData } from "./types";
+import type { MessageFormData, DecoratorVariant } from "./types";
 import { useState } from "react";
 import { parseMarkdownToInlineFormat } from "@/utils/markdown-parser";
 import { getApiBaseUrl } from "@/config/api";
@@ -21,8 +20,277 @@ interface MessagePreviewDialogProps {
   data: MessageFormData;
 }
 
+const DECORATOR_IMAGES: Record<string, string> = {
+  'header-logo': '/header-logo.webp',
+  'header-logo-stripes': '/header-logo-stripes.webp',
+  'footer-wave-dark': '/footer-wave-dark.webp',
+  'footer-wave-logo': '/footer-wave-logo.webp',
+  'footer-diagonal-stripes': '/footer-diagonal-stripes.webp',
+  'footer-wave-gold': '/footer-wave-gold.webp',
+  'footer-geometric': '/footer-geometric.webp',
+};
+
+const DecoratorPreview = ({ variant }: { variant: DecoratorVariant }) => {
+  const src = DECORATOR_IMAGES[variant] ?? DECORATOR_IMAGES['footer-wave-dark'];
+  const isHeader = variant.startsWith('header-');
+  return (
+    <img
+      src={src}
+      alt="Decoração"
+      style={{
+        width: '100%',
+        display: 'block',
+        ...(isHeader ? { height: '80px', objectFit: 'cover', objectPosition: 'left center' } : {}),
+      }}
+    />
+  );
+};
+
 export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePreviewDialogProps) => {
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
+
+  const handleExportPDF = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=1200');
+    if (!printWindow) return;
+
+    const previewEl = document.getElementById('message-preview-content');
+
+    const esc = (s: string) =>
+      String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const escAttr = (s: string) =>
+      String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
+    const fmtToHtml = (text: string): string => {
+      const segments = parseMarkdownToInlineFormat(text);
+      return segments.map((seg: any) => {
+        const c = esc(seg.content ?? '').replace(/\n/g, '<br>');
+        switch (seg.type) {
+          case 'bold': return `<strong>${c}</strong>`;
+          case 'italic': return `<em>${c}</em>`;
+          case 'underline': return `<u>${c}</u>`;
+          case 'link': return `<a href="${escAttr(seg.url ?? '')}" style="color:#3bc914">${c}</a>`;
+          case 'color': return `<span style="color:${escAttr(seg.color ?? '')}">${c}</span>`;
+          default: return c;
+        }
+      }).join('');
+    };
+
+    const sizeMap: Record<string, string> = {
+      xs: '9px', sm: '11px', base: '13px', lg: '15px',
+      xl: '17px', '2xl': '20px', '3xl': '24px',
+    };
+    const weightMap: Record<string, string> = {
+      normal: '400', medium: '500', semibold: '600', bold: '700',
+    };
+
+    // Inner content block renderer — no outer margin/padding (wrapper controls vertical rhythm)
+    const toHtml = (block: any): string => {
+      switch (block.type) {
+        case 'heading1':
+        case 'heading2':
+        case 'heading3': {
+          const levelDefaults: Record<string, { tag: string; size: string; weight: string }> = {
+            heading1: { tag: 'h1', size: '18px', weight: '700' },
+            heading2: { tag: 'h2', size: '15px', weight: '600' },
+            heading3: { tag: 'h3', size: '13px', weight: '600' },
+          };
+          const lv = levelDefaults[block.type];
+          const sz = sizeMap[block.fontSize] || lv.size;
+          const wt = weightMap[block.fontWeight] || lv.weight;
+          return `<${lv.tag} style="font-size:${sz};font-weight:${wt};margin:0 0 2px 0;line-height:1.25;color:#111827">${fmtToHtml(block.content ?? '')}</${lv.tag}>`;
+        }
+        case 'paragraph': {
+          const sz = sizeMap[block.fontSize] || '12px';
+          const wt = weightMap[block.fontWeight] || '400';
+          return `<p style="font-size:${sz};font-weight:${wt};line-height:1.5;margin:0;color:#111827">${fmtToHtml(block.content ?? '')}</p>`;
+        }
+        case 'quote': {
+          const sz = sizeMap[block.fontSize] || '12px';
+          return `<blockquote style="border-left:3px solid #3bc914;padding:5px 10px;margin:0;font-style:italic;color:#374151;font-size:${sz};background:#f9fafb;border-radius:0 3px 3px 0">${fmtToHtml(block.content ?? '')}</blockquote>`;
+        }
+        case 'divider':
+          return `<hr style="border:none;border-top:1px solid #e5e7eb;margin:0">`;
+        case 'spacer': {
+          const hMap: Record<string, string> = { sm: '6px', md: '12px', lg: '20px', xl: '30px' };
+          return `<div style="height:${hMap[block.height ?? 'md'] ?? '12px'}"></div>`;
+        }
+        case 'list': {
+          const items = (block.items as string[] || [])
+            .map(item => `<li style="font-size:12px;line-height:1.5;margin-bottom:2px;color:#111827">${fmtToHtml(item)}</li>`)
+            .join('');
+          const tag = block.ordered ? 'ol' : 'ul';
+          const listStyle = block.ordered ? 'decimal' : 'disc';
+          return `<${tag} style="list-style:${listStyle};padding-left:18px;margin:0">${items}</${tag}>`;
+        }
+        case 'button':
+          return '';
+        case 'image': {
+          if (!block.url) return '';
+          const alignJustify: Record<string, string> = { left: 'flex-start', center: 'center', right: 'flex-end' };
+          const justify = alignJustify[block.alignment || 'left'] || 'flex-start';
+          const maxW = block.customWidth || block.size || '50%';
+          const caption = block.caption
+            ? `<p style="font-size:12px;color:#9ca3af;text-align:center;margin-top:6px">${esc(block.caption)}</p>`
+            : '';
+          return `<div style="display:flex;justify-content:${justify}"><div style="max-width:${maxW}"><img src="${escAttr(resolveImageUrl(block.url))}" alt="${escAttr(block.alt || '')}" style="width:100%;height:auto;border-radius:8px">${caption}</div></div>`;
+        }
+        case 'icon':
+          return '';
+        case 'row': {
+          const gapMap: Record<string, string> = { none: '0', sm: '8px', md: '16px', lg: '24px' };
+          const gap = gapMap[block.gap || 'md'] || '16px';
+          const cells = (block.blocks as any[] || [])
+            .map(b => `<div style="flex:${b.type === 'icon' ? '0 0 auto' : '1 1 0'};min-width:0">${toHtml(b)}</div>`)
+            .join('');
+          return `<div style="display:flex;gap:${gap};align-items:flex-start">${cells}</div>`;
+        }
+        case 'decorator': {
+          const imgSrc = DECORATOR_IMAGES[block.variant] ?? DECORATOR_IMAGES['footer-wave-dark'];
+          return `<img src="${window.location.origin}${imgSrc}" style="width:100%;display:block" />`;
+        }
+        case 'company-asset': {
+          const url = block.asset === 'logo' ? '/logo.png' : '/android-chrome-192x192.png';
+          const maxW = block.size || '75%';
+          const align = block.alignment === 'center' ? 'center' : block.alignment === 'right' ? 'right' : 'left';
+          return `<div style="text-align:${align}"><img src="${window.location.origin}${url}" style="max-width:${maxW};height:auto" /></div>`;
+        }
+        default:
+          return '';
+      }
+    };
+
+    // Wrapper: decorator = edge-to-edge, everything else = tight vertical + 14mm horizontal margin
+    const wrapBlock = (block: any, inner: string) => {
+      if (block.type === 'decorator') {
+        return `<div style="width:100%;margin:0;padding:0;line-height:0;font-size:0;overflow:hidden">${inner}</div>`;
+      }
+      if (block.type === 'company-asset') {
+        return `<div style="padding:4px 8mm">${inner}</div>`;
+      }
+      return `<div style="padding:3px 8mm">${inner}</div>`;
+    };
+
+    // Detect header (first block = decorator) and footer (last block = decorator)
+    const blocks = data.blocks;
+    const firstBlock = blocks[0];
+    const lastBlock = blocks[blocks.length - 1];
+    const hasHeader = firstBlock?.type === 'decorator' && blocks.length > 0;
+    const hasFooter = lastBlock?.type === 'decorator' && !(hasHeader && blocks.length === 1);
+
+    // Pre-generate header / footer HTML strings to embed in the script.
+    const headerHtmlStr = hasHeader ? toHtml(firstBlock) : '';
+    const footerHtmlStr = hasFooter ? toHtml(lastBlock) : '';
+
+    // Generate individual wrapped block HTML strings for content blocks.
+    const contentBlocks = blocks.filter((_, i) => {
+      if (hasHeader && i === 0) return false;
+      if (hasFooter && i === blocks.length - 1) return false;
+      return true;
+    });
+    const blockItems = contentBlocks
+      .map(block => { const inner = toHtml(block); return inner ? wrapBlock(block, inner) : ''; })
+      .filter(Boolean);
+
+    // Measurement container includes header/footer divs so JS can measure their actual heights.
+    const measureHtml = [
+      hasHeader ? `<div id="hm" style="width:100%">${headerHtmlStr}</div>` : '',
+      hasFooter ? `<div id="fm" style="width:100%">${footerHtmlStr}</div>` : '',
+      ...blockItems.map((html, i) => `<div data-b="${i}" style="width:100%">${html}</div>`),
+    ].join('');
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>${esc(data.title || 'Mensagem')}</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    color: #111827;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+  u { text-decoration: underline; }
+  a { color: #3bc914; }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<!-- Hidden measurement container: 210mm wide so heights match print layout -->
+<div id="mc" style="position:fixed;top:-9999px;left:0;width:210mm;visibility:hidden">${measureHtml}</div>
+<div id="out"></div>
+<script>
+(function() {
+  var HEADER_HTML = ${JSON.stringify(headerHtmlStr)};
+  var FOOTER_HTML = ${JSON.stringify(footerHtmlStr)};
+  var PX_PER_MM = 96 / 25.4;
+
+  function build() {
+    var mc = document.getElementById('mc');
+
+    // Measure actual header/footer rendered heights so bars have no blank space
+    var hmEl = document.getElementById('hm');
+    var fmEl = document.getElementById('fm');
+    var HEADER_PX = hmEl ? Math.ceil(hmEl.getBoundingClientRect().height) : 0;
+    var FOOTER_PX = fmEl ? Math.ceil(fmEl.getBoundingClientRect().height) : 0;
+
+    var PAGE_PX = Math.floor(297 * PX_PER_MM);
+    var AVAIL_PX = PAGE_PX - HEADER_PX - FOOTER_PX;
+
+    var els = Array.from(mc.querySelectorAll('[data-b]'));
+    var items = els.map(function(el) {
+      return { h: Math.ceil(el.getBoundingClientRect().height), html: el.innerHTML };
+    });
+
+    var pages = [], page = [], used = 0;
+    items.forEach(function(item) {
+      if (used + item.h > AVAIL_PX && page.length > 0) {
+        pages.push(page); page = [item]; used = item.h;
+      } else {
+        page.push(item); used += item.h;
+      }
+    });
+    if (page.length > 0) pages.push(page);
+    if (pages.length === 0) pages = [[]];
+
+    // No fixed height — image renders at its natural height, no blank strip
+    var hBar = HEADER_PX > 0
+      ? '<div style="line-height:0;font-size:0;overflow:hidden;flex-shrink:0">' + HEADER_HTML + '</div>'
+      : '';
+    var fBar = FOOTER_PX > 0
+      ? '<div style="line-height:0;font-size:0;overflow:hidden;flex-shrink:0">' + FOOTER_HTML + '</div>'
+      : '';
+
+    var html = pages.map(function(p, i) {
+      var notLast = i < pages.length - 1;
+      var content = p.map(function(b) { return b.html; }).join('');
+      return '<div style="width:210mm;height:297mm;display:flex;flex-direction:column;' +
+             (notLast ? 'page-break-after:always;break-after:page;' : '') + '">' +
+        hBar +
+        '<div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;">' + content + '</div>' +
+        fBar +
+        '</div>';
+    }).join('');
+
+    document.getElementById('out').innerHTML = html;
+    mc.remove();
+
+    setTimeout(function() { window.print(); }, 400);
+  }
+
+  if (document.readyState === 'complete') { build(); }
+  else { window.addEventListener('load', build); }
+})();
+<\/script>
+</body>
+</html>`);
+    printWindow.document.close();
+  };
 
   // Helper to render text content with newlines converted to <br /> elements
   const renderTextWithLineBreaks = (text: string) => {
@@ -62,6 +330,14 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
             >
               {renderTextWithLineBreaks(format.content)}
             </a>
+          );
+        case 'underline':
+          return <u key={key}>{renderTextWithLineBreaks(format.content)}</u>;
+        case 'color':
+          return (
+            <span key={key} style={{ color: format.color }}>
+              {renderTextWithLineBreaks(format.content)}
+            </span>
           );
         default:
           return null;
@@ -178,14 +454,17 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
             </div>
           </div>
         );
-      case 'button':
+      case 'button': {
         const buttonContent = (
-          <Button variant={block.variant || 'default'} className="my-2">
+          <Button
+            variant={block.variant || 'default'}
+            className="my-2 print:hidden"
+            onClick={() => block.url && window.open(block.url, '_blank', 'noopener,noreferrer')}
+          >
             {block.text}
           </Button>
         );
 
-        // Apply alignment wrapper if specified
         if (block.alignment) {
           const buttonAlignmentClasses = {
             left: 'justify-start',
@@ -193,26 +472,27 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
             right: 'justify-end',
           };
           return (
-            <div className={`flex my-4 first:mt-0 last:mb-0 ${buttonAlignmentClasses[block.alignment as keyof typeof buttonAlignmentClasses]}`}>
+            <div className={`flex my-4 first:mt-0 last:mb-0 print:hidden ${buttonAlignmentClasses[block.alignment as keyof typeof buttonAlignmentClasses]}`}>
               {buttonContent}
             </div>
           );
         }
 
         return buttonContent;
+      }
       case 'divider':
         return <Separator />;
       case 'list':
         return block.ordered ? (
           <ol className="list-decimal list-inside space-y-1">
             {block.items.map((item: string, i: number) => (
-              <li key={i}>{item}</li>
+              <li key={i}>{renderFormattedText(item)}</li>
             ))}
           </ol>
         ) : (
           <ul className="list-disc list-inside space-y-1">
             {block.items.map((item: string, i: number) => (
-              <li key={i}>{item}</li>
+              <li key={i}>{renderFormattedText(item)}</li>
             ))}
           </ul>
         );
@@ -253,6 +533,19 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
             {iconContent}
           </div>
         ) : iconContent;
+      case 'decorator':
+        return <DecoratorPreview variant={block.variant} />;
+      case 'company-asset': {
+        const assetUrl = block.asset === 'logo' ? '/logo.png' : '/android-chrome-192x192.png';
+        const sizeStyle = block.size ? { maxWidth: block.size } : { maxWidth: '75%' };
+        return (
+          <div className={`flex ${block.alignment === 'center' ? 'justify-center' : block.alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
+            <div style={sizeStyle}>
+              <img src={assetUrl} alt={block.asset === 'logo' ? 'Logo' : 'Ícone'} className="w-full h-auto" />
+            </div>
+          </div>
+        );
+      }
       case 'row':
         const rowGapClasses = {
           none: 'gap-0',
@@ -289,59 +582,42 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
     }
   };
 
-  const getTargetingText = () => {
-    switch (data.targeting.type) {
-      case 'all':
-        return 'Todos os usuários';
-      case 'specific':
-        return `${data.targeting.userIds?.length || 0} usuários específicos`;
-      case 'sector':
-        return `${data.targeting.sectorIds?.length || 0} setores selecionados`;
-      case 'position':
-        return `${data.targeting.positionIds?.length || 0} cargos selecionados`;
-      default:
-        return 'Não definido';
-    }
-  };
-
   const PreviewContent = () => (
-    <Card className="w-full overflow-hidden">
-      <CardContent className="p-6 space-y-6 overflow-hidden">
-            {/* Header */}
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold break-words">{data.title}</h2>
+    // bg-background ensures dark mode responds correctly (dark bg in dark mode)
+    // overflow-hidden + rounded-xl clips decorator SVGs to the card border-radius
+    <div
+      className="w-full overflow-hidden rounded-xl border border-border bg-background text-foreground"
+      id="message-preview-content"
+    >
+      {/* Title */}
+      <div className="px-6 pt-5 pb-4">
+        <h2 className="text-2xl font-bold break-words">{data.title}</h2>
+      </div>
+      <Separator />
 
-              <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                <div>Público: {getTargetingText()}</div>
-                {data.scheduling.startDate && (
-                  <div>
-                    Início: {data.scheduling.startDate.toLocaleDateString('pt-BR')}
-                  </div>
-                )}
-                {data.scheduling.endDate && (
-                  <div>
-                    Término: {data.scheduling.endDate.toLocaleDateString('pt-BR')}
-                  </div>
-                )}
+      {/* Blocks — decorators are edge-to-edge (no px), company-asset gets extra py, rest get px-6 py-2 */}
+      {data.blocks.length > 0 ? (
+        <div>
+          {data.blocks.map((block) => {
+            const isDecorator = block.type === 'decorator';
+            const isCompanyAsset = block.type === 'company-asset';
+            return (
+              <div
+                key={block.id}
+                data-block-id={block.id}
+                className={isDecorator ? 'w-full' : isCompanyAsset ? 'px-6 py-5' : 'px-6 py-2'}
+              >
+                {renderBlock(block)}
               </div>
-            </div>
-
-            <Separator />
-
-            {/* Content Blocks */}
-            <div className="space-y-4">
-              {data.blocks.map((block) => (
-                <div key={block.id}>{renderBlock(block)}</div>
-              ))}
-            </div>
-
-        {data.blocks.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            Nenhum conteúdo adicionado ainda
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="px-6 py-8 text-center text-muted-foreground">
+          Nenhum conteúdo adicionado ainda
+        </div>
+      )}
+    </div>
   );
 
   return (
@@ -380,6 +656,18 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
                 <div>375 × 812 px</div>
               </div>
             )}
+
+            <div className="mt-auto pt-4 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPDF}
+                className="w-full justify-start gap-2"
+              >
+                <IconFileDownload className="h-4 w-4" />
+                Exportar PDF
+              </Button>
+            </div>
           </div>
 
           {/* Preview area */}

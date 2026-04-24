@@ -18,13 +18,17 @@ import {
   IconSpacingVertical,
   IconStar,
   IconColumns,
+  IconArrowBarToDown,
+  IconArrowBarToUp,
+  IconBuildingStore,
 } from "@tabler/icons-react";
 import type { BlockType } from "./types";
+import type { DecoratorVariant } from "./types";
 
 interface BlockTypeSelectorProps {
   open: boolean;
   onClose: () => void;
-  onSelect: (type: BlockType) => void;
+  onSelect: (type: BlockType, initialDecoratorVariant?: DecoratorVariant) => void;
 }
 
 const blockTypes: Array<{
@@ -107,9 +111,36 @@ const blockTypes: Array<{
   },
 ];
 
+const decoratorEntries: Array<{
+  label: string;
+  icon: typeof IconH1;
+  description: string;
+  initialVariant?: DecoratorVariant;
+  blockType?: BlockType;
+}> = [
+  {
+    label: 'Cabeçalho',
+    icon: IconArrowBarToUp,
+    description: 'Cabeçalho visual do documento',
+    initialVariant: 'header-logo',
+  },
+  {
+    label: 'Rodapé',
+    icon: IconArrowBarToDown,
+    description: 'Rodapé visual do documento',
+    initialVariant: 'footer-wave-dark',
+  },
+  {
+    label: 'Ativos',
+    icon: IconBuildingStore,
+    description: 'Logo e ícone da empresa',
+    blockType: 'company-asset',
+  },
+];
+
 export const BlockTypeSelector = ({ open, onClose, onSelect }: BlockTypeSelectorProps) => {
-  const handleSelect = (type: BlockType) => {
-    onSelect(type);
+  const handleSelect = (type: BlockType, initialDecoratorVariant?: DecoratorVariant) => {
+    onSelect(type, initialDecoratorVariant);
     onClose();
   };
 
@@ -134,6 +165,35 @@ export const BlockTypeSelector = ({ open, onClose, onSelect }: BlockTypeSelector
                   <div className="font-medium text-sm">{blockType.label}</div>
                   <div className="text-xs text-muted-foreground">
                     {blockType.description}
+                  </div>
+                </div>
+              </Button>
+            );
+          })}
+
+          {/* Separator — Decoradores e Ativos */}
+          <div className="col-span-full border-t border-border/50 my-1" />
+
+          {/* Decorator and company-asset entries */}
+          {decoratorEntries.map((entry) => {
+            const Icon = entry.icon;
+            const key = entry.blockType ?? entry.initialVariant ?? entry.label;
+            return (
+              <Button
+                key={key}
+                variant="outline"
+                className="h-auto flex-col gap-2 p-4 hover:bg-muted"
+                onClick={() =>
+                  entry.blockType
+                    ? handleSelect(entry.blockType)
+                    : handleSelect('decorator', entry.initialVariant)
+                }
+              >
+                <Icon className="h-6 w-6" />
+                <div className="text-center">
+                  <div className="font-medium text-sm">{entry.label}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {entry.description}
                   </div>
                 </div>
               </Button>

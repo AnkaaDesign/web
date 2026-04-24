@@ -29,7 +29,7 @@ export const ButtonBlockEditor = ({ block, onUpdate }: ButtonBlockEditorProps) =
   return (
     <div className="space-y-3">
       <div>
-        <Label className="text-xs">Texto do Botão</Label>
+        <Label className="text-xs text-muted-foreground mb-1">Texto do Botão</Label>
         <Input
           value={block.text}
           onChange={(value: string | number | null) => onUpdate({ text: value as string })}
@@ -40,7 +40,7 @@ export const ButtonBlockEditor = ({ block, onUpdate }: ButtonBlockEditorProps) =
       </div>
 
       <div>
-        <Label className="text-xs">URL de Destino</Label>
+        <Label className="text-xs text-muted-foreground mb-1">URL de Destino</Label>
         <Input
           value={block.url}
           onChange={(value: string | number | null) => handleUrlChange(value as string)}
@@ -58,7 +58,7 @@ export const ButtonBlockEditor = ({ block, onUpdate }: ButtonBlockEditorProps) =
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <Label className="text-xs">Estilo</Label>
+          <Label className="text-xs text-muted-foreground mb-1">Estilo</Label>
           <Combobox
             value={block.variant || 'default'}
             onValueChange={(value) => onUpdate({ variant: value as any })}
@@ -74,7 +74,7 @@ export const ButtonBlockEditor = ({ block, onUpdate }: ButtonBlockEditorProps) =
         </div>
 
         <div>
-          <Label className="text-xs">Alinhamento</Label>
+          <Label className="text-xs text-muted-foreground mb-1">Alinhamento</Label>
           <Combobox
             value={block.alignment || 'center'}
             onValueChange={(value) => onUpdate({ alignment: value as any })}

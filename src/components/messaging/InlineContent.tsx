@@ -17,9 +17,7 @@ interface InlineContentProps {
 const parseMarkdownText = (text: string): InlineFormat[] => {
   const result: InlineFormat[] = [];
 
-  // Regex to match **bold**, *italic*, and [text](url)
-  // Order matters: check bold (**) before italic (*) to avoid conflicts
-  const pattern = /(\*\*(.+?)\*\*)|(__(.+?)__)|(\*(.+?)\*)|(_(.+?)_)|(\[(.+?)\]\((.+?)\))/g;
+  const pattern = /(\{c:#([0-9a-fA-F]{3,6})\}(.*?)\{\/c\})|(\*\*(.+?)\*\*)|(__(.+?)__)|(\*(.+?)\*)|(_(.+?)_)|(\[(.+?)\]\((.+?)\))/g;
 
   let lastIndex = 0;
   let match;
@@ -30,21 +28,24 @@ const parseMarkdownText = (text: string): InlineFormat[] => {
       result.push({ type: 'text', content: text.slice(lastIndex, match.index) });
     }
 
-    if (match[2]) {
-      // **bold**
-      result.push({ type: 'bold', content: match[2] });
+    if (match[1]) {
+      // {c:#hex}text{/c}
+      result.push({ type: 'color', content: match[3], color: `#${match[2]}` });
     } else if (match[4]) {
-      // __bold__
-      result.push({ type: 'bold', content: match[4] });
+      // **bold**
+      result.push({ type: 'bold', content: match[5] });
     } else if (match[6]) {
-      // *italic*
-      result.push({ type: 'italic', content: match[6] });
+      // __underline__
+      result.push({ type: 'underline', content: match[7] });
     } else if (match[8]) {
+      // *italic*
+      result.push({ type: 'italic', content: match[9] });
+    } else if (match[10]) {
       // _italic_
-      result.push({ type: 'italic', content: match[8] });
-    } else if (match[10] && match[11]) {
-      // [text](url)
-      result.push({ type: 'link', content: match[10], url: match[11] });
+      result.push({ type: 'italic', content: match[11] });
+    } else if (match[13] && match[14]) {
+      // [text](url) — match[12]=full, match[13]=text, match[14]=url
+      result.push({ type: 'link', content: match[13], url: match[14] });
     }
 
     lastIndex = pattern.lastIndex;
@@ -115,6 +116,20 @@ export const InlineContent = React.memo<InlineContentProps>(({ content, classNam
               <em key={key} className="italic">
                 {renderTextWithLineBreaks(format.content)}
               </em>
+            );
+
+          case 'underline':
+            return (
+              <u key={key}>
+                {renderTextWithLineBreaks(format.content)}
+              </u>
+            );
+
+          case 'color':
+            return (
+              <span key={key} style={{ color: (format as any).color }}>
+                {renderTextWithLineBreaks(format.content)}
+              </span>
             );
 
           case 'link':

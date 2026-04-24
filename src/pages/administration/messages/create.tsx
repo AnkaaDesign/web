@@ -131,7 +131,7 @@ export const CreateMessagePage = () => {
       iconPosition: "right" as const,
       onClick: handleNextStep,
       variant: "outline" as const,
-      disabled: isSubmitting,
+      disabled: isSubmitting || !stepState.canGoNext,
     }] : []),
     // Publish - only visible on last step (RIGHT POSITION)
     ...(stepState.currentStep === stepState.totalSteps ? [{

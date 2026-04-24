@@ -59,36 +59,37 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
   return (
     <div className="space-y-3">
       {!block.url ? (
-        <div className="border-2 border-dashed border-border dark:border-muted rounded-lg p-8 text-center">
-          <IconPhoto className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-          <p className="text-sm text-muted-foreground mb-3">
-            Faça upload de uma imagem ou cole a URL
-          </p>
-          <div className="flex gap-2 justify-center">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={uploading}
-              onClick={() => document.getElementById(`file-upload-${block.id}`)?.click()}
-            >
-              <IconUpload className="h-4 w-4 mr-2" />
-              {uploading ? 'Enviando...' : 'Upload'}
-            </Button>
-            <input
-              id={`file-upload-${block.id}`}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-          </div>
-          <div className="mt-3">
-            <Input
-              placeholder="Ou cole a URL da imagem..."
-              onChange={(value: string | number | null) => onUpdate({ url: value as string })}
-              transparent
-              className="dark:border-muted"
-            />
+        <div className="space-y-3">
+          {/* Upload / URL */}
+          <div className="border-2 border-dashed border-border dark:border-muted rounded-lg p-6 text-center">
+            <IconPhoto className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground mb-3">Upload ou cole uma URL</p>
+            <div className="flex gap-2 justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={uploading}
+                onClick={() => document.getElementById(`file-upload-${block.id}`)?.click()}
+              >
+                <IconUpload className="h-4 w-4 mr-2" />
+                {uploading ? 'Enviando...' : 'Upload'}
+              </Button>
+              <input
+                id={`file-upload-${block.id}`}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+            </div>
+            <div className="mt-3">
+              <Input
+                placeholder="Ou cole a URL da imagem..."
+                onChange={(value: string | number | null) => onUpdate({ url: value as string })}
+                transparent
+                className="dark:border-muted"
+              />
+            </div>
           </div>
         </div>
       ) : (
@@ -105,7 +106,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="text-xs">Tamanho</Label>
+              <Label className="text-xs text-muted-foreground mb-1">Tamanho</Label>
               <Combobox
                 value={block.size || '50%'}
                 onValueChange={(value) => onUpdate({ size: value as any })}
@@ -125,7 +126,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
               />
             </div>
             <div>
-              <Label className="text-xs">Alinhamento</Label>
+              <Label className="text-xs text-muted-foreground mb-1">Alinhamento</Label>
               <Combobox
                 value={block.alignment || 'center'}
                 onValueChange={(value) => onUpdate({ alignment: value as any })}
@@ -140,7 +141,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
               />
             </div>
             <div>
-              <Label className="text-xs">Texto Alternativo</Label>
+              <Label className="text-xs text-muted-foreground mb-1">Texto Alternativo</Label>
               <Input
                 value={block.alt || ''}
                 onChange={(value: string | number | null) => onUpdate({ alt: value as string })}
@@ -152,7 +153,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
           </div>
 
           <div>
-            <Label className="text-xs">Legenda (opcional)</Label>
+            <Label className="text-xs text-muted-foreground mb-1">Legenda (opcional)</Label>
             <Input
               value={block.caption || ''}
               onChange={(value: string | number | null) => onUpdate({ caption: value as string })}
