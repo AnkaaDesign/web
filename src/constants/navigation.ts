@@ -1380,6 +1380,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "tipos-tinta-editar", title: "Editar", icon: "edit", path: "/pintura/tipos-de-tinta/editar/:id", isDynamic: true },
         ],
       },
+      {
+        id: "paleta",
+        title: "Paleta",
+        icon: "color",
+        path: "/pintura/paleta",
+        requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
+      },
     ],
   },
 

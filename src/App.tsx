@@ -273,6 +273,7 @@ const PaintFormulasEdit = lazy(() => import("@/pages/painting/formulas/edit/[id]
 const PaintFormulaDetails = lazy(() => import("@/pages/painting/formulas/details/[id]").then((module) => ({ default: module.default })));
 const PaintCatalogFormulaDetails = lazy(() => import("@/pages/painting/catalog/details/[id]/formulas/details/[formulaId]").then((module) => ({ default: module.default })));
 const PaintProductionDetails = lazy(() => import("@/pages/painting/productions/details/[id]").then((module) => ({ default: module.default })));
+const PaintPalette = lazy(() => import("@/pages/painting/true-color-system"));
 
 // Production
 const Production = lazy(() => import("@/pages/production/root").then((module) => ({ default: module.ProductionRootPage })));
@@ -2053,6 +2054,15 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PaintBrandsDetails />
+                    </Suspense>
+                  }
+                />
+
+                <Route
+                  path={routes.painting.palette.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PaintPalette />
                     </Suspense>
                   }
                 />

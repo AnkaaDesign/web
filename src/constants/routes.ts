@@ -414,6 +414,9 @@ export const routes = {
       edit: (id: string) => `/pintura/producoes/editar/${id}`,
       root: "/pintura/producoes",
     },
+    palette: {
+      root: "/pintura/paleta",
+    },
     root: "/pintura",
   },
 
