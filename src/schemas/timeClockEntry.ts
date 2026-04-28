@@ -43,8 +43,11 @@ export const timeClockEntryCreateSchema = timeClockEntryBaseSchema.extend({
 });
 
 // Update schema
+// Note: id is intentionally a free-form string. The time-clock grid binds to
+// Secullum-native numeric IDs (e.g. "10733"), not UUIDs, so a UUID check here
+// would silently fail form validation and break saves.
 export const timeClockEntryUpdateSchema = timeClockEntryBaseSchema.partial().extend({
-  id: z.string().uuid("Registro inválido"),
+  id: z.string().min(1, "Registro inválido"),
 });
 
 // Batch update schema for inline editing

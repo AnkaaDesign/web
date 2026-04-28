@@ -273,7 +273,7 @@ const PaintFormulasEdit = lazy(() => import("@/pages/painting/formulas/edit/[id]
 const PaintFormulaDetails = lazy(() => import("@/pages/painting/formulas/details/[id]").then((module) => ({ default: module.default })));
 const PaintCatalogFormulaDetails = lazy(() => import("@/pages/painting/catalog/details/[id]/formulas/details/[formulaId]").then((module) => ({ default: module.default })));
 const PaintProductionDetails = lazy(() => import("@/pages/painting/productions/details/[id]").then((module) => ({ default: module.default })));
-const PaintPalette = lazy(() => import("@/pages/painting/true-color-system"));
+const ColorPalettePage = lazy(() => import("@/pages/tools/color-palette"));
 
 // Production
 const Production = lazy(() => import("@/pages/production/root").then((module) => ({ default: module.ProductionRootPage })));
@@ -367,6 +367,13 @@ const ServerServices = lazy(() => import("@/pages/server/services").then((module
 const ServerFileManager = lazy(() => import("@/pages/server/file-manager").then((module) => ({ default: module.ServerFileManagerPage })));
 const ServerUsers = lazy(() => import("@/pages/server/users").then((module) => ({ default: module.ServerUsersPage })));
 const ServerRateLimiting = lazy(() => import("@/pages/server/rate-limiting").then((module) => ({ default: module.RateLimitingPage })));
+
+// Tools
+const ToolsHubPage = lazy(() => import("@/pages/tools").then((module) => ({ default: module.ToolsHubPage })));
+const QrCodeToolPage = lazy(() => import("@/pages/tools/qr-code").then((module) => ({ default: module.QrCodeToolPage })));
+const TimeCalculatorPage = lazy(() => import("@/pages/tools/time-calculator"));
+const OvertimeCostCalculatorPage = lazy(() => import("@/pages/tools/overtime-cost-calculator"));
+const PaintMixCalculatorPage = lazy(() => import("@/pages/tools/paint-mix-calculator"));
 
 function App() {
   // Initialize web notifications
@@ -2060,11 +2067,7 @@ function App() {
 
                 <Route
                   path={routes.painting.palette.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PaintPalette />
-                    </Suspense>
-                  }
+                  element={<Navigate to={routes.tools.colorPalette.root} replace />}
                 />
 
                 {/* Human Resources routes */}
@@ -2578,6 +2581,56 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ServerRateLimiting />
+                    </Suspense>
+                  }
+                />
+
+                {/* Tools routes */}
+                <Route
+                  path={routes.tools.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ToolsHubPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.tools.qrCode.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <QrCodeToolPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.tools.colorPalette.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ColorPalettePage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.tools.timeCalculator.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <TimeCalculatorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.tools.overtimeCost.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OvertimeCostCalculatorPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.tools.paintMix.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PaintMixCalculatorPage />
                     </Suspense>
                   }
                 />

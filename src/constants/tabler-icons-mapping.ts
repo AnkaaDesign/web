@@ -64,6 +64,7 @@ export const TABLER_ICONS = {
   truck: "IconTruck",
   tool: "IconTool", // Single tool icon (for favorites)
   tools: "IconTools", // Multiple tools icon (for favorites)
+  qrcode: "IconQrcode",
   serviceWrench: "IconTool",
   maintenance: "IconTools",
   brush: "IconBrush", // Paint brush (for favorites)

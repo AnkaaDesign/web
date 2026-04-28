@@ -152,20 +152,25 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
     name: "entries",
   });
 
-  // Only reset form initially when data first arrives, not on every change
-  const hasInitializedForm = useRef(false);
-  const previousEntriesLength = useRef(0);
+  // Compute a stable signature that changes whenever the underlying entries
+  // change — i.e. user switches, period changes, or a refetch returns updated
+  // rows. We include each row's Versao so an upstream save (which bumps Versao)
+  // also triggers a reset of any stale local form state.
+  const entriesSignature = useMemo(() => {
+    if (!entries || entries.length === 0) return "";
+    return entries.map((e: any) => `${e.Id}:${e.Versao ?? ""}`).join("|");
+  }, [entries]);
 
+  // Reset the form AND the modification tracker whenever the dataset changes.
+  // Previously a `hasInitializedForm` ref guarded this and was never reset, so
+  // switching users kept the previous user's values cached until a hard reload.
   useEffect(() => {
-    const currentLength = defaultFormData.entries.length;
-
-    // Only reset if we actually have new data and haven't initialized yet
-    if (currentLength > 0 && currentLength !== previousEntriesLength.current && !hasInitializedForm.current) {
-      form.reset(defaultFormData);
-      hasInitializedForm.current = true;
-      previousEntriesLength.current = currentLength;
-    }
-  }, [defaultFormData, form]); // Depend on form and defaultFormData
+    form.reset(defaultFormData);
+    stateManager.actions.restoreAll();
+    // defaultFormData is derived from entries, but we depend on the signature
+    // (stable string) instead of the object identity to avoid loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entriesSignature]);
 
   // Handle field change
   const handleFieldChange = useCallback(
@@ -344,75 +349,125 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
       const changedCount = stateManager.actions.getChangedEntryCount();
       const modifications = stateManager.actions.getAllModifications();
 
-      if (changedCount > 0) {
-        try {
-          // Build changed entries from modifications
-          const changedEntriesMap = new Map<string, any>();
+      if (changedCount === 0) return;
 
-          modifications.forEach((mod) => {
-            if (!changedEntriesMap.has(mod.entryId)) {
-              // Get the original entry data from the raw entries
-              const originalEntry = entries.find((e: any) => e.Id === parseInt(mod.entryId));
-              const formEntry = data.entries.find((e) => e.id === mod.entryId);
+      // Form-field name → Secullum-native column triple (value, FonteDados object, FonteDadosId).
+      // Matching the upstream Batidas row schema (verified via HAR).
+      const FORM_TO_SECULLUM_COL: Record<string, string> = {
+        entry1: "Entrada1", exit1: "Saida1",
+        entry2: "Entrada2", exit2: "Saida2",
+        entry3: "Entrada3", exit3: "Saida3",
+        entry4: "Entrada4", exit4: "Saida4",
+        entry5: "Entrada5", exit5: "Saida5",
+      };
+      const FORM_TO_FONTE_DADOS: Record<string, string> = {
+        entry1: "FonteDadosEntrada1", exit1: "FonteDadosSaida1",
+        entry2: "FonteDadosEntrada2", exit2: "FonteDadosSaida2",
+        entry3: "FonteDadosEntrada3", exit3: "FonteDadosSaida3",
+        entry4: "FonteDadosEntrada4", exit4: "FonteDadosSaida4",
+        entry5: "FonteDadosEntrada5", exit5: "FonteDadosSaida5",
+      };
+      const FORM_TO_FONTE_DADOS_ID: Record<string, string> = {
+        entry1: "FonteDadosIdEntrada1", exit1: "FonteDadosIdSaida1",
+        entry2: "FonteDadosIdEntrada2", exit2: "FonteDadosIdSaida2",
+        entry3: "FonteDadosIdEntrada3", exit3: "FonteDadosIdSaida3",
+        entry4: "FonteDadosIdEntrada4", exit4: "FonteDadosIdSaida4",
+        entry5: "FonteDadosIdEntrada5", exit5: "FonteDadosIdSaida5",
+      };
+      const TIME_FIELDS = ["entry1","exit1","entry2","exit2","entry3","exit3","entry4","exit4","entry5","exit5"] as const;
 
-              if (originalEntry && formEntry) {
-                // Merge the original Secullum data with the changed form fields
-                const mergedEntry = {
-                  // Preserve all original Secullum fields
-                  ...originalEntry,
-                  // Override with form data
-                  Id: parseInt(formEntry.id),
-                  Entrada1: formEntry.entry1,
-                  Saida1: formEntry.exit1,
-                  Entrada2: formEntry.entry2,
-                  Saida2: formEntry.exit2,
-                  Entrada3: formEntry.entry3,
-                  Saida3: formEntry.exit3,
-                  Entrada4: formEntry.entry4,
-                  Saida4: formEntry.exit4,
-                  Entrada5: formEntry.entry5,
-                  Saida5: formEntry.exit5,
-                  Compensado: formEntry.compensated,
-                  Neutro: formEntry.neutral,
-                  Folga: formEntry.dayOff,
-                  AlmocoLivre: formEntry.freeLunch,
-                  // Also update backup fields
-                  BackupEntrada1: formEntry.entry1,
-                  BackupSaida1: formEntry.exit1,
-                  BackupEntrada2: formEntry.entry2,
-                  BackupSaida2: formEntry.exit2,
-                  BackupEntrada3: formEntry.entry3,
-                  BackupSaida3: formEntry.exit3,
-                  BackupEntrada4: formEntry.entry4,
-                  BackupSaida4: formEntry.exit4,
-                  BackupEntrada5: formEntry.entry5,
-                  BackupSaida5: formEntry.exit5,
-                };
+      try {
+        // Build the changed-entry payload set from modification metadata.
+        const changedEntriesMap = new Map<string, any>();
+        const changedEntryIds = new Set(modifications.map((m) => m.entryId));
 
-                changedEntriesMap.set(mod.entryId, mergedEntry);
-              }
-            }
-          });
+        changedEntryIds.forEach((entryId) => {
+          const originalEntry = entries.find((e: any) => String(e.Id) === entryId || String(e.id) === entryId) as any;
+          const formEntry = data.entries.find((e) => e.id === entryId);
+          if (!originalEntry || !formEntry) return;
 
-          const changedEntries = Array.from(changedEntriesMap.values());
-
-          // Call Secullum API batch update endpoint
-          const response = await secullumService.batchUpdateTimeEntries(changedEntries);
-
-          if (response.data?.success) {
-            toast.success(response.data.message || `${changedEntries.length} registros salvos com sucesso`);
-
-            // Clear all state after successful save
-            stateManager.actions.restoreAll();
-            form.reset(defaultFormData);
-          } else {
-            toast.error(response.data?.message || "Erro ao salvar alterações");
+          // Detect moves so we can swap the FonteDados* metadata along with the
+          // visible time. Per HAR (SAVE-5): moving Saida1→Entrada1 sends
+          // Saida1:"" + Entrada1:"11:30" + FonteDadosEntrada1=<previous Saida1 metadata>
+          // + FonteDadosIdEntrada1=<previous Saida1 id> + null on the source side.
+          // Without this swap, Secullum receives orphan metadata and inconsistent rows.
+          const cleared: { field: string; value: string }[] = [];
+          const filled: { field: string; value: string }[] = [];
+          for (const f of TIME_FIELDS) {
+            const orig = ((originalEntry as any)[FORM_TO_SECULLUM_COL[f]] ?? null) as string | null;
+            const cur = ((formEntry as any)[f] ?? null) as string | null;
+            const origNorm = orig === null || orig === undefined || orig === "" ? "" : orig;
+            const curNorm = cur === null || cur === undefined || cur === "" ? "" : cur;
+            if (origNorm && !curNorm) cleared.push({ field: f, value: origNorm });
+            else if (!origNorm && curNorm) filled.push({ field: f, value: curNorm });
           }
-        } catch (error: any) {
-          const errorMessage = error.response?.data?.message || error.message || "Erro ao salvar alterações";
-          toast.error(errorMessage);
-          console.error("Save error:", error);
+
+          // Pair cleared cells with filled cells that share the same value — those
+          // are moves. Whatever remains in `cleared` is a true delete, and whatever
+          // remains in `filled` is a fresh manual addition.
+          const moves: { from: string; to: string; value: string }[] = [];
+          const usedFilled = new Set<number>();
+          for (const c of cleared) {
+            const idx = filled.findIndex((f, i) => !usedFilled.has(i) && f.value === c.value);
+            if (idx !== -1) {
+              moves.push({ from: c.field, to: filled[idx].field, value: c.value });
+              usedFilled.add(idx);
+            }
+          }
+          const trueClears = cleared.filter((c) => !moves.some((m) => m.from === c.field));
+          // Build the merged row starting from a deep-ish copy of the upstream row.
+          const merged: any = { ...originalEntry };
+
+          // 1) Apply form values to Entrada/Saida columns.
+          for (const f of TIME_FIELDS) {
+            merged[FORM_TO_SECULLUM_COL[f]] = (formEntry as any)[f];
+          }
+          // 2) Cleared cells must be explicitly "" (not null) — Secullum
+          //    distinguishes never-touched (null) from cleared ("").
+          for (const c of trueClears) {
+            merged[FORM_TO_SECULLUM_COL[c.field]] = "";
+          }
+          // 3) For each move, also relocate the FonteDados object + id from the
+          //    source slot to the destination slot, leaving the source nulled out.
+          for (const m of moves) {
+            merged[FORM_TO_SECULLUM_COL[m.from]] = "";
+            const srcFD = FORM_TO_FONTE_DADOS[m.from];
+            const dstFD = FORM_TO_FONTE_DADOS[m.to];
+            const srcFDId = FORM_TO_FONTE_DADOS_ID[m.from];
+            const dstFDId = FORM_TO_FONTE_DADOS_ID[m.to];
+            const fdObj = (originalEntry as any)[srcFD] ?? null;
+            const fdId = (originalEntry as any)[srcFDId] ?? null;
+            merged[dstFD] = fdObj;
+            merged[dstFDId] = fdId;
+            merged[srcFD] = null;
+            merged[srcFDId] = null;
+          }
+          // 4) Checkbox / scalar columns.
+          merged.Compensado = formEntry.compensated;
+          merged.Neutro = formEntry.neutral;
+          merged.Folga = formEntry.dayOff;
+          merged.AlmocoLivre = formEntry.freeLunch;
+          merged.Id = parseInt(formEntry.id, 10);
+
+          changedEntriesMap.set(entryId, merged);
+        });
+
+        const changedEntries = Array.from(changedEntriesMap.values());
+        if (changedEntries.length === 0) return;
+
+        const response = await secullumService.batchUpdateTimeEntries(changedEntries);
+
+        if (response.data?.success) {
+          toast.success(response.data.message || `${changedEntries.length} registros salvos com sucesso`);
+          stateManager.actions.restoreAll();
+          form.reset(defaultFormData);
+        } else {
+          toast.error(response.data?.message || "Erro ao salvar alterações");
         }
+      } catch (error: any) {
+        const errorMessage = error.response?.data?.message || error.message || "Erro ao salvar alterações";
+        toast.error(errorMessage);
+        console.error("Save error:", error);
       }
     },
     [stateManager.actions, form, defaultFormData, entries],
@@ -729,6 +784,15 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                         const isModified = isFieldModified(field.id, timeField);
                         const rawEntry = entries.find((e: any) => String(e.Id) === field.id || String(e.id) === field.id);
                         const isManual = isManualEntry(rawEntry, timeField);
+                        // The move arrows must respect the absolute column index
+                        // (entry1=0 ... exit5=9), not just whether the cell has a
+                        // value. Otherwise entry1 shows a left chevron with no slot
+                        // to swap into, and exit5 shows a right chevron with the
+                        // same problem.
+                        const ALL_TIME_FIELDS = ["entry1","exit1","entry2","exit2","entry3","exit3","entry4","exit4","entry5","exit5"];
+                        const absoluteIndex = ALL_TIME_FIELDS.indexOf(timeField);
+                        const canMoveLeft = absoluteIndex > 0;
+                        const canMoveRight = absoluteIndex < ALL_TIME_FIELDS.length - 1;
                         return (
                           <td
                             key={timeField}
@@ -751,7 +815,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                                   <FormControl>
                                     <div className="flex items-center gap-0.5 justify-center min-w-[100px]">
                                       <div className="w-6 flex justify-center">
-                                        {formField.value && (
+                                        {formField.value && canMoveLeft && (
                                           <Button type="button" variant="ghost" size="icon" className="h-6 w-6 p-0" onClick={() => handleTimeShift(field.id, timeField, "left")}>
                                             <ChevronLeft className="h-3 w-3" />
                                           </Button>
@@ -775,7 +839,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                                         className="h-8 w-14 text-center px-1 flex-shrink-0"
                                       />
                                       <div className="w-6 flex justify-center">
-                                        {formField.value && (
+                                        {formField.value && canMoveRight && (
                                           <Button type="button" variant="ghost" size="icon" className="h-6 w-6 p-0" onClick={() => handleTimeShift(field.id, timeField, "right")}>
                                             <ChevronRight className="h-3 w-3" />
                                           </Button>

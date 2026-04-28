@@ -754,7 +754,7 @@ export default function TrueColorSystemPage() {
           title="Paleta"
           breadcrumbs={[
             { label: "Inicio", href: routes.home },
-            { label: "Pintura", href: routes.painting.root },
+            { label: "Ferramentas", href: routes.tools.root },
             { label: "Paleta" },
           ]}
           className="flex-shrink-0"

@@ -72,6 +72,7 @@ export const TABLER_ICONS = {
   tool: "IconTool",
   serviceWrench: "IconTool",
   tools: "IconTools",
+  qrcode: "IconQrcode",
   maintenance: "IconTools",
 
   // Documentation
@@ -1380,13 +1381,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "tipos-tinta-editar", title: "Editar", icon: "edit", path: "/pintura/tipos-de-tinta/editar/:id", isDynamic: true },
         ],
       },
-      {
-        id: "paleta",
-        title: "Paleta",
-        icon: "color",
-        path: "/pintura/paleta",
-        requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
-      },
     ],
   },
 
@@ -1560,6 +1554,46 @@ export const NAVIGATION_MENU: MenuItem[] = [
       // { id: "folha-de-pagamento", title: "Folha de Pagamento", icon: "payroll", path: "/recursos-humanos/folha-de-pagamento" }, // Temporarily hidden for testing
       { id: "minhas-mensagens-rh", title: "Minhas Mensagens", icon: "message", path: "/pessoal/mensagens", requiredPrivilege: SECTOR_PRIVILEGES.HUMAN_RESOURCES },
       { id: "requisicoes", title: "Requisições", icon: "clipboardList", path: "/recursos-humanos/requisicoes" },
+    ],
+  },
+
+  // FERRAMENTAS
+  {
+    id: "ferramentas",
+    title: "Ferramentas",
+    icon: "tools",
+    path: "/ferramentas",
+    children: [
+      {
+        id: "ferramentas-qr-code",
+        title: "Gerador de QR Code",
+        icon: "qrcode",
+        path: "/ferramentas/qr-code",
+      },
+      {
+        id: "ferramentas-paleta",
+        title: "Paleta de Cores",
+        icon: "palette",
+        path: "/ferramentas/paleta",
+      },
+      {
+        id: "ferramentas-calculadora-de-horas",
+        title: "Calculadora de Horas",
+        icon: "clock",
+        path: "/ferramentas/calculadora-de-horas",
+      },
+      {
+        id: "ferramentas-custo-horas-extras",
+        title: "Custo de Horas Extras",
+        icon: "calendarDollar",
+        path: "/ferramentas/custo-horas-extras",
+      },
+      {
+        id: "ferramentas-calculadora-de-mistura",
+        title: "Calculadora de Mistura",
+        icon: "flask",
+        path: "/ferramentas/calculadora-de-mistura",
+      },
     ],
   },
 

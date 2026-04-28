@@ -242,8 +242,11 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
         data: {
           Versao: selectedRequest.Versao,
           AlteracoesFonteDados: selectedRequest.AlteracoesFonteDados,
-          TipoSolicitacao: selectedRequest.TipoSolicitacao || 0
-        }
+          // Secullum's TipoSolicitacao on the wire mirrors the request's `Tipo` field
+          // (0 = adjust markings, 2 = justify absence). Previously this read
+          // `selectedRequest.TipoSolicitacao`, which doesn't exist → always sent 0.
+          TipoSolicitacao: selectedRequest.Tipo ?? 0,
+        },
       });
 
       // Refresh and select next request
@@ -264,9 +267,11 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
         requestId: selectedRequest.Id.toString(),
         data: {
           Versao: selectedRequest.Versao,
-          MotivoDescarte: rejectReason,
-          TipoSolicitacao: selectedRequest.TipoSolicitacao || 0
-        }
+          // Secullum's /Solicitacoes/Descartar expects "Motivo" (request body), not
+          // "MotivoDescarte" (which is the response field name).
+          Motivo: rejectReason,
+          TipoSolicitacao: selectedRequest.Tipo ?? 0,
+        },
       });
 
       // Refresh and select next request

@@ -609,6 +609,26 @@ export const routes = {
     },
   },
 
+  // Tools - Ferramentas - Utility tools for the company
+  tools: {
+    root: "/ferramentas",
+    qrCode: {
+      root: "/ferramentas/qr-code",
+    },
+    colorPalette: {
+      root: "/ferramentas/paleta",
+    },
+    timeCalculator: {
+      root: "/ferramentas/calculadora-de-horas",
+    },
+    overtimeCost: {
+      root: "/ferramentas/custo-horas-extras",
+    },
+    paintMix: {
+      root: "/ferramentas/calculadora-de-mistura",
+    },
+  },
+
   // Users - Alias for administration users (collaborators) for backward compatibility
   users: {
     batchEdit: "/administracao/colaboradores/editar-em-lote",

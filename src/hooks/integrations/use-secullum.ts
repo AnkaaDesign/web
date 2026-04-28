@@ -25,17 +25,17 @@ export const secullumKeys = {
 };
 
 // Authentication hooks
+// Note: success/error toasts for write methods are emitted by the axios
+// success/error interceptors (see api-client/axiosClient.ts). Adding a
+// hook-level toast here would produce a duplicate. The interceptor skips
+// /batch URLs, so batch hooks below still own their own toast.
 export const useSecullumAuth = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (credentials: SecullumAuthCredentials) => secullumService.authenticate(credentials),
-    onSuccess: (_data) => {
-      toast.success(_data.data.message || "Autenticação realizada com sucesso");
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: secullumKeys.authStatus() });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao autenticar com Secullum");
     },
   });
 };
@@ -53,12 +53,8 @@ export const useSecullumLogout = () => {
 
   return useMutation({
     mutationFn: (email?: string) => secullumService.logout(email),
-    onSuccess: (_data) => {
-      toast.success(_data.data.message || "Logout realizado com sucesso");
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: secullumKeys.all });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao fazer logout");
     },
   });
 };
@@ -77,12 +73,8 @@ export const useSecullumSyncEmployees = () => {
 
   return useMutation({
     mutationFn: () => secullumService.syncEmployees(),
-    onSuccess: (_data) => {
-      toast.success(_data.data.message || "Sincronização iniciada com sucesso");
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: secullumKeys.employees() });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao sincronizar funcionários");
     },
   });
 };
@@ -241,15 +233,15 @@ export const useSecullumRequests = (pending?: boolean) => {
 export const useSecullumApproveRequest = () => {
   const queryClient = useQueryClient();
 
+  // Note: success/error toasts are emitted by the axios success/error
+  // interceptors in `axiosClient.ts` for write methods. Adding them here too
+  // produces a duplicate toast for every approve. Same for the reject hook
+  // and the single-entry update hook below.
   return useMutation({
     mutationFn: ({ requestId, data }: { requestId: string; data: any }) => secullumService.approveRequest(requestId, data),
-    onSuccess: (_data) => {
-      toast.success(_data.data.message || "Solicitação aprovada com sucesso");
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "requests"] });
       queryClient.invalidateQueries({ queryKey: secullumKeys.pendencias() });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao aprovar solicitação");
     },
   });
 };
@@ -259,13 +251,9 @@ export const useSecullumRejectRequest = () => {
 
   return useMutation({
     mutationFn: ({ requestId, data }: { requestId: string; data: any }) => secullumService.rejectRequest(requestId, data),
-    onSuccess: (_data) => {
-      toast.success(_data.data.message || "Solicitação rejeitada com sucesso");
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "requests"] });
       queryClient.invalidateQueries({ queryKey: secullumKeys.pendencias() });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao rejeitar solicitação");
     },
   });
 };
@@ -285,13 +273,9 @@ export const useSecullumSyncTrigger = () => {
 
   return useMutation({
     mutationFn: (_params: { type: "full" | "partial" | "pause" | "resume" | "stop"; entityTypes?: string[] }) => secullumService.triggerSync(_params),
-    onSuccess: (_data) => {
-      toast.success(_data.data.message || "Sincronização iniciada com sucesso");
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "sync-status"] });
       queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "sync-history"] });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao iniciar sincronização");
     },
   });
 };
@@ -317,12 +301,8 @@ export const useSecullumResolveConflict = () => {
 
   return useMutation({
     mutationFn: (_params: { conflictId: string; resolution: "use_ankaa" | "use_secullum" | "merge" | "ignore"; notes?: string }) => secullumService.resolveConflict(_params),
-    onSuccess: (_data) => {
-      toast.success(_data.data.message || "Conflito resolvido com sucesso");
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "conflicts"] });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao resolver conflito");
     },
   });
 };
@@ -333,12 +313,8 @@ export const useSecullumBulkResolveConflicts = () => {
   return useMutation({
     mutationFn: (_params: { resolution: "use_ankaa" | "use_secullum" | "merge" | "ignore"; conflictIds?: string[]; filters?: any }) =>
       secullumService.bulkResolveConflicts(_params),
-    onSuccess: (_data) => {
-      toast.success(_data.data.message || "Conflitos resolvidos em lote com sucesso");
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "conflicts"] });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao resolver conflitos em lote");
     },
   });
 };
@@ -356,12 +332,8 @@ export const useSecullumUpdateEntityMapping = () => {
 
   return useMutation({
     mutationFn: (_params: { entityType: string; mappingConfig: any }) => secullumService.updateEntityMapping(_params),
-    onSuccess: (_data) => {
-      toast.success(_data.data.message || "Mapeamento atualizado com sucesso");
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "entity-mappings"] });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao atualizar mapeamento");
     },
   });
 };
@@ -379,13 +351,9 @@ export const useSecullumUpdateSyncConfig = () => {
 
   return useMutation({
     mutationFn: (config: any) => secullumService.updateSyncConfig(config),
-    onSuccess: (_data) => {
-      toast.success(_data.data.message || "Configuração salva com sucesso");
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "sync-config"] });
       queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "sync-status"] });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao salvar configuração");
     },
   });
 };
@@ -393,12 +361,6 @@ export const useSecullumUpdateSyncConfig = () => {
 export const useSecullumTestConnection = () => {
   return useMutation({
     mutationFn: () => secullumService.testConnection(),
-    onSuccess: (_data) => {
-      toast.success(_data.data.message || "Conexão testada com sucesso");
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Falha no teste de conexão");
-    },
   });
 };
 
@@ -440,23 +402,53 @@ export const useSecullumTimeEntries = (params?: {
   });
 };
 
+// Update a single Secullum time-card row. The Secullum Batidas endpoint expects
+// the full row payload (Versao, Entrada1..Saida5, FonteDados*, NumeroHorario, ...);
+// for justifications send the abbreviated NomeAbreviado as the cell value
+// ("ATESTAD"); for manual time edits set the cell to "HH:MM" and append a
+// ListaFonteDados entry with the user-supplied motivo.
+// Toasts are emitted by the axios interceptor (write-method auto-toast) — no
+// hook-level toast to avoid duplicates.
 export const useSecullumUpdateTimeEntry = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (_params: { entryId: string; field: string; value: string | null; justification?: string }) =>
-      secullumService.updateTimeEntry(parseInt(_params.entryId), {
-        [_params.field]: _params.value,
-        justification: _params.justification,
-      }),
-    onSuccess: (_data, _variables) => {
-      toast.success(_data.data.message || "Registro atualizado com sucesso");
-      // Invalidate time entries queries to refresh the data
+    mutationFn: ({ entryId, data }: { entryId: number | string; data: Record<string, unknown> }) =>
+      secullumService.updateTimeEntry(typeof entryId === 'string' ? parseInt(entryId, 10) : entryId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: secullumKeys.timeEntries() });
+    },
+  });
+};
+
+// Batch update for time-card rows — sends multiple changed rows at once,
+// matching the upstream POST /Batidas?origem=cartao+ponto behaviour where the
+// body is an array of full row payloads.
+// The axios interceptor SKIPS auto-toast for URLs containing "/batch", so this
+// hook owns the success/error toast for batch flows.
+export const useSecullumBatchUpdateTimeEntries = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (entries: Record<string, unknown>[]) =>
+      secullumService.batchUpdateTimeEntries(entries),
+    onSuccess: (response) => {
+      toast.success(response.data.message || "Registros atualizados com sucesso");
       queryClient.invalidateQueries({ queryKey: secullumKeys.timeEntries() });
     },
     onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao atualizar registro");
+      toast.error(_error.response?.data?.message || "Erro ao atualizar registros");
     },
+  });
+};
+
+// Justifications dropdown source for the time-card cell context menu.
+// Cached for 1 hour — codes change rarely.
+export const useSecullumJustifications = () => {
+  return useQuery({
+    queryKey: [...secullumKeys.all, "justifications"],
+    queryFn: () => secullumService.getJustifications(),
+    staleTime: 60 * 60 * 1000,
   });
 };
 
@@ -493,13 +485,8 @@ export const useSecullumCreateHoliday = () => {
 
   return useMutation({
     mutationFn: (_data: { Data: string; Descricao: string }) => secullumService.createHoliday(_data),
-    onSuccess: (response) => {
-      toast.success(response.data.message || "Feriado criado com sucesso");
-      // Invalidate holidays queries to refresh the list
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "holidays"] });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao criar feriado");
     },
   });
 };
@@ -509,13 +496,8 @@ export const useSecullumDeleteHoliday = () => {
 
   return useMutation({
     mutationFn: (holidayId: string | number) => secullumService.deleteHoliday(holidayId),
-    onSuccess: (response) => {
-      toast.success(response.data.message || "Feriado excluído com sucesso");
-      // Invalidate holidays queries to refresh the list
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "holidays"] });
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao excluir feriado");
     },
   });
 };
@@ -535,15 +517,10 @@ export const useSecullumSyncUserMapping = () => {
 
   return useMutation({
     mutationFn: (params?: { dryRun?: boolean }) => secullumService.syncUserMapping(params),
-    onSuccess: (response, _variables) => {
-      const data = response.data;
-      if (data && !_variables?.dryRun) {
-        toast.success(`Mapeamento sincronizado: ${data.summary?.updated || 0} usuários atualizados`);
+    onSuccess: (_response, _variables) => {
+      if (!_variables?.dryRun) {
         queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "employees"] });
       }
-    },
-    onError: (_error: any) => {
-      toast.error(_error.response?.data?.message || "Erro ao sincronizar mapeamento de usuários");
     },
   });
 };
