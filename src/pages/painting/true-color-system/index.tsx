@@ -15,7 +15,9 @@ import {
   IconEye,
   IconArrowLeft,
   IconSearch,
+  IconLink,
 } from "@tabler/icons-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -53,6 +55,7 @@ export default function TrueColorSystemPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showSelected, setShowSelected] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const [linked, setLinked] = useState(false);
 
   // Marquee drag state
   const [dragging, setDragging] = useState(false);
@@ -93,6 +96,44 @@ export default function TrueColorSystemPage() {
 
   const currentK = K_LEVELS[kIndex];
   const currentY = Y_LEVELS[yIndex];
+
+  // When linked, K and Y move in opposite directions by the same step (atomic).
+  const moveK = useCallback(
+    (delta: 1 | -1) => {
+      const newK = kIndex + delta;
+      if (newK < 0 || newK >= K_LEVELS.length) return;
+      if (linked) {
+        const newY = yIndex - delta;
+        if (newY < 0 || newY >= Y_LEVELS.length) return;
+        setKIndex(newK);
+        setYIndex(newY);
+      } else {
+        setKIndex(newK);
+      }
+    },
+    [kIndex, yIndex, linked],
+  );
+
+  const moveY = useCallback(
+    (delta: 1 | -1) => {
+      const newY = yIndex + delta;
+      if (newY < 0 || newY >= Y_LEVELS.length) return;
+      if (linked) {
+        const newK = kIndex - delta;
+        if (newK < 0 || newK >= K_LEVELS.length) return;
+        setYIndex(newY);
+        setKIndex(newK);
+      } else {
+        setYIndex(newY);
+      }
+    },
+    [kIndex, yIndex, linked],
+  );
+
+  const kPrevDisabled = kIndex <= 0 || (linked && yIndex >= Y_LEVELS.length - 1);
+  const kNextDisabled = kIndex >= K_LEVELS.length - 1 || (linked && yIndex <= 0);
+  const yPrevDisabled = yIndex <= 0 || (linked && kIndex >= K_LEVELS.length - 1);
+  const yNextDisabled = yIndex >= Y_LEVELS.length - 1 || (linked && kIndex <= 0);
 
   const mVals = useMemo(() => buildRange(step, mMin, mMax), [step, mMin, mMax]);
   const cVals = useMemo(() => buildRange(step, cMin, cMax), [step, cMin, cMax]);
@@ -228,18 +269,18 @@ export default function TrueColorSystemPage() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
       switch (e.key) {
         case "ArrowLeft":
-          setYIndex((i) => Math.max(0, i - 1));
+          moveY(-1);
           break;
         case "ArrowRight":
-          setYIndex((i) => Math.min(Y_LEVELS.length - 1, i + 1));
+          moveY(1);
           break;
         case "ArrowUp":
           e.preventDefault();
-          setKIndex((i) => Math.max(0, i - 1));
+          moveK(-1);
           break;
         case "ArrowDown":
           e.preventDefault();
-          setKIndex((i) => Math.min(K_LEVELS.length - 1, i + 1));
+          moveK(1);
           break;
         case "Escape":
           setDetailOpen(false);
@@ -248,7 +289,7 @@ export default function TrueColorSystemPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [moveK, moveY]);
 
   // --- Helpers to convert between grid-area coords and canvas coords ---
   const toGridAreaCoords = useCallback((clientX: number, clientY: number) => {
@@ -729,21 +770,41 @@ export default function TrueColorSystemPage() {
               <NavPill
                 label="K"
                 value={currentK}
-                onPrev={() => setKIndex((i) => Math.max(0, i - 1))}
-                onNext={() => setKIndex((i) => Math.min(K_LEVELS.length - 1, i + 1))}
-                prevDisabled={kIndex <= 0}
-                nextDisabled={kIndex >= K_LEVELS.length - 1}
+                onPrev={() => moveK(-1)}
+                onNext={() => moveK(1)}
+                prevDisabled={kPrevDisabled}
+                nextDisabled={kNextDisabled}
                 variant="dark"
               />
+
+              {/* Link K↔Y: when checked, increasing K decreases Y and vice-versa */}
+              <div className="flex items-center gap-1.5">
+                <Checkbox
+                  id="link-ky"
+                  checked={linked}
+                  onCheckedChange={(v) => setLinked(v === true)}
+                />
+                <label
+                  htmlFor="link-ky"
+                  className={cn(
+                    "flex items-center gap-1 text-xs cursor-pointer select-none",
+                    linked ? "text-foreground font-medium" : "text-muted-foreground",
+                  )}
+                  title="Quando ativado, aumentar K diminui Y e vice-versa"
+                >
+                  <IconLink className="h-3.5 w-3.5" />
+                  Vincular
+                </label>
+              </div>
 
               {/* Y navigation */}
               <NavPill
                 label="Y"
                 value={currentY}
-                onPrev={() => setYIndex((i) => Math.max(0, i - 1))}
-                onNext={() => setYIndex((i) => Math.min(Y_LEVELS.length - 1, i + 1))}
-                prevDisabled={yIndex <= 0}
-                nextDisabled={yIndex >= Y_LEVELS.length - 1}
+                onPrev={() => moveY(-1)}
+                onNext={() => moveY(1)}
+                prevDisabled={yPrevDisabled}
+                nextDisabled={yNextDisabled}
                 variant="yellow"
               />
 
