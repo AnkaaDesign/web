@@ -88,44 +88,25 @@ const renderHourValue = (value: string | undefined) => {
   );
 };
 
+const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
 // Helper function to format date
 const renderDate = (value: string | undefined) => {
   if (!value) return <span className="text-muted-foreground">-</span>;
 
-  // Parse the date and format as DD/MM/YYYY - Day
-  // Input format from Secullum is already DD/MM/YYYY - keep it as is
-  const parts = value.split(" - ");
-  const formattedDate = parts[0];
-  const dayOfWeek = parts[1];
+  // Input format from Secullum: "03/04/2026 - Fer" (Feriado) or "03/04/2026 - Sex"
+  // Always compute day of week from date to correctly handle holidays
+  const formattedDate = value.split(" - ")[0];
 
-  // Convert day abbreviation to Portuguese proper case
-  const dayMap: { [key: string]: string } = {
-    "Mon": "Seg",
-    "Tue": "Ter",
-    "Wed": "Qua",
-    "Thu": "Qui",
-    "Fri": "Sex",
-    "Sat": "Sáb",
-    "Sun": "Dom",
-    "Monday": "Seg",
-    "Tuesday": "Ter",
-    "Wednesday": "Qua",
-    "Thursday": "Qui",
-    "Friday": "Sex",
-    "Saturday": "Sáb",
-    "Sunday": "Dom",
-    "Segunda": "Seg",
-    "Terça": "Ter",
-    "Quarta": "Qua",
-    "Quinta": "Qui",
-    "Sexta": "Sex",
-    "Sábado": "Sáb",
-    "Domingo": "Dom"
-  };
+  let displayDay = "";
+  if (formattedDate) {
+    const [day, month, year] = formattedDate.split("/").map(Number);
+    if (day && month && year) {
+      displayDay = DAY_NAMES[new Date(year, month - 1, day).getDay()];
+    }
+  }
 
-  const displayDay = dayOfWeek ? (dayMap[dayOfWeek] || dayOfWeek) : "";
   const displayText = displayDay ? `${formattedDate} - ${displayDay}` : formattedDate;
-
   return <span className="text-sm whitespace-nowrap">{displayText}</span>;
 };
 

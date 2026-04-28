@@ -91,7 +91,13 @@ export function rgbToHsv(r: number, g: number, b: number): [number, number, numb
 }
 
 export function isLightColor(r: number, g: number, b: number): boolean {
-  return r * 0.299 + g * 0.587 + b * 0.114 > 160;
+  // WCAG relative luminance (sRGB gamma-corrected). Threshold 0.179 is the
+  // perceptual crossover: above it, a black overlay has more contrast than white.
+  const linearize = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b) > 0.179;
 }
 
 /** Build array of values from 0..max by step that fall within [min, max] filter */

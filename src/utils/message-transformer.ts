@@ -191,6 +191,31 @@ export function transformBlocksForDisplay(editorBlocks: ContentBlock[]): Message
       };
     }
 
+    // Handle decorator blocks (header/footer visual images)
+    if (block.type === 'decorator') {
+      const LEGACY_VARIANT_MAP: Record<string, string> = {
+        'header-main': 'header-logo',
+        'footer-main': 'footer-wave-dark',
+      };
+      const variant = LEGACY_VARIANT_MAP[block.variant] ?? block.variant;
+      return {
+        type: 'decorator',
+        variant,
+        id: block.id,
+      };
+    }
+
+    // Handle company-asset blocks (logo/icon)
+    if (block.type === 'company-asset') {
+      return {
+        type: 'company-asset',
+        asset: block.asset,
+        size: block.size,
+        alignment: block.alignment,
+        id: block.id,
+      };
+    }
+
     // Unknown block type - skip rendering
     return null;
   }).filter((block): block is MessageBlock => block !== null);

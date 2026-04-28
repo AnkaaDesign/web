@@ -10,6 +10,8 @@ import { ListBlock } from "./ListBlock";
 import { QuoteBlock } from "./QuoteBlock";
 import { IconBlock } from "./IconBlock";
 import { RowBlock } from "./RowBlock";
+import { DecoratorBlock } from "./DecoratorBlock";
+import { CompanyAssetBlock } from "./CompanyAssetBlock";
 import { cn } from "@/lib/utils";
 
 /**
@@ -88,6 +90,12 @@ export const MessageBlockRenderer = React.memo<MessageBlockRendererProps>(
 
         case 'row':
           return <RowBlock key={key} block={block} />;
+
+        case 'decorator':
+          return <DecoratorBlock key={key} block={block} />;
+
+        case 'company-asset':
+          return <CompanyAssetBlock key={key} block={block} />;
 
         default:
           // Type-safe exhaustiveness check

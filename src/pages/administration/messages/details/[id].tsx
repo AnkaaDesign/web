@@ -279,7 +279,7 @@ export const MessageDetailsPage = () => {
                   <CardTitle>Prévia do Conteúdo</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="border border-border rounded-lg px-4 py-3 bg-card">
+                  <div className="border border-border rounded-lg overflow-hidden bg-background">
                     {(() => {
                       // Handle content - API returns { blocks: [...], version: "1.0" }
                       let blocks = message.content?.blocks || message.content;
@@ -300,7 +300,7 @@ export const MessageDetailsPage = () => {
 
                       // Check if we have valid blocks
                       if (blocks && Array.isArray(blocks) && blocks.length > 0) {
-                        return <MessageBlockRenderer blocks={transformBlocksForDisplay(blocks)} />;
+                        return <MessageBlockRenderer blocks={transformBlocksForDisplay(blocks)} className="px-4 py-3" />;
                       }
 
                       return (

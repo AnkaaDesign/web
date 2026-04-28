@@ -1,24 +1,50 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useSecullumTimeEntries, useSecullumConfiguration } from "../../../hooks";
-import { startOfMonth, endOfMonth, format } from "date-fns";
+import { format, addMonths, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { TimeClockEntryTable } from "@/components/human-resources/time-clock-entry/time-clock-entry-table";
 import type { TimeClockEntryTableRef } from "@/components/human-resources/time-clock-entry/time-clock-entry-table";
-import { IconChevronLeft, IconChevronRight, IconDeviceFloppy, IconRestore } from "@tabler/icons-react";
+import { IconChevronLeft, IconChevronRight, IconDeviceFloppy, IconRestore, IconCalendar } from "@tabler/icons-react";
 import { Combobox } from "@/components/ui/combobox";
 import type { ComboboxOption } from "@/components/ui/combobox";
 import { useUsers } from "../../../hooks";
 import { PageHeader } from "@/components/ui/page-header";
 import { routes, FAVORITE_PAGES, USER_STATUS } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
+import { ColumnVisibilityManager } from "@/components/integrations/secullum/calculations/list";
+import type { ColumnDef } from "@/components/integrations/secullum/calculations/list";
+
+const TIME_CLOCK_COLUMNS: ColumnDef[] = [
+  { key: "entry1", header: "Entrada 1" },
+  { key: "exit1", header: "Saída 1" },
+  { key: "entry2", header: "Entrada 2" },
+  { key: "exit2", header: "Saída 2" },
+  { key: "entry3", header: "Entrada 3" },
+  { key: "exit3", header: "Saída 3" },
+  { key: "entry4", header: "Entrada 4" },
+  { key: "exit4", header: "Saída 4" },
+  { key: "entry5", header: "Entrada 5" },
+  { key: "exit5", header: "Saída 5" },
+  { key: "compensated", header: "Compensado" },
+  { key: "neutral", header: "Neutro" },
+  { key: "dayOff", header: "Folga" },
+  { key: "freeLunch", header: "Almoço" },
+];
 
 export default function TimeClockListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tableRef = useRef<TimeClockEntryTableRef>(null);
   const [changedRowsCount, setChangedRowsCount] = useState(0);
+
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility(
+    "time-clock-visible-columns",
+    new Set(["entry1", "exit1", "entry2", "exit2", "entry3", "exit3", "entry4", "exit4", "compensated", "dayOff"]),
+  );
 
   // Callback to handle changed rows count updates
   const handleChangedRowsChange = useCallback((count: number) => {
@@ -174,8 +200,9 @@ export default function TimeClockListPage() {
       !endDate &&
       !hasUrlDates
     ) {
-      const defaultStart = startOfMonth(new Date());
-      const defaultEnd = endOfMonth(new Date());
+      const prevMonth = addMonths(new Date(), -1);
+      const defaultStart = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 26);
+      const defaultEnd = new Date(new Date().getFullYear(), new Date().getMonth(), 25);
 
       setStartDate(defaultStart);
       setEndDate(defaultEnd);
@@ -183,6 +210,8 @@ export default function TimeClockListPage() {
       setEndDateInput(format(defaultEnd, "yyyy-MM-dd"));
     }
   }, [configLoading, configData, searchParams, startDate, endDate]);
+
+  const [selectedMonth, setSelectedMonth] = useState<Date>(() => new Date());
 
   const [selectedUserId, setSelectedUserId] = useState(searchParams.get("userId") || "");
 
@@ -287,6 +316,44 @@ export default function TimeClockListPage() {
     }
   };
 
+  const getPayrollPeriod = (month: Date) => {
+    const previousMonth = addMonths(month, -1);
+    const startDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 26);
+    const endDate = new Date(month.getFullYear(), month.getMonth(), 25);
+    return {
+      startDate: format(startDate, "yyyy-MM-dd"),
+      endDate: format(endDate, "yyyy-MM-dd"),
+    };
+  };
+
+  const getPayrollPeriodDisplay = (month: Date) => {
+    const previousMonth = subMonths(month, 1);
+    const start = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 26);
+    const end = new Date(month.getFullYear(), month.getMonth(), 25);
+    return {
+      period: `${format(start, "dd/MM", { locale: ptBR })} a ${format(end, "dd/MM/yyyy", { locale: ptBR })}`,
+      monthName: format(month, "MMMM yyyy", { locale: ptBR }),
+    };
+  };
+
+  const handleMonthChange = (month: Date) => {
+    setSelectedMonth(month);
+    const period = getPayrollPeriod(month);
+    const s = new Date(period.startDate + "T00:00:00");
+    const e = new Date(period.endDate + "T00:00:00");
+    setStartDate(s);
+    setEndDate(e);
+    setStartDateInput(period.startDate);
+    setEndDateInput(period.endDate);
+    const params = new URLSearchParams(searchParams);
+    params.set("startDate", period.startDate);
+    params.set("endDate", period.endDate);
+    setSearchParams(params);
+  };
+
+  const handlePreviousMonth = () => handleMonthChange(subMonths(selectedMonth, 1));
+  const handleNextMonth = () => handleMonthChange(addMonths(selectedMonth, 1));
+
   const handleUserChange = (userId: string) => {
     setSelectedUserId(userId);
 
@@ -376,40 +443,58 @@ export default function TimeClockListPage() {
       <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
         <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
           {/* Filters */}
-          <div className="flex gap-2 w-full flex-shrink-0">
-            <div className="flex gap-1 flex-1">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Left: user selector */}
+            <div className="flex gap-1 shrink-0">
+              <Button type="button" variant="outline" size="icon" onClick={handlePreviousUser} disabled={!usersData?.data || usersData.data.length === 0} className="h-10 w-10">
+                <IconChevronLeft className="h-4 w-4" />
+              </Button>
               <Combobox
                 options={userOptions}
                 value={selectedUserId}
                 onValueChange={(value) => handleUserChange((Array.isArray(value) ? value[0] : value) || "")}
-                placeholder={usersLoading ? "Carregando funcionários..." : "Selecione um funcionário"}
+                placeholder={usersLoading ? "Carregando..." : "Selecione um funcionário"}
                 emptyText="Nenhum funcionário encontrado"
                 searchable={true}
-                className="flex-1"
+                className="w-96"
                 disabled={usersLoading}
               />
-
-              <Button type="button" variant="outline" size="icon" onClick={handlePreviousUser} disabled={!usersData?.data || usersData.data.length === 0} className="h-10 w-10">
-                <IconChevronLeft className="h-4 w-4" />
-              </Button>
-
               <Button type="button" variant="outline" size="icon" onClick={handleNextUser} disabled={!usersData?.data || usersData.data.length === 0} className="h-10 w-10">
                 <IconChevronRight className="h-4 w-4" />
               </Button>
             </div>
 
-            <div className="flex gap-2">
-              <DateTimeInput mode="date" value={startDate} onChange={handleStartDateChange} className="w-[160px]" placeholder="Data inicial" showClearButton={true} />
+            {/* Right: period + dates */}
+            <div className="flex items-center gap-2 ml-auto">
+              <div className="flex items-center gap-1">
+                <Button type="button" variant="outline" size="icon" onClick={handlePreviousMonth} className="h-10 w-10">
+                  <IconChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex flex-col items-center px-2">
+                  <div className="flex items-center gap-1 text-sm font-medium">
+                    <IconCalendar className="h-4 w-4" />
+                    <span className="capitalize">{getPayrollPeriodDisplay(selectedMonth).monthName}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">Período: {getPayrollPeriodDisplay(selectedMonth).period}</div>
+                </div>
+                <Button type="button" variant="outline" size="icon" onClick={handleNextMonth} className="h-10 w-10">
+                  <IconChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
 
-              <span className="flex items-center text-muted-foreground">até</span>
+              <div className="flex items-center gap-1">
+                <DateTimeInput mode="date" value={startDate} onChange={handleStartDateChange} className="w-[140px]" placeholder="Data inicial" showClearButton={true} />
+                <span className="text-muted-foreground text-sm px-1">até</span>
+                <DateTimeInput mode="date" value={endDate} onChange={handleEndDateChange} className="w-[140px]" placeholder="Data final" showClearButton={true} />
+              </div>
 
-              <DateTimeInput mode="date" value={endDate} onChange={handleEndDateChange} className="w-[160px]" placeholder="Data final" showClearButton={true} />
+              <ColumnVisibilityManager columns={TIME_CLOCK_COLUMNS} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             </div>
           </div>
 
           {/* Table in scrollable area */}
           <div className="flex-1 min-h-0">
-            <TimeClockEntryTable ref={tableRef} entries={data?.data?.data?.lista || []} isLoading={isLoading} className="h-full" onChangedRowsChange={handleChangedRowsChange} />
+            <TimeClockEntryTable ref={tableRef} entries={data?.data?.data?.lista || []} isLoading={isLoading} className="h-full" onChangedRowsChange={handleChangedRowsChange} visibleColumns={visibleColumns} />
           </div>
         </CardContent>
       </Card>

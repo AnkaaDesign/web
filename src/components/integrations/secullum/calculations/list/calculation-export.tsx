@@ -167,16 +167,20 @@ export function CalculationExport({
 
   const exportToPDF = async (items: CalculationRow[], columns: ExportColumn<CalculationRow>[]) => {
     const columnCount = columns.length;
+    const fontSize = columnCount <= 8 ? "10px" : columnCount <= 14 ? "9px" : "8px";
+    const headerFontSize = columnCount <= 8 ? "9px" : columnCount <= 14 ? "8px" : "7px";
+    const cellPadding = columnCount <= 8 ? "5px 4px" : "3px 3px";
+    const headerPadding = columnCount <= 8 ? "6px 4px" : "4px 3px";
 
-    // Dynamic font sizes and padding based on column count
-    const fontSize = columnCount <= 6 ? "11px" : columnCount <= 10 ? "9px" : "8px";
-    const headerFontSize = columnCount <= 6 ? "10px" : columnCount <= 10 ? "8px" : "7px";
-    const cellPadding = columnCount <= 6 ? "6px 4px" : columnCount <= 10 ? "4px 3px" : "3px 2px";
-    const headerPadding = columnCount <= 6 ? "8px 6px" : columnCount <= 10 ? "6px 4px" : "4px 3px";
-
-    const monthLabel = filters.selectedMonth
-      ? format(filters.selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })
-      : "Período não especificado";
+    const periodLabel = (() => {
+      if (filters.customStartDate && filters.customEndDate) {
+        return `${formatDate(filters.customStartDate)} a ${formatDate(filters.customEndDate)}`;
+      }
+      if (filters.selectedMonth) {
+        return format(filters.selectedMonth, "MMMM 'de' yyyy", { locale: ptBR });
+      }
+      return "Período não especificado";
+    })();
 
     const pdfContent = `
       <!DOCTYPE html>
@@ -186,8 +190,8 @@ export function CalculationExport({
         <title>Cálculos de Ponto - ${formatDate(new Date())}</title>
         <style>
           @page {
-            size: A4 landscape;
-            margin: 12mm;
+            size: A4;
+            margin: 10mm;
           }
 
           * {
@@ -202,8 +206,7 @@ export function CalculationExport({
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background: white;
             font-size: ${fontSize};
-            line-height: 1.3;
-            overflow-x: auto;
+            line-height: 1.2;
           }
 
           body {
@@ -214,102 +217,136 @@ export function CalculationExport({
           }
 
           .header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 12px;
             flex-shrink: 0;
           }
 
           .logo {
-            width: ${columnCount <= 6 ? "100px" : "80px"};
+            width: 140px;
             height: auto;
-            margin-right: 15px;
+            margin-bottom: 8px;
           }
 
           .header-info {
-            flex: 1;
+          }
+
+          .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 4px;
           }
 
           .info {
             color: #6b7280;
-            font-size: ${columnCount <= 6 ? "12px" : "10px"};
+            font-size: 10px;
           }
 
           .info p {
-            margin: 2px 0;
+            margin: 1px 0;
           }
 
           .content-wrapper {
             flex: 1;
             overflow: auto;
             min-height: 0;
-            padding-bottom: 40px;
+            padding-bottom: 35px;
           }
 
           table {
             width: 100%;
             border-collapse: collapse;
-            border: 1px solid #e5e7eb;
             font-size: ${fontSize};
-            table-layout: fixed;
-            word-wrap: break-word;
           }
 
           th {
-            background-color: #f9fafb;
+            background-color: hsl(142, 72%, 29%);
             font-weight: 600;
-            color: #374151;
+            color: #ffffff;
             padding: ${headerPadding};
-            border-bottom: 2px solid #e5e7eb;
-            border-right: 1px solid #e5e7eb;
+            border: 1px solid hsl(142, 72%, 25%);
             font-size: ${headerFontSize};
             text-transform: uppercase;
             letter-spacing: 0.03em;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            text-align: left;
           }
 
           td {
             padding: ${cellPadding};
-            border-bottom: 1px solid #f3f4f6;
-            border-right: 1px solid #f3f4f6;
-            vertical-align: top;
-            word-wrap: break-word;
+            border-left: 1px solid #e5e7eb;
+            border-right: 1px solid #e5e7eb;
+            border-bottom: 1px solid #e5e7eb;
+            border-top: none;
+            vertical-align: middle;
+            white-space: nowrap;
             overflow: hidden;
+            text-overflow: ellipsis;
             font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            font-size: ${columnCount <= 6 ? "9px" : "7px"};
+            color: #374151;
           }
 
           tbody tr:nth-child(even) {
             background-color: #fafafa;
           }
 
+          .text-left { text-align: left; }
           .text-center { text-align: center; }
-          .font-medium { font-weight: 500; }
+          .text-right { text-align: right; }
 
           .footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding-top: 15px;
+            padding-top: 10px;
             border-top: 1px solid #e5e7eb;
             color: #6b7280;
-            font-size: ${columnCount <= 6 ? "10px" : "8px"};
+            font-size: 9px;
             flex-shrink: 0;
             background: white;
+          }
+
+          .footer-left {
+            flex: 1;
+          }
+
+          .footer-right {
+            text-align: right;
+          }
+
+          @media print {
+            @page {
+              size: A4;
+              margin: 8mm;
+            }
+
+            .footer {
+              position: fixed;
+              bottom: 6mm;
+              left: 6mm;
+              right: 6mm;
+              background: white;
+              font-size: 7px;
+            }
+
+            .content-wrapper {
+              padding-bottom: 50px;
+            }
           }
         </style>
       </head>
       <body>
         <div class="header">
           <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <h1 class="header-title">Cálculos de Ponto</h1>
           <div class="header-info">
             <div class="info">
-              <p><strong>Cálculos de Ponto - ${monthLabel}</strong></p>
+              <p><strong>Período:</strong> ${periodLabel}</p>
               <p><strong>Total de registros:</strong> ${items.length}</p>
+              <p><strong>Colunas:</strong> ${columnCount}</p>
+              <p><strong>Gerado em:</strong> ${formatDateTime(new Date())}</p>
             </div>
           </div>
         </div>
@@ -318,34 +355,25 @@ export function CalculationExport({
           <table>
             <thead>
               <tr>
-                ${columns.map((col) => `<th class="text-center">${col.label}</th>`).join("")}
+                ${columns.map((col) => `<th class="text-left">${col.label}</th>`).join("")}
               </tr>
             </thead>
             <tbody>
-              ${items
-                .map((item) => {
-                  return `
-                  <tr>
-                    ${columns
-                      .map((col) => {
-                        const value = col.getValue(item) || "-";
-                        return `<td class="text-center">${value}</td>`;
-                      })
-                      .join("")}
-                  </tr>
-                `;
-                })
-                .join("")}
+              ${items.map((item) => `
+                <tr>
+                  ${columns.map((col) => `<td class="text-left">${col.getValue(item) || "-"}</td>`).join("")}
+                </tr>
+              `).join("")}
             </tbody>
           </table>
         </div>
 
         <div class="footer">
           <div class="footer-left">
-            <p>Relatório gerado pelo sistema Ankaa</p>
+            <p>Cálculos de Ponto - Sistema Ankaa</p>
           </div>
           <div class="footer-right">
-            <p><strong>Gerado em:</strong> ${formatDateTime(new Date())}</p>
+            <p><strong>Gerado em:</strong> ${formatDate(new Date())} ${new Date().toLocaleTimeString('pt-BR')}</p>
           </div>
         </div>
       </body>

@@ -18,7 +18,9 @@ export type MessageBlock =
   | ListBlock
   | QuoteBlock
   | IconBlock
-  | RowBlock;
+  | RowBlock
+  | DecoratorBlock
+  | CompanyAssetBlock;
 
 export interface HeadingBlock {
   type: 'heading';
@@ -106,6 +108,29 @@ export interface RowBlock {
   columns?: 2 | 3 | 4;
   gap?: 'none' | 'sm' | 'md' | 'lg';
   verticalAlign?: 'top' | 'center' | 'bottom';
+  id?: string;
+}
+
+export type DecoratorVariant =
+  | 'header-logo'
+  | 'header-logo-stripes'
+  | 'footer-wave-dark'
+  | 'footer-wave-logo'
+  | 'footer-diagonal-stripes'
+  | 'footer-wave-gold'
+  | 'footer-geometric';
+
+export interface DecoratorBlock {
+  type: 'decorator';
+  variant: DecoratorVariant | string;
+  id?: string;
+}
+
+export interface CompanyAssetBlock {
+  type: 'company-asset';
+  asset: 'logo' | 'icon';
+  size?: string;
+  alignment?: 'left' | 'center' | 'right';
   id?: string;
 }
 

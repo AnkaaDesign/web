@@ -39,6 +39,7 @@ interface TimeClockEntryTableProps {
   isLoading?: boolean;
   className?: string;
   onChangedRowsChange?: (count: number) => void;
+  visibleColumns?: Set<string>;
 }
 
 export interface TimeClockEntryTableRef {
@@ -77,7 +78,8 @@ function isManualEntry(rawEntry: any, fieldName: string): boolean {
 }
 
 const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: React.Ref<TimeClockEntryTableRef>) => {
-  const { entries, isLoading, className, onChangedRowsChange } = props;
+  const { entries, isLoading, className, onChangedRowsChange, visibleColumns } = props;
+  const isVisible = (key: string) => !visibleColumns || visibleColumns.has(key);
   const [pendingJustification, setPendingJustification] = useState<PendingJustification | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<TimeClockEntry | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: TimeClockEntry; field?: string } | null>(null);
@@ -669,20 +671,20 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                   <th className="text-left p-2 font-medium text-sm sticky left-0 bg-background z-30 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border">
                     Data
                   </th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 1</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 1</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 2</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 2</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 3</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 3</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 4</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 4</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 5</th>
-                  <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 5</th>
-                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Compensado</th>
-                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Neutro</th>
-                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Folga</th>
-                  <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-neutral-400 dark:border-border">Almoço</th>
+                  {isVisible("entry1") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 1</th>}
+                  {isVisible("exit1") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 1</th>}
+                  {isVisible("entry2") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 2</th>}
+                  {isVisible("exit2") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 2</th>}
+                  {isVisible("entry3") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 3</th>}
+                  {isVisible("exit3") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 3</th>}
+                  {isVisible("entry4") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 4</th>}
+                  {isVisible("exit4") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 4</th>}
+                  {isVisible("entry5") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 5</th>}
+                  {isVisible("exit5") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 5</th>}
+                  {isVisible("compensated") && <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Compensado</th>}
+                  {isVisible("neutral") && <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Neutro</th>}
+                  {isVisible("dayOff") && <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Folga</th>}
+                  {isVisible("freeLunch") && <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-neutral-400 dark:border-border">Almoço</th>}
                 </tr>
               </thead>
               <tbody>
@@ -723,7 +725,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       </td>
 
                       {/* Time inputs */}
-                      {["entry1", "exit1", "entry2", "exit2", "entry3", "exit3", "entry4", "exit4", "entry5", "exit5"].map((timeField) => {
+                      {["entry1", "exit1", "entry2", "exit2", "entry3", "exit3", "entry4", "exit4", "entry5", "exit5"].filter(isVisible).map((timeField) => {
                         const isModified = isFieldModified(field.id, timeField);
                         const rawEntry = entries.find((e: any) => String(e.Id) === field.id || String(e.id) === field.id);
                         const isManual = isManualEntry(rawEntry, timeField);
@@ -792,105 +794,45 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       })}
 
                       {/* Checkboxes */}
-                      <td
-                        className={cn(
-                          "p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border",
-                          isFieldModified(field.id, "compensated") && "bg-yellow-100 dark:bg-yellow-900/30",
-                        )}
-                      >
-                        <FormField
-                          control={form.control}
-                          name={`entries.${index}.compensated`}
-                          render={({ field: formField }) => (
-                            <FormItem className="flex justify-center">
-                              <FormControl>
-                                <Checkbox
-                                  checked={formField.value}
-                                  onCheckedChange={(checked) => {
-                                    formField.onChange(checked);
-                                    handleFieldChange(field.id, "compensated", checked);
-                                  }}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </td>
+                      {isVisible("compensated") && (
+                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border", isFieldModified(field.id, "compensated") && "bg-yellow-100 dark:bg-yellow-900/30")}>
+                          <FormField control={form.control} name={`entries.${index}.compensated`} render={({ field: formField }) => (
+                            <FormItem className="flex justify-center"><FormControl>
+                              <Checkbox checked={formField.value} onCheckedChange={(checked) => { formField.onChange(checked); handleFieldChange(field.id, "compensated", checked); }} />
+                            </FormControl></FormItem>
+                          )} />
+                        </td>
+                      )}
 
-                      <td
-                        className={cn(
-                          "p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border",
-                          isFieldModified(field.id, "neutral") && "bg-yellow-100 dark:bg-yellow-900/30",
-                        )}
-                      >
-                        <FormField
-                          control={form.control}
-                          name={`entries.${index}.neutral`}
-                          render={({ field: formField }) => (
-                            <FormItem className="flex justify-center">
-                              <FormControl>
-                                <Checkbox
-                                  checked={formField.value}
-                                  onCheckedChange={(checked) => {
-                                    formField.onChange(checked);
-                                    handleFieldChange(field.id, "neutral", checked);
-                                  }}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </td>
+                      {isVisible("neutral") && (
+                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border", isFieldModified(field.id, "neutral") && "bg-yellow-100 dark:bg-yellow-900/30")}>
+                          <FormField control={form.control} name={`entries.${index}.neutral`} render={({ field: formField }) => (
+                            <FormItem className="flex justify-center"><FormControl>
+                              <Checkbox checked={formField.value} onCheckedChange={(checked) => { formField.onChange(checked); handleFieldChange(field.id, "neutral", checked); }} />
+                            </FormControl></FormItem>
+                          )} />
+                        </td>
+                      )}
 
-                      <td
-                        className={cn(
-                          "p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border",
-                          isFieldModified(field.id, "dayOff") && "bg-yellow-100 dark:bg-yellow-900/30",
-                        )}
-                      >
-                        <FormField
-                          control={form.control}
-                          name={`entries.${index}.dayOff`}
-                          render={({ field: formField }) => (
-                            <FormItem className="flex justify-center">
-                              <FormControl>
-                                <Checkbox
-                                  checked={formField.value}
-                                  onCheckedChange={(checked) => {
-                                    formField.onChange(checked);
-                                    handleFieldChange(field.id, "dayOff", checked);
-                                  }}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </td>
+                      {isVisible("dayOff") && (
+                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border", isFieldModified(field.id, "dayOff") && "bg-yellow-100 dark:bg-yellow-900/30")}>
+                          <FormField control={form.control} name={`entries.${index}.dayOff`} render={({ field: formField }) => (
+                            <FormItem className="flex justify-center"><FormControl>
+                              <Checkbox checked={formField.value} onCheckedChange={(checked) => { formField.onChange(checked); handleFieldChange(field.id, "dayOff", checked); }} />
+                            </FormControl></FormItem>
+                          )} />
+                        </td>
+                      )}
 
-                      <td
-                        className={cn(
-                          "p-1 text-center w-28 min-w-28 max-w-28 border-neutral-400 dark:border-border",
-                          isFieldModified(field.id, "freeLunch") && "bg-yellow-100 dark:bg-yellow-900/30",
-                        )}
-                      >
-                        <FormField
-                          control={form.control}
-                          name={`entries.${index}.freeLunch`}
-                          render={({ field: formField }) => (
-                            <FormItem className="flex justify-center">
-                              <FormControl>
-                                <Checkbox
-                                  checked={formField.value}
-                                  onCheckedChange={(checked) => {
-                                    formField.onChange(checked);
-                                    handleFieldChange(field.id, "freeLunch", checked);
-                                  }}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </td>
+                      {isVisible("freeLunch") && (
+                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-neutral-400 dark:border-border", isFieldModified(field.id, "freeLunch") && "bg-yellow-100 dark:bg-yellow-900/30")}>
+                          <FormField control={form.control} name={`entries.${index}.freeLunch`} render={({ field: formField }) => (
+                            <FormItem className="flex justify-center"><FormControl>
+                              <Checkbox checked={formField.value} onCheckedChange={(checked) => { formField.onChange(checked); handleFieldChange(field.id, "freeLunch", checked); }} />
+                            </FormControl></FormItem>
+                          )} />
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

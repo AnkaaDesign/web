@@ -100,9 +100,12 @@ export function useColorGridCanvas() {
       const availW = rect.width;
       const availH = rect.height;
 
-      const cellPx = Math.max(2, Math.min(availW / Nm, availH / Nc));
-      const chartW = cellPx * Nm;
-      const chartH = cellPx * Nc;
+      const initCellPx = Math.min(availW / Nm, availH / Nc);
+      const initGap = Math.max(1.5, Math.min(3.5, initCellPx * 0.07));
+      const cellPx = Math.max(2, Math.min((availW - initGap) / Nm, (availH - initGap) / Nc));
+      const gap = Math.max(1.5, Math.min(3.5, cellPx * 0.07));
+      const chartW = cellPx * Nm + gap;
+      const chartH = cellPx * Nc + gap;
 
       const dpr = window.devicePixelRatio || 1;
       canvas.width = chartW * dpr;
@@ -115,8 +118,8 @@ export function useColorGridCanvas() {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, chartW, chartH);
-
-      const gap = Math.max(1.5, Math.min(3.5, cellPx * 0.07));
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, chartW, chartH);
 
       for (let row = 0; row < Nc; row++) {
         for (let col = 0; col < Nm; col++) {
@@ -126,8 +129,8 @@ export function useColorGridCanvas() {
           const id = cellId(y, k, c, m);
           const isSelected = selected.has(id);
 
-          const x = col * cellPx + gap / 2;
-          const yPos = row * cellPx + gap / 2;
+          const x = col * cellPx + gap;
+          const yPos = row * cellPx + gap;
           const cw = cellPx - gap;
           const ch = cellPx - gap;
 

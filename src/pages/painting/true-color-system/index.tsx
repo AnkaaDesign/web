@@ -82,6 +82,7 @@ export default function TrueColorSystemPage() {
   } | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [printColsDialogOpen, setPrintColsDialogOpen] = useState(false);
+  const [confirmDeselectOpen, setConfirmDeselectOpen] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -96,6 +97,34 @@ export default function TrueColorSystemPage() {
   const mVals = useMemo(() => buildRange(step, mMin, mMax), [step, mMin, mMax]);
   const cVals = useMemo(() => buildRange(step, cMin, cMax), [step, cMin, cMax]);
   const isEmpty = mVals.length === 0 || cVals.length === 0;
+
+  // Track the actual grid-area dimensions so the canvas can fill all available space
+  const [gridAreaSize, setGridAreaSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  useEffect(() => {
+    const node = gridAreaRef.current;
+    if (!node) return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0].contentRect;
+      setGridAreaSize({ w: r.width, h: r.height });
+    });
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, []);
+
+  const hostStyle = useMemo(() => {
+    const Nm = mVals.length;
+    const Nc = cVals.length;
+    if (!Nm || !Nc || gridAreaSize.w === 0 || gridAreaSize.h === 0) return undefined;
+    // Reserve room for tick numbers (left ~28px) and axis labels (top ~32px, bottom ~20px)
+    const reservedW = 32;
+    const reservedH = 56;
+    const availW = Math.max(40, gridAreaSize.w - reservedW);
+    const availH = Math.max(40, gridAreaSize.h - reservedH);
+    const ratio = Nm / Nc;
+    const w = Math.min(availW, availH * ratio);
+    const h = w / ratio;
+    return { width: `${w}px`, height: `${h}px` };
+  }, [gridAreaSize, mVals.length, cVals.length]);
 
   // --- Drawing ---
   const redraw = useCallback(() => {
@@ -130,11 +159,11 @@ export default function TrueColorSystemPage() {
 
   // --- Selected-view drawing ---
   const selectedCells = useMemo(() => {
-    if (!showSelected || selected.size === 0) return [];
+    if (selected.size === 0) return [];
     return Array.from(selected)
       .map(parseCellId)
       .filter(Boolean) as { y: number; k: number; c: number; m: number }[];
-  }, [showSelected, selected]);
+  }, [selected]);
 
   const drawSelectedGrid = useCallback(() => {
     const canvas = selectedCanvasRef.current;
@@ -143,12 +172,15 @@ export default function TrueColorSystemPage() {
 
     const rect = host.getBoundingClientRect();
     const availW = rect.width;
+    const availH = rect.height;
     const N = selectedCells.length;
 
-    // Fill the full width — cell size = availW / cols, auto-rows
-    const cellPx = Math.max(4, Math.floor(availW / Math.ceil(Math.sqrt(N))));
-    const cols = Math.max(1, Math.floor(availW / cellPx));
+    // Fill the full available area without scrolling — choose cols based on the
+    // host aspect ratio so cells stay roughly square, then size them to fit both axes.
+    const aspect = availH > 0 ? availW / availH : 1;
+    const cols = Math.max(1, Math.min(N, Math.round(Math.sqrt(N * aspect)) || 1));
     const rows = Math.ceil(N / cols);
+    const cellPx = Math.max(4, Math.floor(Math.min(availW / cols, availH / rows)));
     const chartW = cols * cellPx;
     const chartH = rows * cellPx;
     const gap = Math.max(1.5, Math.min(3.5, cellPx * 0.07));
@@ -353,8 +385,30 @@ export default function TrueColorSystemPage() {
             });
           }
         } else {
-          // Clicked blank area → clear selection
-          setSelected(new Set());
+          // Clicked outside canvas → select all of current page if empty,
+          // or confirm before deselecting if any selection exists on current page
+          const prefix = `y${currentY}|k${currentK}|`;
+          let hasCurrentPageSelection = false;
+          for (const id of selected) {
+            if (id.startsWith(prefix)) {
+              hasCurrentPageSelection = true;
+              break;
+            }
+          }
+          if (!hasCurrentPageSelection) {
+            // Select every cell of the current page (within active filter)
+            setSelected((prev) => {
+              const next = new Set(prev);
+              for (const cv of cVals) {
+                for (const mv of mVals) {
+                  next.add(cellId(currentY, currentK, cv, mv));
+                }
+              }
+              return next;
+            });
+          } else {
+            setConfirmDeselectOpen(true);
+          }
         }
       }
 
@@ -362,7 +416,7 @@ export default function TrueColorSystemPage() {
       dragStartRef.current = null;
       setMarquee(null);
     },
-    [dragging, marquee, resolveMarqueeSelection, hitTest, step, cMin, cMax, mMin, mMax, currentY, currentK],
+    [dragging, marquee, resolveMarqueeSelection, hitTest, step, cMin, cMax, mMin, mMax, currentY, currentK, selected, cVals, mVals],
   );
 
   const handleGridAreaMouseLeave = useCallback(
@@ -463,6 +517,7 @@ export default function TrueColorSystemPage() {
     const style = document.createElement("style");
     style.textContent = `
       @media print {
+        html, body { background: white !important; }
         body > *:not(#tcs-print-root) { display: none !important; }
         #tcs-print-root {
           display: flex !important;
@@ -471,6 +526,7 @@ export default function TrueColorSystemPage() {
           position: static !important;
           width: 100% !important;
           height: auto !important;
+          background: white !important;
         }
         #tcs-print-root canvas {
           break-inside: avoid !important;
@@ -496,7 +552,7 @@ export default function TrueColorSystemPage() {
   }, [selectedCells]);
 
   const handlePrint = useCallback(() => {
-    if (showSelected && selectedCells.length > 0) {
+    if (selectedCells.length > 0) {
       setPrintColsDialogOpen(true);
       return;
     }
@@ -588,12 +644,14 @@ export default function TrueColorSystemPage() {
     const style = document.createElement("style");
     style.textContent = `
       @media print {
+        html, body { background: white !important; }
         body > *:not(#tcs-print-root) { display: none !important; }
         #tcs-print-root {
           display: flex !important;
           position: static !important;
           width: 100% !important;
           height: auto !important;
+          background: white !important;
         }
         *, *::before, *::after {
           -webkit-print-color-adjust: exact !important;
@@ -612,12 +670,24 @@ export default function TrueColorSystemPage() {
         document.head.removeChild(style);
       }, 500);
     });
-  }, [showSelected, selectedCells.length, currentY, currentK, step, cMin, cMax, mMin, mMax]);
+  }, [selectedCells.length, currentY, currentK, step, cMin, cMax, mMin, mMax]);
   const clearSelection = useCallback(() => {
     setSelected(new Set());
     setShowSelected(false);
   }, []);
   const selectionCount = selected.size;
+
+  const handleConfirmDeselect = useCallback(() => {
+    setSelected((prev) => {
+      const prefix = `y${currentY}|k${currentK}|`;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (!id.startsWith(prefix)) next.add(id);
+      }
+      return next;
+    });
+    setConfirmDeselectOpen(false);
+  }, [currentY, currentK]);
 
   const clamp = (v: string, lo: number, hi: number, def: number) => {
     const n = parseInt(v, 10);
@@ -769,13 +839,13 @@ export default function TrueColorSystemPage() {
               </Button>
             </div>
 
-            {/* Selected view — compact grid of all selected colors, fills width */}
+            {/* Selected view — compact grid of all selected colors, fills full area */}
             {showSelected ? (
-              <div className="flex-1 min-h-0 overflow-y-auto p-2">
+              <div className="flex-1 min-h-0 overflow-hidden p-2 flex items-center justify-center">
                 {selectedCells.length === 0 ? (
                   <p className="text-muted-foreground text-sm text-center py-8">Nenhuma cor selecionada.</p>
                 ) : (
-                  <div ref={selectedHostRef} className="w-full">
+                  <div ref={selectedHostRef} className="w-full h-full flex items-center justify-center">
                     <canvas ref={selectedCanvasRef} className="block" />
                   </div>
                 )}
@@ -839,12 +909,7 @@ export default function TrueColorSystemPage() {
                       <div
                         ref={hostRef}
                         className="relative"
-                        style={{
-                          width: "min(calc(100vw - 8rem), calc(100vh - 20rem))",
-                          height: "min(calc(100vw - 8rem), calc(100vh - 20rem))",
-                          maxWidth: "800px",
-                          maxHeight: "800px",
-                        }}
+                        style={hostStyle}
                       >
                         <canvas
                           ref={canvasRef}
@@ -907,6 +972,26 @@ export default function TrueColorSystemPage() {
             printSelectedWithCols(cols);
           }}
         />
+
+        {/* Confirm deselect dialog */}
+        <Dialog open={confirmDeselectOpen} onOpenChange={setConfirmDeselectOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Desmarcar seleção?</DialogTitle>
+              <DialogDescription>
+                Existem cores selecionadas nesta página. Deseja desmarcá-las?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setConfirmDeselectOpen(false)}>
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={handleConfirmDeselect}>
+                Desmarcar
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </PrivilegeRoute>
   );

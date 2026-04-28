@@ -21,6 +21,9 @@ export type {
   DividerBlock as DividerBlockType,
   ListBlock as ListBlockType,
   QuoteBlock as QuoteBlockType,
+  DecoratorBlock as DecoratorBlockType,
+  CompanyAssetBlock as CompanyAssetBlockType,
+  DecoratorVariant,
   InlineFormat,
   MessageBlockRendererProps,
 } from "./types";

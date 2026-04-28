@@ -4,8 +4,8 @@ import { useSecullumCalculations, useMySecullumCalculations, useUsers } from "..
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CalculationTable } from "./calculation-table";
-import { CalculationExport } from "./calculation-export";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createCalculationColumns } from "./calculation-table-columns";
 import { cn } from "@/lib/utils";
@@ -22,12 +22,8 @@ type CalculationListMode = 'hr' | 'personal';
 
 interface CalculationListProps {
   className?: string;
-  /**
-   * Mode determines the behavior:
-   * - 'hr': Shows user selector, fetches all users (requires HR privileges) - default
-   * - 'personal': Uses current user only, no user selector (accessible to all)
-   */
   mode?: CalculationListMode;
+  onExportDataChange?: (data: { rows: any[]; visibleColumns: Set<string>; filters: any }) => void;
 }
 
 interface CalculationRow {
@@ -78,22 +74,39 @@ const getPayrollPeriod = (selectedMonth: Date) => {
   };
 };
 
-export function CalculationList({ className, mode = 'hr' }: CalculationListProps) {
+export function CalculationList({ className, mode = 'hr', onExportDataChange }: CalculationListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user: currentUser } = useAuth();
   const isPersonalMode = mode === 'personal';
 
   // Get selected month from URL or default to current month
-  const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
+  const initialMonth = (() => {
     const monthParam = searchParams.get("month");
     if (monthParam) {
-      try {
-        return new Date(monthParam);
-      } catch (e) {
-        // Ignore invalid dates
-      }
+      try { return new Date(monthParam); } catch (e) { /* ignore */ }
     }
-    return new Date(); // Default to current month
+    return new Date();
+  })();
+  const [selectedMonth, setSelectedMonth] = useState<Date>(initialMonth);
+
+  // Custom date range — defaults to the current payroll period
+  const [customStartDate, setCustomStartDate] = useState<Date | null>(() => {
+    const s = searchParams.get("customStartDate");
+    if (s) {
+      const parts = s.split("-");
+      if (parts.length === 3) return new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    }
+    const p = getPayrollPeriod(initialMonth);
+    return new Date(p.startDate + "T00:00:00");
+  });
+  const [customEndDate, setCustomEndDate] = useState<Date | null>(() => {
+    const e = searchParams.get("customEndDate");
+    if (e) {
+      const parts = e.split("-");
+      if (parts.length === 3) return new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    }
+    const p = getPayrollPeriod(initialMonth);
+    return new Date(p.endDate + "T00:00:00");
   });
 
   // Get selected user from URL (only for HR mode)
@@ -160,33 +173,13 @@ export function CalculationList({ className, mode = 'hr' }: CalculationListProps
 
   // Build query parameters for Secullum API
   const queryParams = useMemo(() => {
-    // In personal mode, we don't need a userId - backend uses authenticated user
-    if (isPersonalMode) {
-      if (!selectedMonth) return null;
-      const period = getPayrollPeriod(selectedMonth);
-      return {
-        startDate: period.startDate,
-        endDate: period.endDate,
-      };
-    }
-
-    // In HR mode, we need a selected user
-    if (!selectedUserId || !selectedMonth) {
-      return null; // Don't fetch if required params are missing
-    }
-
-    const period = getPayrollPeriod(selectedMonth);
-
-    // Build parameters for API call
-    // The backend expects userId and will map it to Secullum employeeId
-    const params: any = {
-      userId: selectedUserId,           // Pass Ankaa userId
-      startDate: period.startDate,      // Use startDate for backend
-      endDate: period.endDate,          // Use endDate for backend
-    };
-
-    return params;
-  }, [selectedUserId, selectedMonth, isPersonalMode]);
+    if (!customStartDate || !customEndDate) return null;
+    const startDate = format(customStartDate, "yyyy-MM-dd");
+    const endDate = format(customEndDate, "yyyy-MM-dd");
+    if (isPersonalMode) return { startDate, endDate };
+    if (!selectedUserId) return null;
+    return { userId: selectedUserId, startDate, endDate };
+  }, [selectedUserId, isPersonalMode, customStartDate, customEndDate]);
 
   // Fetch calculations from Secullum - use personal endpoint in personal mode
   const hrCalculations = useSecullumCalculations(!isPersonalMode ? queryParams : null);
@@ -322,12 +315,65 @@ export function CalculationList({ className, mode = 'hr' }: CalculationListProps
     setSearchParams(params);
   };
 
-  // Handle month change
+  const handlePreviousUser = () => {
+    if (!usersData?.data || usersData.data.length === 0) return;
+    const currentIndex = usersData.data.findIndex((user) => user.id === selectedUserId);
+    if (currentIndex === -1 || currentIndex === 0) {
+      handleUserChange(usersData.data[usersData.data.length - 1].id);
+    } else {
+      handleUserChange(usersData.data[currentIndex - 1].id);
+    }
+  };
+
+  const handleNextUser = () => {
+    if (!usersData?.data || usersData.data.length === 0) return;
+    const currentIndex = usersData.data.findIndex((user) => user.id === selectedUserId);
+    if (currentIndex === -1 || currentIndex === usersData.data.length - 1) {
+      handleUserChange(usersData.data[0].id);
+    } else {
+      handleUserChange(usersData.data[currentIndex + 1].id);
+    }
+  };
+
+  const handleCustomStartDateChange = (date: Date | null | any) => {
+    if (date && typeof date === 'object' && 'getTime' in date && !isNaN(date.getTime())) {
+      setCustomStartDate(date);
+      const params = new URLSearchParams(searchParams);
+      params.set("customStartDate", format(date, "yyyy-MM-dd"));
+      setSearchParams(params);
+    } else if (!date) {
+      setCustomStartDate(null);
+      const params = new URLSearchParams(searchParams);
+      params.delete("customStartDate");
+      setSearchParams(params);
+    }
+  };
+
+  const handleCustomEndDateChange = (date: Date | null | any) => {
+    if (date && typeof date === 'object' && 'getTime' in date && !isNaN(date.getTime())) {
+      setCustomEndDate(date);
+      const params = new URLSearchParams(searchParams);
+      params.set("customEndDate", format(date, "yyyy-MM-dd"));
+      setSearchParams(params);
+    } else if (!date) {
+      setCustomEndDate(null);
+      const params = new URLSearchParams(searchParams);
+      params.delete("customEndDate");
+      setSearchParams(params);
+    }
+  };
+
   const handleMonthChange = (month: Date) => {
     setSelectedMonth(month);
-
+    const p = getPayrollPeriod(month);
+    const s = new Date(p.startDate + "T00:00:00");
+    const e = new Date(p.endDate + "T00:00:00");
+    setCustomStartDate(s);
+    setCustomEndDate(e);
     const params = new URLSearchParams(searchParams);
     params.set("month", format(month, "yyyy-MM-dd"));
+    params.set("customStartDate", p.startDate);
+    params.set("customEndDate", p.endDate);
     setSearchParams(params);
   };
 
@@ -367,12 +413,16 @@ export function CalculationList({ className, mode = 'hr' }: CalculationListProps
     }));
   }, [usersData]);
 
-  // Memoize export filters to prevent unnecessary re-renders
   const exportFilters = useMemo(() => ({
     selectedMonth,
     userId: selectedUserId,
-  }), [selectedMonth, selectedUserId]);
+    customStartDate,
+    customEndDate,
+  }), [selectedMonth, selectedUserId, customStartDate, customEndDate]);
 
+  useEffect(() => {
+    onExportDataChange?.({ rows: calculationRows, visibleColumns, filters: exportFilters });
+  }, [calculationRows, visibleColumns, exportFilters]);
 
   return (
     <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
@@ -386,72 +436,57 @@ export function CalculationList({ className, mode = 'hr' }: CalculationListProps
         )}
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              {/* User Selector - only shown in HR mode */}
-              {!isPersonalMode && (
-                <div className="flex gap-1 flex-1 min-w-0">
-                  <Combobox
-                    options={userOptions}
-                    value={selectedUserId || ""}
-                    onValueChange={(value) => {
-                      const userId = Array.isArray(value) ? value[0] : value;
-                      handleUserChange(userId || "");
-                    }}
-                    placeholder={usersLoading ? "Carregando funcionários..." : "Selecione um funcionário"}
-                    emptyText="Nenhum funcionário encontrado"
-                    searchable={true}
-                    className="flex-1"
-                    disabled={usersLoading}
-                  />
-                </div>
-              )}
-
-              {/* Month Selector */}
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={handlePreviousMonth}
-                  className="h-10 w-10"
-                >
-                  <IconChevronLeft className="h-4 w-4" />
-                </Button>
-
-                <div className="flex flex-col items-center min-w-0">
-                  <div className="flex items-center gap-1 text-sm font-medium">
-                    <IconCalendar className="h-4 w-4" />
-                    <span className="capitalize">{monthName}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Período: {period}
-                  </div>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={handleNextMonth}
-                  className="h-10 w-10"
-                >
-                  <IconChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+        <div className="flex items-center gap-2">
+          {/* Left: user selector */}
+          {!isPersonalMode && (
+            <div className="flex gap-1 shrink-0">
+              <Button type="button" variant="outline" size="icon" onClick={handlePreviousUser} disabled={!usersData?.data || usersData.data.length === 0} className="h-10 w-10">
+                <IconChevronLeft className="h-4 w-4" />
+              </Button>
+              <Combobox
+                options={userOptions}
+                value={selectedUserId || ""}
+                onValueChange={(value) => { const userId = Array.isArray(value) ? value[0] : value; handleUserChange(userId || ""); }}
+                placeholder={usersLoading ? "Carregando..." : "Selecione um funcionário"}
+                emptyText="Nenhum funcionário encontrado"
+                searchable={true}
+                className="w-96"
+                disabled={usersLoading}
+              />
+              <Button type="button" variant="outline" size="icon" onClick={handleNextUser} disabled={!usersData?.data || usersData.data.length === 0} className="h-10 w-10">
+                <IconChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-          </div>
+          )}
 
-          <div className="flex gap-2 shrink-0">
-            <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
-            <CalculationExport
-              filters={exportFilters}
-              currentItems={calculationRows}
-              totalRecords={calculationRows.length}
-              visibleColumns={visibleColumns}
-            />
+          {/* Right: period + dates + actions */}
+          <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-1">
+              <Button type="button" variant="outline" size="icon" onClick={handlePreviousMonth} className="h-10 w-10">
+                <IconChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex flex-col items-center px-2">
+                <div className="flex items-center gap-1 text-sm font-medium">
+                  <IconCalendar className="h-4 w-4" />
+                  <span className="capitalize">{monthName}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">Período: {period}</div>
+              </div>
+              <Button type="button" variant="outline" size="icon" onClick={handleNextMonth} className="h-10 w-10">
+                <IconChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <DateTimeInput mode="date" value={customStartDate} onChange={handleCustomStartDateChange} className="w-[140px]" placeholder="Data inicial" showClearButton={true} />
+              <span className="text-muted-foreground text-sm px-1">até</span>
+              <DateTimeInput mode="date" value={customEndDate} onChange={handleCustomEndDateChange} className="w-[140px]" placeholder="Data final" showClearButton={true} />
+            </div>
+
+            <div className="flex gap-2 shrink-0">
+              <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+              <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
+            </div>
           </div>
         </div>
 

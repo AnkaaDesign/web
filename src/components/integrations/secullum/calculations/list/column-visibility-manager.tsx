@@ -7,15 +7,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
 import { getHeaderText } from "@/components/ui/column-visibility-utils";
-import type { CalculationColumn } from "./calculation-table-columns";
 
 // Function to get default visible columns for calculations
 export function getDefaultVisibleColumns(): Set<string> {
   return new Set(["date", "entrada1", "saida1", "entrada2", "saida2", "normais", "ex50", "ex100", "dsr", "ajuste"]);
 }
 
+export interface ColumnDef {
+  key: string;
+  header: string | React.ReactNode;
+}
+
 interface ColumnVisibilityManagerProps {
-  columns: CalculationColumn[];
+  columns: ColumnDef[];
   visibleColumns: Set<string>;
   onVisibilityChange: (columns: Set<string>) => void;
 }
