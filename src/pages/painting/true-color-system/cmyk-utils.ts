@@ -26,6 +26,21 @@ export function rgbToCmyk(r: number, g: number, b: number): [number, number, num
   ];
 }
 
+/** CMYK representation of a color with K capped at 55%, redistributing excess into CMY. */
+export function rgbToCmykCap55(r: number, g: number, b: number): [number, number, number, number] {
+  const R = r / 255, G = g / 255, B = b / 255;
+  const kCanonical = 1 - Math.max(R, G, B);
+  const kCapped = Math.min(kCanonical, 0.55);
+  const denom = 1 - kCapped;
+  if (denom < 0.001) return [100, 100, 100, 55];
+  return [
+    Math.max(0, Math.min(100, Math.round(((1 - R - kCapped) / denom) * 100))),
+    Math.max(0, Math.min(100, Math.round(((1 - G - kCapped) / denom) * 100))),
+    Math.max(0, Math.min(100, Math.round(((1 - B - kCapped) / denom) * 100))),
+    Math.round(kCapped * 100),
+  ];
+}
+
 export function rgbToHex(r: number, g: number, b: number): string {
   return (
     "#" +

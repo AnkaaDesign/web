@@ -17,7 +17,6 @@ import {
   IconSearch,
   IconLink,
 } from "@tabler/icons-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -30,8 +29,8 @@ import { cmykToRgb, rgbToHex, buildRange, cellId, parseCellId, parseColorToRgb, 
 import { useColorGridCanvas, cellsInRect } from "./use-color-grid-canvas";
 import { ColorDetailDialog } from "./color-detail-dialog";
 
-// K (Black): 5% → 55%, Y (Yellow): 0% → 100%
-const K_LEVELS = Array.from({ length: 11 }, (_, i) => (i + 1) * 5);
+// K (Black): 5% → 100%, Y (Yellow): 0% → 100%
+const K_LEVELS = Array.from({ length: 20 }, (_, i) => (i + 1) * 5);
 const Y_LEVELS = Array.from({ length: 21 }, (_, i) => i * 5);
 
 const STEP_OPTIONS = [
@@ -777,25 +776,21 @@ export default function TrueColorSystemPage() {
                 variant="dark"
               />
 
-              {/* Link K↔Y: when checked, increasing K decreases Y and vice-versa */}
-              <div className="flex items-center gap-1.5">
-                <Checkbox
-                  id="link-ky"
-                  checked={linked}
-                  onCheckedChange={(v) => setLinked(v === true)}
-                />
-                <label
-                  htmlFor="link-ky"
-                  className={cn(
-                    "flex items-center gap-1 text-xs cursor-pointer select-none",
-                    linked ? "text-foreground font-medium" : "text-muted-foreground",
-                  )}
-                  title="Quando ativado, aumentar K diminui Y e vice-versa"
-                >
-                  <IconLink className="h-3.5 w-3.5" />
-                  Vincular
-                </label>
-              </div>
+              {/* Link K↔Y: when active, increasing K decreases Y and vice-versa */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-7 w-7",
+                  linked
+                    ? "text-primary hover:text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setLinked((v) => !v)}
+                title="Travar"
+              >
+                <IconLink className="h-5 w-5" />
+              </Button>
 
               {/* Y navigation */}
               <NavPill
@@ -809,26 +804,21 @@ export default function TrueColorSystemPage() {
               />
 
               {/* Color search */}
-              <div className="flex items-center gap-1">
-                <div className="relative">
-                  <IconSearch className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchValue}
-                    onChange={(e) => setSearchValue(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-                    placeholder="#HEX, RGB, CMYK..."
-                    className="h-8 w-[160px] rounded-md border border-border bg-transparent pl-7 pr-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSearch} disabled={!searchValue.trim()}>
-                  <IconSearch className="h-3.5 w-3.5" />
-                </Button>
+              <div className="relative">
+                <IconSearch className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
+                  placeholder="#HEX, RGB, CMYK..."
+                  className="h-8 w-[160px] rounded-md border border-border bg-transparent pl-7 pr-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                />
               </div>
 
               {/* Step — using Combobox */}
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">Passo:</span>
+                <span className="text-sm text-muted-foreground">Passo:</span>
                 <Combobox
                   value={String(step)}
                   onValueChange={(v) => { if (v) setStep(Number(v)); }}
@@ -931,21 +921,21 @@ export default function TrueColorSystemPage() {
                     {/* Wrapper that holds ticks, labels, and canvas */}
                     <div className="relative" style={{ maxWidth: "100%", maxHeight: "100%" }}>
                       {/* Axis label: MAGENTA → */}
-                      <div className="absolute -top-8 right-0 text-[10px] font-bold tracking-[0.16em] text-muted-foreground select-none print:text-[8px]">
+                      <div className="absolute -top-8 right-0 text-xs font-bold tracking-[0.16em] text-muted-foreground select-none print:text-[8px]">
                         MAGENTA &rarr;
                       </div>
 
                       {/* Axis label: ↓ CIANO */}
-                      <div className="absolute left-0 -bottom-5 text-[10px] font-bold tracking-[0.16em] text-muted-foreground select-none">
+                      <div className="absolute left-0 -bottom-5 text-xs font-bold tracking-[0.16em] text-muted-foreground select-none">
                         &darr; CIANO
                       </div>
 
                       {/* Top ticks (Magenta values) */}
-                      <div className="absolute -top-4 left-0 right-0 h-4 pointer-events-none">
+                      <div className="absolute -top-5 left-0 right-0 h-5 pointer-events-none">
                         {mVals.map((v, i) => (
                           <span
                             key={v}
-                            className="absolute bottom-0 -translate-x-1/2 text-[9px] font-semibold text-muted-foreground font-mono"
+                            className="absolute bottom-0 -translate-x-1/2 text-[11px] font-bold text-muted-foreground font-mono"
                             style={{ left: `${((i + 0.5) / mVals.length) * 100}%` }}
                           >
                             {v}
@@ -954,11 +944,11 @@ export default function TrueColorSystemPage() {
                       </div>
 
                       {/* Left ticks (Cyan values) */}
-                      <div className="absolute -left-7 top-0 bottom-0 w-6 pointer-events-none">
+                      <div className="absolute -left-8 top-0 bottom-0 w-7 pointer-events-none">
                         {cVals.map((v, i) => (
                           <span
                             key={v}
-                            className="absolute right-0 -translate-y-1/2 text-[9px] font-semibold text-muted-foreground font-mono"
+                            className="absolute right-0 -translate-y-1/2 text-[11px] font-bold text-muted-foreground font-mono"
                             style={{ top: `${((i + 0.5) / cVals.length) * 100}%` }}
                           >
                             {v}
@@ -1090,13 +1080,13 @@ function NavPill({
       </Button>
       <div
         className={cn(
-          "px-3 h-7 flex items-center gap-1 rounded-md text-xs font-medium shadow-sm min-w-[60px] justify-center",
+          "px-3 h-7 flex items-center gap-1 rounded-md text-sm font-semibold shadow-sm min-w-[60px] justify-center",
           variant === "dark"
             ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
             : "bg-amber-400 text-neutral-900",
         )}
       >
-        <span className="text-[10px] opacity-80">{label}</span>
+        <span className="text-xs opacity-80">{label}</span>
         <span>{value}%</span>
       </div>
       <Button
@@ -1127,7 +1117,7 @@ function RangeFilter({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs text-muted-foreground">{label}:</span>
+      <span className="text-sm text-muted-foreground">{label}:</span>
       <Input
         type="number"
         value={min}
@@ -1135,9 +1125,9 @@ function RangeFilter({
         max={100}
         step={5}
         onChange={(v) => onMinChange(String(v ?? 0))}
-        className="h-8 w-14 text-xs text-center"
+        className="h-8 w-14 text-sm text-center"
       />
-      <span className="text-xs text-muted-foreground">&ndash;</span>
+      <span className="text-sm text-muted-foreground">&ndash;</span>
       <Input
         type="number"
         value={max}
@@ -1145,9 +1135,9 @@ function RangeFilter({
         max={100}
         step={5}
         onChange={(v) => onMaxChange(String(v ?? 100))}
-        className="h-8 w-14 text-xs text-center"
+        className="h-8 w-14 text-sm text-center"
       />
-      <span className="text-xs text-muted-foreground">%</span>
+      <span className="text-sm text-muted-foreground">%</span>
     </div>
   );
 }
