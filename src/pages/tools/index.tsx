@@ -89,7 +89,6 @@ export function ToolsHubPage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Ferramentas"
-          subtitle="Conjunto de ferramentas auxiliares para uso interno"
           icon={IconTools}
           breadcrumbs={[
             { label: "Início", href: routes.home },

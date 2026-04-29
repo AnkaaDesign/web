@@ -142,7 +142,7 @@ export function PayrollCalculation({
 
   // Current calculation values (API returns live data for current period)
   const baseRemuneration = toNumber(payroll?.baseRemuneration);
-  const bonusValue = toNumber(payroll?.bonus?.baseBonus) || toNumber(payroll?.bonus?.finalValue);
+  const bonusValue = toNumber(payroll?.bonus?.netBonus) || toNumber(payroll?.bonus?.baseBonus);
   const grossSalary = baseRemuneration + bonusValue;
 
   // Calculate discounts

@@ -114,7 +114,7 @@ export function PayrollForm({
   const baseRemuneration = watchedValues.baseRemuneration || 0;
   // Note: bonusId is not part of the form schema, bonuses are linked separately via payrollId
   const selectedBonus = initialData?.bonus;
-  const bonusValue = toNumber(selectedBonus?.finalValue) || 0;
+  const bonusValue = toNumber(selectedBonus?.netBonus) || 0;
   const estimatedGrossSalary = baseRemuneration + bonusValue;
 
   const handleSubmit = (data: PayrollCreateFormData | PayrollUpdateFormData) => {
@@ -365,7 +365,7 @@ export function PayrollForm({
                       <div className="grid gap-2 text-sm">
                         <div className="flex justify-between">
                           <span>Valor final:</span>
-                          <span className="font-medium">{formatCurrency(toNumber(selectedBonus.finalValue))}</span>
+                          <span className="font-medium">{formatCurrency(toNumber(selectedBonus.netBonus))}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Valor base:</span>

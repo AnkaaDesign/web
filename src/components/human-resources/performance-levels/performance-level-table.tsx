@@ -16,8 +16,8 @@ import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { IconSelector, IconChevronUp, IconChevronDown } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useUserMutations, useUserBatchMutations } from "../../../hooks/human-resources/use-user";
+import { useBonusSimulation } from "../../../hooks/human-resources/use-bonus";
 import { formatCurrency, getCurrentPayrollPeriod } from "../../../utils";
-import { calculateBonusForPosition } from "../../../utils/bonus";
 import { bonusService } from "../../../api-client";
 import type { User } from "../../../types";
 
@@ -192,42 +192,47 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
     return taskQuantity / eligibleCount;
   }, [users, taskQuantity, userPerformanceLevels]);
 
-  // Calculate bonuses for all users on the frontend
+  // Bonus values come from the API's /bonus/simulate endpoint — the web
+  // frontend never recomputes the formula locally.
+  const simulationInput = useMemo(() => {
+    if (users.length === 0) return null;
+    return {
+      averageTasksPerUser,
+      users: users
+        .filter(u => u.position?.bonifiable === true)
+        .map(u => {
+          const performanceLevel =
+            pendingChanges.get(u.id) ??
+            userPerformanceLevels.get(u.id) ??
+            u.performanceLevel ??
+            0;
+          return {
+            id: u.id,
+            name: u.name,
+            positionName: u.position?.name,
+            performanceLevel,
+          };
+        }),
+    };
+  }, [users, averageTasksPerUser, pendingChanges, userPerformanceLevels]);
+
+  const { data: simulation } = useBonusSimulation(simulationInput, {
+    enabled: simulationInput !== null && simulationInput.users.length > 0,
+  });
+
   const bonusByUserId = useMemo(() => {
     const map = new Map<string, number>();
-
-    users.forEach(user => {
-      // Skip if position is not bonifiable
-      if (user.position?.bonifiable !== true) {
-        map.set(user.id, 0);
-        return;
+    if (simulation?.users) {
+      for (const u of simulation.users) {
+        if (u.id) map.set(u.id, u.bonus);
       }
-
-      const positionName = user.position?.name || "Pleno I";
-
-      // Use pending performance level if exists, otherwise use current level
-      const performanceLevel = pendingChanges.get(user.id) ??
-                               userPerformanceLevels.get(user.id) ??
-                               user.performanceLevel ??
-                               0;
-
-      if (performanceLevel === 0) {
-        map.set(user.id, 0);
-        return;
-      }
-
-      // Calculate bonus using the same function as bonus simulation
-      const bonus = calculateBonusForPosition(
-        positionName,
-        performanceLevel,
-        averageTasksPerUser
-      );
-
-      map.set(user.id, bonus);
+    }
+    // Default 0 for users not in the simulation (non-bonifiable / perf=0).
+    users.forEach(u => {
+      if (!map.has(u.id)) map.set(u.id, 0);
     });
-
     return map;
-  }, [users, taskQuantity, pendingChanges, userPerformanceLevels]);
+  }, [simulation, users]);
 
   // Calculate total bonus sum from all visible users
   const totalBonusSum = useMemo(() => {

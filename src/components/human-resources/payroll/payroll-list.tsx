@@ -60,8 +60,8 @@ const calculateNetSalary = (payroll: Payroll): number => {
   let netSalary = toNumber(payroll.baseRemuneration);
 
   // Add bonus if exists
-  if (payroll.bonus?.finalValue) {
-    netSalary += toNumber(payroll.bonus.finalValue);
+  if (payroll.bonus?.netBonus) {
+    netSalary += toNumber(payroll.bonus.netBonus);
   }
 
   // Subtract discounts
@@ -83,7 +83,7 @@ const getTotalDiscounts = (payroll: Payroll): number => {
   if (!payroll.discounts) return 0;
 
   let totalDiscounts = 0;
-  let baseAmount = toNumber(payroll.baseRemuneration) + toNumber(payroll.bonus?.finalValue);
+  let baseAmount = toNumber(payroll.baseRemuneration) + toNumber(payroll.bonus?.netBonus);
 
   for (const discount of payroll.discounts) {
     if (discount.value) {
@@ -266,7 +266,7 @@ export function PayrollList({ className }: PayrollListProps) {
     {
       key: "bonus",
       header: "Bônus",
-      accessor: (payroll) => formatCurrency(toNumber(payroll.bonus?.finalValue)),
+      accessor: (payroll) => formatCurrency(toNumber(payroll.bonus?.netBonus)),
       sortable: true,
       className: "text-right min-w-[120px]",
       align: "right",
@@ -363,7 +363,7 @@ export function PayrollList({ className }: PayrollListProps) {
     return payrolls.reduce((acc, payroll) => ({
       totalEmployees: acc.totalEmployees + 1,
       totalBaseRemuneration: acc.totalBaseRemuneration + toNumber(payroll.baseRemuneration),
-      totalBonuses: acc.totalBonuses + toNumber(payroll.bonus?.finalValue),
+      totalBonuses: acc.totalBonuses + toNumber(payroll.bonus?.netBonus),
       totalDiscounts: acc.totalDiscounts + getTotalDiscounts(payroll),
       totalNetSalary: acc.totalNetSalary + calculateNetSalary(payroll),
     }), {

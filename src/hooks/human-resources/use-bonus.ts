@@ -333,6 +333,129 @@ export const usePayroll = (
 };
 
 /**
+ * Bonus simulation — hits POST /bonus/simulate which runs the salary-based
+ * logistic algorithm on the API. The web frontend NEVER calculates bonuses
+ * client-side. Input shape mirrors the simulator UI.
+ */
+export interface SimulateInput {
+  averageTasksPerUser: number;
+  users: Array<{
+    id?: string;
+    name?: string;
+    positionName?: string;
+    positionId?: string;
+    sectorName?: string;
+    /** Either `salary` or `positionId` must be provided; the API resolves
+     * the salary from positionId when only that is given. */
+    salary?: number;
+    performanceLevel: number;
+  }>;
+  config?: {
+    k?: number;
+    x0?: number;
+    piso?: number;
+    pscale?: number;
+    ceil?: number;
+    adjustment?: number;
+  };
+  salaryRange?: { min: number; max: number };
+  b1Sweep?: {
+    salary: number;
+    performanceLevel: number;
+    min?: number;
+    max?: number;
+    steps?: number;
+  };
+}
+
+export interface SimulateResponseUser {
+  id?: string;
+  name?: string;
+  positionName?: string;
+  positionId?: string;
+  sectorName?: string;
+  salary: number;
+  performanceLevel: number;
+  bonus: number;
+  baseBonus: number;
+  ratio: number;
+  x: number;
+  anchor: number;
+  performanceMultiplier: number;
+}
+
+export interface SimulateResponse {
+  averageTasksPerUser: number;
+  salaryRange: { min: number; max: number };
+  config: { k: number; x0: number; piso: number; pscale: number; ceil: number; adjustment: number };
+  anchor: number;
+  users: SimulateResponseUser[];
+  totals: { totalBonus: number; userCount: number; eligibleCount: number };
+  b1Curve?: Array<{ b1: number; bonus: number }>;
+}
+
+export const useBonusSimulation = (
+  input: SimulateInput | null,
+  options?: { enabled?: boolean },
+) => {
+  return useQuery({
+    queryKey: ["bonus", "simulate", input],
+    queryFn: async () => {
+      if (!input) throw new Error("simulate input required");
+      const response = await bonusService.simulate(input);
+      const data = (response.data as any)?.data ?? response.data;
+      return data as SimulateResponse;
+    },
+    enabled: (options?.enabled ?? true) && input !== null && input.users.length >= 0,
+    staleTime: 1000 * 5, // 5s — algorithm is deterministic, cheap to recompute
+    gcTime: 1000 * 60, // 1 min
+  });
+};
+
+/**
+ * Read the period-level reajuste percentage (0 if not set).
+ */
+export const usePeriodAdjustment = (
+  year?: number,
+  month?: number,
+  options?: { enabled?: boolean },
+) => {
+  return useQuery({
+    queryKey: [...bonusKeys.all, "period-adjustment", year, month],
+    queryFn: async () => {
+      if (!year || !month) return { adjustment: 0 };
+      const response = await bonusService.getPeriodAdjustment(year, month);
+      const data = (response.data as any)?.data ?? response.data;
+      return data as { adjustment: number };
+    },
+    enabled: (options?.enabled ?? true) && !!year && !!month,
+    staleTime: 1000 * 30,
+  });
+};
+
+/**
+ * Apply a period-level reajuste. The API recomputes every saved bonus in
+ * the period with the new adjustment baked into the algorithm.
+ */
+export const useApplyPeriodAdjustment = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      year,
+      month,
+      percentage,
+    }: {
+      year: number;
+      month: number;
+      percentage: number;
+    }) => bonusService.applyPeriodAdjustment(year, month, percentage).then(r => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: bonusKeys.all });
+    },
+  });
+};
+
+/**
  * Hook to export payroll data as Excel file
  */
 export const useExportPayroll = () => {

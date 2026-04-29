@@ -31,7 +31,7 @@ import {
 import { formatCurrency, getBonusPeriod, getCurrentPayrollPeriod, formatDate } from "../../../utils";
 import { useUsers, useSectors } from "../../../hooks";
 import { bonusService } from "../../../api-client";
-import { calculateBonusForPosition } from "../../../utils/bonus";
+import { useBonusSimulation } from "../../../hooks/human-resources/use-bonus";
 import { cn } from "@/lib/utils";
 import { USER_STATUS } from "../../../constants";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
@@ -250,23 +250,9 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   useEffect(() => {
     if (usersData?.data) {
       if (usersData.data.length > 0) {
-        // Calculate initial average for bonus calculation
-        // Only count users that are truly eligible (bonifiable position + performanceLevel > 0)
-        const eligibleCount = usersData.data.filter(u =>
-          u.position?.bonifiable === true && (u.performanceLevel ?? 0) > 0
-        ).length;
-        const initialAverage = eligibleCount > 0 ? taskQuantity / eligibleCount : 0;
-
         const users = usersData.data.map(user => {
           const initialPosition = user.position?.name || "Pleno I";
           const initialPerformanceLevel = user.performanceLevel ?? 0;
-
-          // Calculate initial bonus immediately
-          const initialBonus = calculateBonusForPosition(
-            initialPosition,
-            initialPerformanceLevel,
-            initialAverage
-          );
 
           return {
             id: user.id,
@@ -279,7 +265,9 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
             sectorName: user.sector?.name || null,
             position: initialPosition,
             performanceLevel: initialPerformanceLevel,
-            bonusAmount: initialBonus
+            // Populated by the simulation sync effect once /bonus/simulate
+            // returns. Starts at 0 to avoid a flash of stale legacy values.
+            bonusAmount: 0,
           };
         }) as SimulatedUser[];
         setSimulatedUsers(users);
@@ -380,7 +368,9 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
 
       if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
+      // Stable tiebreaker by id so rows don't shuffle when bonus values
+      // are equal (common across users with the same position+perf level).
+      return a.id.localeCompare(b.id);
     });
 
     return sorted;
@@ -405,6 +395,53 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     if (eligibleUserCount === 0) return 0;
     return taskQuantity / eligibleUserCount;
   }, [taskQuantity, eligibleUserCount]);
+
+  // ============================================================
+  // Bonus calculation — runs server-side via /bonus/simulate.
+  // The web frontend never recomputes the formula locally.
+  // ============================================================
+  const simulationInput = useMemo(
+    () =>
+      simulatedUsers.length === 0
+        ? null
+        : {
+            averageTasksPerUser,
+            users: simulatedUsers.map(u => ({
+              id: u.id,
+              name: u.name,
+              positionName: u.position,
+              sectorName: u.sectorName ?? undefined,
+              performanceLevel: u.performanceLevel,
+            })),
+          },
+    [simulatedUsers, averageTasksPerUser],
+  );
+  const { data: simulation } = useBonusSimulation(simulationInput, {
+    enabled: simulationInput !== null,
+  });
+  const bonusByUserId = useMemo(() => {
+    const map = new Map<string, number>();
+    if (simulation?.users) {
+      for (const u of simulation.users) {
+        if (u.id) map.set(u.id, u.bonus);
+      }
+    }
+    return map;
+  }, [simulation]);
+  // Sync simulation results back into the simulatedUsers state's `bonusAmount`
+  // field so the existing render/sort/export code keeps working unchanged.
+  useEffect(() => {
+    if (!simulation?.users) return;
+    setSimulatedUsers(prev => {
+      const next = prev.map(u => {
+        const newBonus = bonusByUserId.get(u.id) ?? 0;
+        return Math.abs(u.bonusAmount - newBonus) < 0.005 ? u : { ...u, bonusAmount: newBonus };
+      });
+      // Reference equality short-circuit if nothing changed.
+      const changed = next.some((u, i) => u !== prev[i]);
+      return changed ? next : prev;
+    });
+  }, [simulation, bonusByUserId]);
 
   const totalBonusAmount = useMemo(() =>
     sortedUsers.reduce((sum, user) => sum + user.bonusAmount, 0),
@@ -433,36 +470,23 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
     }
   }, [taskQuantity, eligibleUserCount, averageInput]);
 
-  // Effect 2: Recalculate bonuses when average or filtered users change
+  // Effect 2: Zero out bonuses for users excluded by filters.
+  // Inclusion-based bonus values are populated by the /bonus/simulate sync effect.
   useEffect(() => {
-    if (filteredUsers.length === 0) {
-      return;
-    }
-
-    const currentAverage = eligibleUserCount > 0 ? taskQuantity / eligibleUserCount : 0;
-
-    // Only update bonuses if needed (avoid unnecessary recalculations)
+    if (filteredUsers.length === 0) return;
+    const filteredIds = new Set(filteredUsers.map(u => u.id));
     setSimulatedUsers(prev => {
-      // Check if any updates are needed
-      const needsUpdate = prev.some(user => {
-        const expectedBonus = filteredUsers.find(f => f.id === user.id) ?
-          calculateBonusForPosition(user.position, user.performanceLevel, currentAverage) :
-          0;
-        return Math.abs(user.bonusAmount - expectedBonus) > 0.01; // Allow small rounding differences
-      });
-
-      if (!needsUpdate) return prev;
-
-      return prev.map(user => {
-        const isFiltered = filteredUsers.find(f => f.id === user.id);
-        if (!isFiltered) {
+      let changed = false;
+      const next = prev.map(user => {
+        if (!filteredIds.has(user.id) && user.bonusAmount !== 0) {
+          changed = true;
           return { ...user, bonusAmount: 0 };
         }
-        const bonus = calculateBonusForPosition(user.position, user.performanceLevel, currentAverage);
-        return { ...user, bonusAmount: bonus };
+        return user;
       });
+      return changed ? next : prev;
     });
-  }, [taskQuantity, filteredUsers, eligibleUserCount]);
+  }, [filteredUsers]);
 
   // Handlers
   const handleTaskQuantityChange = (e: React.ChangeEvent<HTMLInputElement> | string) => {
@@ -564,24 +588,18 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
       : <IconArrowDown className="h-4 w-4" />;
   };
 
+  // Position / performance changes only update the input fields. The bonus
+  // value is recomputed by the /bonus/simulate hook + sync effect above.
   const handlePositionChange = (userId: string, newPosition: string) => {
-    setSimulatedUsers(prev => prev.map(user => {
-      if (user.id === userId) {
-        const bonus = calculateBonusForPosition(newPosition, user.performanceLevel, averageTasksPerUser);
-        return { ...user, position: newPosition, bonusAmount: bonus };
-      }
-      return user;
-    }));
+    setSimulatedUsers(prev =>
+      prev.map(user => (user.id === userId ? { ...user, position: newPosition } : user)),
+    );
   };
 
   const handlePerformanceLevelChange = (userId: string, newLevel: number) => {
-    setSimulatedUsers(prev => prev.map(user => {
-      if (user.id === userId) {
-        const bonus = calculateBonusForPosition(user.position, newLevel, averageTasksPerUser);
-        return { ...user, performanceLevel: newLevel, bonusAmount: bonus };
-      }
-      return user;
-    }));
+    setSimulatedUsers(prev =>
+      prev.map(user => (user.id === userId ? { ...user, performanceLevel: newLevel } : user)),
+    );
   };
 
   const hasActiveFilters =

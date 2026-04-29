@@ -5,13 +5,15 @@ import type { TimeClockEntry, SecullumTimeEntry } from "@/types/time-clock";
 import { normalizeSecullumEntry } from "@/types/time-clock";
 import type { TimeClockEntryBatchUpdateFormData } from "../../../schemas";
 import { timeClockEntryBatchUpdateSchema } from "../../../schemas";
-import { useTimeClockEntryBatchUpdateWithJustification } from "../../../hooks";
+import { useTimeClockEntryBatchUpdateWithJustification, useSecullumJustifications } from "../../../hooks";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDate } from "../../../utils";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { TransparentTimeInput } from "@/components/ui/transparent-time-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TimeClockJustificationDialog } from "./time-clock-justification-dialog";
+import { AddJustificationDialog } from "./add-justification-dialog";
 import { TimeClockEntryDetailModal } from "./time-clock-entry-detail-modal";
 import { PhotoViewDialog } from "./photo-view-dialog";
 import { LocationMapDialog } from "./location-map-dialog";
@@ -33,6 +35,8 @@ import { secullumService } from "../../../api-client";
 import { toast } from "@/components/ui/sonner";
 import { useTimeClockStateManager } from "./state";
 import type { LocationData, PendingJustification } from "./types";
+import { useQueryClient } from "@tanstack/react-query";
+import { secullumKeys } from "../../../hooks/integrations/use-secullum";
 
 interface TimeClockEntryTableProps {
   entries: SecullumTimeEntry[];
@@ -85,9 +89,23 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: TimeClockEntry; field?: string } | null>(null);
   const [photoDialog, setPhotoDialog] = useState<{ userId: number; fonteDadosId: number } | null>(null);
   const [locationDialog, setLocationDialog] = useState<LocationData | null>(null);
+  const [addJustificationTarget, setAddJustificationTarget] = useState<{ entry: TimeClockEntry; field?: string } | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const { isPending } = useTimeClockEntryBatchUpdateWithJustification();
+  const queryClient = useQueryClient();
+
+  // Justification short-name → long-name lookup, used to render the tooltip on
+  // cells that hold an absence code (e.g. "ATESTAD" → "ATESTADO MÉDICO").
+  const { data: justificationsResp } = useSecullumJustifications();
+  const justificationFullNameMap = useMemo(() => {
+    const list = (justificationsResp?.data?.data ?? []) as Array<{ NomeAbreviado: string; NomeCompleto: string | null }>;
+    const map = new Map<string, string>();
+    for (const j of list) {
+      if (j.NomeCompleto) map.set(j.NomeAbreviado.trim(), j.NomeCompleto);
+    }
+    return map;
+  }, [justificationsResp]);
 
   // Keep original entries for comparison
   const originalNormalizedEntries = useMemo(() => {
@@ -459,8 +477,18 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
 
         if (response.data?.success) {
           toast.success(response.data.message || `${changedEntries.length} registros salvos com sucesso`);
+          // Clear modification highlights. The form already shows the saved values,
+          // so do NOT reset to defaultFormData — that's still derived from the stale
+          // `entries` prop and would snap cells back to their pre-move column.
+          // Invalidate the time-entries query so the refetched data updates `entries`,
+          // and the `entriesSignature` effect will reset the form to fresh values.
           stateManager.actions.restoreAll();
-          form.reset(defaultFormData);
+          // Use the bare prefix instead of secullumKeys.timeEntries() — calling
+          // it with no args produces ['secullum','time-entries',undefined], and
+          // React Query's partialMatchKey rejects matches against
+          // ['secullum','time-entries',{params}] because typeof undefined
+          // !== typeof object. Prefix-only matches all parameterised variants.
+          await queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "time-entries"] });
         } else {
           toast.error(response.data?.message || "Erro ao salvar alterações");
         }
@@ -470,7 +498,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
         console.error("Save error:", error);
       }
     },
-    [stateManager.actions, form, defaultFormData, entries],
+    [stateManager.actions, form, defaultFormData, entries, queryClient],
   );
 
   const handleRestore = useCallback(() => {
@@ -627,15 +655,121 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
     [originalNormalizedEntries, form, stateManager.actions],
   );
 
-  const handleReleaseJustification = useCallback(() => {
-    toast.info("Liberar justificativa");
+  // Open the "Adicionar Justificativa" dialog for the right-clicked cell. The
+  // pair (entry/exit) is preserved on the target so we know what to fill on
+  // confirm — Secullum stores absences across the entry+exit pair (HAR shows
+  // both Entrada2 and Saida2 set to "ATESTAD" when adding a single justification).
+  const handleOpenAddJustification = useCallback(() => {
+    if (!contextMenu) return;
+    setAddJustificationTarget({ entry: contextMenu.entry, field: contextMenu.field });
     setContextMenu(null);
+  }, [contextMenu]);
+
+  // Resolve the paired field for a given time field — entry1↔exit1, entry2↔exit2, etc.
+  const getPairedField = useCallback((field: string): string | null => {
+    if (field.startsWith("entry")) return "exit" + field.slice("entry".length);
+    if (field.startsWith("exit")) return "entry" + field.slice("exit".length);
+    return null;
   }, []);
 
+  const handleConfirmAddJustification = useCallback(
+    (nomeAbreviado: string) => {
+      if (!addJustificationTarget) return;
+      const { entry, field } = addJustificationTarget;
+      const entryIndex = originalNormalizedEntries.findIndex((e) => e.id === entry.id);
+      if (entryIndex === -1) {
+        toast.error("Registro não encontrado");
+        setAddJustificationTarget(null);
+        return;
+      }
+
+      const targets: string[] = [];
+      if (field) {
+        targets.push(field);
+        const paired = getPairedField(field);
+        if (paired) targets.push(paired);
+      } else {
+        // Row-level: fill the first empty entry/exit pair.
+        const ALL = ["entry1", "exit1", "entry2", "exit2", "entry3", "exit3", "entry4", "exit4", "entry5", "exit5"];
+        const firstEmpty = ALL.find((f) => !form.getValues(`entries.${entryIndex}.${f}` as any));
+        if (firstEmpty) {
+          targets.push(firstEmpty);
+          const paired = getPairedField(firstEmpty);
+          if (paired) targets.push(paired);
+        }
+      }
+
+      if (targets.length === 0) {
+        toast.warning("Nenhum campo disponível para a justificativa");
+        setAddJustificationTarget(null);
+        return;
+      }
+
+      const originalEntry = originalNormalizedEntries[entryIndex];
+      for (const t of targets) {
+        form.setValue(`entries.${entryIndex}.${t}` as any, nomeAbreviado, {
+          shouldValidate: false,
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+        const originalValue = originalEntry[t as keyof typeof originalEntry];
+        stateManager.actions.updateField(entry.id, t, nomeAbreviado, originalValue);
+      }
+
+      toast.success(`Justificativa "${nomeAbreviado.trim()}" adicionada — clique em salvar para enviar`);
+      setAddJustificationTarget(null);
+    },
+    [addJustificationTarget, originalNormalizedEntries, form, stateManager.actions, getPairedField],
+  );
+
+  // Clear the targeted cell. Per delete_value.har, Secullum receives the cleared
+  // cell as "" (the existing handleSubmit converts null → "" for fields that
+  // were originally filled). When the value is a justification (non-time text),
+  // clear the paired entry/exit slot too — that's how Secullum's UI behaves and
+  // how the HAR was captured.
   const handleDeleteEntry = useCallback(() => {
-    toast.info("Excluir registro");
+    if (!contextMenu) return;
+    const { entry, field } = contextMenu;
+    if (!field) {
+      setContextMenu(null);
+      return;
+    }
+    const entryIndex = originalNormalizedEntries.findIndex((e) => e.id === entry.id);
+    if (entryIndex === -1) {
+      setContextMenu(null);
+      return;
+    }
+
+    const currentValue = form.getValues(`entries.${entryIndex}.${field}` as any) as string | null;
+    if (!currentValue) {
+      setContextMenu(null);
+      return;
+    }
+
+    const isTimeValue = /^\d{1,2}:\d{2}$/.test(currentValue);
+    const targets: string[] = [field];
+    if (!isTimeValue) {
+      const paired = getPairedField(field);
+      if (paired) {
+        const pairedValue = form.getValues(`entries.${entryIndex}.${paired}` as any) as string | null;
+        if (pairedValue) targets.push(paired);
+      }
+    }
+
+    const originalEntry = originalNormalizedEntries[entryIndex];
+    for (const t of targets) {
+      form.setValue(`entries.${entryIndex}.${t}` as any, null, {
+        shouldValidate: false,
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+      const originalValue = originalEntry[t as keyof typeof originalEntry];
+      stateManager.actions.updateField(entry.id, t, null, originalValue);
+    }
+
+    toast.success(targets.length > 1 ? "Justificativa removida — clique em salvar para enviar" : "Valor removido — clique em salvar para enviar");
     setContextMenu(null);
-  }, []);
+  }, [contextMenu, originalNormalizedEntries, form, stateManager.actions, getPairedField]);
 
   const handleViewLocation = useCallback((entry: TimeClockEntry) => {
     const locationData: LocationData = {
@@ -687,7 +821,13 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
   useImperativeHandle(
     ref,
     () => ({
-      handleSubmit: () => form.handleSubmit(handleSubmit)(),
+      handleSubmit: () => form.handleSubmit(handleSubmit, (errors) => {
+        // react-hook-form swallows invalid submits silently otherwise — surface
+        // a toast so cells that fail schema validation (e.g. malformed time)
+        // don't look like a no-op save.
+        console.warn("Time-clock form validation errors", errors);
+        toast.error("Há campos com formato inválido. Verifique os horários e justificativas.");
+      })(),
       handleRestore: () => handleRestore(),
       hasChanges: stateManager.actions.getChangedEntryCount() > 0,
       isPending,
@@ -718,7 +858,13 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
   return (
     <div className={cn("flex flex-col h-full overflow-hidden", className)} ref={tableRef}>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 overflow-hidden flex flex-col">
+        <form onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+        // react-hook-form swallows invalid submits silently otherwise — surface
+        // a toast so cells that fail schema validation (e.g. malformed time)
+        // don't look like a no-op save.
+        console.warn("Time-clock form validation errors", errors);
+        toast.error("Há campos com formato inválido. Verifique os horários e justificativas.");
+      })} className="flex-1 overflow-hidden flex flex-col">
           <div className="flex-1 overflow-auto border border-neutral-400 dark:border-border rounded-md">
             <table className="w-full border-collapse">
               <thead className="sticky top-0 z-20 bg-background">
@@ -756,7 +902,6 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       className={cn(
                         "border-b border-neutral-400 dark:border-border transition-colors",
                         isWeekend && "bg-red-50 dark:bg-red-900/10",
-                        !isWeekend && index % 2 === 0 && "bg-muted/50",
                       )}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -782,8 +927,17 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       {/* Time inputs */}
                       {["entry1", "exit1", "entry2", "exit2", "entry3", "exit3", "entry4", "exit4", "entry5", "exit5"].filter(isVisible).map((timeField) => {
                         const isModified = isFieldModified(field.id, timeField);
-                        const rawEntry = entries.find((e: any) => String(e.Id) === field.id || String(e.id) === field.id);
+                        // `field.id` is react-hook-form's auto-generated key, not
+                        // Secullum's numeric Id — match by the normalized entry id
+                        // (which is `String(secullumEntry.Id)`) so we actually find
+                        // the row carrying the FonteDados metadata.
+                        const rawEntry = entries.find((e: any) => String(e.Id) === entry.id || String(e.id) === entry.id);
                         const isManual = isManualEntry(rawEntry, timeField);
+                        const fonteDadosKey = FONTE_DADOS_FIELD_MAP[timeField];
+                        const manualMotivo: string | null =
+                          isManual && fonteDadosKey && (rawEntry as any)?.[fonteDadosKey]?.Motivo
+                            ? String((rawEntry as any)[fonteDadosKey].Motivo)
+                            : null;
                         // The move arrows must respect the absolute column index
                         // (entry1=0 ... exit5=9), not just whether the cell has a
                         // value. Otherwise entry1 shows a left chevron with no slot
@@ -800,17 +954,22 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                             onContextMenu={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              // Only show context menu if cell has a value
-                              const cellValue = form.getValues(`entries.${index}.${timeField}` as any);
-                              if (cellValue) {
-                                handleContextMenu(e, entry, timeField);
-                              }
+                              // Open the context menu regardless of whether the
+                              // cell has a value — empty cells still need access
+                              // to "Liberar justificativa" so the user can record
+                              // an absence reason. Move/delete/photo/location
+                              // options are gated below.
+                              handleContextMenu(e, entry, timeField);
                             }}
                           >
                             <FormField
                               control={form.control}
                               name={`entries.${index}.${timeField}` as any}
-                              render={({ field: formField }) => (
+                              render={({ field: formField }) => {
+                                const cellValue = formField.value as string | null;
+                                const isJustification = !!cellValue && !/^\d{1,2}:\d{2}$/.test(cellValue);
+                                const justificationFullName = isJustification ? justificationFullNameMap.get((cellValue || "").trim()) : null;
+                                return (
                                 <FormItem>
                                   <FormControl>
                                     <div className="flex items-center gap-0.5 justify-center min-w-[100px]">
@@ -821,23 +980,39 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                                           </Button>
                                         )}
                                       </div>
-                                      <TransparentTimeInput
-                                        value={formField.value as string | null}
-                                        onChange={(value) => {
-                                          formField.onChange(value);
-                                          handleTimeChange(field.id, timeField, value);
-                                        }}
-                                        onBlur={() =>
-                                          handleTimeBlur(
-                                            field.id,
-                                            timeField,
-                                            timeField.replace("entry", "Entrada ").replace("exit", "Saída "),
-                                            entry[timeField as keyof TimeClockEntry] as string | null,
-                                            formField.value as string | null,
-                                          )
-                                        }
-                                        className="h-8 w-14 text-center px-1 flex-shrink-0"
-                                      />
+                                      {isJustification ? (
+                                        <Tooltip delayDuration={500}>
+                                          <TooltipTrigger asChild>
+                                            <div className="h-8 px-2 flex items-center justify-center text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400 cursor-default whitespace-nowrap select-none">
+                                              {cellValue?.trim()}
+                                            </div>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="top" className="max-w-[280px]">
+                                            <div className="space-y-0.5">
+                                              <div className="font-semibold">{cellValue?.trim()}</div>
+                                              {justificationFullName && <div className="text-xs opacity-90">{justificationFullName}</div>}
+                                            </div>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      ) : (
+                                        <TransparentTimeInput
+                                          value={cellValue}
+                                          onChange={(value) => {
+                                            formField.onChange(value);
+                                            handleTimeChange(field.id, timeField, value);
+                                          }}
+                                          onBlur={() =>
+                                            handleTimeBlur(
+                                              field.id,
+                                              timeField,
+                                              timeField.replace("entry", "Entrada ").replace("exit", "Saída "),
+                                              entry[timeField as keyof TimeClockEntry] as string | null,
+                                              cellValue,
+                                            )
+                                          }
+                                          className="h-8 w-14 text-center px-1 flex-shrink-0"
+                                        />
+                                      )}
                                       <div className="w-6 flex justify-center">
                                         {formField.value && canMoveRight && (
                                           <Button type="button" variant="ghost" size="icon" className="h-6 w-6 p-0" onClick={() => handleTimeShift(field.id, timeField, "right")}>
@@ -846,12 +1021,23 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                                         )}
                                       </div>
                                       {isManual && formField.value && (
-                                        <PencilIcon className="h-3 w-3 text-amber-500 flex-shrink-0" title="Entrada manual" />
+                                        <Tooltip delayDuration={500}>
+                                          <TooltipTrigger asChild>
+                                            <PencilIcon className="h-4 w-4 text-rose-500 dark:text-rose-400 flex-shrink-0 cursor-default" strokeWidth={2.5} />
+                                          </TooltipTrigger>
+                                          <TooltipContent side="top" className="max-w-[280px]">
+                                            <div className="space-y-0.5">
+                                              <div className="font-semibold">Inclusão manual</div>
+                                              {manualMotivo && <div className="text-xs opacity-90">{manualMotivo}</div>}
+                                            </div>
+                                          </TooltipContent>
+                                        </Tooltip>
                                       )}
                                     </div>
                                   </FormControl>
                                 </FormItem>
-                              )}
+                                );
+                              }}
                             />
                           </td>
                         );
@@ -907,7 +1093,16 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
       </Form>
 
       {/* Context Menu */}
-      {contextMenu && (
+      {contextMenu && (() => {
+        // Determine whether the targeted cell has a value. Field-level right-click
+        // → check that specific cell. Row-level right-click (date column, no field)
+        // → treat as having content if any time slot in the row is filled.
+        const ctxIndex = originalNormalizedEntries.findIndex((e) => e.id === contextMenu.entry.id);
+        const ALL_TIME_FIELDS = ["entry1", "exit1", "entry2", "exit2", "entry3", "exit3", "entry4", "exit4", "entry5", "exit5"] as const;
+        const hasValue = contextMenu.field
+          ? Boolean(form.getValues(`entries.${ctxIndex}.${contextMenu.field}` as any))
+          : ctxIndex !== -1 && ALL_TIME_FIELDS.some((f) => Boolean(form.getValues(`entries.${ctxIndex}.${f}` as any)));
+        return (
         <div
           className="fixed z-50"
           style={{
@@ -915,43 +1110,54 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
             top: contextMenu.y,
           }}
         >
-          <DropdownMenu open={!!contextMenu} onOpenChange={() => setContextMenu(null)}>
+          <DropdownMenu
+            open={!!contextMenu}
+            onOpenChange={(open) => {
+              if (!open) setContextMenu(null);
+            }}
+            modal={false}
+          >
             <DropdownMenuTrigger asChild>
               <div className="opacity-0 pointer-events-none w-1 h-1" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" side="bottom" className="min-w-56">
-              <DropdownMenuItem onClick={handleReleaseJustification}>
+              <DropdownMenuItem onClick={handleOpenAddJustification}>
                 <FileText className="h-4 w-4 mr-2" />
-                Liberar justificativa
+                Adicionar Justificativa
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleDeleteEntry}>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Excluir
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleMoveToPreviousDay(contextMenu.entry, contextMenu.field)}>
-                <MoveUp className="h-4 w-4 mr-2" />
-                Mover para dia anterior
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleMoveToNextDay(contextMenu.entry, contextMenu.field)}>
-                <MoveDown className="h-4 w-4 mr-2" />
-                Mover para próximo dia
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleViewLocation(contextMenu.entry)}>
-                <MapPin className="h-4 w-4 mr-2" />
-                Ver localização no mapa
-              </DropdownMenuItem>
-              {contextMenu.entry.hasPhoto && (
-                <DropdownMenuItem onClick={() => handleViewPhoto(contextMenu.entry)}>
-                  <Camera className="h-4 w-4 mr-2" />
-                  Ver foto
-                </DropdownMenuItem>
+              {hasValue && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleDeleteEntry}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleMoveToPreviousDay(contextMenu.entry, contextMenu.field)}>
+                    <MoveUp className="h-4 w-4 mr-2" />
+                    Mover para dia anterior
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleMoveToNextDay(contextMenu.entry, contextMenu.field)}>
+                    <MoveDown className="h-4 w-4 mr-2" />
+                    Mover para próximo dia
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleViewLocation(contextMenu.entry)}>
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Ver localização no mapa
+                  </DropdownMenuItem>
+                  {contextMenu.entry.hasPhoto && (
+                    <DropdownMenuItem onClick={() => handleViewPhoto(contextMenu.entry)}>
+                      <Camera className="h-4 w-4 mr-2" />
+                      Ver foto
+                    </DropdownMenuItem>
+                  )}
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      )}
+        );
+      })()}
 
       <TimeClockJustificationDialog
         open={!!pendingJustification}
@@ -969,6 +1175,17 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
       {photoDialog && <PhotoViewDialog isOpen={!!photoDialog} onClose={() => setPhotoDialog(null)} userId={photoDialog.userId} fonteDadosId={photoDialog.fonteDadosId} />}
 
       {locationDialog && <LocationMapDialog isOpen={!!locationDialog} onClose={() => setLocationDialog(null)} location={locationDialog} />}
+
+      <AddJustificationDialog
+        open={!!addJustificationTarget}
+        onOpenChange={(open) => !open && setAddJustificationTarget(null)}
+        onConfirm={handleConfirmAddJustification}
+        fieldLabel={
+          addJustificationTarget?.field
+            ? addJustificationTarget.field.replace("entry", "Entrada ").replace("exit", "Saída ")
+            : "do dia"
+        }
+      />
     </div>
   );
 };

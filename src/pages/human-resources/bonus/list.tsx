@@ -11,7 +11,20 @@ import {
   IconCalculator,
   IconAlertCircle,
   IconUsers,
+  IconAdjustments,
 } from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/sonner";
+import { useApplyPeriodAdjustment, usePeriodAdjustment } from "@/hooks/human-resources/use-bonus";
 import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -772,6 +785,50 @@ export default function BonusListPage() {
   const hasActiveFilters = activeFiltersCount > 0;
   const hasError = !!error;
 
+  // Period reajuste — only applicable when a single period is selected.
+  const singlePeriod =
+    filters.year && filters.months && filters.months.length === 1
+      ? { year: filters.year, month: parseInt(filters.months[0], 10) }
+      : null;
+  const { data: currentAdjustment } = usePeriodAdjustment(singlePeriod?.year, singlePeriod?.month, {
+    enabled: !!singlePeriod,
+  });
+  const applyPeriodAdjustment = useApplyPeriodAdjustment();
+  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
+  const [adjustmentInput, setAdjustmentInput] = useState("");
+
+  const openAdjustmentModal = () => {
+    if (!singlePeriod) return;
+    setAdjustmentInput(currentAdjustment ? String(currentAdjustment.adjustment) : "");
+    setAdjustmentModalOpen(true);
+  };
+
+  const submitAdjustment = async () => {
+    if (!singlePeriod) return;
+    const parsed = parseFloat(adjustmentInput.replace(",", "."));
+    if (!Number.isFinite(parsed)) {
+      toast.error("Informe um percentual válido.");
+      return;
+    }
+    if (parsed < -100 || parsed > 100) {
+      toast.error("Reajuste deve estar entre -100% e +100%.");
+      return;
+    }
+    try {
+      const res: any = await applyPeriodAdjustment.mutateAsync({
+        year: singlePeriod.year,
+        month: singlePeriod.month,
+        percentage: parsed,
+      });
+      toast.success(
+        res?.message || `Reajuste de ${parsed > 0 ? "+" : ""}${parsed}% aplicado ao período.`,
+      );
+      setAdjustmentModalOpen(false);
+    } catch (err: any) {
+      toast.error(err?.message || "Falha ao aplicar reajuste.");
+    }
+  };
+
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
@@ -791,7 +848,21 @@ export default function BonusListPage() {
             }
             return "Visualização de bônus com cálculos de tarefas e bonificações";
           })()}
-          actions={[]}
+          actions={[
+            {
+              key: "adjustment",
+              label: currentAdjustment && currentAdjustment.adjustment !== 0
+                ? `Reajuste: ${currentAdjustment.adjustment > 0 ? "+" : ""}${currentAdjustment.adjustment}%`
+                : "Aplicar Reajuste",
+              icon: IconAdjustments,
+              onClick: openAdjustmentModal,
+              variant: "outline",
+              disabled: !singlePeriod,
+              tooltip: !singlePeriod
+                ? "Selecione um único mês para aplicar o reajuste"
+                : "Aplica um % de ajuste para todo o período (recalcula todos os bônus)",
+            } as any,
+          ]}
         />
 
         {hasError && (
@@ -894,6 +965,59 @@ export default function BonusListPage() {
           onApplyFilters={handleApplyFilters}
         />
       </div>
+
+      <Dialog open={adjustmentModalOpen} onOpenChange={(o) => !o && setAdjustmentModalOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconAdjustments className="h-5 w-5 text-primary" />
+              Aplicar Reajuste do Período
+            </DialogTitle>
+            <DialogDescription>
+              Define um percentual de reajuste para o período inteiro. O algoritmo recalcula
+              todos os bônus do período com este ajuste embutido. Use 0 para remover.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="period-adjustment-percentage">Percentual (%)</Label>
+              <Input
+                id="period-adjustment-percentage"
+                type="text"
+                inputMode="decimal"
+                placeholder="ex: 5 ou -3"
+                value={adjustmentInput}
+                onChange={(v: any) =>
+                  setAdjustmentInput(typeof v === "string" ? v : v?.target?.value ?? "")
+                }
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Aceita valores entre -100 e +100. Use vírgula ou ponto para decimais.
+                {singlePeriod
+                  ? ` Aplicado a ${singlePeriod.month
+                      .toString()
+                      .padStart(2, "0")}/${singlePeriod.year}.`
+                  : ""}
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAdjustmentModalOpen(false)}
+              disabled={applyPeriodAdjustment.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={submitAdjustment} disabled={applyPeriodAdjustment.isPending}>
+              {applyPeriodAdjustment.isPending ? "Aplicando..." : "Aplicar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PrivilegeRoute>
   );
 }

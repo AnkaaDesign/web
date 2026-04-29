@@ -538,8 +538,12 @@ export default function BonusDetailPage() {
                           title="Ver regra"
                         >
                           <div className="flex justify-between items-start gap-2">
-                            <span className="text-sm text-muted-foreground group-hover:text-foreground flex items-center gap-1">
+                            <span className="text-sm text-muted-foreground group-hover:text-foreground flex items-center gap-1 flex-wrap">
                               {label}
+                              {/* Single date stays inline; multiple dates break to a column below. */}
+                              {dates.length === 1 && (
+                                <span className="text-xs text-muted-foreground/70">{dates[0]}</span>
+                              )}
                               <IconInfoCircle className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-50 transition-opacity" />
                             </span>
                             <span className="text-sm font-medium text-destructive shrink-0">
@@ -548,7 +552,7 @@ export default function BonusDetailPage() {
                                 : formatCurrency(Number(discount.value) || 0)}
                             </span>
                           </div>
-                          {dates.length > 0 && (
+                          {dates.length > 1 && (
                             <div className="mt-0.5 pl-0.5 flex flex-col gap-0.5">
                               {dates.map((date, i) => (
                                 <span key={i} className="text-xs text-muted-foreground/70">

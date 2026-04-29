@@ -31,3 +31,10 @@ export const STANDARD_WORKDAY = "08:45";
 
 /** CLT Art. 64 — monthly divisor uses 30 days (including paid weekly rest). */
 export const STANDARD_DIVISOR_DAYS = 30;
+
+/**
+ * Monthly hours divisor used to derive the hourly rate from a monthly salary
+ * (hourlyRate = monthlySalary / STANDARD_MONTHLY_HOURS). Hardcoded at 220h —
+ * the company-standard reference regardless of the daily workday pattern.
+ */
+export const STANDARD_MONTHLY_HOURS = 220;

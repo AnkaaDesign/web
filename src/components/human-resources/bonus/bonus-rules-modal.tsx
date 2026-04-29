@@ -14,6 +14,7 @@ import {
   IconCalendarOff,
   IconHeartbeat,
   IconCheckbox,
+  IconBan,
 } from "@tabler/icons-react";
 
 interface BonusRulesModalProps {
@@ -28,6 +29,7 @@ function detectSection(ref?: string): string | null {
   if (lower.includes("falta")) return "faltas";
   if (lower.includes("atestado")) return "atestado";
   if (lower.includes("assiduidade")) return "assiduidade";
+  if (lower.includes("suspensa") || lower.includes("suspens")) return "suspensas";
   return null;
 }
 
@@ -139,6 +141,24 @@ export function BonusRulesModal({ open, onClose, highlightReference }: BonusRule
               <IconTrendingDown className="h-3.5 w-3.5 text-destructive" />
               Descontos
             </p>
+
+            <Section
+              icon={IconBan}
+              title="Tarefas Suspensas"
+              badge="Excluído do cálculo"
+              badgeClassName="bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400"
+              highlighted={highlighted === "suspensas"}
+            >
+              <p>
+                Quando uma tarefa é marcada com <strong className="text-foreground">comissão suspensa</strong>, ela é <strong className="text-destructive">removida do cálculo do bônus</strong>.
+              </p>
+              <p>
+                Tarefas suspensas <strong className="text-foreground">não contam</strong> na média ponderada por colaborador e portanto não geram bônus para nenhum dos elegíveis. O valor que seria recebido por aquela tarefa aparece como <strong className="text-foreground">desconto "Tarefas Suspensas"</strong> no bônus.
+              </p>
+              <p className="text-xs italic">
+                Tarefas com <strong className="text-foreground">comissão integral</strong> contam como 1.0 e <strong className="text-foreground">comissão parcial</strong> conta como 0.5 na ponderação. <strong className="text-foreground">Sem comissão</strong> e <strong className="text-foreground">suspensa</strong> contam como 0.
+              </p>
+            </Section>
 
             <Section
               icon={IconCalendarOff}

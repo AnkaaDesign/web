@@ -1,11 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   IconCalendarDollar,
-  IconPlus,
   IconTrash,
   IconUsers,
   IconAlertTriangle,
-  IconRefresh,
   IconInfoCircle,
 } from "@tabler/icons-react";
 
@@ -29,28 +27,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { routes } from "@/constants";
 import { formatCurrency } from "@/utils";
 import { getUsers } from "@/api-client";
-import { useUsers } from "@/hooks";
 import {
   OVERTIME_DAY_TYPE,
   OVERTIME_DAY_TYPE_LABELS,
   OVERTIME_MULTIPLIERS,
-  STANDARD_WORKDAY,
+  STANDARD_MONTHLY_HOURS,
   type OvertimeDayType,
 } from "@/constants/overtime-multipliers";
 import {
   computeOvertimeRowCost,
   computeTotalOvertimeCost,
   getHourlyRate,
-  getMonthlyDivisor,
   getPositionMonthlySalary,
   parseWorkdayHHMM,
 } from "@/utils/overtime-cost";
@@ -62,14 +53,35 @@ interface OvertimeRow {
   userName: string;
   positionName: string | null;
   monthlySalary: number | null; // R$/mês, snapshot
-  hoursInput: string; // HH:MM
-  dayType: OvertimeDayType;
 }
 
 const PRICE_DASH = "—";
 
 const newRowKey = () =>
   `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+// Mask user input as HH:MM. Two paths:
+//   1) The value already has a colon (e.g. user edited the hours portion of
+//      "08:45" mid-string) — respect their colon position and just clamp each
+//      side to two digits. This preserves edit intent: replacing "08" with
+//      "02" must yield "02:45", not "04:52".
+//   2) No colon yet (typing fresh) — auto-insert after the 2nd digit.
+// Used for the hours field which represents a duration of worked hours, not
+// a clock time, so HTML5 type="time" (with AM/PM affordances) doesn't fit.
+const formatHHMMInput = (raw: string): string => {
+  const cleaned = raw.replace(/[^\d:]/g, "");
+
+  if (cleaned.includes(":")) {
+    const [h = "", m = ""] = cleaned.split(":");
+    const hours = h.replace(/\D/g, "").slice(0, 2);
+    const minutes = m.replace(/\D/g, "").slice(0, 2);
+    return `${hours}:${minutes}`;
+  }
+
+  const digits = cleaned.slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+};
 
 // Format a decimal hours number using Brazilian locale, e.g. 262.5 -> "262,5".
 const formatDecimal = (value: number, fractionDigits = 1): string =>
@@ -89,45 +101,30 @@ const DAY_TYPE_OPTIONS: ComboboxOption[] = (
   )}×)`,
 }));
 
+// Hardcoded workday decimal that yields a 220h/month divisor under the
+// existing CLT formula (workday × 30). The monthly hours figure is the
+// company-standard reference used across payroll calculations.
+const HARDCODED_WORKDAY_DECIMAL = STANDARD_MONTHLY_HOURS / 30;
+
 export function OvertimeCostCalculatorPage() {
   // --- Globals -----------------------------------------------------------
-  const [workdayInput, setWorkdayInput] = useState<string>(STANDARD_WORKDAY);
-  const workdayDecimal = useMemo(
-    () => parseWorkdayHHMM(workdayInput) ?? 0,
-    [workdayInput],
+  const [dayType, setDayType] = useState<OvertimeDayType>(
+    OVERTIME_DAY_TYPE.WEEKDAY,
   );
-  const monthlyDivisor = useMemo(
-    () => getMonthlyDivisor(workdayDecimal),
-    [workdayDecimal],
+  const [hoursInput, setHoursInput] = useState<string>("08:45");
+  const hoursDecimal = useMemo(
+    () => parseWorkdayHHMM(hoursInput),
+    [hoursInput],
   );
 
   // --- Row state ---------------------------------------------------------
   const [rows, setRows] = useState<OvertimeRow[]>([]);
-  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
 
-  // Fetch the user-being-added with full position + monetaryValues so we can
-  // snapshot the monthly salary.
-  const { data: pendingUserResponse, isFetching: pendingUserLoading } = useUsers(
-    {
-      where: pendingUserId ? { id: pendingUserId } : undefined,
-      include: {
-        position: {
-          include: {
-            monetaryValues: true,
-            remunerations: true,
-          },
-        },
-      },
-    },
-    { enabled: !!pendingUserId },
-  );
-
-  // --- Combobox: search users to add -------------------------------------
+  // --- Combobox: search users (multiselect) ------------------------------
   const queryUsers = useCallback(
     async (searchTerm: string, page = 1) => {
       try {
         const pageSize = 50;
-        const existingIds = new Set(rows.map((r) => r.userId));
         const response = await getUsers({
           take: pageSize,
           skip: (page - 1) * pageSize,
@@ -153,13 +150,11 @@ export function OvertimeCostCalculatorPage() {
         const hasMore = page * pageSize < total;
 
         return {
-          data: users
-            .filter((u) => !existingIds.has(u.id))
-            .map((u) => ({
-              value: u.id,
-              label: u.name,
-              description: u.position?.name ?? "Sem cargo",
-            })) as ComboboxOption[],
+          data: users.map((u) => ({
+            value: u.id,
+            label: u.name,
+            description: u.position?.name ?? "Sem cargo",
+          })) as ComboboxOption[],
           hasMore,
           total,
         };
@@ -170,64 +165,77 @@ export function OvertimeCostCalculatorPage() {
         return { data: [], hasMore: false };
       }
     },
-    [rows],
+    [],
   );
 
-  // When the pending user finishes loading, materialize a row.
-  const handleAddPendingUser = () => {
-    const user = pendingUserResponse?.data?.[0];
-    if (!user) return;
+  // Reconcile selection diffs from the multiselect combobox: fetch full data
+  // for newly-selected users and snapshot their salary; drop rows that are
+  // no longer selected.
+  const handleSelectionChange = useCallback(
+    async (nextIds: string[]) => {
+      const currentIds = new Set(rows.map((r) => r.userId));
+      const added = nextIds.filter((id) => !currentIds.has(id));
+      const removedIds = new Set(
+        [...currentIds].filter((id) => !nextIds.includes(id)),
+      );
 
-    const monthlySalary = getPositionMonthlySalary(user.position ?? null);
+      if (removedIds.size > 0) {
+        setRows((prev) => prev.filter((r) => !removedIds.has(r.userId)));
+      }
 
-    const row: OvertimeRow = {
-      rowKey: newRowKey(),
-      userId: user.id,
-      userName: user.name,
-      positionName: user.position?.name ?? null,
-      monthlySalary,
-      hoursInput: "",
-      dayType: OVERTIME_DAY_TYPE.WEEKDAY,
-    };
-    setRows((prev) => [...prev, row]);
-    setPendingUserId(null);
-  };
+      if (added.length === 0) return;
+
+      try {
+        const response = await getUsers({
+          where: { id: { in: added } },
+          include: {
+            position: {
+              include: {
+                monetaryValues: true,
+                remunerations: true,
+              },
+            },
+          },
+          take: added.length,
+        });
+        const fetched = response.data ?? [];
+        const newRows: OvertimeRow[] = fetched.map((user) => ({
+          rowKey: newRowKey(),
+          userId: user.id,
+          userName: user.name,
+          positionName: user.position?.name ?? null,
+          monthlySalary: getPositionMonthlySalary(user.position ?? null),
+        }));
+        setRows((prev) => [...prev, ...newRows]);
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Erro ao adicionar colaboradores:", error);
+        }
+      }
+    },
+    [rows],
+  );
 
   const handleRemoveRow = (rowKey: string) =>
     setRows((prev) => prev.filter((r) => r.rowKey !== rowKey));
 
-  const handleHoursChange = (rowKey: string, value: string) => {
-    setRows((prev) =>
-      prev.map((r) => (r.rowKey === rowKey ? { ...r, hoursInput: value } : r)),
-    );
-  };
-
-  const handleDayTypeChange = (rowKey: string, value: OvertimeDayType) => {
-    setRows((prev) =>
-      prev.map((r) => (r.rowKey === rowKey ? { ...r, dayType: value } : r)),
-    );
-  };
-
-  const handleResetHoursToAll = () => {
-    setRows((prev) => prev.map((r) => ({ ...r, hoursInput: "" })));
-  };
-
   const handleClearAll = () => setRows([]);
+
+  const selectedUserIds = useMemo(() => rows.map((r) => r.userId), [rows]);
 
   // --- Computed totals ---------------------------------------------------
   const rowCosts = useMemo(
     () =>
       rows.map((r) => {
-        const hoursDecimal = parseWorkdayHHMM(r.hoursInput);
         if (hoursDecimal == null) return null;
         return computeOvertimeRowCost({
           monthlySalary: r.monthlySalary,
-          workdayDecimal,
+          workdayDecimal: HARDCODED_WORKDAY_DECIMAL,
           hoursDecimal,
-          dayType: r.dayType,
+          dayType,
         });
       }),
-    [rows, workdayDecimal],
+    [rows, dayType, hoursDecimal],
   );
 
   const totalCost = useMemo(
@@ -245,7 +253,6 @@ export function OvertimeCostCalculatorPage() {
         <div className="flex-shrink-0">
           <PageHeader
             title="Custo de Horas Extras"
-            subtitle="Cálculo de horas extras por colaborador conforme CLT e CCT dos metalúrgicos"
             icon={IconCalendarDollar}
             breadcrumbs={[
               { label: "Início", href: routes.home },
@@ -267,106 +274,79 @@ export function OvertimeCostCalculatorPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto pb-6">
-          <div className="mt-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
             {/* Globals card */}
-            <Card className="lg:col-span-2 flex flex-col lg:sticky lg:top-4 self-start w-full">
+            <Card className="lg:col-span-2 flex flex-col w-full">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">Padrões</CardTitle>
                 <CardDescription>
-                  Jornada padrão usada para calcular o divisor mensal de horas e a
-                  taxa horária de cada colaborador.
+                  Defina as horas extras e o tipo de dia. Aplicados a todos os
+                  colaboradores selecionados.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="overtime-workday">Jornada Padrão (HH:MM)</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label="Saiba mais sobre a jornada padrão"
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <IconInfoCircle className="h-3.5 w-3.5" stroke={1.5} />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        Jornada diária. Divisor mensal = jornada × 30 (CLT Art. 64).
-                      </TooltipContent>
-                    </Tooltip>
+              <CardContent className="space-y-4 flex-1">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-1 space-y-2">
+                    <Label htmlFor="overtime-hours">Horas Extras (HH:MM)</Label>
+                    <Input
+                      id="overtime-hours"
+                      type="text"
+                      inputMode="numeric"
+                      value={hoursInput}
+                      onChange={(v) =>
+                        setHoursInput(
+                          formatHHMMInput(typeof v === "string" ? v : ""),
+                        )
+                      }
+                      placeholder="00:00"
+                    />
                   </div>
-                  <Input
-                    id="overtime-workday"
-                    type="time"
-                    value={workdayInput}
-                    onChange={(v) => setWorkdayInput(typeof v === "string" ? v : "")}
-                    placeholder="08:45"
-                  />
-                  <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-                    <span>
-                      Divisor mensal:{" "}
-                      <span className="font-medium tabular-nums text-foreground">
-                        {monthlyDivisor > 0
-                          ? `${formatDecimal(monthlyDivisor, 1)} horas`
-                          : PRICE_DASH}
-                      </span>
-                    </span>
-                    <span>
-                      Custo da hora regular varia por colaborador (salário ÷ divisor).
-                    </span>
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="overtime-day-type">Tipo de Dia</Label>
+                    <Combobox
+                      options={DAY_TYPE_OPTIONS}
+                      value={dayType}
+                      onValueChange={(v) => {
+                        const next = Array.isArray(v) ? v[0] : v;
+                        if (
+                          next === OVERTIME_DAY_TYPE.WEEKDAY ||
+                          next === OVERTIME_DAY_TYPE.SATURDAY ||
+                          next === OVERTIME_DAY_TYPE.SUNDAY_HOLIDAY
+                        ) {
+                          setDayType(next);
+                        }
+                      }}
+                      searchable={false}
+                      clearable={false}
+                    />
                   </div>
                 </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={handleResetHoursToAll}
-                  disabled={rows.length === 0}
-                >
-                  <IconRefresh className="h-4 w-4 mr-2" stroke={1.5} />
-                  Limpar horas de todos
-                </Button>
-
-                <div className="border-t border-border pt-4 space-y-2">
-                  <Label>Adicionar colaborador</Label>
-                  <div className="flex items-stretch gap-2">
-                    <div className="flex-1">
-                      <Combobox
-                        async
-                        queryKey={[
-                          "overtime-cost",
-                          "user-search",
-                          rows.map((r) => r.userId).sort().join(","),
-                        ]}
-                        queryFn={queryUsers}
-                        minSearchLength={0}
-                        pageSize={50}
-                        debounceMs={300}
-                        value={pendingUserId ?? undefined}
-                        onValueChange={(v) => {
-                          const next = Array.isArray(v) ? v[0] : v;
-                          setPendingUserId(next ? String(next) : null);
-                        }}
-                        placeholder="Buscar colaborador..."
-                        emptyText="Nenhum colaborador encontrado"
-                        searchable
-                        clearable
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={handleAddPendingUser}
-                      disabled={!pendingUserId || pendingUserLoading}
-                    >
-                      <IconPlus className="h-4 w-4 mr-1" stroke={1.5} />
-                      Adicionar
-                    </Button>
-                  </div>
+                <div className="space-y-2">
+                  <Label>Colaboradores</Label>
+                  <Combobox
+                    mode="multiple"
+                    async
+                    queryKey={["overtime-cost", "user-search"]}
+                    queryFn={queryUsers}
+                    minSearchLength={0}
+                    pageSize={50}
+                    debounceMs={300}
+                    value={selectedUserIds}
+                    onValueChange={(v) => {
+                      const ids = Array.isArray(v)
+                        ? v.map(String)
+                        : v != null
+                          ? [String(v)]
+                          : [];
+                      void handleSelectionChange(ids);
+                    }}
+                    placeholder="Buscar colaboradores..."
+                    emptyText="Nenhum colaborador encontrado"
+                    searchable
+                  />
                   <p className="text-xs text-muted-foreground">
-                    O salário mensal vigente do cargo é congelado no momento em que o
-                    colaborador é adicionado.
+                    O salário mensal vigente do cargo é congelado no momento em
+                    que o colaborador é adicionado.
                   </p>
                 </div>
               </CardContent>
@@ -383,7 +363,7 @@ export function OvertimeCostCalculatorPage() {
                   <CardDescription>
                     {noSalaryCount > 0
                       ? `${noSalaryCount} colaborador(es) sem salário no cargo — não entram no total.`
-                      : "Informe as horas extras (HH:MM) e o tipo de dia para cada colaborador."}
+                      : "Horas extras e tipo de dia são definidos nos padrões e aplicados a todos os colaboradores."}
                   </CardDescription>
                 </div>
               </CardHeader>
@@ -405,8 +385,6 @@ export function OvertimeCostCalculatorPage() {
                           <TableHead>Cargo</TableHead>
                           <TableHead className="text-right">Salário</TableHead>
                           <TableHead className="text-right">Valor/h</TableHead>
-                          <TableHead className="w-[110px]">Horas Extras</TableHead>
-                          <TableHead className="w-[200px]">Tipo de Dia</TableHead>
                           <TableHead className="text-right">Total</TableHead>
                           <TableHead className="w-[60px]"></TableHead>
                         </TableRow>
@@ -415,8 +393,11 @@ export function OvertimeCostCalculatorPage() {
                         {rows.map((row, idx) => {
                           const cost = rowCosts[idx];
                           const hourly =
-                            row.monthlySalary !== null && workdayDecimal > 0
-                              ? getHourlyRate(row.monthlySalary, workdayDecimal)
+                            row.monthlySalary !== null
+                              ? getHourlyRate(
+                                  row.monthlySalary,
+                                  HARDCODED_WORKDAY_DECIMAL,
+                                )
                               : null;
                           const isInvalid = row.monthlySalary === null;
                           return (
@@ -445,37 +426,6 @@ export function OvertimeCostCalculatorPage() {
                               </TableCell>
                               <TableCell className="text-right tabular-nums">
                                 {hourly !== null ? formatCurrency(hourly) : PRICE_DASH}
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="time"
-                                  value={row.hoursInput}
-                                  onChange={(v) =>
-                                    handleHoursChange(
-                                      row.rowKey,
-                                      typeof v === "string" ? v : "",
-                                    )
-                                  }
-                                  placeholder="00:00"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Combobox
-                                  options={DAY_TYPE_OPTIONS}
-                                  value={row.dayType}
-                                  onValueChange={(v) => {
-                                    const next = Array.isArray(v) ? v[0] : v;
-                                    if (
-                                      next === OVERTIME_DAY_TYPE.WEEKDAY ||
-                                      next === OVERTIME_DAY_TYPE.SATURDAY ||
-                                      next === OVERTIME_DAY_TYPE.SUNDAY_HOLIDAY
-                                    ) {
-                                      handleDayTypeChange(row.rowKey, next);
-                                    }
-                                  }}
-                                  searchable={false}
-                                  clearable={false}
-                                />
                               </TableCell>
                               <TableCell className="text-right font-semibold tabular-nums">
                                 {cost !== null ? formatCurrency(cost) : PRICE_DASH}

@@ -114,6 +114,19 @@ export const bonusService = {
   batchDelete: (ids: string[]) =>
     apiClient.delete<BatchOperationResult<Bonus>>('/bonus/batch', { data: { ids } }),
 
+  /**
+   * Read the current period reajuste % (0 if not set).
+   */
+  getPeriodAdjustment: (year: number, month: number) =>
+    apiClient.get<any>(`/bonus/period-adjustment/${year}/${month}`),
+
+  /**
+   * Set the period reajuste %. Recomputes all saved bonuses in the period
+   * with the new adjustment baked into the salary-based logistic algorithm.
+   */
+  applyPeriodAdjustment: (year: number, month: number, percentage: number) =>
+    apiClient.post<any>(`/bonus/period-adjustment/${year}/${month}`, { percentage }),
+
   // =====================================================
   // Live Bonus Calculation Endpoints (NEW - Clean Implementation)
   // =====================================================
@@ -124,6 +137,44 @@ export const bonusService = {
    */
   getPeriodTaskStats: (year: number, month: number) =>
     apiClient.get<any>(`/bonus/period-stats/${year}/${month}`),
+
+  /**
+   * Run the salary-based logistic bonus algorithm against a hypothetical
+   * set of users. The single source of truth lives on the API; both web
+   * and mobile simulators call this endpoint instead of doing client-side math.
+   *
+   * Note: this calculates ONLY the base bonus. Assiduidade extras and
+   * discounts are saved-bonus concepts that don't apply to "what-if" simulations.
+   */
+  simulate: (data: {
+    averageTasksPerUser: number;
+    users: Array<{
+      id?: string;
+      name?: string;
+      positionName?: string;
+      positionId?: string;
+      sectorName?: string;
+      /** Either `salary` or `positionId`/`positionName` must be provided. */
+      salary?: number;
+      performanceLevel: number;
+    }>;
+    config?: {
+      k?: number;
+      x0?: number;
+      piso?: number;
+      pscale?: number;
+      ceil?: number;
+      adjustment?: number;
+    };
+    salaryRange?: { min: number; max: number };
+    b1Sweep?: {
+      salary: number;
+      performanceLevel: number;
+      min?: number;
+      max?: number;
+      steps?: number;
+    };
+  }) => apiClient.post<any>('/bonus/simulate', data),
 
   /**
    * Get live bonus calculations for a specific period

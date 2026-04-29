@@ -54,6 +54,50 @@ function lastValueMinutes(expr: string): number | null {
   return tailEval.ok ? tailEval.minutes : null;
 }
 
+/**
+ * Apply a single input character to the current expression with HH:MM
+ * auto-formatting. Digits typed without an explicit colon are treated as
+ * a `HH:MM` literal in the current "slot" (the run of characters since the
+ * last operator): the third digit triggers an automatic colon insert, and
+ * the slot is capped at four digits + colon.
+ */
+function applyInputChar(prev: string, ch: string): string {
+  // Operators always append.
+  if (ch === "+" || ch === "-" || ch === "*" || ch === "/") {
+    return prev + ch;
+  }
+
+  let slotStart = prev.length;
+  for (let i = prev.length - 1; i >= 0; i--) {
+    const c = prev[i];
+    if (c === "+" || c === "-" || c === "*" || c === "/") {
+      slotStart = i + 1;
+      break;
+    }
+    if (i === 0) slotStart = 0;
+  }
+  const slot = prev.slice(slotStart);
+
+  if (ch === ":") {
+    if (slot.length === 0 || slot.includes(":")) return prev;
+    return prev + ":";
+  }
+
+  // Digit input.
+  const colonIdx = slot.indexOf(":");
+  if (colonIdx >= 0) {
+    const minutesPart = slot.slice(colonIdx + 1);
+    if (minutesPart.length >= 2) return prev; // HH:MM full
+    return prev + ch;
+  }
+
+  // No colon yet — auto-insert before the third digit so input formats as HH:MM.
+  if (slot.length === 2) {
+    return prev + ":" + ch;
+  }
+  return prev + ch;
+}
+
 interface KeyDef {
   key: string;
   label: React.ReactNode;
@@ -149,7 +193,13 @@ export function TimeCalculatorPage() {
       setMode("input");
       return;
     }
-    setDisplay((prev) => prev.slice(0, -1));
+    setDisplay((prev) => {
+      let next = prev.slice(0, -1);
+      // Strip a now-trailing colon so the slot returns to a clean HH state
+      // instead of leaving a dangling separator on screen.
+      if (next.endsWith(":")) next = next.slice(0, -1);
+      return next;
+    });
   }, [mode]);
 
   const handleEquals = useCallback(() => {
@@ -169,18 +219,16 @@ export function TimeCalculatorPage() {
   const appendChar = useCallback(
     (ch: string) => {
       setDisplay((prev) => {
-        // After a result/error, any input replaces the display (digit/colon)
-        // or chains from the result (operator).
         if (mode === "error") {
-          return /[0-9]/.test(ch) ? ch : "";
+          if (/[0-9]/.test(ch)) return applyInputChar("", ch);
+          return "";
         }
         if (mode === "result") {
-          // If user types an operator, chain from the result.
-          if (/[+\-*/]/.test(ch)) return prev + ch;
+          if (/[+\-*/]/.test(ch)) return applyInputChar(prev, ch);
           // Digit/colon → start fresh.
-          return ch;
+          return applyInputChar("", ch);
         }
-        return prev + ch;
+        return applyInputChar(prev, ch);
       });
       setMode("input");
     },
@@ -323,7 +371,6 @@ export function TimeCalculatorPage() {
       <div className="flex-shrink-0">
         <PageHeader
           title="Calculadora de Horas"
-          subtitle="Some, subtraia, multiplique e divida tempos"
           icon={IconClock}
           breadcrumbs={[
             { label: "Início", href: routes.home },
@@ -421,7 +468,7 @@ export function TimeCalculatorPage() {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Use <span className="font-mono">HH:MM</span> para tempos (ex.: <span className="font-mono">01:30</span>) ou números puros para minutos. Multiplicação e divisão tratam o segundo valor como escalar.
+                Os dígitos formatam automaticamente como <span className="font-mono">HH:MM</span> (ex.: digite <span className="font-mono">0130</span> → <span className="font-mono">01:30</span>). Multiplicação e divisão tratam o segundo valor como escalar.
               </p>
             </CardContent>
           </Card>

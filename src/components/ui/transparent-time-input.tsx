@@ -112,8 +112,12 @@ const TransparentTimeInput = React.forwardRef<HTMLInputElement, TransparentTimeI
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(false);
 
-    // Validate and correct on blur
-    if (internalValue) {
+    // Only attempt time validation/correction when the value looks like a time
+    // (digits and optional colon). Non-numeric content — e.g. Secullum
+    // justification codes such as "ATESTAD", "FALTA 2", "AT OBTO" — must be
+    // left untouched; otherwise blurring after a right-click would silently
+    // clear the cell.
+    if (internalValue && /^[0-9:]+$/.test(internalValue)) {
       const validated = validateAndCorrectTime(internalValue);
       if (validated) {
         setInternalValue(validated);
@@ -121,7 +125,7 @@ const TransparentTimeInput = React.forwardRef<HTMLInputElement, TransparentTimeI
           onChange(validated);
         }
       } else {
-        // Clear invalid input
+        // Clear invalid time input
         setInternalValue("");
         if (onChange) {
           onChange(null);

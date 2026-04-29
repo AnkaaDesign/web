@@ -3,10 +3,21 @@ import { z } from "zod";
 // Note: Time clock entries are now managed internally without external integrations
 import { dateRangeSchema } from "./common";
 
-// Time validation - HH:MM format
+// Time-card cell value: either an HH:MM time, an empty string (cleared), or a
+// Secullum justification code (NomeAbreviado, e.g. "ATESTAD", "AT OBTO",
+// "FÉRIAS", "folga "). Justification codes are short alphanumeric strings —
+// possibly with spaces or accents — up to ~10 chars. Validating both keeps
+// the strict time-format error for hand-typed entries while letting the
+// "Adicionar Justificativa" flow submit a non-numeric code.
 export const timeSchema = z
   .string()
-  .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato inválido. Use HH:MM")
+  .refine(
+    (v) =>
+      v === "" ||
+      /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(v) ||
+      /^[\p{L}0-9 ]{1,15}$/u.test(v),
+    { message: "Formato inválido. Use HH:MM ou uma justificativa válida." },
+  )
   .nullable()
   .optional();
 
