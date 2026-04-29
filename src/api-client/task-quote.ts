@@ -53,8 +53,8 @@ export const taskQuoteService = {
   // PUBLIC ENDPOINTS (No Authentication Required)
   // =====================
 
-  // Get quote for public view (customer budget page)
-  getPublic: (id: string) => apiClient.get(`/task-quotes/public/${id}`),
+  // Get quote for public view (customer budget page) — _t busts the axios in-memory cache
+  getPublic: (id: string) => apiClient.get(`/task-quotes/public/${id}`, { params: { _t: Date.now() } }),
 
   // Upload customer signature (public)
   uploadPublicSignature: (id: string, file: File) => {

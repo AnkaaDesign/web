@@ -88,9 +88,9 @@ export function BudgetStepInfo({
   const customGuaranteeText = useWatch({ control, name: "customGuaranteeText" });
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
 
-  // Initialize validity period from expiresAt
+  // Sync validity period whenever expiresAt changes (including after form.reset() populates saved data)
   useEffect(() => {
-    if (!quoteExpiresAt || validityPeriod !== null) return;
+    if (!quoteExpiresAt) return;
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const expiryDate = new Date(quoteExpiresAt);
@@ -105,18 +105,50 @@ export function BudgetStepInfo({
       }
     }
     setValidityPeriod(30);
-  }, [quoteExpiresAt, validityPeriod]);
+  }, [quoteExpiresAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initialize custom guarantee state
+  // Show custom guarantee textarea whenever the saved text is populated
   useEffect(() => {
     if (customGuaranteeText) setShowCustomGuarantee(true);
-  }, []);
+  }, [customGuaranteeText]);
 
   const currentGuaranteeOption = useMemo(() => {
     if (customGuaranteeText) return "CUSTOM";
     if (guaranteeYears) return guaranteeYears.toString();
     return "";
   }, [guaranteeYears, customGuaranteeText]);
+
+  const UPLOAD_NEW_SENTINEL = "__UPLOAD_NEW__";
+  const artworkOptions = useMemo(() => {
+    if (!artworks || artworks.length === 0) return [];
+    const imageArtworks = artworks.filter((a) =>
+      (a.mimetype || "").startsWith("image/"),
+    );
+    if (imageArtworks.length === 0) return [];
+    return [
+      ...imageArtworks,
+      { id: UPLOAD_NEW_SENTINEL, filename: "Enviar novo arquivo" } as ArtworkOption,
+    ];
+  }, [artworks]);
+
+  // True when the loaded layout file came from an artwork selection (id exists in artworkOptions)
+  const isLayoutFromArtwork = useMemo(() => {
+    if (!currentLayoutFileId || artworkOptions.length === 0) return false;
+    return artworkOptions.some(
+      (a) => a.id === currentLayoutFileId && a.id !== UPLOAD_NEW_SENTINEL,
+    );
+  }, [currentLayoutFileId, artworkOptions]);
+
+  // When form.reset() populates a layout that was a standalone upload (not an artwork),
+  // switch to upload-mode view so the FileUploadField renders with the existing file.
+  useEffect(() => {
+    if (!currentLayoutFileId || artworkOptions.length === 0 || showLayoutUploadMode) return;
+    if (!isLayoutFromArtwork) {
+      setShowLayoutUploadMode(true);
+    }
+  // Run whenever the layoutFileId changes (e.g. after form.reset())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLayoutFileId]);
 
   const handleGuaranteeOptionChange = useCallback(
     (value: string) => {
@@ -290,19 +322,6 @@ export function BudgetStepInfo({
     },
     [artworks, setValue, onLayoutFilesChange],
   );
-
-  const UPLOAD_NEW_SENTINEL = "__UPLOAD_NEW__";
-  const artworkOptions = useMemo(() => {
-    if (!artworks || artworks.length === 0) return [];
-    const imageArtworks = artworks.filter((a) =>
-      (a.mimetype || "").startsWith("image/"),
-    );
-    if (imageArtworks.length === 0) return [];
-    return [
-      ...imageArtworks,
-      { id: UPLOAD_NEW_SENTINEL, filename: "Enviar novo arquivo" } as ArtworkOption,
-    ];
-  }, [artworks]);
 
   const renderArtworkOption = useCallback((artwork: ArtworkOption) => {
     if (artwork.id === "__UPLOAD_NEW__") {
@@ -551,7 +570,9 @@ export function BudgetStepInfo({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {artworkOptions.length > 0 && !showLayoutUploadMode && (
+          {/* Artwork selector: only shown when artworks exist, not in upload mode,
+              and the current layout (if any) is one of those artworks */}
+          {artworkOptions.length > 0 && !showLayoutUploadMode && (!currentLayoutFileId || isLayoutFromArtwork) && (
             <div className="space-y-3">
               <Combobox<ArtworkOption>
                 value={currentLayoutFileId || ""}
@@ -569,8 +590,7 @@ export function BudgetStepInfo({
                 searchable
               />
 
-              {currentLayoutFileId &&
-                artworkOptions.some((a) => a.id === currentLayoutFileId) && (
+              {currentLayoutFileId && isLayoutFromArtwork && (
                   <div className="bg-muted/30 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-xs text-muted-foreground">
@@ -617,7 +637,9 @@ export function BudgetStepInfo({
             </div>
           )}
 
-          {(artworkOptions.length === 0 || showLayoutUploadMode) && (
+          {/* File uploader: shown when no artworks, user chose upload mode,
+              or the current layout was uploaded (not selected from artworks) */}
+          {(artworkOptions.length === 0 || showLayoutUploadMode || (currentLayoutFileId && !isLayoutFromArtwork)) && (
             <div className="space-y-2">
               {artworkOptions.length > 0 && (
                 <button

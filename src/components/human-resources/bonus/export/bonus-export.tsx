@@ -17,9 +17,11 @@ interface BonusRow {
   status: string;
   bonusId?: string;
   bonusAmount: number;
+  baseBonus?: number;
   tasksCompleted: number;
   averageTasks: number;
   totalWeightedTasks: number;
+  totalCollaborators?: number;
   bonusStatus: 'live' | 'saved';
   totalDiscounts: number;
   netBonus: number;
@@ -48,8 +50,13 @@ interface BonusExportProps {
   visibleColumns?: Set<string>;
 }
 
-// Column configuration for export
+// Column configuration for export — must mirror BonusTableComponent column keys/labels/values
 const EXPORT_COLUMNS: ExportColumn<BonusRow>[] = [
+  {
+    id: "month",
+    label: "Período",
+    getValue: (row: BonusRow) => row.monthLabel || "-"
+  },
   {
     id: "payrollNumber",
     label: "Nº Folha",
@@ -57,7 +64,7 @@ const EXPORT_COLUMNS: ExportColumn<BonusRow>[] = [
   },
   {
     id: "user.name",
-    label: "Nome",
+    label: "Colaborador",
     getValue: (row: BonusRow) => row.userName || ""
   },
   {
@@ -77,38 +84,63 @@ const EXPORT_COLUMNS: ExportColumn<BonusRow>[] = [
   },
   {
     id: "performanceLevel",
-    label: "Performance",
+    label: "Desempenho",
     getValue: (row: BonusRow) => row.performanceLevel?.toString() || "0"
+  },
+  {
+    id: "tasksCompleted",
+    label: "Tarefas",
+    getValue: (row: BonusRow) => (row.tasksCompleted ?? 0).toString()
+  },
+  {
+    id: "totalWeightedTasks",
+    label: "Ponderadas",
+    getValue: (row: BonusRow) => (row.totalWeightedTasks ?? 0).toFixed(1)
+  },
+  {
+    id: "totalCollaborators",
+    label: "Colaboradores",
+    getValue: (row: BonusRow) => (row.totalCollaborators ?? 0).toString()
   },
   {
     id: "averageTasks",
     label: "Média",
     getValue: (row: BonusRow) => {
       const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
-      return isEligible ? row.averageTasks.toFixed(1) : "-";
+      return isEligible ? row.averageTasks.toFixed(2) : "-";
     }
   },
   {
     id: "bonus",
-    label: "Bônus",
+    label: "Bônus Bruto",
     getValue: (row: BonusRow) => {
       const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
-      return isEligible ? formatCurrency(row.bonusAmount) : "Não elegível";
+      return isEligible ? formatCurrency(row.baseBonus ?? row.bonusAmount) : "Não elegível";
+    }
+  },
+  {
+    id: "totalDiscounts",
+    label: "Ajustes",
+    getValue: (row: BonusRow) => {
+      if (row.totalDiscounts === 0) return "R$ 0,00";
+      const prefix = row.totalDiscounts > 0 ? "+" : "-";
+      return `${prefix}${formatCurrency(Math.abs(row.totalDiscounts))}`;
     }
   },
   {
     id: "netBonus",
-    label: "Líquido",
+    label: "Bônus Líquido",
     getValue: (row: BonusRow) => formatCurrency(row.netBonus)
   },
 ];
 
-// Default visible columns
+// Default visible columns — matches BonusListPage default visible columns
 const DEFAULT_VISIBLE_COLUMNS = new Set([
-  "payrollNumber",
   "user.name",
   "position.name",
   "performanceLevel",
+  "tasksCompleted",
+  "totalCollaborators",
   "averageTasks",
   "bonus",
   "netBonus",
@@ -125,8 +157,9 @@ export function BonusExport({
 
   // Calculate totals from current data
   const calculateTotals = (data: BonusRow[]) => {
-    const totalBonus = data.reduce((sum, row) => sum + (row.bonusAmount || 0), 0);
+    const totalBaseBonus = data.reduce((sum, row) => sum + (row.baseBonus ?? row.bonusAmount ?? 0), 0);
     const totalNet = data.reduce((sum, row) => sum + (row.netBonus || 0), 0);
+    const totalDiscounts = data.reduce((sum, row) => sum + (row.totalDiscounts || 0), 0);
     const eligibleUsers = data.filter(row => row.position?.bonifiable && row.performanceLevel > 0);
 
     // Get weighted tasks from first eligible user (they share the same pool)
@@ -134,8 +167,9 @@ export function BonusExport({
     const avgTasks = eligibleUsers.length > 0 ? eligibleUsers[0]?.averageTasks || 0 : 0;
 
     return {
-      totalBonus,
+      totalBaseBonus,
       totalNet,
+      totalDiscounts,
       totalWeightedTasks,
       avgTasks,
       eligibleCount: eligibleUsers.length,
@@ -188,7 +222,12 @@ export function BonusExport({
     // Add total row
     const totalRow = columns.map((col) => {
       if (col.id === "user.name") return "TOTAL";
-      if (col.id === "bonus") return formatCurrency(totals.totalBonus);
+      if (col.id === "bonus") return formatCurrency(totals.totalBaseBonus);
+      if (col.id === "totalDiscounts") {
+        if (totals.totalDiscounts === 0) return "R$ 0,00";
+        const prefix = totals.totalDiscounts > 0 ? "+" : "-";
+        return `${prefix}${formatCurrency(Math.abs(totals.totalDiscounts))}`;
+      }
       if (col.id === "netBonus") return formatCurrency(totals.totalNet);
       return "";
     });
@@ -221,7 +260,12 @@ export function BonusExport({
     // Add total row
     const totalRow = columns.map((col) => {
       if (col.id === "user.name") return "TOTAL";
-      if (col.id === "bonus") return formatCurrency(totals.totalBonus);
+      if (col.id === "bonus") return formatCurrency(totals.totalBaseBonus);
+      if (col.id === "totalDiscounts") {
+        if (totals.totalDiscounts === 0) return "R$ 0,00";
+        const prefix = totals.totalDiscounts > 0 ? "+" : "-";
+        return `${prefix}${formatCurrency(Math.abs(totals.totalDiscounts))}`;
+      }
       if (col.id === "netBonus") return formatCurrency(totals.totalNet);
       return "";
     });
@@ -443,7 +487,12 @@ export function BonusExport({
               <tr>
                 ${columns.map((col) => {
                   if (col.id === "user.name") return `<td class="text-left">TOTAL</td>`;
-                  if (col.id === "bonus") return `<td class="text-left">${formatCurrency(totals.totalBonus)}</td>`;
+                  if (col.id === "bonus") return `<td class="text-left">${formatCurrency(totals.totalBaseBonus)}</td>`;
+                  if (col.id === "totalDiscounts") {
+                    if (totals.totalDiscounts === 0) return `<td class="text-left">R$ 0,00</td>`;
+                    const prefix = totals.totalDiscounts > 0 ? "+" : "-";
+                    return `<td class="text-left">${prefix}${formatCurrency(Math.abs(totals.totalDiscounts))}</td>`;
+                  }
                   if (col.id === "netBonus") return `<td class="text-left">${formatCurrency(totals.totalNet)}</td>`;
                   return `<td></td>`;
                 }).join("")}

@@ -1160,6 +1160,16 @@ export const NAVIGATION_MENU: MenuItem[] = [
     path: "/producao/observacoes",
     requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
   },
+  {
+    id: "orcamento-commercial",
+    title: "Orçamentos",
+    icon: "fileDescription",
+    path: "/financeiro/orcamento",
+    requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+    children: [
+      { id: "orcamento-commercial-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/orcamento/detalhes/:id", isDynamic: true },
+    ],
+  },
 
   // PLOTTING - Direct menu items (flat structure, sorted alphabetically)
   // Provides simplified navigation for plotting users with relevant sections

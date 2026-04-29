@@ -5,6 +5,15 @@ import type { Installment } from './invoice';
 export type TASK_QUOTE_STATUS = 'PENDING' | 'BUDGET_APPROVED' | 'COMMERCIAL_APPROVED' | 'BILLING_APPROVED' | 'UPCOMING' | 'DUE' | 'PARTIAL' | 'SETTLED';
 export type DISCOUNT_TYPE = 'NONE' | 'PERCENTAGE' | 'FIXED_VALUE';
 
+export interface PaymentConfig {
+  type: 'CASH' | 'INSTALLMENTS';
+  cashDays?: number;
+  installmentCount?: number;
+  installmentStep?: number;
+  entryDays?: number;
+  specificDate?: string; // YYYY-MM-DD
+}
+
 export interface TaskQuoteService extends BaseEntity {
   description: string;
   observation?: string | null;
@@ -28,6 +37,7 @@ export interface TaskQuoteCustomerConfig extends BaseEntity {
   orderNumber?: string | null;
   responsibleId?: string | null;
   paymentCondition?: string | null;
+  paymentConfig?: PaymentConfig | null;
   customerSignatureId?: string | null;
   customerSignature?: File;
   customer?: { id: string; corporateName?: string; fantasyName: string; cnpj?: string | null };
@@ -36,27 +46,25 @@ export interface TaskQuoteCustomerConfig extends BaseEntity {
 }
 
 export interface TaskQuote extends BaseEntity {
-  budgetNumber: number; // Auto-generated sequential number for display
-  subtotal: number; // Aggregate: sum of config subtotals
-  total: number; // Aggregate: sum of config totals
+  budgetNumber: number;
+  subtotal: number;
+  total: number;
   expiresAt: Date;
   status: TASK_QUOTE_STATUS;
   statusOrder: number;
+  billingApprovedAt?: Date | null;
 
-  // Guarantee Terms
   guaranteeYears: number | null;
   customGuaranteeText: string | null;
 
-  // Custom Forecast - manual override for production days displayed in budget
   customForecastDays: number | null;
 
-  // Layout File
   layoutFileId: string | null;
   layoutFile?: File;
 
-  simultaneousTasks: number | null; // Number of simultaneous tasks (1-100)
+  simultaneousTasks: number | null;
 
-  task?: any;  // One-to-one relationship with task
+  task?: any;
   services?: TaskQuoteService[];
   customerConfigs?: TaskQuoteCustomerConfig[];
 }

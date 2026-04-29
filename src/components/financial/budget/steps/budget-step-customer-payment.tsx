@@ -65,11 +65,29 @@ export function BudgetStepCustomerPayment({
     return "cnpj";
   });
 
+  // Sync docType when form data loads asynchronously (after form.reset())
+  useEffect(() => {
+    if (customerData.cpf && !customerData.cnpj) {
+      setDocType("cpf");
+    } else if (customerData.cnpj) {
+      setDocType("cnpj");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config?.customerId]);
+
   const paymentConfig: PaymentConfig | null =
     config?.paymentConfig ?? legacyToConfig(config?.paymentCondition);
   const paymentType = paymentConfig?.type ?? null;
   const typeValue = configToTypeValue(paymentConfig);
   const [showDateInput, setShowDateInput] = useState(() => !!paymentConfig?.specificDate);
+
+  // Sync showDateInput when form data loads asynchronously (after form.reset())
+  useEffect(() => {
+    if (paymentConfig?.specificDate) {
+      setShowDateInput(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config?.paymentConfig, config?.paymentCondition]);
 
   const setPaymentConfig = useCallback((next: PaymentConfig | null) => {
     setFormValue(`customerConfigs.${configIndex}.paymentConfig`, next, { shouldDirty: true });

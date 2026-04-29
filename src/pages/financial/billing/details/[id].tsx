@@ -7,6 +7,7 @@ import { useInvoicesByTask } from "@/hooks/production/use-invoice";
 import { taskQuoteKeys } from "@/hooks/production/use-task-quote";
 import { taskQuoteService } from "@/api-client/task-quote";
 import { customerService } from "@/api-client/customer";
+import { uploadSingleFile, getFileById } from "@/api-client/file";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
@@ -14,7 +15,9 @@ import { BillingStepTask } from "@/components/financial/billing/steps/billing-st
 import { BillingStepServices } from "@/components/financial/billing/steps/billing-step-services";
 import { BillingStepCustomer } from "@/components/financial/billing/steps/billing-step-customer";
 import { BillingStepReview } from "@/components/financial/billing/steps/billing-step-review";
+import { BillingStepBudgetInfo } from "@/components/financial/billing/steps/billing-step-budget-info";
 import { SECTOR_PRIVILEGES, IMPLEMENT_TYPE, routes } from "@/constants";
+import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { canUpdateQuoteStatus, canEditQuote } from "@/utils/permissions/quote-permissions";
@@ -52,10 +55,15 @@ export const BillingDetailPage = () => {
 
   const userPrivilege = currentUser?.sector?.privileges || "";
   const canEdit = canEditQuote(userPrivilege) || canUpdateQuoteStatus(userPrivilege);
+  const canSeeBudgetInfoStep = [
+    SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.ADMIN,
+  ].includes(userPrivilege as SECTOR_PRIVILEGES);
 
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
+  const [layoutFiles, setLayoutFiles] = useState<FileWithPreview[]>([]);
   const [billingApprovalDialogOpen, setBillingApprovalDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [dossieCustomerId, setDossieCustomerId] = useState<string>("all");
@@ -141,6 +149,7 @@ export const BillingDetailPage = () => {
       customerConfigs: [] as any[],
       guaranteeYears: null as number | null,
       customGuaranteeText: null as string | null,
+      layoutFileId: null as string | null,
     },
   });
 
@@ -190,6 +199,7 @@ export const BillingDetailPage = () => {
       total: Number(quote.total) || 0,
       guaranteeYears: quote.guaranteeYears,
       customGuaranteeText: quote.customGuaranteeText,
+      layoutFileId: quote.layoutFileId || null,
       services: (quote.services || []).map((s: any) => ({
         id: s.id,
         description: s.description || "",
@@ -230,10 +240,50 @@ export const BillingDetailPage = () => {
         },
       })),
     }, { keepDirtyValues: true }); // preserve user edits on background refetch
+
+    // Load layout file if present
+    if (quote.layoutFile) {
+      setLayoutFiles([
+        {
+          id: quote.layoutFile.id,
+          name: quote.layoutFile.filename || "layout",
+          size: quote.layoutFile.size || 0,
+          type: quote.layoutFile.mimetype || "application/octet-stream",
+          lastModified: Date.now(),
+          uploaded: true,
+          uploadProgress: 100,
+          uploadedFileId: quote.layoutFile.id,
+          thumbnailUrl: quote.layoutFile.thumbnailUrl,
+        } as FileWithPreview,
+      ]);
+    } else if (quote.layoutFileId) {
+      getFileById(quote.layoutFileId)
+        .then((response) => {
+          const file = response?.data;
+          if (file?.id) {
+            setLayoutFiles([
+              {
+                id: file.id,
+                name: file.filename || "layout",
+                size: file.size || 0,
+                type: file.mimetype || "application/octet-stream",
+                lastModified: Date.now(),
+                uploaded: true,
+                uploadProgress: 100,
+                uploadedFileId: file.id,
+                thumbnailUrl: file.thumbnailUrl,
+              } as FileWithPreview,
+            ]);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setLayoutFiles([]);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id, quote?.id]); // use IDs — object refs change on every refetch and would wipe unsaved edits
 
-  // Dynamic steps: Tarefa → Serviços → Cliente(s) → Resumo
+  // Dynamic steps: Tarefa → Serviços → Cliente(s) → [Proposta] → Resumo
   const customerConfigs = form.watch("customerConfigs") || [];
 
   // Skip to summary step when invoices already exist
@@ -241,12 +291,12 @@ export const BillingDetailPage = () => {
   useEffect(() => {
     if (hasInitializedStep.current) return;
     if (invoices.length > 0 && customerConfigs.length > 0) {
-      // 2 base steps + N customer steps + 1 summary step
-      const summaryStep = 2 + customerConfigs.length + 1;
+      // 2 base steps + N customer steps + optional proposta step + 1 summary step
+      const summaryStep = 2 + customerConfigs.length + (canSeeBudgetInfoStep ? 1 : 0) + 1;
       setCurrentStep(summaryStep);
       hasInitializedStep.current = true;
     }
-  }, [invoices, customerConfigs]);
+  }, [invoices, customerConfigs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const steps = useMemo(() => {
     const base = [
@@ -262,9 +312,12 @@ export const BillingDetailPage = () => {
         "Cliente";
       base.push({ id: 3 + i, name: `Cliente ${i + 1}`, description: name });
     });
+    if (canSeeBudgetInfoStep) {
+      base.push({ id: base.length + 1, name: "Proposta", description: "Layout e garantia" });
+    }
     base.push({ id: base.length + 1, name: "Resumo", description: "Revisão final" });
     return base;
-  }, [customerConfigs]);
+  }, [customerConfigs, canSeeBudgetInfoStep]);
 
   const totalSteps = steps.length;
 
@@ -413,13 +466,32 @@ export const BillingDetailPage = () => {
         }
       }
 
-      // 3. Update quote data
+      // 3. Upload new layout file if any (COMMERCIAL/ADMIN step)
+      let layoutFileId = formData.layoutFileId || null;
+      if (canSeeBudgetInfoStep) {
+        const newLayoutFiles = layoutFiles.filter((f) => !f.uploaded);
+        if (newLayoutFiles.length > 0) {
+          try {
+            const response = await uploadSingleFile(newLayoutFiles[0], {
+              fileContext: "quote-layout",
+            });
+            if (response.success && response.data) {
+              layoutFileId = response.data.id;
+            }
+          } catch (error: any) {
+            toast.error(`Erro ao enviar layout: ${error.message}`);
+          }
+        }
+      }
+
+      // 4. Update quote data
       const quotePayload: any = {
         expiresAt: formData.expiresAt,
         subtotal: formData.subtotal,
         total: formData.total,
         guaranteeYears: formData.guaranteeYears,
         customGuaranteeText: formData.customGuaranteeText,
+        layoutFileId: canSeeBudgetInfoStep ? layoutFileId : undefined,
         services: formData.services
           .filter((s: any) => s.description?.trim())
           .map((s: any) => ({
@@ -483,6 +555,8 @@ export const BillingDetailPage = () => {
     queryClient,
     updateTaskAsync,
     navigate,
+    layoutFiles,
+    canSeeBudgetInfoStep,
   ]);
 
   // Save handler — validates and shows confirmation for BILLING_APPROVED
@@ -571,8 +645,9 @@ export const BillingDetailPage = () => {
     }
   }
 
-  // Customer steps are between step 3 and (totalSteps - 1) inclusive
-  const isCustomerStep = currentStep >= 3 && currentStep < totalSteps;
+  // Step detection: customer steps run from 3 to (2 + customerCount), proposta step follows (COMMERCIAL/ADMIN only)
+  const isProposalStep = canSeeBudgetInfoStep && currentStep === totalSteps - 1;
+  const isCustomerStep = currentStep >= 3 && currentStep < (canSeeBudgetInfoStep ? totalSteps - 1 : totalSteps);
   const isReviewStep = currentStep === totalSteps;
   const customerStepIndex = currentStep - 3; // 0-based
   const currentConfig = isCustomerStep ? customerConfigs[customerStepIndex] : null;
@@ -684,6 +759,14 @@ export const BillingDetailPage = () => {
                 </div>
               );
             })}
+
+            {isProposalStep && (
+              <BillingStepBudgetInfo
+                disabled={!canEdit}
+                layoutFiles={layoutFiles}
+                onLayoutFilesChange={setLayoutFiles}
+              />
+            )}
 
             {isReviewStep && (
               <BillingStepReview

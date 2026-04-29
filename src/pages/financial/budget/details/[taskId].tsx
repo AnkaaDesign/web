@@ -31,7 +31,7 @@ import { FormSteps } from "@/components/ui/form-steps";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "@/components/ui/sonner";
-import { uploadSingleFile } from "@/api-client/file";
+import { uploadSingleFile, getFileById } from "@/api-client/file";
 import { getCustomers } from "@/api-client";
 import { customerService } from "@/api-client/customer";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -77,7 +77,10 @@ export const FinancialBudgetDetailPage = () => {
   // Fetch existing quote
   const { data: quoteResponse, isLoading: quoteLoading } =
     useTaskQuoteByTask(taskId || "");
-  const existingQuote = quoteResponse?.data?.data || quoteResponse?.data;
+  // Unwrap the API response: backend may wrap as { data: quote } or return the quote directly.
+  // Guard with .id to prevent treating an empty wrapper object ({ data: null }) as a valid quote.
+  const rawQuote = quoteResponse?.data?.data || quoteResponse?.data;
+  const existingQuote = rawQuote?.id ? rawQuote : null;
 
   // Mutations
   const createQuoteMutation = useCreateTaskQuote();
@@ -92,6 +95,11 @@ export const FinancialBudgetDetailPage = () => {
   // State
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Tracks whether the form has received its first server-data reset.
+  // Ref: used inside the effect (always current, no stale closure).
+  // State: signals child components that need to wait before running side-effects.
+  const formInitializedRef = useRef(false);
+  const [formInitialized, setFormInitialized] = useState(false);
   const [layoutFiles, setLayoutFiles] = useState<FileWithPreview[]>([]);
   const customersCache = useRef<Map<string, any>>(new Map());
   const [selectedCustomers, setSelectedCustomers] = useState<Map<string, any>>(
@@ -204,6 +212,8 @@ export const FinancialBudgetDetailPage = () => {
           },
         ],
       });
+      formInitializedRef.current = true;
+      setFormInitialized(true);
       return;
     }
 
@@ -225,6 +235,9 @@ export const FinancialBudgetDetailPage = () => {
           customerId: c.customerId || c.id,
           subtotal: c.subtotal ?? 0,
           total: c.total ?? 0,
+          discountType: c.discountType || "NONE",
+          discountValue: c.discountValue != null ? Number(c.discountValue) : null,
+          discountReference: c.discountReference || null,
           paymentCondition: c.paymentCondition || null,
           paymentConfig: c.paymentConfig ?? null,
           customPaymentText: c.customPaymentText || null,
@@ -279,9 +292,14 @@ export const FinancialBudgetDetailPage = () => {
                 invoiceToCustomerId: null,
               },
             ],
-    }, { keepDirtyValues: true });
+    // On first load keepDirtyValues is false so server data always wins.
+    // On subsequent resets (e.g. background refetch) it's true to preserve unsaved edits.
+    }, { keepDirtyValues: formInitializedRef.current });
+    formInitializedRef.current = true;
+    setFormInitialized(true);
 
-    // Set layout files
+    // Set layout files from included data, or fetch separately when the API
+    // doesn't include the layoutFile relation (e.g. running an older build).
     if (existingQuote.layoutFile) {
       setLayoutFiles([
         {
@@ -297,6 +315,27 @@ export const FinancialBudgetDetailPage = () => {
           thumbnailUrl: existingQuote.layoutFile.thumbnailUrl,
         } as FileWithPreview,
       ]);
+    } else if (existingQuote.layoutFileId) {
+      getFileById(existingQuote.layoutFileId)
+        .then((response) => {
+          const file = response?.data;
+          if (file?.id) {
+            setLayoutFiles([
+              {
+                id: file.id,
+                name: file.filename || "layout",
+                size: file.size || 0,
+                type: file.mimetype || "application/octet-stream",
+                lastModified: Date.now(),
+                uploaded: true,
+                uploadProgress: 100,
+                uploadedFileId: file.id,
+                thumbnailUrl: file.thumbnailUrl,
+              } as FileWithPreview,
+            ]);
+          }
+        })
+        .catch(() => { /* layout will still display via artwork selector if applicable */ });
     }
 
     // Initialize customers cache from existing configs, then fetch full data
@@ -894,6 +933,7 @@ export const FinancialBudgetDetailPage = () => {
               task={task}
               disabled={isSubmitting || !canEdit}
               selectedCustomers={selectedCustomers}
+              formInitialized={formInitialized}
             />
           </div>
 

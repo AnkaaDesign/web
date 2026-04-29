@@ -37,6 +37,7 @@ interface BudgetStepServicesProps {
   disabled?: boolean;
   selectedCustomers: Map<string, any>;
   isCreateMode?: boolean;
+  formInitialized?: boolean;
 }
 
 export function BudgetStepServices({
@@ -44,6 +45,7 @@ export function BudgetStepServices({
   disabled,
   selectedCustomers,
   isCreateMode,
+  formInitialized = true,
 }: BudgetStepServicesProps) {
   const { control, setValue: setFormValue, getValues } = useFormContext();
   const { fields, append, remove, replace } = useFieldArray({ control, name: "services" });
@@ -118,9 +120,10 @@ export function BudgetStepServices({
   }, [selectedCustomers]);
 
 
-  // Service order sync on mount
+  // Service order sync — runs only after the parent has called form.reset() with server data
+  // (formInitialized = true), avoiding dirty-field conflicts with keepDirtyValues
   useEffect(() => {
-    if (syncedOnMount || !task) return;
+    if (syncedOnMount || !task || !formInitialized) return;
     setSyncedOnMount(true);
 
     const serviceOrders: SyncServiceOrder[] = (task.serviceOrders || []).filter(
@@ -146,7 +149,7 @@ export function BudgetStepServices({
         );
       });
     }
-  }, [task, syncedOnMount, getValues, append]);
+  }, [task, syncedOnMount, formInitialized, getValues, append]);
 
   // Add new service row
   const handleAddItem = useCallback(() => {

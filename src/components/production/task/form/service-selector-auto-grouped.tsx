@@ -133,8 +133,11 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
         return type === SERVICE_ORDER_TYPE.COMMERCIAL && (isNotAssigned || isAssignedToCurrentUser);
 
       case SECTOR_PRIVILEGES.LOGISTIC:
-        // Can ONLY edit service orders explicitly assigned to them (cannot edit unassigned orders)
-        return (type === SERVICE_ORDER_TYPE.LOGISTIC || type === SERVICE_ORDER_TYPE.PRODUCTION) && isAssignedToCurrentUser;
+        // LOGISTIC orders: can edit if unassigned or assigned to self
+        // PRODUCTION orders: only if explicitly assigned to self
+        if (type === SERVICE_ORDER_TYPE.LOGISTIC) return isNotAssigned || isAssignedToCurrentUser;
+        if (type === SERVICE_ORDER_TYPE.PRODUCTION) return isAssignedToCurrentUser;
+        return false;
 
       case SECTOR_PRIVILEGES.PRODUCTION_MANAGER:
         // Can edit PRODUCTION and LOGISTIC service orders when not assigned or assigned to them
@@ -168,8 +171,11 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
       case SECTOR_PRIVILEGES.FINANCIAL:
         return type === SERVICE_ORDER_TYPE.COMMERCIAL && (isNotAssigned || isAssignedToCurrentUser);
       case SECTOR_PRIVILEGES.LOGISTIC:
-        // Can ONLY change status on service orders explicitly assigned to them
-        return (type === SERVICE_ORDER_TYPE.LOGISTIC || type === SERVICE_ORDER_TYPE.PRODUCTION) && isAssignedToCurrentUser;
+        // LOGISTIC orders: can change status if unassigned or assigned to self
+        // PRODUCTION orders: only if explicitly assigned to self
+        if (type === SERVICE_ORDER_TYPE.LOGISTIC) return isNotAssigned || isAssignedToCurrentUser;
+        if (type === SERVICE_ORDER_TYPE.PRODUCTION) return isAssignedToCurrentUser;
+        return false;
       case SECTOR_PRIVILEGES.PRODUCTION_MANAGER:
         // Can change status on PRODUCTION and LOGISTIC service orders
         return (type === SERVICE_ORDER_TYPE.PRODUCTION || type === SERVICE_ORDER_TYPE.LOGISTIC) && (isNotAssigned || isAssignedToCurrentUser);

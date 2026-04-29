@@ -6,19 +6,20 @@ import { SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "@/c
  * Defines visibility and edit permissions for service order columns based on sector privileges.
  *
  * Permission Matrix (VISIBILITY):
- * | Sector          | PRODUCTION | COMMERCIAL | LOGISTIC   | ARTWORK    |
- * |-----------------|------------|------------|------------|------------|
- * | ADMIN           | view+edit  | view+edit  | view+edit  | view+edit  |
- * | COMMERCIAL      | view only  | view+edit* | view only  | view only  |
- * | DESIGNER        | view only  | -          | -          | view+edit* |
- * | FINANCIAL       | -          | view+edit* | view only  | -          |
- * | LOGISTIC        | view+edit  | view only  | view+edit* | view only  |
- * | PRODUCTION      | view+edit  | -          | -          | -          |
- * | WAREHOUSE       | view only  | -          | -          | -          |
- * | HUMAN_RESOURCES | view only  | -          | -          | -          |
- * | Others          | view only  | -          | -          | -          |
+ * | Sector          | PRODUCTION  | COMMERCIAL | LOGISTIC   | ARTWORK    |
+ * |-----------------|-------------|------------|------------|------------|
+ * | ADMIN           | view+edit   | view+edit  | view+edit  | view+edit  |
+ * | COMMERCIAL      | view only   | view+edit* | view only  | view only  |
+ * | DESIGNER        | view only   | -          | -          | view+edit* |
+ * | FINANCIAL       | -           | view+edit* | view only  | -          |
+ * | LOGISTIC        | view+edit†  | view only  | view+edit* | view only  |
+ * | PRODUCTION      | view+edit   | -          | -          | -          |
+ * | WAREHOUSE       | view only   | -          | -          | -          |
+ * | HUMAN_RESOURCES | view only   | -          | -          | -          |
+ * | Others          | view only   | -          | -          | -          |
  *
  * * = edit only own/unassigned service orders
+ * † = edit only when explicitly assigned (unassigned orders are not editable)
  *
  * Visibility Rules:
  * - PRODUCTION: Visible to ALL sectors, Editable by Admin/Logistic/Production only
@@ -32,6 +33,8 @@ export interface ServiceOrderPermissions {
   canEdit: boolean;
   /** Can only edit if no assignment or assigned to current user */
   editOnlyOwnOrUnassigned: boolean;
+  /** Stricter than editOnlyOwnOrUnassigned: can only edit if explicitly assigned to current user (unassigned is not enough) */
+  editOnlyOwn?: boolean;
 }
 
 /**
@@ -270,9 +273,12 @@ export function getServiceOrderPermissions(
 
   switch (serviceOrderType) {
     case SERVICE_ORDER_TYPE.PRODUCTION:
-      // Production visible to ALL, but editable only by Admin, Logistic, Production Manager, and Production
+      // LOGISTIC can edit PRODUCTION orders only when explicitly assigned to them
+      if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
+        return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: false, editOnlyOwn: true };
+      }
+      // Production Manager and Production sector can edit any unassigned or own PRODUCTION order
       const canEditProduction =
-        sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
         sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION_MANAGER ||
         sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION;
 
@@ -344,9 +350,13 @@ export function canEditServiceOrder(
     return false;
   }
 
-  // If edit is restricted to own/unassigned, check assignment
+  // Strictest restriction: must be explicitly assigned to current user
+  if (permissions.editOnlyOwn) {
+    return serviceOrderAssignedToId === currentUserId;
+  }
+
+  // Can edit if unassigned or assigned to current user
   if (permissions.editOnlyOwnOrUnassigned) {
-    // Can edit if unassigned or assigned to current user
     return !serviceOrderAssignedToId || serviceOrderAssignedToId === currentUserId;
   }
 

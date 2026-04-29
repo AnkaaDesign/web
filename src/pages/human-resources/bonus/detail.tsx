@@ -540,7 +540,6 @@ export default function BonusDetailPage() {
                           <div className="flex justify-between items-start gap-2">
                             <span className="text-sm text-muted-foreground group-hover:text-foreground flex items-center gap-1 flex-wrap">
                               {label}
-                              {/* Single date stays inline; multiple dates break to a column below. */}
                               {dates.length === 1 && (
                                 <span className="text-xs text-muted-foreground/70">{dates[0]}</span>
                               )}

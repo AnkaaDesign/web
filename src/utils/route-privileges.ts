@@ -39,6 +39,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/financeiro/faturamento": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
   "/financeiro/faturamento/detalhes/:id": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
   "/financeiro/orcamento": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
+  "/financeiro/orcamento/cadastrar": ["ADMIN", "COMMERCIAL"],
   "/financeiro/orcamento/detalhes/:id": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
   "/financeiro/notas-fiscais": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
   "/financeiro/notas-fiscais/:id": ["FINANCIAL", "ADMIN", "COMMERCIAL"],
