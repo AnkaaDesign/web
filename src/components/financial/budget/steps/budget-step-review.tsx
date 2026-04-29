@@ -7,6 +7,16 @@ import { Combobox } from "@/components/ui/combobox";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
   IconFileInvoice,
   IconBuilding,
   IconTruck,
@@ -21,7 +31,7 @@ import { formatCurrency, formatDate, formatChassis } from "@/utils";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/quote-text-generators";
 import { getApiBaseUrl } from "@/config/api";
 import { routes } from "@/constants";
-import { canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
+import { canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
 import { cn } from "@/lib/utils";
 import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
 
@@ -157,6 +167,20 @@ export function BudgetStepReview({
 
   const canChangeStatus = canUpdateQuoteStatus(userRole);
 
+  // Allowed next statuses for the current state + role.
+  const allowedNextStatuses = useMemo(() => {
+    if (!currentStatus) return [] as string[];
+    return getAvailableQuoteStatusTransitions(
+      currentStatus as TASK_QUOTE_STATUS,
+      userRole,
+    );
+  }, [currentStatus, userRole]);
+
+  // Reject-reason dialog: required when reverting from BUDGET_APPROVED to PENDING.
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [pendingRejectStatus, setPendingRejectStatus] = useState<string | null>(null);
+
   // Public budget URL
   const publicBudgetUrl = existingQuote?.id && task?.customer?.id
     ? routes.customer.budget(task.customer.id, existingQuote.id)
@@ -204,15 +228,26 @@ export function BudgetStepReview({
                   <Combobox
                     value={currentStatus}
                     onValueChange={(v) => {
-                      if (v && typeof v === "string") {
+                      if (v && typeof v === "string" && v !== currentStatus) {
+                        // Reject path — require a reason when stepping back to PENDING.
+                        if (v === "PENDING" && currentStatus && currentStatus !== "PENDING") {
+                          setPendingRejectStatus(v);
+                          setRejectReason("");
+                          setRejectDialogOpen(true);
+                          return;
+                        }
                         setValue("status", v, { shouldDirty: true });
                         onStatusChange?.(v);
                       }
                     }}
-                    options={STATUS_OPTIONS.map((s) => ({
-                      ...s,
-                      disabled: s.value === currentStatus,
-                    }))}
+                    options={STATUS_OPTIONS.map((s) => {
+                      const isCurrent = s.value === currentStatus;
+                      const allowed = isCurrent || allowedNextStatuses.includes(s.value as TASK_QUOTE_STATUS);
+                      return {
+                        ...s,
+                        disabled: isCurrent || !allowed,
+                      };
+                    })}
                     searchable={false}
                     clearable={false}
                     disabled={disabled}
@@ -598,6 +633,60 @@ export function BudgetStepReview({
           </div>
         );
       })()}
+
+      {/* Reject reason dialog — required when reverting to PENDING.
+          NOTE: parent FinancialBudgetDetailPage submits via taskQuoteService.update +
+          updateStatus on save; the reason is stored in form ("statusReason") and forwarded. */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rejeitar Orçamento</DialogTitle>
+            <DialogDescription>
+              Informe o motivo da rejeição. O status do orçamento voltará para Pendente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <Label htmlFor="budget-reject-reason" className="text-sm font-medium">
+              Motivo da rejeição <span className="text-destructive">*</span>
+            </Label>
+            <Textarea
+              id="budget-reject-reason"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Descreva o motivo (mínimo 5 caracteres)..."
+              rows={4}
+              className="resize-none"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRejectDialogOpen(false);
+                setPendingRejectStatus(null);
+                setRejectReason("");
+              }}
+            >
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={rejectReason.trim().length < 5}
+              onClick={() => {
+                if (rejectReason.trim().length < 5 || !pendingRejectStatus) return;
+                setValue("statusReason", rejectReason.trim(), { shouldDirty: true });
+                setValue("status", pendingRejectStatus, { shouldDirty: true });
+                onStatusChange?.(pendingRejectStatus);
+                setRejectDialogOpen(false);
+                setPendingRejectStatus(null);
+                setRejectReason("");
+              }}
+            >
+              Confirmar Rejeição
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

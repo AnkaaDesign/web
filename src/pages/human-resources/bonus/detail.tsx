@@ -8,7 +8,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { formatCurrency } from "../../../utils";
@@ -352,6 +352,13 @@ export default function BonusDetailPage() {
   // The server flags this when the response came from the stale SWR tier.
   const isStale = !!bonus?.isStale;
 
+  // Wave 2-H: live bonus endpoints expose Secullum integration health flags.
+  // When `secullumAvailable === false`, atestado/falta penalty calculations
+  // could not run — warn admins that the displayed values may be stale.
+  const secullumAvailable: boolean | undefined = bonus?.secullumAvailable;
+  const secullumSyncError: string | null | undefined = bonus?.secullumSyncError;
+  const showSecullumWarning = secullumAvailable === false;
+
   // Skeleton blocks used while stage 3 is still loading.
   const financialSkeleton = (
     <CardContent className="space-y-2">
@@ -435,6 +442,21 @@ export default function BonusDetailPage() {
             },
           ]}
         />
+
+        {showSecullumWarning && (
+          <Alert variant="warning">
+            <AlertTitle>Integração Secullum indisponível</AlertTitle>
+            <AlertDescription>
+              <p>
+                Os descontos de atestado e falta não puderam ser calculados. Os valores exibidos
+                podem estar desatualizados. Tente novamente em alguns minutos.
+              </p>
+              {secullumSyncError && (
+                <p className="mt-1 text-xs opacity-80">{secullumSyncError}</p>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Info Cards - 2 columns */}
         <div className="grid gap-4 md:grid-cols-2">

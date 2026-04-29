@@ -653,7 +653,10 @@ export const validateBonusGeneration = (data: BonusGeneratePeriodFormData): { is
  */
 export const getBonusPeriodRange = (year: number, month: number) => {
   // Start date: 26th of previous month
-  const startDate = new Date(year, month - 2, 26);
+  const startDate =
+    month === 1
+      ? new Date(year - 1, 11, 26, 0, 0, 0, 0)
+      : new Date(year, month - 2, 26, 0, 0, 0, 0);
 
   // End date: 25th of current month
   const endDate = new Date(year, month - 1, 25, 23, 59, 59, 999);

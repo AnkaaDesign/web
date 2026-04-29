@@ -316,16 +316,18 @@ export const useBonusList = (
 // =====================================================
 
 /**
- * Hook to get payroll data for a specific period
- * Shows confirmed bonuses that are ready for payroll processing
+ * Hook to get bonus payroll data for a specific period.
+ * Renamed from `usePayroll` to avoid collision with `usePayroll` exported by
+ * `use-payroll.ts` (which has a different staleTime and serves saved payroll
+ * records, not bonus payroll data).
  */
-export const usePayroll = (
+export const useBonusPayroll = (
   params: BonusPayrollParams,
   options?: { enabled?: boolean }
 ) => {
   return useQuery({
     queryKey: bonusKeys.payroll(params),
-    queryFn: () => bonusService.getPayroll(params).then(response => response.data),
+    queryFn: () => bonusService.getBonusPayroll(params).then(response => response.data),
     staleTime: 1000 * 60, // 1 minute - refresh frequently for payroll data
     refetchInterval: 1000 * 60, // Refetch every minute
     enabled: (options?.enabled ?? true) && !!params.year && !!params.month,
@@ -606,20 +608,31 @@ export const useExportBonuses = () => {
 // =====================================================
 
 /**
- * Hook to manage bonus discounts (add/remove discounts from bonuses)
+ * Hook to manage bonus discounts (add/remove discounts from bonuses).
+ *
+ * On success we invalidate `bonusKeys.all` so list views refetch, and — when
+ * a `bonusId` is provided in the variables — also invalidate the specific
+ * bonus detail query so the detail page reflects the discount change.
  */
 export const useBonusDiscountMutations = () => {
   const queryClient = useQueryClient();
 
-  const invalidateQueries = () => {
+  const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: bonusKeys.all });
+  };
+
+  const invalidateBonusDetail = (bonusId?: string) => {
+    if (bonusId) {
+      queryClient.invalidateQueries({ queryKey: bonusKeys.detail(bonusId) });
+    }
   };
 
   return {
     create: useMutation({
       mutationFn: (data: BonusDiscountCreateFormData) => bonusService.createDiscount(data),
-      onSuccess: () => {
-        invalidateQueries();
+      onSuccess: (_data, variables) => {
+        invalidateAll();
+        invalidateBonusDetail(variables?.bonusId);
         toast.success('Desconto adicionado com sucesso');
       },
       onError: (error: any) => {
@@ -629,9 +642,17 @@ export const useBonusDiscountMutations = () => {
     }),
 
     delete: useMutation({
-      mutationFn: (id: string) => bonusService.deleteDiscount(id),
-      onSuccess: () => {
-        invalidateQueries();
+      // Caller may pass a plain id (legacy) or { id, bonusId } so the parent
+      // bonus detail can also be invalidated.
+      mutationFn: (input: string | { id: string; bonusId?: string }) => {
+        const id = typeof input === 'string' ? input : input.id;
+        return bonusService.deleteDiscount(id);
+      },
+      onSuccess: (_data, variables) => {
+        invalidateAll();
+        if (typeof variables !== 'string') {
+          invalidateBonusDetail(variables?.bonusId);
+        }
         toast.success('Desconto removido com sucesso');
       },
       onError: (error: any) => {

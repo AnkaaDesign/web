@@ -5,7 +5,6 @@
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, DecimalValue } from "./common";
 import type { ORDER_BY_DIRECTION } from "../constants";
-import { BONUS_STATUS } from "../constants/enums";
 import type { User, UserIncludes } from "./user";
 import type { Task, TaskIncludes } from "./task";
 import type { BonusDiscount, BonusDiscountIncludes } from "./bonusDiscount";
@@ -26,16 +25,16 @@ export interface Bonus extends BaseEntity {
   weightedTasks: DecimalValue | number;
   averageTaskPerUser: DecimalValue | number;
 
-  // Status tracking
-  status?: BONUS_STATUS;
-  statusOrder?: number;
+  // Note: Bonus status is NOT a Prisma column. Status was previously tracked
+  // here but the database has no such field. Use derived state from
+  // payrollId presence (saved/draft) instead.
 
   // Calculation period
   calculationPeriodStart?: Date | null;
   calculationPeriodEnd?: Date | null;
 
-  // Note: ponderedTaskCount might be a duplicate of weightedTasks
-  // Consider if these should be aliases or separate properties
+  // @deprecated Aliases retained for `mapToBonusFormData` in schemas/bonus.ts
+  // (owned by another agent). Prefer canonical names: weightedTasks, averageTaskPerUser.
   ponderedTaskCount?: DecimalValue | number;
   averageTasksPerUser?: DecimalValue | number;
 
@@ -271,6 +270,16 @@ export interface LiveBonusGetManyResponse {
     year: number;
     month: number;
   };
+  /**
+   * Wave 2-H: Secullum integration health flags returned by the live bonus
+   * endpoints (`GET /bonus/live/:year/:month` and `GET /bonus/live/:userId/:year/:month`).
+   * When `secullumAvailable === false`, atestado/falta penalty calculations
+   * could not run — the UI should warn admins that the displayed values may
+   * be stale.
+   */
+  secullumAvailable?: boolean;
+  /** Optional human-readable error from the Secullum sync attempt. */
+  secullumSyncError?: string | null;
 }
 
 // =====================

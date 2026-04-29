@@ -54,6 +54,16 @@ interface PayrollData {
     minBonus: number;
     maxBonus: number;
   };
+  /**
+   * Wave 2-H: Secullum integration health flags returned by the live bonus
+   * endpoints (`GET /bonus/live/:year/:month` and
+   * `GET /bonus/live/:userId/:year/:month`). When `secullumAvailable === false`,
+   * atestado/falta penalty calculations could not run — the UI should warn
+   * admins that the displayed values may be stale.
+   */
+  secullumAvailable?: boolean;
+  /** Optional human-readable error from the Secullum sync attempt. */
+  secullumSyncError?: string | null;
 }
 
 interface BonusDiscountCreateFormData {
@@ -244,7 +254,7 @@ export const bonusService = {
   saveMonthlyBonuses: (params: BonusCalculationParams) =>
     apiClient.post<BonusCalculationResult>(`/bonus/calculate/${params.year}/${params.month}`),
 
-  getPayroll: (params: BonusPayrollParams) => {
+  getBonusPayroll: (params: BonusPayrollParams) => {
     const year = params.year || new Date().getFullYear().toString();
     const month = params.month || (new Date().getMonth() + 1).toString();
     return apiClient.get<PayrollData>(`/bonus/live/${year}/${month}`);

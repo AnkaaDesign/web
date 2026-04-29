@@ -30,19 +30,25 @@ export const payrollService = {
 
   /**
    * Get payroll by ID - Standard entity retrieval
-   * Handles both regular UUIDs and live IDs (format: live-{userId}-{year}-{month})
+   * Handles both regular UUIDs and live IDs (format: live-{userId}-{year}-{month}).
+   *
+   * The userId portion is a UUID containing internal hyphens, so we cannot
+   * split-on-`-`; the year and month are always the last two segments.
    */
   getById: (id: string, params?: PayrollGetByIdParams) => {
-    // Check if this is a live ID (format: live-{userId}-{year}-{month})
     if (id.startsWith('live-')) {
-      const parts = id.split('-');
-      // live-{uuid part1}-{uuid part2}-{uuid part3}-{uuid part4}-{uuid part5}-{year}-{month}
-      if (parts.length === 8) {
-        const userId = `${parts[1]}-${parts[2]}-${parts[3]}-${parts[4]}-${parts[5]}`;
-        const year = parseInt(parts[6], 10);
-        const month = parseInt(parts[7], 10);
-        // Call the proper live endpoint
-        return apiClient.get<Payroll>(`/payroll/live/${userId}/${year}/${month}`);
+      const rest = id.slice(5); // strip 'live-' prefix
+      const lastDash = rest.lastIndexOf('-');
+      if (lastDash > 0) {
+        const secondLastDash = rest.lastIndexOf('-', lastDash - 1);
+        if (secondLastDash > 0) {
+          const userId = rest.slice(0, secondLastDash);
+          const year = parseInt(rest.slice(secondLastDash + 1, lastDash), 10);
+          const month = parseInt(rest.slice(lastDash + 1), 10);
+          if (userId && Number.isFinite(year) && Number.isFinite(month)) {
+            return apiClient.get<Payroll>(`/payroll/live/${userId}/${year}/${month}`);
+          }
+        }
       }
     }
     // Regular UUID - use normal endpoint

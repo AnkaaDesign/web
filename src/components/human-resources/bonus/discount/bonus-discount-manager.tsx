@@ -8,6 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { formatCurrency } from "../../../../utils";
 import { bonusDiscountCreateSchema } from "../../../../schemas";
@@ -42,6 +52,19 @@ export function BonusDiscountManager({
   className
 }: BonusDiscountManagerProps) {
   const [activeTab, setActiveTab] = useState<"discounts" | "extras" | "suspended">("discounts");
+  const [discountToRemove, setDiscountToRemove] = useState<string | null>(null);
+  const [isRemovingDiscount, setIsRemovingDiscount] = useState(false);
+
+  const confirmRemoveDiscount = async () => {
+    if (!discountToRemove) return;
+    setIsRemovingDiscount(true);
+    try {
+      await onRemoveDiscount(discountToRemove);
+      setDiscountToRemove(null);
+    } finally {
+      setIsRemovingDiscount(false);
+    }
+  };
 
   const form = useForm<BonusDiscountCreateFormData>({
     resolver: zodResolver(bonusDiscountCreateSchema),
@@ -145,7 +168,7 @@ export function BonusDiscountManager({
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => onRemoveDiscount(discount.id)}
+          onClick={() => setDiscountToRemove(discount.id)}
         >
           <IconTrash className="h-4 w-4" />
         </Button>
@@ -498,6 +521,34 @@ export function BonusDiscountManager({
           </Card>
         </div>
       )}
+
+      <AlertDialog
+        open={discountToRemove !== null}
+        onOpenChange={(open) => {
+          if (!isRemovingDiscount && !open) {
+            setDiscountToRemove(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover este desconto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação removerá o desconto e recalculará o bônus. Não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemovingDiscount}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemoveDiscount}
+              disabled={isRemovingDiscount}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRemovingDiscount ? "Removendo..." : "Remover"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

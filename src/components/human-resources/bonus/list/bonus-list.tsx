@@ -8,8 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { formatCurrency, formatDate } from "../../../../utils";
-import { BONUS_STATUS_LABELS, routes } from "../../../../constants";
-import { getBadgeVariant } from "../../../../constants";
+import { routes } from "../../../../constants";
 import type { Bonus } from "../../../../types";
 import type { BonusGetManyFormData } from "../../../../schemas";
 import { IconPlus, IconEye, IconCalculator } from "@tabler/icons-react";
@@ -31,7 +30,6 @@ const getDefaultVisibleColumns = () =>
     "month",
     "baseBonus",
     "performanceLevel",
-    "status",
     "createdAt",
     "actions",
   ]);
@@ -142,16 +140,6 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
       render: (bonus) => (
         <Badge variant={bonus.performanceLevel > 0 ? "success" : "secondary"}>
           {bonus.performanceLevel}
-        </Badge>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      sortable: true,
-      render: (bonus) => (
-        <Badge variant={bonus.status ? getBadgeVariant(bonus.status) : "secondary"}>
-          {bonus.status ? (BONUS_STATUS_LABELS[bonus.status] || bonus.status) : "N/A"}
         </Badge>
       ),
     },

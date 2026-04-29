@@ -10,6 +10,7 @@ import {
   IconCurrencyReal,
   IconPaperclip,
   IconUpload,
+  IconCopy,
 } from '@tabler/icons-react';
 import { useRegenerateBoleto, useCancelBoleto, useChangeBankSlipDueDate, useMarkBoletoPaid, useUpdateInstallmentReceipt } from '@/hooks/production/use-invoice';
 import { Combobox } from '@/components/ui/combobox';
@@ -323,6 +324,20 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
     }
   };
 
+  const handleCopyDigitableLine = async () => {
+    const line = bankSlip?.digitableLine;
+    if (!line) {
+      toast.error('Linha digitável indisponível.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(line);
+      toast.success('Linha digitável copiada.');
+    } catch {
+      toast.error('Não foi possível copiar a linha digitável.');
+    }
+  };
+
   // Determine what actions to show
   const isPaid = installmentStatus === 'PAID';
   const isPaidByBankSlip = isPaid && bankSlip?.status === 'PAID';
@@ -331,6 +346,8 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
   const canRegenerate = bankSlip && ['ERROR', 'REJECTED', 'CANCELLED'].includes(bankSlip.status);
   const canCancel = bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canDownloadPdf = bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
+  const canCopyDigitableLine =
+    !!bankSlip?.digitableLine && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canChangeDueDate = bankSlip && (bankSlip.status === 'OVERDUE' || bankSlip.status === 'ACTIVE');
   // Allow mark-as-paid whenever the installment itself is unpaid (PENDING, ACTIVE, or OVERDUE).
   // PENDING is included for the generateInvoice=false flow where no bank slip is created (PIX/transfer).
@@ -342,7 +359,7 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
   // Sicredi removes the PDF after payment; only show if we have a locally stored copy
   const showBoletoPdfForPaid = isPaidByBankSlip && !hasReceipt && !!bankSlip?.pdfFileId;
 
-  const hasAnyAction = canRegenerate || canCancel || canDownloadPdf || canChangeDueDate || canMarkPaid || showBoletoPdfForPaid || showReceiptView || showAttachReceipt;
+  const hasAnyAction = canRegenerate || canCancel || canDownloadPdf || canCopyDigitableLine || canChangeDueDate || canMarkPaid || showBoletoPdfForPaid || showReceiptView || showAttachReceipt;
 
   if (!hasAnyAction) return null;
 
@@ -464,6 +481,18 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
               )}
             </Button>
           </>
+        )}
+
+        {canCopyDigitableLine && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCopyDigitableLine}
+            title="Copiar linha digitável"
+            className="h-7 w-7 p-0"
+          >
+            <IconCopy className="h-4 w-4" />
+          </Button>
         )}
 
         {canChangeDueDate && (

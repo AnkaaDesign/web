@@ -151,6 +151,9 @@ export const FinancialBudgetDetailPage = () => {
       // Quote fields
       expiresAt: getDefaultExpiresAt(),
       status: "PENDING" as string,
+      // Captured by BudgetStepReview when rejecting a quote (status -> PENDING).
+      // Forwarded to taskQuoteService.updateStatus by handleStatusChange.
+      statusReason: "" as string,
       subtotal: 0,
       total: 0,
       guaranteeYears: null as number | null,
@@ -759,13 +762,16 @@ export const FinancialBudgetDetailPage = () => {
     navigate,
   ]);
 
-  // Handle status change
+  // Handle status change. The reject-reason dialog stores the reason in
+  // form.statusReason; we forward it then clear so it isn't reused.
   const handleStatusChange = useCallback(
     async (newStatus: string) => {
       if (!existingQuote?.id) return;
       try {
-        await taskQuoteService.updateStatus(existingQuote.id, newStatus);
+        const reason = (form.getValues("statusReason" as any) as string | undefined)?.trim() || undefined;
+        await taskQuoteService.updateStatus(existingQuote.id, newStatus, reason);
         queryClient.invalidateQueries({ queryKey: taskQuoteKeys.all });
+        if (reason) form.setValue("statusReason" as any, "");
         toast.success("Status atualizado com sucesso!");
       } catch (error: any) {
         console.error("Error updating quote status:", error);
@@ -774,7 +780,7 @@ export const FinancialBudgetDetailPage = () => {
         );
       }
     },
-    [existingQuote, queryClient],
+    [existingQuote, queryClient, form],
   );
 
   // Build header info

@@ -249,14 +249,14 @@ export function BonusForm({
                       <FormLabel>Valor Base da Bonificação</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          step={0.01}
-                          min={0}
-                          placeholder="0,00"
+                          type="currency"
+                          placeholder="R$ 0,00"
                           ref={field.ref}
-                          onChange={(value: string | number | null) => field.onChange(typeof value === 'number' ? value : (typeof value === 'string' ? Number(value) || 0 : 0))}
+                          onChange={(value: string | number | null) =>
+                            field.onChange(typeof value === "number" ? value : 0)
+                          }
                           onBlur={field.onBlur}
-                          value={field.value}
+                          value={field.value ?? 0}
                         />
                       </FormControl>
                       {watchedValues.baseBonus !== undefined && watchedValues.baseBonus > 0 && (

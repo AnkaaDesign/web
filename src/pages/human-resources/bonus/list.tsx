@@ -21,6 +21,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
@@ -34,7 +44,7 @@ import { BonusExport } from "@/components/human-resources/bonus/export/bonus-exp
 import { BonusColumnVisibilityManager } from "@/components/human-resources/bonus/list/bonus-column-visibility-manager";
 import { FilterIndicators } from "@/components/human-resources/bonus/list/filter-indicator";
 import { extractActiveFilters, createFilterRemover } from "@/components/human-resources/bonus/list/filter-utils";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useBonusList, useSectors, usePositions, useUsers } from "../../../hooks";
 import { calculatePonderedTasks } from "../../../utils/bonus";
 import { StandardizedTable } from "@/components/ui/standardized-table";
@@ -644,7 +654,8 @@ export default function BonusListPage() {
           name: user.sector.name,
         } : undefined,
         performanceLevel: bonus.performanceLevel || user.performanceLevel || 0,
-        status: bonus.status || 'active',
+        // Bonus has no `status` column in Prisma; default to 'active' for the UI row shape.
+        status: 'active',
 
         bonusId: bonus.id,
         bonusAmount: netBonusAmount,              // Net bonus (after discounts) for summary calculations
@@ -785,6 +796,13 @@ export default function BonusListPage() {
   const hasActiveFilters = activeFiltersCount > 0;
   const hasError = !!error;
 
+  // Wave 2-H: live bonus endpoints expose Secullum integration health flags.
+  // When `secullumAvailable === false`, atestado/falta penalty calculations
+  // could not run, so admins need to know the displayed values may be stale.
+  const secullumAvailable = (bonusData as any)?.secullumAvailable;
+  const secullumSyncError = (bonusData as any)?.secullumSyncError as string | null | undefined;
+  const showSecullumWarning = secullumAvailable === false;
+
   // Period reajuste — only applicable when a single period is selected.
   const singlePeriod =
     filters.year && filters.months && filters.months.length === 1
@@ -796,6 +814,8 @@ export default function BonusListPage() {
   const applyPeriodAdjustment = useApplyPeriodAdjustment();
   const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
   const [adjustmentInput, setAdjustmentInput] = useState("");
+  const [adjustmentConfirmOpen, setAdjustmentConfirmOpen] = useState(false);
+  const [adjustmentPending, setAdjustmentPending] = useState<number | null>(null);
 
   const openAdjustmentModal = () => {
     if (!singlePeriod) return;
@@ -803,7 +823,10 @@ export default function BonusListPage() {
     setAdjustmentModalOpen(true);
   };
 
-  const submitAdjustment = async () => {
+  // Step 1: validate input and open the confirmation dialog. Does NOT fire the
+  // mutation — the user must explicitly confirm because this recalculates ALL
+  // bonuses for the period (irreversible).
+  const requestAdjustment = () => {
     if (!singlePeriod) return;
     const parsed = parseFloat(adjustmentInput.replace(",", "."));
     if (!Number.isFinite(parsed)) {
@@ -814,6 +837,14 @@ export default function BonusListPage() {
       toast.error("Reajuste deve estar entre -100% e +100%.");
       return;
     }
+    setAdjustmentPending(parsed);
+    setAdjustmentConfirmOpen(true);
+  };
+
+  // Step 2: actually fire the mutation after confirmation.
+  const confirmAdjustment = async () => {
+    if (!singlePeriod || adjustmentPending === null) return;
+    const parsed = adjustmentPending;
     try {
       const res: any = await applyPeriodAdjustment.mutateAsync({
         year: singlePeriod.year,
@@ -823,9 +854,12 @@ export default function BonusListPage() {
       toast.success(
         res?.message || `Reajuste de ${parsed > 0 ? "+" : ""}${parsed}% aplicado ao período.`,
       );
+      setAdjustmentConfirmOpen(false);
       setAdjustmentModalOpen(false);
+      setAdjustmentPending(null);
     } catch (err: any) {
       toast.error(err?.message || "Falha ao aplicar reajuste.");
+      setAdjustmentConfirmOpen(false);
     }
   };
 
@@ -870,6 +904,21 @@ export default function BonusListPage() {
             <IconAlertCircle className="h-4 w-4" />
             <AlertDescription>
               Erro ao carregar dados de bônus. Verifique a conexão e tente novamente.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {showSecullumWarning && (
+          <Alert variant="warning" className="flex-shrink-0">
+            <AlertTitle>Integração Secullum indisponível</AlertTitle>
+            <AlertDescription>
+              <p>
+                Os descontos de atestado e falta não puderam ser calculados. Os valores exibidos
+                podem estar desatualizados. Tente novamente em alguns minutos.
+              </p>
+              {secullumSyncError && (
+                <p className="mt-1 text-xs opacity-80">{secullumSyncError}</p>
+              )}
             </AlertDescription>
           </Alert>
         )}
@@ -1012,12 +1061,59 @@ export default function BonusListPage() {
             >
               Cancelar
             </Button>
-            <Button onClick={submitAdjustment} disabled={applyPeriodAdjustment.isPending}>
+            <Button onClick={requestAdjustment} disabled={applyPeriodAdjustment.isPending}>
               {applyPeriodAdjustment.isPending ? "Aplicando..." : "Aplicar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={adjustmentConfirmOpen}
+        onOpenChange={(open) => {
+          if (!applyPeriodAdjustment.isPending) {
+            setAdjustmentConfirmOpen(open);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar reajuste do período</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {singlePeriod && adjustmentPending !== null && (
+                  <>
+                    <div className="text-sm">
+                      <span className="font-medium">Período: </span>
+                      {String(singlePeriod.month).padStart(2, "0")}/{singlePeriod.year}
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-medium">Reajuste: </span>
+                      {adjustmentPending > 0 ? "+" : ""}
+                      {adjustmentPending}%
+                    </div>
+                    <div className="text-sm">
+                      Esta ação irá recalcular {processedBonuses.length} {" "}
+                      {processedBonuses.length === 1 ? "bônus" : "bônus"} deste período. Deseja continuar?
+                    </div>
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={applyPeriodAdjustment.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmAdjustment}
+              disabled={applyPeriodAdjustment.isPending}
+            >
+              {applyPeriodAdjustment.isPending ? "Aplicando..." : "Confirmar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PrivilegeRoute>
   );
 }

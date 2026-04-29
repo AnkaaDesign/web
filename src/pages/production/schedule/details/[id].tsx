@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { canCancelServiceOrder, canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
-import { canViewQuote, canEditQuote, canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
+import { canViewQuote, canEditQuote, canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
 import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { InstallmentStatusBadge } from "@/components/production/task/billing/installment-status-badge";
 import { BankSlipStatusBadge } from "@/components/production/task/billing/bank-slip-status-badge";
@@ -65,6 +65,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   HoverCard,
   HoverCardContent,
@@ -944,6 +954,12 @@ export const TaskDetailsPage = () => {
     title: string;
     description: string;
   }>({ open: false, newStatus: '', currentStatus: '', title: '', description: '' });
+  // Reject-reason dialog used when downgrading any non-PENDING status to PENDING.
+  const [rejectDialog, setRejectDialog] = useState<{
+    open: boolean;
+    newStatus: string;
+    reason: string;
+  }>({ open: false, newStatus: '', reason: '' });
   // Get user's sector privilege for service order permissions
   const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
 
@@ -1600,6 +1616,12 @@ export const TaskDetailsPage = () => {
       return;
     }
 
+    // Reject/cancel — downgrading any non-PENDING status to PENDING needs a reason.
+    if (newStatus === 'PENDING' && currentStatus && currentStatus !== 'PENDING') {
+      setRejectDialog({ open: true, newStatus, reason: '' });
+      return;
+    }
+
     // Confirmation for reverting SETTLED → PARTIAL (payment reversal)
     if (currentStatus === 'SETTLED' && newStatus === 'PARTIAL') {
       setQuoteConfirmDialog({
@@ -1615,11 +1637,11 @@ export const TaskDetailsPage = () => {
     await executeQuoteStatusChange(newStatus);
   };
 
-  const executeQuoteStatusChange = async (newStatus: string) => {
+  const executeQuoteStatusChange = async (newStatus: string, reason?: string) => {
     if (!task?.quote?.id) return;
     setIsUpdatingQuoteStatus(true);
     try {
-      await taskQuoteService.updateStatus(task.quote.id, newStatus);
+      await taskQuoteService.updateStatus(task.quote.id, newStatus, reason);
       refreshTask();
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
     } catch (error) {
@@ -2262,18 +2284,27 @@ export const TaskDetailsPage = () => {
                               SETTLED: 'Liquidado',
                             };
 
-                            // Task detail page only allows PENDING and BUDGET_APPROVED transitions
-                            // Further status changes must be done in the financial billing page
+                            // Task detail page only exposes PENDING and BUDGET_APPROVED;
+                            // further status changes must be done in the financial billing page.
+                            // The transitions helper still gates by user role.
                             const allStatuses: TASK_QUOTE_STATUS[] = [
                               'PENDING', 'BUDGET_APPROVED',
                             ];
                             const userPrivilege = currentUser?.sector?.privileges || '';
+                            const allowedNext = getAvailableQuoteStatusTransitions(
+                              quoteStatus,
+                              userPrivilege,
+                            );
                             const statusOptions: ComboboxOption[] = allStatuses
-                              .map((s) => ({
-                                value: s,
-                                label: statusLabels[s],
-                                disabled: s === quoteStatus,
-                              }));
+                              .map((s) => {
+                                const isCurrent = s === quoteStatus;
+                                const allowed = isCurrent || allowedNext.includes(s);
+                                return {
+                                  value: s,
+                                  label: statusLabels[s],
+                                  disabled: isCurrent || !allowed,
+                                };
+                              });
 
                             const getQuoteStatusTriggerClass = (status: TASK_QUOTE_STATUS) => {
                               switch (status) {
@@ -4342,6 +4373,60 @@ export const TaskDetailsPage = () => {
             )}
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Reject/Cancel reason dialog — required min 5 chars when reverting to PENDING. */}
+        <Dialog
+          open={rejectDialog.open}
+          onOpenChange={(open) => setRejectDialog((prev) => ({ ...prev, open }))}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Rejeitar Orçamento</DialogTitle>
+              <DialogDescription>
+                Informe o motivo da rejeição. O status do orçamento voltará para Pendente.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-2 space-y-2">
+              <Label htmlFor="quote-reject-reason" className="text-sm font-medium">
+                Motivo da rejeição <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="quote-reject-reason"
+                value={rejectDialog.reason}
+                onChange={(e) =>
+                  setRejectDialog((prev) => ({ ...prev, reason: e.target.value }))
+                }
+                placeholder="Descreva o motivo (mínimo 5 caracteres)..."
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setRejectDialog({ open: false, newStatus: '', reason: '' })}
+                disabled={isUpdatingQuoteStatus}
+              >
+                Voltar
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={
+                  isUpdatingQuoteStatus || rejectDialog.reason.trim().length < 5
+                }
+                onClick={async () => {
+                  const reason = rejectDialog.reason.trim();
+                  if (reason.length < 5) return;
+                  const targetStatus = rejectDialog.newStatus;
+                  await executeQuoteStatusChange(targetStatus, reason);
+                  setRejectDialog({ open: false, newStatus: '', reason: '' });
+                }}
+              >
+                {isUpdatingQuoteStatus ? 'Processando...' : 'Confirmar Rejeição'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
     </PrivilegeRoute>
   );

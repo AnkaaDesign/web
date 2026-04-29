@@ -18,7 +18,7 @@ export {
   useBonusByUser,
   useBonusByPeriod,
   useBonusList,
-  usePayroll as useBonusPayroll,
+  useBonusPayroll,
   useExportPayroll,
   useExportBonuses,
   useBonusDiscountMutations,

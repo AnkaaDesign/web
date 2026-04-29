@@ -12,10 +12,29 @@ import { BoletoActions } from "@/components/production/task/billing/boleto-actio
 import { NfseStatusBadge } from "@/components/production/task/billing/nfse-status-badge";
 import { NfseActions } from "@/components/production/task/billing/nfse-actions";
 import { NfseEnrichedInfo } from "@/components/production/task/billing/nfse-enriched-info";
-import { SECTOR_PRIVILEGES } from "@/constants";
-import { canUpdateQuoteStatus } from "@/utils/permissions/quote-permissions";
+import { canUpdateQuoteStatus, getAvailableQuoteStatusTransitions } from "@/utils/permissions/quote-permissions";
 import type { Invoice } from "@/types/invoice";
 import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { IconFileInvoice, IconCurrencyReal, IconBuilding, IconTruck, IconCreditCard, IconReceipt, IconDownload, IconEye, IconLoader2, IconFolderCheck, IconCameraCheck, IconCameraBolt, IconExternalLink } from "@tabler/icons-react";
 import { cn, getApiBaseUrl } from "@/lib/utils";
 import { useState } from "react";
@@ -159,6 +178,21 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
 
   const canChangeStatus = canUpdateQuoteStatus(userPrivilege);
 
+  // Allowed transitions from the current status for this user.
+  // Helper centralizes role + transition logic.
+  const allowedNextStatuses = useMemo(() => {
+    if (!currentStatus) return [] as string[];
+    return getAvailableQuoteStatusTransitions(currentStatus as TASK_QUOTE_STATUS, userPrivilege);
+  }, [currentStatus, userPrivilege]);
+
+  // Reject/cancel dialog state — when downgrading to PENDING from a non-PENDING status
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [pendingDestructiveStatus, setPendingDestructiveStatus] = useState<string | null>(null);
+  // Generic confirmation for non-reject destructive transitions (e.g. SETTLED -> PARTIAL)
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingConfirmStatus, setPendingConfirmStatus] = useState<string | null>(null);
+
   // Compute paid/total installment counts for PARTIAL badge
   const installmentCounts = useMemo(() => {
     let paid = 0;
@@ -259,19 +293,41 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               <Combobox
                 value={currentStatus}
                 onValueChange={(v) => {
-                  if (v && typeof v === "string") {
+                  if (v && typeof v === "string" && v !== currentStatus) {
                     if (!validateCustomerDataForStatus(v)) return;
+                    // Reject/cancel: downgrading any non-PENDING status back to PENDING — collect reason
+                    if (v === "PENDING" && currentStatus !== "PENDING") {
+                      setPendingDestructiveStatus(v);
+                      setRejectReason("");
+                      setRejectDialogOpen(true);
+                      return;
+                    }
+                    // Generic confirmation for other backwards transitions handled by valid-transitions map
+                    // (e.g. SETTLED -> PARTIAL, BUDGET_APPROVED -> PENDING handled above already).
+                    const isBackward =
+                      (currentStatus === "BUDGET_APPROVED" && v === "PENDING") ||
+                      (currentStatus === "COMMERCIAL_APPROVED" && v === "BUDGET_APPROVED") ||
+                      (currentStatus === "SETTLED" && v === "PARTIAL");
+                    if (isBackward) {
+                      setPendingConfirmStatus(v);
+                      setConfirmDialogOpen(true);
+                      return;
+                    }
                     setValue("status", v, { shouldDirty: true });
                   }
                 }}
-                options={ALL_STATUS_OPTIONS.map((s) => ({
-                  ...s,
-                  disabled: s.value === currentStatus
-                    || AUTOMATIC_STATUSES.includes(s.value)
-                    || (userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL && s.value === "BILLING_APPROVED")
-                    || (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL && s.value === "COMMERCIAL_APPROVED")
-                    || (s.value === "BILLING_APPROVED" && currentStatus !== "COMMERCIAL_APPROVED"),
-                }))}
+                options={ALL_STATUS_OPTIONS.map((s) => {
+                  // Always show the current value (so the dropdown trigger renders correctly).
+                  // Disable: current status (cannot select itself), automatic statuses, and any
+                  // status not in the user's allowed transitions for the current state.
+                  const isCurrent = s.value === currentStatus;
+                  const isAutomatic = AUTOMATIC_STATUSES.includes(s.value);
+                  const isAllowed = isCurrent || allowedNextStatuses.includes(s.value as TASK_QUOTE_STATUS);
+                  return {
+                    ...s,
+                    disabled: isCurrent || isAutomatic || !isAllowed,
+                  };
+                })}
                 searchable={false}
                 clearable={false}
                 disabled={disabled}
@@ -802,6 +858,93 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
           </Card>
         );
       })()}
+
+      {/* Reject / Cancel reason dialog — collected before reverting to PENDING.
+          The reason is stored in the form ("statusReason") and forwarded to
+          taskQuoteService.updateStatus by the parent's executeSave. */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rejeitar Orçamento</DialogTitle>
+            <DialogDescription>
+              Informe o motivo da rejeição. O status do orçamento voltará para Pendente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <Label htmlFor="reject-reason" className="text-sm font-medium">
+              Motivo da rejeição <span className="text-destructive">*</span>
+            </Label>
+            <Textarea
+              id="reject-reason"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Descreva o motivo (mínimo 5 caracteres)..."
+              rows={4}
+              className="resize-none"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRejectDialogOpen(false);
+                setRejectReason("");
+                setPendingDestructiveStatus(null);
+              }}
+            >
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={rejectReason.trim().length < 5}
+              onClick={() => {
+                if (rejectReason.trim().length < 5 || !pendingDestructiveStatus) return;
+                setValue("statusReason", rejectReason.trim(), { shouldDirty: true });
+                setValue("status", pendingDestructiveStatus, { shouldDirty: true });
+                setRejectDialogOpen(false);
+                setPendingDestructiveStatus(null);
+                setRejectReason("");
+              }}
+            >
+              Confirmar Rejeição
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Generic confirmation for backwards transitions (cancel-style ops without reason). */}
+      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reverter status do orçamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja reverter o status? Esta ação altera o estado do orçamento
+              e pode afetar fluxos automáticos (faturas, boletos, NFS-e).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setConfirmDialogOpen(false);
+                setPendingConfirmStatus(null);
+              }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingConfirmStatus) {
+                  setValue("status", pendingConfirmStatus, { shouldDirty: true });
+                }
+                setConfirmDialogOpen(false);
+                setPendingConfirmStatus(null);
+              }}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );

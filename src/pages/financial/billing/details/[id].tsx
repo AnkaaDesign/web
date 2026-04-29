@@ -142,6 +142,9 @@ export const BillingDetailPage = () => {
       finishedAt: null as Date | null,
       // Quote fields
       status: "" as string,
+      // Optional reason captured by the BillingStepReview reject/cancel dialog.
+      // Forwarded to taskQuoteService.updateStatus when transitioning to PENDING.
+      statusReason: "" as string,
       expiresAt: null as Date | null,
       subtotal: 0,
       total: 0,
@@ -520,9 +523,12 @@ export const BillingDetailPage = () => {
 
       await taskQuoteService.update(quote.id, quotePayload);
 
-      // 4. Update status if changed
+      // 4. Update status if changed — forward optional reason captured by the reject/cancel dialog
       if (targetStatus && targetStatus !== quote.status) {
-        await taskQuoteService.updateStatus(quote.id, targetStatus as TASK_QUOTE_STATUS);
+        const reason = (formData as any).statusReason?.trim() || undefined;
+        await taskQuoteService.updateStatus(quote.id, targetStatus as TASK_QUOTE_STATUS, reason);
+        // Clear once consumed so a later edit doesn't accidentally re-send the same reason.
+        form.setValue("statusReason" as any, "");
       }
 
       queryClient.invalidateQueries({ queryKey: taskKeys.all });

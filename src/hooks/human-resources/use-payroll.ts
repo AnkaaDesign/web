@@ -331,6 +331,18 @@ export const useGenerateMonthlyPayrolls = () => {
 export const usePayrollDiscountMutations = () => {
   const queryClient = useQueryClient();
 
+  // Invalidate the broad payroll list keys plus the specific payroll's detail
+  // so the detail page reflects changes immediately. `.all` would already
+  // cover detail keys (they share the `["payrolls"]` prefix), but invalidating
+  // the precise key makes the intent explicit and is cheaper for React Query
+  // to dispatch.
+  const invalidatePayroll = (payrollId?: string) => {
+    queryClient.invalidateQueries({ queryKey: payrollKeys.all });
+    if (payrollId) {
+      queryClient.invalidateQueries({ queryKey: payrollKeys.detail(payrollId) });
+    }
+  };
+
   const addDiscount = useMutation({
     mutationFn: ({ payrollId, discount }: {
       payrollId: string;
@@ -339,16 +351,16 @@ export const usePayrollDiscountMutations = () => {
       // Create discount with payrollId included
       return discountService.create({ ...discount, payrollId } as any).then(response => response.data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
+    onSuccess: (_data, variables) => {
+      invalidatePayroll(variables?.payrollId);
     },
   });
 
   const removeDiscount = useMutation({
     mutationFn: ({ discountId }: { payrollId: string; discountId: string }): Promise<void> =>
       discountService.delete(discountId).then(() => undefined),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
+    onSuccess: (_data, variables) => {
+      invalidatePayroll(variables?.payrollId);
     },
   });
 
@@ -359,8 +371,8 @@ export const usePayrollDiscountMutations = () => {
       discount: DiscountUpdateFormData
     }): Promise<Discount> =>
       discountService.update(discountId, discount).then(response => response.data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
+    onSuccess: (_data, variables) => {
+      invalidatePayroll(variables?.payrollId);
     },
   });
 

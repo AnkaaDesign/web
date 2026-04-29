@@ -195,7 +195,9 @@ export function UsersStatsCard({
         let statusVariant: 'default' | 'secondary' | 'success' | 'warning' | 'destructive' = 'default';
 
         if (showStatusBadge) {
-          if (user.bonus?.status === 'CONFIRMED') {
+          // Bonus has no `status` column in Prisma. Derive CONFIRMED from
+          // payrollId presence (a bonus linked to a payroll is finalized).
+          if (user.bonus?.payrollId) {
             statusLabel = 'Confirmado';
             statusVariant = 'success';
           } else {
