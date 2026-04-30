@@ -53,8 +53,20 @@ export const taskQuoteService = {
   // PUBLIC ENDPOINTS (No Authentication Required)
   // =====================
 
-  // Get quote for public view (customer budget page) — _t busts the axios in-memory cache
-  getPublic: (id: string) => apiClient.get(`/task-quotes/public/${id}`, { params: { _t: Date.now() } }),
+  // Get quote for public view (customer budget page).
+  // We need this to ALWAYS be 100% fresh — customers reach it through long-lived
+  // shareable links and any stale data (missing responsible, etc.) is a real
+  // problem. Three layers of cache busting:
+  //   1. `_t` query param → unique cache key per call (defeats the in-memory axios cache)
+  //   2. Cache-Control: no-cache request header → instructs proxies to revalidate
+  //   3. Server already returns Cache-Control: no-store + Pragma + Expires + Surrogate
+  getPublic: (id: string) => apiClient.get(`/task-quotes/public/${id}`, {
+    params: { _t: Date.now() },
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      Pragma: 'no-cache',
+    },
+  }),
 
   // Upload customer signature (public)
   uploadPublicSignature: (id: string, file: File) => {
