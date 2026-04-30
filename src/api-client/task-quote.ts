@@ -56,16 +56,14 @@ export const taskQuoteService = {
   // Get quote for public view (customer budget page).
   // We need this to ALWAYS be 100% fresh — customers reach it through long-lived
   // shareable links and any stale data (missing responsible, etc.) is a real
-  // problem. Three layers of cache busting:
+  // problem. Cache busting:
   //   1. `_t` query param → unique cache key per call (defeats the in-memory axios cache)
-  //   2. Cache-Control: no-cache request header → instructs proxies to revalidate
-  //   3. Server already returns Cache-Control: no-store + Pragma + Expires + Surrogate
+  //   2. Server returns Cache-Control: no-store + Pragma + Expires + Surrogate-Control
+  //      so the browser HTTP cache and any CDN/proxy in front cannot keep the body.
+  // (Request headers like Cache-Control trigger CORS preflight failures, so we
+  //  rely on response-side directives instead.)
   getPublic: (id: string) => apiClient.get(`/task-quotes/public/${id}`, {
     params: { _t: Date.now() },
-    headers: {
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      Pragma: 'no-cache',
-    },
   }),
 
   // Upload customer signature (public)
