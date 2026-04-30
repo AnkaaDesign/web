@@ -12,7 +12,9 @@ import {
   IconAlertCircle,
   IconUsers,
   IconAdjustments,
+  IconInfoCircle,
 } from "@tabler/icons-react";
+import { BonusRulesModal } from "@/components/human-resources/bonus/bonus-rules-modal";
 import {
   Dialog,
   DialogContent,
@@ -300,7 +302,7 @@ function BonusTableComponent({
     },
     {
       key: "totalWeightedTasks",
-      header: "Ponderadas",
+      header: "Tarefas Ponderadas",
       accessor: (row: BonusRow) => row.totalWeightedTasks.toFixed(1),
       sortable: true,
       className: "text-sm w-24 font-medium truncate",
@@ -509,10 +511,11 @@ export default function BonusListPage() {
       'user.name',
       'position.name',
       'performanceLevel',
-      'tasksCompleted',
+      'totalWeightedTasks',
       'totalCollaborators',
       'averageTasks',
       'bonus',
+      'totalDiscounts',
       'netBonus',
     ])
   );
@@ -816,10 +819,14 @@ export default function BonusListPage() {
   const [adjustmentInput, setAdjustmentInput] = useState("");
   const [adjustmentConfirmOpen, setAdjustmentConfirmOpen] = useState(false);
   const [adjustmentPending, setAdjustmentPending] = useState<number | null>(null);
+  const [rulesModalOpen, setRulesModalOpen] = useState(false);
 
   const openAdjustmentModal = () => {
     if (!singlePeriod) return;
-    setAdjustmentInput(currentAdjustment ? String(currentAdjustment.adjustment) : "");
+    // Input is a DELTA, not the absolute value — pre-filling with the current
+    // cumulative would make a "blind" apply double the adjustment. Start empty;
+    // the current cumulative is shown as a label so HR can see context.
+    setAdjustmentInput("");
     setAdjustmentModalOpen(true);
   };
 
@@ -868,21 +875,27 @@ export default function BonusListPage() {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
         <PageHeader
           className="flex-shrink-0"
-          title="Bônus"
+          title={(() => {
+            if (filters.year && filters.months && filters.months.length === 1) {
+              const monthName = new Date(filters.year, parseInt(filters.months[0]) - 1).toLocaleDateString("pt-BR", { month: "long" });
+              return `Bônus - ${monthName.charAt(0).toUpperCase() + monthName.slice(1)} de ${filters.year}`;
+            }
+            if (filters.year && filters.months && filters.months.length > 1) {
+              return `Bônus - ${filters.months.length} meses de ${filters.year}`;
+            }
+            return "Bônus";
+          })()}
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_BONUS_LISTAR}
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }, { label: "Bônus" }]}
-          subtitle={(() => {
-            if (filters.year && filters.months && filters.months.length > 0) {
-              if (filters.months.length === 1) {
-                const monthName = new Date(filters.year, parseInt(filters.months[0]) - 1).toLocaleDateString("pt-BR", { month: "long" });
-                return `Período: ${monthName} de ${filters.year}`;
-              } else {
-                return `Período: ${filters.months.length} meses de ${filters.year}`;
-              }
-            }
-            return "Visualização de bônus com cálculos de tarefas e bonificações";
-          })()}
           actions={[
+            {
+              key: "rules",
+              label: "Regras",
+              icon: IconInfoCircle,
+              onClick: () => setRulesModalOpen(true),
+              variant: "outline",
+              tooltip: "Como o bônus é calculado e quais regras se aplicam",
+            } as any,
             {
               key: "adjustment",
               label: currentAdjustment && currentAdjustment.adjustment !== 0
@@ -894,7 +907,7 @@ export default function BonusListPage() {
               disabled: !singlePeriod,
               tooltip: !singlePeriod
                 ? "Selecione um único mês para aplicar o reajuste"
-                : "Aplica um % de ajuste para todo o período (recalcula todos os bônus)",
+                : "Soma um % de reajuste ao acumulado do período (não altera bônus já salvos)",
             } as any,
           ]}
         />
@@ -928,6 +941,17 @@ export default function BonusListPage() {
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <Button
+                  onClick={() => navigate(routes.humanResources.bonus.simulation)}
+                  variant="outline"
+                  size="default"
+                >
+                  <IconCalculator className="h-4 w-4 mr-2" />
+                  Simulação de Bônus
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
                   onClick={() => setShowFilters(!showFilters)}
                   variant={hasActiveFilters ? "default" : "outline"}
                   size="default"
@@ -940,17 +964,6 @@ export default function BonusListPage() {
                   visibleColumns={visibleColumns}
                   onVisibilityChange={setVisibleColumns}
                 />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => navigate(routes.humanResources.bonus.simulation)}
-                  variant="outline"
-                  size="default"
-                >
-                  <IconCalculator className="h-4 w-4 mr-2" />
-                  Simulação de Bônus
-                </Button>
 
                 <BonusExport
                   filters={filters}
@@ -1023,14 +1036,41 @@ export default function BonusListPage() {
               Aplicar Reajuste do Período
             </DialogTitle>
             <DialogDescription>
-              Define um percentual de reajuste para o período inteiro. O algoritmo recalcula
-              todos os bônus do período com este ajuste embutido. Use 0 para remover.
+              O valor informado é SOMADO ao reajuste atual do período (acumulativo).
+              Aplicar +5% duas vezes resulta em +10%. Use um valor negativo para reduzir.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-2">
+            {(() => {
+              const current = Number(currentAdjustment?.adjustment) || 0;
+              const parsed = parseFloat(adjustmentInput.replace(",", "."));
+              const delta = Number.isFinite(parsed) ? parsed : 0;
+              const projected = Math.max(-99, current + delta);
+              const fmt = (n: number) =>
+                `${n > 0 ? "+" : ""}${Math.round(n * 100) / 100}%`;
+              return (
+                <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Reajuste atual:</span>
+                    <span className="font-medium">{fmt(current)}</span>
+                  </div>
+                  {Number.isFinite(parsed) && parsed !== 0 && (
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-muted-foreground">Após aplicar:</span>
+                      <span className="font-medium">
+                        {fmt(current)} {delta >= 0 ? "+" : "−"} {Math.abs(delta)}%
+                        {" = "}
+                        <span className="text-primary">{fmt(projected)}</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="space-y-1.5">
-              <Label htmlFor="period-adjustment-percentage">Percentual (%)</Label>
+              <Label htmlFor="period-adjustment-percentage">Variação (%)</Label>
               <Input
                 id="period-adjustment-percentage"
                 type="text"
@@ -1081,23 +1121,33 @@ export default function BonusListPage() {
             <AlertDialogTitle>Confirmar reajuste do período</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
-                {singlePeriod && adjustmentPending !== null && (
-                  <>
-                    <div className="text-sm">
-                      <span className="font-medium">Período: </span>
-                      {String(singlePeriod.month).padStart(2, "0")}/{singlePeriod.year}
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-medium">Reajuste: </span>
-                      {adjustmentPending > 0 ? "+" : ""}
-                      {adjustmentPending}%
-                    </div>
-                    <div className="text-sm">
-                      Esta ação irá recalcular {processedBonuses.length} {" "}
-                      {processedBonuses.length === 1 ? "bônus" : "bônus"} deste período. Deseja continuar?
-                    </div>
-                  </>
-                )}
+                {singlePeriod && adjustmentPending !== null && (() => {
+                  const current = Number(currentAdjustment?.adjustment) || 0;
+                  const projected = Math.max(-99, current + adjustmentPending);
+                  const fmt = (n: number) =>
+                    `${n > 0 ? "+" : ""}${Math.round(n * 100) / 100}%`;
+                  return (
+                    <>
+                      <div className="text-sm">
+                        <span className="font-medium">Período: </span>
+                        {String(singlePeriod.month).padStart(2, "0")}/{singlePeriod.year}
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-medium">Variação: </span>
+                        {adjustmentPending > 0 ? "+" : ""}
+                        {adjustmentPending}%
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-medium">Reajuste acumulado: </span>
+                        {fmt(current)} → <span className="text-primary">{fmt(projected)}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Bônus já salvos não serão alterados — o novo reajuste será aplicado ao
+                        cálculo ao vivo e a futuras execuções de "Calcular e Salvar".
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1114,6 +1164,11 @@ export default function BonusListPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BonusRulesModal
+        open={rulesModalOpen}
+        onClose={() => setRulesModalOpen(false)}
+      />
     </PrivilegeRoute>
   );
 }

@@ -94,7 +94,7 @@ const EXPORT_COLUMNS: ExportColumn<BonusRow>[] = [
   },
   {
     id: "totalWeightedTasks",
-    label: "Ponderadas",
+    label: "Tarefas Ponderadas",
     getValue: (row: BonusRow) => (row.totalWeightedTasks ?? 0).toFixed(1)
   },
   {
@@ -139,10 +139,43 @@ const DEFAULT_VISIBLE_COLUMNS = new Set([
   "user.name",
   "position.name",
   "performanceLevel",
-  "tasksCompleted",
+  "totalWeightedTasks",
   "totalCollaborators",
   "averageTasks",
   "bonus",
+  "totalDiscounts",
+  "netBonus",
+]);
+
+// Relative column widths for the PDF report. Without these the browser
+// auto-sizes columns based on content, which lets long names ("Pedro
+// Antônio de Oliveira") and long headers ("DESEMPENHO", "COLABORADORES")
+// hog space and push currency columns off the right edge. Used together
+// with `table-layout: fixed` so the widths are honored. Values are
+// relative weights — they're rescaled to the visible column set.
+const COLUMN_WIDTH_WEIGHTS: Record<string, number> = {
+  "month": 9,
+  "payrollNumber": 7,
+  "user.name": 18,
+  "user.cpf": 11,
+  "position.name": 8,
+  "sector.name": 11,
+  "performanceLevel": 7,
+  "tasksCompleted": 7,
+  "totalWeightedTasks": 8,
+  "totalCollaborators": 7,
+  "averageTasks": 7,
+  "bonus": 11,
+  "totalDiscounts": 11,
+  "netBonus": 12,
+};
+
+// Currency columns right-align so values like "R$ 1.234,56" line up by
+// decimal. Plain count/score columns (Desempenho, Tarefas, Colaboradores,
+// Média) stay left-aligned to match the in-app table style.
+const NUMERIC_COLUMN_IDS = new Set([
+  "bonus",
+  "totalDiscounts",
   "netBonus",
 ]);
 
@@ -290,10 +323,20 @@ export function BonusExport({
     totals: ReturnType<typeof calculateTotals>
   ) => {
     const periodLabel = getPeriodLabel();
-    const fontSize = "12px";
-    const headerFontSize = "11px";
-    const cellPadding = "8px 6px";
-    const headerPadding = "10px 6px";
+    const fontSize = "11px";
+    const headerFontSize = "10px";
+    const cellPadding = "7px 6px";
+    const headerPadding = "9px 6px";
+
+    // Rescale the static weights to 100% across only the visible columns.
+    const totalWeight = columns.reduce(
+      (sum, col) => sum + (COLUMN_WIDTH_WEIGHTS[col.id] ?? 9),
+      0,
+    );
+    const colWidthPct = (id: string) =>
+      `${(((COLUMN_WIDTH_WEIGHTS[id] ?? 9) / totalWeight) * 100).toFixed(3)}%`;
+    const cellAlignClass = (id: string) =>
+      NUMERIC_COLUMN_IDS.has(id) ? "text-right" : "text-left";
 
     // A4 portrait PDF matching task history format
     const pdfContent = `
@@ -371,6 +414,7 @@ export function BonusExport({
             width: 100%;
             border-collapse: collapse;
             font-size: ${fontSize};
+            table-layout: fixed;
           }
 
           th {
@@ -466,34 +510,45 @@ export function BonusExport({
               <p><strong>Período:</strong> ${periodLabel}</p>
               <p><strong>Tarefas Ponderadas:</strong> ${totals.totalWeightedTasks.toFixed(1)}</p>
               <p><strong>Total de colaboradores:</strong> ${totals.totalCount}</p>
-              <p><strong>Média por colaborador:</strong> ${totals.avgTasks.toFixed(1)}</p>
+              <p><strong>Média por colaborador:</strong> ${totals.avgTasks.toFixed(2)}</p>
             </div>
           </div>
         </div>
 
         <div class="content-wrapper">
           <table>
+            <colgroup>
+              ${columns.map((col) => `<col style="width: ${colWidthPct(col.id)};" />`).join("")}
+            </colgroup>
             <thead>
               <tr>
-                ${columns.map((col) => `<th class="text-left">${col.label}</th>`).join("")}
+                ${columns
+                  .map((col) => `<th class="${cellAlignClass(col.id)}">${col.label}</th>`)
+                  .join("")}
               </tr>
             </thead>
             <tbody>
               ${items.map((item) => `
                 <tr>
-                  ${columns.map((col) => `<td class="text-left">${col.getValue(item)}</td>`).join("")}
+                  ${columns
+                    .map(
+                      (col) =>
+                        `<td class="${cellAlignClass(col.id)}">${col.getValue(item)}</td>`,
+                    )
+                    .join("")}
                 </tr>
               `).join("")}
               <tr>
                 ${columns.map((col) => {
+                  const align = cellAlignClass(col.id);
                   if (col.id === "user.name") return `<td class="text-left">TOTAL</td>`;
-                  if (col.id === "bonus") return `<td class="text-left">${formatCurrency(totals.totalBaseBonus)}</td>`;
+                  if (col.id === "bonus") return `<td class="${align}">${formatCurrency(totals.totalBaseBonus)}</td>`;
                   if (col.id === "totalDiscounts") {
-                    if (totals.totalDiscounts === 0) return `<td class="text-left">R$ 0,00</td>`;
+                    if (totals.totalDiscounts === 0) return `<td class="${align}">R$ 0,00</td>`;
                     const prefix = totals.totalDiscounts > 0 ? "+" : "-";
-                    return `<td class="text-left">${prefix}${formatCurrency(Math.abs(totals.totalDiscounts))}</td>`;
+                    return `<td class="${align}">${prefix}${formatCurrency(Math.abs(totals.totalDiscounts))}</td>`;
                   }
-                  if (col.id === "netBonus") return `<td class="text-left">${formatCurrency(totals.totalNet)}</td>`;
+                  if (col.id === "netBonus") return `<td class="${align}">${formatCurrency(totals.totalNet)}</td>`;
                   return `<td></td>`;
                 }).join("")}
               </tr>

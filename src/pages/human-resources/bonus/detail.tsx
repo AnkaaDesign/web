@@ -257,10 +257,18 @@ export default function BonusDetailPage() {
       ? totalPonderedTasksFromBonus
       : (periodStats?.weightedTasks ?? periodStats?.totalPonderedTasks ?? 0);
 
-    const totalCollaboratorsFromBonus = users.length || 1;
+    // Saved bonus.users may include stale entries (users connected before the
+    // perf>0 filter was added to the save path). The list endpoint already
+    // returns a fresh eligible-only list, but getById returns the raw relation.
+    // Filter to perf>0 here so detail count matches both the list table and
+    // the divisor that was actually used for averageTaskPerUser.
+    const eligibleUsersFromBonus = users.filter(
+      (u: any) => (u?.performanceLevel ?? 0) > 0,
+    ).length;
+    const totalCollaboratorsFromBonus = eligibleUsersFromBonus || users.length || 1;
     const totalCollaborators = bonus
       ? totalCollaboratorsFromBonus
-      : (periodStats?.totalCollaborators ?? periodStats?.totalEligibleUsers ?? 0);
+      : (periodStats?.eligibleUsers ?? periodStats?.totalCollaborators ?? periodStats?.totalEligibleUsers ?? 0);
 
     const averageTasksPerUserFromBonus = bonus?.averageTaskPerUser
       ? (typeof bonus.averageTaskPerUser === 'object' && bonus.averageTaskPerUser?.toNumber

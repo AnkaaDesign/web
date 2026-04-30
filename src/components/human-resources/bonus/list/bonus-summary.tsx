@@ -16,10 +16,12 @@ interface BonusItem {
   // Bonus amount - supports both Bonus.baseBonus and BonusRow.bonusAmount
   baseBonus?: number | { toNumber: () => number };
   bonusAmount?: number;
-  // Task count - supports both Bonus.ponderedTaskCount and BonusRow.tasksCompleted
-  // NOTE: These are actually AVERAGE tasks per user, not total tasks!
-  ponderedTaskCount?: number | { toNumber: () => number };
-  tasksCompleted?: number;
+  // Period-level total weighted tasks (same for all users in a period — they
+  // share the same task pool). Comes from BonusRow.totalWeightedTasks or
+  // Bonus.weightedTasks. This is the AUTHORITATIVE value for the period total;
+  // never reconstruct it from average × users (rounding errors compound).
+  totalWeightedTasks?: number | { toNumber: () => number };
+  weightedTasks?: number | { toNumber: () => number };
   // Average tasks per user (same for all users in a period)
   averageTasks?: number;
   // Period info
@@ -61,43 +63,39 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
     const uniqueUserIds = new Set<string>();
     const bonifiableUserIds = new Set<string>();
 
-    // Track average tasks per month (it's the same for all users in a month)
-    // Key: "year-month", Value: average tasks for that period
-    const averageTasksByMonth = new Map<string, number>();
+    // Per-period snapshots — one entry per (year, month). Avoids double-counting
+    // when the input contains many bonuses for the same period (one per user).
+    // Each period contributes the SAME totalWeightedTasks regardless of how many
+    // user rows exist, so we de-dup by month key and read the period total
+    // straight from the bonus row.
+    const perMonth = new Map<string, { weightedTasks: number; average: number }>();
 
-    // Process bonuses
     bonuses.forEach(bonus => {
-      // Get user ID from either userId (Bonus) or oderId (BonusRow)
       const id = bonus.userId || bonus.oderId || '';
       uniqueUserIds.add(id);
 
-      // Check if user is eligible for bonus
-      // BonusRow: position?.bonifiable and performanceLevel > 0
-      // Bonus: user?.position?.bonifiable
       const isBonifiable = bonus.position?.bonifiable ?? bonus.user?.position?.bonifiable;
-      const performanceLevel = bonus.performanceLevel ?? 1; // Default to 1 if not present (Bonus type)
+      const performanceLevel = bonus.performanceLevel ?? 1;
       const isEligible = isBonifiable !== false && performanceLevel > 0;
 
       if (isEligible) {
         bonifiableUserIds.add(id);
 
-        // Get bonus amount from either baseBonus (Bonus) or bonusAmount (BonusRow)
         const amount = bonus.bonusAmount !== undefined
           ? bonus.bonusAmount
           : toNumber(bonus.baseBonus);
-
         totalBonusAmount += amount;
 
-        // Store the average tasks for this month (same for all users in a period)
-        // tasksCompleted/ponderedTaskCount is actually the AVERAGE per user, not total
         const monthKey = `${bonus.year}-${bonus.month}`;
-        if (!averageTasksByMonth.has(monthKey)) {
-          const avgTasks = bonus.averageTasks !== undefined
-            ? bonus.averageTasks
-            : (bonus.tasksCompleted !== undefined
-              ? bonus.tasksCompleted
-              : toNumber(bonus.ponderedTaskCount));
-          averageTasksByMonth.set(monthKey, avgTasks);
+        if (!perMonth.has(monthKey)) {
+          // Authoritative period total — already stored on the bonus row.
+          // Reconstructing from average × user count introduces rounding error
+          // (2.19 × 16 = 35.04 instead of 35). Use the stored field directly.
+          const weightedTasks = bonus.totalWeightedTasks !== undefined
+            ? toNumber(bonus.totalWeightedTasks)
+            : toNumber(bonus.weightedTasks);
+          const average = bonus.averageTasks ?? 0;
+          perMonth.set(monthKey, { weightedTasks, average });
         }
       }
     });
@@ -105,20 +103,15 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
     const uniqueUsersCount = uniqueUserIds.size;
     const bonifiableUsersCount = bonifiableUserIds.size;
 
-    // Calculate total tasks: average * number of eligible users (for each month)
-    // For single month: just average * users
-    // For multi-month: sum of (average * users) for each month, but we only have one average
+    // Single-month: the period total is the weighted-task figure.
+    // Multi-month: sum the per-period totals.
     let totalTasksCompleted = 0;
-    let averageTasksPerUser = 0;
-
-    if (averageTasksByMonth.size > 0) {
-      // Get the average from the stored values
-      const avgValues = Array.from(averageTasksByMonth.values());
-      averageTasksPerUser = avgValues.reduce((sum, val) => sum + val, 0) / avgValues.length;
-
-      // Total tasks = average * number of eligible users
-      totalTasksCompleted = averageTasksPerUser * bonifiableUsersCount;
+    let averageSum = 0;
+    for (const m of perMonth.values()) {
+      totalTasksCompleted += m.weightedTasks;
+      averageSum += m.average;
     }
+    const averageTasksPerUser = perMonth.size > 0 ? averageSum / perMonth.size : 0;
 
     // Calculate averages
     // For multi-month: divide by total bonus entries for eligible users
@@ -291,7 +284,7 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
                 </p>
               </div>
               <div className="flex-grow flex flex-col justify-between">
-                <p className="text-xl font-bold text-amber-600">{totalTasksCompleted.toFixed(2)}</p>
+                <p className="text-xl font-bold text-amber-600">{totalTasksCompleted.toFixed(1)}</p>
                 <p className="text-xs text-muted-foreground mt-1 min-h-[1rem]">
                   Tarefas ponderadas
                 </p>

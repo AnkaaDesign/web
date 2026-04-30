@@ -21,12 +21,12 @@ const BONUS_COLUMNS: BonusColumn[] = [
   { key: "position.name", header: "Cargo", defaultVisible: true },
   { key: "sector.name", header: "Setor", defaultVisible: false },
   { key: "performanceLevel", header: "Desempenho", defaultVisible: true },
-  { key: "tasksCompleted", header: "Tarefas", defaultVisible: true },
-  { key: "totalWeightedTasks", header: "Ponderadas", defaultVisible: false },
+  { key: "tasksCompleted", header: "Tarefas", defaultVisible: false },
+  { key: "totalWeightedTasks", header: "Tarefas Ponderadas", defaultVisible: true },
   { key: "totalCollaborators", header: "Colaboradores", defaultVisible: true },
   { key: "averageTasks", header: "Média", defaultVisible: true },
   { key: "bonus", header: "Bônus Bruto", defaultVisible: true },
-  { key: "totalDiscounts", header: "Ajustes", defaultVisible: false },
+  { key: "totalDiscounts", header: "Ajustes", defaultVisible: true },
   { key: "netBonus", header: "Bônus Líquido", defaultVisible: true },
 ];
 
