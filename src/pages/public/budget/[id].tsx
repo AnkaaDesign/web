@@ -206,8 +206,10 @@ export function PublicBudgetPage() {
   const corporateName = quote.task?.customer?.corporateName || quote.task?.customer?.fantasyName || "Cliente";
   // Find the relevant customer config (filtered by URL param, or first available)
   const activeConfig = quote.customerConfigs?.find(c => c.customerId === selectedCustomerId) || quote.customerConfigs?.[0];
-  // Prefer the explicitly selected budget responsible; default to the first task responsible
+  // Prefer the explicitly selected budget responsible; then the OWNER-role task responsible; then the first
+  const ownerResponsible = quote.task?.responsibles?.find(r => r.role === 'OWNER');
   const contactName = activeConfig?.responsible?.name
+    || ownerResponsible?.name
     || quote.task?.responsibles?.[0]?.name
     || "";
   // Format budget number with leading zeros (e.g., "0042")

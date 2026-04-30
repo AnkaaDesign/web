@@ -92,7 +92,8 @@ export function PublicServiceReportPage() {
   const corporateName = quote.task?.customer?.corporateName || quote.task?.customer?.fantasyName || "Cliente";
   const activeConfig = quote.customerConfigs?.find((c: any) => c.customerId === selectedCustomerId) || quote.customerConfigs?.[0];
   const budgetNumber = quote.budgetNumber ? String(quote.budgetNumber).padStart(4, "0") : "0000";
-  const contactName = activeConfig?.responsible?.name || quote.task?.responsibles?.[0]?.name || "";
+  const ownerResponsible = quote.task?.responsibles?.find((r: any) => r.role === 'OWNER');
+  const contactName = activeConfig?.responsible?.name || ownerResponsible?.name || quote.task?.responsibles?.[0]?.name || "";
   const paymentText = generatePaymentText({
     customPaymentText: activeConfig?.customPaymentText || null,
     paymentCondition: activeConfig?.paymentCondition,
