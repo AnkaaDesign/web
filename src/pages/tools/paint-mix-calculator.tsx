@@ -29,7 +29,7 @@ import { usePaintTypes } from "@/hooks";
 import { useItemCategories } from "@/hooks";
 import { usePaint, usePaintFormulasByPaintId } from "@/hooks";
 
-import { MEASURE_TYPE, MEASURE_UNIT, PAINT_TYPE_ENUM } from "@/constants";
+import { MEASURE_TYPE, MEASURE_UNIT } from "@/constants";
 import { UNIT_CONVERSION_FACTORS } from "@/types";
 import type { Paint, Item, PaintType, PaintFormula } from "@/types";
 
@@ -59,6 +59,16 @@ const CATEGORY_NAMES = {
   THINNER: ["Diluente", "Diluentes"],
   VARNISH: ["Verniz", "Vernizes"],
 } as const;
+
+// Paint type names that don't use a catalyst (single-component for our flow).
+// Matched case-insensitively as a substring against the dynamic PaintType.name.
+const NO_CATALYST_NAME_KEYWORDS = [
+  "poliéster",
+  "poliester",
+  "polyester",
+  "laca",
+  "lacquer",
+] as const;
 
 // ---------------------------------------------------------------------------
 // Form types
@@ -275,12 +285,12 @@ export function PaintMixCalculatorPage() {
   );
 
   // Catalyst (Endurecedor) only applies to paint types that need a hardener.
-  // Lacquer and Polyester are single-component for our purposes — hide it.
+  // PaintType is dynamic (no enum field on the model), so match by name keyword.
   const showCatalyst = useMemo(() => {
     if (mode === "varnish") return true;
-    if (!selectedPaintType) return true;
-    const t = selectedPaintType.type;
-    return t !== PAINT_TYPE_ENUM.LACQUER && t !== PAINT_TYPE_ENUM.POLYESTER;
+    if (!selectedPaintType?.name) return true;
+    const lower = selectedPaintType.name.toLowerCase();
+    return !NO_CATALYST_NAME_KEYWORDS.some((kw) => lower.includes(kw));
   }, [mode, selectedPaintType]);
 
   // Clear catalyst selection when it gets hidden so it doesn't linger in state.
@@ -301,6 +311,18 @@ export function PaintMixCalculatorPage() {
     },
   } as any);
   const paint: Paint | null = paintDetailResponse?.data ?? null;
+
+  // Brand of the selected paint, used (with paintTypeId) to filter compatible
+  // catalyst/thinner items — same intersection rule the formula form uses.
+  const paintBrandId = paint?.paintBrandId ?? null;
+
+  // Filter catalyst/thinner items by paintType + paintBrand only when we're
+  // actually mixing a paint AND a paint is selected. In varnish mode, or while
+  // the user is still picking a paint, fall back to category-only filtering.
+  const componentFilterPaintTypeId =
+    mode === "paint" && paintId ? paintTypeId : null;
+  const componentFilterPaintBrandId =
+    mode === "paint" && paintId ? paintBrandId : null;
 
   // ---- Selected paint's formulas (separate query — more reliable than
   // relying on `include: { formulas: true }` honoring all scalar fields). ----
@@ -713,6 +735,8 @@ export function PaintMixCalculatorPage() {
                           }}
                           categoryIds={catalystCategoryIds}
                           categoriesLoading={categoriesLoading}
+                          paintTypeId={componentFilterPaintTypeId}
+                          paintBrandId={componentFilterPaintBrandId}
                           placeholder="Selecione o catalisador..."
                           emptyLabel="Endurecedor"
                         />
@@ -735,6 +759,8 @@ export function PaintMixCalculatorPage() {
                         }}
                         categoryIds={thinnerCategoryIds}
                         categoriesLoading={categoriesLoading}
+                        paintTypeId={componentFilterPaintTypeId}
+                        paintBrandId={componentFilterPaintBrandId}
                         placeholder="Selecione o diluente..."
                         emptyLabel="Diluente"
                       />

@@ -3,6 +3,7 @@ import type { Task } from "../types/task";
 import { generatePaymentText, generateGuaranteeText } from "./quote-text-generators";
 import { getApiBaseUrl } from "./file";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
+import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 
 interface BudgetPdfOptions {
   task: Task;
@@ -320,10 +321,8 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
   const corporateName = task.customer?.corporateName || task.customer?.fantasyName || "Cliente";
   // Find the first customer config to read per-config fields
   const firstConfig = task.quote?.customerConfigs?.[0];
-  // Prefer the explicitly selected budget responsible from the config
-  const commercialRep = task.responsibles?.find((r: any) => r.role === "COMMERCIAL");
+  // Prefer the explicitly selected budget responsible; default to the first task responsible
   const contactName = firstConfig?.responsible?.name
-    || commercialRep?.name
     || task.responsibles?.[0]?.name
     || "";
 
@@ -392,6 +391,8 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     serialNumber: task.serialNumber || null,
     plate: task.truck?.plate || null,
     chassisNumber: task.truck?.chassisNumber || null,
+    truckCategory: task.truck?.category ? (TRUCK_CATEGORY_LABELS[task.truck.category] || task.truck.category) : null,
+    truckImplementType: task.truck?.implementType ? (IMPLEMENT_TYPE_LABELS[task.truck.implementType] || task.truck.implementType) : null,
     simultaneousTasks: task.quote.simultaneousTasks || null,
     // Global customer discount from config
     discountType: firstConfig?.discountType || null,
@@ -440,6 +441,8 @@ export interface BudgetHtmlData {
   serialNumber: string | null;
   plate: string | null;
   chassisNumber: string | null;
+  truckCategory?: string | null;
+  truckImplementType?: string | null;
   simultaneousTasks?: number | null;
   customerFilter?: string | null; // Customer ID to filter services by
   // Global customer discount (from CustomerConfig)
@@ -986,7 +989,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
         <div class="budget-number">Orçamento Nº ${escapeHtml(data.budgetNumber)}</div>
         <div class="header-info">
           <span class="header-info-label">Emissão:</span> ${data.currentDate}<br />
-          <span class="header-info-label">Validade:</span> ${data.validityDays} dias
+          <span class="header-info-label">Validade:</span> ${data.validityDays <= 0 ? '<span style="color: #c00; font-weight: 600;">Vencido</span>' : `${data.validityDays} dias`}
         </div>
       </div>
     </header>
@@ -999,8 +1002,16 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 
       <!-- Customer Info -->
       <div class="customer-section">
-        <div class="customer-name">À ${escapeHtml(data.contactName || corporateName(data.corporateName))}</div>
-        <p class="intro-text">Conforme solicitado, apresentamos nossa proposta de preço para execução dos serviços abaixo descriminados${data.serialNumber || data.plate || data.chassisNumber ? ` no veículo${data.serialNumber ? ` nº série: <strong>${escapeHtml(data.serialNumber)}</strong>` : ''}${data.serialNumber && (data.plate || data.chassisNumber) ? ',' : ''}${data.plate ? ` placa: <strong style="font-weight: 600;">${escapeHtml(data.plate)}</strong>` : ''}${data.plate && data.chassisNumber ? ',' : ''}${data.chassisNumber ? ` chassi: <strong style="font-weight: 600;">${escapeHtml(data.chassisNumber)}</strong>` : ''}` : ''}.</p>
+        ${data.contactName ? `<div class="customer-name">À ${escapeHtml(data.contactName)}</div>` : ''}
+        <p class="intro-text">Conforme solicitado, apresentamos nossa proposta de preço para execução dos serviços abaixo descriminados${(() => {
+          const parts: string[] = [];
+          if (data.serialNumber) parts.push(` nº série: <strong>${escapeHtml(data.serialNumber)}</strong>`);
+          if (data.plate) parts.push(` placa: <strong style="font-weight: 600;">${escapeHtml(data.plate)}</strong>`);
+          if (data.chassisNumber) parts.push(` chassi: <strong style="font-weight: 600;">${escapeHtml(data.chassisNumber)}</strong>`);
+          if (data.truckCategory) parts.push(` categoria: <strong style="font-weight: 600;">${escapeHtml(data.truckCategory)}</strong>`);
+          if (data.truckImplementType) parts.push(` implemento: <strong style="font-weight: 600;">${escapeHtml(data.truckImplementType)}</strong>`);
+          return parts.length ? ` no veículo${parts.join(',')}` : '';
+        })()}.</p>
       </div>
 
       <!-- Services -->
@@ -1062,7 +1073,7 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
         <div class="budget-number">Orçamento Nº ${escapeHtml(data.budgetNumber)}</div>
         <div class="header-info">
           <span class="header-info-label">Emissão:</span> ${data.currentDate}<br />
-          <span class="header-info-label">Validade:</span> ${data.validityDays} dias
+          <span class="header-info-label">Validade:</span> ${data.validityDays <= 0 ? '<span style="color: #c00; font-weight: 600;">Vencido</span>' : `${data.validityDays} dias`}
         </div>
       </div>
     </header>
@@ -1109,16 +1120,6 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
 </body>
 </html>
   `;
-}
-
-/**
- * Format corporate name - add brackets if not already present
- */
-function corporateName(name: string): string {
-  if (name.startsWith('[') && name.endsWith(']')) {
-    return name;
-  }
-  return name;
 }
 
 /**

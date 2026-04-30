@@ -1,10 +1,9 @@
-// Overtime multipliers for Brazilian metallurgical syndicate (CCT metalúrgicos).
+// Overtime multipliers (company policy).
 //
 // Reference: CLT Art. 64 (monthly divisor = workday × 30 days, includes paid rest)
-// CCT Sindicato dos Metalúrgicos (ABC / SP):
-//   - Weekday extra hours:    +60% (multiplier 1.60)
+//   - Weekday extra hours:    +50% (multiplier 1.50)
 //   - Saturday work:          +100% (multiplier 2.00)
-//   - Sunday / Holiday work:  +100% (multiplier 2.00, CLT minimum)
+//   - Sunday / Holiday work:  +150% (multiplier 2.50)
 
 export const OVERTIME_DAY_TYPE = {
   WEEKDAY: "WEEKDAY",
@@ -15,9 +14,9 @@ export const OVERTIME_DAY_TYPE = {
 export type OvertimeDayType = (typeof OVERTIME_DAY_TYPE)[keyof typeof OVERTIME_DAY_TYPE];
 
 export const OVERTIME_MULTIPLIERS: Record<OvertimeDayType, number> = {
-  [OVERTIME_DAY_TYPE.WEEKDAY]: 1.6, // +60% — metalúrgicos CCT
+  [OVERTIME_DAY_TYPE.WEEKDAY]: 1.5, // +50%
   [OVERTIME_DAY_TYPE.SATURDAY]: 2.0, // +100%
-  [OVERTIME_DAY_TYPE.SUNDAY_HOLIDAY]: 2.0, // +100% (CLT minimum)
+  [OVERTIME_DAY_TYPE.SUNDAY_HOLIDAY]: 2.5, // +150%
 };
 
 export const OVERTIME_DAY_TYPE_LABELS: Record<OvertimeDayType, string> = {

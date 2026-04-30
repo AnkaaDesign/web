@@ -20,6 +20,17 @@ interface CategoryItemSelectorProps {
   categoryIds: string[];
   /** Whether the parent is still resolving categoryIds. */
   categoriesLoading?: boolean;
+  /**
+   * When set, restricts results to items linked to this paint type
+   * (PaintType.componentItems). Mirrors the formula form's filter.
+   */
+  paintTypeId?: string | null;
+  /**
+   * When set, restricts results to items linked to this paint brand
+   * (PaintBrand.componentItems). Combined with paintTypeId reproduces the
+   * brand∩type intersection used by useAvailableComponents.
+   */
+  paintBrandId?: string | null;
   disabled?: boolean;
   placeholder?: string;
   /** Plural-cased label, e.g. "endurecedores", used in empty state copy. */
@@ -31,6 +42,8 @@ export function CategoryItemSelector({
   onValueChange,
   categoryIds,
   categoriesLoading,
+  paintTypeId,
+  paintBrandId,
   disabled,
   placeholder,
   emptyLabel,
@@ -73,14 +86,21 @@ export function CategoryItemSelector({
       if (categoryIds.length === 0) {
         return { data: [] as Item[], hasMore: false };
       }
+      const where: Record<string, unknown> = {
+        categoryId: { in: categoryIds },
+      };
+      if (paintTypeId) {
+        where.paintTypes = { some: { id: paintTypeId } };
+      }
+      if (paintBrandId) {
+        where.paintBrands = { some: { id: paintBrandId } };
+      }
       const params: any = {
         orderBy: { name: "asc" },
         page,
         take: 20,
         isActive: true,
-        where: {
-          categoryId: { in: categoryIds },
-        },
+        where,
         include: ITEM_INCLUDE,
       };
       if (search && search.trim()) {
@@ -98,7 +118,7 @@ export function CategoryItemSelector({
         return { data: [] as Item[], hasMore: false };
       }
     },
-    [categoryIds],
+    [categoryIds, paintTypeId, paintBrandId],
   );
 
   const renderItem = useCallback((item: Item) => {
@@ -149,6 +169,8 @@ export function CategoryItemSelector({
         "paint-mix",
         "item-search",
         ...(categoryIds.length ? categoryIds : ["empty"]),
+        paintTypeId ?? "no-type",
+        paintBrandId ?? "no-brand",
       ]}
       queryFn={searchItems}
       getOptionLabel={getOptionLabel}

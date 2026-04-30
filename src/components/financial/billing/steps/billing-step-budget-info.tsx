@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
+import { Input } from "@/components/ui/input";
 import { FileUploadField } from "@/components/common/file/file-upload-field";
 import { IconCalendar, IconPhoto } from "@tabler/icons-react";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
@@ -20,6 +21,11 @@ const GUARANTEE_OPTIONS = [
   { value: "15", label: "15 anos" },
   { value: "CUSTOM", label: "Personalizado" },
 ] as const;
+
+const FORECAST_DAYS_OPTIONS = Array.from({ length: 30 }, (_, i) => ({
+  value: String(i + 1),
+  label: `${i + 1} ${i + 1 === 1 ? "dia" : "dias"}`,
+}));
 
 interface BillingStepBudgetInfoProps {
   disabled?: boolean;
@@ -117,7 +123,7 @@ export function BillingStepBudgetInfo({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <FormField
               control={control}
               name="expiresAt"
@@ -160,6 +166,53 @@ export function BillingStepBudgetInfo({
                 />
               </FormControl>
             </FormItem>
+
+            <FormField
+              control={control}
+              name="customForecastDays"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Prazo de Entrega</FormLabel>
+                  <FormControl>
+                    <Combobox
+                      value={field.value ? String(field.value) : ""}
+                      onValueChange={(value) =>
+                        field.onChange(value ? Number(value) : null)
+                      }
+                      disabled={disabled}
+                      options={FORECAST_DAYS_OPTIONS}
+                      placeholder="Auto"
+                      emptyText="Nenhuma opção"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={control}
+              name="simultaneousTasks"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tarefas Simultâneas</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      {...field}
+                      value={field.value ?? ""}
+                      onChange={(val) =>
+                        field.onChange(val ? Number(val) : null)
+                      }
+                      disabled={disabled}
+                      placeholder="1-100"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
 
           {showCustomGuarantee && (

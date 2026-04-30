@@ -425,17 +425,9 @@ export default function TrueColorSystemPage() {
             });
           }
         } else {
-          // Clicked outside canvas → select all of current page if empty,
-          // or confirm before deselecting if any selection exists on current page
-          const prefix = `y${currentY}|k${currentK}|`;
-          let hasCurrentPageSelection = false;
-          for (const id of selected) {
-            if (id.startsWith(prefix)) {
-              hasCurrentPageSelection = true;
-              break;
-            }
-          }
-          if (!hasCurrentPageSelection) {
+          // Clicked outside canvas → select all of current page if no selection
+          // anywhere, or confirm before clearing all selections (across pages)
+          if (selected.size === 0) {
             // Select every cell of the current page (within active filter)
             setSelected((prev) => {
               const next = new Set(prev);
@@ -626,12 +618,27 @@ export default function TrueColorSystemPage() {
       // Top row: K/Y badges on the left, "MAGENTA →" on the right — same baseline
       const topRow = document.createElement("div");
       topRow.style.cssText = `display:flex;align-items:flex-end;justify-content:space-between;width:${chartW + tickSpace}px;padding-left:${tickSpace}px;margin-bottom:2px;`;
-      topRow.innerHTML =
-        `<div style="display:flex;gap:6px;">` +
-          `<span style="background:#1d1d1f;color:#fff;font-size:11px;font-weight:500;padding:2px 10px;border-radius:5px;">K ${currentK}%</span>` +
-          `<span style="background:#fbbf24;color:#1d1d1f;font-size:11px;font-weight:500;padding:2px 10px;border-radius:5px;">Y ${currentY}%</span>` +
-        `</div>` +
-        `<div style="font-size:9px;font-weight:700;letter-spacing:0.16em;color:#666;">MAGENTA →</div>`;
+
+      const badges = document.createElement("div");
+      badges.style.cssText = "display:flex;gap:6px;";
+
+      const kBadge = document.createElement("span");
+      kBadge.style.cssText = "background:#1d1d1f;color:#fff;font-size:11px;font-weight:500;padding:2px 10px;border-radius:5px;";
+      kBadge.textContent = `K ${currentK}%`;
+      badges.appendChild(kBadge);
+
+      const yBadge = document.createElement("span");
+      yBadge.style.cssText = "background:#fbbf24;color:#1d1d1f;font-size:11px;font-weight:500;padding:2px 10px;border-radius:5px;";
+      yBadge.textContent = `Y ${currentY}%`;
+      badges.appendChild(yBadge);
+
+      topRow.appendChild(badges);
+
+      const magentaLabel = document.createElement("div");
+      magentaLabel.style.cssText = "font-size:9px;font-weight:700;letter-spacing:0.16em;color:#666;";
+      magentaLabel.textContent = "MAGENTA →";
+      topRow.appendChild(magentaLabel);
+
       outer.appendChild(topRow);
 
       // Grid wrapper — margin-top provides space for tick numbers only
@@ -718,16 +725,10 @@ export default function TrueColorSystemPage() {
   const selectionCount = selected.size;
 
   const handleConfirmDeselect = useCallback(() => {
-    setSelected((prev) => {
-      const prefix = `y${currentY}|k${currentK}|`;
-      const next = new Set<string>();
-      for (const id of prev) {
-        if (!id.startsWith(prefix)) next.add(id);
-      }
-      return next;
-    });
+    setSelected(new Set());
+    setShowSelected(false);
     setConfirmDeselectOpen(false);
-  }, [currentY, currentK]);
+  }, []);
 
   const clamp = (v: string, lo: number, hi: number, def: number) => {
     const n = parseInt(v, 10);
@@ -1030,7 +1031,7 @@ export default function TrueColorSystemPage() {
             <DialogHeader>
               <DialogTitle>Desmarcar seleção?</DialogTitle>
               <DialogDescription>
-                Existem cores selecionadas nesta página. Deseja desmarcá-las?
+                Existem cores selecionadas. Deseja desmarcar todas?
               </DialogDescription>
             </DialogHeader>
             <div className="flex justify-end gap-2 pt-2">

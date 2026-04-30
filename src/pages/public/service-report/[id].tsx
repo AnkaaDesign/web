@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/components/ui/sonner";
-import { IconLoader2, IconAlertCircle, IconBrandWhatsapp, IconDotsVertical, IconCopy, IconPhoto, IconFileTypePdf, IconDownload } from "@tabler/icons-react";
+import { IconLoader2, IconAlertCircle, IconBrandWhatsapp, IconCopy, IconPhoto, IconFileTypePdf, IconDownload, IconChevronDown, IconShare } from "@tabler/icons-react";
 import { COMPANY_INFO, BRAND_COLORS } from "@/config/company";
+import { TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "@/constants/enum-labels";
 import { exportCompleteDossiePdf } from "@/utils/dossie-pdf-generator";
 import { PdfPageRenderer } from "@/components/common/file/pdf-page-renderer";
 
@@ -164,6 +165,8 @@ export function PublicServiceReportPage() {
         serialNumber: quote.task?.serialNumber || null,
         plate: quote.task?.truck?.plate || null,
         chassisNumber: quote.task?.truck?.chassisNumber || null,
+        truckCategory: quote.task?.truck?.category ? (TRUCK_CATEGORY_LABELS[quote.task.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || quote.task.truck.category) : null,
+        truckImplementType: quote.task?.truck?.implementType ? (IMPLEMENT_TYPE_LABELS[quote.task.truck.implementType as keyof typeof IMPLEMENT_TYPE_LABELS] || quote.task.truck.implementType) : null,
         finishedAt: quote.task?.finishedAt || null,
         services,
         subtotal,
@@ -288,7 +291,34 @@ export function PublicServiceReportPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
               <img src="/logo.png" alt={COMPANY.name} className="h-16 md:h-20" />
-              <div className="flex items-start gap-2">
+              <div className="flex flex-col items-end gap-2">
+                <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="gap-2 h-9 px-3 text-sm font-medium no-print"
+                      style={{ borderColor: COMPANY.primaryGreen, color: COMPANY.primaryGreen }}
+                    >
+                      <IconShare className="h-4 w-4" />
+                      Opções
+                      <IconChevronDown className={`h-3.5 w-3.5 opacity-70 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" sideOffset={6} className="w-52 p-1 bg-white border border-gray-200 shadow-lg">
+                    <button onClick={() => { setMenuOpen(false); handleCopyLink(); }} className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+                      <IconCopy className="h-4 w-4 text-gray-500" /> Copiar link
+                    </button>
+                    <button onClick={() => { setMenuOpen(false); handleWhatsAppShare(); }} className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+                      <IconBrandWhatsapp className="h-4 w-4 text-green-600" /> WhatsApp
+                    </button>
+                    <button onClick={() => { setMenuOpen(false); handleExportPdf(); }} className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+                      <IconFileTypePdf className="h-4 w-4 text-red-500" /> Baixar PDF
+                    </button>
+                    <button onClick={() => { setMenuOpen(false); handleDownloadArchive(); }} className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+                      <IconDownload className="h-4 w-4 text-blue-500" /> Baixar Arquivos
+                    </button>
+                  </PopoverContent>
+                </Popover>
                 <div className="text-right">
                   <h1 className="text-xl md:text-2xl font-bold text-gray-900">
                     Dossiê Nº {budgetNumber}
@@ -296,33 +326,7 @@ export function PublicServiceReportPage() {
                   <p className="text-sm text-gray-600 mt-1">
                     <span className="font-semibold">Emissão:</span> {formatDate(new Date())}
                   </p>
-                  {quote.task?.finishedAt && (
-                    <p className="text-sm text-gray-600">
-                      <span className="font-semibold">Finalizado em:</span> {formatDate(quote.task.finishedAt)}
-                    </p>
-                  )}
                 </div>
-                <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:text-gray-900 hover:bg-gray-100 no-print">
-                      <IconDotsVertical className="h-5 w-5" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" sideOffset={4} className="w-48 p-1 bg-white border border-gray-200 shadow-lg">
-                    <button onClick={() => { setMenuOpen(false); handleCopyLink(); }} className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-                      <IconCopy className="h-4 w-4 text-gray-500" /> Copiar link
-                    </button>
-                    <button onClick={() => { setMenuOpen(false); handleWhatsAppShare(); }} className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-                      <IconBrandWhatsapp className="h-4 w-4 text-green-600" /> WhatsApp
-                    </button>
-                    <button onClick={() => { setMenuOpen(false); handleExportPdf(); }} className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-                      <IconFileTypePdf className="h-4 w-4 text-red-500" /> Baixar PDF
-                    </button>
-                    <button onClick={() => { setMenuOpen(false); handleDownloadArchive(); }} className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-                      <IconDownload className="h-4 w-4 text-blue-500" /> Baixar Arquivos
-                    </button>
-                  </PopoverContent>
-                </Popover>
               </div>
             </div>
 
@@ -336,21 +340,36 @@ export function PublicServiceReportPage() {
 
             {/* Customer + Vehicle Info */}
             <div className="mb-6">
-              <p className="font-bold mb-1" style={{ color: COMPANY.primaryGreen }}>
-                À {contactName || corporateName}
-              </p>
+              {contactName && (
+                <p className="font-bold mb-1" style={{ color: COMPANY.primaryGreen }}>
+                  À {contactName}
+                </p>
+              )}
               <p className="text-gray-700">
                 Prezado(a) cliente, segue o dossiê referente aos serviços realizados
-                {(quote.task?.serialNumber || quote.task?.truck?.plate || quote.task?.truck?.chassisNumber) && (
-                  <>
-                    {" "}no veículo
-                    {quote.task?.serialNumber && <> nº de série: <strong>{quote.task.serialNumber}</strong></>}
-                    {quote.task?.serialNumber && (quote.task?.truck?.plate || quote.task?.truck?.chassisNumber) && ","}
-                    {quote.task?.truck?.plate && <> placa: <strong>{quote.task.truck.plate}</strong></>}
-                    {quote.task?.truck?.plate && quote.task?.truck?.chassisNumber && ","}
-                    {quote.task?.truck?.chassisNumber && <> chassi: <strong>{quote.task.truck.chassisNumber}</strong></>}
-                  </>
-                )}.
+                {(() => {
+                  const truckCategoryLabel = quote.task?.truck?.category
+                    ? (TRUCK_CATEGORY_LABELS[quote.task.truck.category as keyof typeof TRUCK_CATEGORY_LABELS] || quote.task.truck.category)
+                    : null;
+                  const truckImplementLabel = quote.task?.truck?.implementType
+                    ? (IMPLEMENT_TYPE_LABELS[quote.task.truck.implementType as keyof typeof IMPLEMENT_TYPE_LABELS] || quote.task.truck.implementType)
+                    : null;
+                  const parts: React.ReactNode[] = [];
+                  if (quote.task?.serialNumber) parts.push(<> nº de série: <strong>{quote.task.serialNumber}</strong></>);
+                  if (quote.task?.truck?.plate) parts.push(<> placa: <strong>{quote.task.truck.plate}</strong></>);
+                  if (quote.task?.truck?.chassisNumber) parts.push(<> chassi: <strong>{quote.task.truck.chassisNumber}</strong></>);
+                  if (truckCategoryLabel) parts.push(<> categoria: <strong>{truckCategoryLabel}</strong></>);
+                  if (truckImplementLabel) parts.push(<> implemento: <strong>{truckImplementLabel}</strong></>);
+                  if (!parts.length) return null;
+                  return (
+                    <>
+                      {" "}no veículo
+                      {parts.map((p, i) => (
+                        <span key={i}>{i > 0 && ","}{p}</span>
+                      ))}
+                    </>
+                  );
+                })()}.
               </p>
             </div>
 
@@ -461,12 +480,12 @@ export function PublicServiceReportPage() {
               <p className="text-sm text-gray-600">{COMPANY.address}</p>
               <p className="text-sm">
                 <a href={whatsappLink} target="_blank" rel="noopener noreferrer" style={{ color: COMPANY.primaryGreen }} className="hover:underline">
-                  {COMPANY.phone}
+                  {COMPANY.phone.startsWith('(') ? COMPANY.phone : COMPANY.phone.replace(/^(\d{2})\s/, '($1) ')}
                 </a>
               </p>
               <p className="text-sm">
                 <a href={COMPANY.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ color: COMPANY.primaryGreen }} className="hover:underline">
-                  {COMPANY.website}
+                  {COMPANY.websiteUrl}
                 </a>
               </p>
             </div>
@@ -511,9 +530,9 @@ export function PublicServiceReportPage() {
                         {checkinFiles.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1.5">Antes</p>
-                            <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-start justify-items-start">
                               {checkinFiles.map((f: any) => (
-                                <img key={f.id} src={`${apiUrl}/files/serve/${f.id}`} alt={desc} className="w-full aspect-[4/3] object-cover rounded border border-gray-200" />
+                                <img key={f.id} src={`${apiUrl}/files/serve/${f.id}`} alt={desc} className="w-full h-auto block" />
                               ))}
                             </div>
                           </div>
@@ -521,9 +540,9 @@ export function PublicServiceReportPage() {
                         {checkoutFiles.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-1.5">Depois</p>
-                            <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-start justify-items-start">
                               {checkoutFiles.map((f: any) => (
-                                <img key={f.id} src={`${apiUrl}/files/serve/${f.id}`} alt={desc} className="w-full aspect-[4/3] object-cover rounded border border-gray-200" />
+                                <img key={f.id} src={`${apiUrl}/files/serve/${f.id}`} alt={desc} className="w-full h-auto block" />
                               ))}
                             </div>
                           </div>
@@ -538,8 +557,8 @@ export function PublicServiceReportPage() {
               <div className="pt-4 mt-8 border-t" style={{ borderImage: `linear-gradient(to right, #888 0%, ${COMPANY.primaryGreen} 30%) 1` }}>
                 <p className="font-bold" style={{ color: COMPANY.primaryGreen }}>{COMPANY.name}</p>
                 <p className="text-sm text-gray-600">{COMPANY.address}</p>
-                <p className="text-sm"><a href={whatsappLink} target="_blank" rel="noopener noreferrer" style={{ color: COMPANY.primaryGreen }} className="hover:underline">{COMPANY.phone}</a></p>
-                <p className="text-sm"><a href={COMPANY.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ color: COMPANY.primaryGreen }} className="hover:underline">{COMPANY.website}</a></p>
+                <p className="text-sm"><a href={whatsappLink} target="_blank" rel="noopener noreferrer" style={{ color: COMPANY.primaryGreen }} className="hover:underline">{COMPANY.phone.startsWith('(') ? COMPANY.phone : COMPANY.phone.replace(/^(\d{2})\s/, '($1) ')}</a></p>
+                <p className="text-sm"><a href={COMPANY.websiteUrl} target="_blank" rel="noopener noreferrer" style={{ color: COMPANY.primaryGreen }} className="hover:underline">{COMPANY.websiteUrl}</a></p>
               </div>
             </div>
           </div>

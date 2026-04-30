@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -119,9 +119,16 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
     name: "copies",
   });
 
+  const watchedCopies = useWatch({ control: form.control, name: "copies" });
+  const isCopyFilled = (c: { serialNumber?: string | null; plate?: string | null; chassisNumber?: string | null } | undefined) =>
+    !!(c?.serialNumber?.trim() || c?.plate?.trim() || c?.chassisNumber?.trim());
+  const filledCopiesCount = (watchedCopies || []).filter(isCopyFilled).length;
+  const hasEmptyCopy = (watchedCopies || []).some((c) => !isCopyFilled(c));
+
   const handleAddCopy = useCallback(() => {
+    if (hasEmptyCopy) return;
     append({ serialNumber: "", plate: "", chassisNumber: "" });
-  }, [append]);
+  }, [append, hasEmptyCopy]);
 
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen && task) {
@@ -207,7 +214,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       ...(sourceTask.quote && sourceTask.quote.services?.length > 0
         ? {
             quote: {
-              status: 'DRAFT' as const,
+              status: 'PENDING' as const,
               services: sourceTask.quote.services.map((item: any) => ({
                 description: item.description,
                 amount: Number(item.amount) || 0,
@@ -231,6 +238,8 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                 customPaymentText: config.customPaymentText || null,
                 responsibleId: config.responsibleId || null,
                 paymentCondition: config.paymentCondition || null,
+                paymentConfig: config.paymentConfig || null,
+                generateInvoice: config.generateInvoice ?? true,
               })) || [],
             },
           }
@@ -274,7 +283,11 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
 
   const handleDetailedSubmit = async (data: DuplicateFormData) => {
     if (!sourceTask) return;
-    const tasksToCreate = data.copies.map((copy) => buildTaskData(copy)).filter(Boolean) as any[];
+    const tasksToCreate = data.copies
+      .filter(isCopyFilled)
+      .map((copy) => buildTaskData(copy))
+      .filter(Boolean) as any[];
+    if (tasksToCreate.length === 0) return;
     await createCopies(tasksToCreate);
   };
 
@@ -298,9 +311,13 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
 
   const submitLabel = mode === 'quantity'
     ? (quantity && quantity > 1 ? `Criar ${quantity} Cópias` : quantity === 1 ? "Criar Cópia" : "Criar Cópias")
-    : (fields.length > 1 ? `Criar ${fields.length} Cópias` : "Criar Cópia");
+    : (filledCopiesCount > 1 ? `Criar ${filledCopiesCount} Cópias` : "Criar Cópia");
 
-  const isSubmitDisabled = isSubmitting || isLoadingTask || (mode === 'quantity' && (!quantity || quantity < 1));
+  const isSubmitDisabled =
+    isSubmitting ||
+    isLoadingTask ||
+    (mode === 'quantity' && (!quantity || quantity < 1)) ||
+    (mode === 'detailed' && filledCopiesCount === 0);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -459,7 +476,8 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                 variant="outline"
                 size="sm"
                 onClick={handleAddCopy}
-                disabled={isSubmitting}
+                disabled={isSubmitting || hasEmptyCopy}
+                title={hasEmptyCopy ? "Preencha placa, nº série ou chassi em todas as cópias antes de adicionar outra" : undefined}
                 className="w-full mt-2"
               >
                 <IconPlus className="h-4 w-4 mr-2" />

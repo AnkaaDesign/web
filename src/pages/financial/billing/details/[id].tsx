@@ -152,6 +152,8 @@ export const BillingDetailPage = () => {
       customerConfigs: [] as any[],
       guaranteeYears: null as number | null,
       customGuaranteeText: null as string | null,
+      customForecastDays: null as number | null,
+      simultaneousTasks: null as number | null,
       layoutFileId: null as string | null,
     },
   });
@@ -183,6 +185,8 @@ export const BillingDetailPage = () => {
         customerConfigs: [],
         guaranteeYears: null,
         customGuaranteeText: null,
+        customForecastDays: null,
+        simultaneousTasks: null,
       });
       return;
     }
@@ -202,6 +206,8 @@ export const BillingDetailPage = () => {
       total: Number(quote.total) || 0,
       guaranteeYears: quote.guaranteeYears,
       customGuaranteeText: quote.customGuaranteeText,
+      customForecastDays: quote.customForecastDays ?? null,
+      simultaneousTasks: quote.simultaneousTasks ?? null,
       layoutFileId: quote.layoutFileId || null,
       services: (quote.services || []).map((s: any) => ({
         id: s.id,
@@ -302,10 +308,13 @@ export const BillingDetailPage = () => {
   }, [invoices, customerConfigs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const steps = useMemo(() => {
-    const base = [
+    const base: Array<{ id: number; name: string; description: string }> = [
       { id: 1, name: "Tarefa", description: "Dados da tarefa e faturamento" },
-      { id: 2, name: "Serviços", description: "Serviços e preços" },
     ];
+    if (canSeeBudgetInfoStep) {
+      base.push({ id: base.length + 1, name: "Proposta", description: "Layout e garantia" });
+    }
+    base.push({ id: base.length + 1, name: "Serviços", description: "Serviços e preços" });
     customerConfigs.forEach((config: any, i: number) => {
       const cached = customersCache.current.get(config.customerId);
       const name =
@@ -313,16 +322,17 @@ export const BillingDetailPage = () => {
         config.customerData?.corporateName ||
         cached?.fantasyName ||
         "Cliente";
-      base.push({ id: 3 + i, name: `Cliente ${i + 1}`, description: name });
+      base.push({ id: base.length + 1, name: `Cliente ${i + 1}`, description: name });
     });
-    if (canSeeBudgetInfoStep) {
-      base.push({ id: base.length + 1, name: "Proposta", description: "Layout e garantia" });
-    }
     base.push({ id: base.length + 1, name: "Resumo", description: "Revisão final" });
     return base;
   }, [customerConfigs, canSeeBudgetInfoStep]);
 
   const totalSteps = steps.length;
+  // Step layout: 1=Tarefa, 2=Proposta (if visible), then Serviços, customers, Resumo
+  const proposalStepIdx = canSeeBudgetInfoStep ? 2 : null;
+  const servicesStepIdx = canSeeBudgetInfoStep ? 3 : 2;
+  const firstCustomerStepIdx = servicesStepIdx + 1;
 
   const STATUSES_REQUIRING_COMPLETE_DATA = [
     "COMMERCIAL_APPROVED",
@@ -339,7 +349,7 @@ export const BillingDetailPage = () => {
       }
       return true;
     }
-    if (currentStep === 2) {
+    if (currentStep === servicesStepIdx) {
       const services = form.getValues("services") || [];
       const validServices = services.filter((s: any) => s.description?.trim());
       if (validServices.length === 0) {
@@ -349,7 +359,7 @@ export const BillingDetailPage = () => {
       return true;
     }
     return true;
-  }, [currentStep, form]);
+  }, [currentStep, form, servicesStepIdx]);
 
   // Validate customer required fields — only called when status requires it
   const validateCustomerData = useCallback((): boolean => {
@@ -363,7 +373,7 @@ export const BillingDetailPage = () => {
         (s: any) => Number(s.amount) < 0,
       );
       if (negativeAmountServices.length > 0) {
-        setCurrentStep(2);
+        setCurrentStep(servicesStepIdx);
         toast.error("Serviços com valor negativo", {
           description: `${negativeAmountServices.length} serviço(s) com valor negativo. Serviços não podem ter valor negativo para faturamento.`,
         });
@@ -374,7 +384,7 @@ export const BillingDetailPage = () => {
     if (configs.length >= 2) {
       const unassigned = validServices.filter((s: any) => !s.invoiceToCustomerId);
       if (unassigned.length > 0) {
-        setCurrentStep(2);
+        setCurrentStep(servicesStepIdx);
         toast.error("Serviços sem cliente atribuído", {
           description: "Todos os serviços devem ter um cliente selecionado em 'Faturar Para'",
         });
@@ -399,7 +409,7 @@ export const BillingDetailPage = () => {
       if (!data.neighborhood?.trim()) errors.push("Bairro");
       if (!paymentCondition && !(paymentConfig as any)?.type) errors.push("Condição de Pagamento");
       if (errors.length > 0) {
-        setCurrentStep(3 + i);
+        setCurrentStep(firstCustomerStepIdx + i);
         const name = data.fantasyName || data.corporateName || `Cliente ${i + 1}`;
         toast.error(`${name} - campos obrigatórios`, { description: errors.join(", ") });
         return false;
@@ -407,7 +417,7 @@ export const BillingDetailPage = () => {
     }
 
     return true;
-  }, [form]);
+  }, [form, servicesStepIdx, firstCustomerStepIdx]);
 
   const nextStep = useCallback(() => {
     if (validateCurrentStep()) {
@@ -494,6 +504,8 @@ export const BillingDetailPage = () => {
         total: formData.total,
         guaranteeYears: formData.guaranteeYears,
         customGuaranteeText: formData.customGuaranteeText,
+        customForecastDays: canSeeBudgetInfoStep ? formData.customForecastDays : undefined,
+        simultaneousTasks: canSeeBudgetInfoStep ? formData.simultaneousTasks : undefined,
         layoutFileId: canSeeBudgetInfoStep ? layoutFileId : undefined,
         services: formData.services
           .filter((s: any) => s.description?.trim())
@@ -581,7 +593,7 @@ export const BillingDetailPage = () => {
     }
     const validServices = services.filter((s: any) => s.description?.trim());
     if (validServices.length === 0) {
-      setCurrentStep(2);
+      setCurrentStep(servicesStepIdx);
       toast.error("Adicione pelo menos um serviço");
       return;
     }
@@ -596,7 +608,7 @@ export const BillingDetailPage = () => {
     }
 
     await executeSave();
-  }, [quote?.id, task?.id, quote?.status, form, validateCustomerData, executeSave]);
+  }, [quote?.id, task?.id, quote?.status, form, validateCustomerData, executeSave, servicesStepIdx]);
 
   // Loading state
   if (isTaskLoading) {
@@ -651,11 +663,12 @@ export const BillingDetailPage = () => {
     }
   }
 
-  // Step detection: customer steps run from 3 to (2 + customerCount), proposta step follows (COMMERCIAL/ADMIN only)
-  const isProposalStep = canSeeBudgetInfoStep && currentStep === totalSteps - 1;
-  const isCustomerStep = currentStep >= 3 && currentStep < (canSeeBudgetInfoStep ? totalSteps - 1 : totalSteps);
+  // Step detection: 1=Tarefa, 2=Proposta (COMMERCIAL/ADMIN only), then Serviços, Cliente(s), Resumo
+  const isProposalStep = proposalStepIdx !== null && currentStep === proposalStepIdx;
+  const isServicesStep = currentStep === servicesStepIdx;
+  const isCustomerStep = currentStep >= firstCustomerStepIdx && currentStep < totalSteps;
   const isReviewStep = currentStep === totalSteps;
-  const customerStepIndex = currentStep - 3; // 0-based
+  const customerStepIndex = currentStep - firstCustomerStepIdx; // 0-based
   const currentConfig = isCustomerStep ? customerConfigs[customerStepIndex] : null;
   const currentCustomer = currentConfig
     ? customersCache.current.get(currentConfig.customerId)
@@ -739,7 +752,7 @@ export const BillingDetailPage = () => {
 
         <div className="flex-1 overflow-y-auto pb-6">
           <FormProvider {...form}>
-            {/* Steps 1–2 stay mounted (hidden via CSS) to preserve useFieldArray state */}
+            {/* Tarefa, Serviços, and customer steps stay mounted (hidden via CSS) to preserve useFieldArray state */}
             <div style={{ display: currentStep === 1 ? undefined : "none" }}>
               <BillingStepTask
                 disabled={!canEdit}
@@ -748,7 +761,15 @@ export const BillingDetailPage = () => {
               />
             </div>
 
-            <div style={{ display: currentStep === 2 ? undefined : "none" }}>
+            {isProposalStep && (
+              <BillingStepBudgetInfo
+                disabled={!canEdit}
+                layoutFiles={layoutFiles}
+                onLayoutFilesChange={setLayoutFiles}
+              />
+            )}
+
+            <div style={{ display: isServicesStep ? undefined : "none" }}>
               <BillingStepServices disabled={!canEdit} />
             </div>
 
@@ -756,7 +777,7 @@ export const BillingDetailPage = () => {
             {customerConfigs.map((config: any, i: number) => {
               const cachedCustomer = customersCache.current.get(config.customerId);
               return (
-                <div key={config.customerId || i} style={{ display: currentStep === 3 + i ? undefined : "none" }}>
+                <div key={config.customerId || i} style={{ display: currentStep === firstCustomerStepIdx + i ? undefined : "none" }}>
                   <BillingStepCustomer
                     configIndex={i}
                     customer={cachedCustomer}
@@ -765,14 +786,6 @@ export const BillingDetailPage = () => {
                 </div>
               );
             })}
-
-            {isProposalStep && (
-              <BillingStepBudgetInfo
-                disabled={!canEdit}
-                layoutFiles={layoutFiles}
-                onLayoutFilesChange={setLayoutFiles}
-              />
-            )}
 
             {isReviewStep && (
               <BillingStepReview

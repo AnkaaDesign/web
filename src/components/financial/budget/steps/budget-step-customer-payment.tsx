@@ -137,7 +137,9 @@ export function BudgetStepCustomerPayment({
     setShowDateInput(false);
   }, [patchPayment]);
 
-  // Default budget responsible to the first task responsible (only on mount)
+  // Default budget responsible to the first task responsible (only on mount).
+  // shouldDirty: true so the auto-default persists on save — otherwise an edit
+  // form with a previously-null responsibleId would never write the default back.
   const hasAutoDefaulted = useRef(false);
   useEffect(() => {
     if (hasAutoDefaulted.current) return;
@@ -152,7 +154,7 @@ export function BudgetStepCustomerPayment({
         setFormValue(
           `customerConfigs.${configIndex}.responsibleId`,
           firstValid.id,
-          { shouldDirty: false },
+          { shouldDirty: true },
         );
       }
     }

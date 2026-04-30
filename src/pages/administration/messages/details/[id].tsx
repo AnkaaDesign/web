@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { routes, FAVORITE_PAGES } from "../../../../constants";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconMessageCircle, IconEdit, IconTrash, IconRefresh } from "@tabler/icons-react";
+import { IconMessageCircle, IconEdit, IconTrash, IconRefresh, IconEye } from "@tabler/icons-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MessageBlockRenderer } from "@/components/messaging/MessageBlockRenderer";
@@ -21,8 +21,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { MessageViewersTable } from "@/components/administration/message/detail";
+import { MessagePreviewDialog } from "@/components/administration/message/editor/message-preview-dialog";
+import type { MessageFormData } from "@/components/administration/message/editor/types";
 import {
   Tooltip,
   TooltipContent,
@@ -33,6 +35,7 @@ export const MessageDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Fetch message data and stats from API
   const { data: response, isLoading, error, refetch } = useMessage(id!);
@@ -61,6 +64,33 @@ export const MessageDetailsPage = () => {
     refetch();
   };
 
+  const handlePreview = () => {
+    setPreviewOpen(true);
+  };
+
+  const previewData = useMemo<MessageFormData | null>(() => {
+    if (!message) return null;
+
+    let blocks: any = message.content?.blocks ?? message.content;
+    if (typeof blocks === "string") {
+      try {
+        const parsed = JSON.parse(blocks);
+        blocks = parsed?.blocks ?? parsed;
+      } catch {
+        blocks = [];
+      }
+    }
+    if (!Array.isArray(blocks)) blocks = [];
+
+    return {
+      title: message.title,
+      blocks,
+      targeting: { type: "all" },
+      scheduling: {},
+      isDraft: false,
+    };
+  }, [message]);
+
   const STATUS_LABELS: Record<string, string> = {
     DRAFT: "Rascunho",
     SCHEDULED: "Agendada",
@@ -83,6 +113,13 @@ export const MessageDetailsPage = () => {
       label: "Atualizar",
       icon: IconRefresh,
       onClick: handleRefresh,
+      variant: "outline" as const,
+    },
+    {
+      key: "preview",
+      label: "Visualizar",
+      icon: IconEye,
+      onClick: handlePreview,
       variant: "outline" as const,
     },
     {
@@ -319,6 +356,15 @@ export const MessageDetailsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Preview Dialog (with Export PDF inside) */}
+      {previewData && (
+        <MessagePreviewDialog
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          data={previewData}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
