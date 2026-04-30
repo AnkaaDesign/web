@@ -12,7 +12,7 @@ interface TimeClockJustificationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (justification: TimeClockJustificationFormData) => void;
-  originalTime: string;
+  originalTime: string | null;
   newTime: string | null;
   field: string;
   fieldLabel: string;
@@ -35,6 +35,34 @@ const getFieldDisplayName = (field: string): string => {
   return fieldMap[field] || field;
 };
 
+type ChangeKind = "inclusion" | "modification" | "deletion";
+
+function detectChangeKind(originalTime: string | null, newTime: string | null): ChangeKind {
+  const orig = (originalTime ?? "").trim();
+  const next = (newTime ?? "").trim();
+  if (orig === "" && next !== "") return "inclusion";
+  if (orig !== "" && next === "") return "deletion";
+  return "modification";
+}
+
+const COPY: Record<ChangeKind, { tipo: string; description: string; placeholder: string }> = {
+  inclusion: {
+    tipo: "Inclusão",
+    description: "Informe o motivo da inclusão manual",
+    placeholder: "Descreva o motivo da inclusão...",
+  },
+  modification: {
+    tipo: "Alteração",
+    description: "Informe o motivo do descarte do registro original",
+    placeholder: "Descreva o motivo da alteração...",
+  },
+  deletion: {
+    tipo: "Exclusão",
+    description: "Informe o motivo da exclusão do registro",
+    placeholder: "Descreva o motivo da exclusão...",
+  },
+};
+
 export function TimeClockJustificationDialog({
   open,
   onOpenChange,
@@ -48,12 +76,15 @@ export function TimeClockJustificationDialog({
   const form = useForm<TimeClockJustificationFormData>({
     resolver: zodResolver(timeClockJustificationSchema),
     defaultValues: {
-      originalTime,
+      originalTime: originalTime ?? "",
       newTime,
       field,
       reason: "",
     },
   });
+
+  const kind = detectChangeKind(originalTime, newTime);
+  const copy = COPY[kind];
 
   const handleSubmit = (data: TimeClockJustificationFormData) => {
     onConfirm(data);
@@ -70,7 +101,7 @@ export function TimeClockJustificationDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Justificativa de Alteração de Ponto</DialogTitle>
-          <DialogDescription>Informe o motivo do descarte do seguinte registro original</DialogDescription>
+          <DialogDescription>{copy.description}</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -78,14 +109,20 @@ export function TimeClockJustificationDialog({
             <div className="space-y-2">
               <div className="rounded-lg bg-muted p-3 space-y-1">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Registro:</span>
-                  <span className="font-medium">{originalTime}</span>
+                  <span className="text-muted-foreground">Marcação:</span>
+                  <span className="font-medium">{getFieldDisplayName(field)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Tipo:</span>
-                  <span className="font-medium">{getFieldDisplayName(field)}</span>
+                  <span className="font-medium">{copy.tipo}</span>
                 </div>
-                {newTime && (
+                {originalTime && originalTime.trim() !== "" && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Registro original:</span>
+                    <span className="font-medium">{originalTime}</span>
+                  </div>
+                )}
+                {newTime && newTime.trim() !== "" && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Novo valor:</span>
                     <span className="font-medium">{newTime}</span>
@@ -107,7 +144,7 @@ export function TimeClockJustificationDialog({
                       onBlur={field.onBlur}
                       name={field.name}
                       ref={field.ref}
-                      placeholder="Descreva o motivo da alteração..."
+                      placeholder={copy.placeholder}
                       className="min-h-[100px] resize-none"
                       disabled={isLoading}
                     />

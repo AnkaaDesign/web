@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { IconCircleCheck, IconCircleX, IconClock, IconUser, IconCalendar, IconClockEdit, IconFileDescription, IconArrowsExchange, IconWifiOff } from "@tabler/icons-react";
+import { IconCircleCheck, IconCircleX, IconClock, IconUser, IconCalendar, IconClockEdit, IconFileDescription, IconArrowsExchange, IconWifiOff, IconDeviceTablet, IconCloudOff, IconPaperclip } from "@tabler/icons-react";
+import type { Icon as TablerIcon } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useSecullumRequests, useSecullumApproveRequest, useSecullumRejectRequest } from "../../../../hooks";
+import { secullumService } from "../../../../api-client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +24,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/sonner";
 
 interface TimeEntry {
   field: string;
@@ -64,21 +67,34 @@ interface TimeAdjustmentRequest {
   TipoSolicitacao?: number;
   DispositivoTipo?: 'mobile' | 'biometric' | 'qrcode' | 'card' | 'web';
   DispositivoNome?: string;
+  // ID of the attached photo (e.g. medical certificate uploaded with a Justify
+  // Absence request). When set, an attachment can be fetched from
+  // /Solicitacoes/FotoAtestado/{id}. Null/undefined when no photo is attached.
+  SolicitacaoFotoId?: number | null;
+  Justificativa?: string | null;
 }
 
-// Helper function to get origin info (origin: 16 = Ponto Virtual Offline, null/undefined = Solicitado pelo usuário)
+// Helper function to get origin info from Secullum origem code.
+// 16 = Ponto Virtual (mobile app, online sync). Other non-null values are
+// treated as the offline variant. null/undefined = manual employee request.
 const getOriginInfo = (origin: number | null | undefined) => {
   if (origin === 16) {
     return {
-      icon: IconWifiOff,
+      icon: IconDeviceTablet,
+      label: 'Ponto Virtual',
+      color: 'text-neutral-900 dark:text-neutral-100'
+    };
+  }
+  if (origin != null) {
+    return {
+      icon: IconCloudOff,
       label: 'Ponto Virtual Offline',
       color: 'text-neutral-900 dark:text-neutral-100'
     };
   }
-  // No origin means requested by user
   return {
     icon: IconUser,
-    label: 'Solicitado pelo usuário',
+    label: 'Solicitado pelo colaborador',
     color: 'text-neutral-900 dark:text-neutral-100'
   };
 };
@@ -92,6 +108,106 @@ const TimeEntryLabel: Record<string, string> = {
   Entrada3: "Entrada 3",
   Saida3: "Saída 3",
 };
+
+interface TimeCellProps {
+  value: string | null;
+  icon: TablerIcon | null;
+  tooltipLabel?: string;
+  tooltipReason?: string | null;
+}
+
+function RequestAttachmentDialog({
+  solicitacaoId,
+  open,
+  onOpenChange,
+}: {
+  solicitacaoId: number | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || solicitacaoId == null) {
+      setPhoto(null);
+      setError(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    secullumService
+      .getRequestAttachmentPhoto(solicitacaoId)
+      .then((res) => {
+        if (cancelled) return;
+        const base64 = res.data?.data?.Foto;
+        if (base64) {
+          // Upstream returns raw base64 without the data: prefix.
+          setPhoto(`data:image/jpeg;base64,${base64}`);
+        } else {
+          setError("Foto não disponível para esta solicitação.");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError("Falha ao carregar a foto anexada.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, solicitacaoId]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[700px]">
+        <DialogHeader>
+          <DialogTitle>Foto anexada à solicitação</DialogTitle>
+          <DialogDescription>
+            Documento enviado pelo colaborador (ex: atestado médico)
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center justify-center min-h-[300px] bg-muted/30 rounded-lg overflow-hidden">
+          {isLoading && <LoadingSpinner size="lg" />}
+          {!isLoading && error && <p className="text-sm text-muted-foreground p-6">{error}</p>}
+          {!isLoading && !error && photo && (
+            <img src={photo} alt="Foto anexada" className="max-w-full max-h-[70vh] object-contain" />
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TimeCell({ value, icon: Icon, tooltipLabel, tooltipReason }: TimeCellProps) {
+  return (
+    <div className="inline-flex items-center gap-1">
+      <span className="tabular-nums">{value || "-"}</span>
+      {value && Icon && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Icon className="h-3.5 w-3.5 text-neutral-900 dark:text-neutral-100" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="space-y-1 max-w-xs">
+                <p className="text-xs font-medium">{tooltipLabel}</p>
+                {tooltipReason && (
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap">{tooltipReason}</p>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+  );
+}
 
 // Helper function to detect which fields were actually modified vs just shifted
 const detectActualChanges = (request: TimeAdjustmentRequest): Set<string> => {
@@ -165,6 +281,7 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
   const [selectedRequest, setSelectedRequest] = useState<TimeAdjustmentRequest | null>(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [attachmentDialogOpen, setAttachmentDialogOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -234,36 +351,70 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
   }, [refetch]);
 
   const handleApprove = useCallback(async () => {
-    if (!selectedRequest) return;
+    if (!selectedRequest) {
+      toast.error("Nenhuma solicitação selecionada.");
+      return;
+    }
+
+    // Secullum returns HTTP 400 on /Solicitacoes/Aceitar when any
+    // AlteracoesFonteDados entry has Motivo: null. The employee's own
+    // `Observacoes` (e.g. "tablet sem bateria") is the reason for the request,
+    // so we copy it into every entry's Motivo before sending. Falls back to a
+    // generic string if the request has no observation at all.
+    const motivo =
+      (selectedRequest.Observacoes && selectedRequest.Observacoes.trim()) ||
+      "Aprovado";
+    const baseChanges = (selectedRequest.AlteracoesFonteDados ?? []) as any[];
+    const alteracoes = baseChanges.map((c) => ({
+      ...c,
+      Motivo:
+        c?.Motivo && String(c.Motivo).trim() !== "" ? c.Motivo : motivo,
+    }));
 
     try {
-      await approveRequest.mutateAsync({
+      const response = await approveRequest.mutateAsync({
         requestId: selectedRequest.Id.toString(),
         data: {
           Versao: selectedRequest.Versao,
-          AlteracoesFonteDados: selectedRequest.AlteracoesFonteDados,
+          AlteracoesFonteDados: alteracoes,
           // Secullum's TipoSolicitacao on the wire mirrors the request's `Tipo` field
-          // (0 = adjust markings, 2 = justify absence). Previously this read
-          // `selectedRequest.TipoSolicitacao`, which doesn't exist → always sent 0.
+          // (0 = adjust markings, 2 = justify absence).
           TipoSolicitacao: selectedRequest.Tipo ?? 0,
         },
       });
 
-      // Refresh and select next request
+      const result = (response as any)?.data;
+      if (result && result.success === false) {
+        toast.error(result.message || "Falha ao aprovar solicitação.");
+        return;
+      }
+
+      toast.success(result?.message || "Solicitação aprovada com sucesso.");
+
       await refetch();
-      const newSelectedRequest = null;
-      setSelectedRequest(newSelectedRequest);
-      onSelectedRequestChange?.(newSelectedRequest);
-    } catch (error) {
-      // Error handled by hook
+      setSelectedRequest(null);
+      onSelectedRequestChange?.(null);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Falha ao aprovar solicitação.";
+      toast.error(message);
     }
   }, [selectedRequest, approveRequest, refetch, onSelectedRequestChange]);
 
   const handleReject = useCallback(async () => {
-    if (!selectedRequest || !rejectReason) return;
+    if (!selectedRequest) {
+      toast.error("Nenhuma solicitação selecionada.");
+      return;
+    }
+    if (!rejectReason.trim()) {
+      toast.error("Informe o motivo da rejeição.");
+      return;
+    }
 
     try {
-      await rejectRequest.mutateAsync({
+      const response = await rejectRequest.mutateAsync({
         requestId: selectedRequest.Id.toString(),
         data: {
           Versao: selectedRequest.Versao,
@@ -274,15 +425,25 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
         },
       });
 
-      // Refresh and select next request
+      const result = (response as any)?.data;
+      if (result && result.success === false) {
+        toast.error(result.message || "Falha ao rejeitar solicitação.");
+        return;
+      }
+
+      toast.success(result?.message || "Solicitação rejeitada com sucesso.");
+
       await refetch();
-      const newSelectedRequest = null;
-      setSelectedRequest(newSelectedRequest);
-      onSelectedRequestChange?.(newSelectedRequest);
+      setSelectedRequest(null);
+      onSelectedRequestChange?.(null);
       setRejectDialogOpen(false);
       setRejectReason("");
-    } catch (error) {
-      // Error handled by hook
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Falha ao rejeitar solicitação.";
+      toast.error(message);
     }
   }, [selectedRequest, rejectReason, rejectRequest, refetch, onSelectedRequestChange]);
 
@@ -437,28 +598,28 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center gap-2">
                             <IconUser className={cn(
-                              "h-4 w-4",
+                              "h-5 w-5",
                               selectedRequest?.Id === request.Id ? "text-primary-foreground" : "text-primary"
                             )} />
                             <span className={cn(
-                              "font-medium text-sm",
+                              "font-semibold text-base",
                               selectedRequest?.Id === request.Id ? "text-primary-foreground" : "text-foreground"
                             )}>
                               {request.FuncionarioNome}
                             </span>
                           </div>
                           <div className={cn(
-                            "flex items-center gap-4 text-xs",
+                            "flex items-center gap-4 text-sm",
                             selectedRequest?.Id === request.Id ? "text-primary-foreground/80" : "text-muted-foreground"
                           )}>
-                            <div className="flex items-center gap-1">
-                              <IconCalendar className="h-3 w-3" />
+                            <div className="flex items-center gap-1.5">
+                              <IconCalendar className="h-4 w-4" />
                               {format(new Date(request.Data), "dd/MM/yyyy")}
                             </div>
                             <Badge
                               variant={selectedRequest?.Id === request.Id ? "secondary" : "outline"}
                               className={cn(
-                                "text-xs px-2 py-0",
+                                "text-xs px-2 py-0.5",
                                 selectedRequest?.Id === request.Id && "bg-primary-foreground/20 text-primary-foreground border-primary-foreground/30"
                               )}
                             >
@@ -522,37 +683,48 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
                 <ScrollArea className="flex-1">
                   <div className="px-8 py-6 space-y-6">
                   {/* Request Metadata */}
-                  <div className="rounded-lg bg-muted/30 p-4 space-y-3">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
-                      <IconFileDescription className="h-4 w-4 text-primary" />
+                  <div className="rounded-lg bg-muted/30 p-5 space-y-4">
+                    <h3 className="text-base font-semibold flex items-center gap-2">
+                      <IconFileDescription className="h-5 w-5 text-primary" />
                       Informações da Solicitação
                     </h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-4">
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground">Data do Ponto</p>
-                        <p className="text-sm font-medium">
+                        <p className="text-base font-medium">
                           {format(new Date(selectedRequest.Data), "dd/MM/yyyy")}
                         </p>
                       </div>
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground">Solicitado em</p>
-                        <p className="text-sm font-medium">
+                        <p className="text-base font-medium">
                           {format(new Date(selectedRequest.DataSolicitacao), "dd/MM/yyyy HH:mm")}
                         </p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Tipo</p>
-                        <p className="text-sm font-medium">{selectedRequest.TipoDescricao}</p>
+                        <p className="text-xs text-muted-foreground">Solicitado por</p>
+                        <p className="text-base font-medium">{selectedRequest.FuncionarioNome}</p>
                       </div>
-                    </div>
-                    {selectedRequest.Observacoes && (
-                      <div className="mt-4 pt-4 border-t border-border">
+                      {selectedRequest.Observacoes && (
                         <div className="space-y-1">
                           <p className="text-xs text-muted-foreground">Observação</p>
-                          <p className="text-sm">{selectedRequest.Observacoes}</p>
+                          <p className="text-base">{selectedRequest.Observacoes}</p>
                         </div>
-                      </div>
-                    )}
+                      )}
+                      {selectedRequest.SolicitacaoFotoId != null && (
+                        <div className="pt-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => setAttachmentDialogOpen(true)}
+                          >
+                            <IconPaperclip className="h-4 w-4" />
+                            Ver foto anexada
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Time Entries Comparison */}
@@ -570,302 +742,59 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
                     <div className="overflow-hidden rounded-lg border border-border">
                       <Table>
                         <TableHeader className="bg-muted/50">
-                          <TableRow className="h-9">
-                            <TableHead className="w-24 font-medium">Marcação</TableHead>
-                            <TableHead className="text-center">Entrada 1</TableHead>
-                            <TableHead className="text-center">Saída 1</TableHead>
-                            <TableHead className="text-center">Entrada 2</TableHead>
-                            <TableHead className="text-center">Saída 2</TableHead>
-                            <TableHead className="text-center">Entrada 3</TableHead>
-                            <TableHead className="text-center">Saída 3</TableHead>
+                          <TableRow className="h-10">
+                            <TableHead className="w-24 font-semibold text-xs">Marcação</TableHead>
+                            <TableHead className="text-left font-semibold text-xs">Entrada 1</TableHead>
+                            <TableHead className="text-left font-semibold text-xs">Saída 1</TableHead>
+                            <TableHead className="text-left font-semibold text-xs">Entrada 2</TableHead>
+                            <TableHead className="text-left font-semibold text-xs">Saída 2</TableHead>
+                            <TableHead className="text-left font-semibold text-xs">Entrada 3</TableHead>
+                            <TableHead className="text-left font-semibold text-xs">Saída 3</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          <TableRow className="h-10">
-                            <TableCell className="font-medium text-xs py-2">
+                          <TableRow className="h-12">
+                            <TableCell className="font-medium py-2">
                               <Badge variant="secondary" className="text-xs">Original</Badge>
                             </TableCell>
-                            <TableCell className="text-center text-sm font-mono py-2">
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Entrada1Original || "-"}</span>
-                                {selectedRequest.Entrada1Original && selectedRequest.OrigemEntrada1 !== undefined && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(getOriginInfo(selectedRequest.OrigemEntrada1).icon, {
-                                            className: cn("h-3 w-3", getOriginInfo(selectedRequest.OrigemEntrada1).color)
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">{getOriginInfo(selectedRequest.OrigemEntrada1).label}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center text-sm font-mono py-2">
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Saida1Original || "-"}</span>
-                                {selectedRequest.Saida1Original && selectedRequest.OrigemSaida1 !== undefined && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(getOriginInfo(selectedRequest.OrigemSaida1).icon, {
-                                            className: cn("h-3 w-3", getOriginInfo(selectedRequest.OrigemSaida1).color)
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">{getOriginInfo(selectedRequest.OrigemSaida1).label}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center text-sm font-mono py-2">
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Entrada2Original || "-"}</span>
-                                {selectedRequest.Entrada2Original && selectedRequest.OrigemEntrada2 !== undefined && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(getOriginInfo(selectedRequest.OrigemEntrada2).icon, {
-                                            className: cn("h-3 w-3", getOriginInfo(selectedRequest.OrigemEntrada2).color)
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">{getOriginInfo(selectedRequest.OrigemEntrada2).label}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center text-sm font-mono py-2">
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Saida2Original || "-"}</span>
-                                {selectedRequest.Saida2Original && selectedRequest.OrigemSaida2 !== undefined && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(getOriginInfo(selectedRequest.OrigemSaida2).icon, {
-                                            className: cn("h-3 w-3", getOriginInfo(selectedRequest.OrigemSaida2).color)
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">{getOriginInfo(selectedRequest.OrigemSaida2).label}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center text-sm font-mono py-2">
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Entrada3Original || "-"}</span>
-                                {selectedRequest.Entrada3Original && selectedRequest.OrigemEntrada3 !== undefined && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(getOriginInfo(selectedRequest.OrigemEntrada3).icon, {
-                                            className: cn("h-3 w-3", getOriginInfo(selectedRequest.OrigemEntrada3).color)
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">{getOriginInfo(selectedRequest.OrigemEntrada3).label}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center text-sm font-mono py-2">
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Saida3Original || "-"}</span>
-                                {selectedRequest.Saida3Original && selectedRequest.OrigemSaida3 !== undefined && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(getOriginInfo(selectedRequest.OrigemSaida3).icon, {
-                                            className: cn("h-3 w-3", getOriginInfo(selectedRequest.OrigemSaida3).color)
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">{getOriginInfo(selectedRequest.OrigemSaida3).label}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
+                            {(["Entrada1", "Saida1", "Entrada2", "Saida2", "Entrada3", "Saida3"] as const).map((field) => {
+                              const value = selectedRequest[`${field}Original` as keyof TimeAdjustmentRequest] as string | null;
+                              const origin = selectedRequest[`Origem${field}` as keyof TimeAdjustmentRequest] as number | null | undefined;
+                              return (
+                                <TableCell key={field} className="text-left text-sm font-mono py-2">
+                                  <TimeCell value={value} icon={value ? getOriginInfo(origin).icon : null} tooltipLabel={getOriginInfo(origin).label} />
+                                </TableCell>
+                              );
+                            })}
                           </TableRow>
-                          <TableRow className="h-10">
-                            <TableCell className="font-medium text-xs py-2">
+                          <TableRow className="h-12">
+                            <TableCell className="font-medium py-2">
                               <Badge className="text-xs">Solicitado</Badge>
                             </TableCell>
-                            <TableCell className={cn(
-                              "text-center text-sm font-mono py-2 transition-colors",
-                              isTimeChanged('Entrada1', selectedRequest) &&
-                              "bg-green-100 dark:bg-green-950/30 font-semibold text-green-700 dark:text-green-400"
-                            )}>
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Entrada1 || "-"}</span>
-                                {selectedRequest.Entrada1 && isTimeChanged('Entrada1', selectedRequest) && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(IconUser, {
-                                            className: cn("h-3 w-3", "text-neutral-900 dark:text-neutral-100")
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">Solicitado pelo usuário</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className={cn(
-                              "text-center text-sm font-mono py-2 transition-colors",
-                              isTimeChanged('Saida1', selectedRequest) &&
-                              "bg-green-100 dark:bg-green-950/30 font-semibold text-green-700 dark:text-green-400"
-                            )}>
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Saida1 || "-"}</span>
-                                {selectedRequest.Saida1 && isTimeChanged('Saida1', selectedRequest) && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(IconUser, {
-                                            className: cn("h-3 w-3", "text-neutral-900 dark:text-neutral-100")
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">Solicitado pelo usuário</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className={cn(
-                              "text-center text-sm font-mono py-2 transition-colors",
-                              isTimeChanged('Entrada2', selectedRequest) &&
-                              "bg-green-100 dark:bg-green-950/30 font-semibold text-green-700 dark:text-green-400"
-                            )}>
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Entrada2 || "-"}</span>
-                                {selectedRequest.Entrada2 && isTimeChanged('Entrada2', selectedRequest) && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(IconUser, {
-                                            className: cn("h-3 w-3", "text-neutral-900 dark:text-neutral-100")
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">Solicitado pelo usuário</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className={cn(
-                              "text-center text-sm font-mono py-2 transition-colors",
-                              isTimeChanged('Saida2', selectedRequest) &&
-                              "bg-green-100 dark:bg-green-950/30 font-semibold text-green-700 dark:text-green-400"
-                            )}>
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Saida2 || "-"}</span>
-                                {selectedRequest.Saida2 && isTimeChanged('Saida2', selectedRequest) && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(IconUser, {
-                                            className: cn("h-3 w-3", "text-neutral-900 dark:text-neutral-100")
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">Solicitado pelo usuário</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className={cn(
-                              "text-center text-sm font-mono py-2 transition-colors",
-                              isTimeChanged('Entrada3', selectedRequest) &&
-                              "bg-green-100 dark:bg-green-950/30 font-semibold text-green-700 dark:text-green-400"
-                            )}>
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Entrada3 || "-"}</span>
-                                {selectedRequest.Entrada3 && isTimeChanged('Entrada3', selectedRequest) && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(IconUser, {
-                                            className: cn("h-3 w-3", "text-neutral-900 dark:text-neutral-100")
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">Solicitado pelo usuário</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className={cn(
-                              "text-center text-sm font-mono py-2 transition-colors",
-                              isTimeChanged('Saida3', selectedRequest) &&
-                              "bg-green-100 dark:bg-green-950/30 font-semibold text-green-700 dark:text-green-400"
-                            )}>
-                              <div className="flex items-center justify-center gap-1">
-                                <span>{selectedRequest.Saida3 || "-"}</span>
-                                {selectedRequest.Saida3 && isTimeChanged('Saida3', selectedRequest) && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <div className="p-0.5">
-                                          {React.createElement(IconUser, {
-                                            className: cn("h-3 w-3", "text-neutral-900 dark:text-neutral-100")
-                                          })}
-                                        </div>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="text-xs">Solicitado pelo usuário</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
+                            {(["Entrada1", "Saida1", "Entrada2", "Saida2", "Entrada3", "Saida3"] as const).map((field) => {
+                              const value = selectedRequest[field as keyof TimeAdjustmentRequest] as string | null;
+                              const changed = isTimeChanged(field, selectedRequest);
+                              const origin = selectedRequest[`Origem${field}` as keyof TimeAdjustmentRequest] as number | null | undefined;
+                              const info = changed
+                                ? { icon: IconUser, label: "Solicitado pelo colaborador" }
+                                : { icon: getOriginInfo(origin).icon, label: getOriginInfo(origin).label };
+                              return (
+                                <TableCell
+                                  key={field}
+                                  className={cn(
+                                    "text-left text-sm font-mono py-2 transition-colors",
+                                    changed && "bg-green-100 dark:bg-green-950/30 font-semibold text-green-700 dark:text-green-400"
+                                  )}
+                                >
+                                  <TimeCell
+                                    value={value}
+                                    icon={value ? info.icon : null}
+                                    tooltipLabel={info.label}
+                                    tooltipReason={changed ? selectedRequest.Observacoes : null}
+                                  />
+                                </TableCell>
+                              );
+                            })}
                           </TableRow>
                         </TableBody>
                       </Table>
@@ -928,6 +857,13 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
           </DropdownMenu>
         </div>
       )}
+
+      {/* Attachment photo dialog */}
+      <RequestAttachmentDialog
+        solicitacaoId={selectedRequest?.SolicitacaoFotoId ?? null}
+        open={attachmentDialogOpen}
+        onOpenChange={setAttachmentDialogOpen}
+      />
 
       {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>

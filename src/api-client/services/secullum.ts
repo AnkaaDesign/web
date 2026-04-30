@@ -266,6 +266,10 @@ export const secullumService = {
   getTimeEntryPhoto: (userId: number, fonteDadosId: number) =>
     apiClient.get<{ success: boolean; data: { FotoBatida: string } }>(`/integrations/secullum/batidas/foto/${userId}/${fonteDadosId}`),
 
+  // Justify-absence request attachment (e.g. medical certificate uploaded with the request)
+  getRequestAttachmentPhoto: (solicitacaoId: number) =>
+    apiClient.get<{ success: boolean; data: { Foto: string } }>(`/integrations/secullum/solicitacoes/foto/${solicitacaoId}`),
+
   // Update Time Entry
   updateTimeEntry: (entryId: number, data: any) => apiClient.put<{ success: boolean; message: string; data: any }>(`/integrations/secullum/time-entries/${entryId}`, data),
 

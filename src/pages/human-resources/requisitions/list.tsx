@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { TimeAdjustmentRequests } from "@/components/integrations/secullum/requests/time-adjustment-requests";
-import { IconRefresh, IconCircleCheck, IconCircleX } from "@tabler/icons-react";
+import { IconRefresh } from "@tabler/icons-react";
 import { routes } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
@@ -46,11 +46,11 @@ function RequisicosList() {
       actions.push({
         key: "reject",
         label: "Rejeitar",
-        icon: IconCircleX,
         onClick: onReject,
         variant: "outline" as const,
+        size: "default" as const,
         group: "secondary" as const,
-        className: "border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground",
+        className: "!bg-destructive !text-destructive-foreground !border-destructive font-semibold hover:!opacity-[var(--hover-opacity)]",
       });
     }
 
@@ -59,10 +59,11 @@ function RequisicosList() {
       actions.push({
         key: "approve",
         label: "Aprovar",
-        icon: IconCircleCheck,
         onClick: onApprove,
         variant: "default" as const,
+        size: "default" as const,
         group: "secondary" as const,
+        className: "font-semibold !text-primary-foreground",
       });
     }
 

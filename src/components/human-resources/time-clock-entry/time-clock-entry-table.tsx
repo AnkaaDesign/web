@@ -29,6 +29,7 @@ import {
   IconArrowDown as MoveDown,
   IconFileText as FileText,
   IconPencil as PencilIcon,
+  IconUser as UserRequestIcon,
 } from "@tabler/icons-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../../ui/dropdown-menu";
 import { secullumService } from "../../../api-client";
@@ -69,22 +70,36 @@ const FONTE_DADOS_FIELD_MAP: Record<string, string> = {
 };
 
 /**
- * Check if a time entry field was manually added (not electronic).
- * FonteDadosX.Tipo: 0 = electronic (device/app), 1 = manual (requested adjustment).
+ * Determine the marker to render for a time-entry cell based on Secullum's
+ * FonteDados<Field>.{Tipo, Origem}.
+ *   - Tipo=0: electronic punch (device/app) → no marker.
+ *   - Tipo=1, Origem=9: employee-requested adjustment → user icon ("Solicitado pelo colaborador").
+ *   - Tipo=1, other Origem (e.g. 2 = HR web edit): manual pencil edit ("Inclusão manual").
  */
-function isManualEntry(rawEntry: any, fieldName: string): boolean {
-  if (!rawEntry) return false;
+type ManualEntryMarker = { kind: "user-request" | "pencil"; motivo: string | null } | null;
+
+function getManualEntryMarker(rawEntry: any, fieldName: string): ManualEntryMarker {
+  if (!rawEntry) return null;
   const fdField = FONTE_DADOS_FIELD_MAP[fieldName];
-  if (!fdField) return false;
+  if (!fdField) return null;
   const fd = rawEntry[fdField];
-  if (!fd || typeof fd !== 'object') return false;
-  return fd.Tipo === 1;
+  if (!fd || typeof fd !== "object") return null;
+  if (fd.Tipo !== 1) return null;
+  const motivo: string | null = fd.Motivo ? String(fd.Motivo) : null;
+  if (fd.Origem === 9) {
+    return { kind: "user-request", motivo };
+  }
+  return { kind: "pencil", motivo };
 }
 
 const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: React.Ref<TimeClockEntryTableRef>) => {
   const { entries, isLoading, className, onChangedRowsChange, visibleColumns } = props;
   const isVisible = (key: string) => !visibleColumns || visibleColumns.has(key);
   const [pendingJustification, setPendingJustification] = useState<PendingJustification | null>(null);
+  // Reasons captured from the justification dialog, keyed by `${entryId}:${field}`.
+  // Persisted into FonteDados<Field>.Motivo when the batch save fires so that
+  // Secullum classifies the cell as Tipo:1 (manual) on the next read.
+  const [pendingReasons, setPendingReasons] = useState<Record<string, string>>({});
   const [selectedEntry, setSelectedEntry] = useState<TimeClockEntry | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: TimeClockEntry; field?: string } | null>(null);
   const [photoDialog, setPhotoDialog] = useState<{ userId: number; fonteDadosId: number } | null>(null);
@@ -333,10 +348,22 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
 
       const actualEntryId = actualEntry.id;
 
-      // If changing from a value to another value (not clearing), request justification
-      if (originalValue && currentValue && originalValue !== currentValue) {
+      const norm = (v: string | null | undefined) => (v ?? "").trim();
+      const orig = norm(originalValue);
+      const curr = norm(currentValue);
+
+      // Three cases that need a justification (matches Secullum's "Justification
+      // of point change" modal):
+      //   - Modification: orig and curr both set, different
+      //   - Inclusion:    orig empty, curr set
+      //   - Deletion:     orig set, curr empty
+      const isModification = orig !== "" && curr !== "" && orig !== curr;
+      const isInclusion = orig === "" && curr !== "";
+      const isDeletion = orig !== "" && curr === "";
+
+      if (isModification || isInclusion || isDeletion) {
         setPendingJustification({
-          entryId: actualEntryId, // Store the actual entry ID
+          entryId: actualEntryId,
           field,
           originalTime: originalValue,
           newTime: currentValue,
@@ -347,19 +374,28 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
     [fields, normalizedEntries],
   );
 
-  const handleJustificationConfirm = useCallback(() => {
-    if (pendingJustification) {
-      // pendingJustification.entryId is the actual entry ID, need to find the form field ID
-      const entryIndex = normalizedEntries.findIndex((e) => e.id === pendingJustification.entryId);
-      if (entryIndex !== -1) {
-        const formFieldId = fields[entryIndex]?.id;
-        if (formFieldId) {
-          handleFieldChange(formFieldId, pendingJustification.field, pendingJustification.newTime);
+  const handleJustificationConfirm = useCallback(
+    (data?: { reason?: string }) => {
+      if (pendingJustification) {
+        // pendingJustification.entryId is the actual entry ID, need to find the form field ID
+        const entryIndex = normalizedEntries.findIndex((e) => e.id === pendingJustification.entryId);
+        if (entryIndex !== -1) {
+          const formFieldId = fields[entryIndex]?.id;
+          if (formFieldId) {
+            handleFieldChange(formFieldId, pendingJustification.field, pendingJustification.newTime);
+          }
+        }
+        // Stash the reason so the save payload can put it on FonteDados<Field>.Motivo.
+        const reason = data?.reason?.trim();
+        if (reason) {
+          const key = `${pendingJustification.entryId}:${pendingJustification.field}`;
+          setPendingReasons((prev) => ({ ...prev, [key]: reason }));
         }
       }
-    }
-    setPendingJustification(null);
-  }, [handleFieldChange, pendingJustification, normalizedEntries, fields]);
+      setPendingJustification(null);
+    },
+    [handleFieldChange, pendingJustification, normalizedEntries, fields],
+  );
 
   const handleSubmit = useCallback(
     async (data: TimeClockEntryBatchUpdateFormData) => {
@@ -467,6 +503,44 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
           merged.AlmocoLivre = formEntry.freeLunch;
           merged.Id = parseInt(formEntry.id, 10);
 
+          // 5) Build the ListaFonteDados array — Secullum's actual mechanism
+          //    for marking new manual edits. Verified via manual.har: the
+          //    request sends `ListaFonteDados: [{data, funcionarioId, coluna,
+          //    tipo:1, valor, motivo, usaGeolocalizacao}]`, and the next list
+          //    response returns the cell as FonteDados<Field>.{Tipo:1, Origem:2,
+          //    Motivo}. The existing FonteDados<Field> objects on the row stay
+          //    as-is (they reflect prior server state); only ListaFonteDados
+          //    drives the new manual classification.
+          const movedFroms = new Set(moves.map((m) => m.from));
+          const movedTos = new Set(moves.map((m) => m.to));
+          const listaFonteDados: any[] = [];
+          for (const f of TIME_FIELDS) {
+            // Skip move pairs — Secullum handles those via the FonteDados swap above.
+            if (movedFroms.has(f) || movedTos.has(f)) continue;
+
+            const orig = ((originalEntry as any)[FORM_TO_SECULLUM_COL[f]] ?? null) as string | null;
+            const cur = ((formEntry as any)[f] ?? null) as string | null;
+            const origNorm = orig === null || orig === undefined || orig === "" ? "" : orig;
+            const curNorm = cur === null || cur === undefined || cur === "" ? "" : cur;
+            if (origNorm === curNorm) continue; // unchanged
+
+            const reasonKey = `${entryId}:${f}`;
+            const motivo = pendingReasons[reasonKey] || "";
+            listaFonteDados.push({
+              data: merged.Data || (originalEntry as any).Data || null,
+              funcionarioId:
+                merged.FuncionarioId ?? (originalEntry as any).FuncionarioId ?? null,
+              coluna: FORM_TO_SECULLUM_COL[f],
+              tipo: 1, // 1 = manual (red pencil)
+              valor: curNorm, // empty string for clears
+              motivo,
+              usaGeolocalizacao: false,
+            });
+          }
+          if (listaFonteDados.length > 0) {
+            merged.ListaFonteDados = listaFonteDados;
+          }
+
           changedEntriesMap.set(entryId, merged);
         });
 
@@ -483,6 +557,8 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
           // Invalidate the time-entries query so the refetched data updates `entries`,
           // and the `entriesSignature` effect will reset the form to fresh values.
           stateManager.actions.restoreAll();
+          // Clear cached justification reasons — the next save starts fresh.
+          setPendingReasons({});
           // Use the bare prefix instead of secullumKeys.timeEntries() — calling
           // it with no args produces ['secullum','time-entries',undefined], and
           // React Query's partialMatchKey rejects matches against
@@ -498,7 +574,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
         console.error("Save error:", error);
       }
     },
-    [stateManager.actions, form, defaultFormData, entries, queryClient],
+    [stateManager.actions, form, defaultFormData, entries, queryClient, pendingReasons],
   );
 
   const handleRestore = useCallback(() => {
@@ -771,27 +847,45 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
     setContextMenu(null);
   }, [contextMenu, originalNormalizedEntries, form, stateManager.actions, getPairedField]);
 
-  const handleViewLocation = useCallback((entry: TimeClockEntry) => {
+  const handleViewLocation = useCallback((entry: TimeClockEntry, field?: string) => {
+    // Prefer the per-field source for the cell that was right-clicked. If no
+    // specific field is available, fall back to the first slot with a location.
+    const fieldSource = field ? entry.fieldSources?.[field as keyof NonNullable<TimeClockEntry["fieldSources"]>] : undefined;
+    const dayFallback = Object.values(entry.fieldSources ?? {}).find((s) => s?.latitude != null && s?.longitude != null);
+    const source = fieldSource?.latitude != null ? fieldSource : dayFallback;
+
+    if (!source || source.latitude == null || source.longitude == null) {
+      toast.error("Este registro não possui localização salva.");
+      setContextMenu(null);
+      return;
+    }
     const locationData: LocationData = {
-      FonteDadosId: parseInt(entry.id),
-      DataHora: entry.date.toISOString(),
-      Latitude: entry.latitude || -23.5505,
-      Longitude: entry.longitude || -46.6333,
-      Precisao: entry.accuracy || 10,
-      Endereco: entry.address || "São Paulo, Brasil",
-      PossuiFoto: entry.hasPhoto,
+      FonteDadosId: source.fonteDadosId ?? parseInt(entry.id),
+      DataHora: source.dataHora || entry.date.toISOString(),
+      Latitude: source.latitude,
+      Longitude: source.longitude,
+      Precisao: source.accuracy ?? 0,
+      Endereco: source.address ?? "",
+      PossuiFoto: source.hasPhoto,
     };
     setLocationDialog(locationData);
     setContextMenu(null);
   }, []);
 
-  const handleViewPhoto = useCallback((entry: TimeClockEntry) => {
-    if (entry.hasPhoto) {
-      setPhotoDialog({
-        userId: parseInt(entry.userId || "0"),
-        fonteDadosId: parseInt(entry.secullumRecordId || entry.id),
-      });
+  const handleViewPhoto = useCallback((entry: TimeClockEntry, field?: string) => {
+    const fieldSource = field ? entry.fieldSources?.[field as keyof NonNullable<TimeClockEntry["fieldSources"]>] : undefined;
+    const dayFallback = Object.values(entry.fieldSources ?? {}).find((s) => s?.hasPhoto);
+    const source = fieldSource?.hasPhoto ? fieldSource : dayFallback;
+
+    if (!source || !source.hasPhoto || source.fonteDadosId == null) {
+      toast.error("Este registro não possui foto.");
+      setContextMenu(null);
+      return;
     }
+    setPhotoDialog({
+      userId: parseInt(entry.userId || "0"),
+      fonteDadosId: source.fonteDadosId,
+    });
     setContextMenu(null);
   }, []);
 
@@ -927,17 +1021,15 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       {/* Time inputs */}
                       {["entry1", "exit1", "entry2", "exit2", "entry3", "exit3", "entry4", "exit4", "entry5", "exit5"].filter(isVisible).map((timeField) => {
                         const isModified = isFieldModified(field.id, timeField);
+                        // The original value (from server) for comparing live form value below.
+                        // Captured in outer scope; never changes for this render of the row.
+                        const originalCellValue = (entry[timeField as keyof TimeClockEntry] ?? null) as string | null;
                         // `field.id` is react-hook-form's auto-generated key, not
                         // Secullum's numeric Id — match by the normalized entry id
                         // (which is `String(secullumEntry.Id)`) so we actually find
                         // the row carrying the FonteDados metadata.
                         const rawEntry = entries.find((e: any) => String(e.Id) === entry.id || String(e.id) === entry.id);
-                        const isManual = isManualEntry(rawEntry, timeField);
-                        const fonteDadosKey = FONTE_DADOS_FIELD_MAP[timeField];
-                        const manualMotivo: string | null =
-                          isManual && fonteDadosKey && (rawEntry as any)?.[fonteDadosKey]?.Motivo
-                            ? String((rawEntry as any)[fonteDadosKey].Motivo)
-                            : null;
+                        const serverMarker = getManualEntryMarker(rawEntry, timeField);
                         // The move arrows must respect the absolute column index
                         // (entry1=0 ... exit5=9), not just whether the cell has a
                         // value. Otherwise entry1 shows a left chevron with no slot
@@ -969,10 +1061,20 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                                 const cellValue = formField.value as string | null;
                                 const isJustification = !!cellValue && !/^\d{1,2}:\d{2}$/.test(cellValue);
                                 const justificationFullName = isJustification ? justificationFullNameMap.get((cellValue || "").trim()) : null;
+                                // Compute the manual marker INSIDE the render prop so it
+                                // sees the live value as the user types (FormField re-renders
+                                // on every change). If the value differs from the original
+                                // server value, treat it as a local edit → pencil.
+                                const norm = (v: string | null | undefined) => (v ?? "").trim();
+                                const isLocallyModified = norm(cellValue) !== norm(originalCellValue);
+                                const manualMarker = isLocallyModified
+                                  ? { kind: "pencil" as const, motivo: serverMarker?.motivo ?? null }
+                                  : serverMarker;
+                                const manualMotivo = manualMarker?.motivo ?? null;
                                 return (
                                 <FormItem>
                                   <FormControl>
-                                    <div className="flex items-center gap-0.5 justify-center min-w-[100px]">
+                                    <div className="relative flex items-center gap-0.5 justify-center min-w-[100px]">
                                       <div className="w-6 flex justify-center">
                                         {formField.value && canMoveLeft && (
                                           <Button type="button" variant="ghost" size="icon" className="h-6 w-6 p-0" onClick={() => handleTimeShift(field.id, timeField, "left")}>
@@ -1020,15 +1122,21 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                                           </Button>
                                         )}
                                       </div>
-                                      {isManual && formField.value && (
+                                      {manualMarker && formField.value && (
                                         <Tooltip delayDuration={500}>
                                           <TooltipTrigger asChild>
-                                            <PencilIcon className="h-4 w-4 text-rose-500 dark:text-rose-400 flex-shrink-0 cursor-default" strokeWidth={2.5} />
+                                            {manualMarker.kind === "user-request" ? (
+                                              <UserRequestIcon className="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-500 dark:text-blue-400 cursor-default pointer-events-auto" strokeWidth={2.5} />
+                                            ) : (
+                                              <PencilIcon className="absolute right-1 top-1/2 -translate-y-1/2 h-4 w-4 text-rose-500 dark:text-rose-400 cursor-default pointer-events-auto" strokeWidth={2.5} />
+                                            )}
                                           </TooltipTrigger>
                                           <TooltipContent side="top" className="max-w-[280px]">
                                             <div className="space-y-0.5">
-                                              <div className="font-semibold">Inclusão manual</div>
-                                              {manualMotivo && <div className="text-xs opacity-90">{manualMotivo}</div>}
+                                              <div className="font-semibold">
+                                                {manualMarker.kind === "user-request" ? "Solicitado pelo colaborador" : "Inclusão manual"}
+                                              </div>
+                                              {manualMotivo && <div className="text-xs opacity-90 whitespace-pre-wrap">{manualMotivo}</div>}
                                             </div>
                                           </TooltipContent>
                                         </Tooltip>
@@ -1141,16 +1249,14 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                     Mover para próximo dia
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleViewLocation(contextMenu.entry)}>
+                  <DropdownMenuItem onClick={() => handleViewLocation(contextMenu.entry, contextMenu.field)}>
                     <MapPin className="h-4 w-4 mr-2" />
                     Ver localização no mapa
                   </DropdownMenuItem>
-                  {contextMenu.entry.hasPhoto && (
-                    <DropdownMenuItem onClick={() => handleViewPhoto(contextMenu.entry)}>
-                      <Camera className="h-4 w-4 mr-2" />
-                      Ver foto
-                    </DropdownMenuItem>
-                  )}
+                  <DropdownMenuItem onClick={() => handleViewPhoto(contextMenu.entry, contextMenu.field)}>
+                    <Camera className="h-4 w-4 mr-2" />
+                    Ver foto
+                  </DropdownMenuItem>
                 </>
               )}
             </DropdownMenuContent>
@@ -1163,8 +1269,8 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
         open={!!pendingJustification}
         onOpenChange={(open) => !open && setPendingJustification(null)}
         onConfirm={handleJustificationConfirm}
-        originalTime={pendingJustification?.originalTime || ""}
-        newTime={pendingJustification?.newTime || null}
+        originalTime={pendingJustification?.originalTime ?? null}
+        newTime={pendingJustification?.newTime ?? null}
         field={pendingJustification?.field || ""}
         fieldLabel={pendingJustification?.fieldLabel || ""}
         isLoading={isPending}

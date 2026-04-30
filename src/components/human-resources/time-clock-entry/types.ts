@@ -42,7 +42,7 @@ export interface LocationData {
 export interface PendingJustification {
   entryId: string;
   field: string;
-  originalTime: string;
+  originalTime: string | null;
   newTime: string | null;
   fieldLabel: string;
 }

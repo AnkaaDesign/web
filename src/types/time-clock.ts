@@ -39,6 +39,18 @@ export interface SecullumTimeEntry {
   Justificativa?: string;
 }
 
+// Per-field geolocation/photo metadata extracted from Secullum's FonteDados<Field>.
+// Keys correspond to the form's time field names (entry1/exit1/entry2/...).
+export interface FieldSourceMetadata {
+  fonteDadosId?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  accuracy?: number | null;
+  address?: string | null;
+  hasPhoto: boolean;
+  dataHora?: string | null;
+}
+
 // Normalized interface for use in the form
 export interface TimeClockEntry {
   id: string;
@@ -71,7 +83,7 @@ export interface TimeClockEntry {
   hasPhoto: boolean;
   createdAt: Date;
   updatedAt: Date;
-  // Location fields
+  // Location fields (day-level, derived from first available slot — kept for back-compat)
   latitude?: number | null;
   longitude?: number | null;
   accuracy?: number | null;
@@ -81,6 +93,8 @@ export interface TimeClockEntry {
   syncAttempts?: number;
   lastSyncError?: string;
   secullumSyncStatus?: string | null;
+  // Per-time-slot geolocation/photo metadata. Each time slot has its own source.
+  fieldSources?: Partial<Record<"entry1" | "exit1" | "entry2" | "exit2" | "entry3" | "exit3" | "entry4" | "exit4" | "entry5" | "exit5", FieldSourceMetadata>>;
 }
 
 export const timeClockEntryBatchUpdateSchema = z.object({
@@ -120,8 +134,50 @@ export type TimeClockJustificationFormData = z.infer<typeof timeClockJustificati
 export function normalizeSecullumEntry(entry: SecullumTimeEntry): TimeClockEntry {
   const date = new Date(entry.Data);
 
+  // Extract per-field geolocation/photo metadata from Secullum's FonteDados<Field> objects.
+  // The shape is {Geolocalizacao: {Latitude, Longitude, Endereco, Precisao, PossuiFoto, FonteDadosId, ...}}.
+  const fieldSources: TimeClockEntry["fieldSources"] = {};
+  const fieldMap: Array<[keyof NonNullable<TimeClockEntry["fieldSources"]>, string]> = [
+    ["entry1", "FonteDadosEntrada1"],
+    ["exit1", "FonteDadosSaida1"],
+    ["entry2", "FonteDadosEntrada2"],
+    ["exit2", "FonteDadosSaida2"],
+    ["entry3", "FonteDadosEntrada3"],
+    ["exit3", "FonteDadosSaida3"],
+    ["entry4", "FonteDadosEntrada4"],
+    ["exit4", "FonteDadosSaida4"],
+    ["entry5", "FonteDadosEntrada5"],
+    ["exit5", "FonteDadosSaida5"],
+  ];
+  for (const [normalizedField, rawField] of fieldMap) {
+    const fonte = (entry as any)[rawField];
+    if (!fonte) continue;
+    const geo = fonte.Geolocalizacao;
+    if (geo) {
+      fieldSources[normalizedField] = {
+        fonteDadosId: geo.FonteDadosId ?? null,
+        latitude: geo.Latitude ?? null,
+        longitude: geo.Longitude ?? null,
+        accuracy: geo.Precisao ?? null,
+        address: geo.Endereco ?? null,
+        hasPhoto: !!geo.PossuiFoto,
+        dataHora: geo.DataHora ?? null,
+      };
+    } else {
+      fieldSources[normalizedField] = {
+        fonteDadosId: null,
+        hasPhoto: false,
+      };
+    }
+  }
+
+  // Day-level fallbacks: take the first slot that has a location/photo (used by legacy callers).
+  const firstWithLocation = Object.values(fieldSources).find((s) => s?.latitude != null && s?.longitude != null);
+  const anyHasPhoto = Object.values(fieldSources).some((s) => s?.hasPhoto);
+
   return {
     id: entry.Id.toString(),
+    userId: entry.FuncionarioId != null ? entry.FuncionarioId.toString() : undefined,
     date: date,
     entry1: entry.Entrada1 || null,
     exit1: entry.Saida1 || null,
@@ -143,11 +199,15 @@ export function normalizeSecullumEntry(entry: SecullumTimeEntry): TimeClockEntry
     observations: entry.Observacoes,
     justification: entry.Justificativa,
     user: entry.FuncionarioNome ? { name: entry.FuncionarioNome } : undefined,
-    // Default values for compatibility
     source: "SECULLUM",
-    hasPhoto: false,
+    hasPhoto: anyHasPhoto,
     createdAt: date,
     updatedAt: date,
     secullumRecordId: entry.Id.toString(),
+    latitude: firstWithLocation?.latitude ?? null,
+    longitude: firstWithLocation?.longitude ?? null,
+    accuracy: firstWithLocation?.accuracy ?? null,
+    address: firstWithLocation?.address ?? null,
+    fieldSources,
   };
 }

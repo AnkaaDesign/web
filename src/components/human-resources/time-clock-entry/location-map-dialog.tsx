@@ -17,6 +17,8 @@ export function LocationMapDialog({ isOpen, onClose, location }: LocationMapDial
     window.open(`https://www.google.com/maps/search/?api=1&query=${location.Latitude},${location.Longitude}`, "_blank");
   };
 
+  const hasAddress = location.Endereco && location.Endereco !== "null" && location.Endereco.trim() !== "";
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
@@ -27,43 +29,45 @@ export function LocationMapDialog({ isOpen, onClose, location }: LocationMapDial
 
         <div className="space-y-4">
           {/* Map */}
-          <div className="w-full h-[300px] bg-gray-100 rounded-lg overflow-hidden">
+          <div className="w-full h-[300px] bg-muted rounded-lg overflow-hidden border border-border">
             <iframe title="Localização" src={mapUrl} width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
           </div>
 
           {/* Location details */}
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <IconMapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+              <IconMapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-medium">Endereço</p>
-                <p className="text-sm text-gray-600">{location.Endereco !== "null" ? location.Endereco : "Endereço não disponível"}</p>
+                <p className="text-sm font-medium text-foreground">Endereço</p>
+                <p className="text-sm text-muted-foreground">{hasAddress ? location.Endereco : "Endereço não disponível"}</p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
-              <IconClock className="h-5 w-5 text-gray-400 mt-0.5" />
+              <IconClock className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-medium">Data e Hora</p>
-                <p className="text-sm text-gray-600">{format(new Date(location.DataHora), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })}</p>
+                <p className="text-sm font-medium text-foreground">Data e Hora</p>
+                <p className="text-sm text-muted-foreground">{format(new Date(location.DataHora), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })}</p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
-              <IconNavigation className="h-5 w-5 text-gray-400 mt-0.5" />
+              <IconNavigation className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-medium">Coordenadas</p>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm font-medium text-foreground">Coordenadas</p>
+                <p className="text-sm text-muted-foreground">
                   Latitude: {location.Latitude.toFixed(6)}, Longitude: {location.Longitude.toFixed(6)}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Precisão: {location.Precisao.toFixed(1)} metros</p>
+                {location.Precisao > 0 && (
+                  <p className="text-xs text-muted-foreground/80 mt-1">Precisão: {location.Precisao.toFixed(1)} metros</p>
+                )}
               </div>
             </div>
           </div>
 
           {/* Action button */}
           <div className="flex justify-end">
-            <button onClick={openInMaps} className="text-sm text-blue-600 hover:text-blue-700 underline">
+            <button onClick={openInMaps} className="text-sm text-primary hover:opacity-[var(--hover-opacity)] underline">
               Abrir no Google Maps
             </button>
           </div>
