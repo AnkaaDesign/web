@@ -260,7 +260,18 @@ export interface UserOrderBy {
 
 export interface UserGetUniqueResponse extends BaseGetUniqueResponse<User> {}
 export interface UserGetManyResponse extends BaseGetManyResponse<User> {}
-export interface UserCreateResponse extends BaseCreateResponse<User> {}
+export interface UserCreateResponse extends BaseCreateResponse<User> {
+  /**
+   * Result of the Secullum sync attempt. Only present when the user was
+   * created with `secullumSyncEnabled=true`. Used by the create-user page to
+   * toast the outcome immediately after save.
+   */
+  secullumSync?: {
+    status: "synced" | "skipped" | "error";
+    reason?: string;
+    funcionarioId?: number;
+  };
+}
 export interface UserUpdateResponse extends BaseUpdateResponse<User> {}
 export interface UserDeleteResponse extends BaseDeleteResponse {}
 export interface UserMergeResponse extends BaseMergeResponse<User> {}

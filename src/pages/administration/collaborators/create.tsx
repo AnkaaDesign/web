@@ -6,7 +6,9 @@ import { UserForm } from "@/components/administration/user/form/user-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconUsers, IconCheck, IconLoader2 } from "@tabler/icons-react";
 import type { UserCreateFormData } from "../../../schemas";
+import type { UserCreateResponse } from "../../../types";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
+import { toast } from "@/components/ui/sonner";
 
 const CreateCollaboratorPage = () => {
   const navigate = useNavigate();
@@ -15,7 +17,29 @@ const CreateCollaboratorPage = () => {
 
   const handleSubmit = async (data: UserCreateFormData) => {
     try {
-      const response = await createUser(data);
+      const response = (await createUser(data)) as UserCreateResponse;
+
+      // Surface the Secullum sync outcome (only present when
+      // secullumSyncEnabled was true on create). Three possible statuses
+      // come from `UserSecullumSyncService.onUserCreated`.
+      const sync = response?.secullumSync;
+      if (sync) {
+        if (sync.status === "synced") {
+          toast.success(
+            sync.funcionarioId
+              ? `Funcionário Secullum #${sync.funcionarioId} criado e vinculado`
+              : "Funcionário Secullum criado e vinculado",
+          );
+        } else if (sync.status === "skipped") {
+          toast.warning(
+            `Sincronização Secullum ignorada: ${sync.reason ?? "motivo desconhecido"}`,
+          );
+        } else if (sync.status === "error") {
+          toast.error(
+            `Falha ao criar funcionário Secullum: ${sync.reason ?? "erro desconhecido"}`,
+          );
+        }
+      }
 
       // The response already contains the data property from the API
       // Type: UserCreateResponse which has { success, message, data?: User }
