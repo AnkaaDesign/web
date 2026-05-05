@@ -152,7 +152,6 @@ export const routes = {
       // service in apps/api/src/modules/integrations/secullum.
       secullum: {
         root: "/recursos-humanos/integracoes/secullum",
-        mapping: "/recursos-humanos/integracoes/secullum/mapeamento",
       },
     },
     positions: {

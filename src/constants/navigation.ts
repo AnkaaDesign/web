@@ -1507,8 +1507,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         path: "/recursos-humanos/integracoes/secullum",
         requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
       },
-      // Note: legacy path `/recursos-humanos/integracoes/secullum/mapeamento`
-      // is still served by the same page (see routes.ts) for backwards-compat.
       {
         id: "epi-rh",
         title: "EPI",
