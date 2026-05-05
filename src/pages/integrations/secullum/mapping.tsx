@@ -12,7 +12,6 @@ import {
   IconUserOff,
   IconLink,
 } from "@tabler/icons-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -166,31 +165,31 @@ function DepartamentoMappingCard() {
   const linkedCount = groups.reduce((acc, g) => acc + g.linked.length, 0);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Departamentos do Secullum</span>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              departamentosQ.refetch();
-              sectorsQ.refetch();
-            }}
-            disabled={departamentosQ.isFetching || sectorsQ.isFetching}
-          >
-            <IconRefresh
-              className={`h-4 w-4 ${departamentosQ.isFetching ? "animate-spin" : ""}`}
-            />
-          </Button>
-        </CardTitle>
-        <CardDescription>
-          {isLoading
-            ? "Carregando…"
-            : `${departamentos.length} departamento(s) • ${linkedCount} setor(es) Ankaa vinculado(s)`}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Departamentos do Secullum</h2>
+          <p className="text-sm text-muted-foreground">
+            {isLoading
+              ? "Carregando…"
+              : `${departamentos.length} departamento(s) • ${linkedCount} setor(es) Ankaa vinculado(s)`}
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            departamentosQ.refetch();
+            sectorsQ.refetch();
+          }}
+          disabled={departamentosQ.isFetching || sectorsQ.isFetching}
+        >
+          <IconRefresh
+            className={`h-4 w-4 ${departamentosQ.isFetching ? "animate-spin" : ""}`}
+          />
+        </Button>
+      </div>
+      <div className="space-y-4">
         {isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-24 w-full" />
@@ -272,8 +271,8 @@ function DepartamentoMappingCard() {
             ))}
           </UnmappedPanel>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -341,7 +340,10 @@ function DepartamentoGroup({
         {linkedSectors.map((s) => {
           const horarioOptions = horarios
             .filter((h) => !h.Desativar)
-            .map((h) => ({ value: String(h.Id), label: `#${h.Numero} — ${h.Descricao}` }));
+            .map((h) => ({
+              value: String(h.Id),
+              label: h.Numero ? `#${h.Numero} — ${h.Descricao}` : h.Descricao,
+            }));
           return (
             <div
               key={s.id}
@@ -463,29 +465,29 @@ function FuncaoMappingCard() {
   const linkedCount = groups.reduce((acc, g) => acc + g.linked.length, 0);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Funções do Secullum</span>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              funcoesQ.refetch();
-              positionsQ.refetch();
-            }}
-            disabled={funcoesQ.isFetching || positionsQ.isFetching}
-          >
-            <IconRefresh className={`h-4 w-4 ${funcoesQ.isFetching ? "animate-spin" : ""}`} />
-          </Button>
-        </CardTitle>
-        <CardDescription>
-          {isLoading
-            ? "Carregando…"
-            : `${funcoes.length} função(ões) • ${linkedCount} cargo(s) Ankaa vinculado(s)`}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Funções do Secullum</h2>
+          <p className="text-sm text-muted-foreground">
+            {isLoading
+              ? "Carregando…"
+              : `${funcoes.length} função(ões) • ${linkedCount} cargo(s) Ankaa vinculado(s)`}
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            funcoesQ.refetch();
+            positionsQ.refetch();
+          }}
+          disabled={funcoesQ.isFetching || positionsQ.isFetching}
+        >
+          <IconRefresh className={`h-4 w-4 ${funcoesQ.isFetching ? "animate-spin" : ""}`} />
+        </Button>
+      </div>
+      <div className="space-y-4">
         {isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-20 w-full" />
@@ -555,8 +557,8 @@ function FuncaoMappingCard() {
             ))}
           </UnmappedPanel>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -751,78 +753,76 @@ function FuncionariosCard() {
   const isLoading = ativosQ.isLoading || demitidosQ.isLoading || usersQ.isLoading;
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex flex-wrap items-center justify-between gap-2">
-            <span className="flex items-center gap-2">
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-semibold">
               <IconUserCheck className="h-5 w-5 text-emerald-600" />
               Funcionários ativos
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                ativosQ.refetch();
-                demitidosQ.refetch();
-                usersQ.refetch();
-              }}
-              disabled={ativosQ.isFetching || demitidosQ.isFetching || usersQ.isFetching}
-            >
-              <IconRefresh
-                className={`h-4 w-4 ${ativosQ.isFetching ? "animate-spin" : ""}`}
-              />
-            </Button>
-          </CardTitle>
-          <CardDescription>
-            {isLoading
-              ? "Carregando…"
-              : `${ativos.length} ativo(s) no Secullum • ${ativosLinked} vinculado(s) a usuários Ankaa`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="relative">
-            <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, folha ou usuário Ankaa…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {isLoading
+                ? "Carregando…"
+                : `${ativos.length} ativo(s) no Secullum • ${ativosLinked} vinculado(s) a usuários Ankaa`}
+            </p>
           </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              ativosQ.refetch();
+              demitidosQ.refetch();
+              usersQ.refetch();
+            }}
+            disabled={ativosQ.isFetching || demitidosQ.isFetching || usersQ.isFetching}
+          >
+            <IconRefresh
+              className={`h-4 w-4 ${ativosQ.isFetching ? "animate-spin" : ""}`}
+            />
+          </Button>
+        </div>
 
-          {isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : (
-            <FuncionariosTable rows={ativosFiltered} matchUser={matchUser} variant="ativo" />
-          )}
-        </CardContent>
-      </Card>
+        <div className="relative">
+          <IconSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome, folha ou usuário Ankaa…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : (
+          <FuncionariosTable rows={ativosFiltered} matchUser={matchUser} variant="ativo" />
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-base font-semibold">
             <IconUserOff className="h-5 w-5 text-muted-foreground" />
             Funcionários demitidos
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-muted-foreground">
             {isLoading
               ? "Carregando…"
               : `${demitidos.length} desligado(s) — somente leitura`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <Skeleton className="h-32 w-full" />
-          ) : (
-            <FuncionariosTable rows={demitidosFiltered} matchUser={matchUser} variant="demitido" />
-          )}
-        </CardContent>
-      </Card>
+          </p>
+        </div>
+
+        {isLoading ? (
+          <Skeleton className="h-32 w-full" />
+        ) : (
+          <FuncionariosTable rows={demitidosFiltered} matchUser={matchUser} variant="demitido" />
+        )}
+      </section>
     </div>
   );
 }

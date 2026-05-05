@@ -100,11 +100,16 @@ export function HorarioSelector({ disabled }: { disabled?: boolean }) {
                 <SelectContent>
                   {toHorarioArray(horariosQ.data)
                     .filter((h) => !h.Desativar)
-                    .map((h) => (
-                      <SelectItem key={h.Id} value={String(h.Id)}>
-                        #{h.Numero} — {h.Descricao} ({h.Tipo})
-                      </SelectItem>
-                    ))}
+                    .map((h) => {
+                      const label = h.Numero
+                        ? `#${h.Numero} — ${h.Descricao}`
+                        : h.Descricao;
+                      return (
+                        <SelectItem key={h.Id} value={String(h.Id)}>
+                          {h.Tipo ? `${label} (${h.Tipo})` : label}
+                        </SelectItem>
+                      );
+                    })}
                 </SelectContent>
               </Select>
             </FormControl>
