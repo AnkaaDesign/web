@@ -1089,14 +1089,28 @@ export const userCreateSchema = z
 
     // Status timestamp tracking
     effectedAt: nullableDate.optional(),
-    exp1StartAt: nullableDate.optional(),
+    // Admission date — required at create time. Backend depends on it for
+    // Secullum sync (Admissao) and CLT period auto-calculation. The form
+    // shows a red asterisk on this field; the schema must agree.
+    exp1StartAt: z.coerce.date({
+      required_error: "Data de admissão é obrigatória",
+      invalid_type_error: "Data de admissão inválida",
+    }),
     exp1EndAt: nullableDate.optional(),
     exp2StartAt: nullableDate.optional(),
     exp2EndAt: nullableDate.optional(),
     dismissedAt: nullableDate.optional(),
 
-    // Payroll info
-    payrollNumber: z.number().int().positive("Número da folha deve ser positivo").nullable().optional(),
+    // Payroll info — required at create time. Required by Secullum (NumeroFolha)
+    // and by all payroll calculations. Existing rows with NULL can still be
+    // edited (userUpdateSchema keeps it nullable.optional).
+    payrollNumber: z
+      .number({
+        required_error: "Número da folha é obrigatório",
+        invalid_type_error: "Número da folha deve ser numérico",
+      })
+      .int()
+      .positive("Número da folha deve ser positivo"),
 
     // Nested PPE size creation for new users
     ppeSize: ppeSizeCreateNestedSchema.optional(),
