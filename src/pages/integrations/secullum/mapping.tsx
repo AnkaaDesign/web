@@ -76,31 +76,38 @@ export default function SecullumMappingPage() {
           ]}
           className="flex-shrink-0"
         />
-        <div className="flex-1 min-h-0 pb-6 overflow-y-auto">
-          <Tabs defaultValue="departamentos" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="departamentos" className="gap-2">
-                <IconBuildingStore className="h-4 w-4" /> Departamentos ↔ Setores
-              </TabsTrigger>
-              <TabsTrigger value="funcoes" className="gap-2">
-                <IconBriefcase className="h-4 w-4" /> Funções ↔ Cargos
-              </TabsTrigger>
-              <TabsTrigger value="funcionarios" className="gap-2">
-                <IconUsers className="h-4 w-4" /> Funcionários ↔ Usuários
-              </TabsTrigger>
-            </TabsList>
+        <Tabs defaultValue="departamentos" className="flex flex-1 min-h-0 flex-col gap-4">
+          <TabsList className="flex-shrink-0 self-start">
+            <TabsTrigger value="departamentos" className="gap-2">
+              <IconBuildingStore className="h-4 w-4" /> Departamentos ↔ Setores
+            </TabsTrigger>
+            <TabsTrigger value="funcoes" className="gap-2">
+              <IconBriefcase className="h-4 w-4" /> Funções ↔ Cargos
+            </TabsTrigger>
+            <TabsTrigger value="funcionarios" className="gap-2">
+              <IconUsers className="h-4 w-4" /> Funcionários ↔ Usuários
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="departamentos">
-              <DepartamentoMappingCard />
-            </TabsContent>
-            <TabsContent value="funcoes">
-              <FuncaoMappingCard />
-            </TabsContent>
-            <TabsContent value="funcionarios">
-              <FuncionariosCard />
-            </TabsContent>
-          </Tabs>
-        </div>
+          <TabsContent
+            value="departamentos"
+            className="flex-1 min-h-0 overflow-y-auto pb-6 mt-0"
+          >
+            <DepartamentoMappingCard />
+          </TabsContent>
+          <TabsContent
+            value="funcoes"
+            className="flex-1 min-h-0 overflow-y-auto pb-6 mt-0"
+          >
+            <FuncaoMappingCard />
+          </TabsContent>
+          <TabsContent
+            value="funcionarios"
+            className="flex-1 min-h-0 overflow-y-auto pb-6 mt-0"
+          >
+            <FuncionariosCard />
+          </TabsContent>
+        </Tabs>
       </div>
     </PrivilegeRoute>
   );
@@ -324,16 +331,10 @@ function DepartamentoGroup({
         )}
       </div>
 
-      <div className="space-y-2 p-3">
+      <div className="divide-y divide-border/40">
         {linkedSectors.length === 0 && !candidateName && (
-          <p className="px-1 text-sm text-muted-foreground">
+          <p className="px-4 py-3 text-sm text-muted-foreground">
             Nenhum setor Ankaa vinculado ainda.
-          </p>
-        )}
-
-        {(linkedSectors.length > 0 || candidateName) && (
-          <p className="px-1 text-xs text-muted-foreground">
-            Horário padrão é usado ao criar funcionários no Secullum para usuários deste setor.
           </p>
         )}
 
@@ -344,29 +345,32 @@ function DepartamentoGroup({
           return (
             <div
               key={s.id}
-              className="flex flex-wrap items-center gap-2 rounded-md bg-muted/30 px-3 py-2"
+              className="grid grid-cols-[1fr_240px_auto] items-center gap-3 px-4 py-2.5"
             >
-              <span className="flex-1 text-sm font-medium">{s.name}</span>
-              <Combobox
-                mode="single"
-                options={horarioOptions}
-                value={s.secullumHorarioId != null ? String(s.secullumHorarioId) : ""}
-                onValueChange={(v) =>
-                  onSetHorario(s.id, typeof v === "string" && v ? Number(v) : null)
-                }
-                placeholder="Horário padrão…"
-                searchPlaceholder="Buscar horário…"
-                emptyText="Nenhum horário"
-                disabled={isPendingHorario}
-                clearable
-                triggerClassName="h-8 w-56 text-xs"
-              />
+              <span className="min-w-0 truncate text-sm font-medium">{s.name}</span>
+              <div className="w-full">
+                <Combobox
+                  mode="single"
+                  options={horarioOptions}
+                  value={s.secullumHorarioId != null ? String(s.secullumHorarioId) : ""}
+                  onValueChange={(v) =>
+                    onSetHorario(s.id, typeof v === "string" && v ? Number(v) : null)
+                  }
+                  placeholder="Horário padrão…"
+                  searchPlaceholder="Buscar horário…"
+                  emptyText="Nenhum horário"
+                  disabled={isPendingHorario}
+                  clearable
+                  triggerClassName="h-8 text-xs"
+                />
+              </div>
               <Button
-                size="sm"
+                size="icon"
                 variant="ghost"
-                className="h-8 px-2 text-destructive hover:text-destructive"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
                 disabled={isPendingLink}
                 onClick={() => onUnlink(s.id)}
+                aria-label={`Desvincular ${s.name}`}
               >
                 <IconX className="h-4 w-4" />
               </Button>
@@ -375,8 +379,8 @@ function DepartamentoGroup({
         })}
 
         {candidateName && !linkedSectors.some((s) => s.id === candidateName.id) && (
-          <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-2">
-            <span className="flex-1 text-sm">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-3 bg-muted/15 px-4 py-2.5">
+            <span className="text-sm">
               <span className="text-muted-foreground">Sugestão: </span>
               <span className="font-medium">{candidateName.name}</span>
             </span>
@@ -390,22 +394,26 @@ function DepartamentoGroup({
             </Button>
           </div>
         )}
-
-        <Combobox
-          mode="single"
-          options={sectorOptions}
-          value=""
-          onValueChange={(v) => {
-            if (typeof v === "string" && v) onLink(v);
-          }}
-          placeholder="+ Vincular outro setor…"
-          searchPlaceholder="Buscar setor…"
-          emptyText="Nenhum setor disponível"
-          disabled={isPendingLink || sectorOptions.length === 0}
-          triggerClassName="w-full justify-start"
-          clearable={false}
-        />
       </div>
+
+      {sectorOptions.length > 0 && (
+        <div className="border-t border-border/40 p-2">
+          <Combobox
+            mode="single"
+            options={sectorOptions}
+            value=""
+            onValueChange={(v) => {
+              if (typeof v === "string" && v) onLink(v);
+            }}
+            placeholder="+ Vincular outro setor…"
+            searchPlaceholder="Buscar setor…"
+            emptyText="Nenhum setor disponível"
+            disabled={isPendingLink}
+            triggerClassName="h-8 text-xs justify-start text-muted-foreground border-dashed"
+            clearable={false}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -594,23 +602,26 @@ function FuncaoGroup({
         )}
       </div>
 
-      <div className="space-y-2 p-3">
+      <div className="divide-y divide-border/40">
         {linkedPositions.length === 0 && !candidate && (
-          <p className="px-1 text-sm text-muted-foreground">Nenhum cargo Ankaa vinculado ainda.</p>
+          <p className="px-4 py-3 text-sm text-muted-foreground">
+            Nenhum cargo Ankaa vinculado ainda.
+          </p>
         )}
 
         {linkedPositions.map((p) => (
           <div
             key={p.id}
-            className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2"
+            className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5"
           >
-            <span className="flex-1 text-sm font-medium">{p.name}</span>
+            <span className="min-w-0 truncate text-sm font-medium">{p.name}</span>
             <Button
-              size="sm"
+              size="icon"
               variant="ghost"
-              className="h-8 px-2 text-destructive hover:text-destructive"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
               disabled={isPendingLink}
               onClick={() => onUnlink(p.id)}
+              aria-label={`Desvincular ${p.name}`}
             >
               <IconX className="h-4 w-4" />
             </Button>
@@ -618,8 +629,8 @@ function FuncaoGroup({
         ))}
 
         {candidate && !linkedPositions.some((p) => p.id === candidate.id) && (
-          <div className="flex items-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-2">
-            <span className="flex-1 text-sm">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-3 bg-muted/15 px-4 py-2.5">
+            <span className="text-sm">
               <span className="text-muted-foreground">Sugestão: </span>
               <span className="font-medium">{candidate.name}</span>
             </span>
@@ -633,22 +644,26 @@ function FuncaoGroup({
             </Button>
           </div>
         )}
-
-        <Combobox
-          mode="single"
-          options={positionOptions}
-          value=""
-          onValueChange={(v) => {
-            if (typeof v === "string" && v) onLink(v);
-          }}
-          placeholder="+ Vincular outro cargo…"
-          searchPlaceholder="Buscar cargo…"
-          emptyText="Nenhum cargo disponível"
-          disabled={isPendingLink || positionOptions.length === 0}
-          triggerClassName="w-full justify-start"
-          clearable={false}
-        />
       </div>
+
+      {positionOptions.length > 0 && (
+        <div className="border-t border-border/40 p-2">
+          <Combobox
+            mode="single"
+            options={positionOptions}
+            value=""
+            onValueChange={(v) => {
+              if (typeof v === "string" && v) onLink(v);
+            }}
+            placeholder="+ Vincular outro cargo…"
+            searchPlaceholder="Buscar cargo…"
+            emptyText="Nenhum cargo disponível"
+            disabled={isPendingLink}
+            triggerClassName="h-8 text-xs justify-start text-muted-foreground border-dashed"
+            clearable={false}
+          />
+        </div>
+      )}
     </div>
   );
 }
