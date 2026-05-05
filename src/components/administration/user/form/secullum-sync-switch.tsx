@@ -37,7 +37,7 @@ export function SecullumSyncSwitch({
       control={form.control}
       name="secullumSyncEnabled"
       render={({ field }) => (
-        <FormItem className="flex flex-row items-start justify-between rounded-lg border border-secullum-200 bg-secullum-50/40 p-4">
+        <FormItem className="flex flex-row items-start justify-between rounded-lg border border-border/60 bg-muted/30 p-4">
           <div className="space-y-1">
             <FormLabel className="flex items-center gap-2 text-sm font-medium">
               <IconClock className="h-4 w-4" />

@@ -19,6 +19,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSecullumHorarios } from "@/hooks/integrations/use-secullum-mapping";
 import { useSector } from "@/hooks";
 
+type HorarioOption = {
+  Id: number;
+  Numero: number;
+  Descricao: string;
+  Tipo?: string;
+  Desativar?: boolean;
+};
+
+const toHorarioArray = (v: unknown): HorarioOption[] => {
+  if (Array.isArray(v)) return v as HorarioOption[];
+  if (v && typeof v === "object" && Array.isArray((v as any).data)) {
+    return (v as any).data as HorarioOption[];
+  }
+  return [];
+};
+
 /**
  * Per-user override for Secullum HorarioId. Visible only when the
  * "Criar / sincronizar no Secullum" switch is ON. When left empty, the
@@ -82,7 +98,7 @@ export function HorarioSelector({ disabled }: { disabled?: boolean }) {
                   <SelectValue placeholder="Selecione um horário Secullum" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(horariosQ.data ?? [])
+                  {toHorarioArray(horariosQ.data)
                     .filter((h) => !h.Desativar)
                     .map((h) => (
                       <SelectItem key={h.Id} value={String(h.Id)}>

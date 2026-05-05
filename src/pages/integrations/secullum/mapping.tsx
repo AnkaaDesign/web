@@ -19,13 +19,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -309,8 +302,8 @@ function DepartamentoGroup({
   }));
 
   return (
-    <div className="rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b px-4 py-3">
+    <div className="rounded-lg border border-border/60 bg-card">
+      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="font-mono">
             #{departamento.Id}
@@ -344,41 +337,42 @@ function DepartamentoGroup({
           </p>
         )}
 
-        {linkedSectors.map((s) => (
-          <div
-            key={s.id}
-            className="flex flex-wrap items-center gap-2 rounded-md bg-muted/40 px-3 py-2"
-          >
-            <span className="flex-1 text-sm font-medium">{s.name}</span>
-            <Select
-              value={s.secullumHorarioId != null ? String(s.secullumHorarioId) : ""}
-              onValueChange={(v) => onSetHorario(s.id, v === "" ? null : Number(v))}
-              disabled={isPendingHorario}
+        {linkedSectors.map((s) => {
+          const horarioOptions = horarios
+            .filter((h) => !h.Desativar)
+            .map((h) => ({ value: String(h.Id), label: `#${h.Numero} — ${h.Descricao}` }));
+          return (
+            <div
+              key={s.id}
+              className="flex flex-wrap items-center gap-2 rounded-md bg-muted/30 px-3 py-2"
             >
-              <SelectTrigger className="h-8 w-56 text-xs">
-                <SelectValue placeholder="Horário padrão" />
-              </SelectTrigger>
-              <SelectContent>
-                {horarios
-                  .filter((h) => !h.Desativar)
-                  .map((h) => (
-                    <SelectItem key={h.Id} value={String(h.Id)}>
-                      #{h.Numero} — {h.Descricao}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 px-2 text-destructive hover:text-destructive"
-              disabled={isPendingLink}
-              onClick={() => onUnlink(s.id)}
-            >
-              <IconX className="h-4 w-4" />
-            </Button>
-          </div>
-        ))}
+              <span className="flex-1 text-sm font-medium">{s.name}</span>
+              <Combobox
+                mode="single"
+                options={horarioOptions}
+                value={s.secullumHorarioId != null ? String(s.secullumHorarioId) : ""}
+                onValueChange={(v) =>
+                  onSetHorario(s.id, typeof v === "string" && v ? Number(v) : null)
+                }
+                placeholder="Horário padrão…"
+                searchPlaceholder="Buscar horário…"
+                emptyText="Nenhum horário"
+                disabled={isPendingHorario}
+                clearable
+                triggerClassName="h-8 w-56 text-xs"
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 px-2 text-destructive hover:text-destructive"
+                disabled={isPendingLink}
+                onClick={() => onUnlink(s.id)}
+              >
+                <IconX className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        })}
 
         {candidateName && !linkedSectors.some((s) => s.id === candidateName.id) && (
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-2">
@@ -581,8 +575,8 @@ function FuncaoGroup({
   const positionOptions = availablePositions.map((p) => ({ value: p.id, label: p.name }));
 
   return (
-    <div className="rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b px-4 py-3">
+    <div className="rounded-lg border border-border/60 bg-card">
+      <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="font-mono">
             #{funcao.Id}
@@ -669,6 +663,7 @@ type UserRow = {
   payrollNumber?: number | null;
   secullumEmployeeId?: number | null;
   status?: string | null;
+  sector?: { id: string; name: string } | null;
 };
 
 type FuncionarioRow = {
@@ -682,7 +677,11 @@ type FuncionarioRow = {
 function FuncionariosCard() {
   const ativosQ = useSecullumFuncionariosLite();
   const demitidosQ = useSecullumFuncionariosDemitidos();
-  const usersQ = useUsers({ orderBy: { name: "asc" }, take: 100 } as any);
+  const usersQ = useUsers({
+    orderBy: { name: "asc" },
+    take: 100,
+    include: { sector: true },
+  } as any);
 
   const [search, setSearch] = useState("");
 
@@ -831,47 +830,51 @@ function FuncionariosTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-x-auto rounded-md border border-border/60">
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/50 text-left">
+        <thead className="border-b border-border/60 bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
-            <th className="px-3 py-2 font-medium">Secullum (Id / Nome)</th>
-            <th className="px-3 py-2 font-medium">Folha</th>
-            <th className="px-3 py-2 font-medium">Departamento</th>
-            <th className="px-3 py-2 font-medium">Usuário Ankaa</th>
-            <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium" colSpan={3}>
+              Secullum
+            </th>
+            <th className="border-l border-border/60 px-3 py-2 font-medium" colSpan={3}>
+              Ankaa
+            </th>
+            <th className="border-l border-border/60 px-3 py-2 font-medium">Status</th>
+          </tr>
+          <tr className="border-t border-border/60 text-[11px] normal-case">
+            <th className="px-3 py-1.5 font-medium">Folha</th>
+            <th className="px-3 py-1.5 font-medium">Nome</th>
+            <th className="px-3 py-1.5 font-medium">Departamento</th>
+            <th className="border-l border-border/60 px-3 py-1.5 font-medium">Folha</th>
+            <th className="px-3 py-1.5 font-medium">Nome</th>
+            <th className="px-3 py-1.5 font-medium">Setor</th>
+            <th className="border-l border-border/60 px-3 py-1.5 font-medium"></th>
           </tr>
         </thead>
         <tbody>
           {rows.map((f) => {
             const u = matchUser(f);
             return (
-              <tr key={f.Id} className="border-b last:border-0 hover:bg-muted/30">
-                <td className="px-3 py-2">
-                  <div className="flex flex-col">
-                    <span className="font-medium">{f.Nome}</span>
-                    <span className="font-mono text-xs text-muted-foreground">#{f.Id}</span>
-                  </div>
-                </td>
+              <tr
+                key={f.Id}
+                className="border-b border-border/40 last:border-0 hover:bg-muted/20"
+              >
                 <td className="px-3 py-2 font-mono text-xs">{f.NumeroFolha || "—"}</td>
+                <td className="px-3 py-2 font-medium">{f.Nome}</td>
                 <td className="px-3 py-2 text-muted-foreground">
                   {f.DepartamentoDescricao || "—"}
                 </td>
-                <td className="px-3 py-2">
-                  {u ? (
-                    <div className="flex flex-col">
-                      <span className="font-medium">{u.name}</span>
-                      {u.payrollNumber ? (
-                        <span className="font-mono text-xs text-muted-foreground">
-                          Folha #{u.payrollNumber}
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
+                <td className="border-l border-border/40 px-3 py-2 font-mono text-xs">
+                  {u?.payrollNumber ?? "—"}
                 </td>
                 <td className="px-3 py-2">
+                  {u ? <span className="font-medium">{u.name}</span> : <span className="text-muted-foreground">—</span>}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {u?.sector?.name ?? "—"}
+                </td>
+                <td className="border-l border-border/40 px-3 py-2">
                   {variant === "demitido" ? (
                     <Badge variant="outline" className="text-muted-foreground">
                       Desligado
@@ -881,10 +884,7 @@ function FuncionariosTable({
                       <IconCheck className="h-3 w-3" /> Vinculado
                     </Badge>
                   ) : (
-                    <Badge
-                      variant="outline"
-                      className="border-amber-400/60 text-amber-600 dark:text-amber-400"
-                    >
+                    <Badge variant="outline" className="text-muted-foreground">
                       Sem usuário
                     </Badge>
                   )}
