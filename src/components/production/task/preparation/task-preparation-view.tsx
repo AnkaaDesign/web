@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Task } from "@/types";
 import type { TaskGetManyFormData } from "@/schemas";
@@ -97,6 +98,107 @@ export function TaskPreparationView({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
   });
+
+  // Persist selection across navigation. The URL `?selected=...` is dropped when the user
+  // navigates away (e.g. into a task detail or another section) and comes back through
+  // the menu, so we mirror selection + the "Mostrar selecionados" flag into localStorage
+  // and rehydrate the URL on mount.
+  const SELECTION_STORAGE_KEY = "task-preparation-selection";
+  const SHOW_SELECTED_ONLY_STORAGE_KEY = "task-preparation-show-selected-only";
+  const [, setSearchParamsDirect] = useSearchParams();
+
+  // `persistenceReady` gates the persistence effects so they don't fire on the first
+  // render with an empty selection (which would wipe localStorage *before* the hydration
+  // effect has a chance to read it).
+  const [persistenceReady, setPersistenceReady] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hasUrlSelection = params.has("selected") || params.has("showSelectedOnly");
+
+    if (!hasUrlSelection) {
+      // Try to restore the previous session's selection from localStorage.
+      let storedIds: string[] | null = null;
+      let storedShowOnly = false;
+      try {
+        const storedSel = localStorage.getItem(SELECTION_STORAGE_KEY);
+        if (storedSel) {
+          const parsed = JSON.parse(storedSel);
+          if (Array.isArray(parsed)) {
+            const cleaned = parsed.filter((id: unknown) => typeof id === "string");
+            if (cleaned.length > 0) storedIds = cleaned;
+          }
+        }
+        storedShowOnly = localStorage.getItem(SHOW_SELECTED_ONLY_STORAGE_KEY) === "true";
+      } catch {
+        /* ignore */
+      }
+
+      if (storedIds && storedIds.length > 0) {
+        // Atomic URL update — both params land in a single setSearchParams call so
+        // useTableState picks up the full state in one render rather than racing.
+        setSearchParamsDirect(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.set("selected", JSON.stringify(storedIds));
+            if (storedShowOnly) next.set("showSelectedOnly", "true");
+            return next;
+          },
+          { replace: true },
+        );
+      }
+    }
+
+    setPersistenceReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!persistenceReady) return;
+    try {
+      if (selectedIds.length > 0) {
+        localStorage.setItem(SELECTION_STORAGE_KEY, JSON.stringify(selectedIds));
+      } else {
+        localStorage.removeItem(SELECTION_STORAGE_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [persistenceReady, selectedIds]);
+
+  useEffect(() => {
+    if (!persistenceReady) return;
+    try {
+      if (showSelectedOnly) {
+        localStorage.setItem(SHOW_SELECTED_ONLY_STORAGE_KEY, "true");
+      } else {
+        localStorage.removeItem(SHOW_SELECTED_ONLY_STORAGE_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [persistenceReady, showSelectedOnly]);
+
+  // Atomic URL clear so both params disappear in a single setSearchParams call.
+  // Two chained calls (resetSelection() + setShowSelectedOnly(false)) can race and leave
+  // showSelectedOnly stuck in the URL.
+  const handleClearSelection = useCallback(() => {
+    setSearchParamsDirect(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete("selected");
+        params.delete("showSelectedOnly");
+        return params;
+      },
+      { replace: true },
+    );
+    try {
+      localStorage.removeItem(SELECTION_STORAGE_KEY);
+      localStorage.removeItem(SHOW_SELECTED_ONLY_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, [setSearchParamsDirect]);
 
   // Track the last clicked task ID for cross-table shift+click selection
   const lastClickedTaskIdRef = useRef<string | null>(null);
@@ -747,6 +849,20 @@ export function TaskPreparationView({
         />
         <div className="flex gap-2">
           <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+
+          {selectionCount > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              onClick={handleClearSelection}
+              className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              title="Limpar seleção"
+            >
+              <IconX className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Limpar Seleção</span>
+            </Button>
+          )}
 
           {/* Expand/Collapse All Groups Button */}
           {hasGroups && (

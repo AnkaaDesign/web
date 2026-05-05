@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconExternalLink, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter, IconReceipt } from "@tabler/icons-react";
+import { IconExternalLink, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout, IconX, IconDoorEnter, IconReceipt, IconCalendarTime } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { getTaskQuoteDisplayLabel, isTaskQuoteBillingPhase } from "@/constants/enum-labels";
@@ -10,6 +10,7 @@ import type { Task } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
 import { SetStatusModal } from "../schedule/set-status-modal";
 import { SetSectorModal } from "../schedule/set-sector-modal";
+import { SetTermModal } from "../schedule/set-term-modal";
 import { TaskDuplicateModal } from "../modals/task-duplicate-modal";
 import { useAuth } from "@/contexts/auth-context";
 import { canDeleteTasks, canFinishTask } from "@/utils/permissions/entity-permissions";
@@ -52,6 +53,7 @@ export function TaskHistoryContextMenu({
   const { batchUpdate, batchDeleteAsync } = useTaskBatchMutations();
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
+  const [setTermModalOpen, setSetTermModalOpen] = useState(false);
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(true);
   const openingModalRef = React.useRef(false);
@@ -146,14 +148,14 @@ export function TaskHistoryContextMenu({
 
   // When a modal or dialog opens, close the dropdown
   React.useEffect(() => {
-    if (setStatusModalOpen || setSectorModalOpen || duplicateModalOpen || deleteDialog.open) {
+    if (setStatusModalOpen || setSectorModalOpen || setTermModalOpen || duplicateModalOpen || deleteDialog.open) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('[TaskHistoryContextMenu] Modal/Dialog opened, closing dropdown');
       }
       openingModalRef.current = false;
       setDropdownOpen(false);
     }
-  }, [setStatusModalOpen, setSectorModalOpen, duplicateModalOpen, deleteDialog.open]);
+  }, [setStatusModalOpen, setSectorModalOpen, setTermModalOpen, duplicateModalOpen, deleteDialog.open]);
 
   // Close the entire component when dropdown closes and no modals/dialogs are open
   React.useEffect(() => {
@@ -170,13 +172,13 @@ export function TaskHistoryContextMenu({
     }
 
     // Don't close if we're in the process of opening a modal or if any dialog is open
-    if (!dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !duplicateModalOpen && !deleteDialog.open && !openingModalRef.current) {
+    if (!dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !setTermModalOpen && !duplicateModalOpen && !deleteDialog.open && !openingModalRef.current) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('[TaskHistoryContextMenu] Calling onClose()');
       }
       onClose();
     }
-  }, [dropdownOpen, setStatusModalOpen, setSectorModalOpen, duplicateModalOpen, deleteDialog.open, onClose]);
+  }, [dropdownOpen, setStatusModalOpen, setSectorModalOpen, setTermModalOpen, duplicateModalOpen, deleteDialog.open, onClose]);
 
   const handleView = () => {
     if (task && !isBulk) {
@@ -226,6 +228,40 @@ export function TaskHistoryContextMenu({
       if (process.env.NODE_ENV !== 'production') {
         console.error("Error updating task sector:", error);
       }
+    }
+  };
+
+  const handleSetTerm = () => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskHistoryContextMenu] handleSetTerm called');
+    }
+    openingModalRef.current = true;
+    setSetTermModalOpen(true);
+  };
+
+  const handleSetTermConfirm = async (term: Date | null) => {
+    try {
+      if (taskIds.length === 1) {
+        await update({ id: taskIds[0], data: { term } });
+      } else {
+        const updates = taskIds.map(id => ({ id, data: { term } }));
+        await batchUpdate({ tasks: updates });
+      }
+      toast.success(
+        isBulk ? "Prazos atualizados" : "Prazo atualizado",
+        {
+          description: isBulk
+            ? `${taskIds.length} tarefa(s) com prazo atualizado`
+            : "Prazo atualizado com sucesso",
+        }
+      );
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating task term:", error);
+      }
+      toast.error("Erro ao atualizar prazo", {
+        description: "Não foi possível atualizar o prazo. Tente novamente.",
+      });
     }
   };
 
@@ -630,6 +666,17 @@ export function TaskHistoryContextMenu({
             </DropdownMenuItem>
           )}
 
+          {/* Set Term action - Production Manager (and Admin) */}
+          {(isAdmin || isProductionManager) && (
+            <DropdownMenuItem
+              onClick={handleSetTerm}
+              onSelect={(e) => e.preventDefault()}
+            >
+              <IconCalendarTime className="mr-2 h-4 w-4" />
+              <span className="truncate">{tasks.some((t) => t.term) ? "Alterar Prazo" : "Definir Prazo"}</span>
+            </DropdownMenuItem>
+          )}
+
           {/* Set Status for completed tasks */}
           {isAdmin && hasCompletedTasks && (
             <DropdownMenuItem
@@ -723,6 +770,19 @@ export function TaskHistoryContextMenu({
         }}
         tasks={tasks}
         onConfirm={handleSetSectorConfirm}
+      />
+
+      {/* Set Term Modal */}
+      <SetTermModal
+        open={setTermModalOpen}
+        onOpenChange={(open) => {
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[TaskHistoryContextMenu] SetTermModal onOpenChange:', open);
+          }
+          setSetTermModalOpen(open);
+        }}
+        tasks={tasks}
+        onConfirm={handleSetTermConfirm}
       />
 
       {/* Set Status Modal */}

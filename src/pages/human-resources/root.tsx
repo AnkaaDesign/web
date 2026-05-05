@@ -1,8 +1,8 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, VACATION_STATUS, PPE_DELIVERY_STATUS } from "../../constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, PPE_DELIVERY_STATUS } from "../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
-import { useHRDashboard, useVacations, usePpeDeliveries } from "../../hooks";
+import { useHRDashboard, usePpeDeliveries } from "../../hooks";
 import { useNavigate } from "react-router-dom";
 import { formatDate, addDays } from "../../utils";
 import { useState, useMemo } from "react";
@@ -35,7 +35,6 @@ import {
   QuickAccessCard,
   AnalysisCard,
   TimePeriodSelector,
-  SimpleVacationCard,
   SimplePpeDeliveryCard,
   type Activity,
   type PatternData,
@@ -62,14 +61,6 @@ export const HumanResourcesRootPage = () => {
   });
 
   // Memoize date ranges to prevent recreating them on every render
-  const vacationDateRange = useMemo(() => {
-    const now = new Date();
-    return {
-      gte: now.toISOString(),
-      lte: addDays(now, 90).toISOString(), // Next 3 months
-    };
-  }, []); // Empty dependency array - calculated once
-
   const ppeDeliveryDateRange = useMemo(() => {
     const now = new Date();
     return {
@@ -77,28 +68,6 @@ export const HumanResourcesRootPage = () => {
       lte: now.toISOString(),
     };
   }, []); // Empty dependency array - calculated once
-
-  // Fetch vacations with extreme caching to prevent throttling
-  const { data: vacationsData } = useVacations(
-    {
-      statuses: [VACATION_STATUS.APPROVED, VACATION_STATUS.IN_PROGRESS],
-      startAtRange: vacationDateRange,
-      orderBy: { startAt: "asc" },
-      limit: 5,
-      include: { user: true },
-    },
-    {
-      enabled: !isLoading, // Only fetch after dashboard loads
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
-      retry: false,
-      retryOnMount: false,
-      staleTime: Infinity, // Never consider stale
-      gcTime: 60 * 60 * 1000, // 1 hour cache
-      refetchInterval: false,
-    },
-  );
 
   // Fetch PPE deliveries with extreme caching to prevent throttling
   const { data: ppeDeliveriesData } = usePpeDeliveries(
@@ -121,18 +90,6 @@ export const HumanResourcesRootPage = () => {
       refetchInterval: false,
     },
   );
-
-  // Transform vacation data for the component
-  const vacations = useMemo(() => {
-    if (!vacationsData?.data) return [];
-
-    return vacationsData.data.map((vacation) => ({
-      id: vacation.id,
-      userName: vacation.user?.name || "Funcionário",
-      startDate: formatDate(new Date(vacation.startAt)),
-      endDate: formatDate(new Date(vacation.endAt)),
-    }));
-  }, [vacationsData]);
 
   // Transform PPE delivery data for the component
   const ppeDeliveries = useMemo(() => {
@@ -174,49 +131,6 @@ export const HumanResourcesRootPage = () => {
       label: label.substring(0, 20),
       value: positionData.datasets[0].data[index] || 0,
     }));
-  };
-
-  // Get vacation status distribution
-  const getVacationStatus = () => {
-    if (!dashboard?.data?.vacationMetrics) return [];
-
-    const metrics = dashboard.data.vacationMetrics;
-    // Calculate totals from the metrics we have
-    const onVacation = metrics.onVacationNow?.value || 0;
-    const upcoming = metrics.upcomingVacations?.value || 0;
-    const approved = metrics.approvedVacations?.value || 0;
-    const totalVacations = onVacation + upcoming + approved;
-
-    return [
-      {
-        status: "Em Andamento",
-        quantity: onVacation,
-        total: totalVacations,
-        icon: IconBeach,
-        color: "blue" as const,
-      },
-      {
-        status: "Aprovado",
-        quantity: approved,
-        total: totalVacations,
-        icon: IconUserCheck,
-        color: "green" as const,
-      },
-      {
-        status: "Próximas",
-        quantity: upcoming,
-        total: totalVacations,
-        icon: IconClock,
-        color: "orange" as const,
-      },
-      {
-        status: "Agendadas",
-        quantity: metrics.vacationSchedule?.length || 0,
-        total: totalVacations,
-        icon: IconCalendar,
-        color: "purple" as const,
-      },
-    ];
   };
 
   // Get employee analysis data
@@ -387,10 +301,9 @@ export const HumanResourcesRootPage = () => {
                   color="blue"
                 />
                 <QuickAccessCard
-                  title="Férias"
+                  title="Ausências"
                   icon={IconBeach}
-                  onClick={() => navigate(routes.humanResources.vacations.root)}
-                  count={data?.vacationMetrics?.vacationSchedule?.length}
+                  onClick={() => navigate(routes.humanResources.absences.root)}
                   color="green"
                 />
                 <QuickAccessCard
@@ -423,7 +336,6 @@ export const HumanResourcesRootPage = () => {
               <h3 className="text-lg font-semibold text-foreground mb-4">Atividades Recentes</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <RecentActivitiesCard title="Atividades Recentes" activities={transformRecentActivities()} icon={IconActivity} color="blue" />
-                <SimpleVacationCard vacations={vacations} />
                 <SimplePpeDeliveryCard deliveries={ppeDeliveries} />
                 <RecentActivitiesCard
                   title="Avisos Ativos"
@@ -462,14 +374,6 @@ export const HumanResourcesRootPage = () => {
                   subtitle="Posições disponíveis"
                 />
                 <TrendCard
-                  title="Férias Aprovadas"
-                  value={data?.vacationMetrics?.approvedVacations?.value || 0}
-                  trend="stable"
-                  percentage={0}
-                  icon={IconBeach}
-                  subtitle="Aprovadas"
-                />
-                <TrendCard
                   title="EPIs Entregues"
                   value={data?.ppeMetrics?.deliveredThisMonth || 0}
                   trend={data?.ppeMetrics?.deliveryTrend}
@@ -498,34 +402,11 @@ export const HumanResourcesRootPage = () => {
                   color="green"
                 />
                 <ActivityPatternCard
-                  title="Status das Férias"
-                  data={[
-                    {
-                      label: "Aprovadas",
-                      value: data?.vacationMetrics?.approvedVacations?.value || 0,
-                    },
-                    {
-                      label: "Em Andamento",
-                      value: data?.vacationMetrics?.onVacationNow?.value || 0,
-                    },
-                    {
-                      label: "Próximas",
-                      value: data?.vacationMetrics?.upcomingVacations?.value || 0,
-                    },
-                  ]}
+                  title="Setores Mais Ativos"
+                  data={[]}
                   icon={IconCalendar}
                   color="purple"
                 />
-              </div>
-            </div>
-
-            {/* Vacation Status */}
-            <div>
-              <h3 className="text-lg font-semibold text-foreground mb-4">Status das Férias</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {getVacationStatus().map((status, index) => (
-                  <StatusCard key={index} status={status.status} quantity={status.quantity} total={status.total} icon={status.icon} color={status.color} unit="solicitações" />
-                ))}
               </div>
             </div>
 

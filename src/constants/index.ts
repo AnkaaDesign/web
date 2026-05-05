@@ -1,6 +1,7 @@
 export * from "./enums";
 export * from "./enum-labels";
 export * from "./routes";
+export * from "./secullum-justifications";
 export * from "./sortOrders";
 export * from "./brazil";
 export * from "./navigation";

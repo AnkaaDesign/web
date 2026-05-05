@@ -98,6 +98,9 @@ export const TABLER_ICONS = {
   // Scheduling and Automation
   calendar: "IconCalendar",
   calendarEvent: "IconCalendarEvent", // Alias for favorites icon mapping
+  calendarStats: "IconCalendarStats",
+  calendarWeek: "IconCalendarWeek",
+  calendarOff: "IconCalendarOff",
   schedule: "IconCalendarPlus",
   automation: "IconRobot",
 

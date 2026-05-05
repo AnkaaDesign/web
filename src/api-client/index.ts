@@ -75,7 +75,6 @@ export * from "./layout";
 export * from "./services/layoutSection";
 export * from "./services/team-staff";
 export * from "./user";
-export * from "./vacation";
 export * from "./dashboard";
 export * from "./economic-activity";
 export * from "./server";

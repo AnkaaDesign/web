@@ -238,7 +238,6 @@ const PaintStatisticsHub = lazy(() => import("@/pages/painting/statistics/index"
 const Personal = lazy(() => import("@/pages/personal/root").then((module) => ({ default: module.Personal })));
 const PersonalMyMessages = lazy(() => import("@/pages/personal/my-messages").then((module) => ({ default: module.MyMessagesPage })));
 const PersonalMyHolidays = lazy(() => import("@/pages/personal/my-holidays").then((module) => ({ default: module.MyHolidaysPage })));
-const PersonalMyVacations = lazy(() => import("@/pages/personal/my-vacations").then((module) => ({ default: module.MyVacationsPage })));
 const PersonalMyPpes = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.MyPpesPage })));
 const PersonalMyPpesRequest = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.PersonalMyPpesRequest })));
 const PersonalMyLoans = lazy(() => import("@/pages/personal/my-loans").then((module) => ({ default: module.MyLoansPage })));
@@ -248,7 +247,6 @@ const PersonalMyTimeEntries = lazy(() => import("@/pages/personal/my-time-entrie
 // Production Manager Pessoal section (company/team-wide views)
 const PmWarnings = lazy(() => import("@/pages/personal/pm-warnings").then((module) => ({ default: module.PmWarningsPage })));
 const PmCalculations = lazy(() => import("@/pages/personal/pm-calculations").then((module) => ({ default: module.PmCalculationsPage })));
-const PmVacations = lazy(() => import("@/pages/personal/pm-vacations").then((module) => ({ default: module.PmVacationsPage })));
 const PmSchedules = lazy(() => import("@/pages/personal/pm-schedules").then((module) => ({ default: module.PmSchedulesPage })));
 
 // Painting (Pintura)
@@ -335,11 +333,9 @@ const HumanResourcesHolidays = lazy(() => import("@/pages/human-resources/holida
 const HumanResourcesHolidaysCalendar = lazy(() => import("@/pages/human-resources/holidays/calendar").then((module) => ({ default: module.HolidayCalendarPage })));
 const HumanResourcesHolidaysCreate = lazy(() => import("@/pages/human-resources/holidays/cadastrar").then((module) => ({ default: module.HolidayCreatePage })));
 const HumanResourcesSchedules = lazy(() => import("@/pages/human-resources/schedules/list").then((module) => ({ default: module.SchedulesListPage })));
-const HumanResourcesVacations = lazy(() => import("@/pages/human-resources/vacations/list").then((module) => ({ default: module.VacationListPage })));
-const HumanResourcesVacationsCreate = lazy(() => import("@/pages/human-resources/vacations/create").then((module) => ({ default: module.CreateVacationPage })));
-const HumanResourcesVacationsDetails = lazy(() => import("@/pages/human-resources/vacations/details/[id]").then((module) => ({ default: module.VacationDetailsPage })));
-const HumanResourcesVacationsEdit = lazy(() => import("@/pages/human-resources/vacations/edit/[id]").then((module) => ({ default: module.EditVacationPage })));
-const HumanResourcesVacationsCalendar = lazy(() => import("@/pages/human-resources/vacations/calendar").then((module) => ({ default: module.VacationCalendarPage })));
+const HumanResourcesAbsences = lazy(() => import("@/pages/human-resources/absences/list").then((module) => ({ default: module.AbsencesListPage })));
+const HumanResourcesFaltas = lazy(() => import("@/pages/human-resources/faltas/list").then((module) => ({ default: module.FaltasListPage })));
+const HumanResourcesHRCalendar = lazy(() => import("@/pages/human-resources/calendar").then((module) => ({ default: module.HRCalendarPage })));
 const HumanResourcesTimeClock = lazy(() => import("@/pages/human-resources/time-clock/list"));
 const HumanResourcesPerformanceLevels = lazy(() => import("@/pages/human-resources/performance-levels/list").then((module) => ({ default: module.default })));
 
@@ -349,7 +345,6 @@ const CatalogDetails = lazy(() => import("@/pages/catalog/details/[id]").then((m
 
 // My Team
 const MyTeam = lazy(() => import("@/pages/my-team/index").then((module) => ({ default: module.default })));
-const MyTeamVacations = lazy(() => import("@/pages/my-team/vacations").then((module) => ({ default: module.default })));
 const MyTeamWarnings = lazy(() => import("@/pages/my-team/warnings").then((module) => ({ default: module.default })));
 const MyTeamLoans = lazy(() => import("@/pages/my-team/loans").then((module) => ({ default: module.default })));
 const MyTeamMembers = lazy(() => import("@/pages/my-team/members").then((module) => ({ default: module.default })));
@@ -1787,14 +1782,6 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.personal.myVacations.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonalMyVacations />
-                    </Suspense>
-                  }
-                />
-                <Route
                   path={routes.personal.myPpes.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -1857,14 +1844,6 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <PmCalculations />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personal.pmVacations.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PmVacations />
                     </Suspense>
                   }
                 />
@@ -2324,42 +2303,26 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.vacations.root}
+                  path={routes.humanResources.absences.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesVacations />
+                      <HumanResourcesAbsences />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.humanResources.vacations.create}
+                  path={routes.humanResources.faltas.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesVacationsCreate />
+                      <HumanResourcesFaltas />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.humanResources.vacations.details(":id")}
+                  path={routes.humanResources.calendar.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesVacationsDetails />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.humanResources.vacations.edit(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesVacationsEdit />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.humanResources.vacations.calendar}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesVacationsCalendar />
+                      <HumanResourcesHRCalendar />
                     </Suspense>
                   }
                 />
@@ -2438,14 +2401,6 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <MyTeam />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.myTeam.vacations}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <MyTeamVacations />
                     </Suspense>
                   }
                 />

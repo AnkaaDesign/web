@@ -191,7 +191,9 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/recursos-humanos/setores/cadastrar": "ADMIN", // Department creation requires admin
   "/recursos-humanos/cargos": "HUMAN_RESOURCES",
   "/recursos-humanos/cargos/cadastrar": "ADMIN", // Position creation requires admin
-  "/recursos-humanos/ferias": "HUMAN_RESOURCES",
+  "/recursos-humanos/ausencias": "HUMAN_RESOURCES",
+  "/recursos-humanos/faltas": "HUMAN_RESOURCES",
+  "/recursos-humanos/calendario": "HUMAN_RESOURCES",
   "/recursos-humanos/feriados": "HUMAN_RESOURCES",
   "/recursos-humanos/advertencias": "HUMAN_RESOURCES",
   "/recursos-humanos/ppe": "HUMAN_RESOURCES",
@@ -202,7 +204,6 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/human-resources": "HUMAN_RESOURCES",
   "/human-resources/employees": "HUMAN_RESOURCES",
   "/human-resources/employees/create": "ADMIN", // Employee creation requires admin
-  "/human-resources/vacations": "HUMAN_RESOURCES",
 
   // Catalog routes (view-only for designers, commercial, logistic, team leaders - NOTE: uses same details path as painting.catalog, so privileges defined on line 87)
   // Team leaders check at component level via isTeamLeader()
@@ -217,7 +218,6 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
 
   // My Team routes (team management for team leaders)
   // Uses TEAM_LEADER virtual privilege which checks user.ledSector relation
-  [routes.myTeam.vacations]: "TEAM_LEADER",
   [routes.myTeam.warnings]: "TEAM_LEADER",
   [routes.myTeam.loans]: "TEAM_LEADER",
   [routes.myTeam.members]: "TEAM_LEADER",

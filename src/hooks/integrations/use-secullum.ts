@@ -502,6 +502,129 @@ export const useSecullumDeleteHoliday = () => {
   });
 };
 
+// === Absences (Afastamentos) ===
+const absenceKeys = {
+  byEmployee: (funcionarioId: number) =>
+    [...secullumKeys.all, "absences", "by-employee", funcionarioId] as const,
+  aggregated: (params: { startDate: string; endDate: string; sectorId?: string }) =>
+    [...secullumKeys.all, "absences", "aggregated", params] as const,
+};
+
+export const useSecullumAbsencesByEmployee = (funcionarioId: number | null | undefined) => {
+  return useQuery({
+    queryKey: absenceKeys.byEmployee(funcionarioId ?? -1),
+    queryFn: () => secullumService.getAbsencesByEmployee(funcionarioId as number),
+    enabled: typeof funcionarioId === "number" && funcionarioId > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useSecullumAggregatedAbsences = (params: {
+  startDate: string;
+  endDate: string;
+  sectorId?: string;
+}) => {
+  return useQuery({
+    queryKey: absenceKeys.aggregated(params),
+    queryFn: () => secullumService.getAggregatedAbsences(params),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!params.startDate && !!params.endDate,
+  });
+};
+
+export const useSecullumUnjustifiedAbsences = (
+  params: { startDate: string; endDate: string; sectorId?: string },
+  options?: { enabled?: boolean },
+) => {
+  return useQuery({
+    queryKey: [...secullumKeys.all, "absences", "unjustified", params] as const,
+    queryFn: () => secullumService.getUnjustifiedAbsences(params),
+    staleTime: 5 * 60 * 1000,
+    enabled: (options?.enabled ?? true) && !!params.startDate && !!params.endDate,
+  });
+};
+
+const invalidateAllAbsences = (queryClient: ReturnType<typeof useQueryClient>) => {
+  queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "absences"] });
+};
+
+export const useSecullumCreateAbsence = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Parameters<typeof secullumService.createAbsence>[0]) =>
+      secullumService.createAbsence(payload),
+    onSuccess: () => invalidateAllAbsences(queryClient),
+  });
+};
+
+// Multi-user create — server-side userId → FuncionarioId resolution + batch.
+export const useSecullumCreateAbsenceForUsers = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Parameters<typeof secullumService.createAbsenceForUsers>[0]) =>
+      secullumService.createAbsenceForUsers(payload),
+    onSuccess: () => invalidateAllAbsences(queryClient),
+  });
+};
+
+export const useSecullumDeleteAbsence = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (absenceId: number | string) => secullumService.deleteAbsence(absenceId),
+    onSuccess: () => invalidateAllAbsences(queryClient),
+  });
+};
+
+export const useSecullumUpdateAbsence = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: {
+      absenceId: number | string;
+      original: Parameters<typeof secullumService.updateAbsence>[1]["original"];
+      next: Parameters<typeof secullumService.updateAbsence>[1]["next"];
+    }) =>
+      secullumService.updateAbsence(params.absenceId, {
+        original: params.original,
+        next: params.next,
+      }),
+    onSuccess: () => invalidateAllAbsences(queryClient),
+  });
+};
+
+// Sequential batch creation for collective vacation. Tracks per-employee result
+// so the UI can show "5 of 6 created, 1 failed for João" via batch-toast.
+export const useSecullumBatchCreateAbsences = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      payloads: Array<Parameters<typeof secullumService.createAbsence>[0] & { _userName?: string }>,
+    ) => {
+      const results: Array<{
+        ok: boolean;
+        userName?: string;
+        funcionarioId: number;
+        error?: string;
+      }> = [];
+      for (const p of payloads) {
+        try {
+          const { _userName, ...payload } = p;
+          await secullumService.createAbsence(payload);
+          results.push({ ok: true, userName: _userName, funcionarioId: p.FuncionarioId });
+        } catch (err: any) {
+          results.push({
+            ok: false,
+            userName: p._userName,
+            funcionarioId: p.FuncionarioId,
+            error: err?.response?.data?.message || err?.message || "Erro desconhecido",
+          });
+        }
+      }
+      return results;
+    },
+    onSuccess: () => invalidateAllAbsences(queryClient),
+  });
+};
+
 // Configuration hook
 export const useSecullumConfiguration = () => {
   return useQuery({

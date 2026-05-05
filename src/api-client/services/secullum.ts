@@ -279,7 +279,101 @@ export const secullumService = {
 
   // User mapping sync
   syncUserMapping: (params?: { dryRun?: boolean }) => apiClient.post<{ success: boolean; summary: any; details: any }>("/integrations/secullum/sync-user-mapping", params),
+
+  // Absences (Afastamentos) — covers planned (Ausências) + unplanned (Faltas).
+  // Categorization is a UI concern via constants/secullum-justifications.ts.
+  getAbsencesByEmployee: (funcionarioId: number) =>
+    apiClient.get<{ success: boolean; data: SecullumAbsence[]; message: string }>(
+      `/integrations/secullum/absences/${funcionarioId}`,
+    ),
+
+  getAggregatedAbsences: (params: { startDate: string; endDate: string; sectorId?: string }) =>
+    apiClient.get<{ success: boolean; data: SecullumAggregatedAbsence[]; message: string }>(
+      "/integrations/secullum/absences",
+      { params },
+    ),
+
+  // Unjustified absences derived from /Batidas (workdays with no entries and
+  // no justificativa). Heavier than getAggregatedAbsences — opt-in only.
+  getUnjustifiedAbsences: (params: { startDate: string; endDate: string; sectorId?: string }) =>
+    apiClient.get<{ success: boolean; data: SecullumAggregatedAbsence[]; message: string }>(
+      "/integrations/secullum/absences/unjustified",
+      { params },
+    ),
+
+  createAbsence: (data: SecullumCreateAbsencePayload) =>
+    apiClient.post<{ success: boolean; data?: SecullumAbsence; message: string }>(
+      "/integrations/secullum/absences",
+      data,
+    ),
+
+  // Multi-user create. Server resolves userIds → secullumEmployeeIds.
+  // Use applyToAll=true to fan out to every active Secullum-linked user.
+  createAbsenceForUsers: (data: {
+    userIds?: string[];
+    applyToAll?: boolean;
+    Inicio: string;
+    Fim: string;
+    JustificativaId: number;
+    Motivo?: string;
+    groupId?: string;
+  }) =>
+    apiClient.post<{
+      success: boolean;
+      message: string;
+      data?: {
+        created: number;
+        failed: number;
+        groupId?: string;
+        results: Array<{
+          userId: string;
+          userName: string;
+          funcionarioId?: number;
+          ok: boolean;
+          error?: string;
+        }>;
+      };
+    }>("/integrations/secullum/absences/by-users", data),
+
+  deleteAbsence: (absenceId: number | string) =>
+    apiClient.delete<{ success: boolean; message: string }>(
+      `/integrations/secullum/absences/${absenceId}`,
+    ),
+
+  updateAbsence: (
+    absenceId: number | string,
+    body: { original: SecullumAbsence; next: SecullumCreateAbsencePayload },
+  ) =>
+    apiClient.put<{ success: boolean; data?: SecullumAbsence; message: string }>(
+      `/integrations/secullum/absences/${absenceId}`,
+      body,
+    ),
 };
+
+export interface SecullumAbsence {
+  Id: number;
+  FuncionarioId: number;
+  Inicio: string;
+  Fim: string;
+  JustificativaId: number;
+  JustificativaDescricao?: string;
+  Motivo?: string;
+}
+
+export interface SecullumAggregatedAbsence extends SecullumAbsence {
+  userId: string;
+  userName: string;
+  sectorId: string | null;
+  sectorName: string | null;
+}
+
+export interface SecullumCreateAbsencePayload {
+  Inicio: string;
+  Fim: string;
+  JustificativaId: number;
+  Motivo: string;
+  FuncionarioId: number;
+}
 
 // Export types
 export type {

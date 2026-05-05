@@ -64,10 +64,6 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   BONUS: "/recursos-humanos/bonus/detalhes",
   Bonus: "/recursos-humanos/bonus/detalhes",
 
-  // Vacation routes
-  VACATION: "/recursos-humanos/ferias/detalhes",
-  Vacation: "/recursos-humanos/ferias/detalhes",
-
   // Financial routes
   FINANCIAL: "/financeiro/transacoes/detalhes",
   Financial: "/financeiro/transacoes/detalhes",

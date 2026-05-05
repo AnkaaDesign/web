@@ -37,7 +37,6 @@ import type {
   SupplierGetManyFormData,
   TaskGetManyFormData,
   UserGetManyFormData,
-  VacationGetManyFormData,
   NotificationGetManyFormData,
   SeenNotificationGetManyFormData,
   AirbrushingGetManyFormData,
@@ -771,27 +770,6 @@ export const holidayKeys = {
 };
 
 // =====================================================
-// Vacation Query Keys
-// =====================================================
-
-export const vacationKeys = {
-  all: ["vacations"] as const,
-  lists: () => ["vacations", "list"] as const,
-  list: (filters?: Partial<VacationGetManyFormData>) => (filters ? (["vacations", "list", filters] as const) : (["vacations", "list"] as const)),
-  details: () => ["vacations", "detail"] as const,
-  detail: (id: string, include?: any) => (include ? (["vacations", "detail", id, include] as const) : (["vacations", "detail", id] as const)),
-  byIds: (ids: string[]) => ["vacations", "byIds", ids] as const,
-
-  // Specialized queries
-  byUser: (userId: string, filters?: Partial<VacationGetManyFormData>) =>
-    filters ? (["vacations", "byUser", userId, filters] as const) : (["vacations", "byUser", userId] as const),
-
-  // Status queries
-  active: (filters?: Partial<VacationGetManyFormData>) => (filters ? (["vacations", "active", filters] as const) : (["vacations", "active"] as const)),
-  upcoming: (filters?: Partial<VacationGetManyFormData>) => (filters ? (["vacations", "upcoming", filters] as const) : (["vacations", "upcoming"] as const)),
-};
-
-// =====================================================
 // Payroll Query Keys
 // =====================================================
 
@@ -896,10 +874,6 @@ export const teamStaffKeys = {
   // Borrows for team members
   borrows: () => ["teamStaff", "borrows"] as const,
   borrowsList: (filters?: Partial<BorrowGetManyFormData>) => (filters ? (["teamStaff", "borrows", "list", filters] as const) : (["teamStaff", "borrows", "list"] as const)),
-
-  // Vacations for team members
-  vacations: () => ["teamStaff", "vacations"] as const,
-  vacationsList: (filters?: Partial<VacationGetManyFormData>) => (filters ? (["teamStaff", "vacations", "list", filters] as const) : (["teamStaff", "vacations", "list"] as const)),
 
   // Warnings for team members
   warnings: () => ["teamStaff", "warnings"] as const,

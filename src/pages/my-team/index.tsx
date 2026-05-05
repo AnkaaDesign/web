@@ -19,12 +19,6 @@ const teamMenuItems = [
     route: routes.myTeam.loans,
   },
   {
-    id: "vacations",
-    title: "Férias",
-    description: "Aprove ou rejeite solicitações de férias da sua equipe",
-    route: routes.myTeam.vacations,
-  },
-  {
     id: "warnings",
     title: "Advertências",
     description: "Visualize e gerencie as advertências dos colaboradores",

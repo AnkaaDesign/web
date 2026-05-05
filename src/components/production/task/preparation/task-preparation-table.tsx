@@ -166,6 +166,99 @@ export function TaskPreparationTable({
     }
   }, [groupedTasks, onGroupsDetected]);
 
+  // Selection adjacency map - drives the green wrapping border for contiguous selected rows.
+  // Each rendered row (single, group-first, expanded group task, or collapsed group row) gets
+  // a flag indicating whether it's at the top/bottom of a contiguous run of selections.
+  const selectedIdsSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+  const selectionAdjacency = useMemo(() => {
+    type RowSel = { key: string; isSelected: boolean };
+    const flat: RowSel[] = [];
+    for (const group of groupedTasks) {
+      if (group.type === 'group-collapsed') {
+        const groupId = group.groupId!;
+        const isExpanded = expandedGroups.has(groupId);
+        if (isExpanded) {
+          for (const t of group.collapsedTasks ?? []) {
+            flat.push({ key: `task-${t.id}`, isSelected: selectedIdsSet.has(t.id) });
+          }
+        } else {
+          const firstTaskGroup = groupedTasks.find(g => g.groupId === groupId && g.type === 'group-first');
+          const allIds: string[] = [];
+          if (firstTaskGroup?.task) allIds.push(firstTaskGroup.task.id);
+          allIds.push(...(group.collapsedTasks ?? []).map(t => t.id));
+          const allSel = allIds.length > 0 && allIds.every(id => selectedIdsSet.has(id));
+          flat.push({ key: `collapsed-${groupId}`, isSelected: allSel });
+        }
+      } else if (group.task) {
+        const t = group.task;
+        let sel: boolean;
+        if (group.type === 'group-first') {
+          // For a group-first row when the group is collapsed, its checkbox represents the
+          // entire group's selection state — match that here so the visuals stay consistent.
+          let foundGroupId: string | undefined;
+          for (const g of groupedTasks) {
+            if (g.type === 'group-first' && g.task?.id === t.id) {
+              foundGroupId = g.groupId;
+              break;
+            }
+          }
+          const groupCollapsed = !!foundGroupId && !expandedGroups.has(foundGroupId);
+          if (groupCollapsed) {
+            const allIds: string[] = [t.id];
+            for (const g of groupedTasks) {
+              if (g.groupId === foundGroupId && g.type === 'group-collapsed' && g.collapsedTasks) {
+                allIds.push(...g.collapsedTasks.map(x => x.id));
+              }
+            }
+            sel = allIds.every(id => selectedIdsSet.has(id));
+          } else {
+            sel = selectedIdsSet.has(t.id);
+          }
+        } else {
+          sel = selectedIdsSet.has(t.id);
+        }
+        flat.push({ key: `task-${t.id}`, isSelected: sel });
+      }
+    }
+    const map = new Map<string, { isSelected: boolean; isFirstInRun: boolean; isLastInRun: boolean }>();
+    flat.forEach((row, i) => {
+      const before = i > 0 ? flat[i - 1].isSelected : false;
+      const after = i < flat.length - 1 ? flat[i + 1].isSelected : false;
+      map.set(row.key, {
+        isSelected: row.isSelected,
+        isFirstInRun: row.isSelected && !before,
+        isLastInRun: row.isSelected && !after,
+      });
+    });
+    return map;
+  }, [groupedTasks, expandedGroups, selectedIdsSet]);
+
+  // When showing only selected rows, the green tint is enough — skip the wrapping
+  // border since every visible row is selected and the border becomes visual noise.
+  const showSelectionBorders = !showSelectedOnly;
+
+  // Per-cell shadow. With `border-collapse: collapse`, box-shadow on `<tr>` is hidden
+  // by the cells' own boxes, so we apply shadows to each `<td>` instead. Each cell only
+  // contributes the shadow edges that belong to it (left on first col, right on last col,
+  // top on first-in-run, bottom on last-in-run).
+  const buildCellShadow = useCallback((opts: {
+    isSelected: boolean;
+    isFirstInRun: boolean;
+    isLastInRun: boolean;
+    isFirstCol: boolean;
+    isLastCol: boolean;
+  }): string | undefined => {
+    if (!opts.isSelected || !showSelectionBorders) return undefined;
+    const c = 'rgb(34 197 94)';
+    const shadows: string[] = [];
+    if (opts.isFirstCol) shadows.push(`inset 2px 0 0 ${c}`);
+    if (opts.isLastCol) shadows.push(`inset -2px 0 0 ${c}`);
+    if (opts.isFirstInRun) shadows.push(`inset 0 2px 0 ${c}`);
+    if (opts.isLastInRun) shadows.push(`inset 0 -2px 0 ${c}`);
+    return shadows.length ? shadows.join(', ') : undefined;
+  }, [showSelectionBorders]);
+
   // Notify parent about ordered task IDs
   useEffect(() => {
     if (onOrderedTaskIdsChange) {
@@ -439,7 +532,18 @@ export function TaskPreparationTable({
 
               // If expanded, render all individual task rows
               if (isExpanded) {
-                return collapsedTasks.map((task, taskIndex) => (
+                return collapsedTasks.map((task, taskIndex) => {
+                  const adj = selectionAdjacency.get(`task-${task.id}`);
+                  const rowSelected = adj?.isSelected ?? false;
+                  const lastColIdx = columns.length - 1;
+                  const checkboxShadow = buildCellShadow({
+                    isSelected: rowSelected,
+                    isFirstInRun: !!adj?.isFirstInRun,
+                    isLastInRun: !!adj?.isLastInRun,
+                    isFirstCol: true,
+                    isLastCol: false,
+                  });
+                  return (
                   <TableRow
                     key={task.id}
                     onClick={(e) => handleRowClick(task, e)}
@@ -448,15 +552,18 @@ export function TaskPreparationTable({
                       "cursor-pointer hover:bg-muted/50",
                       "transition-all duration-200 ease-in-out",
                       "animate-in fade-in slide-in-from-top-2",
-                      isSelected(task.id) && "bg-primary/10"
+                      rowSelected && "bg-green-500/15 hover:bg-green-500/25"
                     )}
                     style={{
                       animationDelay: `${taskIndex * 30}ms`,
-                      animationDuration: "200ms"
+                      animationDuration: "200ms",
                     }}
                   >
                     {canEdit && (
-                      <TableCell className="w-12 border-r p-0">
+                      <TableCell
+                        className="w-12 border-r p-0"
+                        style={checkboxShadow ? { boxShadow: checkboxShadow } : undefined}
+                      >
                         <div
                           className="flex items-center justify-center h-full w-full px-2 py-1"
                           onMouseDown={(e) => {
@@ -487,7 +594,15 @@ export function TaskPreparationTable({
                         </div>
                       </TableCell>
                     )}
-                    {columns.map((column) => (
+                    {columns.map((column, colIdx) => {
+                      const cellShadow = buildCellShadow({
+                        isSelected: rowSelected,
+                        isFirstInRun: !!adj?.isFirstInRun,
+                        isLastInRun: !!adj?.isLastInRun,
+                        isFirstCol: !canEdit && colIdx === 0,
+                        isLastCol: colIdx === lastColIdx,
+                      });
+                      return (
                       <TableCell
                         key={column.id}
                         className={cn("overflow-hidden", column.cellClassName, column.className, "px-4 py-1")}
@@ -495,6 +610,7 @@ export function TaskPreparationTable({
                           width: getColumnWidth(column.id),
                           minWidth: COLUMN_WIDTH_CONSTRAINTS.minWidth,
                           maxWidth: COLUMN_WIDTH_CONSTRAINTS.maxWidth,
+                          ...(cellShadow ? { boxShadow: cellShadow } : {}),
                         }}
                       >
                         <div className="truncate flex items-center">
@@ -510,14 +626,18 @@ export function TaskPreparationTable({
                               : task[column.accessorKey as keyof Task]}
                         </div>
                       </TableCell>
-                    ))}
+                      );
+                    })}
                   </TableRow>
-                ));
+                  );
+                });
               }
 
               // If collapsed, render the collapsed group row
               // Skip rendering if firstTask is not found (shouldn't happen)
               if (!firstTask) return null;
+
+              const collapsedAdj = selectionAdjacency.get(`collapsed-${groupId}`);
 
               return (
                 <CollapsedGroupRow
@@ -544,12 +664,27 @@ export function TaskPreparationTable({
                   canEdit={canEdit}
                   columns={columns}
                   selectedCount={selectedCountInGroup}
+                  highlightSelection={!!collapsedAdj?.isSelected}
+                  isFirstInRun={!!collapsedAdj?.isFirstInRun}
+                  isLastInRun={!!collapsedAdj?.isLastInRun}
+                  showSelectionBorder={showSelectionBorders}
                 />
               );
             }
 
             const task = group.task;
             if (!task) return null;
+
+            const taskAdj = selectionAdjacency.get(`task-${task.id}`);
+            const taskRowSelected = taskAdj?.isSelected ?? false;
+            const taskLastColIdx = columns.length - 1;
+            const taskCheckboxShadow = buildCellShadow({
+              isSelected: taskRowSelected,
+              isFirstInRun: !!taskAdj?.isFirstInRun,
+              isLastInRun: !!taskAdj?.isLastInRun,
+              isFirstCol: true,
+              isLastCol: false,
+            });
 
             return (
               <TableRow
@@ -558,11 +693,14 @@ export function TaskPreparationTable({
                 onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
                 className={cn(
                   "cursor-pointer hover:bg-muted/50",
-                  isSelected(task.id) && "bg-primary/10"
+                  taskRowSelected && "bg-green-500/15 hover:bg-green-500/25"
                 )}
               >
                 {canEdit && (
-                  <TableCell className="w-12 border-r p-0">
+                  <TableCell
+                    className="w-12 border-r p-0"
+                    style={taskCheckboxShadow ? { boxShadow: taskCheckboxShadow } : undefined}
+                  >
                     <div
                       className="flex items-center justify-center h-full w-full px-2 py-1"
                       onMouseDown={(e) => {
@@ -648,7 +786,15 @@ export function TaskPreparationTable({
                     </div>
                   </TableCell>
                 )}
-                {columns.map((column) => (
+                {columns.map((column, colIdx) => {
+                  const cellShadow = buildCellShadow({
+                    isSelected: taskRowSelected,
+                    isFirstInRun: !!taskAdj?.isFirstInRun,
+                    isLastInRun: !!taskAdj?.isLastInRun,
+                    isFirstCol: !canEdit && colIdx === 0,
+                    isLastCol: colIdx === taskLastColIdx,
+                  });
+                  return (
                   <TableCell
                     key={column.id}
                     className={cn("overflow-hidden", column.cellClassName, column.className, "px-4 py-1")}
@@ -656,6 +802,7 @@ export function TaskPreparationTable({
                       width: getColumnWidth(column.id),
                       minWidth: COLUMN_WIDTH_CONSTRAINTS.minWidth,
                       maxWidth: COLUMN_WIDTH_CONSTRAINTS.maxWidth,
+                      ...(cellShadow ? { boxShadow: cellShadow } : {}),
                     }}
                   >
                     <div className="truncate flex items-center">
@@ -671,7 +818,8 @@ export function TaskPreparationTable({
                           : task[column.accessorKey as keyof Task]}
                     </div>
                   </TableCell>
-                ))}
+                  );
+                })}
               </TableRow>
             );
           })}

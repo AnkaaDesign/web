@@ -17,6 +17,4 @@ export { DashboardSection } from "./dashboard-section";
 
 export { TimePeriodSelector } from "./time-period-selector";
 
-export { SimpleVacationCard } from "./simple-vacation-card";
-
 export { SimplePpeDeliveryCard } from "./simple-ppe-delivery-card";

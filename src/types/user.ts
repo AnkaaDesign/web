@@ -8,7 +8,6 @@ import type { Position, PositionIncludes, PositionOrderBy } from "./position";
 import type { Preferences, PreferencesIncludes } from "./preferences";
 import type { Warning, WarningIncludes } from "./warning";
 import type { Sector, SectorIncludes, SectorOrderBy } from "./sector";
-import type { Vacation, VacationIncludes } from "./vacation";
 import type { Task, TaskIncludes } from "./task";
 import type { Activity, ActivityIncludes } from "./activity";
 import type { Borrow, BorrowIncludes } from "./borrow";
@@ -73,7 +72,6 @@ export interface User extends BaseEntity {
   borrows?: Borrow[];
   notifications?: Notification[];
   tasks?: Task[];
-  vacations?: Vacation[];
   bonuses?: Bonus[];
   warningsCollaborator?: Warning[];
   warningsSupervisor?: Warning[];
@@ -88,7 +86,6 @@ export interface User extends BaseEntity {
   // Count fields (when included)
   _count?: {
     activities?: number;
-    vacations?: number;
     bonuses?: number;
     tasks?: number;
     createdTasks?: number; // Used in employee tables
@@ -155,11 +152,6 @@ export interface UserIncludes {
     | boolean
     | {
         include?: TaskIncludes;
-      };
-  vacations?:
-    | boolean
-    | {
-        include?: VacationIncludes;
       };
   bonuses?:
     | boolean

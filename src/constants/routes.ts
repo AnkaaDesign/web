@@ -199,13 +199,20 @@ export const routes = {
       list: "/recursos-humanos/controle-ponto",
       root: "/recursos-humanos/controle-ponto",
     },
-    vacations: {
-      batchEdit: "/recursos-humanos/ferias/editar-em-lote",
-      calendar: "/recursos-humanos/ferias/calendario",
-      create: "/recursos-humanos/ferias/cadastrar",
-      details: (id: string) => `/recursos-humanos/ferias/detalhes/${id}`,
-      edit: (id: string) => `/recursos-humanos/ferias/editar/${id}`,
-      root: "/recursos-humanos/ferias",
+    absences: {
+      root: "/recursos-humanos/ausencias",
+      create: "/recursos-humanos/ausencias/cadastrar",
+      edit: (id: string) => `/recursos-humanos/ausencias/editar/${id}`,
+      details: (id: string) => `/recursos-humanos/ausencias/detalhes/${id}`,
+    },
+    faltas: {
+      root: "/recursos-humanos/faltas",
+      create: "/recursos-humanos/faltas/cadastrar",
+      edit: (id: string) => `/recursos-humanos/faltas/editar/${id}`,
+      details: (id: string) => `/recursos-humanos/faltas/detalhes/${id}`,
+    },
+    calendar: {
+      root: "/recursos-humanos/calendario",
     },
     warnings: {
       batchEdit: "/recursos-humanos/avisos/editar-em-lote",
@@ -366,10 +373,6 @@ export const routes = {
       details: (sectorId: string, id: string) => `/meu-pessoal/emprestimos/${sectorId}/detalhes/${id}`,
       root: (sectorId: string) => `/meu-pessoal/emprestimos/${sectorId}`,
     },
-    ferias: {
-      details: (sectorId: string, id: string) => `/meu-pessoal/ferias/${sectorId}/detalhes/${id}`,
-      root: (sectorId: string) => `/meu-pessoal/ferias/${sectorId}`,
-    },
     root: "/meu-pessoal",
   },
 
@@ -381,7 +384,6 @@ export const routes = {
     movements: "/meu-pessoal/movimentacoes",
     ppes: "/meu-pessoal/epis",
     root: "/meu-pessoal",
-    vacations: "/meu-pessoal/ferias",
     warnings: "/meu-pessoal/advertencias",
   },
 
@@ -436,10 +438,6 @@ export const routes = {
     myHolidays: {
       root: "/pessoal/feriados",
     },
-    myVacations: {
-      details: (id: string) => `/pessoal/ferias/detalhes/${id}`,
-      root: "/pessoal/ferias",
-    },
     myPpes: {
       details: (id: string) => `/pessoal/meus-epis/detalhes/${id}`,
       request: "/pessoal/meus-epis/solicitar",
@@ -467,9 +465,6 @@ export const routes = {
     },
     pmCalculations: {
       root: "/pessoal/calculos-ponto",
-    },
-    pmVacations: {
-      root: "/pessoal/ferias-equipe",
     },
     pmSchedules: {
       root: "/pessoal/horarios",

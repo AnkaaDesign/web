@@ -712,7 +712,8 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
                         </div>
                       )}
                       {selectedRequest.SolicitacaoFotoId != null && (
-                        <div className="pt-1">
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Foto Anexada</p>
                           <Button
                             variant="outline"
                             size="sm"

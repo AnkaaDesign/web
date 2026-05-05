@@ -1,6 +1,7 @@
 // packages/schemas/src/index.ts
 
 export * from "./common";
+export * from "./secullum-absence";
 export * from "./activity";
 export * from "./activity-url-state";
 export * from "./timeClockEntry";
@@ -84,7 +85,6 @@ export * from "./supplier";
 export * from "./task";
 export * from "./layout";
 export * from "./user";
-export * from "./vacation";
 export * from "./dashboard";
 export * from "./auth";
 export * from "./server";

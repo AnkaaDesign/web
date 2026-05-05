@@ -25,6 +25,14 @@ interface CollapsedGroupRowProps {
   canEdit: boolean;
   columns: TaskColumn[];
   selectedCount: number;
+  /** When true, applies the green selection overlay + wrapping border edges */
+  highlightSelection?: boolean;
+  /** Top edge of a contiguous selected run (only used with highlightSelection) */
+  isFirstInRun?: boolean;
+  /** Bottom edge of a contiguous selected run (only used with highlightSelection) */
+  isLastInRun?: boolean;
+  /** When false, the green tint stays but the wrapping border is suppressed */
+  showSelectionBorder?: boolean;
 }
 
 // Service order type column IDs
@@ -55,6 +63,10 @@ export function CollapsedGroupRow({
   canEdit,
   columns,
   selectedCount,
+  highlightSelection = false,
+  isFirstInRun = false,
+  isLastInRun = false,
+  showSelectionBorder = true,
 }: CollapsedGroupRowProps) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(!isExpanded);
@@ -244,11 +256,31 @@ export function CollapsedGroupRow({
     );
   };
 
+  // Per-cell shadow stack — applied to first cell (left edge), last cell (right edge),
+  // and all cells when this row is at the top/bottom of a contiguous selected run.
+  // Row-level box-shadow is unreliable with `border-collapse: collapse` because the
+  // cells' boxes paint on top of the row, hiding its shadows.
+  const totalCellCount = (canEdit ? 1 : 0) + cellGroups.length;
+  const buildCollapsedCellShadow = (cellIdx: number): string | undefined => {
+    if (!highlightSelection || !showSelectionBorder) return undefined;
+    const c = 'rgb(34 197 94)';
+    const isFirstCol = cellIdx === 0;
+    const isLastCol = cellIdx === totalCellCount - 1;
+    const shadows: string[] = [];
+    if (isFirstCol) shadows.push(`inset 2px 0 0 ${c}`);
+    if (isLastCol) shadows.push(`inset -2px 0 0 ${c}`);
+    if (isFirstInRun) shadows.push(`inset 0 2px 0 ${c}`);
+    if (isLastInRun) shadows.push(`inset 0 -2px 0 ${c}`);
+    return shadows.length ? shadows.join(', ') : undefined;
+  };
+
   return (
     <TableRow
       className={cn(
         "cursor-pointer border-b border-border",
-        "bg-muted/30 hover:bg-muted/50",
+        highlightSelection
+          ? "bg-green-500/15 hover:bg-green-500/25"
+          : "bg-muted/30 hover:bg-muted/50",
         "group",
         "transition-all duration-200 ease-in-out",
         isAnimating && "opacity-0 scale-y-0",
@@ -258,7 +290,14 @@ export function CollapsedGroupRow({
     >
       {/* Checkbox column */}
       {canEdit && (
-        <TableCell className="p-0 !border-r-0 w-[60px]" onClick={handleCheckboxClick}>
+        <TableCell
+          className="p-0 !border-r-0 w-[60px]"
+          onClick={handleCheckboxClick}
+          style={(() => {
+            const s = buildCollapsedCellShadow(0);
+            return s ? { boxShadow: s } : undefined;
+          })()}
+        >
           <div className="flex items-center justify-center h-full w-full px-2 py-2">
             <Checkbox
               checked={isSelected}
@@ -273,12 +312,16 @@ export function CollapsedGroupRow({
 
       {/* Cells rendered in column order */}
       {cellGroups.map((group, idx) => {
+        const cellIdx = (canEdit ? 1 : 0) + idx;
+        const cellShadow = buildCollapsedCellShadow(cellIdx);
+        const cellShadowStyle = cellShadow ? { boxShadow: cellShadow } : undefined;
         if (group.type === 'info') {
           return (
             <TableCell
               key={`info-${idx}`}
               colSpan={group.colSpan}
               className="p-0 !border-r-0"
+              style={cellShadowStyle}
             >
               <div className="flex items-center gap-3 px-4 py-2">
                 <div className="flex-shrink-0">
@@ -313,6 +356,7 @@ export function CollapsedGroupRow({
               key={`empty-${idx}`}
               colSpan={group.colSpan}
               className="p-0 !border-r-0"
+              style={cellShadowStyle}
             />
           );
         }
@@ -322,6 +366,7 @@ export function CollapsedGroupRow({
           <TableCell
             key={group.column.id}
             className={cn("overflow-hidden", group.column.cellClassName, group.column.className, "px-4 py-1")}
+            style={cellShadowStyle}
           >
             <div className="truncate flex items-center">
               {renderServiceOrderCell(group.column.id)}

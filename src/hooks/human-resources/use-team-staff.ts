@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   getTeamStaffUsers,
   getTeamStaffBorrows,
-  getTeamStaffVacations,
   getTeamStaffWarnings,
   getTeamStaffActivities,
   getTeamStaffEpis,
@@ -13,14 +12,12 @@ import {
 import type {
   UserGetManyFormData,
   BorrowGetManyFormData,
-  VacationGetManyFormData,
   WarningGetManyFormData,
   ActivityGetManyFormData,
   PpeDeliveryGetManyFormData,
 } from "../../schemas";
 import type {
   BorrowGetManyResponse,
-  VacationGetManyResponse,
   WarningGetManyResponse,
   ActivityGetManyResponse,
   PpeDeliveryGetManyResponse,
@@ -81,36 +78,6 @@ export function useTeamStaffBorrows(
   return useQuery<BorrowGetManyResponse>({
     queryKey: teamStaffKeys.borrowsList(filters),
     queryFn: () => getTeamStaffBorrows(filters),
-    staleTime: options?.staleTime ?? 1000 * 60 * 3, // 3 minutes default
-    enabled: options?.enabled ?? true,
-    refetchInterval: options?.refetchInterval,
-  });
-}
-
-// =====================================================
-// Team Staff Vacations Hook
-// =====================================================
-
-/**
- * Hook to fetch vacations for users in the authenticated team leader's sector.
- * This hook uses the secure team-staff endpoint which automatically filters
- * based on the user's ledSectorId.
- *
- * @param filters - Query parameters (includes, orderBy, pagination, etc.)
- * @param options - React Query options
- * @returns Query result with team vacations
- */
-export function useTeamStaffVacations(
-  filters?: Partial<VacationGetManyFormData>,
-  options?: {
-    enabled?: boolean;
-    staleTime?: number;
-    refetchInterval?: number;
-  }
-) {
-  return useQuery<VacationGetManyResponse>({
-    queryKey: teamStaffKeys.vacationsList(filters),
-    queryFn: () => getTeamStaffVacations(filters),
     staleTime: options?.staleTime ?? 1000 * 60 * 3, // 3 minutes default
     enabled: options?.enabled ?? true,
     refetchInterval: options?.refetchInterval,

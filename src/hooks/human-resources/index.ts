@@ -3,7 +3,6 @@ export * from "./use-user";
 // convertToApiFilters/convertFromApiFilters name conflicts across domains
 export * from "./use-position";
 export * from "./use-position-remuneration";
-export * from "./use-vacation";
 export * from "./use-warning";
 export * from "./use-holiday";
 export * from "./use-ppe";

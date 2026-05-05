@@ -227,16 +227,6 @@ export enum CUT_REQUEST_REASON {
 }
 
 
-export enum VACATION_STATUS {
-  PENDING = "PENDING",
-  APPROVED = "APPROVED",
-  REJECTED = "REJECTED",
-  CANCELLED = "CANCELLED",
-  IN_PROGRESS = "IN_PROGRESS",
-  COMPLETED = "COMPLETED",
-}
-
-
 export enum PPE_REQUEST_STATUS {
   PENDING = "PENDING",
   APPROVED = "APPROVED",
@@ -475,21 +465,6 @@ export enum VALIDATION_SEVERITY {
 }
 
 // =====================
-// Vacation & Leave Types
-// =====================
-
-export enum VACATION_TYPE {
-  ANNUAL = "ANNUAL",
-  COLLECTIVE = "COLLECTIVE",
-  MEDICAL = "MEDICAL",
-  MATERNITY = "MATERNITY",
-  PATERNITY = "PATERNITY",
-  EMERGENCY = "EMERGENCY",
-  STUDY = "STUDY",
-  UNPAID = "UNPAID",
-  OTHER = "OTHER",
-}
-
 // =====================
 // Warning Types
 // =====================
@@ -2024,7 +1999,9 @@ export enum FAVORITE_PAGES {
 
   // Human Resources - List Pages
   RECURSOS_HUMANOS_CARGOS_LISTAR = "/recursos-humanos/cargos",
-  RECURSOS_HUMANOS_FERIAS_LISTAR = "/recursos-humanos/ferias",
+  RECURSOS_HUMANOS_AUSENCIAS_LISTAR = "/recursos-humanos/ausencias",
+  RECURSOS_HUMANOS_FALTAS_LISTAR = "/recursos-humanos/faltas",
+  RECURSOS_HUMANOS_CALENDARIO = "/recursos-humanos/calendario",
   RECURSOS_HUMANOS_FERIADOS_LISTAR = "/recursos-humanos/feriados",
   RECURSOS_HUMANOS_AVISOS_LISTAR = "/recursos-humanos/avisos",
   RECURSOS_HUMANOS_CALCULOS = "/recursos-humanos/calculos",
@@ -2036,7 +2013,8 @@ export enum FAVORITE_PAGES {
 
   // Human Resources - Create Pages
   RECURSOS_HUMANOS_CARGOS_CADASTRAR = "/recursos-humanos/cargos/cadastrar",
-  RECURSOS_HUMANOS_FERIAS_CADASTRAR = "/recursos-humanos/ferias/cadastrar",
+  RECURSOS_HUMANOS_AUSENCIAS_CADASTRAR = "/recursos-humanos/ausencias/cadastrar",
+  RECURSOS_HUMANOS_FALTAS_CADASTRAR = "/recursos-humanos/faltas/cadastrar",
   RECURSOS_HUMANOS_FERIADOS_CADASTRAR = "/recursos-humanos/feriados/cadastrar",
   RECURSOS_HUMANOS_AVISOS_CADASTRAR = "/recursos-humanos/avisos/cadastrar",
   RECURSOS_HUMANOS_EPI_CADASTRAR = "/recursos-humanos/epi/cadastrar",
@@ -2048,7 +2026,6 @@ export enum FAVORITE_PAGES {
 
   // Personal - List Pages
   PESSOAL_FERIADOS_LISTAR = "/pessoal/feriados",
-  PESSOAL_FERIAS_LISTAR = "/pessoal/ferias",
   PESSOAL_MEUS_EPIS_LISTAR = "/pessoal/meus-epis",
   PESSOAL_MEUS_EMPRESTIMOS_LISTAR = "/pessoal/meus-emprestimos",
   PESSOAL_MINHAS_ATIVIDADES_LISTAR = "/pessoal/minhas-atividades",
@@ -2063,25 +2040,25 @@ export enum FAVORITE_PAGES {
 
   // Human Resources - Edit Pages
   RECURSOS_HUMANOS_CARGOS_EDITAR = "/recursos-humanos/cargos/editar/:id",
-  RECURSOS_HUMANOS_FERIAS_EDITAR = "/recursos-humanos/ferias/editar/:id",
+  RECURSOS_HUMANOS_AUSENCIAS_EDITAR = "/recursos-humanos/ausencias/editar/:id",
+  RECURSOS_HUMANOS_FALTAS_EDITAR = "/recursos-humanos/faltas/editar/:id",
   RECURSOS_HUMANOS_FERIADOS_EDITAR = "/recursos-humanos/feriados/editar/:id",
   RECURSOS_HUMANOS_AVISOS_EDITAR = "/recursos-humanos/avisos/editar/:id",
   RECURSOS_HUMANOS_SETORES_EDITAR = "/recursos-humanos/setores/editar/:id",
 
   // Human Resources - Details Pages
   RECURSOS_HUMANOS_CARGOS_DETALHES = "/recursos-humanos/cargos/detalhes/:id",
-  RECURSOS_HUMANOS_FERIAS_DETALHES = "/recursos-humanos/ferias/detalhes/:id",
+  RECURSOS_HUMANOS_AUSENCIAS_DETALHES = "/recursos-humanos/ausencias/detalhes/:id",
+  RECURSOS_HUMANOS_FALTAS_DETALHES = "/recursos-humanos/faltas/detalhes/:id",
   RECURSOS_HUMANOS_FERIADOS_DETALHES = "/recursos-humanos/feriados/detalhes/:id",
   RECURSOS_HUMANOS_AVISOS_DETALHES = "/recursos-humanos/avisos/detalhes/:id",
 
   // Human Resources - Batch Edit Pages
   RECURSOS_HUMANOS_CARGOS_EDITAR_LOTE = "/recursos-humanos/cargos/editar-lote",
-  RECURSOS_HUMANOS_FERIAS_EDITAR_LOTE = "/recursos-humanos/ferias/editar-lote",
   RECURSOS_HUMANOS_FERIADOS_EDITAR_LOTE = "/recursos-humanos/feriados/editar-lote",
   RECURSOS_HUMANOS_AVISOS_EDITAR_LOTE = "/recursos-humanos/avisos/editar-lote",
 
   // Human Resources - Calendar Pages
-  RECURSOS_HUMANOS_FERIAS_CALENDARIO = "/recursos-humanos/ferias/calendario",
   RECURSOS_HUMANOS_FERIADOS_CALENDARIO = "/recursos-humanos/feriados/calendario",
 
   // Human Resources - Additional Pages

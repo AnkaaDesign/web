@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useCurrentUser } from "@/hooks/common/use-auth";
-import { useBorrows, usePpeDeliveries, useMyVacations, useActivities } from "../../hooks";
+import { useBorrows, usePpeDeliveries, useActivities } from "../../hooks";
 import { useNavigate } from "react-router-dom";
 import { routes, PPE_DELIVERY_STATUS, BORROW_STATUS, USER_STATUS_LABELS } from "../../constants";
 import { formatDate, getFileUrl } from "../../utils";
@@ -69,16 +69,6 @@ export function Personal() {
     enabled: !!user?.id,
   });
 
-  // Fetch user's vacations (uses /vacations/my-vacations endpoint)
-  const { data: vacationsData } = useMyVacations({
-    filters: {
-      take: 5,
-      orderBy: { startAt: "desc" },
-    },
-  }, {
-    enabled: !!user?.id,
-  });
-
   // Fetch user's activities
   const { data: activitiesData } = useActivities({
     where: {
@@ -110,9 +100,6 @@ export function Personal() {
 
   // Activities count
   const activitiesCount = activitiesData?.meta?.totalRecords || 0;
-
-  // Vacations count
-  const vacationsCount = vacationsData?.meta?.totalRecords || 0;
 
   // Get initials for avatar fallback
   const getInitials = (name: string) => {
@@ -388,13 +375,6 @@ export function Personal() {
                 color="purple"
               />
               <QuickAccessCard
-                title="Férias"
-                icon={Calendar}
-                onClick={() => navigate(routes.personal.myVacations.root)}
-                count={vacationsCount}
-                color="blue"
-              />
-              <QuickAccessCard
                 title="Meus EPIs"
                 icon={Shield}
                 onClick={() => navigate(routes.personal.myPpes.root)}
@@ -486,40 +466,6 @@ export function Personal() {
             </div>
           </div>
 
-          {/* Upcoming Vacations */}
-          {vacationsData?.data && vacationsData.data.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-foreground mb-4">Minhas Férias</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {vacationsData.data.slice(0, 3).map((vacation) => (
-                  <Card
-                    key={vacation.id}
-                    className="hover:shadow-sm transition-shadow cursor-pointer"
-                    onClick={() => navigate(routes.personal.myVacations.details(vacation.id))}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-500/10 dark:bg-blue-400/20 rounded-lg">
-                          <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-foreground">
-                            {formatDate(vacation.startAt)} - {formatDate(vacation.endAt)}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {vacation.type === "ANNUAL" ? "Férias Anuais" : vacation.type}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {new Date(vacation.startAt) > new Date() ? "Agendada" : "Concluída"}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
           </div>
         </div>
       </div>

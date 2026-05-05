@@ -5,7 +5,6 @@ import type {
   // Schema types (for parameters)
   UserGetManyFormData,
   BorrowGetManyFormData,
-  VacationGetManyFormData,
   WarningGetManyFormData,
   ActivityGetManyFormData,
   PpeDeliveryGetManyFormData,
@@ -14,7 +13,6 @@ import type {
   // Interface types (for responses)
   UserGetManyResponse,
   BorrowGetManyResponse,
-  VacationGetManyResponse,
   WarningGetManyResponse,
   ActivityGetManyResponse,
   PpeDeliveryGetManyResponse,
@@ -59,22 +57,6 @@ export class TeamStaffService {
    */
   async getBorrows(params?: BorrowGetManyFormData): Promise<BorrowGetManyResponse> {
     const response = await apiClient.get<BorrowGetManyResponse>(`${this.basePath}/borrows`, {
-      params,
-    });
-    return response.data;
-  }
-
-  // =====================
-  // Vacations
-  // =====================
-
-  /**
-   * Get all vacations for users in the authenticated user's led sector
-   * @param params - Query parameters (filters, includes, pagination)
-   * @returns List of vacations for team members
-   */
-  async getVacations(params?: VacationGetManyFormData): Promise<VacationGetManyResponse> {
-    const response = await apiClient.get<VacationGetManyResponse>(`${this.basePath}/vacations`, {
       params,
     });
     return response.data;
@@ -158,7 +140,6 @@ export const teamStaffService = new TeamStaffService();
 
 export const getTeamStaffUsers = (params?: UserGetManyFormData) => teamStaffService.getUsers(params);
 export const getTeamStaffBorrows = (params?: BorrowGetManyFormData) => teamStaffService.getBorrows(params);
-export const getTeamStaffVacations = (params?: VacationGetManyFormData) => teamStaffService.getVacations(params);
 export const getTeamStaffWarnings = (params?: WarningGetManyFormData) => teamStaffService.getWarnings(params);
 export const getTeamStaffActivities = (params?: ActivityGetManyFormData) => teamStaffService.getActivities(params);
 export const getTeamStaffEpis = (params?: PpeDeliveryGetManyFormData) => teamStaffService.getEpis(params);

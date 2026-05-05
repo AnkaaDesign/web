@@ -175,10 +175,12 @@ const VALID_ROUTES = [
   routes.humanResources.positions.edit(":id"),
   routes.humanResources.positions.details(":id"),
   routes.humanResources.positions.remunerations(":positionId"),
-  routes.humanResources.vacations.root,
-  routes.humanResources.vacations.create,
-  routes.humanResources.vacations.details(":id"),
-  routes.humanResources.vacations.calendar,
+  routes.humanResources.absences.root,
+  routes.humanResources.absences.create,
+  routes.humanResources.absences.details(":id"),
+  routes.humanResources.faltas.root,
+  routes.humanResources.faltas.create,
+  routes.humanResources.calendar.root,
   routes.humanResources.warnings.root,
   routes.humanResources.warnings.create,
   routes.humanResources.warnings.edit(":id"),
@@ -199,8 +201,6 @@ const VALID_ROUTES = [
   // Personal routes
   routes.personal.root,
   routes.personal.myHolidays.root,
-  routes.personal.myVacations.root,
-  routes.personal.myVacations.details(":id"),
   routes.personal.myPpes.root,
   routes.personal.myPpes.details(":id"),
   routes.personal.myPpes.request,
@@ -211,7 +211,6 @@ const VALID_ROUTES = [
 
   // My Team routes
   routes.myTeam.root,
-  routes.myTeam.vacations,
   routes.myTeam.warnings,
   routes.myTeam.loans,
 
@@ -273,7 +272,8 @@ export const ROUTE_FIXES: Record<string, string> = {
 
   // Human Resources route mappings
   "/recursos-humanos/cargos/listar": "/recursos-humanos/cargos",
-  "/recursos-humanos/ferias/listar": "/recursos-humanos/ferias",
+  "/recursos-humanos/ausencias/listar": "/recursos-humanos/ausencias",
+  "/recursos-humanos/faltas/listar": "/recursos-humanos/faltas",
   "/recursos-humanos/feriados/listar": "/recursos-humanos/feriados",
   "/recursos-humanos/feriados/detalhes/:id": "/recursos-humanos/feriados/:id",
   "/recursos-humanos/avisos/listar": "/recursos-humanos/avisos",
@@ -286,14 +286,11 @@ export const ROUTE_FIXES: Record<string, string> = {
   // Personal (Pessoal) route mappings
   "/pessoal/meus-feriados": "/pessoal/feriados",
   "/pessoal/meus-feriados/listar": "/pessoal/feriados",
-  "/pessoal/minhas-ferias": "/pessoal/ferias",
-  "/pessoal/minhas-ferias/listar": "/pessoal/ferias",
   "/pessoal/meus-epis/listar": "/pessoal/meus-epis",
   "/pessoal/meus-emprestimos/listar": "/pessoal/meus-emprestimos",
   "/pessoal/minhas-atividades/listar": "/pessoal/minhas-atividades",
 
   // My Team (Meu Pessoal) route mappings
-  "/meu-pessoal/ferias/listar": "/meu-pessoal/ferias",
   "/meu-pessoal/avisos/listar": "/meu-pessoal/avisos",
   "/meu-pessoal/emprestimos/listar": "/meu-pessoal/emprestimos",
 
@@ -350,14 +347,8 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/human-resources/employees/list": "/administracao/colaboradores",
   "/human-resources/employees/details": "/administracao/colaboradores",
   "/human-resources/employees/edit": "/administracao/colaboradores",
-  "/human-resources/vacations": "/recursos-humanos/ferias",
-  "/human-resources/vacations/create": "/recursos-humanos/ferias/cadastrar",
-  "/human-resources/vacations/request": "/recursos-humanos/ferias/cadastrar",
-  "/human-resources/vacations/list": "/recursos-humanos/ferias",
-  "/human-resources/vacations/calendar": "/recursos-humanos/ferias/calendario",
-  "/human-resources/vacations/details": "/recursos-humanos/ferias",
-  "/human-resources/vacations/[id]/approve": "/recursos-humanos/ferias",
-  "/human-resources/vacations/[id]/reject": "/recursos-humanos/ferias",
+  "/human-resources/absences": "/recursos-humanos/ausencias",
+  "/human-resources/faltas": "/recursos-humanos/faltas",
   "/producao/cronograma/aguardando": "/producao/agenda",
   "/producao/em-espera": "/producao/agenda",
   "/pintura/formulas/cadastrar": "/pintura/catalogo/cadastrar",
