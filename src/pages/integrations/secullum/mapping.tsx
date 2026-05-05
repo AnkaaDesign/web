@@ -51,6 +51,15 @@ import { useUsers } from "@/hooks/human-resources/use-user";
 const norm = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
 
+// Some hooks return the raw array, others return an axios-wrapped
+// `{ data: [...] }` envelope depending on how the endpoint is shaped on the
+// server. Normalise to an array so consumers can `.filter` / `.map` safely.
+const toArray = <T,>(v: unknown): T[] => {
+  if (Array.isArray(v)) return v as T[];
+  if (v && typeof v === "object" && Array.isArray((v as any).data)) return (v as any).data as T[];
+  return [];
+};
+
 // ============================================================================
 // Page shell
 // ============================================================================
@@ -124,8 +133,13 @@ function DepartamentoMappingCard() {
   const linkSector = useLinkSectorDepartamento();
   const setSectorHorario = useSetSectorHorario();
 
-  const sectors: SectorRow[] = ((sectorsQ.data as any)?.data ?? []) as SectorRow[];
-  const departamentos = departamentosQ.data ?? [];
+  const sectors = toArray<SectorRow>((sectorsQ.data as any)?.data ?? sectorsQ.data);
+  const departamentos = toArray<{ Id: number; Descricao: string; Nfolha?: string | null }>(
+    departamentosQ.data,
+  );
+  const horarios = toArray<{ Id: number; Numero: number; Descricao: string; Desativar?: boolean }>(
+    horariosQ.data,
+  );
 
   const groups = useMemo(() => {
     const linkedBy = new Map<number, SectorRow[]>();
@@ -192,7 +206,7 @@ function DepartamentoMappingCard() {
                 departamento={g.departamento}
                 linkedSectors={g.linked}
                 availableSectors={unmappedSectors}
-                horarios={horariosQ.data ?? []}
+                horarios={horarios}
                 isPendingLink={linkSector.isPending}
                 isPendingHorario={setSectorHorario.isPending}
                 onLink={(sectorId) =>
@@ -412,8 +426,8 @@ function FuncaoMappingCard() {
   const upsert = useUpsertSecullumFuncao();
   const linkPosition = useLinkPositionFuncao();
 
-  const positions: PositionRow[] = ((positionsQ.data as any)?.data ?? []) as PositionRow[];
-  const funcoes = funcoesQ.data ?? [];
+  const positions = toArray<PositionRow>((positionsQ.data as any)?.data ?? positionsQ.data);
+  const funcoes = toArray<{ Id: number; Descricao: string }>(funcoesQ.data);
 
   const groups = useMemo(() => {
     const linkedBy = new Map<number, PositionRow[]>();
@@ -665,9 +679,9 @@ function FuncionariosCard() {
 
   const [search, setSearch] = useState("");
 
-  const users: UserRow[] = ((usersQ.data as any)?.data ?? []) as UserRow[];
-  const ativos: FuncionarioRow[] = (ativosQ.data ?? []) as FuncionarioRow[];
-  const demitidos: FuncionarioRow[] = (demitidosQ.data ?? []) as FuncionarioRow[];
+  const users = toArray<UserRow>((usersQ.data as any)?.data ?? usersQ.data);
+  const ativos = toArray<FuncionarioRow>(ativosQ.data);
+  const demitidos = toArray<FuncionarioRow>(demitidosQ.data);
 
   const userByEmployeeId = useMemo(() => {
     const m = new Map<number, UserRow>();
