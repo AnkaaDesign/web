@@ -249,7 +249,7 @@ function DepartamentoMappingCard() {
             {unmappedSectors.map((s) => (
               <li
                 key={s.id}
-                className="flex items-center justify-between gap-3 rounded-md bg-background/50 px-3 py-2 text-sm"
+                className="flex items-center justify-between gap-3 rounded-md bg-card px-3 py-2 text-sm"
               >
                 <span className="font-medium">{s.name}</span>
                 <Button
@@ -339,10 +339,16 @@ function DepartamentoGroup({
           </p>
         )}
 
+        {(linkedSectors.length > 0 || candidateName) && (
+          <p className="px-1 text-xs text-muted-foreground">
+            Horário padrão é usado ao criar funcionários no Secullum para usuários deste setor.
+          </p>
+        )}
+
         {linkedSectors.map((s) => (
           <div
             key={s.id}
-            className="flex flex-wrap items-center gap-2 rounded-md bg-muted/50 px-3 py-2"
+            className="flex flex-wrap items-center gap-2 rounded-md bg-muted/40 px-3 py-2"
           >
             <span className="flex-1 text-sm font-medium">{s.name}</span>
             <Select
@@ -376,9 +382,10 @@ function DepartamentoGroup({
         ))}
 
         {candidateName && !linkedSectors.some((s) => s.id === candidateName.id) && (
-          <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-amber-400/60 bg-amber-50/50 px-3 py-2 dark:bg-amber-950/20">
+          <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-2">
             <span className="flex-1 text-sm">
-              Sugestão: <span className="font-medium">{candidateName.name}</span>
+              <span className="text-muted-foreground">Sugestão: </span>
+              <span className="font-medium">{candidateName.name}</span>
             </span>
             <Button
               size="sm"
@@ -387,7 +394,6 @@ function DepartamentoGroup({
               onClick={() => onLink(candidateName.id)}
             >
               <IconLink className="mr-1 h-4 w-4" /> Vincular
-            </Button>
           </div>
         )}
 
@@ -523,7 +529,7 @@ function FuncaoMappingCard() {
             {unmappedPositions.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between gap-3 rounded-md bg-background/50 px-3 py-2 text-sm"
+                className="flex items-center justify-between gap-3 rounded-md bg-card px-3 py-2 text-sm"
               >
                 <span className="font-medium">{p.name}</span>
                 <Button
@@ -602,7 +608,7 @@ function FuncaoGroup({
         {linkedPositions.map((p) => (
           <div
             key={p.id}
-            className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2"
+            className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2"
           >
             <span className="flex-1 text-sm font-medium">{p.name}</span>
             <Button
@@ -618,9 +624,10 @@ function FuncaoGroup({
         ))}
 
         {candidate && !linkedPositions.some((p) => p.id === candidate.id) && (
-          <div className="flex items-center gap-2 rounded-md border border-dashed border-amber-400/60 bg-amber-50/50 px-3 py-2 dark:bg-amber-950/20">
+          <div className="flex items-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-2">
             <span className="flex-1 text-sm">
-              Sugestão: <span className="font-medium">{candidate.name}</span>
+              <span className="text-muted-foreground">Sugestão: </span>
+              <span className="font-medium">{candidate.name}</span>
             </span>
             <Button
               size="sm"
@@ -905,11 +912,11 @@ function UnmappedPanel({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-amber-400/40 bg-amber-50/40 p-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+    <div className="rounded-md border border-border bg-muted/30 p-3">
       <div className="mb-2">
-        <div className="text-sm font-medium text-amber-900 dark:text-amber-300">{title}</div>
+        <div className="text-sm font-medium">{title}</div>
         {description ? (
-          <p className="text-xs text-amber-800/80 dark:text-amber-300/70">{description}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
         ) : null}
       </div>
       <ul className="space-y-1.5">{children}</ul>
