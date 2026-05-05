@@ -449,23 +449,28 @@ input[type="time"]::-moz-calendar-picker-indicator {
     caret-color: hsl(0 0% 96%); /* white cursor for dark mode */
   }
 
-  /* Override browser autofill colors */
+  /* Override browser autofill colors — keep background transparent so
+     filled fields blend with the surrounding card/surface instead of
+     showing a darker --input swatch. background-clip: text confines
+     Chrome's autofill paint to the glyphs, which the text-fill-color
+     then overlays, leaving the input visually transparent. */
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus,
-  input:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 30px hsl(var(--input)) inset !important;
+  input:-webkit-autofill:active,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  textarea:-webkit-autofill:active,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus,
+  select:-webkit-autofill:active {
     -webkit-text-fill-color: hsl(var(--foreground)) !important;
-    transition: background-color 5000s ease-in-out 0s;
-  }
-
-  /* Dark mode autofill override */
-  .dark input:-webkit-autofill,
-  .dark input:-webkit-autofill:hover,
-  .dark input:-webkit-autofill:focus,
-  .dark input:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 30px hsl(var(--input)) inset !important;
-    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    caret-color: hsl(var(--foreground));
+    transition: background-color 9999s ease-in-out 0s;
   }
 
   /* Switch border fix */
