@@ -129,14 +129,39 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
 
     prevStatusRef.current = status;
 
-    if (status === USER_STATUS.EFFECTED && !effectedAt) {
-      // Set effectedAt to today if transitioning to EFFECTED
-      form.setValue("effectedAt", startOfDay(new Date()), { shouldValidate: false });
+    // Clear date fields that are NOT applicable to the new status. Each
+    // status only "owns" the dates up to its tier:
+    //   EXP_PERIOD_1 → exp1Start, exp1End
+    //   EXP_PERIOD_2 → + exp2Start, exp2End
+    //   EFFECTED      → + effectedAt
+    //   DISMISSED     → + dismissedAt
+    // Anything beyond the tier is cleared so we don't carry stale values
+    // (e.g., un-dismissing into EXP_1 would otherwise keep the dismissed
+    // user's old contractedAt and exp2 dates, which the user reported).
+    const tier =
+      status === USER_STATUS.DISMISSED
+        ? 4
+        : status === USER_STATUS.EFFECTED
+          ? 3
+          : status === USER_STATUS.EXPERIENCE_PERIOD_2
+            ? 2
+            : status === USER_STATUS.EXPERIENCE_PERIOD_1
+              ? 1
+              : 0;
+
+    if (tier < 4) form.setValue("dismissedAt", null, { shouldDirty: true, shouldValidate: true });
+    if (tier < 3) form.setValue("effectedAt", null, { shouldDirty: true, shouldValidate: true });
+    if (tier < 2) {
+      form.setValue("exp2StartAt", null, { shouldDirty: true, shouldValidate: true });
+      form.setValue("exp2EndAt", null, { shouldDirty: true, shouldValidate: true });
     }
 
+    // Auto-stamp the entering tier's date if not already set.
+    if (status === USER_STATUS.EFFECTED && !form.getValues("effectedAt")) {
+      form.setValue("effectedAt", startOfDay(new Date()), { shouldValidate: false, shouldDirty: true });
+    }
     if (status === USER_STATUS.DISMISSED && !form.getValues("dismissedAt")) {
-      // Set dismissedAt to today if transitioning to DISMISSED
-      form.setValue("dismissedAt", startOfDay(new Date()), { shouldValidate: false });
+      form.setValue("dismissedAt", startOfDay(new Date()), { shouldValidate: false, shouldDirty: true });
     }
   }, [status, effectedAt, form]);
 

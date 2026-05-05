@@ -292,11 +292,31 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             }));
             await batchUpdate({ users });
           } else {
-            // Single mark as dismissed
-            await updateUser({
+            // Single mark as dismissed — surface the Secullum sync result
+            // so the operator can see whether Demissao was set on the
+            // funcionario. Same shape as the edit page.
+            const response = (await updateUser({
               id: contextMenu.users[0].id,
               data: { status: USER_STATUS.DISMISSED, dismissedAt: new Date() },
-            });
+            })) as { secullumSync?: { status: "synced" | "skipped" | "error"; reason?: string; funcionarioId?: number } };
+            const sync = response?.secullumSync;
+            if (sync) {
+              if (sync.status === "synced") {
+                toast.success(
+                  sync.reason === "demissão sincronizada"
+                    ? `Demissão sincronizada com Secullum (Funcionário #${sync.funcionarioId ?? "?"})`
+                    : `Atualização sincronizada com Secullum (Funcionário #${sync.funcionarioId ?? "?"})`,
+                );
+              } else if (sync.status === "skipped") {
+                toast.warning(
+                  `Sincronização Secullum ignorada: ${sync.reason ?? "motivo desconhecido"}`,
+                );
+              } else if (sync.status === "error") {
+                toast.error(
+                  `Falha ao sincronizar com Secullum: ${sync.reason ?? "erro desconhecido"}`,
+                );
+              }
+            }
           }
         }
         setContextMenu(null);
