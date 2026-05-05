@@ -46,15 +46,11 @@ function formatTime(time?: string): string {
 
 function formatWorkload(workload?: string): string {
   if (!workload) return "-";
-  // Workload comes as "HH:mm:ss", format as "HHh MMm"
+  // Workload comes as "HH:mm:ss" or "HH:mm" — render as HH:mm to match
+  // the entrada / saída columns (they're all clock-style values).
   const parts = workload.split(":");
   if (parts.length >= 2) {
-    const hours = parseInt(parts[0], 10);
-    const minutes = parseInt(parts[1], 10);
-    if (minutes === 0) {
-      return `${hours}h`;
-    }
-    return `${hours}h ${minutes}m`;
+    return `${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}`;
   }
   return workload;
 }
