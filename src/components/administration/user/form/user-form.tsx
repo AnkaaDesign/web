@@ -174,13 +174,24 @@ export function UserForm(props: UserFormProps) {
         if (name === "dismissedAt" && value.dismissedAt && value.status !== USER_STATUS.DISMISSED) {
           form.setValue("status", USER_STATUS.DISMISSED, { shouldDirty: true, shouldValidate: true });
         }
-        // If dismissal date is cleared and status is DISMISSED, clear status
+        // If dismissal date is cleared and status is DISMISSED, revert status
         if (name === "dismissedAt" && !value.dismissedAt && value.status === USER_STATUS.DISMISSED) {
-          // Revert to currentStatus (from defaultValues, not form state)
           const currentStatus = (defaultValues as any)?.currentStatus;
           if (currentStatus && currentStatus !== USER_STATUS.DISMISSED) {
             form.setValue("status", currentStatus, { shouldDirty: true, shouldValidate: true });
           }
+        }
+        // If status is changed AWAY from DISMISSED while a dismissedAt
+        // date is still set, clear the date. The schema's
+        // "dismissedAt → status must be DISMISSED" refine would
+        // otherwise reject the form and keep Salvar disabled.
+        if (
+          name === "status" &&
+          value.status &&
+          value.status !== USER_STATUS.DISMISSED &&
+          value.dismissedAt
+        ) {
+          form.setValue("dismissedAt", null, { shouldDirty: true, shouldValidate: true });
         }
         // If status is set to DISMISSED and no dismissal date, don't auto-set (user might want to set it manually)
       });
