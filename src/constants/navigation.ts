@@ -1504,18 +1504,11 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "integracoes-secullum",
         title: "Integração Secullum",
         icon: "users",
-        path: "/recursos-humanos/integracoes/secullum/mapeamento",
+        path: "/recursos-humanos/integracoes/secullum",
         requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-        children: [
-          {
-            id: "integracoes-secullum-mapeamento",
-            title: "Mapeamento",
-            icon: "settings",
-            path: "/recursos-humanos/integracoes/secullum/mapeamento",
-            requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-          },
-        ],
       },
+      // Note: legacy path `/recursos-humanos/integracoes/secullum/mapeamento`
+      // is still served by the same page (see routes.ts) for backwards-compat.
       {
         id: "epi-rh",
         title: "EPI",

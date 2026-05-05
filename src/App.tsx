@@ -2161,7 +2161,15 @@ function App() {
                     </Suspense>
                   }
                 />
-                {/* Secullum integration — admin mapping page */}
+                {/* Secullum integration — admin mapping page (canonical + legacy path) */}
+                <Route
+                  path={routes.humanResources.integrations.secullum.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <SecullumMappingPage />
+                    </Suspense>
+                  }
+                />
                 <Route
                   path={routes.humanResources.integrations.secullum.mapping}
                   element={
