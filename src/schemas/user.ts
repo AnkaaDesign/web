@@ -1296,23 +1296,22 @@ export const userUpdateSchema = z
       path: ["status"],
     }
   )
+  // NOTE: We intentionally allow DISMISSED → other statuses. The CLT
+  // protection is meant to enforce that a true re-hire creates a new
+  // employment record, but operators frequently dismiss by mistake and
+  // need to undo it (especially within minutes of the action). We also
+  // call isValidStatusTransition() below for the OTHER directions, but
+  // relax the rule for un-dismissal here.
   .refine(
     (data) => {
-      // DISMISSED status cannot be changed to any other status
-      if (data.currentStatus === USER_STATUS.DISMISSED && data.status && data.status !== USER_STATUS.DISMISSED) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "Colaboradores DEMITIDOS não podem ter o status alterado",
-      path: ["status"],
-    }
-  )
-  .refine(
-    (data) => {
-      // Validate status transition using helper function
-      if (data.currentStatus && data.status && data.currentStatus !== data.status) {
+      // Validate status transition using helper function — but allow
+      // DISMISSED → anything (mistake correction).
+      if (
+        data.currentStatus &&
+        data.status &&
+        data.currentStatus !== data.status &&
+        data.currentStatus !== USER_STATUS.DISMISSED
+      ) {
         return isValidStatusTransition(data.currentStatus, data.status);
       }
       return true;
