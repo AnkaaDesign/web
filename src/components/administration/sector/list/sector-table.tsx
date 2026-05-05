@@ -333,6 +333,26 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
         ),
       },
       {
+        // Secullum integration — vinculado/não vinculado at a glance
+        key: "secullumDepartamentoId",
+        header: "SECULLUM",
+        sortable: false,
+        className: "min-w-[110px]",
+        align: "center" as const,
+        accessor: (sector: Sector) =>
+          sector.secullumDepartamentoId != null ? (
+            <Badge
+              variant="default"
+              className="font-normal"
+              title={`Departamento Secullum #${sector.secullumDepartamentoId}`}
+            >
+              #{sector.secullumDepartamentoId}
+            </Badge>
+          ) : (
+            <span className="text-sm text-muted-foreground">—</span>
+          ),
+      },
+      {
         key: "_count.users",
         header: "USUÁRIOS",
         sortable: true,

@@ -13,6 +13,17 @@ export interface Sector extends BaseEntity {
   name: string;
   privileges: SECTOR_PRIVILEGES;
 
+  /**
+   * Secullum integration: Departamento.Id mapped to this Sector.
+   * Set via the Mapping admin page. NULL when unmapped.
+   */
+  secullumDepartamentoId?: number | null;
+  /**
+   * Secullum integration: default Horario.Id used when creating funcionários
+   * for users in this sector. NULL = no default (bridge uses 1 as fallback).
+   */
+  secullumHorarioId?: number | null;
+
   // Relations
   leaderId: string | null;
   users?: User[];

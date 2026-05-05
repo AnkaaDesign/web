@@ -293,6 +293,26 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
         ),
       },
       {
+        // Secullum integration — vinculado/não vinculado at a glance
+        key: "secullumFuncaoId",
+        header: "SECULLUM",
+        sortable: false,
+        className: "min-w-[110px]",
+        align: "center" as const,
+        accessor: (position: Position) =>
+          position.secullumFuncaoId != null ? (
+            <Badge
+              variant="default"
+              className="font-normal"
+              title={`Função Secullum #${position.secullumFuncaoId}`}
+            >
+              #{position.secullumFuncaoId}
+            </Badge>
+          ) : (
+            <span className="text-sm text-muted-foreground">—</span>
+          ),
+      },
+      {
         key: "remuneration",
         header: "REMUNERAÇÃO",
         sortable: true,
