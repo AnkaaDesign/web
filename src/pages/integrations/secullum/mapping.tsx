@@ -75,7 +75,6 @@ export default function SecullumMappingPage() {
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Integração Secullum"
-          subtitle="Vincule setores e cargos do Ankaa aos departamentos e funções do Secullum. Cada departamento/função pode ter múltiplos setores/cargos."
           icon={IconUsers}
           breadcrumbs={[
             { label: "Início", href: routes.home },
@@ -394,6 +393,7 @@ function DepartamentoGroup({
               onClick={() => onLink(candidateName.id)}
             >
               <IconLink className="mr-1 h-4 w-4" /> Vincular
+            </Button>
           </div>
         )}
 
