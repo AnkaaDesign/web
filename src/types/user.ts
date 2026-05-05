@@ -272,7 +272,18 @@ export interface UserCreateResponse extends BaseCreateResponse<User> {
     funcionarioId?: number;
   };
 }
-export interface UserUpdateResponse extends BaseUpdateResponse<User> {}
+export interface UserUpdateResponse extends BaseUpdateResponse<User> {
+  /**
+   * Result of the Secullum sync attempt. Present whenever the user being
+   * updated has `secullumSyncEnabled=true`. Used to toast dismissal /
+   * profile-edit propagation outcomes.
+   */
+  secullumSync?: {
+    status: "synced" | "skipped" | "error";
+    reason?: string;
+    funcionarioId?: number;
+  };
+}
 export interface UserDeleteResponse extends BaseDeleteResponse {}
 export interface UserMergeResponse extends BaseMergeResponse<User> {}
 

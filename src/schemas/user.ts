@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, orderByWithNullsSchema, normalizeOrderBy, emailSchema, phoneSchema, cpfSchema, pisSchema, createNameSchema, nullableDate } from "./common";
+import { cleanCPF } from "../utils/cleaners";
+import { isValidCPF } from "../utils/validators";
 import type { User } from '@types';
 import { USER_STATUS, VERIFICATION_TYPE, SECTOR_PRIVILEGES } from '@constants';
 
@@ -1028,7 +1030,17 @@ export const userCreateSchema = z
     phone: phoneSchema.nullable().optional(),
     positionId: z.string().uuid("Cargo inválido").nullable().optional(),
     pis: pisSchema.nullable().optional(),
-    cpf: cpfSchema.nullable().optional(),
+    // CPF — required at create time. Secullum requires it for funcionario
+    // creation and Brazilian payroll mandates it. The userUpdateSchema keeps
+    // it nullable.optional so legacy rows aren't blocked.
+    cpf: z
+      .string({
+        required_error: "CPF é obrigatório",
+        invalid_type_error: "CPF é obrigatório",
+      })
+      .min(1, "CPF é obrigatório")
+      .transform(cleanCPF)
+      .refine(isValidCPF, { message: "CPF inválido" }),
     verified: z.boolean().default(false),
     isActive: z.boolean().default(true),
     performanceLevel: z.number().int().min(0).max(5).default(0),

@@ -19,7 +19,7 @@ export function PayrollNumberInput({ disabled }: PayrollNumberInputProps) {
         <FormItem>
           <FormLabel className="flex items-center gap-2">
             <IconHash className="h-4 w-4 text-muted-foreground" />
-            Número da Folha de Pagamento
+            Número da Folha
             <span className="text-destructive ml-0.5">*</span>
           </FormLabel>
           <FormControl>

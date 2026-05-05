@@ -20,6 +20,7 @@ export function CPFInput({ disabled }: CPFInputProps) {
           <FormLabel className="flex items-center gap-2">
             <IconId className="h-4 w-4 text-muted-foreground" />
             CPF
+            <span className="text-destructive ml-0.5">*</span>
           </FormLabel>
           <FormControl>
             <CPFInputComponent

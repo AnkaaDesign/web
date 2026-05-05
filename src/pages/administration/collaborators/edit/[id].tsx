@@ -6,7 +6,9 @@ import { UserForm } from "@/components/administration/user/form/user-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { IconUsers, IconCheck, IconLoader2 } from "@tabler/icons-react";
+import { toast } from "@/components/ui/sonner";
 import type { UserUpdateFormData } from "../../../../schemas";
+import type { UserUpdateResponse } from "../../../../types";
 
 const EditCollaboratorPage = () => {
   const navigate = useNavigate();
@@ -56,7 +58,34 @@ const EditCollaboratorPage = () => {
             return rest;
           })() as Omit<UserUpdateFormData, 'currentStatus'>;
 
-      const response = await update({ id, data: dataToSend as any });
+      const response = (await update({ id, data: dataToSend as any })) as UserUpdateResponse;
+
+      // Surface the Secullum sync outcome (only present when the user
+      // had `secullumSyncEnabled = true` at the moment of the update).
+      // Particularly important on dismissal so the operator knows whether
+      // Demissao was set on the Secullum funcionario.
+      const sync = response?.secullumSync;
+      if (sync) {
+        if (sync.status === "synced") {
+          if (sync.reason === "demissão sincronizada") {
+            toast.success(
+              `Demissão sincronizada com Secullum (Funcionário #${sync.funcionarioId ?? "?"})`,
+            );
+          } else {
+            toast.success(
+              `Atualização sincronizada com Secullum (Funcionário #${sync.funcionarioId ?? "?"})`,
+            );
+          }
+        } else if (sync.status === "skipped") {
+          toast.warning(
+            `Sincronização Secullum ignorada: ${sync.reason ?? "motivo desconhecido"}`,
+          );
+        } else if (sync.status === "error") {
+          toast.error(
+            `Falha ao sincronizar com Secullum: ${sync.reason ?? "erro desconhecido"}`,
+          );
+        }
+      }
 
       if (response.success) {
         navigate(routes.administration.collaborators.details(id));

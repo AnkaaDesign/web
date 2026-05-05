@@ -8,13 +8,7 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSecullumHorarios } from "@/hooks/integrations/use-secullum-mapping";
 import { useSector } from "@/hooks";
@@ -87,31 +81,29 @@ export function HorarioSelector({ disabled }: { disabled?: boolean }) {
             <Skeleton className="h-10 w-full" />
           ) : (
             <FormControl>
-              <Select
+              <Combobox
+                mode="single"
+                options={toHorarioArray(horariosQ.data)
+                  .filter((h) => !h.Desativar)
+                  .map((h) => {
+                    const base = h.Numero
+                      ? `#${h.Numero} — ${h.Descricao}`
+                      : h.Descricao;
+                    return {
+                      value: String(h.Id),
+                      label: h.Tipo ? `${base} (${h.Tipo})` : base,
+                    };
+                  })}
                 value={field.value != null ? String(field.value) : ""}
                 onValueChange={(v) =>
-                  field.onChange(v === "" ? null : Number(v))
+                  field.onChange(typeof v === "string" && v ? Number(v) : null)
                 }
+                placeholder="Selecione um horário Secullum"
+                searchPlaceholder="Buscar horário…"
+                emptyText="Nenhum horário disponível"
                 disabled={disabled}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um horário Secullum" />
-                </SelectTrigger>
-                <SelectContent>
-                  {toHorarioArray(horariosQ.data)
-                    .filter((h) => !h.Desativar)
-                    .map((h) => {
-                      const label = h.Numero
-                        ? `#${h.Numero} — ${h.Descricao}`
-                        : h.Descricao;
-                      return (
-                        <SelectItem key={h.Id} value={String(h.Id)}>
-                          {h.Tipo ? `${label} (${h.Tipo})` : label}
-                        </SelectItem>
-                      );
-                    })}
-                </SelectContent>
-              </Select>
+                clearable
+              />
             </FormControl>
           )}
           <FormDescription className="text-xs">
