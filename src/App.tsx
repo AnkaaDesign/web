@@ -313,6 +313,8 @@ const HumanResourcesPositionsEdit = lazy(() => import("@/pages/human-resources/p
 const HumanResourcesPositionsDetails = lazy(() => import("@/pages/human-resources/positions/details/[id]").then((module) => ({ default: module.PositionDetailPage })));
 const HumanResourcesPositionsHierarchy = lazy(() => import("@/pages/human-resources/positions/hierarchy").then((module) => ({ default: module.PositionHierarchyPage })));
 const HumanResourcesPositionsBatchEdit = lazy(() => import("@/pages/human-resources/positions/batch-edit").then((module) => ({ default: module.PositionBatchEditPage })));
+// Secullum integration mapping page (admin)
+const SecullumMappingPage = lazy(() => import("@/pages/integrations/secullum/mapping").then((module) => ({ default: module.default })));
 // Note: Employees pages are managed under Administration section, not Human Resources
 const HumanResourcesPpe = lazy(() => import("@/pages/human-resources/ppe/list").then((module) => ({ default: module.PpeListPage })));
 const HumanResourcesPpeCreate = lazy(() => import("@/pages/human-resources/ppe/create").then((module) => ({ default: module.CreateEpiPage })));
@@ -2156,6 +2158,15 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPositionsBatchEdit />
+                    </Suspense>
+                  }
+                />
+                {/* Secullum integration — admin mapping page */}
+                <Route
+                  path={routes.humanResources.integrations.secullum.mapping}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <SecullumMappingPage />
                     </Suspense>
                   }
                 />

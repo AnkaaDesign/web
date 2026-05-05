@@ -1499,6 +1499,24 @@ export const NAVIGATION_MENU: MenuItem[] = [
       },
       { id: "controle-ponto", title: "Controle de Ponto", icon: "fingerprint", path: "/recursos-humanos/controle-ponto" },
       {
+        // Secullum integration — admin tool for mapping sectors↔departamentos
+        // and positions↔funções, plus an overview of active/dismissed funcionários.
+        id: "integracoes-secullum",
+        title: "Integração Secullum",
+        icon: "users",
+        path: "/recursos-humanos/integracoes/secullum/mapeamento",
+        requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          {
+            id: "integracoes-secullum-mapeamento",
+            title: "Mapeamento",
+            icon: "settings",
+            path: "/recursos-humanos/integracoes/secullum/mapeamento",
+            requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+          },
+        ],
+      },
+      {
         id: "epi-rh",
         title: "EPI",
         icon: "helmet",

@@ -24,6 +24,12 @@ export interface Position extends BaseEntity {
   hierarchy: number | null;
   bonifiable: boolean;
 
+  /**
+   * Secullum integration: Funcao.Id mapped to this Position.
+   * Set via the Mapping admin page. NULL when unmapped.
+   */
+  secullumFuncaoId?: number | null;
+
   // Relations (optional, populated based on query)
   users?: User[];
   monetaryValues?: MonetaryValue[];

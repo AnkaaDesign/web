@@ -14,6 +14,8 @@ import { BirthDateInput } from "./birth-date-input";
 import { PositionSelector } from "./position-selector";
 import { SectorSelector } from "./sector-selector";
 import { SectorLeaderSwitch } from "./sector-leader-switch";
+import { SecullumSyncSwitch } from "./secullum-sync-switch";
+import { HorarioSelector } from "./horario-selector";
 import { UserStatusSelector } from "./status-selector";
 import { VerifiedSwitch } from "./verified-switch";
 import { ActiveSwitch } from "./active-switch";
@@ -406,6 +408,18 @@ export function UserForm(props: UserFormProps) {
               </div>
 
               <SectorLeaderSwitch disabled={isSubmitting} sectorPrivilege={sectorPrivilege} />
+
+              {/* Secullum integration toggle — provisions/syncs the funcionário */}
+              <SecullumSyncSwitch
+                disabled={isSubmitting}
+                alreadyLinkedSecullumId={
+                  (form.getValues() as { secullumEmployeeId?: number | null })
+                    .secullumEmployeeId ?? null
+                }
+              />
+
+              {/* Secullum Horário picker — only shows when sync switch is ON */}
+              <HorarioSelector disabled={isSubmitting} />
             </CardContent>
           </Card>
 

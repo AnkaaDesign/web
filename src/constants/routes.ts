@@ -146,6 +146,15 @@ export const routes = {
       list: "/recursos-humanos/horarios",
       details: (id: string) => `/recursos-humanos/horarios/detalhes/${id}`,
     },
+    integrations: {
+      // Secullum Ponto Web integration. Drives the user-form
+      // "Criar / sincronizar no Secullum" toggle and the bridge
+      // service in apps/api/src/modules/integrations/secullum.
+      secullum: {
+        root: "/recursos-humanos/integracoes/secullum",
+        mapping: "/recursos-humanos/integracoes/secullum/mapeamento",
+      },
+    },
     positions: {
       batchEdit: "/recursos-humanos/cargos/editar-em-lote",
       create: "/recursos-humanos/cargos/cadastrar",
