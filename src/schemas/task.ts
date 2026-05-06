@@ -104,7 +104,6 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
                 borrows: z.boolean().optional(),
                 notifications: z.boolean().optional(),
                 tasks: z.boolean().optional(),
-                vacations: z.boolean().optional(),
               })
               .optional(),
           }),

@@ -327,7 +327,6 @@ const HumanResourcesPpeSchedules = lazy(() => import("@/pages/human-resources/pp
 const HumanResourcesPpeSchedulesCreate = lazy(() => import("@/pages/human-resources/ppe/schedules/create").then((module) => ({ default: module.PPEScheduleCreatePage })));
 const HumanResourcesPpeSchedulesEdit = lazy(() => import("@/pages/human-resources/ppe/schedules/edit/[id]").then((module) => ({ default: module.PPEScheduleEditPage })));
 const HumanResourcesPpeSchedulesDetails = lazy(() => import("@/pages/human-resources/ppe/schedules/details/[id]").then((module) => ({ default: module.PPEScheduleDetailsPage })));
-const HumanResourcesCalculations = lazy(() => import("@/pages/human-resources/calculations/list").then((module) => ({ default: module.default })));
 const HumanResourcesRequisitions = lazy(() => import("@/pages/human-resources/requisitions/list").then((module) => ({ default: module.default })));
 const HumanResourcesHolidays = lazy(() => import("@/pages/human-resources/holidays/list").then((module) => ({ default: module.HolidayListPage })));
 const HumanResourcesHolidaysCalendar = lazy(() => import("@/pages/human-resources/holidays/calendar").then((module) => ({ default: module.HolidayCalendarPage })));
@@ -2254,12 +2253,13 @@ function App() {
                     </Suspense>
                   }
                 />
+                {/* Legacy URL — the unified Controle de Ponto page lives at
+                    /recursos-humanos/controle-ponto with `?view=` query
+                    param selecting the mode (colaborador-unico is default). */}
                 <Route
                   path={routes.humanResources.calculations.root}
                   element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesCalculations />
-                    </Suspense>
+                    <Navigate to={routes.humanResources.timeClock.list} replace />
                   }
                 />
                 <Route

@@ -145,18 +145,6 @@ export const userIncludeSchema = z
         }),
       ])
       .optional(),
-    vacations: z
-      .union([
-        z.boolean(),
-        z.object({
-          include: z
-            .object({
-              user: z.boolean().optional(),
-            })
-            .optional(),
-        }),
-      ])
-      .optional(),
     commissions: z
       .union([
         z.boolean(),
@@ -688,14 +676,6 @@ export const userWhereSchema: z.ZodSchema = z.lazy(() =>
         })
         .optional(),
 
-      vacations: z
-        .object({
-          some: z.any().optional(),
-          every: z.any().optional(),
-          none: z.any().optional(),
-        })
-        .optional(),
-
       commissions: z
         .object({
           some: z.any().optional(),
@@ -724,7 +704,6 @@ const userFilters = {
   hasPpeSize: z.boolean().optional(),
   hasActivities: z.boolean().optional(),
   hasTasks: z.boolean().optional(),
-  hasVacations: z.boolean().optional(),
   showDismissed: z.boolean().optional(),
   performanceLevelRange: z
     .object({
@@ -875,16 +854,6 @@ const userTransform = (data: any) => {
       andConditions.push({ createdTasks: { none: {} } });
     }
     delete data.hasTasks;
-  }
-
-  // Handle hasVacations filter
-  if (typeof data.hasVacations === "boolean") {
-    if (data.hasVacations) {
-      andConditions.push({ vacations: { some: {} } });
-    } else {
-      andConditions.push({ vacations: { none: {} } });
-    }
-    delete data.hasVacations;
   }
 
   // Handle performanceLevelRange filter

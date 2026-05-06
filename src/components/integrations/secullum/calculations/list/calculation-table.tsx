@@ -1,6 +1,5 @@
 import React, { useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import { IconChevronUp, IconChevronDown, IconSelector, IconPackage } from "@tabler/icons-react";
 import { CalculationListSkeleton } from "./calculation-list-skeleton";
 import { cn } from "@/lib/utils";
@@ -63,19 +62,13 @@ export function CalculationTable({
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
 
-  // Use URL state management for selection and sorting only (no pagination)
+  // Sorting only — selection columns/UI removed per product decision; the
+  // useTableState selection helpers are no longer wired into this table.
   const {
-    selectedIds,
     sortConfigs,
-    showSelectedOnly,
-    toggleSelectAll,
     toggleSort,
     getSortDirection,
     getSortOrder,
-    isSelected,
-    isAllSelected,
-    isPartiallySelected,
-    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 999999, // Effectively disable pagination
     resetSelectionOnPageChange: false,
@@ -123,35 +116,13 @@ export function CalculationTable({
       });
     }
 
-    // Filter for selected only if needed
-    if (showSelectedOnly && selectedIds.length > 0) {
-      processedData = processedData.filter(item => selectedIds.includes(item.id));
-    }
-
     return {
       items: processedData,
       totalRecords: processedData.length,
     };
-  }, [data, sortConfigs, showSelectedOnly, selectedIds]);
+  }, [data, sortConfigs]);
 
   const { items } = sortedData;
-
-  // Get current page item IDs for selection
-  const currentPageItemIds = React.useMemo(() => {
-    return items.map((item) => item.id);
-  }, [items]);
-
-  // Selection handlers
-  const allSelected = isAllSelected(currentPageItemIds);
-  const partiallySelected = isPartiallySelected(currentPageItemIds);
-
-  const handleSelectAll = () => {
-    toggleSelectAll(currentPageItemIds);
-  };
-
-  const handleSelectItem = (itemId: string, event?: React.MouseEvent) => {
-    handleRowClickSelection(itemId, currentPageItemIds, event?.shiftKey || false);
-  };
 
   const renderSortIndicator = (columnKey: string) => {
     const sortDirection = getSortDirection(columnKey);
@@ -179,23 +150,10 @@ export function CalculationTable({
       <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden flex-shrink-0">
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
-            <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-semibold text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={partiallySelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all items"
-                    disabled={isLoading || items.length === 0}
-                  />
-                </div>
-              </TableHead>
-
+            <TableRow className="bg-muted hover:bg-muted even:bg-muted h-12">
               {/* Data columns */}
               {columns.map((column) => (
-                <TableHead key={column.key} className={cn("whitespace-nowrap text-foreground font-semibold text-xs p-0 bg-muted !border-r-0", column.className)}>
+                <TableHead key={column.key} className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0", column.className)}>
                   {column.sortable ? (
                     <button
                       onClick={() => toggleSort(column.key)}
@@ -240,7 +198,7 @@ export function CalculationTable({
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length + 1} className="p-0">
+                <TableCell colSpan={columns.length} className="p-0">
                   <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
                     <IconPackage className="h-12 w-12 text-muted-foreground/50 mb-4" />
                     <div className="text-lg font-medium mb-2">Nenhum registro encontrado</div>
@@ -250,59 +208,35 @@ export function CalculationTable({
               </TableRow>
             ) : (
               <>
-                {items.map((item, index) => {
-                  const itemIsSelected = isSelected(item.id);
-
-                  return (
-                    <TableRow
-                      key={item.id}
-                      data-state={itemIsSelected ? "selected" : undefined}
-                      className={cn(
-                        "cursor-pointer transition-colors border-b border-border",
-                        // Alternating row colors
-                        index % 2 === 1 && "bg-muted/10",
-                        // Hover state that works with alternating colors
-                        "hover:bg-muted/20",
-                        // Selected state overrides alternating colors
-                        itemIsSelected && "bg-muted/30 hover:bg-muted/40",
-                      )}
-                    >
-                      {/* Selection checkbox */}
-                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectItem(item.id, e);
-                        }}>
-                          <Checkbox
-                            checked={itemIsSelected}
-                            onCheckedChange={() => handleSelectItem(item.id)}
-                            aria-label={`Select ${item.date}`}
-                            data-checkbox
-                          />
-                        </div>
+                {items.map((item, index) => (
+                  <TableRow
+                    key={item.id}
+                    className={cn(
+                      "transition-colors border-b border-border h-12",
+                      // Alternating row colors
+                      index % 2 === 1 && "bg-muted/10",
+                      // Hover state that works with alternating colors
+                      "hover:bg-muted/20",
+                    )}
+                  >
+                    {/* Data columns */}
+                    {columns.map((column) => (
+                      <TableCell
+                        key={column.key}
+                        className={cn(
+                          column.className,
+                          "p-0 !border-r-0",
+                          column.align === "center" && "text-center",
+                          column.align === "right" && "text-right",
+                          column.align === "left" && "text-left",
+                          !column.align && "text-left",
+                        )}
+                      >
+                        <div className="px-4 py-2">{column.accessor(item)}</div>
                       </TableCell>
-
-                      {/* Data columns */}
-                      {columns.map((column) => (
-                        <TableCell
-                          key={column.key}
-                          className={cn(
-                            column.className,
-                            "p-0 !border-r-0",
-                            column.align === "center" && "text-center",
-                            column.align === "right" && "text-right",
-                            column.align === "left" && "text-left",
-                            !column.align && "text-left",
-                          )}
-                        >
-                          <div className="px-4 py-2">{column.accessor(item)}</div>
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  );
-                })}
-
-                {/* Regular rows - remove totals from here */}
+                    ))}
+                  </TableRow>
+                ))}
               </>
             )}
           </TableBody>
@@ -314,15 +248,10 @@ export function CalculationTable({
         <div className="border-l border-r border-b border-border rounded-b-lg overflow-hidden flex-shrink-0 bg-muted">
           <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
             <TableBody>
-              <TableRow className="hover:bg-muted bg-muted">
-                {/* Totais label aligned with checkbox column */}
-                <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0 bg-muted font-bold")}>
-                  <div className="flex items-center justify-center h-full w-full px-4 py-3">
-                    <span className="text-sm font-bold uppercase ml-6">TOTAIS</span>
-                  </div>
-                </TableCell>
-
-                {/* Data columns with totals */}
+              <TableRow className="hover:bg-muted bg-muted h-12">
+                {/* Data columns with totals — TOTAIS label lives in the date column
+                    (replacing what would otherwise be the date string) since the
+                    selection-checkbox column was removed. */}
                 {columns.map((column) => (
                   <TableCell
                     key={column.key}
@@ -335,9 +264,9 @@ export function CalculationTable({
                       !column.align && "text-left",
                     )}
                   >
-                    <div className="px-4 py-3">
+                    <div className="px-4 py-2">
                       {column.key === 'date' ? (
-                        '' // Empty for date column since TOTAIS is in checkbox column
+                        <span className="text-sm font-bold uppercase">TOTAIS</span>
                       ) : (
                         column.accessor(totalsRow)
                       )}

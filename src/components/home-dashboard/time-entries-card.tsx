@@ -62,7 +62,11 @@ function parseSecullumResponse(data: any): ParsedEntry[] {
   }));
 }
 
-export function TimeEntriesCard() {
+interface TimeEntriesCardProps {
+  embedded?: boolean;
+}
+
+export function TimeEntriesCard({ embedded }: TimeEntriesCardProps = {}) {
   const weekRange = useMemo(() => getWeekRange(), []);
   const { data, isLoading, isError } = useMySecullumCalculations({
     startDate: weekRange.startDate,
@@ -80,6 +84,7 @@ export function TimeEntriesCard() {
         viewAllLink="/pessoal/meus-pontos"
         emptyMessage="Sem cadastro no sistema de ponto"
         isEmpty
+        embedded={embedded}
       />
     );
   }
@@ -92,6 +97,7 @@ export function TimeEntriesCard() {
         viewAllLink="/pessoal/meus-pontos"
         emptyMessage="Sem dados de ponto disponíveis"
         isEmpty
+        embedded={embedded}
       />
     );
   }
@@ -104,6 +110,7 @@ export function TimeEntriesCard() {
         viewAllLink="/pessoal/meus-pontos"
         emptyMessage=""
         isEmpty={false}
+        embedded={embedded}
       >
         <div className="px-4 py-6 text-center">
           <span className="text-sm text-muted-foreground">Carregando...</span>
@@ -118,6 +125,7 @@ export function TimeEntriesCard() {
       icon={<IconClock className="h-4 w-4 text-teal-500" />}
       emptyMessage="Sem registros de ponto esta semana"
       isEmpty={entries.length === 0}
+      embedded={embedded}
       footer={
         <DashboardPagination
           totalItems={entries.length}

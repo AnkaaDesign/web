@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -8,9 +8,24 @@ import { Input } from "@/components/ui/input";
 import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
 import { getHeaderText } from "@/components/ui/column-visibility-utils";
 
-// Function to get default visible columns for calculations
+// Default visible columns for the Calculations (Visualização Colaborador)
+// table. Other consumers (e.g. Visualização Dia) pass their own set via the
+// `defaultVisibleColumns` prop on ColumnVisibilityManager — keep this as the
+// fallback so existing call sites that omit the prop don't break.
 export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["date", "entrada1", "saida1", "entrada2", "saida2", "normais", "ex50", "ex100", "dsr", "ajuste"]);
+  return new Set([
+    "date",
+    "entrada1",
+    "saida1",
+    "entrada2",
+    "saida2",
+    "normais",
+    "faltas",
+    "ex50",
+    "ex100",
+    "dsr",
+    "ajuste",
+  ]);
 }
 
 export interface ColumnDef {
@@ -22,12 +37,27 @@ interface ColumnVisibilityManagerProps {
   columns: ColumnDef[];
   visibleColumns: Set<string>;
   onVisibilityChange: (columns: Set<string>) => void;
+  // Per-consumer defaults for "Restaurar". Falls back to calc-list defaults.
+  defaultVisibleColumns?: Set<string>;
 }
 
-export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityChange }: ColumnVisibilityManagerProps) {
+export function ColumnVisibilityManager({
+  columns,
+  visibleColumns,
+  onVisibilityChange,
+  defaultVisibleColumns,
+}: ColumnVisibilityManagerProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [localVisible, setLocalVisible] = useState(visibleColumns);
+
+  // Sync the popover's draft state when the parent's visibleColumns prop
+  // changes (e.g. after another component resets it, or on first render when
+  // the persisted Set arrives async). Without this, the popover's first open
+  // shows the stale initial value.
+  useEffect(() => {
+    setLocalVisible(visibleColumns);
+  }, [visibleColumns]);
 
   const filteredColumns = useMemo(() => {
     if (!searchQuery) return columns;
@@ -54,7 +84,7 @@ export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityC
   };
 
   const handleReset = () => {
-    setLocalVisible(getDefaultVisibleColumns());
+    setLocalVisible(defaultVisibleColumns ?? getDefaultVisibleColumns());
   };
 
   const handleApply = () => {

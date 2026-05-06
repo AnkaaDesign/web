@@ -134,9 +134,32 @@ function MessagePreviewCard({
 interface RecentMessagesListProps {
   messages: HomeDashboardMessage[];
   unreadCount?: number;
+  /**
+   * When true, omit the outer heading and let the grid fill available height.
+   * Used when rendering inside a dashboard widget that supplies its own header.
+   */
+  embedded?: boolean;
+  /**
+   * In embedded mode, override the responsive column count with a fixed
+   * number of columns. Lets dashboard widgets expose a user-controlled
+   * "messages per row" config.
+   */
+  columns?: number;
+  /**
+   * In embedded mode, lock visible rows to this number (cards split the
+   * widget body height equally). Items beyond columns*rows scroll-overflow.
+   */
+  rows?: number;
 }
 
-export function RecentMessagesList({ messages }: RecentMessagesListProps) {
+const GRID_GAP_PX = 12; // gap-3
+
+export function RecentMessagesList({
+  messages,
+  embedded,
+  columns,
+  rows,
+}: RecentMessagesListProps) {
   const [selectedMessage, setSelectedMessage] = useState<HomeDashboardMessage | null>(null);
   const { mutate: markAsViewed } = useMarkAsViewed();
 
@@ -150,23 +173,67 @@ export function RecentMessagesList({ messages }: RecentMessagesListProps) {
     [markAsViewed],
   );
 
-  return (
+  const usingFixedColumns = embedded && typeof columns === "number" && columns > 0;
+  const usingFixedRows = embedded && typeof rows === "number" && rows > 0;
+  const fixedCols = Math.max(1, Math.min(10, columns ?? 4));
+  const fixedRows = Math.max(1, Math.min(6, rows ?? 2));
+  const rowHeight = usingFixedRows
+    ? `calc((100% - ${(fixedRows - 1) * GRID_GAP_PX}px) / ${fixedRows})`
+    : undefined;
+  const gridStyle: React.CSSProperties | undefined = usingFixedColumns
+    ? {
+        gridTemplateColumns: `repeat(${fixedCols}, minmax(0, 1fr))`,
+        ...(usingFixedRows
+          ? {
+              gridTemplateRows: `repeat(${fixedRows}, ${rowHeight})`,
+              gridAutoRows: rowHeight,
+            }
+          : {}),
+      }
+    : embedded
+    ? undefined
+    : { height: 220 };
+  const grid = (
+    <div
+      className={cn(
+        "grid gap-3",
+        usingFixedColumns ? "" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
+        embedded ? "flex-1 min-h-0 p-3" : "",
+        usingFixedRows ? "h-full" : "",
+      )}
+      style={gridStyle}
+    >
+      {messages.map((message) => (
+        <MessagePreviewCard
+          key={message.id}
+          message={message}
+          onClick={() => handleMessageClick(message)}
+        />
+      ))}
+    </div>
+  );
+
+  return embedded ? (
+    <>
+      {grid}
+      {selectedMessage && (
+        <MessageModal
+          open={!!selectedMessage}
+          onOpenChange={(open) => !open && setSelectedMessage(null)}
+          messages={[selectedMessage as any]}
+          currentIndex={0}
+          onClose={() => setSelectedMessage(null)}
+        />
+      )}
+    </>
+  ) : (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <IconMessage className="h-4 w-4 text-indigo-500" />
         <h3 className="text-base font-semibold text-secondary-foreground">Mensagens Recentes</h3>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3" style={{ height: 220 }}>
-        {messages.map((message) => (
-          <MessagePreviewCard
-            key={message.id}
-            message={message}
-            onClick={() => handleMessageClick(message)}
-          />
-        ))}
-      </div>
+      {grid}
 
-      {/* Message Modal */}
       {selectedMessage && (
         <MessageModal
           open={!!selectedMessage}

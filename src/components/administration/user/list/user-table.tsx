@@ -84,7 +84,6 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
       _count: {
         select: {
           createdTasks: true,
-          vacations: true,
         },
       },
     }),

@@ -10,6 +10,18 @@ interface DashboardCardListProps {
   children?: ReactNode;
   isEmpty?: boolean;
   footer?: ReactNode;
+  /**
+   * When true, the card body fills available vertical space instead of using
+   * a fixed 284px height. Use this when rendering inside a flex parent (e.g.
+   * a dashboard widget tile) that controls the height itself.
+   */
+  fillHeight?: boolean;
+  /**
+   * When true, render only the scrollable body + footer — no outer card
+   * chrome, no heading. The parent (typically a dashboard WidgetCard) supplies
+   * the border and header.
+   */
+  embedded?: boolean;
 }
 
 export function DashboardCardList({
@@ -20,11 +32,27 @@ export function DashboardCardList({
   children,
   isEmpty,
   footer,
+  fillHeight,
+  embedded,
 }: DashboardCardListProps) {
+  if (embedded) {
+    return (
+      <div className="flex flex-col h-full min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {isEmpty ? (
+            <p className="text-muted-foreground text-sm py-6 text-center">{emptyMessage}</p>
+          ) : (
+            children
+          )}
+        </div>
+        {footer}
+      </div>
+    );
+  }
   return (
-    <div className="space-y-2">
+    <div className={fillHeight ? "flex flex-col h-full min-h-0 space-y-2" : "space-y-2"}>
       {/* Section header — outside the card */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           {icon}
           <h3 className="text-base font-semibold text-secondary-foreground">{title}</h3>
@@ -35,9 +63,15 @@ export function DashboardCardList({
           </Link>
         )}
       </div>
-      {/* Card body — fixed height for 7 rows */}
-      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-        <div className="h-[284px] overflow-y-auto">
+      {/* Card body — fixed 284px by default, fills available height when fillHeight */}
+      <div
+        className={
+          fillHeight
+            ? "bg-card border border-border rounded-lg shadow-sm overflow-hidden flex flex-col flex-1 min-h-0"
+            : "bg-card border border-border rounded-lg shadow-sm overflow-hidden"
+        }
+      >
+        <div className={fillHeight ? "flex-1 min-h-0 overflow-y-auto" : "h-[284px] overflow-y-auto"}>
           {isEmpty ? (
             <p className="text-muted-foreground text-sm py-6 text-center">{emptyMessage}</p>
           ) : (

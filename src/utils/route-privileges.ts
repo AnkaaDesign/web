@@ -191,6 +191,10 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/recursos-humanos/setores/cadastrar": "ADMIN", // Department creation requires admin
   "/recursos-humanos/cargos": "HUMAN_RESOURCES",
   "/recursos-humanos/cargos/cadastrar": "ADMIN", // Position creation requires admin
+  // Unified Controle de Ponto (3 view modes: colaborador-unico, multiplos-colaboradores, edit).
+  // Read access matches the previous /recursos-humanos/calculos surface; the
+  // edit tab is gated client-side to HR + ADMIN.
+  "/recursos-humanos/controle-ponto": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL"],
   "/recursos-humanos/ausencias": "HUMAN_RESOURCES",
   "/recursos-humanos/faltas": "HUMAN_RESOURCES",
   "/recursos-humanos/calendario": "HUMAN_RESOURCES",

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   format,
   eachDayOfInterval,
@@ -29,21 +29,23 @@ import {
 } from "../../../../constants";
 
 // Category-level color tokens. The cell bars and the summary stat tiles share
-// these so the visual story is consistent: violet = ausência (planejada),
-// orange = falta justificada (atestado, esquecimento, óbito, etc.),
-// red = falta não justificada (synthetic from Cálculos de Ponto, Id < 0),
-// amber = feriado.
+// these so the visual story is consistent. Hues are spaced around the wheel
+// so the four categories never bleed together visually:
+//   violet = ausência (planejada)
+//   amber  = falta justificada (atestado, esquecimento, óbito, etc.) — soft warning
+//   red    = falta não justificada (Cálculos de Ponto, Id < 0) — escalated, alarming
+//   sky    = feriado (cool, off the warm spectrum entirely)
 const CATEGORY_BAR_CLASSES = {
   AUSENCIA:
     "bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-500/20",
   FALTA_JUSTIFIED:
-    "bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/20",
+    "bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30",
   FALTA_UNJUSTIFIED:
-    "bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/20",
+    "bg-red-600/25 text-red-800 dark:text-red-200 border border-red-600/50 font-semibold",
 } as const;
 type BarCategory = keyof typeof CATEGORY_BAR_CLASSES;
 const HOLIDAY_BAR_CLASS =
-  "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/20";
+  "bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/20";
 import type { SecullumAggregatedAbsence } from "../../../../types";
 import {
   useSecullumAggregatedAbsences,
@@ -256,7 +258,7 @@ export function AbsencesCalendar() {
     }
     // Person-day counters: for every absence record, count how many work days
     // it overlaps in the period and add them to the running total. Faltas are
-    // split into "justificadas" (orange — atestado, esquecimento, etc.) and
+    // split into "justificadas" (amber — atestado, esquecimento, etc.) and
     // "não justificadas" (red — synthetic from Cálculos de Ponto with Id < 0)
     // so each summary tile reflects only its own subset.
     const usersOnVacation = new Set<string>();
@@ -303,6 +305,33 @@ export function AbsencesCalendar() {
     setRefMonth(viewMode === "year" ? subYears(refMonth, 1) : subMonths(refMonth, 1));
   const goNext = () =>
     setRefMonth(viewMode === "year" ? addYears(refMonth, 1) : addMonths(refMonth, 1));
+
+  // Keyboard navigation: ←/→ moves to the previous/next period (month in
+  // month view, year in year view). Suppressed while typing in inputs or
+  // while a combobox/dialog/listbox has focus, so the shortcuts don't fight
+  // with form widgets.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable='true'], [role='combobox'], [role='listbox'], [role='dialog'], [role='menu']",
+        )
+      ) {
+        return;
+      }
+      e.preventDefault();
+      if (e.key === "ArrowLeft") {
+        setRefMonth((prev) => (viewMode === "year" ? subYears(prev, 1) : subMonths(prev, 1)));
+      } else {
+        setRefMonth((prev) => (viewMode === "year" ? addYears(prev, 1) : addMonths(prev, 1)));
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [viewMode]);
 
   return (
     <Card className="h-full flex flex-col shadow-sm border border-border">
@@ -356,7 +385,16 @@ export function AbsencesCalendar() {
           </div>
 
           <div className="flex items-center gap-1 flex-shrink-0">
-            <Button type="button" variant="outline" size="icon" onClick={goPrev} className="h-10 w-10">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={goPrev}
+              className="h-10 w-10"
+              title={viewMode === "year" ? "Ano anterior (←)" : "Período anterior (←)"}
+              aria-label={viewMode === "year" ? "Ano anterior" : "Período anterior"}
+              aria-keyshortcuts="ArrowLeft"
+            >
               <IconChevronLeft className="h-4 w-4" />
             </Button>
             <div className="flex flex-col items-center px-3 min-w-[200px]">
@@ -375,7 +413,16 @@ export function AbsencesCalendar() {
                 </div>
               )}
             </div>
-            <Button type="button" variant="outline" size="icon" onClick={goNext} className="h-10 w-10">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={goNext}
+              className="h-10 w-10"
+              title={viewMode === "year" ? "Próximo ano (→)" : "Próximo período (→)"}
+              aria-label={viewMode === "year" ? "Próximo ano" : "Próximo período"}
+              aria-keyshortcuts="ArrowRight"
+            >
               <IconChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -482,7 +529,7 @@ function StatsRow({
         label="Justificadas"
         value={stats.justifiedFaltaDays}
         suffix={`dias · ${colabSuffix(stats.usersOnJustifiedFalta)}`}
-        tone="orange"
+        tone="amber"
         active={showJustifiedFalta}
         onClick={onToggleJustifiedFalta}
       />
@@ -500,7 +547,7 @@ function StatsRow({
         label="Feriados úteis"
         value={stats.holidayDays}
         suffix={stats.holidayDays === 1 ? "dia" : "dias"}
-        tone="amber"
+        tone="sky"
         active={showHoliday}
         onClick={onToggleHoliday}
       />
@@ -521,16 +568,16 @@ function StatTile({
   label: string;
   value: number;
   suffix?: string;
-  tone: "emerald" | "violet" | "orange" | "red" | "amber";
+  tone: "emerald" | "violet" | "red" | "amber" | "sky";
   active?: boolean;
   onClick?: () => void;
 }) {
   const toneClasses: Record<typeof tone, string> = {
     emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
     violet: "bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20",
-    orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/20",
-    red: "bg-red-500/10 text-red-600 dark:text-red-400 ring-red-500/20",
-    amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+    amber: "bg-amber-500/15 text-amber-700 dark:text-amber-400 ring-amber-500/30",
+    red: "bg-red-600/15 text-red-700 dark:text-red-300 ring-red-600/40",
+    sky: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
   };
   const isToggleable = typeof onClick === "function";
   // When the tile is toggleable and inactive, mute it heavily so the user
@@ -610,14 +657,33 @@ function MonthView({
       </div>
       <div className="flex-1 grid grid-cols-7 auto-rows-fr">
         {allDays.map((date, idx) => {
+          const isInPeriod = date >= periodStart && date <= periodEnd;
+          const isLastCol = (idx + 1) % 7 === 0;
+          const isLastRow = idx >= allDays.length - 7;
+
+          // Out-of-period slots are rendered as blank spacers so the calendar
+          // visually starts at periodStart (day 26) and ends at periodEnd
+          // (day 25), without the dimmed prev/next-month dates that read as
+          // "disabled". The grid alignment is preserved by keeping the cell.
+          if (!isInPeriod) {
+            return (
+              <div
+                key={idx}
+                aria-hidden
+                className={cn(
+                  "min-h-[120px] bg-muted/20 border-border",
+                  !isLastCol && "border-r",
+                  !isLastRow && "border-b",
+                )}
+              />
+            );
+          }
+
           const dayAbsences = getAbsencesForDay(absences, date);
           const dayHolidays = getHolidaysForDay(holidays, date);
-          const isInPeriod = date >= periodStart && date <= periodEnd;
           const isToday = isSameDay(date, new Date());
           const dow = date.getDay();
           const isWeekend = dow === 0 || dow === 6;
-          const isLastCol = (idx + 1) % 7 === 0;
-          const isLastRow = idx >= allDays.length - 7;
 
           return (
             <Tooltip key={idx}>
@@ -627,9 +693,8 @@ function MonthView({
                     "bg-background min-h-[120px] p-2 relative overflow-hidden transition-colors duration-150 border-border",
                     !isLastCol && "border-r",
                     !isLastRow && "border-b",
-                    !isInPeriod && "bg-muted/40",
-                    isWeekend && isInPeriod && "bg-blue-50/40 dark:bg-blue-950/20",
-                    isInPeriod && !isToday && "hover:bg-accent/40",
+                    isWeekend && "bg-blue-50/40 dark:bg-blue-950/20",
+                    !isToday && "hover:bg-accent/40",
                     isToday && "ring-2 ring-primary ring-inset",
                   )}
                 >
@@ -637,8 +702,7 @@ function MonthView({
                     <span
                       className={cn(
                         "text-sm tabular-nums",
-                        !isToday && isInPeriod && "font-semibold text-foreground",
-                        !isInPeriod && !isToday && "text-muted-foreground/40 font-medium",
+                        !isToday && "font-semibold text-foreground",
                         isToday && "font-bold text-primary",
                       )}
                     >
@@ -877,19 +941,19 @@ function MiniMonth({
                 </span>
               )}
               {justifiedFaltaDays > 0 && (
-                <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
                   <IconUserOff className="h-3.5 w-3.5" strokeWidth={2.5} />
                   {justifiedFaltaDays}
                 </span>
               )}
               {unjustifiedFaltaDays > 0 && (
-                <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400">
+                <span className="inline-flex items-center gap-1 text-red-700 dark:text-red-300">
                   <IconUserExclamation className="h-3.5 w-3.5" strokeWidth={2.5} />
                   {unjustifiedFaltaDays}
                 </span>
               )}
               {holidayDays > 0 && (
-                <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400">
                   <IconConfetti className="h-3.5 w-3.5" strokeWidth={2.5} />
                   {holidayDays}
                 </span>
@@ -968,7 +1032,7 @@ function MiniMonth({
                     <div className="absolute top-0.5 right-0.5 flex items-center gap-0.5">
                       {showHoliday && (
                         <IconConfetti
-                          className="h-4 w-4 text-amber-600 dark:text-amber-400"
+                          className="h-4 w-4 text-sky-600 dark:text-sky-400"
                           strokeWidth={2.5}
                         />
                       )}
@@ -980,13 +1044,13 @@ function MiniMonth({
                       )}
                       {showJustifiedFalta && (
                         <IconUserOff
-                          className="h-4 w-4 text-orange-600 dark:text-orange-400"
+                          className="h-4 w-4 text-amber-600 dark:text-amber-400"
                           strokeWidth={2.5}
                         />
                       )}
                       {showUnjustifiedFalta && (
                         <IconUserExclamation
-                          className="h-4 w-4 text-red-600 dark:text-red-400"
+                          className="h-4 w-4 text-red-700 dark:text-red-300"
                           strokeWidth={2.5}
                         />
                       )}
@@ -1090,7 +1154,7 @@ function isUnjustifiedFalta(rec: SecullumAggregatedAbsence): boolean {
 }
 
 // Resolves the bar/dot color category from a record. AUSENCIA stays violet;
-// FALTA splits into orange (justified) vs red (unjustified) based on Id sign.
+// FALTA splits into amber (justified) vs red (unjustified) based on Id sign.
 function getBarCategory(rec: SecullumAggregatedAbsence): BarCategory | null {
   const cat = getJustificativaCategory(rec.JustificativaId);
   if (cat === "AUSENCIA") return "AUSENCIA";
@@ -1238,8 +1302,8 @@ function DayTooltip({
                 b.category === "AUSENCIA"
                   ? "bg-violet-500"
                   : b.category === "FALTA_JUSTIFIED"
-                    ? "bg-orange-500"
-                    : "bg-red-500";
+                    ? "bg-amber-500"
+                    : "bg-red-600";
               const label = getCollectiveLabel(b);
               return (
                 <div key={b.key} className="space-y-0.5">
@@ -1272,9 +1336,9 @@ function DayTooltip({
                     barCat === "AUSENCIA"
                       ? "bg-violet-500"
                       : barCat === "FALTA_JUSTIFIED"
-                        ? "bg-orange-500"
+                        ? "bg-amber-500"
                         : barCat === "FALTA_UNJUSTIFIED"
-                          ? "bg-red-500"
+                          ? "bg-red-600"
                           : "bg-muted-foreground";
                   return (
                     <li key={a.Id} className="text-xs flex items-center gap-2 whitespace-nowrap">

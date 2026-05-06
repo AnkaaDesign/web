@@ -39,9 +39,15 @@ interface ServiceOrderListProps {
   orders: HomeDashboardServiceOrder[];
   title?: string;
   showTypeBadge?: boolean;
+  embedded?: boolean;
 }
 
-export function ServiceOrderList({ orders, title = "Ordens de Serviço Abertas", showTypeBadge = false }: ServiceOrderListProps) {
+export function ServiceOrderList({
+  orders,
+  title = "Ordens de Serviço Abertas",
+  showTypeBadge = false,
+  embedded,
+}: ServiceOrderListProps) {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
 
@@ -54,6 +60,7 @@ export function ServiceOrderList({ orders, title = "Ordens de Serviço Abertas",
       viewAllLink="/producao/agenda"
       emptyMessage="Nenhuma ordem de serviço aberta"
       isEmpty={orders.length === 0}
+      embedded={embedded}
       footer={
         <DashboardPagination
           totalItems={orders.length}

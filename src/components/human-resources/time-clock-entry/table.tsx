@@ -193,19 +193,19 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
     return (
       <div className={cn("flex flex-col h-full overflow-hidden", className)}>
         <Form {...form}>
-          <div className="flex-1 overflow-auto border border-neutral-400 dark:border-border rounded-md">
+          <div className="flex-1 overflow-auto border border-border rounded-lg">
             <table className="w-full border-collapse">
               {/* Header */}
-              <thead className="sticky top-0 z-20 bg-background">
-                <tr className="border-b border-neutral-400 dark:border-border">
+              <thead className="sticky top-0 z-20 bg-muted">
+                <tr className="border-b border-border h-12">
                   {/* Date column - sticky left */}
-                  <th className="text-left p-2 font-medium text-sm sticky left-0 bg-background z-30 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border">
+                  <th className="text-left text-foreground font-bold uppercase text-xs px-4 py-2 sticky left-0 bg-muted z-30 w-[150px] min-w-[150px] max-w-[150px] border-r border-border">
                     Data
                   </th>
 
                   {/* Time columns */}
                   {Object.entries(TIME_FIELD_LABELS).map(([field, label]) => (
-                    <th key={field} className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">
+                    <th key={field} className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-32 min-w-32 max-w-32 border-r border-border bg-muted">
                       {label}
                     </th>
                   ))}
@@ -215,8 +215,8 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
                     <th
                       key={field}
                       className={cn(
-                        "text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28",
-                        index < array.length - 1 ? "border-r border-neutral-400 dark:border-border" : "border-neutral-400 dark:border-border",
+                        "text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-28 min-w-28 max-w-28 bg-muted",
+                        index < array.length - 1 && "border-r border-border",
                       )}
                     >
                       {label}
@@ -238,10 +238,9 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
                     <tr
                       key={field.id}
                       className={cn(
-                        "border-b border-neutral-400 dark:border-border transition-colors",
+                        "border-b border-border transition-colors bg-card hover:bg-muted/20 h-12",
+                        isWeekendDay && "bg-red-50/60 dark:bg-red-950/30",
                         isChanged && "bg-yellow-50 dark:bg-yellow-900/20",
-                        isWeekendDay && "bg-red-50 dark:bg-red-900/10",
-                        !isChanged && !isWeekendDay && index % 2 === 0 && "bg-muted/50",
                       )}
                       onContextMenu={(e) => {
                         if (onRowContextMenu) {
@@ -252,12 +251,7 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
                     >
                       {/* Date cell - sticky left */}
                       <td
-                        className={cn(
-                          "p-2 sticky left-0 bg-inherit z-10 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border",
-                          isChanged && "bg-yellow-50 dark:bg-yellow-900/20",
-                          isWeekendDay && "bg-red-50 dark:bg-red-900/10",
-                          !isChanged && !isWeekendDay && index % 2 === 0 && "bg-muted/50",
-                        )}
+                        className="p-2 sticky left-0 bg-inherit z-10 w-[150px] min-w-[150px] max-w-[150px] border-r border-border"
                       >
                         <div className="flex flex-col">
                           <span className="text-sm font-medium">
@@ -274,7 +268,7 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
                         return (
                           <td
                             key={timeField}
-                            className={cn("p-1 w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border", isModified && "bg-yellow-100 dark:bg-yellow-900/30")}
+                            className={cn("p-1 w-32 min-w-32 max-w-32 border-r border-border", isModified && "bg-yellow-100 dark:bg-yellow-900/30")}
                             onContextMenu={(e) => {
                               if (onRowContextMenu) {
                                 e.preventDefault();
@@ -332,7 +326,7 @@ export const TimeClockTable = forwardRef<TimeClockTableRef, TimeClockTableProps>
                             key={checkboxField}
                             className={cn(
                               "p-1 text-center w-28 min-w-28 max-w-28",
-                              cbIndex < array.length - 1 ? "border-r border-neutral-400 dark:border-border" : "border-neutral-400 dark:border-border",
+                              cbIndex < array.length - 1 && "border-r border-border",
                               isModified && "bg-yellow-100 dark:bg-yellow-900/30",
                             )}
                           >

@@ -9,8 +9,6 @@ import { CalculationTable } from "./calculation-table";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createCalculationColumns } from "./calculation-table-columns";
 import { cn } from "@/lib/utils";
-import { useTableState } from "@/hooks/common/use-table-state";
-import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { USER_STATUS } from "../../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -24,6 +22,7 @@ interface CalculationListProps {
   className?: string;
   mode?: CalculationListMode;
   onExportDataChange?: (data: { rows: any[]; visibleColumns: Set<string>; filters: any }) => void;
+  headerSlot?: React.ReactNode;
 }
 
 interface CalculationRow {
@@ -74,7 +73,7 @@ const getPayrollPeriod = (selectedMonth: Date) => {
   };
 };
 
-export function CalculationList({ className, mode = 'hr', onExportDataChange }: CalculationListProps) {
+export function CalculationList({ className, mode = 'hr', onExportDataChange, headerSlot }: CalculationListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user: currentUser } = useAuth();
   const isPersonalMode = mode === 'personal';
@@ -153,18 +152,15 @@ export function CalculationList({ className, mode = 'hr', onExportDataChange }: 
     }
   }, [isPersonalMode, usersData?.data]); // Only depend on user data and mode
 
-  // Get table state for selected items functionality
-  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly } = useTableState({
-    defaultPageSize: DEFAULT_PAGE_SIZE,
-    resetSelectionOnPageChange: false,
-  });
-
-  // Visible columns state with localStorage persistence
+  // Visible columns state with localStorage persistence.
+  // Keep this Set in sync with `getDefaultVisibleColumns()` in
+  // column-visibility-manager.tsx — that function powers the "Restaurar"
+  // button and must produce the same defaults as first-render.
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
     "calculation-list-visible-columns",
     new Set([
       "date", "entrada1", "saida1", "entrada2", "saida2",
-      "normais", "ex50", "ex100", "dsr", "ajuste"
+      "normais", "faltas", "ex50", "ex100", "dsr", "ajuste"
     ])
   );
 
@@ -437,6 +433,7 @@ export function CalculationList({ className, mode = 'hr', onExportDataChange }: 
 
         {/* Filters */}
         <div className="flex items-center gap-2">
+          {headerSlot}
           {/* Left: user selector */}
           {!isPersonalMode && (
             <div className="flex gap-1 shrink-0">
@@ -484,7 +481,6 @@ export function CalculationList({ className, mode = 'hr', onExportDataChange }: 
             </div>
 
             <div className="flex gap-2 shrink-0">
-              <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
               <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             </div>
           </div>

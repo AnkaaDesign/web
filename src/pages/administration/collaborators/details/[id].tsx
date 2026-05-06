@@ -38,7 +38,6 @@ const CollaboratorDetailsPage = () => {
         },
       },
       changeLogs: true,
-      vacations: true,
     },
     enabled: !!id,
   });

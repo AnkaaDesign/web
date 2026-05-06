@@ -1,27 +1,28 @@
 import { cn } from "@/lib/utils";
 
-// CSS utility classes for consistent table styling
+// CSS utility classes for consistent table styling — aligned with the
+// app-wide pattern (see paint-type-table, order-table, warning-table).
 export const tableStyles = {
   // Container styles
   container: "flex flex-col h-full overflow-hidden",
-  scrollContainer: "flex-1 overflow-auto border border-neutral-400 dark:border-border rounded-md",
+  scrollContainer: "flex-1 overflow-auto border border-border rounded-lg",
 
   // Table structure
   table: "w-full border-collapse",
 
   // Header styles
-  thead: "sticky top-0 z-20 bg-background",
-  theadRow: "border-b border-neutral-400 dark:border-border",
-  th: "text-left p-2 font-medium text-sm border-r border-neutral-400 dark:border-border",
-  thSticky: "sticky left-0 bg-background z-30",
-  thCenter: "text-center p-2 font-medium text-sm border-r border-neutral-400 dark:border-border",
+  thead: "sticky top-0 z-20 bg-muted",
+  theadRow: "border-b border-border",
+  th: "text-left text-foreground font-bold uppercase text-xs px-4 py-2 border-r border-border bg-muted",
+  thSticky: "sticky left-0 bg-muted z-30",
+  thCenter: "text-center text-foreground font-bold uppercase text-xs px-4 py-2 border-r border-border bg-muted",
 
   // Body styles
   tbody: "",
-  tr: "border-b border-neutral-400 dark:border-border transition-colors",
-  td: "p-1 border-r border-neutral-400 dark:border-border",
-  tdSticky: "sticky left-0 bg-background z-10",
-  tdCenter: "text-center p-1 border-r border-neutral-400 dark:border-border",
+  tr: "border-b border-border transition-colors",
+  td: "p-1 border-r border-border",
+  tdSticky: "sticky left-0 bg-inherit z-10",
+  tdCenter: "text-center p-1 border-r border-border",
 
   // Column widths
   dateColumn: "w-[150px] min-w-[150px] max-w-[150px]",
@@ -30,12 +31,12 @@ export const tableStyles = {
 
   // Row states
   rowModified: "bg-yellow-50 dark:bg-yellow-900/20",
-  rowWeekend: "bg-red-50 dark:bg-red-900/10",
-  rowEven: "bg-muted/50",
+  rowWeekend: "bg-red-50/60 dark:bg-red-900/10",
+  rowEven: "bg-muted/10",
 
   // Cell states
   cellModified: "bg-yellow-100 dark:bg-yellow-900/30",
-  cellHighlight: "bg-blue-50 dark:bg-blue-900/20",
+  cellHighlight: "bg-muted/20",
 
   // Form elements
   inputContainer: "flex items-center gap-0.5 justify-center min-w-[100px]",
@@ -48,21 +49,21 @@ export const tableStyles = {
 // Highlighting utilities
 export const highlightingClasses = {
   // Modification highlighting
-  modified: "bg-yellow-50 dark:bg-yellow-900/20 ring-1 ring-yellow-200 dark:ring-yellow-800/50",
-  modifiedCell: "bg-yellow-100 dark:bg-yellow-900/30 ring-1 ring-yellow-300 dark:ring-yellow-700/50",
+  modified: "bg-yellow-50 dark:bg-yellow-900/20",
+  modifiedCell: "bg-yellow-100 dark:bg-yellow-900/30",
 
   // Weekend highlighting
-  weekend: "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30",
+  weekend: "bg-red-50/60 dark:bg-red-900/10",
 
   // Selection highlighting
-  selected: "bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-200 dark:ring-blue-800/50",
+  selected: "bg-muted/30",
 
   // Hover states
-  hoverRow: "hover:bg-muted/70",
-  hoverCell: "hover:bg-muted/50",
+  hoverRow: "hover:bg-muted/20",
+  hoverCell: "hover:bg-muted/20",
 
   // Focus states
-  focusCell: "focus-within:ring-2 focus-within:ring-blue-500/20",
+  focusCell: "focus-within:ring-2 focus-within:ring-ring/30",
 };
 
 // Responsive utilities

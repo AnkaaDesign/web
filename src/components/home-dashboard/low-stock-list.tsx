@@ -21,9 +21,10 @@ function getFilterUrl() {
 interface LowStockListProps {
   items: HomeDashboardLowStockItem[];
   totalCount?: number;
+  embedded?: boolean;
 }
 
-export function LowStockList({ items }: LowStockListProps) {
+export function LowStockList({ items, embedded }: LowStockListProps) {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
 
@@ -36,6 +37,7 @@ export function LowStockList({ items }: LowStockListProps) {
       viewAllLink={getFilterUrl()}
       emptyMessage="Nenhum item com estoque baixo"
       isEmpty={items.length === 0}
+      embedded={embedded}
       footer={
         <DashboardPagination
           totalItems={items.length}

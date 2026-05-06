@@ -1476,6 +1476,38 @@ export const TaskDetailsPage = () => {
     };
   }, [taskIds, id]);
 
+  // Keyboard navigation: ←/→ jumps to the previous/next task in the agenda
+  // sequence. Suppressed while typing in inputs or while a combobox/dialog/
+  // listbox/menu has focus, so the shortcuts don't fight with form widgets.
+  useEffect(() => {
+    if (!taskNavigation) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable='true'], [role='combobox'], [role='listbox'], [role='dialog'], [role='menu']",
+        )
+      ) {
+        return;
+      }
+      if (e.key === "ArrowLeft" && taskNavigation.previousTaskId) {
+        e.preventDefault();
+        navigate(routes.production.preparation.details(taskNavigation.previousTaskId), {
+          state: { taskIds },
+        });
+      } else if (e.key === "ArrowRight" && taskNavigation.nextTaskId) {
+        e.preventDefault();
+        navigate(routes.production.preparation.details(taskNavigation.nextTaskId), {
+          state: { taskIds },
+        });
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [taskNavigation, taskIds, navigate]);
+
   // Get display name with fallbacks
   const getTaskDisplayName = (task: any) => {
     if (task.name) return task.name;

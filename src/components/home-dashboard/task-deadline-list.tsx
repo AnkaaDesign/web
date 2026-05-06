@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { IconCalendarDue } from "@tabler/icons-react";
 import { DashboardCardList, DashboardPagination } from "./dashboard-card-list";
 import type { HomeDashboardTask } from "../../types";
+import { getForecastColorClass, getTermColorClass } from "../../utils/task-date-colors";
 
 const PAGE_SIZE = 20;
 
@@ -14,39 +15,6 @@ function formatDateTime(dateStr: string): string {
   const hours = String(d.getHours()).padStart(2, "0");
   const minutes = String(d.getMinutes()).padStart(2, "0");
   return `${day}/${month}/${year} ${hours}:${minutes}`;
-}
-
-function getTermTextColor(term: string | null): string {
-  if (!term) return "";
-
-  const now = new Date();
-  const deadline = new Date(term);
-  const diffMs = deadline.getTime() - now.getTime();
-
-  if (diffMs < 0) {
-    return "text-red-500";
-  }
-
-  const hoursRemaining = diffMs / (1000 * 60 * 60);
-
-  if (hoursRemaining <= 4) {
-    return "text-amber-500";
-  }
-
-  return "text-green-500";
-}
-
-function getForecastUrgencyColor(forecastDate: string | null): string {
-  if (!forecastDate) return "";
-
-  const now = new Date();
-  const forecast = new Date(forecastDate);
-  const diffDays = Math.ceil((forecast.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays <= 3) return "text-red-500";
-  if (diffDays <= 7) return "text-orange-500";
-  if (diffDays <= 10) return "text-yellow-500";
-  return "";
 }
 
 interface TaskDeadlineListProps {
@@ -96,8 +64,8 @@ export function TaskDeadlineList({
       {pagedTasks.map((task, index) => {
         const dateValue = isDeadline ? task.term : task.forecastDate;
         const dateTextColor = isDeadline
-          ? getTermTextColor(task.term)
-          : getForecastUrgencyColor(task.forecastDate);
+          ? getTermColorClass(task.term)
+          : getForecastColorClass(task.forecastDate);
 
         return (
           <div

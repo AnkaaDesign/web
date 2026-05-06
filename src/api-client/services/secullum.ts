@@ -259,6 +259,17 @@ export const secullumService = {
     });
   },
 
+  // One row per active user for a single day — powers "Visualização Dia".
+  getTimeEntriesByDay: (date: string) =>
+    apiClient.get<{
+      success: boolean;
+      message: string;
+      data: Array<{
+        user: { id: string; name: string; positionName: string | null; sectorName: string | null };
+        entry: any | null;
+      }>;
+    }>("/integrations/secullum/time-entries/by-day", { params: { date } }),
+
   // Justifications
   getJustifications: () => apiClient.get<{ success: boolean; data: any[] }>("/integrations/secullum/justifications"),
 

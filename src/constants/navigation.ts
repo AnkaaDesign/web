@@ -1462,7 +1462,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "nivel-de-performance", title: "Nível de Performance", icon: "trendingUp", path: "/recursos-humanos/bonus/nivel-de-performance" },
         ],
       },
-      { id: "calculos", title: "Cálculos de Ponto", icon: "deviceIpadDollar", path: "/recursos-humanos/calculos" },
       {
         id: "cargos",
         title: "Cargos",

@@ -2,6 +2,7 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { cn } from "@/lib/utils";
+import { renderTimeValue, renderHourValue } from "../../cell-renderers";
 
 export interface CalculationColumn {
   key: string;
@@ -44,49 +45,6 @@ interface CalculationRow {
   notTot?: string;
   refeicao?: string;
 }
-
-// Helper function to render time values with proper formatting
-const renderTimeValue = (value: string | undefined) => {
-  if (!value || value === "" || value === "null" || value === null) {
-    return <span className="text-muted-foreground">-</span>;
-  }
-
-  // Handle special values like "Day Off" or folga
-  if (value.toLowerCase().includes("day off") || value.toLowerCase().includes("folga")) {
-    return (
-      <Badge variant="secondary" className="text-xs">
-        Folga
-      </Badge>
-    );
-  }
-
-  return <span className="text-sm">{value}</span>;
-};
-
-// Helper function to render hour values with styling
-const renderHourValue = (value: string | undefined) => {
-  if (!value || value === "" || value === "null" || value === null) {
-    return <span className="text-muted-foreground">-</span>;
-  }
-
-  // Check if it's a positive or negative value for styling
-  const isNegative = value.startsWith("-");
-  const isPositive = !isNegative && value !== "00:00";
-
-  return (
-    <span
-      className={`text-sm ${
-        isNegative
-          ? "text-red-600"
-          : isPositive
-          ? "text-green-600"
-          : "text-muted-foreground"
-      }`}
-    >
-      {value}
-    </span>
-  );
-};
 
 const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -179,7 +137,7 @@ export function createCalculationColumns(): CalculationColumn[] {
     {
       key: "faltas",
       header: "FALTAS",
-      accessor: (row: CalculationRow) => renderHourValue(row.faltas),
+      accessor: (row: CalculationRow) => renderHourValue(row.faltas, "bad"),
       sortable: true,
       className: "w-24",
       align: "center",
@@ -275,7 +233,7 @@ export function createCalculationColumns(): CalculationColumn[] {
     {
       key: "atras",
       header: "ATRASO",
-      accessor: (row: CalculationRow) => renderHourValue(row.atras),
+      accessor: (row: CalculationRow) => renderHourValue(row.atras, "bad"),
       sortable: true,
       className: "w-24",
       align: "center",
@@ -283,7 +241,7 @@ export function createCalculationColumns(): CalculationColumn[] {
     {
       key: "adian",
       header: "ADIANT.",
-      accessor: (row: CalculationRow) => renderHourValue(row.adian),
+      accessor: (row: CalculationRow) => renderHourValue(row.adian, "bad"),
       sortable: true,
       className: "w-24",
       align: "center",

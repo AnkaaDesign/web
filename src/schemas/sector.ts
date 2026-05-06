@@ -27,7 +27,6 @@ export const sectorIncludeSchema = z
               borrows: z.boolean().optional(),
               notifications: z.boolean().optional(),
               tasks: z.boolean().optional(),
-              vacations: z.boolean().optional(),
               commissions: z.boolean().optional(),
             })
             .optional(),
@@ -49,7 +48,6 @@ export const sectorIncludeSchema = z
               borrows: z.boolean().optional(),
               notifications: z.boolean().optional(),
               tasks: z.boolean().optional(),
-              vacations: z.boolean().optional(),
               commissions: z.boolean().optional(),
             })
             .optional(),

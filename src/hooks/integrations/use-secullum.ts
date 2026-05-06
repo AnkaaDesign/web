@@ -154,6 +154,18 @@ export const useMySecullumCalculations = (params?: {
 
 // Time Entries hook (removed duplicate - see line 421)
 
+// One row per active user for a single day. Powers the "Visualização Dia" tab
+// of Controle de Ponto. Backend fans out per-user fetches with a concurrency
+// cap and reuses the per-employee day-granular Redis cache.
+export const useSecullumTimeEntriesByDay = (date?: string) => {
+  return useQuery({
+    queryKey: [...secullumKeys.all, "time-entries-by-day", date] as const,
+    queryFn: () => secullumService.getTimeEntriesByDay(date as string),
+    staleTime: 60 * 1000,
+    enabled: !!date,
+  });
+};
+
 // Department & Position hooks
 export const useSecullumDepartments = () => {
   return useQuery({

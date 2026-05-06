@@ -12,15 +12,8 @@ import {
 
 import type { SecullumAggregatedAbsence } from "../../../../types";
 import { groupAbsences } from "../../../../types";
-import { getJustificativaMeta } from "../../../../constants";
+import { getJustificativaMeta, TONE_CLASSES } from "../../../../constants";
 import { useSecullumDeleteAbsence } from "../../../../hooks";
-
-// Lighten the shadcn TableRow primitive's default zebra (bg-muted/50) and
-// hover (bg-muted/70) — both feel too dark next to the Cálculos de Ponto
-// table. We reuse the primitive's exact selectors so twMerge dedupes them
-// against the primitive defaults instead of layering with higher specificity.
-const ROW_BASE =
-  "[tbody_&:nth-child(even)]:bg-muted/10 [tbody_&]:hover:bg-muted/20 [&>td]:py-2";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -151,54 +144,65 @@ export function AbsenceTable({
 
   if (isPerDayMode) {
     return (
-      <div className="rounded-lg border border-border bg-background overflow-hidden flex flex-col h-full">
-        <div className="flex-1 min-h-0 overflow-auto">
+      <div className="rounded-lg flex flex-col overflow-hidden h-full">
+        <div className="flex-1 min-h-0 overflow-auto border border-border rounded-lg">
           <Table className="text-sm">
-            <TableHeader className="sticky top-0 z-10">
-              <TableRow>
-                <TableHead className="whitespace-nowrap">Data</TableHead>
-                <TableHead className="whitespace-nowrap">Colaborador</TableHead>
-                <TableHead className="whitespace-nowrap">Justificativa</TableHead>
-                <TableHead className="whitespace-nowrap">Setor</TableHead>
-                <TableHead>Motivo</TableHead>
+            <TableHeader className="sticky top-0 z-10 [&_tr]:border-b-0 [&_tr]:hover:bg-muted">
+              <TableRow className="bg-muted hover:bg-muted even:bg-muted">
+                <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Data</TableHead>
+                <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Colaborador</TableHead>
+                <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Justificativa</TableHead>
+                <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Setor</TableHead>
+                <TableHead className="text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Motivo</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <PerDaySkeletonRows />
               ) : (dayRows?.length ?? 0) === 0 ? (
-                <TableRow className="hover:bg-transparent [tbody_&:nth-child(even)]:bg-transparent">
+                <TableRow className="hover:bg-transparent">
                   <TableCell colSpan={5} className="p-0">
                     <EmptyState text={emptyText} />
                   </TableCell>
                 </TableRow>
               ) : (
-                dayRows!.map((row) => {
+                dayRows!.map((row, index) => {
                   const meta = getJustificativaMeta(row.JustificativaId);
                   return (
                     <TableRow
                       key={`${row.Id}-${row.dayDate.toISOString()}`}
                       onContextMenu={(e) => handleRowContextMenu(e, row)}
-                      className={cn(ROW_BASE, "cursor-context-menu")}
+                      className={cn(
+                        "cursor-context-menu transition-colors border-b border-border [&>td]:py-2",
+                        index % 2 === 1 && "bg-muted/10",
+                        "hover:bg-muted/20",
+                      )}
                     >
-                      <TableCell className="tabular-nums font-medium whitespace-nowrap">
+                      <TableCell className="tabular-nums font-medium whitespace-nowrap px-4">
                         {format(row.dayDate, "dd/MM/yy", { locale: ptBR })} -{" "}
                         {WEEKDAY_SHORT_PT[row.dayDate.getDay()]}
                       </TableCell>
-                      <TableCell className="font-medium">{row.userName}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-normal">
+                      <TableCell className="font-medium px-4">{row.userName}</TableCell>
+                      <TableCell className="px-4">
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "font-normal border-0",
+                            meta && TONE_CLASSES[meta.tone].bg,
+                            meta && TONE_CLASSES[meta.tone].text,
+                          )}
+                        >
                           {meta?.label ?? row.JustificativaDescricao}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {row.sectorName ?? "—"}
+                      <TableCell className="text-muted-foreground px-4">
+                        {row.sectorName ?? "-"}
                       </TableCell>
                       <TableCell
-                        className="text-muted-foreground truncate max-w-[260px]"
+                        className="text-muted-foreground truncate max-w-[260px] px-4"
                         title={row.Motivo ?? ""}
                       >
-                        {row.Motivo || "—"}
+                        {row.Motivo || "-"}
                       </TableCell>
                     </TableRow>
                   );
@@ -279,60 +283,74 @@ export function AbsenceTable({
   }
 
   return (
-    <div className="rounded-lg border border-border bg-background flex flex-col h-full overflow-hidden">
-      <div className="flex-1 min-h-0 overflow-auto">
+    <div className="rounded-lg flex flex-col h-full overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-auto border border-border rounded-lg">
         <Table className="text-sm">
-          <TableHeader className="sticky top-0 z-10">
-            <TableRow>
-              <TableHead className="w-10 p-0" />
-              <TableHead className="whitespace-nowrap">Colaborador</TableHead>
-              <TableHead className="whitespace-nowrap w-28">Início</TableHead>
-              <TableHead className="whitespace-nowrap w-28">Fim</TableHead>
-              <TableHead className="whitespace-nowrap w-16 text-center">Dias</TableHead>
-              <TableHead className="whitespace-nowrap">Justificativa</TableHead>
-              <TableHead className="whitespace-nowrap">Setor</TableHead>
-              <TableHead>Motivo</TableHead>
-              <TableHead className="whitespace-nowrap w-24 text-right pr-3">Ações</TableHead>
+          <TableHeader className="sticky top-0 z-10 [&_tr]:border-b-0 [&_tr]:hover:bg-muted">
+            <TableRow className="bg-muted hover:bg-muted even:bg-muted">
+              <TableHead className="w-10 p-0 bg-muted border-b border-border" />
+              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Colaborador</TableHead>
+              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-28">Início</TableHead>
+              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-28">Fim</TableHead>
+              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-16 text-center">Dias</TableHead>
+              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Justificativa</TableHead>
+              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Setor</TableHead>
+              <TableHead className="text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Motivo</TableHead>
+              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-24 text-right pr-3">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <SkeletonRows />
             ) : groups.length === 0 ? (
-              <TableRow className="hover:bg-transparent [tbody_&:nth-child(even)]:bg-transparent">
+              <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={9} className="p-0">
                   <EmptyState text={emptyText} />
                 </TableCell>
               </TableRow>
             ) : (
-              groups.map((g) => {
+              groups.map((g, index) => {
                 const meta = getJustificativaMeta(g.justificativaId);
                 const isOpen = expanded.has(g.groupId);
                 const head = g.records[0];
 
                 if (!g.isCollective) {
                   return (
-                    <TableRow key={g.groupId} className={ROW_BASE}>
+                    <TableRow
+                      key={g.groupId}
+                      className={cn(
+                        "transition-colors border-b border-border [&>td]:py-2",
+                        index % 2 === 1 && "bg-muted/10",
+                        "hover:bg-muted/20",
+                      )}
+                    >
                       <TableCell />
-                      <TableCell className="font-medium">{head.userName}</TableCell>
-                      <TableCell className="tabular-nums">{fmt(head.Inicio)}</TableCell>
-                      <TableCell className="tabular-nums">{fmt(head.Fim)}</TableCell>
-                      <TableCell className="text-center tabular-nums text-muted-foreground">
+                      <TableCell className="font-medium px-4">{head.userName}</TableCell>
+                      <TableCell className="tabular-nums px-4">{fmt(head.Inicio)}</TableCell>
+                      <TableCell className="tabular-nums px-4">{fmt(head.Fim)}</TableCell>
+                      <TableCell className="text-center tabular-nums text-muted-foreground px-4">
                         {daysBetween(head.Inicio, head.Fim)}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-normal">
+                      <TableCell className="px-4">
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "font-normal border-0",
+                            meta && TONE_CLASSES[meta.tone].bg,
+                            meta && TONE_CLASSES[meta.tone].text,
+                          )}
+                        >
                           {meta?.label ?? head.JustificativaDescricao}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {head.sectorName ?? "—"}
+                      <TableCell className="text-muted-foreground px-4">
+                        {head.sectorName ?? "-"}
                       </TableCell>
                       <TableCell
-                        className="text-muted-foreground truncate max-w-[260px]"
+                        className="text-muted-foreground truncate max-w-[260px] px-4"
                         title={g.motivo}
                       >
-                        {g.motivo || "—"}
+                        {g.motivo || "-"}
                       </TableCell>
                       <TableCell className="text-right pr-3">
                         <RowActions
@@ -351,13 +369,8 @@ export function AbsenceTable({
                     <TableRow
                       key={g.groupId}
                       className={cn(
-                        "[&>td]:py-2",
-                        // Match the primitive's selectors so twMerge dedupes
-                        // its zebra and hover defaults; ! avoids losing to
-                        // the higher-specificity nth-child rule.
-                        "[tbody_&:nth-child(odd)]:!bg-violet-50/40 [tbody_&:nth-child(even)]:!bg-violet-50/40",
-                        "dark:[tbody_&:nth-child(odd)]:!bg-violet-900/10 dark:[tbody_&:nth-child(even)]:!bg-violet-900/10",
-                        "[tbody_&]:hover:!bg-violet-100/50 dark:[tbody_&]:hover:!bg-violet-900/20",
+                        "transition-colors border-b border-border [&>td]:py-2",
+                        "bg-muted/30 hover:bg-muted/40",
                       )}
                     >
                       <TableCell className="p-0">
@@ -375,31 +388,38 @@ export function AbsenceTable({
                           )}
                         </Button>
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium px-4">
                         <div className="flex items-center gap-2">
-                          <IconUsers className="h-4 w-4 text-violet-600" />
+                          <IconUsers className="h-4 w-4 text-muted-foreground" />
                           Coletiva ·{" "}
                           <span className="text-muted-foreground font-normal">
                             {g.records.length} colaboradores
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="tabular-nums">{fmt(head.Inicio)}</TableCell>
-                      <TableCell className="tabular-nums">{fmt(head.Fim)}</TableCell>
-                      <TableCell className="text-center tabular-nums text-muted-foreground">
+                      <TableCell className="tabular-nums px-4">{fmt(head.Inicio)}</TableCell>
+                      <TableCell className="tabular-nums px-4">{fmt(head.Fim)}</TableCell>
+                      <TableCell className="text-center tabular-nums text-muted-foreground px-4">
                         {daysBetween(head.Inicio, head.Fim)}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-normal">
+                      <TableCell className="px-4">
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "font-normal border-0",
+                            meta && TONE_CLASSES[meta.tone].bg,
+                            meta && TONE_CLASSES[meta.tone].text,
+                          )}
+                        >
                           {meta?.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">—</TableCell>
+                      <TableCell className="text-muted-foreground px-4">-</TableCell>
                       <TableCell
-                        className="text-muted-foreground truncate max-w-[260px]"
+                        className="text-muted-foreground truncate max-w-[260px] px-4"
                         title={g.motivo}
                       >
-                        {g.motivo || "—"}
+                        {g.motivo || "-"}
                       </TableCell>
                       <TableCell className="text-right pr-3">
                         <RowActions
@@ -411,23 +431,26 @@ export function AbsenceTable({
                     </TableRow>
                     {isOpen &&
                       g.records.map((rec) => (
-                        <TableRow key={rec.Id} className={ROW_BASE}>
+                        <TableRow
+                          key={rec.Id}
+                          className="transition-colors border-b border-border [&>td]:py-2 hover:bg-muted/20"
+                        >
                           <TableCell />
                           <TableCell className="pl-10 text-muted-foreground">
                             ↳ {rec.userName}
                           </TableCell>
-                          <TableCell className="tabular-nums text-muted-foreground">
+                          <TableCell className="tabular-nums text-muted-foreground px-4">
                             {fmt(rec.Inicio)}
                           </TableCell>
-                          <TableCell className="tabular-nums text-muted-foreground">
+                          <TableCell className="tabular-nums text-muted-foreground px-4">
                             {fmt(rec.Fim)}
                           </TableCell>
-                          <TableCell className="text-center tabular-nums text-muted-foreground">
+                          <TableCell className="text-center tabular-nums text-muted-foreground px-4">
                             {daysBetween(rec.Inicio, rec.Fim)}
                           </TableCell>
                           <TableCell />
-                          <TableCell className="text-muted-foreground text-xs">
-                            {rec.sectorName ?? "—"}
+                          <TableCell className="text-muted-foreground text-xs px-4">
+                            {rec.sectorName ?? "-"}
                           </TableCell>
                           <TableCell />
                           <TableCell className="text-right pr-3">
@@ -510,7 +533,7 @@ function PerDaySkeletonRows() {
   return (
     <>
       {Array.from({ length: 8 }).map((_, i) => (
-        <TableRow key={i} className="[&>td]:py-2 hover:bg-transparent [tbody_&:nth-child(even)]:bg-transparent">
+        <TableRow key={i} className="[&>td]:py-2 border-b border-border hover:bg-transparent">
           <TableCell>
             <div className="h-4 w-24 bg-muted animate-pulse rounded" />
             <div className="h-3 w-16 bg-muted animate-pulse rounded mt-1" />
@@ -538,7 +561,7 @@ function SkeletonRows() {
   return (
     <>
       {Array.from({ length: 6 }).map((_, i) => (
-        <TableRow key={i} className="[&>td]:py-2 hover:bg-transparent [tbody_&:nth-child(even)]:bg-transparent">
+        <TableRow key={i} className="[&>td]:py-2 border-b border-border hover:bg-transparent">
           <TableCell />
           <TableCell>
             <div className="h-4 w-40 bg-muted animate-pulse rounded" />

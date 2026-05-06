@@ -45,6 +45,9 @@ interface TimeClockEntryTableProps {
   className?: string;
   onChangedRowsChange?: (count: number) => void;
   visibleColumns?: Set<string>;
+  // Set of "yyyy-MM-dd" strings — used to render "FERIADO" in time cells on
+  // holidays (since Secullum's /Batidas response leaves them null).
+  holidayDates?: Set<string>;
 }
 
 export interface TimeClockEntryTableRef {
@@ -93,7 +96,7 @@ function getManualEntryMarker(rawEntry: any, fieldName: string): ManualEntryMark
 }
 
 const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: React.Ref<TimeClockEntryTableRef>) => {
-  const { entries, isLoading, className, onChangedRowsChange, visibleColumns } = props;
+  const { entries, isLoading, className, onChangedRowsChange, visibleColumns, holidayDates } = props;
   const isVisible = (key: string) => !visibleColumns || visibleColumns.has(key);
   const [pendingJustification, setPendingJustification] = useState<PendingJustification | null>(null);
   // Reasons captured from the justification dialog, keyed by `${entryId}:${field}`.
@@ -959,27 +962,27 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
         console.warn("Time-clock form validation errors", errors);
         toast.error("Há campos com formato inválido. Verifique os horários e justificativas.");
       })} className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-auto border border-neutral-400 dark:border-border rounded-md">
+          <div className="flex-1 overflow-auto border border-border rounded-lg">
             <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-20 bg-background">
-                <tr className="border-b border-neutral-400 dark:border-border">
-                  <th className="text-left p-2 font-medium text-sm sticky left-0 bg-background z-30 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border">
+              <thead className="sticky top-0 z-20 bg-muted">
+                <tr className="border-b border-border h-12">
+                  <th className="text-left text-foreground font-bold uppercase text-xs px-4 py-2 sticky left-0 bg-muted z-30 w-[150px] min-w-[150px] max-w-[150px] border-r border-border">
                     Data
                   </th>
-                  {isVisible("entry1") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 1</th>}
-                  {isVisible("exit1") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 1</th>}
-                  {isVisible("entry2") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 2</th>}
-                  {isVisible("exit2") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 2</th>}
-                  {isVisible("entry3") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 3</th>}
-                  {isVisible("exit3") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 3</th>}
-                  {isVisible("entry4") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 4</th>}
-                  {isVisible("exit4") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 4</th>}
-                  {isVisible("entry5") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Entrada 5</th>}
-                  {isVisible("exit5") && <th className="text-center p-2 font-medium text-sm w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border">Saída 5</th>}
-                  {isVisible("compensated") && <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Compensado</th>}
-                  {isVisible("neutral") && <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Neutro</th>}
-                  {isVisible("dayOff") && <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border">Folga</th>}
-                  {isVisible("freeLunch") && <th className="text-center p-2 font-medium text-sm w-28 min-w-28 max-w-28 border-neutral-400 dark:border-border">Almoço</th>}
+                  {isVisible("entry1") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-32 min-w-32 max-w-32 border-r border-border bg-muted">Entrada 1</th>}
+                  {isVisible("exit1") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-32 min-w-32 max-w-32 border-r border-border bg-muted">Saída 1</th>}
+                  {isVisible("entry2") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-32 min-w-32 max-w-32 border-r border-border bg-muted">Entrada 2</th>}
+                  {isVisible("exit2") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-32 min-w-32 max-w-32 border-r border-border bg-muted">Saída 2</th>}
+                  {isVisible("entry3") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-32 min-w-32 max-w-32 border-r border-border bg-muted">Entrada 3</th>}
+                  {isVisible("exit3") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-32 min-w-32 max-w-32 border-r border-border bg-muted">Saída 3</th>}
+                  {isVisible("entry4") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-32 min-w-32 max-w-32 border-r border-border bg-muted">Entrada 4</th>}
+                  {isVisible("exit4") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-32 min-w-32 max-w-32 border-r border-border bg-muted">Saída 4</th>}
+                  {isVisible("entry5") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-32 min-w-32 max-w-32 border-r border-border bg-muted">Entrada 5</th>}
+                  {isVisible("exit5") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-32 min-w-32 max-w-32 border-r border-border bg-muted">Saída 5</th>}
+                  {isVisible("compensated") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-28 min-w-28 max-w-28 border-r border-border bg-muted">Compensado</th>}
+                  {isVisible("neutral") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-28 min-w-28 max-w-28 border-r border-border bg-muted">Neutro</th>}
+                  {isVisible("dayOff") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-28 min-w-28 max-w-28 border-r border-border bg-muted">Folga</th>}
+                  {isVisible("freeLunch") && <th className="text-center text-foreground font-bold uppercase text-xs px-4 py-2 w-28 min-w-28 max-w-28 bg-muted">Almoço</th>}
                 </tr>
               </thead>
               <tbody>
@@ -994,8 +997,8 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                     <tr
                       key={field.id}
                       className={cn(
-                        "border-b border-neutral-400 dark:border-border transition-colors",
-                        isWeekend && "bg-red-50 dark:bg-red-900/10",
+                        "border-b border-border transition-colors bg-card hover:bg-muted/20 h-12",
+                        isWeekend && "bg-red-50/60 dark:bg-red-950/30",
                       )}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -1003,7 +1006,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       }}
                     >
                       <td
-                        className="p-2 sticky left-0 bg-background z-10 w-[150px] min-w-[150px] max-w-[150px] border-r border-neutral-400 dark:border-border"
+                        className="p-2 sticky left-0 bg-inherit z-10 w-[150px] min-w-[150px] max-w-[150px] border-r border-border"
                         onContextMenu={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -1042,7 +1045,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                         return (
                           <td
                             key={timeField}
-                            className={cn("p-1 w-32 min-w-32 max-w-32 border-r border-neutral-400 dark:border-border", isModified && "bg-yellow-100 dark:bg-yellow-900/30")}
+                            className={cn("p-1 w-32 min-w-32 max-w-32 border-r border-border", isModified && "bg-yellow-100 dark:bg-yellow-900/30")}
                             onContextMenu={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -1061,6 +1064,24 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                                 const cellValue = formField.value as string | null;
                                 const isJustification = !!cellValue && !/^\d{1,2}:\d{2}$/.test(cellValue);
                                 const justificationFullName = isJustification ? justificationFullNameMap.get((cellValue || "").trim()) : null;
+                                // When Secullum's /Batidas leaves the time cell blank but the
+                                // day is a folga or feriado, /Calculos (Visualização Colaborador)
+                                // shows "FOLGA" / "FERIADO" in the same column. Mirror that
+                                // here so Edit mode reads the same way. The TimeInput is
+                                // hidden in favor of a static label — context-menu still
+                                // works for editing if needed.
+                                const entryDate = entry.date instanceof Date ? entry.date : new Date(entry.date);
+                                const ymd = isNaN(entryDate.getTime())
+                                  ? null
+                                  : `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, "0")}-${String(entryDate.getDate()).padStart(2, "0")}`;
+                                const isHoliday = !!ymd && !!holidayDates && holidayDates.has(ymd);
+                                const derivedLabel: string | null = !cellValue
+                                  ? isHoliday
+                                    ? "FERIADO"
+                                    : entry.dayOff
+                                      ? "FOLGA"
+                                      : null
+                                  : null;
                                 // Compute the manual marker INSIDE the render prop so it
                                 // sees the live value as the user types (FormField re-renders
                                 // on every change). If the value differs from the original
@@ -1096,6 +1117,17 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                                             </div>
                                           </TooltipContent>
                                         </Tooltip>
+                                      ) : derivedLabel ? (
+                                        <div
+                                          className={cn(
+                                            "h-8 px-2 flex items-center justify-center text-xs font-semibold uppercase tracking-wide cursor-default whitespace-nowrap select-none",
+                                            derivedLabel === "FERIADO"
+                                              ? "text-cyan-700 dark:text-cyan-300"
+                                              : "text-emerald-700 dark:text-emerald-400",
+                                          )}
+                                        >
+                                          {derivedLabel}
+                                        </div>
                                       ) : (
                                         <TransparentTimeInput
                                           value={cellValue}
@@ -1153,7 +1185,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
 
                       {/* Checkboxes */}
                       {isVisible("compensated") && (
-                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border", isFieldModified(field.id, "compensated") && "bg-yellow-100 dark:bg-yellow-900/30")}>
+                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-r border-border", isFieldModified(field.id, "compensated") && "bg-yellow-100 dark:bg-yellow-900/30")}>
                           <FormField control={form.control} name={`entries.${index}.compensated`} render={({ field: formField }) => (
                             <FormItem className="flex justify-center"><FormControl>
                               <Checkbox checked={formField.value} onCheckedChange={(checked) => { formField.onChange(checked); handleFieldChange(field.id, "compensated", checked); }} />
@@ -1163,7 +1195,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       )}
 
                       {isVisible("neutral") && (
-                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border", isFieldModified(field.id, "neutral") && "bg-yellow-100 dark:bg-yellow-900/30")}>
+                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-r border-border", isFieldModified(field.id, "neutral") && "bg-yellow-100 dark:bg-yellow-900/30")}>
                           <FormField control={form.control} name={`entries.${index}.neutral`} render={({ field: formField }) => (
                             <FormItem className="flex justify-center"><FormControl>
                               <Checkbox checked={formField.value} onCheckedChange={(checked) => { formField.onChange(checked); handleFieldChange(field.id, "neutral", checked); }} />
@@ -1173,7 +1205,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       )}
 
                       {isVisible("dayOff") && (
-                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-r border-neutral-400 dark:border-border", isFieldModified(field.id, "dayOff") && "bg-yellow-100 dark:bg-yellow-900/30")}>
+                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-r border-border", isFieldModified(field.id, "dayOff") && "bg-yellow-100 dark:bg-yellow-900/30")}>
                           <FormField control={form.control} name={`entries.${index}.dayOff`} render={({ field: formField }) => (
                             <FormItem className="flex justify-center"><FormControl>
                               <Checkbox checked={formField.value} onCheckedChange={(checked) => { formField.onChange(checked); handleFieldChange(field.id, "dayOff", checked); }} />
@@ -1183,7 +1215,7 @@ const TimeClockEntryTableComponent = (props: TimeClockEntryTableProps, ref: Reac
                       )}
 
                       {isVisible("freeLunch") && (
-                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-neutral-400 dark:border-border", isFieldModified(field.id, "freeLunch") && "bg-yellow-100 dark:bg-yellow-900/30")}>
+                        <td className={cn("p-1 text-center w-28 min-w-28 max-w-28 border-border", isFieldModified(field.id, "freeLunch") && "bg-yellow-100 dark:bg-yellow-900/30")}>
                           <FormField control={form.control} name={`entries.${index}.freeLunch`} render={({ field: formField }) => (
                             <FormItem className="flex justify-center"><FormControl>
                               <Checkbox checked={formField.value} onCheckedChange={(checked) => { formField.onChange(checked); handleFieldChange(field.id, "freeLunch", checked); }} />
