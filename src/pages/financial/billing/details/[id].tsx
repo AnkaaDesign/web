@@ -229,6 +229,7 @@ export const BillingDetailPage = () => {
         paymentConfig: (config.paymentConfig as any) || null,
         customPaymentText: config.customPaymentText || null,
         generateInvoice: config.generateInvoice !== false,
+        generateBankSlip: config.generateBankSlip !== false,
         orderNumber: config.orderNumber || null,
         responsibleId: config.responsibleId || null,
         customerData: {
@@ -528,6 +529,7 @@ export const BillingDetailPage = () => {
           paymentConfig: c.paymentConfig ?? null,
           customPaymentText: c.customPaymentText || null,
           generateInvoice: c.generateInvoice !== false,
+          generateBankSlip: c.generateBankSlip !== false,
           orderNumber: c.orderNumber || null,
           responsibleId: c.responsibleId || null,
         })),

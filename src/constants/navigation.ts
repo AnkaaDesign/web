@@ -868,6 +868,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.DESIGNER,
   },
   {
+    id: "calendario-producao-designer",
+    title: "Calendário",
+    icon: "calendarStats",
+    path: "/producao/calendario",
+    requiredPrivilege: SECTOR_PRIVILEGES.DESIGNER,
+  },
+  {
     id: "feriados-designer",
     title: "Feriados",
     icon: "holiday",
@@ -986,6 +993,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
   },
   {
+    id: "calendario-producao-logistic",
+    title: "Calendário",
+    icon: "calendarStats",
+    path: "/producao/calendario",
+    requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
+  },
+  {
     id: "historico-logistic",
     title: "Histórico",
     icon: "history",
@@ -1036,6 +1050,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Cronograma",
     icon: "calendarStats",
     path: "/producao/cronograma",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  },
+  {
+    id: "calendario-producao-production-manager",
+    title: "Calendário",
+    icon: "calendarStats",
+    path: "/producao/calendario",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   },
   {
@@ -1125,6 +1146,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
   },
   {
+    id: "calendario-producao-commercial",
+    title: "Calendário",
+    icon: "calendarStats",
+    path: "/producao/calendario",
+    requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+  },
+  {
     id: "gerenciador-de-arquivos",
     title: "Gerenciador de Arquivos",
     icon: "fileManager",
@@ -1170,6 +1198,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Cronograma",
     icon: "calendarStats",
     path: "/producao/cronograma",
+    requiredPrivilege: SECTOR_PRIVILEGES.PLOTTING,
+  },
+  {
+    id: "calendario-producao-plotting",
+    title: "Calendário",
+    icon: "calendarStats",
+    path: "/producao/calendario",
     requiredPrivilege: SECTOR_PRIVILEGES.PLOTTING,
   },
   {
@@ -1416,6 +1451,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
           // { id: "cronograma-cadastrar", title: "Nova Tarefa", icon: "plus", path: "/producao/cronograma/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN }, // Removed - tasks are now created in the "in preparation" page
         ],
       },
+      { id: "calendario-producao", title: "Calendário", icon: "calendarStats", path: "/producao/calendario" },
       { id: "historico", title: "Histórico", icon: "history", path: "/producao/historico", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN] },
       {
         id: "observacoes",

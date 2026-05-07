@@ -11,7 +11,12 @@
 // pre-configured for that sector's most common questions ("what's my queue
 // today?", "what's near deadline?", "what's blocking me?").
 
-import { SECTOR_PRIVILEGES, TASK_STATUS, STOCK_LEVEL } from "../constants";
+import {
+  SECTOR_PRIVILEGES,
+  TASK_STATUS,
+  STOCK_LEVEL,
+  PPE_DELIVERY_STATUS,
+} from "../constants";
 import { DASHBOARD_LAYOUT_VERSION } from "./types";
 import type { DashboardLayout, WidgetInstance } from "./types";
 
@@ -308,6 +313,29 @@ function warehouseLayout(): DashboardLayout {
           },
           sort: { key: "quantity", direction: "asc" },
           limit: 50,
+        },
+      ),
+      makeInstance(
+        "table.borrows",
+        { cols: 2, rows: 2 },
+        {
+          title: "Empréstimos Ativos",
+          accent: { color: "violet", icon: "Package", borderColor: "none" },
+          columns: ["itemUniCode", "itemName", "userName", "borrowedAt"],
+          filters: {
+            searchingFor: "",
+            statuses: [],
+            itemIds: [],
+            userIds: [],
+            categoryIds: [],
+            brandIds: [],
+            createdPreset: "any",
+            hideReturned: true,
+            onlyOverdue: false,
+          },
+          sort: { key: "createdAt", direction: "desc" },
+          limit: 30,
+          showHeader: true,
         },
       ),
       itemWidget(
@@ -635,6 +663,60 @@ function hrLayout(): DashboardLayout {
     updatedAt: new Date().toISOString(),
     items: [
       favorites(),
+      makeInstance(
+        "table.hr-requests",
+        { cols: 4, rows: 3 },
+        {
+          title: "Requisições de RH",
+          accent: { color: "indigo", icon: "Clock", borderColor: "none" },
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            hoverHighlight: true,
+            showSearchBox: true,
+            emptyStateMessage: "",
+          },
+          filters: { searchingFor: "", estados: [0], tipos: [] },
+          sort: { key: "dataSolicitacao", direction: "desc" },
+          limit: 30,
+          showHeader: true,
+          showActionButtons: true,
+        },
+      ),
+      makeInstance(
+        "table.ppe-deliveries",
+        { cols: 4, rows: 2 },
+        {
+          title: "Entregas de EPI Pendentes",
+          accent: { color: "amber", icon: "ClipboardCheck", borderColor: "none" },
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            hoverHighlight: true,
+            stickyHeader: true,
+            showSearchBox: true,
+            emptyStateMessage: "",
+          },
+          columns: ["itemName", "userName", "quantity", "status", "scheduledDate"],
+          filters: {
+            searchingFor: "",
+            statuses: [
+              PPE_DELIVERY_STATUS.PENDING,
+              PPE_DELIVERY_STATUS.WAITING_SIGNATURE,
+            ],
+            itemIds: [],
+            userIds: [],
+            onlyActionable: false,
+          },
+          sort: { key: "createdAt", direction: "desc" },
+          limit: 30,
+          showHeader: true,
+          showRowDot: true,
+          showActionButtons: true,
+        },
+      ),
       makeInstance("home.daily-ponto", { cols: 4, rows: 4 }, {
         title: "Ponto do Dia",
         columns: [
@@ -742,6 +824,60 @@ function adminLayout(): DashboardLayout {
             finishedPreset: "today",
           },
           sort: { key: "finishedAt", direction: "desc" },
+        },
+      ),
+      makeInstance(
+        "table.ppe-deliveries",
+        { cols: 2, rows: 2 },
+        {
+          title: "EPIs Pendentes",
+          accent: { color: "amber", icon: "ClipboardCheck", borderColor: "none" },
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            hoverHighlight: true,
+            stickyHeader: true,
+            showSearchBox: true,
+            emptyStateMessage: "",
+          },
+          columns: ["itemName", "userName", "status", "scheduledDate"],
+          filters: {
+            searchingFor: "",
+            statuses: [
+              PPE_DELIVERY_STATUS.PENDING,
+              PPE_DELIVERY_STATUS.WAITING_SIGNATURE,
+            ],
+            itemIds: [],
+            userIds: [],
+            onlyActionable: false,
+          },
+          sort: { key: "createdAt", direction: "desc" },
+          limit: 20,
+          showHeader: true,
+          showRowDot: true,
+          showActionButtons: true,
+        },
+      ),
+      makeInstance(
+        "table.hr-requests",
+        { cols: 4, rows: 2 },
+        {
+          title: "Requisições de RH",
+          accent: { color: "indigo", icon: "Clock", borderColor: "none" },
+          display: {
+            density: "compact",
+            striping: true,
+            gridLines: true,
+            hoverHighlight: true,
+            showSearchBox: false,
+            emptyStateMessage: "",
+          },
+          filters: { searchingFor: "", estados: [0], tipos: [] },
+          sort: { key: "dataSolicitacao", direction: "desc" },
+          limit: 20,
+          showHeader: true,
+          showActionButtons: true,
         },
       ),
       recentMessages(),

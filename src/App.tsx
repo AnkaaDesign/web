@@ -290,6 +290,7 @@ const ProductionCuttingDetails = lazy(() => import("@/pages/production/cutting/d
 
 // Production Tasks
 const ProductionTasksList = lazy(() => import("@/pages/production/schedule/list").then((module) => ({ default: module.TaskListPage })));
+const ProductionTasksCalendar = lazy(() => import("@/pages/production/schedule/calendar").then((module) => ({ default: module.TaskScheduleCalendarPage })));
 const ProductionTasksHistory = lazy(() => import("@/pages/production/history").then((module) => ({ default: module.TaskHistoryPage })));
 const ProductionTasksBatchEdit = lazy(() => import("@/pages/production/schedule/batch-edit"));
 const ProductionTasksCreate = lazy(() => import("@/pages/production/schedule/create"));
@@ -495,6 +496,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ProductionTasksList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.production.calendar}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProductionTasksCalendar />
                     </Suspense>
                   }
                 />

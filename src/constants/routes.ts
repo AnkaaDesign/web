@@ -505,6 +505,7 @@ export const routes = {
     },
     root: "/producao",
     // Note: 'schedule' property name is kept for backward compatibility but routes point to 'cronograma'
+    calendar: "/producao/calendario",
     schedule: {
       batchEdit: "/producao/cronograma/editar-em-lote",
       create: "/producao/cronograma/cadastrar",

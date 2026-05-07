@@ -100,6 +100,7 @@ export function AbsenceList({ category, className }: AbsenceListProps) {
 
   const { data: usersData, isLoading: usersLoading } = useUsers({
     statuses: [USER_STATUS.EXPERIENCE_PERIOD_1, USER_STATUS.EXPERIENCE_PERIOD_2, USER_STATUS.EFFECTED],
+    where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,
   } as any);

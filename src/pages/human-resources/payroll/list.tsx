@@ -508,6 +508,7 @@ export default function PayrollListPage() {
     where: {
       isActive: true,
       payrollNumber: { not: null },
+      secullumEmployeeId: { not: null },
     },
     limit: 100,
   });

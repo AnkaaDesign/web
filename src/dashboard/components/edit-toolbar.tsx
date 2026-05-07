@@ -44,7 +44,7 @@ export function EditToolbar({
       </Button>
       <div className="w-px h-6 bg-border" />
       <Button
-        variant="ghost"
+        variant="destructive"
         size="sm"
         onClick={onDiscard}
         disabled={isSaving}

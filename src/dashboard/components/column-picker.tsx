@@ -1,21 +1,25 @@
-// Two-list column selector with drag-reorder for the SELECTED columns.
+// Column picker — two sections, both keyed off checkboxes for visibility,
+// with drag-reorder on the visible section.
 //
 // Shape of UX:
 //   ┌──────────────────────────────────────────┐
-//   │ Selecionadas (4)              [Limpar]   │
-//   │ ⋮⋮ Logomarca           ✕                  │  ← drag-sortable
-//   │ ⋮⋮ Cliente             ✕                  │
-//   │ ⋮⋮ Identificador       ✕                  │
-//   │ ⋮⋮ Prazo               ✕                  │
+//   │ Visíveis (4)                  [Limpar]   │
+//   │ ⋮⋮ ☑ Logomarca                            │  ← drag-sortable; uncheck removes
+//   │ ⋮⋮ ☑ Cliente                              │
+//   │ ⋮⋮ ☑ Identificador                        │
+//   │ ⋮⋮ ☑ Prazo                                │
 //   ├──────────────────────────────────────────┤
-//   │ Disponíveis                              │
-//   │ + Setor                                  │  ← click adds at the end
-//   │ + Status                                 │
-//   │ ...                                      │
+//   │ Disponíveis                               │
+//   │ ☐ Setor          ☐ Status                 │  ← 2-col grid; check adds
+//   │ ☐ Tempo restante ☐ ...                    │
 //   └──────────────────────────────────────────┘
 //
-// Generic over a key type so it can be reused by any table widget.
-// dnd-kit is already loaded for the dashboard grid, so we reuse it.
+// Single mental model — "check the columns I want, drag to order them."
+// Order is preserved only for visible (checked) columns; unchecked columns
+// fall back to the catalog order.
+//
+// Generic over a key type so it can be reused by any table widget. dnd-kit
+// is already loaded for the dashboard grid, so we reuse it.
 
 import { useMemo } from "react";
 import {
@@ -35,7 +39,7 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { IconGripVertical, IconX, IconPlus } from "@tabler/icons-react";
+import { IconGripVertical } from "@tabler/icons-react";
 
 export interface ColumnDescriptor<K extends string> {
   key: K;
@@ -100,7 +104,7 @@ export function ColumnPicker<K extends string>({
       <div className="border border-border rounded-md">
         <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Selecionadas ({selected.length})
+            Visíveis ({selected.length})
           </span>
           {selected.length > 1 && (
             <button
@@ -123,8 +127,8 @@ export function ColumnPicker<K extends string>({
                     key={key}
                     id={key}
                     label={def.label}
-                    onRemove={() => remove(key)}
-                    canRemove={selected.length > 1}
+                    onToggle={() => remove(key)}
+                    canUncheck={selected.length > 1}
                   />
                 );
               })}
@@ -146,14 +150,15 @@ export function ColumnPicker<K extends string>({
                 key={c.key}
                 className="col-span-1 odd:border-r odd:border-border last:odd:border-r-0"
               >
-                <button
-                  type="button"
-                  onClick={() => add(c.key)}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent/50 text-left"
-                >
-                  <IconPlus className="h-3.5 w-3.5 text-muted-foreground" />
+                <label className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent/50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={false}
+                    onChange={() => add(c.key)}
+                    className="h-3.5 w-3.5 rounded border-border accent-primary shrink-0"
+                  />
                   <span className="truncate">{c.label}</span>
-                </button>
+                </label>
               </li>
             ))}
           </ul>
@@ -161,7 +166,7 @@ export function ColumnPicker<K extends string>({
       )}
 
       <p className="text-[11px] text-muted-foreground">
-        Arraste para reordenar as colunas selecionadas. A ordem aqui define a ordem na tabela.
+        Marque as colunas que deseja exibir. Arraste pela alça para reordenar — a ordem aqui define a ordem na tabela.
       </p>
     </div>
   );
@@ -172,13 +177,13 @@ export function ColumnPicker<K extends string>({
 function SortableRow<K extends string>({
   id,
   label,
-  onRemove,
-  canRemove,
+  onToggle,
+  canUncheck,
 }: {
   id: K;
   label: string;
-  onRemove: () => void;
-  canRemove: boolean;
+  onToggle: () => void;
+  canUncheck: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
@@ -197,23 +202,22 @@ function SortableRow<K extends string>({
     >
       <button
         type="button"
-        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
         aria-label="Arrastar coluna"
         {...attributes}
         {...listeners}
       >
         <IconGripVertical className="h-3.5 w-3.5" />
       </button>
+      <input
+        type="checkbox"
+        checked
+        onChange={onToggle}
+        disabled={!canUncheck}
+        aria-label={`Ocultar ${label}`}
+        className="h-3.5 w-3.5 rounded border-border accent-primary disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+      />
       <span className="flex-1 text-sm truncate">{label}</span>
-      <button
-        type="button"
-        onClick={onRemove}
-        disabled={!canRemove}
-        className="text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed"
-        aria-label={`Remover ${label}`}
-      >
-        <IconX className="h-3.5 w-3.5" />
-      </button>
     </li>
   );
 }

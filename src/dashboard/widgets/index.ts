@@ -6,17 +6,28 @@
 import { widgetRegistry } from "../registry";
 import { taskTableWidget } from "./task-table";
 import { itemTableWidget } from "./item-table";
+import { borrowTableWidget } from "./borrow-table";
+import { installmentTableWidget } from "./installment-table";
+import { ppeDeliveryTableWidget } from "./ppe-delivery-table";
+import { hrRequestsTableWidget } from "./hr-requests-table";
 import { favoritesWidget } from "./favorites";
 import { recentMessagesWidget } from "./recent-messages";
 import { timeEntriesWidget } from "./time-entries";
 import { dailyPontoWidget } from "./daily-ponto";
 import { quickNoteWidget } from "./quick-note";
 import { quickBudgetWidget } from "./quick-budget";
+import { hrCalendarWidget } from "./hr-calendar";
+import { productionCalendarWidget } from "./production-calendar";
 
 const allWidgets: any[] = [
   // Configurable workhorses (preferred — instantiate as many as needed)
   taskTableWidget,
   itemTableWidget,
+  borrowTableWidget,
+  installmentTableWidget,
+  // HR approval queues (sector-restricted)
+  ppeDeliveryTableWidget,
+  hrRequestsTableWidget,
   // Quick-action / form widgets
   quickBudgetWidget,
   quickNoteWidget,
@@ -26,6 +37,9 @@ const allWidgets: any[] = [
   recentMessagesWidget,
   timeEntriesWidget,
   dailyPontoWidget,
+  // Calendar widgets (monthly, period 26→25)
+  hrCalendarWidget,
+  productionCalendarWidget,
 ];
 
 let registered = false;

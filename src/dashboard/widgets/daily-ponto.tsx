@@ -16,10 +16,11 @@ import {
   useRef,
   useState,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import {
   IconAdjustments,
-  IconChevronDown,
+  IconCalendar,
   IconChevronLeft,
   IconChevronRight,
   IconClock24,
@@ -38,11 +39,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "../../components/ui/collapsible";
+import { routes } from "../../constants/routes";
 import { useSecullumTimeEntriesByDay } from "../../hooks/integrations/use-secullum";
 import {
   renderHourValue,
@@ -62,6 +59,12 @@ import type {
   WidgetDefinition,
   WidgetRenderProps,
 } from "../types";
+import {
+  Section,
+  ToggleRow,
+  LimitInput,
+  SORT_DIRECTION_OPTIONS,
+} from "./_shared";
 
 // ============================================================================
 // Column catalog
@@ -449,6 +452,8 @@ export const dailyPontoConfigSchema = z.object({
       direction: z.enum(["asc", "desc"]).default("asc"),
     })
     .default({ key: "userName", direction: "asc" }),
+
+  limit: z.number().int().min(5).max(200).default(50),
 });
 
 export type DailyPontoConfig = z.infer<typeof dailyPontoConfigSchema>;
@@ -498,8 +503,8 @@ interface DayRow {
 
 function densityClasses(d: DailyPontoConfig["display"]["density"]) {
   if (d === "compact") return { row: "px-2 py-1 text-xs", header: "px-2 py-1 text-[10px]" };
-  if (d === "spacious") return { row: "px-3 py-3", header: "px-3 py-2 text-[10px]" };
-  return { row: "px-3 py-2", header: "px-3 py-1.5 text-[10px]" };
+  if (d === "spacious") return { row: "px-3 py-3 text-sm", header: "px-3 py-2 text-[10px]" };
+  return { row: "px-3 py-2 text-sm", header: "px-3 py-1.5 text-[10px]" };
 }
 
 // ============================================================================
@@ -624,6 +629,7 @@ function DailyPontoRender({
   instanceId,
 }: WidgetRenderProps<DailyPontoConfig>) {
   const config = useMemo(() => normalizeConfig(rawConfig), [rawConfig]);
+  const navigate = useNavigate();
   const [date, setDate] = useState<Date>(() => todayDate());
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDeferredValue(searchInput);
@@ -635,7 +641,11 @@ function DailyPontoRender({
 
   const search = debouncedSearch || config.filters.defaultSearch;
   const rows = useMemo(
-    () => applySort(applyFilters(rawRows, config, search), config),
+    () =>
+      applySort(applyFilters(rawRows, config, search), config).slice(
+        0,
+        config.limit,
+      ),
     [rawRows, config, search],
   );
 
@@ -727,27 +737,26 @@ function DailyPontoRender({
         </div>
       )}
       {display.showDayNavigator && (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center h-7 rounded-md border border-border bg-background overflow-hidden">
           <button
             type="button"
             onClick={() => setDate((d) => addDays(d, -1))}
-            className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+            className="h-full px-1.5 flex items-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             title="Dia anterior"
           >
             <IconChevronLeft className="h-3.5 w-3.5" />
           </button>
-          <button
-            type="button"
-            onClick={() => setDate(todayDate())}
-            disabled={isToday}
-            className="text-[10px] tabular-nums px-1.5 py-0.5 rounded hover:bg-accent disabled:cursor-default text-muted-foreground hover:text-foreground"
+          <div
+            title={isToday ? "Hoje" : formatBR(date)}
+            className="h-full w-[110px] px-2 flex items-center justify-center gap-1.5 text-[11px] font-medium tabular-nums border-x border-border text-foreground select-none"
           >
-            {isToday ? "Hoje" : formatBR(date)}
-          </button>
+            <IconCalendar className="h-3 w-3 opacity-60 shrink-0" />
+            <span>{isToday ? "Hoje" : formatBR(date)}</span>
+          </div>
           <button
             type="button"
             onClick={() => setDate((d) => addDays(d, 1))}
-            className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+            className="h-full px-1.5 flex items-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             title="Próximo dia"
           >
             <IconChevronRight className="h-3.5 w-3.5" />
@@ -761,7 +770,22 @@ function DailyPontoRender({
   const renderRow = (row: DayRow, i: number) => (
     <div
       key={row.user.id}
-      className={`grid gap-x-3 items-center transition-colors ${dens.row} ${rowBorder} ${rowHover} ${
+      role="button"
+      tabIndex={0}
+      onClick={() =>
+        navigate(
+          `${routes.humanResources.timeClock.root}?view=colaborador-unico&userId=${row.user.id}`,
+        )
+      }
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigate(
+            `${routes.humanResources.timeClock.root}?view=colaborador-unico&userId=${row.user.id}`,
+          );
+        }
+      }}
+      className={`grid gap-x-3 items-center cursor-pointer transition-colors ${dens.row} ${rowBorder} ${rowHover} ${
         display.striping && i % 2 === 1 ? "bg-muted/20" : ""
       }`}
       style={{ gridTemplateColumns: gridTemplate }}
@@ -769,7 +793,9 @@ function DailyPontoRender({
       {cols.map((c) => (
         <div
           key={c.key}
-          className={`min-w-0 ${c.align === "center" ? "text-center" : ""}`}
+          className={`min-w-0 truncate ${
+            c.align === "center" ? "text-center" : ""
+          }`}
         >
           {c.render(row)}
         </div>
@@ -935,57 +961,6 @@ const SORT_LABELS: Record<(typeof SORT_KEYS)[number], string> = {
   atras: "Atraso",
   normais: "Horas normais",
 };
-const YES_NO_OPTIONS: Array<{ value: "yes" | "no"; label: string }> = [
-  { value: "yes", label: "Sim" },
-  { value: "no", label: "Não" },
-];
-
-function Section({
-  title,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Collapsible defaultOpen={defaultOpen} className="border border-border rounded-md">
-      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
-        {title}
-        <IconChevronDown className="h-4 w-4 transition-transform" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-function ToggleRow({
-  label,
-  hint,
-  checked,
-  onCheckedChange,
-}: {
-  label: string;
-  hint?: string;
-  checked: boolean;
-  onCheckedChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs">{label}</Label>
-      <Combobox
-        mode="single"
-        value={checked ? "yes" : "no"}
-        onValueChange={(v) => onCheckedChange(v === "yes")}
-        options={YES_NO_OPTIONS}
-        clearable={false}
-      />
-      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
-
 function asArray(v: unknown): string[] {
   if (Array.isArray(v)) return v;
   if (typeof v === "string" && v) return [v];
@@ -1189,7 +1164,7 @@ function DailyPontoConfigComponent({
               diretamente na tabela. Duplo clique reseta para o padrão.
             </p>
           </Section>
-          <Section title="Ordenação">
+          <Section title="Ordenação e limite">
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">Ordenar por</Label>
@@ -1219,14 +1194,15 @@ function DailyPontoConfigComponent({
                       (typeof v === "string" ? v : "asc") as DailyPontoConfig["sort"]["direction"],
                     )
                   }
-                  options={[
-                    { value: "asc", label: "Crescente" },
-                    { value: "desc", label: "Decrescente" },
-                  ]}
+                  options={SORT_DIRECTION_OPTIONS}
                   clearable={false}
                 />
               </div>
             </div>
+            <LimitInput
+              value={c.limit}
+              onChange={(n) => set("limit", n)}
+            />
           </Section>
         </TabsContent>
 
@@ -1348,7 +1324,7 @@ export const dailyPontoWidget: WidgetDefinition<DailyPontoConfig> = {
   category: "hr",
   allowedSectors: "*",
   defaultSize: { cols: 4, rows: 3 },
-  minSize: { cols: 2, rows: 1 },
+  minSize: { cols: 1, rows: 1 },
   maxSize: { cols: 4, rows: 4 },
   configSchema: dailyPontoConfigSchema,
   defaultConfig: {
@@ -1379,6 +1355,7 @@ export const dailyPontoWidget: WidgetDefinition<DailyPontoConfig> = {
     ],
     filters: { mode: "all", sectorNames: [], positionNames: [], defaultSearch: "" },
     sort: { key: "userName", direction: "asc" },
+    limit: 50,
   },
   RenderComponent: DailyPontoRender,
   ConfigComponent: DailyPontoConfigComponent,

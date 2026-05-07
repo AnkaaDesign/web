@@ -1,8 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { IconDeviceFloppy, IconRestore } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { TimeClockEntryEditList } from "@/components/human-resources/time-clock-entry/time-clock-edit-list";
+import {
+  TimeClockEntryEditList,
+  type TimeClockEntryEditActions,
+} from "@/components/human-resources/time-clock-entry/time-clock-edit-list";
 import { TimeClockDayView } from "@/components/human-resources/time-clock-entry/time-clock-day-view";
 import {
   TimeClockDayViewExport,
@@ -153,6 +157,8 @@ export default function TimeClockListPage() {
     endDate: Date | null;
   } | null>(null);
 
+  const [editActions, setEditActions] = useState<TimeClockEntryEditActions | null>(null);
+
   const viewOptions: ViewOption[] = [
     { value: "colaborador-unico", label: "Visualização Colaborador", visible: true },
     { value: "multiplos-colaboradores", label: "Visualização Dia", visible: true },
@@ -197,6 +203,18 @@ export default function TimeClockListPage() {
                 endDate={editExport.endDate}
               />
             )}
+            {view === "edit" && editActions && editActions.changedRowsCount > 0 && (
+              <div className="flex items-center gap-1">
+                <Button type="button" variant="outline" onClick={editActions.onRestore}>
+                  <IconRestore className="h-4 w-4 mr-2" />
+                  Restaurar
+                </Button>
+                <Button type="button" variant="default" onClick={editActions.onSave}>
+                  <IconDeviceFloppy className="h-4 w-4 mr-2" />
+                  Salvar ({editActions.changedRowsCount})
+                </Button>
+              </div>
+            )}
           </div>
         }
       />
@@ -209,7 +227,11 @@ export default function TimeClockListPage() {
           <TimeClockDayView className="h-full" onExportDataChange={setDayExport} />
         )}
         {view === "edit" && canEdit && (
-          <TimeClockEntryEditList className="h-full" onExportDataChange={setEditExport} />
+          <TimeClockEntryEditList
+            className="h-full"
+            onExportDataChange={setEditExport}
+            onActionsChange={setEditActions}
+          />
         )}
       </div>
     </div>

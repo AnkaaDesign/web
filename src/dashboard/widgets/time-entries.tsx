@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { z } from "zod";
-import { IconClock } from "@tabler/icons-react";
+import { IconClock, IconAdjustments, IconChevronDown } from "@tabler/icons-react";
 import { SECTOR_PRIVILEGES } from "../../constants";
 import { TimeEntriesCard } from "../../components/home-dashboard";
 import { WidgetCard } from "../components/widget-card";
@@ -16,6 +16,8 @@ import type {
 } from "../components/widget-accent";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../components/ui/collapsible";
 import type {
   WidgetConfigProps,
   WidgetDefinition,
@@ -59,6 +61,26 @@ function Render({ config }: WidgetRenderProps<Config>) {
   );
 }
 
+function Section({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Collapsible defaultOpen={defaultOpen} className="border border-border rounded-md">
+      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
+        {title}
+        <IconChevronDown className="h-4 w-4 transition-transform" />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
   const set = <K extends keyof Config>(key: K, value: Config[K]) =>
     onChange({ ...config, [key]: value });
@@ -75,19 +97,28 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
           placeholder="Ponto da Semana"
         />
       </div>
-      <div className="space-y-2">
-        <Label className="text-xs">Aparência</Label>
-        <AccentPicker
-          value={{ color: accentColor, icon: accentIcon, borderColor }}
-          onChange={(next) =>
-            set("accent", {
-              color: next.color,
-              icon: next.icon,
-              borderColor: next.borderColor,
-            } as Config["accent"])
-          }
-        />
-      </div>
+      <Tabs defaultValue="appearance" className="flex flex-col gap-2">
+        <TabsList className="self-start">
+          <TabsTrigger value="appearance" className="gap-1">
+            <IconAdjustments className="h-3.5 w-3.5" /> Aparência
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="appearance" className="space-y-3 mt-0">
+          <Section title="Acento (cor, ícone, borda)" defaultOpen>
+            <AccentPicker
+              value={{ color: accentColor, icon: accentIcon, borderColor }}
+              onChange={(next) =>
+                set("accent", {
+                  color: next.color,
+                  icon: next.icon,
+                  borderColor: next.borderColor,
+                } as Config["accent"])
+              }
+            />
+          </Section>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

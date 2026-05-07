@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   format,
   eachDayOfInterval,
-  isSameMonth,
   isSameDay,
   addMonths,
   subMonths,
@@ -117,12 +116,19 @@ export function AbsencesCalendar() {
   const [showJustifiedFalta, setShowJustifiedFalta] = useState(true);
   const [showUnjustifiedFalta, setShowUnjustifiedFalta] = useState(true);
   const [showHoliday, setShowHoliday] = useState(true);
+  // Selected day powers the right-side "Detalhe do dia" panel. Clicking a
+  // cell selects it; clicking the same cell again or pressing "Limpar"
+  // clears it. Persists only while the day stays inside the visible period.
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
   // Fetch + render range — driven by payroll period (26→25).
   const range = useMemo(() => {
     if (viewMode === "year") {
-      const start = new Date(refMonth.getFullYear(), 0, 1);
-      const end = new Date(refMonth.getFullYear(), 11, 31);
+      // Year view = the 12 payroll periods anchored in this year. Each runs
+      // day 26 of the previous month → day 25 of the anchor month, so the
+      // year as a whole spans Dec 26 of prev year → Dec 25 of this year.
+      const start = new Date(refMonth.getFullYear() - 1, 11, 26);
+      const end = new Date(refMonth.getFullYear(), 11, 25);
       return { periodStart: start, periodEnd: end, gridStart: start, gridEnd: end };
     }
     const { start, end } = getPayrollPeriod(refMonth);
@@ -155,6 +161,7 @@ export function AbsencesCalendar() {
       USER_STATUS.EXPERIENCE_PERIOD_2,
       USER_STATUS.EFFECTED,
     ],
+    where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,
   } as any);
@@ -306,6 +313,16 @@ export function AbsencesCalendar() {
   const goNext = () =>
     setRefMonth(viewMode === "year" ? addYears(refMonth, 1) : addMonths(refMonth, 1));
 
+  // Drop the selected day whenever the visible period no longer contains
+  // it (period change, year-view toggle, etc.) so the side panel never
+  // points at a date that's not on screen.
+  useEffect(() => {
+    if (!selectedDay) return;
+    if (selectedDay < range.periodStart || selectedDay > range.periodEnd) {
+      setSelectedDay(null);
+    }
+  }, [selectedDay, range.periodStart, range.periodEnd]);
+
   // Keyboard navigation: ←/→ moves to the previous/next period (month in
   // month view, year in year view). Suppressed while typing in inputs or
   // while a combobox/dialog/listbox has focus, so the shortcuts don't fight
@@ -449,14 +466,26 @@ export function AbsencesCalendar() {
             <LoadingSpinner size="lg" />
           </div>
         ) : viewMode === "month" ? (
-          <MonthView
-            gridStart={range.gridStart}
-            gridEnd={range.gridEnd}
-            periodStart={range.periodStart}
-            periodEnd={range.periodEnd}
-            absences={absences}
-            holidays={holidays}
-          />
+          <div className="flex-1 min-h-0 flex gap-4 overflow-hidden">
+            <div className="flex-1 min-w-0 overflow-hidden flex">
+              <MonthView
+                gridStart={range.gridStart}
+                gridEnd={range.gridEnd}
+                periodStart={range.periodStart}
+                periodEnd={range.periodEnd}
+                absences={absences}
+                holidays={holidays}
+                selectedDay={selectedDay}
+                onSelectDay={setSelectedDay}
+              />
+            </div>
+            <DayDetailPanel
+              selectedDay={selectedDay}
+              absences={absences}
+              holidays={holidays}
+              onClose={() => setSelectedDay(null)}
+            />
+          </div>
         ) : (
           <YearView
             year={refMonth.getFullYear()}
@@ -633,6 +662,8 @@ function MonthView({
   periodEnd,
   absences,
   holidays,
+  selectedDay,
+  onSelectDay,
 }: {
   gridStart: Date;
   gridEnd: Date;
@@ -640,8 +671,15 @@ function MonthView({
   periodEnd: Date;
   absences: SecullumAggregatedAbsence[];
   holidays: any[];
+  selectedDay: Date | null;
+  onSelectDay: (d: Date | null) => void;
 }) {
   const allDays = eachDayOfInterval({ start: gridStart, end: gridEnd });
+  // Lock all rows to the same fraction of available height. `auto-rows-fr`
+  // sets `1fr` only as a minimum, so a cell whose min-content exceeds that
+  // share will stretch its whole row. `repeat(N, minmax(0, 1fr))` is a hard
+  // cap — content overflow stays inside the cell where it can scroll.
+  const numRows = Math.max(1, Math.ceil(allDays.length / 7));
 
   return (
     <div className="flex-1 flex flex-col rounded-lg border border-border bg-background shadow-sm overflow-hidden">
@@ -655,7 +693,10 @@ function MonthView({
           </div>
         ))}
       </div>
-      <div className="flex-1 grid grid-cols-7 auto-rows-fr">
+      <div
+        className="flex-1 grid grid-cols-7 min-h-0"
+        style={{ gridTemplateRows: `repeat(${numRows}, minmax(0, 1fr))` }}
+      >
         {allDays.map((date, idx) => {
           const isInPeriod = date >= periodStart && date <= periodEnd;
           const isLastCol = (idx + 1) % 7 === 0;
@@ -682,20 +723,25 @@ function MonthView({
           const dayAbsences = getAbsencesForDay(absences, date);
           const dayHolidays = getHolidaysForDay(holidays, date);
           const isToday = isSameDay(date, new Date());
+          const isSelected = selectedDay ? isSameDay(date, selectedDay) : false;
           const dow = date.getDay();
           const isWeekend = dow === 0 || dow === 6;
 
           return (
-            <Tooltip key={idx}>
-              <TooltipTrigger asChild>
-                <div
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => onSelectDay(isSelected ? null : date)}
+                  aria-pressed={isSelected}
                   className={cn(
-                    "bg-background min-h-[120px] p-2 relative overflow-hidden transition-colors duration-150 border-border",
+                    "bg-background min-h-[120px] p-2 relative overflow-hidden transition-colors duration-150 border-border text-left flex flex-col items-stretch justify-start gap-1.5",
                     !isLastCol && "border-r",
                     !isLastRow && "border-b",
                     isWeekend && "bg-blue-50/40 dark:bg-blue-950/20",
-                    !isToday && "hover:bg-accent/40",
+                    !isToday && !isSelected && "hover:bg-accent/40",
                     isToday && "ring-2 ring-primary ring-inset",
+                    isSelected && !isToday && "ring-2 ring-primary/60 ring-inset bg-primary/5",
+                    "focus:outline-none focus:bg-accent/40",
                   )}
                 >
                   <div className="flex items-start justify-between">
@@ -794,21 +840,196 @@ function MonthView({
                       );
                     })()}
                   </div>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="w-auto max-w-none">
-                <DayTooltip
-                  date={date}
-                  absences={dayAbsences}
-                  holidays={dayHolidays}
-                  isWeekend={isWeekend}
-                  isInPeriod={isInPeriod}
-                />
-              </TooltipContent>
-            </Tooltip>
+                </button>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ===== DAY DETAIL PANEL ===============================================
+// Right-side panel that mirrors the production calendar's "Detalhe do dia"
+// — each event/absence is its own card with the matching category color,
+// icon, collaborator name, justificativa label and sector. Replaces the
+// older hover popover, which the user found cramped.
+function DayDetailPanel({
+  selectedDay,
+  absences,
+  holidays,
+  onClose,
+}: {
+  selectedDay: Date | null;
+  absences: SecullumAggregatedAbsence[];
+  holidays: any[];
+  onClose: () => void;
+}) {
+  const dayAbsences = selectedDay ? getAbsencesForDay(absences, selectedDay) : [];
+  const dayHolidays = selectedDay ? getHolidaysForDay(holidays, selectedDay) : [];
+  const isWeekend =
+    !!selectedDay && (selectedDay.getDay() === 0 || selectedDay.getDay() === 6);
+
+  // Bucket absences exactly like the cell bars: ≥3 collaborators sharing a
+  // [GRP:uuid] tag (or implicit JustId+period) collapse into a "coletiva"
+  // card; everyone else is rendered as an individual card.
+  const buckets = selectedDay && !isWeekend && dayHolidays.length === 0
+    ? bucketDayAbsences(dayAbsences)
+    : { collectives: [], individuals: [] as SecullumAggregatedAbsence[] };
+
+  const totalCards = dayHolidays.length + buckets.collectives.length + buckets.individuals.length;
+  const showWeekendNote = !!selectedDay && isWeekend && dayHolidays.length === 0;
+  const showWorkdayNote =
+    !!selectedDay && !isWeekend && dayHolidays.length === 0 && dayAbsences.length === 0;
+
+  return (
+    <aside className="hidden lg:flex w-[360px] shrink-0 flex-col rounded-lg border border-border bg-card overflow-hidden">
+      <div className="px-3 py-2.5 border-b border-border flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+            Detalhe do dia
+          </div>
+          <div className="text-sm font-bold capitalize truncate">
+            {selectedDay
+              ? format(selectedDay, "EEEE, dd 'de' MMMM", { locale: ptBR })
+              : "Selecione um dia"}
+          </div>
+        </div>
+        {selectedDay && (
+          <Button variant="ghost" size="sm" onClick={onClose} className="h-7 px-2 text-xs">
+            Limpar
+          </Button>
+        )}
+      </div>
+      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+        {!selectedDay && (
+          <div className="h-full flex flex-col items-center justify-center text-center text-xs text-muted-foreground p-6 gap-2">
+            <IconCalendar className="h-8 w-8 opacity-50" />
+            Clique em qualquer dia da grade para ver os eventos deste dia.
+          </div>
+        )}
+        {selectedDay && totalCards === 0 && (
+          <div className="h-full flex flex-col items-center justify-center text-center text-xs text-muted-foreground p-6 gap-2">
+            <IconCalendar className="h-8 w-8 opacity-50" />
+            {showWorkdayNote && "Dia útil — sem registros."}
+            {showWeekendNote && "Fim de semana."}
+            {!showWorkdayNote && !showWeekendNote && "Nenhum evento neste dia."}
+          </div>
+        )}
+        {selectedDay && dayHolidays.map((h: any, i: number) => (
+          <HolidayCard key={`h${i}`} holiday={h} />
+        ))}
+        {selectedDay && buckets.collectives.map((b) => (
+          <CollectiveCard key={b.key} bucket={b} />
+        ))}
+        {selectedDay && buckets.individuals.map((a) => (
+          <AbsenceCard key={a.Id} absence={a} />
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+// --- Card variants ----------------------------------------------------
+
+function CategoryBadge({
+  category,
+  label,
+}: {
+  category: BarCategory | "HOLIDAY";
+  label: string;
+}) {
+  const tone = {
+    AUSENCIA: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+    FALTA_JUSTIFIED: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    FALTA_UNJUSTIFIED: "bg-red-600/25 text-red-800 dark:text-red-200",
+    HOLIDAY: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  }[category];
+  const Icon =
+    category === "AUSENCIA"
+      ? IconBeach
+      : category === "FALTA_JUSTIFIED"
+        ? IconUserOff
+        : category === "FALTA_UNJUSTIFIED"
+          ? IconUserExclamation
+          : IconConfetti;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] uppercase tracking-wide font-semibold",
+        tone,
+      )}
+    >
+      <Icon className="h-3 w-3" strokeWidth={2.5} />
+      {label}
+    </span>
+  );
+}
+
+function HolidayCard({ holiday }: { holiday: any }) {
+  const desc = holiday.Descricao || holiday.descricao || "Feriado";
+  return (
+    <div className="rounded-md border border-border bg-background px-2.5 py-2">
+      <CategoryBadge category="HOLIDAY" label="Feriado" />
+      <div className="mt-1 text-sm font-semibold truncate">{desc}</div>
+    </div>
+  );
+}
+
+function AbsenceCard({ absence }: { absence: SecullumAggregatedAbsence }) {
+  const cat = getBarCategory(absence);
+  const meta = getJustificativaMeta(absence.JustificativaId);
+  const catLabel =
+    cat === "AUSENCIA"
+      ? "Ausência"
+      : cat === "FALTA_JUSTIFIED"
+        ? "Justificada"
+        : cat === "FALTA_UNJUSTIFIED"
+          ? "Não Justificada"
+          : "Outro";
+  const justLabel = meta?.label ?? absence.JustificativaDescricao ?? `#${absence.JustificativaId}`;
+  return (
+    <div className="rounded-md border border-border bg-background px-2.5 py-2 space-y-1">
+      <CategoryBadge category={cat ?? "AUSENCIA"} label={catLabel} />
+      <div className="text-sm font-semibold truncate">{absence.userName}</div>
+      <div className="text-xs text-muted-foreground truncate">{justLabel}</div>
+      {absence.sectorName && (
+        <div className="text-[11px] text-muted-foreground/80 truncate">
+          {absence.sectorName}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CollectiveCard({ bucket }: { bucket: CollectiveBucket }) {
+  const catLabel =
+    bucket.category === "AUSENCIA"
+      ? "Ausência Coletiva"
+      : bucket.category === "FALTA_JUSTIFIED"
+        ? "Justificada Coletiva"
+        : "Não Justificada Coletiva";
+  const label = getCollectiveLabel(bucket);
+  return (
+    <div className="rounded-md border border-border bg-background px-2.5 py-2 space-y-1">
+      <CategoryBadge category={bucket.category} label={catLabel} />
+      <div className="text-sm font-semibold flex items-center gap-1.5 truncate">
+        <IconUsersGroup className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+        <span className="truncate">{label}</span>
+      </div>
+      <div className="text-xs text-muted-foreground">
+        {bucket.members.length} colaboradores
+      </div>
+      <ul className="pt-1 space-y-0.5 max-h-32 overflow-y-auto pr-1">
+        {bucket.members.map((m) => (
+          <li
+            key={m.Id}
+            className="text-[11px] text-muted-foreground truncate flex items-center gap-1"
+          >
+            <span className="inline-block w-1 h-1 rounded-full bg-muted-foreground/60 shrink-0" />
+            {m.userName}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -858,13 +1079,15 @@ function MiniMonth({
   holidays: any[];
   onClick: () => void;
 }) {
-  const monthFirst = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const monthLast = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-  const gridStart = startOfWeekSunday(monthFirst);
-  const gridEnd = endOfWeekSaturday(monthLast);
+  // Each mini-month renders the payroll period anchored at this month
+  // (day 26 of previous month → day 25 of this month) so the year overview
+  // matches what the user sees when they click in to the month view.
+  const { start: periodStart, end: periodEnd } = getPayrollPeriod(monthDate);
+  const gridStart = startOfWeekSunday(periodStart);
+  const gridEnd = endOfWeekSaturday(periodEnd);
   // Pad to 42 cells (6 weeks × 7 days) so every mini-month has identical
-  // height. Without this, Fevereiro (4 natural weeks) renders shorter than
-  // Janeiro/Março and cards within the same row don't top-align.
+  // height. Without this, periods that fit in fewer weeks render shorter
+  // and cards within the same row don't top-align.
   const naturalDays = eachDayOfInterval({ start: gridStart, end: gridEnd });
   const allDays = [...naturalDays];
   while (allDays.length < 42) {
@@ -873,27 +1096,25 @@ function MiniMonth({
     allDays.push(next);
   }
 
-  // Per-month counters: person-days for absences, holiday-days for holidays.
+  // Per-period counters: person-days for absences, holiday-days for holidays.
   // Matches the StatsRow tile math so the year-view glance and the month-view
   // summary line up.
   let vacationDays = 0;
   let justifiedFaltaDays = 0;
   let unjustifiedFaltaDays = 0;
   let holidayDays = 0;
-  // Holidays in this month, indexed by yyyy-mm-dd for quick lookup
   const holidayKeys = new Set<string>();
   for (const h of holidays) {
     const raw = (h as any).Data || (h as any).data || (h as any).date;
     if (!raw) continue;
     const part = String(raw).substring(0, 10);
-    holidayKeys.add(part);
     const [yy, mm, dd] = part.split("-").map(Number);
     if (!yy || !mm || !dd) continue;
-    if (yy === monthDate.getFullYear() && mm === monthDate.getMonth() + 1) {
-      const d = new Date(yy, mm - 1, dd);
-      const dow = d.getDay();
-      if (dow !== 0 && dow !== 6) holidayDays++;
-    }
+    const d = new Date(yy, mm - 1, dd);
+    if (d < periodStart || d > periodEnd) continue;
+    holidayKeys.add(part);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) holidayDays++;
   }
   for (const a of absences) {
     const cat = getJustificativaCategory(a.JustificativaId);
@@ -902,7 +1123,11 @@ function MiniMonth({
     const end = new Date(a.Fim);
     const startD = new Date(start.getFullYear(), start.getMonth(), start.getDate());
     const endD = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-    for (let d = new Date(monthFirst); d <= monthLast; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+    for (
+      let d = new Date(periodStart);
+      d <= periodEnd;
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)
+    ) {
       const dow = d.getDay();
       if (dow === 0 || dow === 6) continue; // skip weekends
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -982,14 +1207,33 @@ function MiniMonth({
           </div>
           <div className="grid grid-cols-7">
           {allDays.map((date, idx) => {
+            const isInPeriod = date >= periodStart && date <= periodEnd;
+            const isLastCol = (idx + 1) % 7 === 0;
+            const isLastRow = idx >= allDays.length - 7;
+
+            // Out-of-period slots render as blank spacers so the mini-month
+            // visually starts at periodStart (day 26) and ends at periodEnd
+            // (day 25), matching the month view. The cell is kept so the
+            // 7-column grid alignment is preserved.
+            if (!isInPeriod) {
+              return (
+                <div
+                  key={idx}
+                  aria-hidden
+                  className={cn(
+                    "aspect-square bg-muted/30 border-border",
+                    !isLastCol && "border-r",
+                    !isLastRow && "border-b",
+                  )}
+                />
+              );
+            }
+
             const dayAbsences = getAbsencesForDay(absences, date);
             const dayHolidays = getHolidaysForDay(holidays, date);
-            const isCurrentMonth = isSameMonth(date, monthDate);
             const isToday = isSameDay(date, new Date());
             const dow = date.getDay();
             const isWeekend = dow === 0 || dow === 6;
-            const isLastCol = (idx + 1) % 7 === 0;
-            const isLastRow = idx >= allDays.length - 7;
 
             const ausencias = dayAbsences.filter(
               (a) => getJustificativaCategory(a.JustificativaId) === "AUSENCIA",
@@ -1020,9 +1264,8 @@ function MiniMonth({
                   "relative aspect-square flex items-center justify-center text-[13px] font-medium tabular-nums transition-colors border-border",
                   !isLastCol && "border-r",
                   !isLastRow && "border-b",
-                  !isCurrentMonth && "bg-muted/40 text-muted-foreground/40",
-                  isCurrentMonth && isWeekend && !isToday && "bg-blue-50/40 dark:bg-blue-950/20 text-blue-600/80 dark:text-blue-400/80",
-                  isCurrentMonth && !isWeekend && !isToday && "text-foreground hover:bg-accent/30",
+                  isWeekend && !isToday && "bg-blue-50/40 dark:bg-blue-950/20 text-blue-600/80 dark:text-blue-400/80",
+                  !isWeekend && !isToday && "text-foreground hover:bg-accent/30",
                   isToday && "ring-2 ring-primary ring-inset font-bold text-primary",
                 )}
               >
@@ -1061,7 +1304,7 @@ function MiniMonth({
 
             // Tooltip only when there's something to show; else just render
             // the cell to keep the year-view grid lightweight (12 × 42 cells).
-            const hasContent = (isCurrentMonth && (dayAbsences.length > 0 || dayHolidays.length > 0));
+            const hasContent = dayAbsences.length > 0 || dayHolidays.length > 0;
             if (!hasContent) {
               return <div key={idx}>{cellNode}</div>;
             }
@@ -1083,7 +1326,7 @@ function MiniMonth({
                     absences={isWeekend ? [] : dayAbsences}
                     holidays={dayHolidays}
                     isWeekend={isWeekend}
-                    isInPeriod={isCurrentMonth}
+                    isInPeriod={true}
                   />
                 </TooltipContent>
               </Tooltip>

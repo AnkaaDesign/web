@@ -240,6 +240,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                 paymentCondition: config.paymentCondition || null,
                 paymentConfig: config.paymentConfig || null,
                 generateInvoice: config.generateInvoice ?? true,
+                generateBankSlip: config.generateBankSlip ?? true,
               })) || [],
             },
           }

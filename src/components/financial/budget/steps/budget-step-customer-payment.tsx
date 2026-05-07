@@ -427,6 +427,17 @@ export function BudgetStepCustomerPayment({
                 <span className="text-sm">{config?.generateInvoice !== false ? "Sim" : "Não"}</span>
               </div>
             </div>
+            <div className="space-y-1.5 min-w-[90px]">
+              <Label className="text-sm font-medium whitespace-nowrap">Gerar Boleto</Label>
+              <div className="flex items-center gap-2 border border-input rounded-md px-3 py-2 h-9">
+                <Switch
+                  checked={config?.generateBankSlip !== false}
+                  onCheckedChange={(checked) => setConfigField("generateBankSlip", checked)}
+                  disabled={disabled}
+                />
+                <span className="text-sm">{config?.generateBankSlip !== false ? "Sim" : "Não"}</span>
+              </div>
+            </div>
             <div className="space-y-1.5 flex-1 min-w-[100px]">
               <Label className="text-sm font-medium">N° do Pedido</Label>
               <Input

@@ -10,7 +10,14 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { z } from "zod";
-import { IconMessage, IconMessageOff } from "@tabler/icons-react";
+import {
+  IconAdjustments,
+  IconChevronDown,
+  IconClock,
+  IconLayout,
+  IconMessage,
+  IconMessageOff,
+} from "@tabler/icons-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { HomeDashboardWidgetBody } from "./_shared";
@@ -25,8 +32,15 @@ import type {
   WidgetAccentIcon,
   WidgetBorderColor,
 } from "../components/widget-accent";
+import { Combobox } from "../../components/ui/combobox";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../../components/ui/collapsible";
 import { MessageModal } from "../../components/common/message-modal/message-modal";
 import { useMarkAsViewed } from "../../hooks/administration/use-message";
 import type { HomeDashboardMessage } from "../../types";
@@ -35,6 +49,14 @@ import type {
   WidgetDefinition,
   WidgetRenderProps,
 } from "../types";
+
+const DENSITY = ["compact", "comfortable", "spacious"] as const;
+type Density = (typeof DENSITY)[number];
+const DENSITY_LABELS: Record<Density, string> = {
+  compact: "Compacto",
+  comfortable: "Confortável",
+  spacious: "Espaçoso",
+};
 
 const configSchema = z.object({
   title: z.string().min(1).max(80).default("Mensagens Recentes"),
@@ -45,6 +67,7 @@ const configSchema = z.object({
   }),
   itemsPerRow: z.number().int().min(1).max(8).default(4),
   itemsPerColumn: z.number().int().min(1).max(6).default(2),
+  density: z.enum(DENSITY).default("comfortable"),
 });
 type Config = z.infer<typeof configSchema>;
 
@@ -92,10 +115,15 @@ function seededRng(seed: string): () => number {
  *     divider every few paragraphs
  *   - 30% chance of a button block near the end
  */
-function generateBlocks(seed: string): PreviewBlock[] {
+function generateBlocks(seed: string, density: Density = "comfortable"): PreviewBlock[] {
   const rng = seededRng(seed);
   const blocks: PreviewBlock[] = [];
-  const totalBlocks = 8 + Math.floor(rng() * 7); // 8–14
+  const totalBlocks =
+    density === "compact"
+      ? 5 + Math.floor(rng() * 4) // 5–8
+      : density === "spacious"
+        ? 11 + Math.floor(rng() * 5) // 11–15
+        : 8 + Math.floor(rng() * 5); // 8–12
 
   // Heading
   blocks.push({ kind: "heading", width: 55 + Math.floor(rng() * 35) });
@@ -171,17 +199,44 @@ function generateBlocks(seed: string): PreviewBlock[] {
  * The actual bar (h-2 paragraph / h-3 heading / etc.) sits centered in its
  * slot so cards stay legible at any aspect ratio.
  */
+const DENSITY_BLOCK = {
+  compact: {
+    heading: "h-2",
+    paragraph: "h-1",
+    list: "h-1",
+    listDot: "h-1 w-1",
+    button: "h-3",
+  },
+  comfortable: {
+    heading: "h-2.5",
+    paragraph: "h-1.5",
+    list: "h-1.5",
+    listDot: "h-1.5 w-1.5",
+    button: "h-3.5",
+  },
+  spacious: {
+    heading: "h-3",
+    paragraph: "h-2",
+    list: "h-2",
+    listDot: "h-2 w-2",
+    button: "h-4",
+  },
+} as const;
+
 function PreviewBlockNode({
   block,
   isUnread,
+  density,
 }: {
   block: PreviewBlock;
   isUnread: boolean;
+  density: Density;
 }) {
-  const baseBar = isUnread ? "bg-primary/30" : "bg-muted-foreground/25";
+  const baseBar = isUnread ? "bg-primary/45" : "bg-foreground/15";
   const baseBarHover = isUnread
-    ? "group-hover:bg-primary/40"
-    : "group-hover:bg-muted-foreground/40";
+    ? "group-hover:bg-primary/55"
+    : "group-hover:bg-foreground/25";
+  const sizes = DENSITY_BLOCK[density];
 
   let barClass = "";
   let isList = false;
@@ -189,26 +244,23 @@ function PreviewBlockNode({
   let isImage = false;
 
   if (block.kind === "heading") {
-    barClass = `h-2.5 rounded-md ${baseBar} ${baseBarHover}`;
+    barClass = `${sizes.heading} rounded-md ${baseBar} ${baseBarHover}`;
   } else if (block.kind === "paragraph") {
-    barClass = `h-1.5 rounded-full ${baseBar} ${baseBarHover}`;
+    barClass = `${sizes.paragraph} rounded-full ${baseBar} ${baseBarHover}`;
   } else if (block.kind === "list") {
     isList = true;
   } else if (block.kind === "divider") {
     isDivider = true;
   } else if (block.kind === "button") {
-    barClass = `h-3.5 rounded-md ${
-      isUnread ? "bg-primary/45" : "bg-muted-foreground/35"
+    barClass = `${sizes.button} rounded-md ${
+      isUnread ? "bg-primary/65" : "bg-foreground/25"
     } ${
-      isUnread ? "group-hover:bg-primary/55" : "group-hover:bg-muted-foreground/50"
+      isUnread ? "group-hover:bg-primary/80" : "group-hover:bg-foreground/40"
     }`;
   } else {
     isImage = true;
   }
 
-  // Slot wrapper — flex column centering the bar vertically. `min-h-0`
-  // allows the slot to shrink below its content size so all blocks fit
-  // even in compact cards.
   return (
     <div className="min-h-0 flex flex-col justify-center transition-colors">
       {isDivider ? (
@@ -216,10 +268,10 @@ function PreviewBlockNode({
       ) : isList ? (
         <div className="flex items-center gap-1.5">
           <span
-            className={`h-1.5 w-1.5 rounded-full shrink-0 ${baseBar} ${baseBarHover} transition-colors`}
+            className={`${sizes.listDot} rounded-full shrink-0 ${baseBar} ${baseBarHover} transition-colors`}
           />
           <div
-            className={`h-1.5 rounded-full ${baseBar} ${baseBarHover} transition-colors`}
+            className={`${sizes.list} rounded-full ${baseBar} ${baseBarHover} transition-colors`}
             style={{ width: `${block.width}%` }}
           />
         </div>
@@ -227,8 +279,8 @@ function PreviewBlockNode({
         <div
           className={`rounded-md ${
             isUnread
-              ? "bg-primary/15 border border-primary/30"
-              : "bg-muted/60 border border-border"
+              ? "bg-primary/20 border border-primary/40"
+              : "bg-muted/70 border border-border"
           } transition-colors`}
           style={{ width: `${block.width}%`, minHeight: "1.5rem", height: "100%" }}
         />
@@ -245,76 +297,125 @@ function PreviewBlockNode({
 interface MessageStubCardProps {
   message: HomeDashboardMessage;
   onClick: () => void;
+  density: Density;
 }
 
-function MessageStubCard({ message, onClick }: MessageStubCardProps) {
+const DENSITY_CARD = {
+  compact: {
+    padding: "p-2",
+    gap: "gap-1.5",
+    blockGap: "gap-0.5",
+    title: "text-xs",
+    badge: "text-[8px] px-1 py-0",
+    footer: "text-[9px] pt-1 gap-1",
+    footerIcon: "h-2.5 w-2.5",
+  },
+  comfortable: {
+    padding: "p-3",
+    gap: "gap-2",
+    blockGap: "gap-1",
+    title: "text-sm",
+    badge: "text-[9px] px-1.5 py-0.5",
+    footer: "text-[10px] pt-1.5 gap-1.5",
+    footerIcon: "h-3 w-3",
+  },
+  spacious: {
+    padding: "p-3.5",
+    gap: "gap-2.5",
+    blockGap: "gap-1.5",
+    title: "text-[15px]",
+    badge: "text-[10px] px-2 py-0.5",
+    footer: "text-[11px] pt-2 gap-1.5",
+    footerIcon: "h-3.5 w-3.5",
+  },
+} as const;
+
+function MessageStubCard({ message, onClick, density }: MessageStubCardProps) {
   const isUnread = !message.viewedAt;
-  const blocks = useMemo(() => generateBlocks(message.id), [message.id]);
+  const blocks = useMemo(
+    () => generateBlocks(message.id, density),
+    [message.id, density],
+  );
   const timeAgo = message.publishedAt
     ? formatDistanceToNow(new Date(message.publishedAt), {
         addSuffix: true,
         locale: ptBR,
       })
     : null;
+  const sizes = DENSITY_CARD[density];
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group relative h-full w-full text-left rounded-lg border bg-card hover:shadow-md hover:border-primary/40 hover:scale-[1.01] transition-all overflow-hidden flex flex-col ${
-        isUnread ? "border-primary/40 ring-1 ring-primary/20" : "border-border"
+      className={`group relative h-full w-full text-left rounded-xl border transition-colors duration-150 overflow-hidden flex flex-col hover:border-primary ${
+        isUnread
+          ? "border-primary/40 bg-gradient-to-br from-primary/[0.07] via-card to-card"
+          : "border-border bg-card"
       }`}
     >
-      {/* Top accent bar — solid primary for unread, muted otherwise */}
       <div
-        className={`h-1 shrink-0 ${isUnread ? "bg-primary" : "bg-muted-foreground/20"}`}
+        className={`h-1 shrink-0 ${
+          isUnread
+            ? "bg-gradient-to-r from-primary via-primary to-primary/50"
+            : "bg-gradient-to-r from-muted-foreground/25 via-muted-foreground/15 to-transparent"
+        }`}
       />
 
-      <div className="p-3 flex flex-col flex-1 min-h-0 gap-2">
-        {/* Title + small tag */}
+      <div className={`flex flex-col flex-1 min-h-0 ${sizes.padding} ${sizes.gap}`}>
         <div className="flex items-start gap-2 min-w-0">
+          <span
+            className={`mt-1 h-1.5 w-1.5 rounded-full shrink-0 transition-all ${
+              isUnread
+                ? "bg-primary shadow-[0_0_6px_0] shadow-primary/60"
+                : "bg-muted-foreground/30"
+            }`}
+            aria-hidden
+          />
           <h4
-            className={`text-sm font-semibold leading-tight line-clamp-2 flex-1 min-w-0 ${
-              isUnread ? "text-primary" : "text-secondary-foreground"
+            className={`${sizes.title} font-semibold leading-tight line-clamp-2 flex-1 min-w-0 ${
+              isUnread ? "text-foreground" : "text-foreground/75"
             }`}
           >
             {message.title || "Sem título"}
           </h4>
           {isUnread && (
-            <span className="shrink-0 rounded-md bg-primary/15 text-primary text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5">
+            <span
+              className={`shrink-0 rounded-full bg-primary text-primary-foreground font-semibold uppercase tracking-wider leading-tight ${sizes.badge}`}
+            >
               Novo
             </span>
           )}
         </div>
 
-        {/* Block preview — CSS grid with equal rows so all blocks render
-            and distribute through the card height regardless of card size.
-            (overflow-hidden was clipping blocks at small sizes.) */}
         <div
-          className="flex-1 min-h-0 grid gap-1 py-1"
+          className={`flex-1 min-h-0 grid ${sizes.blockGap}`}
           style={{
             gridTemplateRows: `repeat(${blocks.length}, minmax(0, 1fr))`,
           }}
         >
           {blocks.map((b, i) => (
-            <PreviewBlockNode key={i} block={b} isUnread={isUnread} />
+            <PreviewBlockNode
+              key={i}
+              block={b}
+              isUnread={isUnread}
+              density={density}
+            />
           ))}
         </div>
 
-        {/* Footer — relative time */}
         {timeAgo && (
-          <div className="shrink-0 text-[10px] text-muted-foreground tabular-nums truncate pt-1 border-t border-border/50">
-            {timeAgo}
+          <div
+            className={`shrink-0 flex items-center text-muted-foreground tabular-nums truncate border-t border-border/40 ${sizes.footer}`}
+          >
+            <IconClock
+              className={`${sizes.footerIcon} opacity-60 shrink-0`}
+              aria-hidden
+            />
+            <span className="truncate">{timeAgo}</span>
           </div>
         )}
       </div>
-
-      {/* Bottom accent bar */}
-      <div
-        className={`h-0.5 shrink-0 ${
-          isUnread ? "bg-primary" : "bg-muted-foreground/15"
-        }`}
-      />
     </button>
   );
 }
@@ -338,6 +439,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
   const perRow = Math.max(1, Math.min(8, config.itemsPerRow ?? 4));
   const perCol = Math.max(1, Math.min(6, config.itemsPerColumn ?? 2));
   const rowHeight = `calc((100% - ${(perCol - 1) * GRID_GAP_PX}px) / ${perCol})`;
+  const density: Density = config.density ?? "comfortable";
 
   const accent = resolveAccent({
     color: config.accent?.color as WidgetAccentColor,
@@ -379,6 +481,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
                     key={message.id}
                     message={message}
                     onClick={() => onMessageClick(message)}
+                    density={density}
                   />
                 ))}
               </div>
@@ -399,6 +502,26 @@ function Render({ config }: WidgetRenderProps<Config>) {
   );
 }
 
+function Section({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Collapsible defaultOpen={defaultOpen} className="border border-border rounded-md">
+      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
+        {title}
+        <IconChevronDown className="h-4 w-4 transition-transform" />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
   const set = <K extends keyof Config>(key: K, value: Config[K]) =>
     onChange({ ...config, [key]: value });
@@ -415,43 +538,69 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
           placeholder="Mensagens Recentes"
         />
       </div>
-      <div className="space-y-2">
-        <Label className="text-xs">Aparência</Label>
-        <AccentPicker
-          value={{ color: accentColor, icon: accentIcon, borderColor }}
-          onChange={(next) =>
-            set("accent", {
-              color: next.color,
-              icon: next.icon,
-              borderColor: next.borderColor,
-            } as Config["accent"])
-          }
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs">Mensagens por linha (1–8)</Label>
-          <Input
-            type="number"
-            value={config.itemsPerRow}
-            onChange={(v) => {
-              const n = typeof v === "number" ? v : Number(v);
-              if (Number.isFinite(n)) set("itemsPerRow", Math.max(1, Math.min(8, n)));
-            }}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Linhas visíveis (1–6)</Label>
-          <Input
-            type="number"
-            value={config.itemsPerColumn}
-            onChange={(v) => {
-              const n = typeof v === "number" ? v : Number(v);
-              if (Number.isFinite(n)) set("itemsPerColumn", Math.max(1, Math.min(6, n)));
-            }}
-          />
-        </div>
-      </div>
+      <Tabs defaultValue="appearance" className="flex flex-col gap-2">
+        <TabsList className="self-start">
+          <TabsTrigger value="appearance" className="gap-1">
+            <IconAdjustments className="h-3.5 w-3.5" /> Aparência
+          </TabsTrigger>
+          <TabsTrigger value="behavior" className="gap-1">
+            <IconLayout className="h-3.5 w-3.5" /> Comportamento
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="appearance" className="space-y-3 mt-0">
+          <Section title="Acento (cor, ícone, borda)" defaultOpen>
+            <AccentPicker
+              value={{ color: accentColor, icon: accentIcon, borderColor }}
+              onChange={(next) =>
+                set("accent", {
+                  color: next.color,
+                  icon: next.icon,
+                  borderColor: next.borderColor,
+                } as Config["accent"])
+              }
+            />
+          </Section>
+          <Section title="Densidade" defaultOpen>
+            <Combobox
+              mode="single"
+              value={config.density ?? "comfortable"}
+              onValueChange={(v) =>
+                set("density", (typeof v === "string" ? v : "comfortable") as Density)
+              }
+              options={DENSITY.map((d) => ({ value: d, label: DENSITY_LABELS[d] }))}
+              clearable={false}
+            />
+          </Section>
+        </TabsContent>
+        <TabsContent value="behavior" className="space-y-3 mt-0">
+          <Section title="Grade" defaultOpen>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Mensagens por linha (1–8)</Label>
+                <Input
+                  type="number"
+                  value={config.itemsPerRow}
+                  onChange={(v) => {
+                    const n = typeof v === "number" ? v : Number(v);
+                    if (Number.isFinite(n)) set("itemsPerRow", Math.max(1, Math.min(8, n)));
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Linhas visíveis (1–6)</Label>
+                <Input
+                  type="number"
+                  value={config.itemsPerColumn}
+                  onChange={(v) => {
+                    const n = typeof v === "number" ? v : Number(v);
+                    if (Number.isFinite(n)) set("itemsPerColumn", Math.max(1, Math.min(6, n)));
+                  }}
+                />
+              </div>
+            </div>
+          </Section>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -462,7 +611,7 @@ export const recentMessagesWidget: WidgetDefinition<Config> = {
   description:
     "Últimas mensagens recebidas. Configurável: título, aparência, mensagens por linha, linhas visíveis.",
   icon: IconMessage,
-  category: "communication",
+  category: "other",
   allowedSectors: "*",
   defaultSize: { cols: 4, rows: 2 },
   minSize: { cols: 1, rows: 1 },
@@ -473,6 +622,7 @@ export const recentMessagesWidget: WidgetDefinition<Config> = {
     accent: { color: "indigo", icon: "Message", borderColor: "none" },
     itemsPerRow: 4,
     itemsPerColumn: 2,
+    density: "comfortable",
   },
   RenderComponent: Render,
   ConfigComponent: ConfigComp,

@@ -34,9 +34,10 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
     orderBy: { name: "asc" },
     include: { position: true, sector: true },
     where: {
-      // Only active users with payroll number
+      // Only active users with payroll number registered in Secullum
       isActive: true,
       payrollNumber: { not: null },
+      secullumEmployeeId: { not: null },
     },
     limit: 100, // Max 100 due to API limit
   });

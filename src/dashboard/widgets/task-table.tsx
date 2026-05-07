@@ -13,7 +13,6 @@ import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import {
   IconAdjustments,
-  IconChevronDown,
   IconClipboardText,
   IconColumns,
   IconCornerDownLeft,
@@ -75,11 +74,6 @@ import {
   TabsTrigger,
 } from "../../components/ui/tabs";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "../../components/ui/collapsible";
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -92,6 +86,7 @@ import { QuoteStatusBadge } from "../../components/production/task/quote/quote-s
 import { WidgetCard } from "../components/widget-card";
 import { ColumnPicker } from "../components/column-picker";
 import { AccentPicker, resolveAccent } from "../components/widget-accent";
+import { Section, ToggleRow, LimitInput } from "./_shared";
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
@@ -1374,8 +1369,8 @@ const TASK_INCLUDE = {
 
 function densityClasses(d: TaskTableConfig["display"]["density"]) {
   if (d === "compact") return { row: "px-2 py-1 text-xs", header: "px-2 py-1 text-[10px]" };
-  if (d === "spacious") return { row: "px-3 py-3", header: "px-3 py-2" };
-  return { row: "px-3 py-2", header: "px-3 py-1.5 text-[10px]" };
+  if (d === "spacious") return { row: "px-3 py-3 text-sm", header: "px-3 py-2 text-[10px]" };
+  return { row: "px-3 py-2 text-sm", header: "px-3 py-1.5 text-[10px]" };
 }
 
 function statusGroupClass(status: TASK_STATUS): string {
@@ -1914,60 +1909,6 @@ const REFETCH_OPTIONS: Array<{ value: number; label: string }> = [
   { value: 5 * 60_000, label: "A cada 5 min" },
   { value: 15 * 60_000, label: "A cada 15 min" },
 ];
-
-function Section({
-  title,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Collapsible defaultOpen={defaultOpen} className="border border-border rounded-md">
-      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
-        {title}
-        <IconChevronDown className="h-4 w-4 transition-transform" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-// Boolean field rendered as a Sim/Não Combobox so every config control on the
-// page shares the same dropdown look — matches the user's preference for
-// consistent Combobox UX across status / sectors / customers / dates / etc.
-const YES_NO_OPTIONS: Array<{ value: "yes" | "no"; label: string }> = [
-  { value: "yes", label: "Sim" },
-  { value: "no", label: "Não" },
-];
-
-function ToggleRow({
-  label,
-  hint,
-  checked,
-  onCheckedChange,
-}: {
-  label: string;
-  hint?: string;
-  checked: boolean;
-  onCheckedChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs">{label}</Label>
-      <Combobox
-        mode="single"
-        value={checked ? "yes" : "no"}
-        onValueChange={(v) => onCheckedChange(v === "yes")}
-        options={YES_NO_OPTIONS}
-        clearable={false}
-      />
-      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
 
 const COLOR_TOKEN_OPTIONS = DEADLINE_COLOR_TOKENS.map((t) => ({
   value: t,
@@ -2584,17 +2525,10 @@ function TaskTableConfigComponent({
             </div>
           </Section>
           <Section title="Quantidade máxima">
-            <div>
-              <Label className="text-xs">Linhas (5–200)</Label>
-              <Input
-                type="number"
-                value={c.limit}
-                onChange={(v) => {
-                  const n = typeof v === "number" ? v : Number(v);
-                  if (Number.isFinite(n)) set("limit", Math.max(5, Math.min(200, n)));
-                }}
-              />
-            </div>
+            <LimitInput
+              value={c.limit}
+              onChange={(n) => set("limit", n)}
+            />
           </Section>
         </TabsContent>
 
@@ -3111,7 +3045,7 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
   description:
     "Tabela de tarefas com paridade visual à página de preparação: OSs ricas, pintura em canvas, contagem regressiva, cores de prazo configuráveis, multi-ordenação, presets e modo abas/agrupado.",
   icon: IconClipboardText,
-  category: "tasks",
+  category: "production",
   allowedSectors: "*",
   defaultSize: { cols: 2, rows: 2 },
   minSize: { cols: 1, rows: 1 },

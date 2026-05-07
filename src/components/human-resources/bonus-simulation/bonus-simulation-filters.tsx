@@ -61,6 +61,7 @@ export function BonusSimulationFilters({
     include: { position: true, sector: true },
     where: {
       status: USER_STATUS.EFFECTED, // Only effected users (not dismissed, not inactive)
+      secullumEmployeeId: { not: null }, // Only users registered in Secullum
     },
     orderBy: { name: "asc" },
     limit: 100, // API maximum limit

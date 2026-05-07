@@ -10,8 +10,6 @@ import type { ComboboxOption } from "@/components/ui/combobox";
 import {
   IconChevronLeft,
   IconChevronRight,
-  IconDeviceFloppy,
-  IconRestore,
   IconCalendar,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
@@ -41,6 +39,12 @@ const TIME_CLOCK_COLUMNS: ColumnDef[] = [
   { key: "freeLunch", header: "Almoço" },
 ];
 
+export interface TimeClockEntryEditActions {
+  changedRowsCount: number;
+  onRestore: () => void;
+  onSave: () => void;
+}
+
 interface TimeClockEntryEditListProps {
   className?: string;
   headerSlot?: React.ReactNode;
@@ -53,12 +57,14 @@ interface TimeClockEntryEditListProps {
       endDate: Date | null;
     } | null,
   ) => void;
+  onActionsChange?: (actions: TimeClockEntryEditActions | null) => void;
 }
 
 export function TimeClockEntryEditList({
   className,
   headerSlot,
   onExportDataChange,
+  onActionsChange,
 }: TimeClockEntryEditListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const tableRef = useRef<TimeClockEntryTableRef>(null);
@@ -83,6 +89,20 @@ export function TimeClockEntryEditList({
   const handleChangedRowsChange = useCallback((count: number) => {
     setChangedRowsCount(count);
   }, []);
+
+  useEffect(() => {
+    if (!onActionsChange) return;
+    if (changedRowsCount === 0) {
+      onActionsChange(null);
+      return;
+    }
+    onActionsChange({
+      changedRowsCount,
+      onRestore: () => tableRef.current?.handleRestore(),
+      onSave: () => tableRef.current?.handleSubmit(),
+    });
+    return () => onActionsChange(null);
+  }, [changedRowsCount, onActionsChange]);
 
   const { data: configData, isLoading: configLoading } = useSecullumConfiguration();
 
@@ -226,6 +246,7 @@ export function TimeClockEntryEditList({
       USER_STATUS.EXPERIENCE_PERIOD_2,
       USER_STATUS.EFFECTED,
     ],
+    where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,
   });
@@ -573,27 +594,6 @@ export function TimeClockEntryEditList({
               visibleColumns={visibleColumns}
               onVisibilityChange={setVisibleColumns}
             />
-
-            {changedRowsCount > 0 && (
-              <div className="flex items-center gap-1 ml-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => tableRef.current?.handleRestore()}
-                >
-                  <IconRestore className="h-4 w-4 mr-2" />
-                  Restaurar
-                </Button>
-                <Button
-                  type="button"
-                  variant="default"
-                  onClick={() => tableRef.current?.handleSubmit()}
-                >
-                  <IconDeviceFloppy className="h-4 w-4 mr-2" />
-                  Salvar ({changedRowsCount})
-                </Button>
-              </div>
-            )}
           </div>
         </div>
 

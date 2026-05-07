@@ -89,6 +89,7 @@ export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoPro
 
           customPaymentText: null,
           generateInvoice: true,
+          generateBankSlip: true,
           responsibleId: null,
           customerData: {
             corporateName: cached?.corporateName || "",

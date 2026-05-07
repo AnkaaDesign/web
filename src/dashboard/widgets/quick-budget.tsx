@@ -46,6 +46,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "../../components/ui/collapsible";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "../../components/ui/tabs";
+import { IconAdjustments, IconLayout } from "@tabler/icons-react";
 import { useCustomers } from "../../hooks/administration/use-customer";
 import { useTaskMutations } from "../../hooks/production/use-task";
 import { useCreateTaskQuote } from "../../hooks/production/use-task-quote";
@@ -454,8 +461,33 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
   const accentColor = (config.accent?.color ?? "emerald") as WidgetAccentColor;
   const accentIcon = (config.accent?.icon ?? "Receipt") as WidgetAccentIcon;
   const borderColor = (config.accent?.borderColor ?? "none") as WidgetBorderColor;
+
+  const { data: customersData } = useCustomers({
+    orderBy: { fantasyName: "asc" },
+  } as any);
+  const customerOptions = useMemo(
+    () =>
+      (customersData?.data ?? []).map((c: any) => ({
+        value: c.id,
+        label: c.fantasyName || c.corporateName,
+      })),
+    [customersData?.data],
+  );
+  const guaranteeOptions = useMemo(
+    () => [
+      { value: "none", label: "Sem padrão" },
+      { value: "0", label: "Sem garantia (0 anos)" },
+      { value: "1", label: "1 ano" },
+      { value: "2", label: "2 anos" },
+      { value: "3", label: "3 anos" },
+      { value: "4", label: "4 anos" },
+      { value: "5", label: "5 anos" },
+    ],
+    [],
+  );
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="space-y-1.5">
         <Label className="text-sm">Título</Label>
         <Input
@@ -464,19 +496,82 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
           placeholder="Novo Orçamento"
         />
       </div>
-      <div className="space-y-2">
-        <Label className="text-xs">Aparência</Label>
-        <AccentPicker
-          value={{ color: accentColor, icon: accentIcon, borderColor }}
-          onChange={(next) =>
-            set("accent", {
-              color: next.color,
-              icon: next.icon,
-              borderColor: next.borderColor,
-            } as Config["accent"])
-          }
-        />
-      </div>
+
+      <Tabs defaultValue="appearance" className="flex flex-col gap-2">
+        <TabsList className="self-start">
+          <TabsTrigger value="appearance" className="gap-1">
+            <IconAdjustments className="h-3.5 w-3.5" /> Aparência
+          </TabsTrigger>
+          <TabsTrigger value="behavior" className="gap-1">
+            <IconLayout className="h-3.5 w-3.5" /> Comportamento
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="appearance" className="space-y-3 mt-0">
+          <Section title="Acento (cor, ícone, borda)" defaultOpen>
+            <AccentPicker
+              value={{ color: accentColor, icon: accentIcon, borderColor }}
+              onChange={(next) =>
+                set("accent", {
+                  color: next.color,
+                  icon: next.icon,
+                  borderColor: next.borderColor,
+                } as Config["accent"])
+              }
+            />
+          </Section>
+        </TabsContent>
+
+        <TabsContent value="behavior" className="space-y-3 mt-0">
+          <Section title="Valores padrão" defaultOpen>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cliente padrão (opcional)</Label>
+              <Combobox
+                mode="single"
+                value={config.defaultCustomerId}
+                onValueChange={(v) => {
+                  const id =
+                    typeof v === "string"
+                      ? v
+                      : Array.isArray(v)
+                        ? v[0]
+                        : undefined;
+                  set("defaultCustomerId", id);
+                }}
+                options={customerOptions}
+                placeholder="Sem cliente padrão..."
+                searchPlaceholder="Buscar cliente..."
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Garantia padrão (anos)</Label>
+              <Combobox
+                mode="single"
+                value={
+                  config.defaultGuaranteeYears == null
+                    ? "none"
+                    : String(config.defaultGuaranteeYears)
+                }
+                onValueChange={(v) => {
+                  const raw = typeof v === "string" ? v : Array.isArray(v) ? v[0] : "none";
+                  if (!raw || raw === "none") {
+                    set("defaultGuaranteeYears", undefined);
+                  } else {
+                    const n = Number(raw);
+                    set(
+                      "defaultGuaranteeYears",
+                      Number.isFinite(n) ? n : undefined,
+                    );
+                  }
+                }}
+                options={guaranteeOptions}
+                placeholder="Sem padrão"
+                searchable={false}
+              />
+            </div>
+          </Section>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -487,7 +582,7 @@ export const quickBudgetWidget: WidgetDefinition<Config> = {
   description:
     "Crie um orçamento sem sair do painel — agrupado em Tarefa, Informações e Serviços, exatamente como o formulário completo.",
   icon: IconReceipt,
-  category: "quick-actions",
+  category: "other",
   allowedSectors: [
     SECTOR_PRIVILEGES.COMMERCIAL,
     SECTOR_PRIVILEGES.FINANCIAL,

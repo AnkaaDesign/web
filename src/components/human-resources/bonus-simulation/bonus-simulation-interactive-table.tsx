@@ -237,6 +237,7 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   const { data: usersData } = useUsers({
     where: {
       status: USER_STATUS.EFFECTED, // Only EFFECTED users (not dismissed, not inactive)
+      secullumEmployeeId: { not: null }, // Only users registered in Secullum
     },
     include: {
       position: true,

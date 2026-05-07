@@ -25,28 +25,19 @@ export const WIDGET_ROW_VALUES: readonly WidgetRows[] = [1, 2, 3, 4] as const;
 // ---------- Categories ----------
 
 export type WidgetCategory =
-  | "favorites"
-  | "tasks"
-  | "production"
   | "inventory"
   | "hr"
+  | "production"
   | "financial"
-  | "paint"
-  | "admin"
-  | "communication"
-  | "quick-actions";
+  | "other";
 
+// Order here = order shown in the gallery tabs.
 export const WIDGET_CATEGORY_LABELS: Record<WidgetCategory, string> = {
-  favorites: "Favoritos",
-  tasks: "Tarefas",
-  production: "Produção",
   inventory: "Estoque",
   hr: "Recursos Humanos",
+  production: "Produção",
   financial: "Financeiro",
-  paint: "Tintas",
-  admin: "Administração",
-  communication: "Comunicação",
-  "quick-actions": "Ações Rápidas",
+  other: "Outros",
 };
 
 // ---------- Widget definition ----------

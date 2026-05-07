@@ -34,7 +34,8 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
     include: { position: true, sector: true },
     where: {
       isActive: true, // Only active users for bonus
-      payrollNumber: { not: null } // Only users with payroll numbers
+      payrollNumber: { not: null }, // Only users with payroll numbers
+      secullumEmployeeId: { not: null } // Only users registered in Secullum
     },
     limit: 100, // Max 100 due to API limit
   });
