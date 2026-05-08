@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,9 +37,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { IconFileInvoice, IconCurrencyReal, IconBuilding, IconTruck, IconCreditCard, IconReceipt, IconDownload, IconEye, IconLoader2, IconFolderCheck, IconCameraCheck, IconCameraBolt, IconExternalLink } from "@tabler/icons-react";
 import { cn, getApiBaseUrl } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { invoiceService } from "@/api-client/invoice";
 import { nfseService } from "@/api-client/nfse";
+import { taskQuoteService } from "@/api-client/task-quote";
 import { SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { useFileViewer } from "@/components/common/file";
 import { Button } from "@/components/ui/button";
@@ -193,6 +194,50 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingConfirmStatus, setPendingConfirmStatus] = useState<string | null>(null);
 
+  // Revert billing approval state
+  const [revertBillingDialogOpen, setRevertBillingDialogOpen] = useState(false);
+  const [revertBillingLoading, setRevertBillingLoading] = useState(false);
+
+  const revertableStatuses = ["BILLING_APPROVED", "UPCOMING", "DUE", "PARTIAL"];
+  const canRevertBilling = canChangeStatus && revertableStatuses.includes(currentStatus);
+
+  // Check if all bank slips and NFS-e are cancelled (condition to show the revert button)
+  const allCancelledForRevert = useMemo(() => {
+    if (!canRevertBilling) return false;
+    for (const inv of filteredInvoices) {
+      const insts = (inv as any).installments || [];
+      for (const inst of insts) {
+        if (inst.status === 'CANCELLED') continue;
+        const bs = inst.bankSlip;
+        if (bs && bs.status !== 'CANCELLED') return false;
+      }
+      const nfses = (inv as any).nfseDocuments || [];
+      for (const n of nfses) {
+        if (!['CANCELLED', 'ERROR'].includes(n.status)) return false;
+      }
+    }
+    return true;
+  }, [canRevertBilling, filteredInvoices]);
+
+  const handleRevertBilling = useCallback(async () => {
+    if (!task?.quoteId) return;
+    setRevertBillingLoading(true);
+    try {
+      await taskQuoteService.revertBilling(task.quoteId);
+      toast.success("Faturamento revertido com sucesso.", {
+        description: "O orçamento retornou para Aprovado pelo Comercial.",
+      });
+      window.location.reload();
+    } catch (err: any) {
+      toast.error("Erro ao reverter faturamento", {
+        description: err?.response?.data?.message || String(err),
+      });
+    } finally {
+      setRevertBillingLoading(false);
+      setRevertBillingDialogOpen(false);
+    }
+  }, [task?.quoteId]);
+
   // Compute paid/total installment counts for PARTIAL badge
   const installmentCounts = useMemo(() => {
     let paid = 0;
@@ -287,6 +332,17 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               >
                 <IconExternalLink className="h-3.5 w-3.5" />
                 Ver Tarefa
+              </Button>
+            )}
+            {allCancelledForRevert && (
+              <Button
+                variant="outline"
+                size="default"
+                className="gap-1.5 h-9 border-orange-400 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                onClick={() => setRevertBillingDialogOpen(true)}
+                disabled={disabled}
+              >
+                Reverter Faturamento
               </Button>
             )}
             {canChangeStatus ? (
@@ -652,10 +708,8 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
                                   {activeNfse.elotechNfseId && (
                                     <NfsePdfButtons elotechNfseId={activeNfse.elotechNfseId} />
                                   )}
-                                  {/* Cancel button — only for authorized NFSe */}
-                                  {activeNfse.status === 'AUTHORIZED' && (
-                                    <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
-                                  )}
+                                  {/* Cancel for authorized; reemit for error/pending */}
+                                  <NfseActions invoiceId={configInvoice.id} nfseDocuments={nfseDocuments} />
                                 </div>
                               </div>
                               {activeNfse.elotechNfseId && (
@@ -941,6 +995,29 @@ export function BillingStepReview({ task, customersCache, invoices = [], userPri
               }}
             >
               Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Revert billing approval confirmation */}
+      <AlertDialog open={revertBillingDialogOpen} onOpenChange={setRevertBillingDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reverter aprovação de faturamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá remover as faturas, parcelas e boletos (já cancelados) e reverter o orçamento
+              para <strong>Aprovado pelo Comercial</strong>. O orçamento poderá ser editado e aprovado novamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={revertBillingLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRevertBilling}
+              disabled={revertBillingLoading}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {revertBillingLoading ? "Revertendo..." : "Reverter Faturamento"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,8 +1,8 @@
 // Shared types for all statistics pages
 
-export type StatisticsChartType = 'bar' | 'line' | 'area' | 'pie' | 'bar-stacked';
+export type StatisticsChartType = 'bar' | 'line' | 'area' | 'pie' | 'bar-stacked' | 'line-stacked';
 
-export type YAxisMode = 'quantity' | 'value' | 'days' | 'percentage' | 'count';
+export type YAxisMode = 'quantity' | 'value' | 'days' | 'percentage' | 'count' | 'both';
 
 export type ComparisonType = 'simple' | 'sectors' | 'users' | 'periods' | 'customers' | 'garages' | 'paintTypes' | 'paintBrands';
 

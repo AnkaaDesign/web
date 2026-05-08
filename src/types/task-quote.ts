@@ -41,7 +41,23 @@ export interface TaskQuoteCustomerConfig extends BaseEntity {
   paymentConfig?: PaymentConfig | null;
   customerSignatureId?: string | null;
   customerSignature?: File;
-  customer?: { id: string; corporateName?: string; fantasyName: string; cnpj?: string | null };
+  customer?: {
+    id: string;
+    corporateName?: string | null;
+    fantasyName: string;
+    cnpj?: string | null;
+    cpf?: string | null;
+    address?: string | null;
+    addressNumber?: string | null;
+    addressComplement?: string | null;
+    neighborhood?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zipCode?: string | null;
+    stateRegistration?: string | null;
+    streetType?: string | null;
+    registrationStatus?: string | null;
+  };
   responsible?: { id: string; name: string; role: string };
   installments?: Installment[];
 }

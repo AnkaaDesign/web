@@ -124,3 +124,53 @@ export interface ProductionAnalyticsFilters {
 }
 
 export type ProductionChartType = 'bar' | 'pie' | 'area' | 'line' | 'bar-stacked';
+
+// Task Production Statistics
+export type TaskProductionXAxisMode = 'month' | 'year';
+export type TaskProductionYAxisMode = 'count' | 'avgPerUser' | 'both';
+export type TaskProductionCompareMode = 'combined' | 'separated' | 'separatedWithTotal';
+export type TaskProductionChartType = 'bar' | 'bar-stacked' | 'line' | 'line-stacked' | 'area';
+
+export interface TaskProductionFilters {
+  startDate?: Date;
+  endDate?: Date;
+  sectorIds?: string[];
+  xAxisMode?: TaskProductionXAxisMode;
+  yAxisMode?: TaskProductionYAxisMode;
+  compareMode?: TaskProductionCompareMode;
+}
+
+export interface TaskProductionSectorComparison {
+  sectorId: string;
+  sectorName: string;
+  count: number;
+  activeUsers: number;
+  avgPerUser: number;
+}
+
+export interface TaskProductionItem {
+  period: string;
+  periodLabel: string;
+  totalCount: number;
+  activeUsers: number;
+  avgPerUser: number;
+  comparisons?: TaskProductionSectorComparison[];
+}
+
+export interface TaskProductionSummary {
+  totalCompleted: number;
+  avgPerUser: number;
+  totalActiveUsers: number;
+  avgTasksPerPeriod: number;
+}
+
+export interface TaskProductionData {
+  summary: TaskProductionSummary;
+  items: TaskProductionItem[];
+}
+
+export interface TaskProductionResponse {
+  success: boolean;
+  message: string;
+  data: TaskProductionData;
+}

@@ -204,7 +204,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
                   options={DOC_TYPE_OPTIONS}
                   searchable={false}
                   clearable={false}
-                  className="w-32"
+                  className="w-[150px]"
                   disabled={disabled}
                 />
                 {docType === "cnpj" ? (
@@ -279,7 +279,7 @@ export function BillingStepCustomer({ configIndex, customer, disabled }: Billing
           </div>
 
           {/* Row 3: CEP + Cidade + UF + Tipo + Logradouro + Número */}
-          <div className="grid grid-cols-2 md:grid-cols-[120px_1fr_80px_120px_1fr_80px] gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-[150px_1fr_150px_150px_1fr_150px] gap-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium">CEP <span className="text-destructive">*</span></Label>
               <Input

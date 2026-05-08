@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { getProductionThroughput, getProductionBottlenecks, getProductionRevenue } from '@/api-client/production-analytics';
+import { getProductionThroughput, getProductionBottlenecks, getProductionRevenue, getTaskProductionStats } from '@/api-client/production-analytics';
 import type {
   ProductionAnalyticsFilters,
   ThroughputAnalyticsResponse,
   BottleneckAnalyticsResponse,
   RevenueAnalyticsResponse,
+  TaskProductionFilters,
+  TaskProductionResponse,
 } from '@/types/production-analytics';
 
 export const productionAnalyticsKeys = {
@@ -12,6 +14,7 @@ export const productionAnalyticsKeys = {
   throughput: (filters: ProductionAnalyticsFilters) => [...productionAnalyticsKeys.all, 'throughput', filters] as const,
   bottlenecks: (filters: any) => [...productionAnalyticsKeys.all, 'bottlenecks', filters] as const,
   revenue: (filters: ProductionAnalyticsFilters) => [...productionAnalyticsKeys.all, 'revenue', filters] as const,
+  taskProduction: (filters: TaskProductionFilters) => [...productionAnalyticsKeys.all, 'task-production', filters] as const,
 };
 
 export function useProductionThroughput(filters: ProductionAnalyticsFilters) {
@@ -38,6 +41,16 @@ export function useProductionRevenue(filters: ProductionAnalyticsFilters) {
   return useQuery<RevenueAnalyticsResponse, Error>({
     queryKey: productionAnalyticsKeys.revenue(filters),
     queryFn: () => getProductionRevenue(filters),
+    staleTime: 3 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 2,
+  });
+}
+
+export function useTaskProductionStats(filters: TaskProductionFilters) {
+  return useQuery<TaskProductionResponse, Error>({
+    queryKey: productionAnalyticsKeys.taskProduction(filters),
+    queryFn: () => getTaskProductionStats(filters),
     staleTime: 3 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     retry: 2,

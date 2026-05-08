@@ -343,6 +343,7 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
   const isPaidByBankSlip = isPaid && bankSlip?.status === 'PAID';
   const hasReceipt = !!receiptFile;
 
+  const canGenerate = !bankSlip && !isPaid && installmentStatus !== 'CANCELLED';
   const canRegenerate = bankSlip && ['ERROR', 'REJECTED', 'CANCELLED'].includes(bankSlip.status);
   const canCancel = bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
   const canDownloadPdf = bankSlip && (bankSlip.status === 'ACTIVE' || bankSlip.status === 'OVERDUE');
@@ -359,7 +360,7 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
   // Sicredi removes the PDF after payment; only show if we have a locally stored copy
   const showBoletoPdfForPaid = isPaidByBankSlip && !hasReceipt && !!bankSlip?.pdfFileId;
 
-  const hasAnyAction = canRegenerate || canCancel || canDownloadPdf || canCopyDigitableLine || canChangeDueDate || canMarkPaid || showBoletoPdfForPaid || showReceiptView || showAttachReceipt;
+  const hasAnyAction = canGenerate || canRegenerate || canCancel || canDownloadPdf || canCopyDigitableLine || canChangeDueDate || canMarkPaid || showBoletoPdfForPaid || showReceiptView || showAttachReceipt;
 
   if (!hasAnyAction) return null;
 
@@ -504,6 +505,23 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
             className="h-7 w-7 p-0"
           >
             <IconCalendarEvent className="h-4 w-4" />
+          </Button>
+        )}
+
+        {canGenerate && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={openRegenerateDialog}
+            disabled={regenerateBoleto.isPending}
+            title="Gerar Boleto"
+            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700"
+          >
+            {regenerateBoleto.isPending ? (
+              <IconLoader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <IconRefresh className="h-4 w-4" />
+            )}
           </Button>
         )}
 
@@ -731,13 +749,13 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
         </DialogContent>
       </Dialog>
 
-      {/* Regenerate Boleto Dialog (with date picker) */}
+      {/* Generate / Regenerate Boleto Dialog (with date picker) */}
       <Dialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Regenerar Boleto</DialogTitle>
+            <DialogTitle>{canGenerate ? 'Gerar Boleto' : 'Regenerar Boleto'}</DialogTitle>
             <DialogDescription>
-              O boleto será recriado com a data de vencimento selecionada. Selecione uma data válida (igual ou posterior a hoje).
+              O boleto será {canGenerate ? 'gerado' : 'recriado'} com a data de vencimento selecionada. Selecione uma data válida (igual ou posterior a hoje).
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -757,7 +775,9 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
               onClick={handleRegenerate}
               disabled={regenerateBoleto.isPending || !regenerateDate}
             >
-              {regenerateBoleto.isPending ? 'Regenerando...' : 'Regenerar Boleto'}
+              {regenerateBoleto.isPending
+                ? (canGenerate ? 'Gerando...' : 'Regenerando...')
+                : (canGenerate ? 'Gerar Boleto' : 'Regenerar Boleto')}
             </Button>
           </DialogFooter>
         </DialogContent>

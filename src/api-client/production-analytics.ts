@@ -4,6 +4,8 @@ import type {
   BottleneckAnalyticsResponse,
   RevenueAnalyticsResponse,
   ProductionAnalyticsFilters,
+  TaskProductionFilters,
+  TaskProductionResponse,
 } from '../types/production-analytics';
 
 export class ProductionAnalyticsService {
@@ -32,6 +34,14 @@ export class ProductionAnalyticsService {
     );
     return response.data;
   }
+
+  async getTaskProductionStats(filters: TaskProductionFilters): Promise<TaskProductionResponse> {
+    const response = await apiClient.post<TaskProductionResponse>(
+      `${this.basePath}/task-production`,
+      filters,
+    );
+    return response.data;
+  }
 }
 
 export const productionAnalyticsService = new ProductionAnalyticsService();
@@ -44,3 +54,6 @@ export const getProductionBottlenecks = (filters: Omit<ProductionAnalyticsFilter
 
 export const getProductionRevenue = (filters: ProductionAnalyticsFilters) =>
   productionAnalyticsService.getRevenue(filters);
+
+export const getTaskProductionStats = (filters: TaskProductionFilters) =>
+  productionAnalyticsService.getTaskProductionStats(filters);

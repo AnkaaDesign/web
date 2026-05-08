@@ -29,8 +29,8 @@ export const taskQuoteService = {
   // Commercial approve (BUDGET_APPROVED → COMMERCIAL_APPROVED)
   commercialApprove: (id: string) => apiClient.put(`/task-quotes/${id}/commercial-approve`),
 
-  // Internal Approve (final approval: COMMERCIAL_APPROVED → BILLING_APPROVED)
-  internalApprove: (id: string) => apiClient.put(`/task-quotes/${id}/internal-approve`),
+  // Revert billing approval back to COMMERCIAL_APPROVED (requires all bank slips + NFS-e cancelled)
+  revertBilling: (id: string) => apiClient.put(`/task-quotes/${id}/revert-billing`),
 
   // Reject (sends back to PENDING with a reason)
   reject: (id: string, reason?: string) =>

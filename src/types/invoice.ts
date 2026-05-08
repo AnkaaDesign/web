@@ -16,7 +16,7 @@ export interface Invoice {
   createdById: string | null;
   installments?: Installment[];
   nfseDocuments?: NfseDocument[];
-  customer?: { id: string; fantasyName: string; cnpj?: string | null };
+  customer?: { id: string; fantasyName: string; cnpj?: string | null; state?: string | null };
   task?: { id: string; name?: string | null; serialNumber?: string | null };
   createdBy?: { id: string; name: string } | null;
   createdAt: Date;
