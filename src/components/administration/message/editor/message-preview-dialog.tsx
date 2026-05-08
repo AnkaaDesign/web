@@ -183,31 +183,37 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
             {renderFormattedText(block.content)}
           </blockquote>
         );
-      case 'image':
-        // Calculate size style (matching ImageBlock component)
+      case 'image': {
         const getSizeStyle = () => {
-          // If customWidth is provided, use it directly
-          if (block.customWidth) {
-            return { maxWidth: block.customWidth };
-          }
-
-          // If size is provided, use it
-          if (block.size) {
-            return { maxWidth: block.size };
-          }
-
-          // Default to 50% (medium)
+          if (block.customWidth) return { maxWidth: block.customWidth };
+          if (block.size) return { maxWidth: block.size };
           return { maxWidth: '50%' };
         };
-
+        const resolvedSrc = resolveImageUrl(block.url);
+        const isVideo =
+          block.mediaType === 'video' ||
+          block.mimeType?.startsWith('video/') ||
+          /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(block.url || '');
         return (
           <div className={`flex ${block.alignment === 'center' ? 'justify-center' : block.alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
             <div style={getSizeStyle()}>
-              <img
-                src={resolveImageUrl(block.url)}
-                alt={block.alt || ''}
-                className="w-full h-auto rounded-lg"
-              />
+              {isVideo ? (
+                <video
+                  src={resolvedSrc}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-auto rounded-lg bg-black"
+                >
+                  {block.mimeType && <source src={resolvedSrc} type={block.mimeType} />}
+                </video>
+              ) : (
+                <img
+                  src={resolvedSrc}
+                  alt={block.alt || ''}
+                  className="w-full h-auto rounded-lg"
+                />
+              )}
               {block.caption && (
                 <p className="text-sm text-muted-foreground mt-2 text-center">
                   {block.caption}
@@ -216,6 +222,7 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
             </div>
           </div>
         );
+      }
       case 'button': {
         const buttonContent = (
           <Button

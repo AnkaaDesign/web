@@ -73,8 +73,8 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
         let currentYear = now.getFullYear();
         let currentMonth = now.getMonth() + 1; // 1-indexed
 
-        // If today is <= 5th, default to PREVIOUS month (bonus not paid yet)
-        // If today is > 5th, default to CURRENT month (bonus was paid on day 5)
+        // If today is <= 5th, default to PREVIOUS month (bonus not finalized yet)
+        // If today is > 5th, default to CURRENT month (bonus was saved on day 5)
         if (currentDay <= 5) {
           currentMonth -= 1;
           if (currentMonth < 1) {

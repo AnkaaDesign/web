@@ -998,13 +998,14 @@ export const TaskDetailsPage = () => {
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.PRODUCTION_MANAGER)
   );
-  // Check if user can view artwork badges and non-approved artworks (ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER only)
+  // Check if user can view artwork badges and non-approved artworks
   const canViewArtworkBadges = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.PRODUCTION_MANAGER)
   );
 
   // Check if user can view restricted fields (forecastDate, responsibles) - ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER only

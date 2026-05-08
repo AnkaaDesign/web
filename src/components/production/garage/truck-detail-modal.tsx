@@ -83,12 +83,13 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
 
   const task = taskResponse?.data;
 
-  // Check if user can view artwork badges and non-approved artworks (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
+  // Check if user can view artwork badges and non-approved artworks
   const canViewArtworkBadges = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.PRODUCTION_MANAGER)
   );
 
   // Get layout dimensions (both sides have the same measures)

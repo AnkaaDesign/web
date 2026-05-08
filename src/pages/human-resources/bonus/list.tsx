@@ -396,7 +396,7 @@ function getDefaultFilters(): BonusFiltersData {
   let year = currentYear;
   let month = currentMonth;
 
-  // If day <= 5, show previous month (bonus not yet paid for current month)
+  // If day <= 5, show previous month (bonus not yet finalized for current month)
   if (currentDay <= 5) {
     month = currentMonth - 1;
     if (month < 1) {
