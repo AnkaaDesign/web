@@ -609,7 +609,7 @@ function ItemTableRender({ config }: WidgetRenderProps<ItemTableConfig>) {
               onClick={() => navigate(`/estoque/produtos/detalhes/${item.id}`)}
             >
               {cols.map((c, idx) => (
-                <div key={c.key} className="min-w-0">
+                <div key={c.key} className="min-w-0 overflow-hidden">
                   {idx === 0 && showRowDot ? (
                     <div className="flex items-center gap-2 min-w-0">
                       <span

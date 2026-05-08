@@ -48,6 +48,12 @@ import { Badge } from "../../components/ui/badge";
 import { Textarea } from "../../components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "../../components/ui/accordion";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -234,22 +240,12 @@ function asArray(v: unknown): string[] {
   return [];
 }
 
-/** Detect a justification (Tipo 2 OR all changes share the same `to` with empty `from`). */
+/** Detect an absence-justification request. Mirrors the requisicoes page,
+ *  which always renders the marking-comparison table for time-adjustment
+ *  requests (Tipo !== 2) — even when only a single "to" is filled and the
+ *  "from" side is empty (a missing-punch correction). */
 function isJustification(r: SecullumRequest): boolean {
-  if (r.Tipo === 2) return true;
-  const tos: string[] = [];
-  let allEmptyFrom = true;
-  for (const f of TIME_FIELDS) {
-    const cur = (r[f.key] as string | null) ?? "";
-    const orig = (r[f.origKey] as string | null) ?? "";
-    if (cur !== orig) {
-      tos.push(cur);
-      if (orig) allEmptyFrom = false;
-    }
-  }
-  if (tos.length === 0) return false;
-  const firstTo = tos[0];
-  return allEmptyFrom && tos.every((t) => t === firstTo);
+  return r.Tipo === 2;
 }
 
 function justificationToken(r: SecullumRequest): string | undefined {
@@ -337,7 +333,7 @@ function HrRequestsTableRender({
 
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDeferredValue(searchInput);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [openIds, setOpenIds] = useState<string[]>([]);
 
   const onlyPendingApi =
     config.filters.estados.length === 1 && config.filters.estados[0] === 0;
@@ -414,23 +410,15 @@ function HrRequestsTableRender({
     return out.slice(0, config.limit);
   }, [allRows, config.filters, config.sort, config.limit, debouncedSearch]);
 
-  // Auto-select first row when data loads or selection becomes stale.
+  // Drop any open accordion ids that no longer correspond to a visible row
+  // (filters/search changed). All-closed-by-default is preserved otherwise.
   useEffect(() => {
-    if (rows.length === 0) {
-      setSelectedId(null);
-      return;
-    }
-    if (selectedId === null || !rows.some((r) => r.Id === selectedId)) {
-      setSelectedId(rows[0].Id);
-    }
-  }, [rows, selectedId]);
-
-  const selected = useMemo(
-    () => rows.find((r) => r.Id === selectedId) ?? null,
-    [rows, selectedId],
-  );
-  const isSelectedActionable =
-    !!selected && ACTIONABLE_ESTADOS.has(selected.Estado);
+    setOpenIds((prev) => {
+      const visibleIds = new Set(rows.map((r) => String(r.Id)));
+      const next = prev.filter((id) => visibleIds.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [rows]);
 
   const accent = useMemo(
     () =>
@@ -487,10 +475,9 @@ function HrRequestsTableRender({
     );
   };
 
-  // ---- Header search + actions ----
-  const showActions =
-    config.showActionButtons && !!selected && isSelectedActionable;
-
+  // ---- Header search + refresh ----
+  // Per-card Aprovar/Rejeitar live inside each accordion's content now —
+  // the header only owns the global concerns (search + refresh).
   const headerExtra = (
     <>
       {display.showSearchBox && (
@@ -517,42 +504,8 @@ function HrRequestsTableRender({
           className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}
         />
       </Button>
-      {showActions && (
-        <>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-7 px-3 !bg-destructive !text-destructive-foreground !border-destructive font-semibold hover:!opacity-90"
-            disabled={approveMutation.isPending || rejectMutation.isPending}
-            onClick={() => {
-              if (!selected) return;
-              setRejectTarget(selected);
-              setRejectReason("");
-            }}
-          >
-            Rejeitar
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="default"
-            className="h-7 px-3 font-semibold !text-primary-foreground"
-            disabled={approveMutation.isPending || rejectMutation.isPending}
-            onClick={() => {
-              if (!selected) return;
-              onApprove(selected);
-            }}
-          >
-            Aprovar
-          </Button>
-        </>
-      )}
     </>
   );
-
-  // ---- Layout: split master-detail at >=3 cols, list-only otherwise ----
-  const useSplitLayout = (size?.cols ?? 4) >= 3;
 
   return (
     <WidgetCard
@@ -576,41 +529,31 @@ function HrRequestsTableRender({
             {display.emptyStateMessage?.trim() ||
               "Nenhuma requisição encontrada com os filtros atuais."}
           </div>
-        ) : useSplitLayout ? (
-          <div className="flex h-full min-h-0">
-            <div className="w-2/5 min-w-[180px] border-r border-border overflow-y-auto">
-              <ListPanel
-                rows={rows}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                dens={dens}
-                accentDot={accent.classes.dot}
-                striping={display.striping}
-                gridLines={display.gridLines}
-                hoverHighlight={display.hoverHighlight}
-              />
-            </div>
-            <div className="flex-1 min-w-0 overflow-y-auto">
-              {selected ? (
-                <DetailPanel r={selected} />
-              ) : (
-                <div className="p-6 text-center text-sm text-muted-foreground">
-                  Selecione uma requisição.
-                </div>
-              )}
-            </div>
-          </div>
         ) : (
-          <ListPanel
-            rows={rows}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            dens={dens}
-            accentDot={accent.classes.dot}
-            striping={display.striping}
-            gridLines={display.gridLines}
-            hoverHighlight={display.hoverHighlight}
-          />
+          <div className="h-full min-h-0 overflow-y-auto">
+            <Accordion
+              type="multiple"
+              value={openIds}
+              onValueChange={setOpenIds}
+              className="p-2 space-y-1.5"
+            >
+              {rows.map((r) => (
+                <RequestAccordionItem
+                  key={r.Id}
+                  r={r}
+                  dens={dens}
+                  showActions={config.showActionButtons}
+                  approvePending={approveMutation.isPending}
+                  rejectPending={rejectMutation.isPending}
+                  onApprove={() => onApprove(r)}
+                  onReject={() => {
+                    setRejectTarget(r);
+                    setRejectReason("");
+                  }}
+                />
+              ))}
+            </Accordion>
+          </div>
         )}
 
         <AlertDialog
@@ -662,221 +605,152 @@ function HrRequestsTableRender({
 }
 
 // ============================================================
-// List panel + card
+// Accordion item — collapsible card whose trigger shows the request
+// summary (name + date + tipo badge) and whose content shows the full
+// detail (info row + comparison table + per-card actions).
 // ============================================================
 
-function ListPanel({
-  rows,
-  selectedId,
-  onSelect,
-  dens,
-}: {
-  rows: SecullumRequest[];
-  selectedId: number | null;
-  onSelect: (id: number) => void;
-  dens: ReturnType<typeof cardDensityClasses>;
-  accentDot: string;
-  striping: boolean;
-  gridLines: boolean;
-  hoverHighlight: boolean;
-}) {
-  // Inner padding + small inter-card gap matches the page layout. The
-  // bordered cards do the row-separation job that striping/gridLines did
-  // before, so we don't need extra dividers.
-  return (
-    <div className="p-2 space-y-1.5">
-      {rows.map((r, i) => (
-        <ListCard
-          key={r.Id}
-          r={r}
-          index={i}
-          selected={r.Id === selectedId}
-          onSelect={onSelect}
-          dens={dens}
-          accentDot=""
-          striping={false}
-          gridLines={false}
-          hoverHighlight
-        />
-      ))}
-    </div>
-  );
-}
-
-function ListCard({
+function RequestAccordionItem({
   r,
-  selected,
-  onSelect,
   dens,
+  showActions,
+  approvePending,
+  rejectPending,
+  onApprove,
+  onReject,
 }: {
   r: SecullumRequest;
-  index: number;
-  selected: boolean;
-  onSelect: (id: number) => void;
   dens: ReturnType<typeof cardDensityClasses>;
-  accentDot: string;
-  striping: boolean;
-  gridLines: boolean;
-  hoverHighlight: boolean;
+  showActions: boolean;
+  approvePending: boolean;
+  rejectPending: boolean;
+  onApprove: () => void;
+  onReject: () => void;
 }) {
   const tipoLabel = TIPO_LABELS[r.Tipo] || r.TipoDescricao || "—";
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(r.Id)}
-      // Mirrors the real page's list card chrome: primary-blue fill when
-      // selected (with a pulsing dot), neutral hover otherwise. The widget
-      // version drops striping/gridLines on purpose — at tile widths a
-      // selected card already reads as "current"; extra row chrome adds
-      // visual noise without information value.
-      className={`relative w-full text-left ${dens.card} rounded-md border transition-colors min-w-0 ${
-        selected
-          ? "border-primary bg-primary text-primary-foreground shadow-sm"
-          : "border-border/40 hover:bg-secondary/40"
-      }`}
-    >
-      <div className={`flex items-center gap-2 min-w-0 ${dens.primary}`}>
-        <IconUser
-          className={`h-3.5 w-3.5 shrink-0 ${
-            selected ? "text-primary-foreground" : "text-muted-foreground"
-          }`}
-        />
-        <span className="font-semibold truncate flex-1 min-w-0 uppercase tracking-tight">
-          {r.FuncionarioNome || "—"}
-        </span>
-        {selected && (
-          <span
-            className="h-2 w-2 rounded-full shrink-0 bg-primary-foreground animate-pulse shadow-sm"
-            aria-hidden="true"
-          />
-        )}
-      </div>
-      <div
-        className={`mt-1 flex items-center gap-1.5 ${dens.meta} min-w-0 ${
-          selected ? "text-primary-foreground/80" : "text-muted-foreground"
-        }`}
-      >
-        <IconCalendar className="h-3 w-3 shrink-0" />
-        <span className="tabular-nums">{formatDate(r.Data)}</span>
-        <Badge
-          variant={selected ? "secondary" : "outline"}
-          className={`ml-auto text-[10px] py-0 px-1.5 shrink-0 font-normal ${
-            selected
-              ? "bg-primary-foreground/20 text-primary-foreground border-primary-foreground/30"
-              : ""
-          }`}
-        >
-          {tipoLabel}
-        </Badge>
-      </div>
-    </button>
-  );
-}
-
-// ============================================================
-// Detail panel
-// ============================================================
-
-function DetailPanel({ r }: { r: SecullumRequest }) {
-  const tipoLabel = r.TipoDescricao || TIPO_LABELS[r.Tipo] || "—";
-  const longDate = useMemo(() => {
-    if (!r.Data) return "—";
-    try {
-      return new Date(r.Data).toLocaleDateString("pt-BR", {
-        weekday: "short",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
-    } catch {
-      return formatDate(r.Data);
-    }
-  }, [r.Data]);
-
   const justification = isJustification(r);
   const token = justification ? justificationToken(r) : undefined;
   const estadoTone =
     ESTADO_TONES[r.Estado] ?? "border-border text-muted-foreground";
   const estadoLabel = ESTADO_LABELS[r.Estado] ?? String(r.Estado);
-
+  const isActionable = ACTIONABLE_ESTADOS.has(r.Estado);
   const [attachmentOpen, setAttachmentOpen] = useState(false);
 
   return (
-    <div className="p-3 space-y-3">
-      {/* Header — name + tipo badge + long date. Mirrors the page's
-          px-8 py-6 detail header, scaled to widget tile size. */}
-      <div className="space-y-1.5 pb-2 border-b border-border">
-        <div className="flex items-center gap-2 min-w-0">
-          <IconUser className="h-4 w-4 text-primary shrink-0" />
-          <h2 className="text-sm font-semibold truncate">
-            {r.FuncionarioNome || "—"}
-          </h2>
-          {r.Estado !== 0 && (
-            <Badge
-              variant="outline"
-              className={`text-[10px] py-0 px-1.5 ml-auto shrink-0 ${estadoTone}`}
+    <AccordionItem
+      value={String(r.Id)}
+      className="rounded-md border border-border/60 bg-card last:border-b last:border-border/60 data-[state=open]:border-primary/50 data-[state=open]:shadow-sm"
+    >
+      <AccordionTrigger
+        className={`${dens.card} no-underline hover:no-underline data-[state=open]:bg-muted/30 transition-colors rounded-md`}
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex-1 min-w-0 text-left">
+            <div className={`flex items-center gap-2 min-w-0 ${dens.primary}`}>
+              <IconUser className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="font-semibold truncate flex-1 min-w-0 uppercase tracking-tight">
+                {r.FuncionarioNome || "—"}
+              </span>
+            </div>
+            <div
+              className={`mt-1 flex items-center gap-1.5 ${dens.meta} min-w-0 text-muted-foreground`}
             >
-              {estadoLabel}
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
-          <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+              <IconCalendar className="h-3 w-3 shrink-0" />
+              <span className="tabular-nums">{formatDate(r.Data)}</span>
+              {r.Estado !== 0 && (
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] py-0 px-1.5 shrink-0 ${estadoTone}`}
+                >
+                  {estadoLabel}
+                </Badge>
+              )}
+            </div>
+          </div>
+          <Badge
+            variant="outline"
+            className="text-[10px] py-0 px-1.5 shrink-0 font-normal"
+          >
             {tipoLabel}
           </Badge>
-          <span>·</span>
-          <span className="tabular-nums">{longDate}</span>
         </div>
-      </div>
+      </AccordionTrigger>
+      <AccordionContent className="px-3 pt-3 pb-3 space-y-3">
+        {/* Information block — same fields as the page, but laid out
+            horizontally so it fits compactly inside the accordion. */}
+        <div className="rounded-md bg-muted/30 p-3 space-y-2.5">
+          <h3 className="text-[11px] font-semibold flex items-center gap-1.5 text-foreground">
+            <IconFileDescription className="h-3.5 w-3.5 text-primary" />
+            Informações da Solicitação
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+            <InfoRow label="Data do Ponto" value={formatDate(r.Data)} />
+            <InfoRow label="Solicitado em" value={formatDateTime(r.DataSolicitacao)} />
+            <InfoRow label="Solicitado por" value={r.FuncionarioNome || "—"} />
+          </div>
+          {r.Observacoes && (
+            <InfoRow label="Observação" value={r.Observacoes} multiline />
+          )}
+          {r.SolicitacaoFotoId != null && (
+            <div className="space-y-1">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Foto Anexada
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 h-7 text-xs"
+                onClick={() => setAttachmentOpen(true)}
+              >
+                <IconPaperclip className="h-3.5 w-3.5" />
+                Ver foto anexada
+              </Button>
+            </div>
+          )}
+        </div>
 
-      {/* Information block — vertical metadata stack matching the real page.
-          Same grouping (Data do Ponto / Solicitado em / Solicitado por /
-          Observação / Foto Anexada) just smaller padding for tile widths. */}
-      <div className="rounded-md bg-muted/30 p-3 space-y-2.5">
-        <h3 className="text-[11px] font-semibold flex items-center gap-1.5 text-foreground">
-          <IconFileDescription className="h-3.5 w-3.5 text-primary" />
-          Informações da Solicitação
-        </h3>
-        <InfoRow label="Data do Ponto" value={formatDate(r.Data)} />
-        <InfoRow label="Solicitado em" value={formatDateTime(r.DataSolicitacao)} />
-        <InfoRow label="Solicitado por" value={r.FuncionarioNome || "—"} />
-        {r.Observacoes && (
-          <InfoRow label="Observação" value={r.Observacoes} multiline />
+        {/* Comparison or justification card. */}
+        {justification ? (
+          <JustificationCard token={token} observacoes={r.Observacoes} />
+        ) : (
+          <ComparisonGrid r={r} />
         )}
-        {r.SolicitacaoFotoId != null && (
-          <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Foto Anexada
-            </p>
+
+        {/* Per-card action buttons — only for pending (actionable) requests. */}
+        {showActions && isActionable && (
+          <div className="flex items-center justify-end gap-2 pt-1">
             <Button
-              variant="outline"
+              type="button"
               size="sm"
-              className="gap-2 h-7 text-xs"
-              onClick={() => setAttachmentOpen(true)}
+              variant="outline"
+              className="h-7 px-3 !bg-destructive !text-destructive-foreground !border-destructive font-semibold hover:!opacity-90"
+              disabled={approvePending || rejectPending}
+              onClick={onReject}
             >
-              <IconPaperclip className="h-3.5 w-3.5" />
-              Ver foto anexada
+              Rejeitar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="default"
+              className="h-7 px-3 font-semibold !text-primary-foreground"
+              disabled={approvePending || rejectPending}
+              onClick={onApprove}
+            >
+              Aprovar
             </Button>
           </div>
         )}
-      </div>
 
-      {/* Comparison or justification card. */}
-      {justification ? (
-        <JustificationCard token={token} observacoes={r.Observacoes} />
-      ) : (
-        <ComparisonGrid r={r} />
-      )}
-
-      {r.SolicitacaoFotoId != null && (
-        <RequestAttachmentDialog
-          solicitacaoId={r.SolicitacaoFotoId}
-          open={attachmentOpen}
-          onOpenChange={setAttachmentOpen}
-        />
-      )}
-    </div>
+        {r.SolicitacaoFotoId != null && (
+          <RequestAttachmentDialog
+            solicitacaoId={r.SolicitacaoFotoId}
+            open={attachmentOpen}
+            onOpenChange={setAttachmentOpen}
+          />
+        )}
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
@@ -1038,8 +912,8 @@ function ComparisonGrid({ r }: { r: SecullumRequest }) {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-md border border-border">
-        <div className="grid grid-cols-[auto_repeat(6,minmax(0,1fr))] gap-px bg-border text-[11px]">
+      <div className="overflow-x-auto rounded-md border border-border">
+        <div className="grid grid-cols-[auto_repeat(6,minmax(56px,1fr))] gap-px bg-border text-[11px] min-w-[420px]">
           {/* ----- header ----- */}
           <div className="bg-muted/60 px-2 py-1.5 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
             Marcação
@@ -1150,20 +1024,16 @@ function JustificationCard({
 
 function SkeletonState() {
   return (
-    <div className="flex h-full min-h-0">
-      <div className="w-2/5 min-w-[180px] border-r border-border space-y-px p-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="space-y-1.5 px-1 py-2">
-            <div className="h-3 rounded bg-muted/60 animate-pulse w-3/4" />
-            <div className="h-2.5 rounded bg-muted/40 animate-pulse w-1/2" />
-          </div>
-        ))}
-      </div>
-      <div className="flex-1 p-3 space-y-3">
-        <div className="h-3 rounded bg-muted/60 animate-pulse w-1/3" />
-        <div className="h-3 rounded bg-muted/40 animate-pulse w-2/3" />
-        <div className="h-24 rounded bg-muted/40 animate-pulse" />
-      </div>
+    <div className="p-2 space-y-1.5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-md border border-border/60 bg-card px-3 py-2 space-y-1.5"
+        >
+          <div className="h-3 rounded bg-muted/60 animate-pulse w-2/3" />
+          <div className="h-2.5 rounded bg-muted/40 animate-pulse w-1/3" />
+        </div>
+      ))}
     </div>
   );
 }

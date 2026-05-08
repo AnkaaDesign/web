@@ -9,8 +9,7 @@
 // client-side. Tasks that fall in multiple buckets show one bar per event
 // type (and one tooltip line per type).
 
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -31,6 +30,7 @@ import { Combobox } from "../../components/ui/combobox";
 import type { ComboboxOption } from "../../components/ui/combobox";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import { TruckDetailModal } from "../../components/production/garage/truck-detail-modal";
 import {
   Tooltip,
   TooltipContent,
@@ -106,13 +106,6 @@ const EVENT_DOT_CLASSES: Record<EventType, string> = {
   finishedAt: "bg-green-700",
 };
 
-const EVENT_ICONS: Record<EventType, React.ComponentType<{ className?: string }>> = {
-  term: IconFlag,
-  forecastDate: IconCalendarDue,
-  startedAt: IconBolt,
-  finishedAt: IconCircleCheck,
-};
-
 interface DayEvent {
   type: EventType;
   task: Task;
@@ -185,7 +178,6 @@ function ProductionCalendarRender({
   config,
   size,
 }: WidgetRenderProps<ProductionCalendarConfig>) {
-  const navigate = useNavigate();
   const accent = useMemo(
     () =>
       resolveAccent({
@@ -197,21 +189,42 @@ function ProductionCalendarRender({
   const AccentIcon = accent.Icon;
 
   const [refMonth, setRefMonth] = useState<Date>(() => defaultRefMonth());
-  const [statuses, setStatuses] = useState<TASK_STATUS[]>(config.filters.statuses);
+
+  // Status filter is set in the configure modal's "Filtros" tab — never
+  // exposed in the widget header (no removable chips dangling in the title bar).
+  const effectiveStatuses = useMemo<TASK_STATUS[]>(() => {
+    const list = [...config.filters.statuses];
+    if (config.filters.includeCancelled && !list.includes(TASK_STATUS.CANCELLED)) {
+      list.push(TASK_STATUS.CANCELLED);
+    }
+    return list;
+  }, [config.filters.statuses, config.filters.includeCancelled]);
+
+  // Local visibility toggles for each event type, seeded from config.display.*.
+  // Tile clicks below mutate these — saved config defaults are preserved
+  // until the next manual toggle. Re-syncs when the saved config changes.
+  const [showTerm, setShowTerm] = useState(config.display.showTerm);
+  const [showForecast, setShowForecast] = useState(config.display.showForecast);
+  const [showStarted, setShowStarted] = useState(config.display.showStarted);
+  const [showFinished, setShowFinished] = useState(config.display.showFinished);
+  useEffect(() => setShowTerm(config.display.showTerm), [config.display.showTerm]);
+  useEffect(() => setShowForecast(config.display.showForecast), [config.display.showForecast]);
+  useEffect(() => setShowStarted(config.display.showStarted), [config.display.showStarted]);
+  useEffect(() => setShowFinished(config.display.showFinished), [config.display.showFinished]);
+
+  // Click-to-open task modal — same flow as the production schedule page.
+  const [modalTaskId, setModalTaskId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const openTaskModal = (taskId: string) => {
+    setModalTaskId(taskId);
+    setModalOpen(true);
+  };
 
   const grid = useMemo(() => buildPeriodGrid(refMonth), [refMonth]);
   const { start: periodStart, end: periodEnd } = useMemo(
     () => getPayrollPeriod(refMonth),
     [refMonth],
   );
-
-  const effectiveStatuses = useMemo<TASK_STATUS[]>(() => {
-    const list = [...statuses];
-    if (config.filters.includeCancelled && !list.includes(TASK_STATUS.CANCELLED)) {
-      list.push(TASK_STATUS.CANCELLED);
-    }
-    return list;
-  }, [statuses, config.filters.includeCancelled]);
 
   const baseParams = {
     take: 200,
@@ -227,22 +240,22 @@ function ProductionCalendarRender({
   const termQ = useTasks({
     ...baseParams,
     termRange: { from: periodStart, to: periodEnd },
-    enabled: config.display.showTerm,
+    enabled: showTerm,
   } as any);
   const forecastQ = useTasks({
     ...baseParams,
     forecastDateRange: { from: periodStart, to: periodEnd },
-    enabled: config.display.showForecast,
+    enabled: showForecast,
   } as any);
   const startedQ = useTasks({
     ...baseParams,
     startedDateRange: { from: periodStart, to: periodEnd },
-    enabled: config.display.showStarted,
+    enabled: showStarted,
   } as any);
   const finishedQ = useTasks({
     ...baseParams,
     finishedDateRange: { from: periodStart, to: periodEnd },
-    enabled: config.display.showFinished,
+    enabled: showFinished,
   } as any);
 
   const isLoading =
@@ -282,10 +295,10 @@ function ProductionCalendarRender({
         push(toIsoDay(dt), { type, task: t });
       }
     };
-    if (config.display.showTerm) slot(termQ.data?.data ?? [], "term", (t) => t.term);
-    if (config.display.showForecast) slot(forecastQ.data?.data ?? [], "forecastDate", (t) => t.forecastDate);
-    if (config.display.showStarted) slot(startedQ.data?.data ?? [], "startedAt", (t) => t.startedAt);
-    if (config.display.showFinished) slot(finishedQ.data?.data ?? [], "finishedAt", (t) => t.finishedAt);
+    if (showTerm) slot(termQ.data?.data ?? [], "term", (t) => t.term);
+    if (showForecast) slot(forecastQ.data?.data ?? [], "forecastDate", (t) => t.forecastDate);
+    if (showStarted) slot(startedQ.data?.data ?? [], "startedAt", (t) => t.startedAt);
+    if (showFinished) slot(finishedQ.data?.data ?? [], "finishedAt", (t) => t.finishedAt);
     return map;
   }, [
     termQ.data,
@@ -294,10 +307,10 @@ function ProductionCalendarRender({
     finishedQ.data,
     periodStart,
     periodEnd,
-    config.display.showTerm,
-    config.display.showForecast,
-    config.display.showStarted,
-    config.display.showFinished,
+    showTerm,
+    showForecast,
+    showStarted,
+    showFinished,
   ]);
 
   // Footer counters — total events of each visible type within the period.
@@ -317,30 +330,12 @@ function ProductionCalendarRender({
     return { term, forecast, started, finished };
   }, [dayEvents]);
 
-  const statusOptions = useMemo<ComboboxOption[]>(() => {
-    return Object.entries(TASK_STATUS_LABELS).map(([value, label]) => ({ value, label }));
-  }, []);
-
-  const compact = (size?.cols ?? 4) <= 2;
-
+  // Header — only period nav. Status filtering moved entirely to the
+  // configure modal's "Filtros" tab so the title bar stays clean.
+  // (Suppress unused-var lint for size since we no longer branch on it.)
+  void size;
   const headerExtra = (
     <div className="flex items-center gap-2 flex-wrap justify-end">
-      {!compact && config.display.showFilters && (
-        <div className="w-44">
-          <Combobox
-            mode="multiple"
-            options={statusOptions}
-            value={statuses}
-            onValueChange={(v) =>
-              setStatuses(Array.isArray(v) ? (v as TASK_STATUS[]) : v ? [v as TASK_STATUS] : [])
-            }
-            placeholder="Status"
-            emptyText="Nenhum"
-            searchable
-            triggerClassName="h-7 text-xs"
-          />
-        </div>
-      )}
       <PeriodHeader
         refMonth={refMonth}
         onChange={setRefMonth}
@@ -417,7 +412,7 @@ function ProductionCalendarRender({
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigate(routes.production.schedule.details(ev.task.id));
+                  openTaskModal(ev.task.id);
                 }}
                 title={label}
               >
@@ -484,48 +479,116 @@ function ProductionCalendarRender({
           showSunday={config.display.showSunday}
           showSaturday={config.display.showSaturday}
         />
-        <div className="flex items-center justify-between gap-3 px-1 text-[11px] text-muted-foreground flex-wrap">
-          {config.display.showTerm && (
-            <SummaryChip type="term" label="Prazos" value={stats.term} />
-          )}
-          {config.display.showForecast && (
-            <SummaryChip type="forecastDate" label="Previsões" value={stats.forecast} />
-          )}
-          {config.display.showStarted && (
-            <SummaryChip type="startedAt" label="Iniciadas" value={stats.started} />
-          )}
-          {config.display.showFinished && (
-            <SummaryChip type="finishedAt" label="Concluídas" value={stats.finished} />
-          )}
-          {isLoading && <span className="text-[10px] italic">Carregando…</span>}
+
+        {/* Legend tiles — click to show/hide each event type. Mirrors the
+            StatsRow tiles on the full Calendário de Produção page. */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-1 flex-shrink-0">
+          <LegendTile
+            icon={IconFlag}
+            label="Prazos"
+            value={stats.term}
+            tone="purple"
+            active={showTerm}
+            onClick={() => setShowTerm((v) => !v)}
+          />
+          <LegendTile
+            icon={IconCalendarDue}
+            label="Previsões"
+            value={stats.forecast}
+            tone="orange"
+            active={showForecast}
+            onClick={() => setShowForecast((v) => !v)}
+          />
+          <LegendTile
+            icon={IconBolt}
+            label="Iniciadas"
+            value={stats.started}
+            tone="blue"
+            active={showStarted}
+            onClick={() => setShowStarted((v) => !v)}
+          />
+          <LegendTile
+            icon={IconCircleCheck}
+            label="Concluídas"
+            value={stats.finished}
+            tone="green"
+            active={showFinished}
+            onClick={() => setShowFinished((v) => !v)}
+          />
         </div>
+        {isLoading && (
+          <span className="text-[10px] italic text-muted-foreground px-1">Carregando…</span>
+        )}
       </div>
+
+      {/* Click-to-open task modal (reuses the garage feature's task detail modal). */}
+      <TruckDetailModal
+        taskId={modalTaskId}
+        open={modalOpen}
+        onOpenChange={(open) => {
+          setModalOpen(open);
+          if (!open) setModalTaskId(null);
+        }}
+      />
     </WidgetCard>
   );
 }
 
-function SummaryChip({
-  type,
+// ============================================================
+// Legend tile — clickable visibility toggle for an event type.
+// ============================================================
+
+function LegendTile({
+  icon: Icon,
   label,
   value,
+  tone,
+  active,
+  onClick,
 }: {
-  type: EventType;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
+  tone: "purple" | "orange" | "blue" | "green";
+  active: boolean;
+  onClick: () => void;
 }) {
-  const Icon = EVENT_ICONS[type];
-  const colorText = {
-    term: "text-purple-600 dark:text-purple-300",
-    forecastDate: "text-orange-600 dark:text-orange-300",
-    startedAt: "text-blue-600 dark:text-blue-300",
-    finishedAt: "text-green-700 dark:text-green-300",
-  }[type];
+  const toneClasses: Record<typeof tone, string> = {
+    purple: "bg-purple-500/10 text-purple-600 dark:text-purple-400 ring-purple-500/20",
+    orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/20",
+    blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20",
+    green: "bg-green-500/10 text-green-600 dark:text-green-400 ring-green-500/20",
+  };
   return (
-    <span className="inline-flex items-center gap-1">
-      <Icon className={cn("h-3 w-3", colorText)} />
-      <span className={cn("font-semibold tabular-nums", colorText)}>{value}</span>
-      <span className="hidden sm:inline">{label}</span>
-    </span>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={
+        active
+          ? `Ocultar ${label.toLowerCase()} no calendário`
+          : `Mostrar ${label.toLowerCase()} no calendário`
+      }
+      className={cn(
+        "flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-left transition-all hover:border-primary/40 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40",
+        !active && "opacity-40 grayscale",
+      )}
+    >
+      <div className={cn("rounded p-1 ring-1 relative", toneClasses[tone])}>
+        <Icon className="h-3.5 w-3.5" />
+        {!active && (
+          <span className="absolute inset-1 flex items-center justify-center pointer-events-none">
+            <span className="block h-[1.5px] w-full rotate-45 bg-current rounded-full" />
+          </span>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[9px] uppercase tracking-wide text-muted-foreground font-medium leading-none">
+          {label}
+        </div>
+        <div className="text-sm font-bold tabular-nums leading-tight">{value}</div>
+      </div>
+    </button>
   );
 }
 

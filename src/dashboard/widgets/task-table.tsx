@@ -28,6 +28,8 @@ import {
 } from "@tabler/icons-react";
 
 import {
+  ARTWORK_STATUS,
+  ARTWORK_STATUS_LABELS,
   COMMISSION_STATUS,
   COMMISSION_STATUS_LABELS,
   IMPLEMENT_TYPE,
@@ -83,6 +85,15 @@ import { CanvasNormalMapRenderer } from "../../components/painting/effects/canva
 import { ServiceOrderCell } from "../../components/production/task/history/service-order-cell";
 import { DeadlineCountdown } from "../../components/production/task/schedule/deadline-countdown";
 import { QuoteStatusBadge } from "../../components/production/task/quote/quote-status-badge";
+import { FilePreviewModal } from "../../components/common/file/file-preview-modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import { getFileThumbnailUrl } from "../../utils/file";
 
 import { WidgetCard } from "../components/widget-card";
 import { ColumnPicker } from "../components/column-picker";
@@ -458,6 +469,185 @@ function dateClassFor(
   return ctx.bold ? `${cls} font-medium` : cls;
 }
 
+// ============================================================================
+// Artworks cell + modal
+// ============================================================================
+// The "Artes" column displays the artwork count and overrides the row click
+// to open an inline modal listing every artwork for the task with its status.
+// Clicking a thumbnail in the listing hands off to the shared FilePreviewModal
+// so the user can preview/download/zoom the file with the same UX as the rest
+// of the app. Badges follow the same `approved` / `rejected` variants used in
+// the task detail page (`components/production/task/artwork/artwork-status-badge.tsx`)
+// so the visual language stays consistent.
+
+function artworkStatusBadgeVariant(
+  status: ARTWORK_STATUS,
+): "approved" | "rejected" | "secondary" {
+  switch (status) {
+    case ARTWORK_STATUS.APPROVED:
+      return "approved";
+    case ARTWORK_STATUS.REPROVED:
+      return "rejected";
+    default:
+      return "secondary";
+  }
+}
+
+type TaskArtwork = {
+  id: string;
+  artworkId?: string;
+  status: ARTWORK_STATUS;
+  filename: string;
+  originalName?: string;
+  path?: string;
+  mimetype: string;
+  size?: number;
+  thumbnailUrl?: string | null;
+};
+
+function ArtworksCell({ task }: { task: Task }) {
+  const artworks = ((task as any).artworks ?? []) as TaskArtwork[];
+  const count = artworks.length;
+  const [listOpen, setListOpen] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+
+  if (count === 0) {
+    return <span className="text-sm tabular-nums text-muted-foreground">0</span>;
+  }
+
+  // React synthetic events propagate through the *virtual* tree, not the DOM
+  // tree. Even though Radix portals the dialog content to <body>, the dialog
+  // is still a React child of this cell — and this cell is a child of the
+  // table row, which has an onClick that navigates to the task detail page.
+  // Without this boundary, closing FilePreviewModal (via X / Escape / overlay
+  // click) would bubble up the virtual tree into the row's onClick and
+  // trigger navigation. The wrapper stops both pointer and keyboard events
+  // before they can reach the row.
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
+  // Status breakdown — drives the cell color so users see at a glance whether
+  // anything still needs approval.
+  const counts = artworks.reduce(
+    (acc, a) => {
+      acc[a.status] = (acc[a.status] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+  const hasReproved = (counts[ARTWORK_STATUS.REPROVED] ?? 0) > 0;
+  const hasDraft = (counts[ARTWORK_STATUS.DRAFT] ?? 0) > 0;
+  const allApproved = !hasReproved && !hasDraft;
+  const cellColor = hasReproved
+    ? "text-red-500"
+    : hasDraft
+      ? "text-amber-500"
+      : allApproved
+        ? "text-emerald-500"
+        : "";
+
+  return (
+    <span
+      onClick={stop}
+      onMouseDown={stop}
+      onPointerDown={stop}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+      }}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          // Cell click overrides the row click — never navigate away.
+          e.stopPropagation();
+          setListOpen(true);
+        }}
+        onKeyDown={(e) => {
+          // The row owns Enter/Space for navigation. Re-bind them here so the
+          // cell button can be activated from the keyboard without the row
+          // hijacking the event.
+          if (e.key === "Enter" || e.key === " ") {
+            e.stopPropagation();
+            e.preventDefault();
+            setListOpen(true);
+          }
+        }}
+        className={`text-sm tabular-nums font-medium hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-1 ${cellColor}`}
+        aria-label={`Ver ${count} ${count === 1 ? "arte" : "artes"} da tarefa`}
+      >
+        {count}
+      </button>
+
+      <Dialog open={listOpen} onOpenChange={setListOpen}>
+        <DialogContent
+          className="max-w-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DialogHeader>
+            <DialogTitle>Artes — {task.name ?? task.serialNumber ?? ""}</DialogTitle>
+            <DialogDescription>
+              {count} {count === 1 ? "arte" : "artes"} ·{" "}
+              {(Object.keys(counts) as ARTWORK_STATUS[])
+                .map((s) => `${counts[s]} ${ARTWORK_STATUS_LABELS[s] ?? s}`)
+                .join(" · ")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[60vh] overflow-auto pr-1">
+            {artworks.map((art, idx) => {
+              const thumb = getFileThumbnailUrl(art as any) || art.thumbnailUrl || null;
+              const label = art.originalName || art.filename;
+              return (
+                <button
+                  key={art.id}
+                  type="button"
+                  onClick={() => setPreviewIndex(idx)}
+                  className="group relative flex flex-col items-stretch gap-1.5 rounded-md border border-border bg-card p-2 text-left hover:border-primary hover:bg-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  title={label}
+                >
+                  <div className="aspect-square overflow-hidden rounded bg-muted">
+                    {thumb ? (
+                      <img
+                        src={thumb}
+                        alt={label}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                        {art.mimetype?.split("/")[1]?.toUpperCase() ?? "Arquivo"}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Badge
+                      variant={artworkStatusBadgeVariant(art.status)}
+                      size="sm"
+                      className="shrink-0"
+                    >
+                      {ARTWORK_STATUS_LABELS[art.status] ?? art.status}
+                    </Badge>
+                    <span className="truncate text-xs text-foreground min-w-0">
+                      {label}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <FilePreviewModal
+        files={artworks as any}
+        initialFileIndex={previewIndex ?? 0}
+        open={previewIndex !== null}
+        onOpenChange={(v) => {
+          if (!v) setPreviewIndex(null);
+        }}
+      />
+    </span>
+  );
+}
+
 function buildColumnCatalog(): ColumnDef[] {
   return [
     {
@@ -573,7 +763,9 @@ function buildColumnCatalog(): ColumnDef[] {
       label: "Prazo",
       track: "minmax(0, 1fr)",
       render: (t, ctx) => {
-        const cls = dateClassFor(t.term, "term", ctx);
+        const isInactive =
+          t.status === TASK_STATUS.COMPLETED || t.status === TASK_STATUS.CANCELLED;
+        const cls = isInactive ? "" : dateClassFor(t.term, "term", ctx);
         return (
           <span className={`text-sm tabular-nums ${cls}`}>{formatDateTimeShort(t.term)}</span>
         );
@@ -605,7 +797,9 @@ function buildColumnCatalog(): ColumnDef[] {
       label: "Previsão",
       track: "minmax(0, 1fr)",
       render: (t, ctx) => {
-        const cls = dateClassFor(t.forecastDate, "forecast", ctx);
+        const isInactive =
+          t.status === TASK_STATUS.COMPLETED || t.status === TASK_STATUS.CANCELLED;
+        const cls = isInactive ? "" : dateClassFor(t.forecastDate, "forecast", ctx);
         return (
           <span className={`text-sm tabular-nums ${cls}`}>
             {formatDateTimeShort(t.forecastDate)}
@@ -846,12 +1040,7 @@ function buildColumnCatalog(): ColumnDef[] {
       key: "hasArtworks",
       label: "Artes",
       track: "minmax(0, 0.6fr)",
-      render: (t) => {
-        const n = (t.artworks ?? []).length;
-        return (
-          <span className={`text-sm tabular-nums ${n > 0 ? "text-emerald-500" : ""}`}>{n}</span>
-        );
-      },
+      render: (t) => <ArtworksCell task={t} />,
     },
     {
       key: "hasOpenSO",
@@ -1122,6 +1311,10 @@ export const taskTableConfigSchema = z.object({
 
   columnWidths: z.record(z.string()).default({}),
 
+  // User-supplied label overrides per column key. Empty/missing entries fall
+  // back to the catalog's default label.
+  columnLabels: z.record(z.string()).default({}),
+
   filters: z
     .object({
       status: z.array(z.nativeEnum(TASK_STATUS)).default([]),
@@ -1252,11 +1445,18 @@ function rangeFromCalendar(range: DateRangeValue): unknown {
   return out;
 }
 
-function buildWhere(
+type TaskQueryParams = {
+  where: Record<string, unknown>;
+  searchingFor?: string;
+  createdByIds?: string[];
+  isOverdue?: boolean;
+};
+
+function buildQueryParams(
   config: TaskTableConfig,
   runtimeSearch: string,
   runtimeStatus?: TASK_STATUS,
-): Record<string, unknown> {
+): TaskQueryParams {
   const where: Record<string, unknown> = {};
   const ANDs: Array<Record<string, unknown>> = [];
   const f = config.filters;
@@ -1270,7 +1470,6 @@ function buildWhere(
 
   if (f.sectorIds.length > 0) where.sectorId = { in: f.sectorIds };
   if (f.customerIds.length > 0) where.customerId = { in: f.customerIds };
-  if (f.assigneeIds.length > 0) where.createdById = { in: f.assigneeIds };
   if (f.commissions.length > 0) where.commission = { in: f.commissions };
 
   // Calendar ranges win when set, otherwise fall back to presets.
@@ -1318,13 +1517,15 @@ function buildWhere(
   if (f.hasBudget === "yes") ANDs.push({ quote: { isNot: null as any } });
   if (f.hasBudget === "no") ANDs.push({ quote: null as any });
 
+  // isOverdue 'yes' → top-level helper (API adds `term: not null` + active status)
+  // isOverdue 'no' → manual where (API has no built-in "not overdue")
+  let isOverdueParam: boolean | undefined;
   if (f.isOverdue === "yes") {
-    ANDs.push({ term: { lt: startOfDay() } });
-    ANDs.push({ status: { notIn: [TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED] } });
+    isOverdueParam = true;
   } else if (f.isOverdue === "no") {
     ANDs.push({
       OR: [
-        { term: null as any },
+        { term: null },
         { term: { gte: startOfDay() } },
         { status: { in: [TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED] } },
       ],
@@ -1339,11 +1540,17 @@ function buildWhere(
     ANDs.push({ quote: { is: { status: { in: f.quoteStatuses } } } });
   }
 
-  const search = runtimeSearch.trim() || f.defaultSearch.trim();
-  if (search) (where as any).searchingFor = search;
-
   if (ANDs.length > 0) where.AND = ANDs;
-  return where;
+
+  // Top-level helpers — these are NOT valid keys inside the strict where schema,
+  // so they must be sent as separate query params alongside `where`.
+  const search = runtimeSearch.trim() || f.defaultSearch.trim();
+  return {
+    where,
+    searchingFor: search || undefined,
+    createdByIds: f.assigneeIds.length > 0 ? f.assigneeIds : undefined,
+    isOverdue: isOverdueParam,
+  };
 }
 
 function buildOrderBy(config: TaskTableConfig): Array<Record<string, "asc" | "desc">> {
@@ -1464,7 +1671,9 @@ function TaskTableRender({
 
   const setColumnWidthPx = useCallback(
     (key: string, px: number) => {
-      const next = { ...liveWidths, [key]: `${Math.max(40, Math.round(px))}px` };
+      // Clamp width to a sane range so a runaway drag can't blow out the layout.
+      const clamped = Math.min(800, Math.max(40, Math.round(px)));
+      const next = { ...liveWidths, [key]: `${clamped}px` };
       setLiveWidths(next);
       writeStoredWidths(instanceId, next);
     },
@@ -1506,14 +1715,17 @@ function TaskTableRender({
   const runtimeStatus =
     layoutMode === "tabs" && activeStatusTab !== "ALL" ? activeStatusTab : undefined;
 
-  const where = useMemo(
-    () => buildWhere(config, debouncedSearch, runtimeStatus),
+  const queryParams = useMemo(
+    () => buildQueryParams(config, debouncedSearch, runtimeStatus),
     [config, debouncedSearch, runtimeStatus],
   );
   const orderBy = useMemo(() => buildOrderBy(config), [config]);
 
   const { data, isLoading, isError, refetch } = useTasks({
-    where,
+    where: queryParams.where,
+    searchingFor: queryParams.searchingFor,
+    createdByIds: queryParams.createdByIds,
+    isOverdue: queryParams.isOverdue,
     orderBy: orderBy as any,
     take: config.limit,
     include: TASK_INCLUDE as any,
@@ -1521,8 +1733,10 @@ function TaskTableRender({
 
   // Background refetch — useTasks doesn't support refetchInterval, so we drive
   // it ourselves. Skip when the tab is hidden so we don't churn against the API
-  // for an off-screen dashboard.
-  const refetchInterval = config.behavior?.refetchIntervalMs ?? 0;
+  // for an off-screen dashboard. Clamp to a 5s floor so a misconfigured value
+  // can't hammer the API.
+  const rawInterval = config.behavior?.refetchIntervalMs ?? 0;
+  const refetchInterval = rawInterval > 0 ? Math.max(5000, rawInterval) : 0;
   useEffect(() => {
     if (!refetchInterval || !refetch) return;
     const id = setInterval(() => {
@@ -1650,8 +1864,17 @@ function TaskTableRender({
     }
     if (isError) {
       return (
-        <div className="p-6 text-center text-sm text-muted-foreground">
-          Erro ao carregar tarefas.
+        <div className="p-6 text-center text-sm text-muted-foreground space-y-2">
+          <div>Erro ao carregar tarefas.</div>
+          {refetch && (
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="text-xs text-primary hover:underline"
+            >
+              Tentar novamente
+            </button>
+          )}
         </div>
       );
     }
@@ -1685,16 +1908,25 @@ function TaskTableRender({
   const renderRow = (task: Task, i: number) => (
     <div
       key={task.id}
-      className={`grid gap-x-3 items-center cursor-pointer transition-colors ${dens.row} ${rowBorder} ${rowHover} ${
+      role="button"
+      tabIndex={0}
+      aria-label={`Abrir tarefa ${task.name ?? task.serialNumber ?? task.id}`}
+      className={`grid gap-x-3 items-center cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${dens.row} ${rowBorder} ${rowHover} ${
         display.striping && i % 2 === 1 ? "bg-muted/20" : ""
       }`}
       style={{ gridTemplateColumns: gridTemplate }}
       onClick={() => navigate(detailHref(task.id))}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigate(detailHref(task.id));
+        }
+      }}
     >
       {cols.map((c, idx) => (
         <div
           key={c.key}
-          className={`min-w-0 ${c.needsRelative ? "relative" : ""}`}
+          className={`min-w-0 ${c.needsRelative ? "relative" : "overflow-hidden"}`}
         >
           {idx === 0 && showRowDot ? (
             <div className="flex items-center gap-2 min-w-0">
@@ -1719,18 +1951,21 @@ function TaskTableRender({
         className={`grid gap-x-3 ${dens.header} ${stickyClass} bg-muted/95 backdrop-blur-sm border-b border-border font-semibold uppercase tracking-wider text-muted-foreground`}
         style={{ gridTemplateColumns: gridTemplate }}
       >
-        {cols.map((c, i) => (
+        {cols.map((c, i) => {
+          const displayLabel = config.columnLabels?.[c.key]?.trim() || c.label;
+          return (
           <div
             key={c.key}
             data-col-key={c.key}
             className="relative truncate select-none"
+            title={displayLabel}
           >
-            {c.label}
+            {displayLabel}
             {i < cols.length - 1 && (
               <div
                 role="separator"
                 aria-orientation="vertical"
-                aria-label={`Redimensionar coluna ${c.label}`}
+                aria-label={`Redimensionar coluna ${displayLabel}`}
                 onPointerDown={(e) => onResizeStart(e, c.key)}
                 onClick={(e) => e.stopPropagation()}
                 onDoubleClick={(e) => {
@@ -1746,7 +1981,8 @@ function TaskTableRender({
               />
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
       {renderRows()}
     </>
@@ -1756,7 +1992,12 @@ function TaskTableRender({
     layoutMode === "tabs" ? (
       <Tabs
         value={activeStatusTab}
-        onValueChange={(v) => setActiveStatusTab(v as TASK_STATUS | "ALL")}
+        onValueChange={(v) => {
+          setActiveStatusTab(v as TASK_STATUS | "ALL");
+          // Reset search across tab boundaries — a query that matched on the
+          // previous tab is rarely meaningful on a different status subset.
+          setSearchInput("");
+        }}
         className="flex flex-col h-full min-h-0"
       >
         <TabsList className="m-2 self-start">
@@ -2392,6 +2633,46 @@ function TaskTableConfigComponent({
               Para ajustar a largura, arraste a borda direita do cabeçalho da coluna
               diretamente na tabela (mesma forma da página de preparação).
             </p>
+          </Section>
+          <Section title="Renomear cabeçalhos" defaultOpen={false}>
+            <div className="space-y-1.5">
+              {c.columns.map((colKey) => {
+                const col = COLUMN_BY_KEY[colKey];
+                if (!col) return null;
+                const override = c.columnLabels?.[colKey] ?? "";
+                return (
+                  <div key={colKey} className="flex items-center gap-2">
+                    <Label className="text-xs w-32 shrink-0 truncate" title={col.label}>
+                      {col.label}
+                    </Label>
+                    <Input
+                      type="text"
+                      value={override}
+                      placeholder={col.label}
+                      onChange={(v) => {
+                        // The shared Input component invokes onChange with the
+                        // raw value, not a ChangeEvent.
+                        const value = typeof v === "string" ? v : "";
+                        const next = { ...(c.columnLabels ?? {}) };
+                        if (value.trim()) next[colKey] = value;
+                        else delete next[colKey];
+                        set("columnLabels", next);
+                      }}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                );
+              })}
+              {Object.keys(c.columnLabels ?? {}).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => set("columnLabels", {})}
+                  className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+                >
+                  Restaurar todos os rótulos
+                </button>
+              )}
+            </div>
           </Section>
           <Section title="Navegação ao clicar na linha">
             <div>

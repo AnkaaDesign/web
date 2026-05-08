@@ -61,6 +61,8 @@ export interface ImageBlock extends BaseBlock {
   size?: ImageSizePreset; // Preset sizes (pixels or percentages)
   customWidth?: string; // Custom CSS width value (e.g., "300px", "50%", "20rem")
   alignment?: 'left' | 'center' | 'right';
+  mediaType?: 'image' | 'video';
+  mimeType?: string;
 }
 
 export interface ButtonBlock extends BaseBlock {

@@ -103,45 +103,47 @@ export function WidgetTile({
       style={style}
       className={`relative h-full min-h-0 ${isEditing ? "ring-2 ring-primary/40 ring-offset-2 ring-offset-background rounded-lg" : ""}`}
     >
-      {/* Edit-mode floating toolbar — overlays the top of the tile without consuming layout space */}
+      {/* Edit-mode floating toolbars — drag handle on the left next to the title, action toolbar on the right */}
       {isEditing && (
-        <div className="absolute top-1 right-1 z-20 flex items-center gap-0.5 rounded-md border border-border bg-card/95 backdrop-blur-sm shadow-md p-0.5">
+        <>
           <button
             type="button"
-            className="cursor-grab active:cursor-grabbing rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent"
+            className="absolute top-1 left-1 z-20 cursor-grab active:cursor-grabbing rounded-md border border-border bg-card/95 backdrop-blur-sm shadow-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent"
             aria-label={`Arrastar ${def.name}`}
             {...attributes}
             {...listeners}
           >
             <IconGripVertical className="h-4 w-4" />
           </button>
-          <SizeSelector
-            value={instance.size}
-            min={def.minSize}
-            max={def.maxSize}
-            onChange={onResize}
-          />
-          {hasConfigUi && (
+          <div className="absolute top-1 right-1 z-20 flex items-center gap-0.5 rounded-md border border-border bg-card/95 backdrop-blur-sm shadow-md p-0.5">
+            <SizeSelector
+              value={instance.size}
+              min={def.minSize}
+              max={def.maxSize}
+              onChange={onResize}
+            />
+            {hasConfigUi && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={onConfigure}
+                title="Configurar widget"
+              >
+                <IconSettings className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 w-7 p-0"
-              onClick={onConfigure}
-              title="Configurar widget"
+              className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+              onClick={onRemove}
+              title="Remover widget"
             >
-              <IconSettings className="h-3.5 w-3.5" />
+              <IconTrash className="h-3.5 w-3.5" />
             </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-            onClick={onRemove}
-            title="Remover widget"
-          >
-            <IconTrash className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+          </div>
+        </>
       )}
       <div className="h-full min-h-0">
         <Suspense

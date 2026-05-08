@@ -15,6 +15,7 @@ import {
   IconLayout,
 } from "@tabler/icons-react";
 import { useFavorites } from "../../contexts/favorites-context";
+import { routes } from "../../constants/routes";
 import { getIconInfoByPath, isPageCadastrar } from "../../utils";
 import { WidgetCard } from "../components/widget-card";
 import {
@@ -55,6 +56,7 @@ type Config = z.infer<typeof configSchema>;
 const GRID_GAP_PX = 12;
 const WIDGET_ROW_PX = 180;
 const WIDGET_HEADER_PX = 40;
+const WIDGET_FOOTER_PX = 28;
 const WIDGET_PADDING_PX = 24;
 // Below this card height, spacious gracefully degrades to the comfortable
 // horizontal layout so very thin rows still render legibly.
@@ -93,11 +95,11 @@ const VARIANT_STYLES: Record<LayoutVariant, VariantStyles> = {
     showChevron: true,
   },
   "v-centered": {
-    flex: "flex-col items-center justify-center text-center gap-2.5",
-    cardPad: "p-3",
-    iconBox: "p-3 rounded-xl",
-    iconSize: "h-6 w-6",
-    title: "text-[15px] font-semibold line-clamp-2 leading-tight",
+    flex: "flex-col items-center justify-center text-center gap-1.5",
+    cardPad: "p-2",
+    iconBox: "p-2 rounded-lg",
+    iconSize: "h-5 w-5",
+    title: "text-[13px] font-semibold line-clamp-2 leading-tight",
     showChevron: false,
   },
 };
@@ -110,7 +112,10 @@ function FavoritesRender({ config, size: tileSize }: WidgetRenderProps<Config>) 
   const density: Density = config.density ?? "comfortable";
 
   const widgetBodyHeight =
-    tileSize.rows * WIDGET_ROW_PX - WIDGET_HEADER_PX - WIDGET_PADDING_PX;
+    tileSize.rows * WIDGET_ROW_PX -
+    WIDGET_HEADER_PX -
+    WIDGET_FOOTER_PX -
+    WIDGET_PADDING_PX;
   const cardHeightPx =
     (widgetBodyHeight - (perCol - 1) * GRID_GAP_PX) / perCol;
 
@@ -143,6 +148,7 @@ function FavoritesRender({ config, size: tileSize }: WidgetRenderProps<Config>) 
       }
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       count={favorites.length || null}
+      viewAllHref={routes.favorites}
       borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
     >
       {favorites.length === 0 ? (

@@ -15,7 +15,7 @@ import { recentMessagesWidget } from "./recent-messages";
 import { timeEntriesWidget } from "./time-entries";
 import { dailyPontoWidget } from "./daily-ponto";
 import { quickNoteWidget } from "./quick-note";
-import { quickBudgetWidget } from "./quick-budget";
+// import { quickBudgetWidget } from "./quick-budget"; // Hidden from gallery — pending redesign
 import { hrCalendarWidget } from "./hr-calendar";
 import { productionCalendarWidget } from "./production-calendar";
 
@@ -29,7 +29,7 @@ const allWidgets: any[] = [
   ppeDeliveryTableWidget,
   hrRequestsTableWidget,
   // Quick-action / form widgets
-  quickBudgetWidget,
+  // quickBudgetWidget, // Hidden from gallery — pending redesign
   quickNoteWidget,
   // Navigation
   favoritesWidget,

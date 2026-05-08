@@ -54,6 +54,8 @@ export interface ImageBlock {
   height?: number;
   alignment?: 'left' | 'center' | 'right';
   id?: string;
+  mediaType?: 'image' | 'video';
+  mimeType?: string;
 }
 
 export interface ButtonBlock {

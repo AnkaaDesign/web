@@ -1419,12 +1419,12 @@ function getExplicitCollectiveKey(rec: SecullumAggregatedAbsence): string | null
 }
 
 // Splits a day's absences into "collective buckets" (≥ THRESHOLD members
-// sharing the same group key) and leftover individual records. Group key is
-// either the explicit [GRP:uuid] prefix or the implicit
-// (JustificativaId + Inicio + Fim) tuple — both indicate the same coletiva
-// regardless of whether the records were created via Ankaa or directly in
-// Secullum. Records with non-AUSENCIA/non-FALTA categories are left as
-// individuals (we don't collapse "Hora extra" etc.).
+// sharing the same group key) and leftover individual records. Only Férias
+// (JustificativaId 2) collapses into coletivas — every other type (faltas,
+// dispensas, treinamentos, etc.) renders as individual rows even when many
+// employees share the same date range. Group key is either the explicit
+// [GRP:uuid] prefix or the implicit (JustificativaId + Inicio + Fim) tuple.
+const VACATION_JUSTIFICATIVA_ID = 2;
 function bucketDayAbsences(
   dayAbsences: SecullumAggregatedAbsence[],
 ): { collectives: CollectiveBucket[]; individuals: SecullumAggregatedAbsence[] } {
@@ -1432,19 +1432,16 @@ function bucketDayAbsences(
   const individuals: SecullumAggregatedAbsence[] = [];
   for (const a of dayAbsences) {
     const barCat = getBarCategory(a);
-    if (!barCat) {
+    if (!barCat || a.JustificativaId !== VACATION_JUSTIFICATIVA_ID) {
       individuals.push(a);
       continue;
     }
     const explicit = getExplicitCollectiveKey(a);
     const inicio = String(a.Inicio).substring(0, 10);
     const fim = String(a.Fim).substring(0, 10);
-    // Implicit key includes the unjustified suffix so a coletiva of justified
-    // faltas (id 3 with explicit Secullum entries, Id ≥ 0) doesn't merge with
-    // unjustified synthetic ones (id 3 with Id < 0).
     const key = explicit
       ? `grp:${explicit}`
-      : `imp:${a.JustificativaId}:${inicio}:${fim}:${isUnjustifiedFalta(a) ? "u" : "j"}`;
+      : `imp:${a.JustificativaId}:${inicio}:${fim}`;
     const arr = buckets.get(key) ?? [];
     arr.push(a);
     buckets.set(key, arr);
@@ -1473,12 +1470,11 @@ function bucketDayAbsences(
   return { collectives, individuals };
 }
 
-// Pretty label for a collective bar. Vacation collectives are common enough
-// to deserve the dedicated "Férias Coletivas" wording; everything else uses
-// the justificativa label suffixed with "Coletiva".
+// Pretty label for a collective bar. Only Férias (JustificativaId 2) is ever
+// bucketed today, so this always returns "Férias Coletivas" — the fallback
+// stays as a defensive default in case the bucketing rule is widened later.
 function getCollectiveLabel(bucket: CollectiveBucket): string {
-  // JustificativaId 5 = Férias (per AUSENCIA bucket: ids 2,5,6,7,8,9,10,12).
-  if (bucket.justificativaId === 5) return "Férias Coletivas";
+  if (bucket.justificativaId === VACATION_JUSTIFICATIVA_ID) return "Férias Coletivas";
   return `${bucket.justificativaLabel} (coletiva)`;
 }
 

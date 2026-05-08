@@ -1008,7 +1008,7 @@ function Render({ config, instanceId }: WidgetRenderProps<InstallmentTableConfig
         {cols.map((c) => (
           <div
             key={c.key}
-            className={`min-w-0 ${
+            className={`min-w-0 overflow-hidden ${
               c.align === "center"
                 ? "text-center"
                 : c.align === "right"

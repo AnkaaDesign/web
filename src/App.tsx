@@ -38,6 +38,9 @@ import { VerifyPasswordResetPage } from "@/pages/authentication/verify-password-
 // Home
 const HomePage = lazy(() => import("@/pages/home").then((module) => ({ default: module.HomePage })));
 
+// Hidden auto-running tutorial — public, no auth, for screen-recording demos. Delete file when done.
+const DashboardDemoPage = lazy(() => import("@/pages/dashboard-demo").then((module) => ({ default: module.DashboardDemoPage })));
+
 // Favorites
 const FavoritesPage = lazy(() => import("@/pages/favorites").then((module) => ({ default: module.FavoritesPage })));
 
@@ -397,6 +400,16 @@ function App() {
               element={
                 <Suspense fallback={<PageLoader />}>
                   <PublicServiceReportPage />
+                </Suspense>
+              }
+            />
+
+            {/* Hidden screen-recording demo — fully public, no auth, no providers. Delete when done. */}
+            <Route
+              path="/dashboard-demo"
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <DashboardDemoPage />
                 </Suspense>
               }
             />

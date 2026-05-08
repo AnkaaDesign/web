@@ -208,10 +208,10 @@ function productionLayout(): DashboardLayout {
 // ============================================================
 // PRODUCTION_MANAGER
 // ----------------------------------------------------------------
-// Workflow: supervises the production funnel end-to-end. Wants the
-// full pipeline view (PREP / WAITING / IN_PRODUCTION) plus the team's
-// daily ponto and overdue work. They need the budget shortcut for
-// ad-hoc estimates and oversight on stock that could block the line.
+// Layout authored by kennedy.ankaa@gmail.com (2026-05-08) and saved
+// as the sector default. Pairs the team's daily ponto with two
+// task panels — overdue work currently in production, and the
+// 7-day forecast queue — plus favorites and recent messages.
 // ============================================================
 function productionManagerLayout(): DashboardLayout {
   presetCounter = 0;
@@ -219,58 +219,195 @@ function productionManagerLayout(): DashboardLayout {
     version: DASHBOARD_LAYOUT_VERSION,
     updatedAt: new Date().toISOString(),
     items: [
-      favorites(),
-      taskWidget(
-        { cols: 2, rows: 2 },
+      makeInstance(
+        "home.favorites",
+        { cols: 2, rows: 1 },
         {
-          title: "Em Preparação",
-          columns: ["name", "customerName", "sector", "hasArtworks", "term"],
-          filters: { status: [TASK_STATUS.PREPARATION] },
-          sort: { key: "term", direction: "asc" },
+          title: "Favoritos",
+          accent: { icon: "Star", color: "blue", borderColor: "blue" },
+          density: "spacious",
+          itemsPerRow: 6,
+          itemsPerColumn: 1,
         },
       ),
-      taskWidget(
-        { cols: 2, rows: 2 },
+      makeInstance(
+        "home.recent-messages",
+        { cols: 2, rows: 1 },
         {
-          title: "Aguardando Produção",
-          columns: ["name", "customerName", "serialNumber", "term"],
-          filters: { status: [TASK_STATUS.WAITING_PRODUCTION] },
-          sort: { key: "term", direction: "asc" },
+          title: "Mensagens Recentes",
+          accent: { icon: "Message", color: "indigo", borderColor: "indigo" },
+          density: "compact",
+          itemsPerRow: 4,
+          itemsPerColumn: 1,
         },
       ),
-      taskWidget(
-        { cols: 2, rows: 2 },
+      makeInstance(
+        "home.daily-ponto",
+        { cols: 1, rows: 4 },
         {
-          title: "Em Produção",
+          title: "Ponto do Dia",
+          accent: { icon: "Clock24", color: "teal", borderColor: "teal" },
+          columns: ["userName", "entrada1", "saida1", "entrada2", "saida2"],
+          sort: { key: "userName", direction: "asc" },
+          limit: 50,
+          showHeader: true,
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            layoutMode: "flat",
+            stickyHeader: true,
+            showSearchBox: false,
+            hoverHighlight: true,
+            showViewAllLink: true,
+            showDayNavigator: true,
+            emptyStateMessage: "",
+          },
+          filters: {
+            mode: "all",
+            sectorNames: [],
+            defaultSearch: "",
+            positionNames: [],
+          },
+        },
+      ),
+      makeInstance(
+        "table.tasks",
+        { cols: 3, rows: 2 },
+        {
+          title: "Tarefas em Execução",
+          accent: { icon: "ClipboardText", color: "blue", borderColor: "blue" },
           columns: [
             "name",
             "customerName",
-            "soOpenCount",
-            "soProductionCount",
-            "forecastDate",
+            "serialNumber",
+            "sector",
+            "observation",
+            "soLogistic",
+            "soProduction",
+            "hasArtworks",
+            "term",
           ],
-          filters: { status: [TASK_STATUS.IN_PRODUCTION] },
-          sort: { key: "forecastDate", direction: "asc" },
-        },
-      ),
-      taskWidget(
-        { cols: 2, rows: 2 },
-        {
-          title: "Atrasadas",
-          columns: ["name", "customerName", "term", "status", "sector"],
-          filters: { isOverdue: "yes" },
+          columnLabels: {
+            soLogistic: "OS Logística",
+            soProduction: "OS Produção",
+          },
+          columnWidths: {},
           sort: { key: "term", direction: "asc" },
+          sorts: [{ key: "term", direction: "asc" }],
           limit: 20,
+          showHeader: true,
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            layoutMode: "flat",
+            showRowDot: false,
+            stickyHeader: true,
+            showSearchBox: false,
+            hoverHighlight: true,
+            showViewAllLink: true,
+            emptyStateMessage: "",
+          },
+          filters: {
+            ...EMPTY_TASK_FILTERS,
+            status: [TASK_STATUS.IN_PRODUCTION],
+            termPreset: "overdue",
+          },
+          presets: [],
+          behavior: { refetchIntervalMs: 0, viewAllRouteOverride: "" },
+          cellModes: {
+            paint: "swatch-name",
+            status: "badge",
+            serviceOrder: "progress-bar",
+          },
+          deadlineColors: {
+            bold: true,
+            enabled: true,
+            termOnTrackColor: "green",
+            termOverdueColor: "red",
+            termCriticalColor: "amber",
+            termCriticalHours: 4,
+            forecastNoticeDays: 10,
+            forecastNoticeColor: "yellow",
+            forecastWarningDays: 7,
+            forecastCriticalDays: 3,
+            forecastWarningColor: "orange",
+            forecastCriticalColor: "red",
+          },
+          rowClickTarget: "task",
         },
       ),
-      makeInstance("home.daily-ponto", { cols: 4, rows: 3 }, {
-        title: "Ponto do Dia (Equipe)",
-        columns: ["entrada1", "saida1", "entrada2", "saida2", "normais", "faltas"],
-        showHeader: true,
-        showSector: true,
-      }),
-      lowStockSnapshot(),
-      recentMessages(),
+      makeInstance(
+        "table.tasks",
+        { cols: 3, rows: 2 },
+        {
+          title: "Tarefas Próximas",
+          accent: {
+            icon: "ClipboardText",
+            color: "orange",
+            borderColor: "orange",
+          },
+          columns: [
+            "name",
+            "customerName",
+            "serialNumber",
+            "observation",
+            "soLogistic",
+            "soArtwork",
+            "hasArtworks",
+            "forecastDate",
+            "term",
+          ],
+          columnLabels: {
+            soArtwork: "OS Arte",
+            soLogistic: "OS Logistica",
+          },
+          columnWidths: {},
+          sort: { key: "term", direction: "asc" },
+          sorts: [{ key: "term", direction: "asc" }],
+          limit: 20,
+          showHeader: true,
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            layoutMode: "flat",
+            showRowDot: false,
+            stickyHeader: true,
+            showSearchBox: false,
+            hoverHighlight: true,
+            showViewAllLink: true,
+            emptyStateMessage: "",
+          },
+          filters: {
+            ...EMPTY_TASK_FILTERS,
+            forecastPreset: "next-7-days",
+          },
+          presets: [],
+          behavior: { refetchIntervalMs: 0, viewAllRouteOverride: "" },
+          cellModes: {
+            paint: "swatch-name",
+            status: "badge",
+            serviceOrder: "progress-bar",
+          },
+          deadlineColors: {
+            bold: true,
+            enabled: true,
+            termOnTrackColor: "green",
+            termOverdueColor: "red",
+            termCriticalColor: "amber",
+            termCriticalHours: 4,
+            forecastNoticeDays: 10,
+            forecastNoticeColor: "yellow",
+            forecastWarningDays: 7,
+            forecastCriticalDays: 3,
+            forecastWarningColor: "orange",
+            forecastCriticalColor: "red",
+          },
+          rowClickTarget: "task",
+        },
+      ),
     ],
   };
 }
@@ -480,10 +617,10 @@ function plottingLayout(): DashboardLayout {
 // ============================================================
 // LOGISTIC
 // ----------------------------------------------------------------
-// Workflow: receives trucks, parks them, and dispatches finished ones
-// back to the customer. Cares about: trucks ready to leave (COMPLETED
-// last 7 days), what's coming up on forecastDate (when can the
-// customer pick up?), and any logistical service orders.
+// Layout authored by kennedy.ankaa@gmail.com (2026-05-08) and saved
+// as the sector default. Pairs the production calendar with overdue
+// in-production work and a 7-day forecast queue, plus favorites and
+// recent messages.
 // ============================================================
 function logisticLayout(): DashboardLayout {
   presetCounter = 0;
@@ -491,49 +628,187 @@ function logisticLayout(): DashboardLayout {
     version: DASHBOARD_LAYOUT_VERSION,
     updatedAt: new Date().toISOString(),
     items: [
-      favorites(),
-      taskWidget(
-        { cols: 4, rows: 2 },
+      makeInstance(
+        "home.favorites",
+        { cols: 2, rows: 1 },
         {
-          title: "Liberação Próxima",
-          columns: ["name", "customerName", "serialNumber", "status", "forecastDate"],
+          title: "Favoritos",
+          accent: { icon: "Star", color: "blue", borderColor: "blue" },
+          density: "spacious",
+          itemsPerRow: 6,
+          itemsPerColumn: 1,
+        },
+      ),
+      makeInstance(
+        "home.recent-messages",
+        { cols: 2, rows: 1 },
+        {
+          title: "Mensagens Recentes",
+          accent: { icon: "Message", color: "indigo", borderColor: "indigo" },
+          density: "compact",
+          itemsPerRow: 4,
+          itemsPerColumn: 1,
+        },
+      ),
+      makeInstance(
+        "home.production-calendar",
+        { cols: 2, rows: 4 },
+        {
+          title: "Calendário de Produção",
+          accent: { icon: "Calendar", color: "indigo", borderColor: "none" },
+          display: {
+            showTerm: true,
+            showSunday: false,
+            showFilters: true,
+            showStarted: true,
+            showFinished: true,
+            showForecast: true,
+            showSaturday: false,
+          },
           filters: {
-            forecastPreset: "next-7-days",
-            status: [
+            statuses: [
               TASK_STATUS.PREPARATION,
               TASK_STATUS.WAITING_PRODUCTION,
               TASK_STATUS.IN_PRODUCTION,
+              TASK_STATUS.COMPLETED,
             ],
+            includeCancelled: false,
           },
-          sort: { key: "forecastDate", direction: "asc" },
         },
       ),
-      taskWidget(
+      makeInstance(
+        "table.tasks",
         { cols: 2, rows: 2 },
         {
-          title: "Concluídas (Aguardando Retirada)",
-          columns: ["name", "customerName", "serialNumber", "finishedAt"],
-          filters: {
-            status: [TASK_STATUS.COMPLETED],
-            finishedPreset: "last-7-days",
+          title: "Tarefas em Execução",
+          accent: { icon: "ClipboardText", color: "blue", borderColor: "blue" },
+          columns: [
+            "name",
+            "serialNumber",
+            "sector",
+            "observation",
+            "soLogistic",
+            "hasArtworks",
+            "term",
+          ],
+          columnLabels: {
+            soLogistic: "OS Logística",
+            soProduction: "OS Produção",
           },
-          sort: { key: "finishedAt", direction: "desc" },
+          columnWidths: {},
+          sort: { key: "term", direction: "asc" },
+          sorts: [{ key: "term", direction: "asc" }],
+          limit: 20,
+          showHeader: true,
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            layoutMode: "flat",
+            showRowDot: false,
+            stickyHeader: true,
+            showSearchBox: false,
+            hoverHighlight: true,
+            showViewAllLink: true,
+            emptyStateMessage: "",
+          },
+          filters: {
+            ...EMPTY_TASK_FILTERS,
+            status: [TASK_STATUS.IN_PRODUCTION],
+            termPreset: "overdue",
+          },
+          presets: [],
+          behavior: { refetchIntervalMs: 0, viewAllRouteOverride: "" },
+          cellModes: {
+            paint: "swatch-name",
+            status: "badge",
+            serviceOrder: "progress-bar",
+          },
+          deadlineColors: {
+            bold: true,
+            enabled: true,
+            termOnTrackColor: "green",
+            termOverdueColor: "red",
+            termCriticalColor: "amber",
+            termCriticalHours: 4,
+            forecastNoticeDays: 10,
+            forecastNoticeColor: "yellow",
+            forecastWarningDays: 7,
+            forecastCriticalDays: 3,
+            forecastWarningColor: "orange",
+            forecastCriticalColor: "red",
+          },
+          rowClickTarget: "task",
         },
       ),
-      taskWidget(
+      makeInstance(
+        "table.tasks",
         { cols: 2, rows: 2 },
         {
-          title: "OS Logística Abertas",
-          columns: ["name", "customerName", "soLogisticCount", "forecastDate"],
-          filters: {
-            hasOpenSO: "yes",
-            serviceOrderTypes: ["LOGISTIC"],
+          title: "Tarefas Próximas",
+          accent: {
+            icon: "ClipboardText",
+            color: "orange",
+            borderColor: "orange",
           },
-          sort: { key: "forecastDate", direction: "asc" },
+          columns: [
+            "name",
+            "serialNumber",
+            "observation",
+            "soLogistic",
+            "hasArtworks",
+            "forecastDate",
+            "term",
+          ],
+          columnLabels: {
+            soArtwork: "OS Arte",
+            soLogistic: "OS Logistica",
+          },
+          columnWidths: {},
+          sort: { key: "term", direction: "asc" },
+          sorts: [{ key: "term", direction: "asc" }],
+          limit: 20,
+          showHeader: true,
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            layoutMode: "flat",
+            showRowDot: false,
+            stickyHeader: true,
+            showSearchBox: false,
+            hoverHighlight: true,
+            showViewAllLink: true,
+            emptyStateMessage: "",
+          },
+          filters: {
+            ...EMPTY_TASK_FILTERS,
+            forecastPreset: "next-7-days",
+          },
+          presets: [],
+          behavior: { refetchIntervalMs: 0, viewAllRouteOverride: "" },
+          cellModes: {
+            paint: "swatch-name",
+            status: "badge",
+            serviceOrder: "progress-bar",
+          },
+          deadlineColors: {
+            bold: true,
+            enabled: true,
+            termOnTrackColor: "green",
+            termOverdueColor: "red",
+            termCriticalColor: "amber",
+            termCriticalHours: 4,
+            forecastNoticeDays: 10,
+            forecastNoticeColor: "yellow",
+            forecastWarningDays: 7,
+            forecastCriticalDays: 3,
+            forecastWarningColor: "orange",
+            forecastCriticalColor: "red",
+          },
+          rowClickTarget: "task",
         },
       ),
-      myWeekPonto(),
-      recentMessages(),
     ],
   };
 }
@@ -541,9 +816,10 @@ function logisticLayout(): DashboardLayout {
 // ============================================================
 // COMMERCIAL
 // ----------------------------------------------------------------
-// Workflow: sells the service, creates budgets, manages customer
-// relationships. They want quick budget creation front-and-center,
-// plus a view of pending budgets that need follow-up with customers.
+// Layout authored by kennedy.ankaa@gmail.com (2026-05-08) and saved
+// as the sector default. Pairs quote-approval and billing-approval
+// queues with the boletos pipeline; favorites and recent messages
+// share the top row.
 // ============================================================
 function commercialLayout(): DashboardLayout {
   presetCounter = 0;
@@ -551,37 +827,183 @@ function commercialLayout(): DashboardLayout {
     version: DASHBOARD_LAYOUT_VERSION,
     updatedAt: new Date().toISOString(),
     items: [
-      favorites(),
-      makeInstance("quick-action.budget", { cols: 2, rows: 4 }, {
-        title: "Novo Orçamento",
-      }),
-      taskWidget(
+      makeInstance(
+        "home.favorites",
+        { cols: 2, rows: 1 },
+        {
+          title: "Favoritos",
+          accent: { icon: "Star", color: "blue", borderColor: "blue" },
+          density: "spacious",
+          itemsPerRow: 6,
+          itemsPerColumn: 1,
+        },
+      ),
+      makeInstance(
+        "home.recent-messages",
+        { cols: 2, rows: 1 },
+        {
+          title: "Mensagens Recentes",
+          accent: { icon: "Message", color: "indigo", borderColor: "indigo" },
+          density: "compact",
+          itemsPerRow: 4,
+          itemsPerColumn: 1,
+        },
+      ),
+      makeInstance(
+        "table.tasks",
         { cols: 2, rows: 2 },
         {
-          title: "Orçamentos Pendentes",
-          columns: ["name", "customerName", "quoteTotal", "createdAt"],
+          title: "Orçamentos Esperando Aprovação",
+          accent: { icon: "ClipboardText", color: "gray", borderColor: "slate" },
+          columns: [
+            "name",
+            "customerName",
+            "serialNumber",
+            "quoteTotal",
+            "forecastDate",
+          ],
+          columnLabels: {},
+          columnWidths: {},
+          sort: { key: "term", direction: "asc" },
+          sorts: [{ key: "term", direction: "asc" }],
+          limit: 50,
+          showHeader: true,
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            layoutMode: "flat",
+            showRowDot: false,
+            stickyHeader: true,
+            showSearchBox: false,
+            hoverHighlight: true,
+            showViewAllLink: true,
+            emptyStateMessage: "",
+          },
           filters: {
-            hasBudget: "yes",
+            ...EMPTY_TASK_FILTERS,
             status: [TASK_STATUS.PREPARATION],
+            hasBudget: "yes",
+            quoteStatuses: ["PENDING"],
           },
-          sort: { key: "createdAt", direction: "desc" },
-          limit: 30,
+          presets: [],
+          behavior: { refetchIntervalMs: 0, viewAllRouteOverride: "" },
+          cellModes: {
+            paint: "swatch-name",
+            status: "badge",
+            serviceOrder: "progress-bar",
+          },
+          deadlineColors: {
+            bold: true,
+            enabled: true,
+            termOnTrackColor: "green",
+            termOverdueColor: "red",
+            termCriticalColor: "amber",
+            termCriticalHours: 4,
+            forecastNoticeDays: 10,
+            forecastNoticeColor: "yellow",
+            forecastWarningDays: 7,
+            forecastCriticalDays: 3,
+            forecastWarningColor: "orange",
+            forecastCriticalColor: "red",
+          },
+          rowClickTarget: "budget",
         },
       ),
-      taskWidget(
+      makeInstance(
+        "table.tasks",
+        { cols: 2, rows: 4 },
+        {
+          title: "Faturamento Aguardando Aprovação",
+          accent: { icon: "ClipboardText", color: "red", borderColor: "red" },
+          columns: ["name", "customerName", "serialNumber", "finishedAt"],
+          columnLabels: {},
+          columnWidths: {},
+          sort: { key: "term", direction: "asc" },
+          sorts: [{ key: "finishedAt", direction: "asc" }],
+          limit: 50,
+          showHeader: true,
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            layoutMode: "flat",
+            showRowDot: false,
+            stickyHeader: true,
+            showSearchBox: false,
+            hoverHighlight: true,
+            showViewAllLink: true,
+            emptyStateMessage: "",
+          },
+          filters: {
+            ...EMPTY_TASK_FILTERS,
+            status: [TASK_STATUS.COMPLETED],
+            quoteStatuses: ["BUDGET_APPROVED"],
+          },
+          presets: [],
+          behavior: { refetchIntervalMs: 0, viewAllRouteOverride: "" },
+          cellModes: {
+            paint: "swatch-name",
+            status: "badge",
+            serviceOrder: "progress-bar",
+          },
+          deadlineColors: {
+            bold: false,
+            enabled: false,
+            termOnTrackColor: "green",
+            termOverdueColor: "red",
+            termCriticalColor: "amber",
+            termCriticalHours: 4,
+            forecastNoticeDays: 10,
+            forecastNoticeColor: "yellow",
+            forecastWarningDays: 7,
+            forecastCriticalDays: 3,
+            forecastWarningColor: "orange",
+            forecastCriticalColor: "red",
+          },
+          rowClickTarget: "billing",
+        },
+      ),
+      makeInstance(
+        "financial.installments",
         { cols: 2, rows: 2 },
         {
-          title: "Orçamentos Recentes (mês)",
-          columns: ["name", "customerName", "quoteTotal", "status"],
-          filters: {
-            hasBudget: "yes",
-            createdPreset: "this-month",
+          title: "Boletos",
+          accent: { icon: "Receipt", color: "green", borderColor: "green" },
+          columns: [
+            "customer",
+            "task",
+            "dueDate",
+            "amount",
+            "installmentStatus",
+          ],
+          sort: { key: "dueDate", direction: "asc" },
+          limit: 50,
+          showHeader: true,
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            showCount: true,
+            layoutMode: "flat",
+            stickyHeader: true,
+            showSearchBox: false,
+            hoverHighlight: true,
+            showBucketChips: false,
+            showViewAllLink: true,
+            emptyStateMessage: "",
           },
-          sort: { key: "createdAt", direction: "desc" },
-          limit: 30,
+          filters: {
+            customerIds: [],
+            defaultBucket: "next-30-days",
+            hideFullyPaid: false,
+            bankSlipStatuses: [],
+            hideMissingBankSlip: false,
+            installmentStatuses: ["PENDING", "OVERDUE"],
+          },
+          refetchInterval: 0,
         },
       ),
-      recentMessages(),
     ],
   };
 }
@@ -589,9 +1011,10 @@ function commercialLayout(): DashboardLayout {
 // ============================================================
 // FINANCIAL
 // ----------------------------------------------------------------
-// Workflow: bills completed tasks, approves payments, manages NFe.
-// Their queue is COMPLETED tasks with budgets ready to invoice. They
-// also want to track high-value tasks and overdue billing.
+// Layout authored by kennedy.ankaa@gmail.com (2026-05-08) and saved
+// as the sector default. Pairs the billing-approval queue (commercial-
+// approved, finished tasks waiting on financial sign-off) with two
+// installment views — upcoming/overdue and the most recent receipts.
 // ============================================================
 function financialLayout(): DashboardLayout {
   presetCounter = 0;
@@ -599,143 +1022,295 @@ function financialLayout(): DashboardLayout {
     version: DASHBOARD_LAYOUT_VERSION,
     updatedAt: new Date().toISOString(),
     items: [
-      favorites(),
-      makeInstance("quick-action.budget", { cols: 2, rows: 4 }, {
-        title: "Novo Orçamento",
-      }),
-      taskWidget(
+      makeInstance(
+        "home.favorites",
+        { cols: 2, rows: 1 },
+        {
+          title: "Favoritos",
+          accent: { icon: "Star", color: "blue", borderColor: "blue" },
+          density: "spacious",
+          itemsPerRow: 6,
+          itemsPerColumn: 1,
+        },
+      ),
+      makeInstance(
+        "home.recent-messages",
+        { cols: 2, rows: 1 },
+        {
+          title: "Mensagens Recentes",
+          accent: { icon: "Message", color: "indigo", borderColor: "indigo" },
+          density: "compact",
+          itemsPerRow: 4,
+          itemsPerColumn: 1,
+        },
+      ),
+      makeInstance(
+        "table.tasks",
+        { cols: 2, rows: 4 },
+        {
+          title: "Faturamento Aguardando Aprovação",
+          accent: { icon: "ClipboardText", color: "red", borderColor: "red" },
+          columns: ["name", "customerName", "serialNumber", "finishedAt"],
+          columnLabels: {},
+          columnWidths: {},
+          sort: { key: "term", direction: "asc" },
+          sorts: [{ key: "finishedAt", direction: "asc" }],
+          limit: 50,
+          showHeader: true,
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            layoutMode: "flat",
+            showRowDot: false,
+            stickyHeader: true,
+            showSearchBox: false,
+            hoverHighlight: true,
+            showViewAllLink: true,
+            emptyStateMessage: "",
+          },
+          filters: {
+            ...EMPTY_TASK_FILTERS,
+            status: [TASK_STATUS.COMPLETED],
+            quoteStatuses: ["COMMERCIAL_APPROVED"],
+          },
+          presets: [],
+          behavior: { refetchIntervalMs: 0, viewAllRouteOverride: "" },
+          cellModes: {
+            paint: "swatch-name",
+            status: "badge",
+            serviceOrder: "progress-bar",
+          },
+          deadlineColors: {
+            bold: false,
+            enabled: false,
+            termOnTrackColor: "green",
+            termOverdueColor: "red",
+            termCriticalColor: "amber",
+            termCriticalHours: 4,
+            forecastNoticeDays: 10,
+            forecastNoticeColor: "yellow",
+            forecastWarningDays: 7,
+            forecastCriticalDays: 3,
+            forecastWarningColor: "orange",
+            forecastCriticalColor: "red",
+          },
+          rowClickTarget: "billing",
+        },
+      ),
+      makeInstance(
+        "financial.installments",
         { cols: 2, rows: 2 },
         {
-          title: "Concluídas a Faturar",
-          columns: ["name", "customerName", "quoteTotal", "finishedAt"],
-          filters: {
-            status: [TASK_STATUS.COMPLETED],
-            hasBudget: "yes",
-            finishedPreset: "last-30-days",
+          title: "Próximos Boletos",
+          accent: { icon: "Receipt", color: "yellow", borderColor: "amber" },
+          columns: [
+            "customer",
+            "task",
+            "dueDate",
+            "amount",
+            "installmentStatus",
+          ],
+          sort: { key: "dueDate", direction: "asc" },
+          limit: 50,
+          showHeader: true,
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            showCount: true,
+            layoutMode: "flat",
+            stickyHeader: true,
+            showSearchBox: false,
+            hoverHighlight: true,
+            showBucketChips: false,
+            showViewAllLink: true,
+            emptyStateMessage: "",
           },
-          sort: { key: "finishedAt", direction: "desc" },
-          limit: 40,
+          filters: {
+            customerIds: [],
+            defaultBucket: "next-30-days",
+            hideFullyPaid: false,
+            bankSlipStatuses: [],
+            hideMissingBankSlip: false,
+            installmentStatuses: ["PENDING", "OVERDUE"],
+          },
+          refetchInterval: 0,
         },
       ),
-      taskWidget(
+      makeInstance(
+        "financial.installments",
         { cols: 2, rows: 2 },
         {
-          title: "Concluídas no Mês",
-          columns: ["name", "customerName", "quoteTotal", "finishedAt"],
-          filters: {
-            status: [TASK_STATUS.COMPLETED],
-            hasBudget: "yes",
-            finishedPreset: "this-month",
+          title: "Últimos Pagamentos Recebido",
+          accent: { icon: "Receipt", color: "green", borderColor: "green" },
+          columns: ["customer", "task", "installment", "dueDate", "paidAmount"],
+          sort: { key: "dueDate", direction: "desc" },
+          limit: 50,
+          showHeader: true,
+          display: {
+            density: "comfortable",
+            striping: true,
+            gridLines: true,
+            showCount: true,
+            layoutMode: "flat",
+            stickyHeader: true,
+            showSearchBox: false,
+            hoverHighlight: true,
+            showBucketChips: false,
+            showViewAllLink: true,
+            emptyStateMessage: "",
           },
-          sort: { key: "finishedAt", direction: "desc" },
-          limit: 30,
+          filters: {
+            customerIds: [],
+            defaultBucket: "all",
+            hideFullyPaid: false,
+            bankSlipStatuses: [],
+            hideMissingBankSlip: false,
+            installmentStatuses: ["PAID"],
+          },
+          refetchInterval: 0,
         },
       ),
-      taskWidget(
-        { cols: 4, rows: 2 },
-        {
-          title: "Sem Orçamento (Atenção)",
-          columns: ["name", "customerName", "status", "createdAt"],
-          filters: {
-            hasBudget: "no",
-            status: [TASK_STATUS.PREPARATION, TASK_STATUS.IN_PRODUCTION],
-          },
-          sort: { key: "createdAt", direction: "asc" },
-          limit: 30,
-        },
-      ),
-      recentMessages(),
     ],
   };
 }
 
 // ============================================================
-// HUMAN_RESOURCES
+// HUMAN_RESOURCES + ADMIN
 // ----------------------------------------------------------------
-// Workflow: manages people, hours, vacations. The daily ponto of the
-// entire team is the centerpiece. They also need broadcast messages
-// for HR comms.
+// Layout authored by kennedy.ankaa@gmail.com (2026-05-08) and saved
+// as the sector default for both HR and Admin. The team-wide Ponto
+// do Dia anchors a 1/2-width column; the right column stacks the
+// HR requisitions queue above the PPE delivery queue. Favorites and
+// recent messages share the top row.
 // ============================================================
-function hrLayout(): DashboardLayout {
-  presetCounter = 0;
-  return {
-    version: DASHBOARD_LAYOUT_VERSION,
-    updatedAt: new Date().toISOString(),
-    items: [
-      favorites(),
-      makeInstance(
-        "table.hr-requests",
-        { cols: 4, rows: 3 },
-        {
-          title: "Requisições de RH",
-          accent: { color: "indigo", icon: "Clock", borderColor: "none" },
-          display: {
-            density: "comfortable",
-            striping: true,
-            gridLines: true,
-            hoverHighlight: true,
-            showSearchBox: true,
-            emptyStateMessage: "",
-          },
-          filters: { searchingFor: "", estados: [0], tipos: [] },
-          sort: { key: "dataSolicitacao", direction: "desc" },
-          limit: 30,
-          showHeader: true,
-          showActionButtons: true,
-        },
-      ),
-      makeInstance(
-        "table.ppe-deliveries",
-        { cols: 4, rows: 2 },
-        {
-          title: "Entregas de EPI Pendentes",
-          accent: { color: "amber", icon: "ClipboardCheck", borderColor: "none" },
-          display: {
-            density: "comfortable",
-            striping: true,
-            gridLines: true,
-            hoverHighlight: true,
-            stickyHeader: true,
-            showSearchBox: true,
-            emptyStateMessage: "",
-          },
-          columns: ["itemName", "userName", "quantity", "status", "scheduledDate"],
-          filters: {
-            searchingFor: "",
-            statuses: [
-              PPE_DELIVERY_STATUS.PENDING,
-              PPE_DELIVERY_STATUS.WAITING_SIGNATURE,
-            ],
-            itemIds: [],
-            userIds: [],
-            onlyActionable: false,
-          },
-          sort: { key: "createdAt", direction: "desc" },
-          limit: 30,
-          showHeader: true,
-          showRowDot: true,
-          showActionButtons: true,
-        },
-      ),
-      makeInstance("home.daily-ponto", { cols: 4, rows: 4 }, {
+function hrAndAdminItems(): WidgetInstance[] {
+  return [
+    makeInstance(
+      "home.favorites",
+      { cols: 2, rows: 1 },
+      {
+        title: "Favoritos",
+        accent: { icon: "Star", color: "blue", borderColor: "blue" },
+        density: "spacious",
+        itemsPerRow: 6,
+        itemsPerColumn: 1,
+      },
+    ),
+    makeInstance(
+      "home.recent-messages",
+      { cols: 2, rows: 1 },
+      {
+        title: "Mensagens Recentes",
+        accent: { icon: "Message", color: "indigo", borderColor: "indigo" },
+        density: "compact",
+        itemsPerRow: 4,
+        itemsPerColumn: 1,
+      },
+    ),
+    makeInstance(
+      "home.daily-ponto",
+      { cols: 2, rows: 4 },
+      {
         title: "Ponto do Dia",
+        accent: { icon: "Clock24", color: "teal", borderColor: "teal" },
         columns: [
+          "userName",
+          "sectorName",
           "entrada1",
           "saida1",
           "entrada2",
           "saida2",
           "normais",
           "faltas",
-          "ex50",
-          "ex100",
-          "ajuste",
         ],
+        sort: { key: "userName", direction: "asc" },
+        limit: 50,
         showHeader: true,
-        showSector: true,
-      }),
-      myWeekPonto(),
-      recentMessages(),
-    ],
+        display: {
+          density: "comfortable",
+          striping: true,
+          gridLines: true,
+          layoutMode: "flat",
+          stickyHeader: true,
+          showSearchBox: false,
+          hoverHighlight: true,
+          showViewAllLink: true,
+          showDayNavigator: true,
+          emptyStateMessage: "",
+        },
+        filters: {
+          mode: "all",
+          sectorNames: [],
+          defaultSearch: "",
+          positionNames: [],
+        },
+      },
+    ),
+    makeInstance(
+      "table.hr-requests",
+      { cols: 2, rows: 2 },
+      {
+        title: "Requisições de RH",
+        accent: { icon: "Clock", color: "lime", borderColor: "lime" },
+        display: {
+          density: "comfortable",
+          striping: true,
+          gridLines: true,
+          showSearchBox: false,
+          hoverHighlight: true,
+          emptyStateMessage: "",
+        },
+        filters: { tipos: [], estados: [0], searchingFor: "" },
+        sort: { key: "dataSolicitacao", direction: "desc" },
+        limit: 30,
+        showHeader: true,
+        showActionButtons: true,
+      },
+    ),
+    makeInstance(
+      "table.ppe-deliveries",
+      { cols: 2, rows: 2 },
+      {
+        title: "Entregas de EPI",
+        accent: { icon: "ClipboardCheck", color: "amber", borderColor: "amber" },
+        columns: ["itemName", "userName", "quantity", "status", "scheduledDate"],
+        display: {
+          density: "comfortable",
+          striping: true,
+          gridLines: true,
+          stickyHeader: true,
+          showSearchBox: false,
+          hoverHighlight: true,
+          emptyStateMessage: "",
+        },
+        filters: {
+          itemIds: [],
+          userIds: [],
+          statuses: [
+            PPE_DELIVERY_STATUS.PENDING,
+            PPE_DELIVERY_STATUS.WAITING_SIGNATURE,
+          ],
+          searchingFor: "",
+          onlyActionable: false,
+        },
+        sort: { key: "createdAt", direction: "desc" },
+        limit: 30,
+        showHeader: true,
+        showRowDot: false,
+        showActionButtons: true,
+      },
+    ),
+  ];
+}
+
+function hrLayout(): DashboardLayout {
+  presetCounter = 0;
+  return {
+    version: DASHBOARD_LAYOUT_VERSION,
+    updatedAt: new Date().toISOString(),
+    items: hrAndAdminItems(),
   };
 }
 
@@ -774,114 +1349,16 @@ function maintenanceLayout(): DashboardLayout {
 // ============================================================
 // ADMIN
 // ----------------------------------------------------------------
-// Workflow: full system oversight. The dashboard should show the
-// state of everything that matters at a glance — tasks, items,
-// people, comms.
+// Shares the HR layout (see hrAndAdminItems above): same widgets,
+// same sizes, same filters. Admin and HR sectors land on the same
+// default until either is split out.
 // ============================================================
 function adminLayout(): DashboardLayout {
   presetCounter = 0;
   return {
     version: DASHBOARD_LAYOUT_VERSION,
     updatedAt: new Date().toISOString(),
-    items: [
-      favorites(),
-      taskWidget(
-        { cols: 2, rows: 2 },
-        {
-          title: "Tarefas Atrasadas",
-          columns: ["name", "customerName", "sector", "term", "status"],
-          filters: { isOverdue: "yes" },
-          sort: { key: "term", direction: "asc" },
-          limit: 25,
-        },
-      ),
-      taskWidget(
-        { cols: 2, rows: 2 },
-        {
-          title: "Em Produção (Geral)",
-          columns: ["name", "customerName", "soOpenCount", "forecastDate"],
-          filters: { status: [TASK_STATUS.IN_PRODUCTION] },
-          sort: { key: "forecastDate", direction: "asc" },
-        },
-      ),
-      lowStockSnapshot(),
-      makeInstance("home.daily-ponto", { cols: 2, rows: 2 }, {
-        title: "Ponto do Dia",
-        columns: ["entrada1", "saida1", "entrada2", "saida2", "normais", "faltas"],
-        showHeader: true,
-        showSector: true,
-      }),
-      makeInstance("quick-action.budget", { cols: 2, rows: 4 }, {
-        title: "Novo Orçamento",
-      }),
-      taskWidget(
-        { cols: 2, rows: 2 },
-        {
-          title: "Concluídas Hoje",
-          columns: ["name", "customerName", "finishedAt"],
-          filters: {
-            status: [TASK_STATUS.COMPLETED],
-            finishedPreset: "today",
-          },
-          sort: { key: "finishedAt", direction: "desc" },
-        },
-      ),
-      makeInstance(
-        "table.ppe-deliveries",
-        { cols: 2, rows: 2 },
-        {
-          title: "EPIs Pendentes",
-          accent: { color: "amber", icon: "ClipboardCheck", borderColor: "none" },
-          display: {
-            density: "comfortable",
-            striping: true,
-            gridLines: true,
-            hoverHighlight: true,
-            stickyHeader: true,
-            showSearchBox: true,
-            emptyStateMessage: "",
-          },
-          columns: ["itemName", "userName", "status", "scheduledDate"],
-          filters: {
-            searchingFor: "",
-            statuses: [
-              PPE_DELIVERY_STATUS.PENDING,
-              PPE_DELIVERY_STATUS.WAITING_SIGNATURE,
-            ],
-            itemIds: [],
-            userIds: [],
-            onlyActionable: false,
-          },
-          sort: { key: "createdAt", direction: "desc" },
-          limit: 20,
-          showHeader: true,
-          showRowDot: true,
-          showActionButtons: true,
-        },
-      ),
-      makeInstance(
-        "table.hr-requests",
-        { cols: 4, rows: 2 },
-        {
-          title: "Requisições de RH",
-          accent: { color: "indigo", icon: "Clock", borderColor: "none" },
-          display: {
-            density: "compact",
-            striping: true,
-            gridLines: true,
-            hoverHighlight: true,
-            showSearchBox: false,
-            emptyStateMessage: "",
-          },
-          filters: { searchingFor: "", estados: [0], tipos: [] },
-          sort: { key: "dataSolicitacao", direction: "desc" },
-          limit: 20,
-          showHeader: true,
-          showActionButtons: true,
-        },
-      ),
-      recentMessages(),
-    ],
+    items: hrAndAdminItems(),
   };
 }
 

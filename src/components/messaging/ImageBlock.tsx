@@ -20,6 +20,11 @@ export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => 
     ? `${getApiBaseUrl()}${rawSrc}`
     : rawSrc;
   const { alt, caption, width, height, id, size, alignment } = block;
+  const mimeType = (block as any).mimeType as string | undefined;
+  const isVideo =
+    (block as any).mediaType === 'video' ||
+    (mimeType?.startsWith('video/')) ||
+    /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(rawSrc || '');
   const [isLoading, setIsLoading] = React.useState(true);
   const [hasError, setHasError] = React.useState(false);
 
@@ -87,10 +92,28 @@ export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => 
                 />
               </svg>
               <p className="mt-2 text-sm text-muted-foreground">
-                Failed to load image
+                {isVideo ? 'Failed to load video' : 'Failed to load image'}
               </p>
             </div>
           </div>
+        ) : isVideo ? (
+          <video
+            src={imageSrc}
+            width={width}
+            height={height}
+            controls
+            playsInline
+            preload="metadata"
+            onLoadedData={handleLoad}
+            onError={handleError}
+            aria-label={alt}
+            className={cn(
+              "w-full h-auto object-contain transition-opacity duration-300 rounded-lg bg-black",
+              isLoading ? "opacity-0" : "opacity-100"
+            )}
+          >
+            {mimeType && <source src={imageSrc} type={mimeType} />}
+          </video>
         ) : (
           <img
             src={imageSrc}

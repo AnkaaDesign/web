@@ -3,10 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
-import { IconUpload, IconPhoto } from "@tabler/icons-react";
+import { IconUpload, IconPhoto, IconVideo } from "@tabler/icons-react";
 import { fileService } from "@/api-client/file";
 import { getApiBaseUrl } from "@/config/api";
 import type { ImageBlock } from "../types";
+
+const ACCEPTED_MEDIA = "image/*,video/mp4,video/webm,video/quicktime";
+
+const detectMediaType = (mimeType?: string, url?: string): 'image' | 'video' => {
+  if (mimeType?.startsWith('video/')) return 'video';
+  if (mimeType?.startsWith('image/')) return 'image';
+  if (url && /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(url)) return 'video';
+  return 'image';
+};
 
 interface ImageBlockEditorProps {
   block: ImageBlock;
@@ -47,7 +56,12 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
         fileContext: 'messageImages',
       });
       if (response.success && response.data) {
-        onUpdate({ url: `/files/serve/${response.data.id}` });
+        const mimeType = file.type || response.data.mimetype;
+        onUpdate({
+          url: `/files/serve/${response.data.id}`,
+          mediaType: detectMediaType(mimeType),
+          mimeType,
+        });
       }
     } catch (error) {
       console.error('Upload failed:', error);
@@ -56,14 +70,19 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
     }
   };
 
+  const isVideoBlock = detectMediaType(block.mimeType, block.url) === 'video';
+
   return (
     <div className="space-y-3">
       {!block.url ? (
         <div className="space-y-3">
           {/* Upload / URL */}
           <div className="border-2 border-dashed border-border dark:border-muted rounded-lg p-6 text-center">
-            <IconPhoto className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground mb-3">Upload ou cole uma URL</p>
+            <div className="flex justify-center gap-1 mb-2">
+              <IconPhoto className="h-10 w-10 text-muted-foreground" />
+              <IconVideo className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">Envie uma imagem ou vídeo (MP4/WebM) ou cole uma URL</p>
             <div className="flex gap-2 justify-center">
               <Button
                 variant="outline"
@@ -77,15 +96,18 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
               <input
                 id={`file-upload-${block.id}`}
                 type="file"
-                accept="image/*"
+                accept={ACCEPTED_MEDIA}
                 className="hidden"
                 onChange={handleFileUpload}
               />
             </div>
             <div className="mt-3">
               <Input
-                placeholder="Ou cole a URL da imagem..."
-                onChange={(value: string | number | null) => onUpdate({ url: value as string })}
+                placeholder="Ou cole a URL da mídia..."
+                onChange={(value: string | number | null) => {
+                  const url = (value as string) || '';
+                  onUpdate({ url, mediaType: detectMediaType(undefined, url) });
+                }}
                 transparent
                 className="dark:border-muted"
               />
@@ -96,11 +118,21 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
         <div className="space-y-3">
           <div className={`flex ${block.alignment === 'center' ? 'justify-center' : block.alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
             <div style={getSizeStyle()}>
-              <img
-                src={resolveImageUrl(block.url)}
-                alt={block.alt || ''}
-                className="w-full h-auto rounded-lg border dark:border-muted"
-              />
+              {isVideoBlock ? (
+                <video
+                  src={resolveImageUrl(block.url)}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-auto rounded-lg border dark:border-muted bg-black"
+                />
+              ) : (
+                <img
+                  src={resolveImageUrl(block.url)}
+                  alt={block.alt || ''}
+                  className="w-full h-auto rounded-lg border dark:border-muted"
+                />
+              )}
             </div>
           </div>
 
@@ -166,9 +198,9 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onUpdate({ url: '' })}
+            onClick={() => onUpdate({ url: '', mediaType: undefined, mimeType: undefined })}
           >
-            Trocar Imagem
+            {isVideoBlock ? 'Trocar Vídeo' : 'Trocar Imagem'}
           </Button>
         </div>
       )}

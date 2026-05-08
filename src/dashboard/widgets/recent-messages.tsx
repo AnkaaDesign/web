@@ -26,6 +26,7 @@ import {
   DENSITY_VALUES,
   type Density,
 } from "./_shared";
+import { routes } from "../../constants/routes";
 import { WidgetCard } from "../components/widget-card";
 import {
   AccentPicker,
@@ -447,6 +448,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
         </span>
       }
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
+      viewAllHref={routes.administration.messages.root}
       borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
     >
       <HomeDashboardWidgetBody
