@@ -12,7 +12,6 @@ import { useCallback, useMemo, useState } from "react";
 import { z } from "zod";
 import {
   IconAdjustments,
-  IconChevronDown,
   IconClock,
   IconLayout,
   IconMessage,
@@ -20,7 +19,13 @@ import {
 } from "@tabler/icons-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { HomeDashboardWidgetBody } from "./_shared";
+import {
+  HomeDashboardWidgetBody,
+  Section,
+  DENSITY_OPTIONS,
+  DENSITY_VALUES,
+  type Density,
+} from "./_shared";
 import { WidgetCard } from "../components/widget-card";
 import {
   AccentPicker,
@@ -36,11 +41,6 @@ import { Combobox } from "../../components/ui/combobox";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "../../components/ui/collapsible";
 import { MessageModal } from "../../components/common/message-modal/message-modal";
 import { useMarkAsViewed } from "../../hooks/administration/use-message";
 import type { HomeDashboardMessage } from "../../types";
@@ -49,14 +49,6 @@ import type {
   WidgetDefinition,
   WidgetRenderProps,
 } from "../types";
-
-const DENSITY = ["compact", "comfortable", "spacious"] as const;
-type Density = (typeof DENSITY)[number];
-const DENSITY_LABELS: Record<Density, string> = {
-  compact: "Compacto",
-  comfortable: "Confortável",
-  spacious: "Espaçoso",
-};
 
 const configSchema = z.object({
   title: z.string().min(1).max(80).default("Mensagens Recentes"),
@@ -67,7 +59,7 @@ const configSchema = z.object({
   }),
   itemsPerRow: z.number().int().min(1).max(8).default(4),
   itemsPerColumn: z.number().int().min(1).max(6).default(2),
-  density: z.enum(DENSITY).default("comfortable"),
+  density: z.enum(DENSITY_VALUES).default("comfortable"),
 });
 type Config = z.infer<typeof configSchema>;
 
@@ -502,26 +494,6 @@ function Render({ config }: WidgetRenderProps<Config>) {
   );
 }
 
-function Section({
-  title,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Collapsible defaultOpen={defaultOpen} className="border border-border rounded-md">
-      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
-        {title}
-        <IconChevronDown className="h-4 w-4 transition-transform" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
-    </Collapsible>
-  );
-}
-
 function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
   const set = <K extends keyof Config>(key: K, value: Config[K]) =>
     onChange({ ...config, [key]: value });
@@ -567,7 +539,7 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
               onValueChange={(v) =>
                 set("density", (typeof v === "string" ? v : "comfortable") as Density)
               }
-              options={DENSITY.map((d) => ({ value: d, label: DENSITY_LABELS[d] }))}
+              options={DENSITY_OPTIONS}
               clearable={false}
             />
           </Section>

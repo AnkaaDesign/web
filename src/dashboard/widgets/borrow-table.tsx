@@ -16,7 +16,7 @@ import {
   IconFilter,
 } from "@tabler/icons-react";
 
-import { BORROW_STATUS, BORROW_STATUS_LABELS } from "../../constants";
+import { BORROW_STATUS, BORROW_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../constants";
 import { useBorrows } from "../../hooks/inventory/use-borrow";
 import { useItemBrands } from "../../hooks/inventory/use-item-brand";
 import { useItemCategories } from "../../hooks/inventory/use-item-category";
@@ -51,6 +51,10 @@ import {
   ToggleRow,
   LimitInput,
   SORT_DIRECTION_OPTIONS,
+  DENSITY_VALUES,
+  DENSITY_OPTIONS,
+  densityClasses,
+  type Density,
 } from "./_shared";
 
 import { BorrowStatusBadge } from "../../components/inventory/borrow/common/borrow-status-badge";
@@ -356,6 +360,21 @@ export const borrowTableConfigSchema = z.object({
   limit: z.number().int().min(5).max(200).default(30),
   showHeader: z.boolean().default(true),
   showRowDot: z.boolean().default(true),
+  display: z
+    .object({
+      density: z.enum(DENSITY_VALUES).default("comfortable"),
+      striping: z.boolean().default(true),
+      gridLines: z.boolean().default(true),
+      hoverHighlight: z.boolean().default(true),
+      stickyHeader: z.boolean().default(true),
+    })
+    .default({
+      density: "comfortable",
+      striping: true,
+      gridLines: true,
+      hoverHighlight: true,
+      stickyHeader: true,
+    }),
 });
 
 export type BorrowTableConfig = z.infer<typeof borrowTableConfigSchema>;
@@ -492,6 +511,11 @@ function BorrowTableRender({
   const showRowDot =
     config.showRowDot &&
     (config.columns[0] === "itemName" || config.columns[0] === "itemUniCode");
+  const display = config.display;
+  const dens = densityClasses(display.density as Density);
+  const stickyClass = display.stickyHeader ? "sticky top-0 z-20" : "";
+  const rowBorder = display.gridLines ? "border-b border-border last:border-b-0" : "";
+  const rowHover = display.hoverHighlight ? "hover:bg-secondary/50" : "";
 
   return (
     <WidgetCard
@@ -504,7 +528,7 @@ function BorrowTableRender({
     >
       <>
         <div
-          className="sticky top-0 z-20 grid gap-x-3 px-3 py-1.5 bg-muted/95 backdrop-blur-sm border-b border-border text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+          className={`${stickyClass} grid gap-x-3 ${dens.header} bg-muted/95 backdrop-blur-sm border-b border-border font-semibold uppercase tracking-wider text-muted-foreground`}
           style={{ gridTemplateColumns: gridTemplate }}
         >
           {cols.map((c) => (
@@ -515,7 +539,7 @@ function BorrowTableRender({
         </div>
 
         {isLoading ? (
-          <SkeletonRows columns={cols.length} count={6} gridTemplate={gridTemplate} />
+          <SkeletonRows columns={cols.length} count={6} gridTemplate={gridTemplate} dens={dens} />
         ) : isError ? (
           <div className="p-6 text-center text-sm text-muted-foreground">
             Erro ao carregar empréstimos.
@@ -528,8 +552,8 @@ function BorrowTableRender({
           rows.map((b, i) => (
             <div
               key={b.id}
-              className={`grid gap-x-3 items-center px-3 py-2 cursor-pointer border-b border-border last:border-b-0 transition-colors hover:bg-secondary/50 ${
-                i % 2 === 1 ? "bg-muted/20" : ""
+              className={`grid gap-x-3 items-center ${dens.row} cursor-pointer ${rowBorder} transition-colors ${rowHover} ${
+                display.striping && i % 2 === 1 ? "bg-muted/20" : ""
               }`}
               style={{ gridTemplateColumns: gridTemplate }}
               onClick={() => navigate(routes.inventory.loans.details(b.id))}
@@ -561,17 +585,19 @@ function SkeletonRows({
   columns,
   count,
   gridTemplate,
+  dens,
 }: {
   columns: number;
   count: number;
   gridTemplate: string;
+  dens: { row: string; header: string };
 }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="grid gap-x-3 items-center px-3 py-2 border-b border-border last:border-b-0"
+          className={`grid gap-x-3 items-center ${dens.row} border-b border-border last:border-b-0`}
           style={{ gridTemplateColumns: gridTemplate }}
         >
           {Array.from({ length: columns }).map((__, j) => (
@@ -617,6 +643,10 @@ function BorrowTableConfigComponent({
     key: K,
     value: BorrowTableConfig["sort"][K],
   ) => onChange({ ...c, sort: { ...c.sort, [key]: value } });
+  const setDisplay = <K extends keyof BorrowTableConfig["display"]>(
+    key: K,
+    value: BorrowTableConfig["display"][K],
+  ) => onChange({ ...c, display: { ...c.display, [key]: value } });
 
   // Async-loaded option lists for the filter combos.
   const { data: brandsData } = useItemBrands({ orderBy: { name: "asc" } } as any);
@@ -735,6 +765,47 @@ function BorrowTableConfigComponent({
                 hint="Marca cada linha com a cor do acento. Aparece apenas quando a primeira coluna é Item ou Código."
                 checked={c.showRowDot}
                 onCheckedChange={(v) => set("showRowDot", v)}
+              />
+            </div>
+          </Section>
+          <Section title="Densidade e linhas" defaultOpen>
+            <div className="space-y-1">
+              <Label className="text-xs">Densidade</Label>
+              <Combobox
+                mode="single"
+                value={c.display?.density ?? "comfortable"}
+                onValueChange={(v) =>
+                  setDisplay(
+                    "density",
+                    (typeof v === "string" ? v : "comfortable") as Density,
+                  )
+                }
+                options={DENSITY_OPTIONS}
+                clearable={false}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <ToggleRow
+                label="Listras zebra"
+                hint="Alterna fundo nas linhas pares para facilitar leitura."
+                checked={c.display?.striping ?? true}
+                onCheckedChange={(v) => setDisplay("striping", v)}
+              />
+              <ToggleRow
+                label="Linhas divisórias"
+                checked={c.display?.gridLines ?? true}
+                onCheckedChange={(v) => setDisplay("gridLines", v)}
+              />
+              <ToggleRow
+                label="Realçar linha sob o cursor"
+                checked={c.display?.hoverHighlight ?? true}
+                onCheckedChange={(v) => setDisplay("hoverHighlight", v)}
+              />
+              <ToggleRow
+                label="Cabeçalho fixo"
+                hint="O cabeçalho permanece visível ao rolar."
+                checked={c.display?.stickyHeader ?? true}
+                onCheckedChange={(v) => setDisplay("stickyHeader", v)}
               />
             </div>
           </Section>
@@ -934,7 +1005,11 @@ export const borrowTableWidget: WidgetDefinition<BorrowTableConfig> = {
     "Acompanhamento de itens emprestados: status, prazo, usuário, item, marca, categoria. Filtros por período, status e atrasados.",
   icon: IconPackage,
   category: "inventory",
-  allowedSectors: "*",
+  // Mirror /estoque/emprestimos page (parent /estoque is [WAREHOUSE, ADMIN]).
+  allowedSectors: [
+    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.ADMIN,
+  ],
   defaultSize: { cols: 2, rows: 2 },
   minSize: { cols: 2, rows: 1 },
   maxSize: { cols: 4, rows: 4 },
@@ -958,6 +1033,13 @@ export const borrowTableWidget: WidgetDefinition<BorrowTableConfig> = {
     limit: 30,
     showHeader: true,
     showRowDot: true,
+    display: {
+      density: "comfortable",
+      striping: true,
+      gridLines: true,
+      hoverHighlight: true,
+      stickyHeader: true,
+    },
   },
   RenderComponent: BorrowTableRender,
   ConfigComponent: BorrowTableConfigComponent,

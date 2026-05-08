@@ -1381,7 +1381,13 @@ export const USER_STATUS_TRANSITIONS: Record<USER_STATUS, USER_STATUS[]> = {
   [USER_STATUS.EXPERIENCE_PERIOD_1]: [USER_STATUS.EXPERIENCE_PERIOD_2, USER_STATUS.DISMISSED],
   [USER_STATUS.EXPERIENCE_PERIOD_2]: [USER_STATUS.EFFECTED, USER_STATUS.DISMISSED],
   [USER_STATUS.EFFECTED]: [USER_STATUS.DISMISSED],
-  [USER_STATUS.DISMISSED]: [], // No transitions allowed from DISMISSED
+  // DISMISSED → active permitted so operators can undo a mistaken dismissal
+  // (mirrors api/src/schemas/user.ts and api UserService.validateUserStatusTransition).
+  [USER_STATUS.DISMISSED]: [
+    USER_STATUS.EXPERIENCE_PERIOD_1,
+    USER_STATUS.EXPERIENCE_PERIOD_2,
+    USER_STATUS.EFFECTED,
+  ],
 };
 
 /**

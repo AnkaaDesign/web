@@ -340,10 +340,15 @@ function DepartamentoGroup({
         {linkedSectors.map((s) => {
           const horarioOptions = horarios
             .filter((h) => !h.Desativar)
-            .map((h) => ({
-              value: String(h.Id),
-              label: h.Numero ? `#${h.Numero} — ${h.Descricao}` : h.Descricao,
-            }));
+            .map((h) => {
+              // Defensive: Secullum rows may omit Descricao. Combobox requires
+              // `label: string`, never undefined.
+              const descricao = h.Descricao ?? "(sem descrição)";
+              return {
+                value: String(h.Id),
+                label: h.Numero ? `#${h.Numero} — ${descricao}` : descricao,
+              };
+            });
           return (
             <div
               key={s.id}
@@ -788,7 +793,7 @@ function FuncionariosCard() {
           <Input
             placeholder="Buscar por nome, folha ou usuário Ankaa…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(value) => setSearch(typeof value === "string" ? value : "")}
             className="pl-9"
           />
         </div>

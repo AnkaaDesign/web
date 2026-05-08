@@ -19,11 +19,11 @@ import { ptBR } from "date-fns/locale";
 import {
   IconCalendar,
   IconAdjustments,
-  IconChevronDown,
   IconBeach,
   IconUserOff,
   IconUserExclamation,
   IconConfetti,
+  IconUserSearch,
 } from "@tabler/icons-react";
 
 import {
@@ -40,7 +40,6 @@ import {
   useSectors,
   useUsers,
 } from "../../hooks";
-import { Button } from "../../components/ui/button";
 import { Combobox } from "../../components/ui/combobox";
 import type { ComboboxOption } from "../../components/ui/combobox";
 import { Input } from "../../components/ui/input";
@@ -56,11 +55,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "../../components/ui/collapsible";
 import { cn } from "../../lib/utils";
 import { routes } from "../../constants/routes";
 
@@ -80,7 +74,7 @@ import type {
   WidgetDefinition,
   WidgetRenderProps,
 } from "../types";
-import { ToggleRow } from "./_shared";
+import { Section, ToggleRow } from "./_shared";
 import {
   CalendarGrid,
   PeriodHeader,
@@ -98,16 +92,15 @@ const ALL_USERS = "__ALL__";
 
 // Same palette as components/human-resources/absence/calendar/absences-calendar.tsx —
 // the dashboard tile and the full HR page must read identically at a glance.
+// Solid backgrounds + white text per the centralized BADGE_COLORS workflow:
+//   purple = ausência, amber = falta just., red = falta n.j., cyan = feriado.
 const CATEGORY_BAR_CLASSES = {
-  AUSENCIA:
-    "bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-500/20",
-  FALTA_JUSTIFIED:
-    "bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30",
+  AUSENCIA: "bg-purple-600 text-white border border-purple-700",
+  FALTA_JUSTIFIED: "bg-amber-600 text-white border border-amber-700",
   FALTA_UNJUSTIFIED:
-    "bg-red-600/25 text-red-800 dark:text-red-200 border border-red-600/50 font-semibold",
+    "bg-red-700 text-white border border-red-800 font-semibold",
 } as const;
-const HOLIDAY_BAR_CLASS =
-  "bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/20";
+const HOLIDAY_BAR_CLASS = "bg-cyan-600 text-white border border-cyan-700";
 
 type BarCategory = keyof typeof CATEGORY_BAR_CLASSES;
 
@@ -484,7 +477,7 @@ function HrCalendarRender({ config, size }: WidgetRenderProps<HrCalendarConfig>)
               {format(date, "EEEE, dd 'de' MMMM", { locale: ptBR })}
             </div>
             {dayHolidays.map((h, i) => (
-              <div key={`th${i}`} className="text-sky-600 dark:text-sky-300">
+              <div key={`th${i}`} className="text-cyan-600 dark:text-cyan-300">
                 🎉 {h.Descricao || h.descricao || "Feriado"}
               </div>
             ))}
@@ -496,9 +489,9 @@ function HrCalendarRender({ config, size }: WidgetRenderProps<HrCalendarConfig>)
                   <span
                     className={cn(
                       "inline-block w-1.5 h-1.5 rounded-full mt-1 shrink-0",
-                      cat === "AUSENCIA" && "bg-violet-500",
-                      cat === "FALTA_JUSTIFIED" && "bg-amber-500",
-                      cat === "FALTA_UNJUSTIFIED" && "bg-red-600",
+                      cat === "AUSENCIA" && "bg-purple-600",
+                      cat === "FALTA_JUSTIFIED" && "bg-amber-600",
+                      cat === "FALTA_UNJUSTIFIED" && "bg-red-700",
                     )}
                   />
                   <span>
@@ -536,7 +529,7 @@ function HrCalendarRender({ config, size }: WidgetRenderProps<HrCalendarConfig>)
         {/* Footer summary — counts mirror the full HR page tiles */}
         <div className="flex items-center justify-between gap-3 px-1 text-[11px] text-muted-foreground flex-wrap">
           {config.display.showVacation && (
-            <SummaryChip color="violet" icon={IconBeach} label="Férias/Ausência" value={stats.vacation} />
+            <SummaryChip color="purple" icon={IconBeach} label="Férias/Ausência" value={stats.vacation} />
           )}
           {config.display.showJustifiedFalta && (
             <SummaryChip color="amber" icon={IconUserOff} label="Faltas Just." value={stats.justified} />
@@ -545,7 +538,7 @@ function HrCalendarRender({ config, size }: WidgetRenderProps<HrCalendarConfig>)
             <SummaryChip color="red" icon={IconUserExclamation} label="Faltas N.J." value={stats.unjustified} />
           )}
           {config.display.showHoliday && (
-            <SummaryChip color="sky" icon={IconConfetti} label="Feriados" value={stats.holiday} />
+            <SummaryChip color="cyan" icon={IconConfetti} label="Feriados" value={stats.holiday} />
           )}
           {isLoading && <span className="text-[10px] italic">Carregando…</span>}
         </div>
@@ -560,16 +553,16 @@ function SummaryChip({
   label,
   value,
 }: {
-  color: "violet" | "amber" | "red" | "sky";
+  color: "purple" | "amber" | "red" | "cyan";
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
 }) {
   const colors = {
-    violet: "text-violet-700 dark:text-violet-300",
-    amber: "text-amber-700 dark:text-amber-300",
+    purple: "text-purple-600 dark:text-purple-300",
+    amber: "text-amber-600 dark:text-amber-300",
     red: "text-red-700 dark:text-red-300",
-    sky: "text-sky-700 dark:text-sky-300",
+    cyan: "text-cyan-600 dark:text-cyan-300",
   };
   return (
     <span className="inline-flex items-center gap-1">
@@ -583,26 +576,6 @@ function SummaryChip({
 // ============================================================
 // Config component
 // ============================================================
-
-function Section({
-  title,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Collapsible defaultOpen={defaultOpen} className="border border-border rounded-md">
-      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
-        {title}
-        <IconChevronDown className="h-4 w-4 transition-transform" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
-    </Collapsible>
-  );
-}
 
 function HrCalendarConfigComponent({
   config,
@@ -658,16 +631,33 @@ function HrCalendarConfigComponent({
         />
       </div>
 
-      <Tabs defaultValue="display" className="flex flex-col gap-2">
+      <Tabs defaultValue="appearance" className="flex flex-col gap-2">
         <TabsList className="self-start">
+          <TabsTrigger value="appearance" className="gap-1">
+            <IconAdjustments className="h-3.5 w-3.5" /> Aparência
+          </TabsTrigger>
           <TabsTrigger value="display" className="gap-1">
-            <IconAdjustments className="h-3.5 w-3.5" /> Exibição
+            <IconCalendar className="h-3.5 w-3.5" /> Exibição
           </TabsTrigger>
           <TabsTrigger value="filters" className="gap-1">
-            <IconCalendar className="h-3.5 w-3.5" /> Filtros
+            <IconUserSearch className="h-3.5 w-3.5" /> Filtros
           </TabsTrigger>
-          <TabsTrigger value="appearance">Aparência</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="appearance" className="space-y-3 mt-0">
+          <Section title="Acento (cor, ícone, borda)" defaultOpen>
+            <AccentPicker
+              value={{ color: accentColor, icon: accentIcon, borderColor }}
+              onChange={(next) =>
+                set("accent", {
+                  color: next.color,
+                  icon: next.icon,
+                  borderColor: next.borderColor,
+                } as HrCalendarConfig["accent"])
+              }
+            />
+          </Section>
+        </TabsContent>
 
         <TabsContent value="display" className="space-y-3 mt-0">
           <Section title="Categorias visíveis" defaultOpen>
@@ -752,20 +742,6 @@ function HrCalendarConfigComponent({
           </Section>
         </TabsContent>
 
-        <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{ color: accentColor, icon: accentIcon, borderColor }}
-              onChange={(next) =>
-                set("accent", {
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                } as HrCalendarConfig["accent"])
-              }
-            />
-          </Section>
-        </TabsContent>
       </Tabs>
     </div>
   );

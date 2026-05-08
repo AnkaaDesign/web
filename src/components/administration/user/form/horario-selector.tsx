@@ -86,9 +86,13 @@ export function HorarioSelector({ disabled }: { disabled?: boolean }) {
                 options={toHorarioArray(horariosQ.data)
                   .filter((h) => !h.Desativar)
                   .map((h) => {
+                    // Defensive fallbacks: Secullum occasionally returns rows
+                    // missing Descricao or Numero. Combobox requires `label`
+                    // to be a string so we never let `undefined` leak through.
+                    const descricao = h.Descricao ?? "(sem descrição)";
                     const base = h.Numero
-                      ? `#${h.Numero} — ${h.Descricao}`
-                      : h.Descricao;
+                      ? `#${h.Numero} — ${descricao}`
+                      : descricao;
                     return {
                       value: String(h.Id),
                       label: h.Tipo ? `${base} (${h.Tipo})` : base,

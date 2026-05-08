@@ -33,7 +33,6 @@ import {
   IconCalendarEvent,
   IconCurrencyReal,
   IconExternalLink,
-  IconChevronDown,
   IconClipboardText,
   IconShieldCheck,
 } from "@tabler/icons-react";
@@ -41,11 +40,6 @@ import { Button } from "../../components/ui/button";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
 import { Combobox } from "../../components/ui/combobox";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "../../components/ui/collapsible";
 import {
   Tabs,
   TabsList,
@@ -57,6 +51,7 @@ import { useCustomers } from "../../hooks/administration/use-customer";
 import { useTaskMutations } from "../../hooks/production/use-task";
 import { useCreateTaskQuote } from "../../hooks/production/use-task-quote";
 import { WidgetCard } from "../components/widget-card";
+import { Section } from "./_shared";
 import {
   AccentPicker,
   makeAccentSchema,
@@ -95,31 +90,6 @@ function todayPlusDays(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return d.toISOString().split("T")[0];
-}
-
-function Section({
-  title,
-  defaultOpen = true,
-  children,
-  icon,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Collapsible defaultOpen={defaultOpen} className="border border-border rounded-md">
-      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
-        <span className="flex items-center gap-2">
-          {icon}
-          {title}
-        </span>
-        <IconChevronDown className="h-4 w-4 transition-transform" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-2">{children}</CollapsibleContent>
-    </Collapsible>
-  );
 }
 
 function Render({ config }: WidgetRenderProps<Config>) {
@@ -254,6 +224,15 @@ function Render({ config }: WidgetRenderProps<Config>) {
       }
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      footerExtra={
+        <Link
+          to="/financeiro/orcamento/cadastrar"
+          className="text-[11px] text-muted-foreground hover:text-foreground hover:underline flex items-center gap-1"
+        >
+          Formulário completo
+          <IconExternalLink className="h-3 w-3" />
+        </Link>
+      }
     >
       <div className="h-full flex flex-col gap-3 p-3 overflow-y-auto">
         {/* TAREFA */}
@@ -442,14 +421,6 @@ function Render({ config }: WidgetRenderProps<Config>) {
           <IconPlus className="h-4 w-4" />
           {isSubmitting ? "Criando..." : "Criar orçamento"}
         </Button>
-
-        <Link
-          to="/financeiro/orcamento/cadastrar"
-          className="text-[11px] text-muted-foreground hover:text-foreground hover:underline text-center flex items-center justify-center gap-1"
-        >
-          Abrir formulário completo (com anexos, condições e múltiplos
-          clientes) <IconExternalLink className="h-3 w-3" />
-        </Link>
       </div>
     </WidgetCard>
   );
@@ -583,10 +554,12 @@ export const quickBudgetWidget: WidgetDefinition<Config> = {
     "Crie um orçamento sem sair do painel — agrupado em Tarefa, Informações e Serviços, exatamente como o formulário completo.",
   icon: IconReceipt,
   category: "other",
+  // Mirror /financeiro/orcamento page privileges. PRODUCTION_MANAGER is
+  // intentionally excluded — managers don't create budgets.
   allowedSectors: [
+    SECTOR_PRIVILEGES.ADMIN,
     SECTOR_PRIVILEGES.COMMERCIAL,
     SECTOR_PRIVILEGES.FINANCIAL,
-    SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   ],
   defaultSize: { cols: 2, rows: 4 },
   minSize: { cols: 2, rows: 3 },

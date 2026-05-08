@@ -2,13 +2,11 @@
 // absence approval queue that lives at /recursos-humanos/requisicoes.
 //
 // Design decision: this widget mirrors the page's master-detail layout — a
-// compact card list on the left and a detail panel on the right showing the
-// current selection's metadata + before/after comparison. Action buttons
-// (Atualizar / Rejeitar / Aprovar) live in the WidgetCard header so they
-// remain accessible regardless of detail panel state. The widget version
-// trims the verbose vertical metadata stack on the page (Data do Ponto /
-// Solicitado em / Solicitado por / Observação as separate rows) into a
-// single inline row to keep things compact at widget widths.
+// compact card list on the left, detail panel on the right with vertical
+// metadata stack and a 7-column comparison table that shows the origin
+// (mobile/biometric/manual) of every time entry as an icon with tooltip.
+// Action buttons (Atualizar / Rejeitar / Aprovar) live in the WidgetCard
+// header so they remain accessible regardless of the detail panel's state.
 //
 // Approve copies Observacoes into every AlteracoesFonteDados.Motivo (Secullum
 // rejects the request with HTTP 400 when any entry has Motivo: null). Reject
@@ -22,12 +20,16 @@ import {
   IconFilter,
   IconUser,
   IconCalendar,
-  IconClock,
-  IconNotes,
   IconRefresh,
   IconSearch,
   IconArrowsSort,
+  IconCloudOff,
+  IconDeviceTablet,
+  IconPaperclip,
+  IconArrowsExchange,
+  IconFileDescription,
 } from "@tabler/icons-react";
+import type { TablerIcon } from "@tabler/icons-react";
 
 import { SECTOR_PRIVILEGES } from "../../constants";
 import { routes } from "../../constants/routes";
@@ -55,6 +57,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
+import { LoadingSpinner } from "../../components/ui/loading";
+import { secullumService } from "../../api-client/services/secullum";
 
 import { WidgetCard } from "../components/widget-card";
 import {
@@ -79,6 +96,7 @@ import {
   SORT_DIRECTION_OPTIONS,
   DENSITY_VALUES,
   DENSITY_OPTIONS,
+  cardDensityClasses,
   type Density,
 } from "./_shared";
 
@@ -104,6 +122,15 @@ interface SecullumRequest {
   Saida2Original: string | null;
   Entrada3Original: string | null;
   Saida3Original: string | null;
+  // Origin codes for each time entry (16 = Ponto Virtual / mobile online,
+  // other non-null = mobile offline, null = manual employee request).
+  // Surfaced in the comparison table as icons + tooltips matching the page.
+  OrigemEntrada1?: number | null;
+  OrigemSaida1?: number | null;
+  OrigemEntrada2?: number | null;
+  OrigemSaida2?: number | null;
+  OrigemEntrada3?: number | null;
+  OrigemSaida3?: number | null;
   Tipo: number;
   TipoDescricao: string;
   Estado: number;
@@ -113,6 +140,22 @@ interface SecullumRequest {
   Versao: string;
   DispositivoTipo?: "mobile" | "biometric" | "qrcode" | "card" | "web";
   DispositivoNome?: string;
+  // ID of the attached photo (e.g. medical certificate uploaded with a
+  // Justify Absence request). When set, an attachment can be fetched from
+  // /Solicitacoes/FotoAtestado/{id}.
+  SolicitacaoFotoId?: number | null;
+}
+
+// Origin lookup ported from the page so widget time cells read identically:
+// 16 → Ponto Virtual (mobile, online sync); other non-null → mobile offline;
+// null/undefined → manual request entered by the employee.
+function getOriginInfo(origin: number | null | undefined): {
+  icon: TablerIcon;
+  label: string;
+} {
+  if (origin === 16) return { icon: IconDeviceTablet, label: "Ponto Virtual" };
+  if (origin != null) return { icon: IconCloudOff, label: "Ponto Virtual Offline" };
+  return { icon: IconUser, label: "Solicitado pelo colaborador" };
 }
 
 const ESTADO_LABELS: Record<number, string> = {
@@ -120,10 +163,12 @@ const ESTADO_LABELS: Record<number, string> = {
   1: "Aprovado",
   2: "Rejeitado",
 };
+// Solid BADGE_COLORS palette (centralized in src/constants/badge-colors.ts):
+//   pending → amber, approved → green, rejected → red.
 const ESTADO_TONES: Record<number, string> = {
-  0: "border-amber-500/40 text-amber-500",
-  1: "border-emerald-500/40 text-emerald-500",
-  2: "border-rose-500/40 text-rose-500",
+  0: "bg-amber-600 text-white border-amber-700",
+  1: "bg-green-700 text-white border-green-800",
+  2: "bg-red-700 text-white border-red-800",
 };
 const ESTADO_OPTIONS = [
   { value: "0", label: "Pendente" },
@@ -145,15 +190,16 @@ const ACTIONABLE_ESTADOS = new Set<number>([0]);
 const TIME_FIELDS: ReadonlyArray<{
   key: keyof SecullumRequest;
   origKey: keyof SecullumRequest;
+  originKey: keyof SecullumRequest;
   short: string;
   long: string;
 }> = [
-  { key: "Entrada1", origKey: "Entrada1Original", short: "E1", long: "Entrada 1" },
-  { key: "Saida1", origKey: "Saida1Original", short: "S1", long: "Saída 1" },
-  { key: "Entrada2", origKey: "Entrada2Original", short: "E2", long: "Entrada 2" },
-  { key: "Saida2", origKey: "Saida2Original", short: "S2", long: "Saída 2" },
-  { key: "Entrada3", origKey: "Entrada3Original", short: "E3", long: "Entrada 3" },
-  { key: "Saida3", origKey: "Saida3Original", short: "S3", long: "Saída 3" },
+  { key: "Entrada1", origKey: "Entrada1Original", originKey: "OrigemEntrada1", short: "E1", long: "Entrada 1" },
+  { key: "Saida1", origKey: "Saida1Original", originKey: "OrigemSaida1", short: "S1", long: "Saída 1" },
+  { key: "Entrada2", origKey: "Entrada2Original", originKey: "OrigemEntrada2", short: "E2", long: "Entrada 2" },
+  { key: "Saida2", origKey: "Saida2Original", originKey: "OrigemSaida2", short: "S2", long: "Saída 2" },
+  { key: "Entrada3", origKey: "Entrada3Original", originKey: "OrigemEntrada3", short: "E3", long: "Entrada 3" },
+  { key: "Saida3", origKey: "Saida3Original", originKey: "OrigemSaida3", short: "S3", long: "Saída 3" },
 ];
 
 // ============================================================
@@ -212,34 +258,6 @@ function justificationToken(r: SecullumRequest): string | undefined {
     if (cur) return cur;
   }
   return undefined;
-}
-
-interface CardDensity {
-  card: string;
-  primary: string;
-  meta: string;
-}
-
-function listCardDensity(d: Density): CardDensity {
-  if (d === "compact") {
-    return {
-      card: "px-2.5 py-1.5",
-      primary: "text-xs",
-      meta: "text-[10px]",
-    };
-  }
-  if (d === "spacious") {
-    return {
-      card: "px-3 py-2.5",
-      primary: "text-sm",
-      meta: "text-xs",
-    };
-  }
-  return {
-    card: "px-3 py-2",
-    primary: "text-sm",
-    meta: "text-[11px]",
-  };
 }
 
 // ============================================================
@@ -315,7 +333,7 @@ function HrRequestsTableRender({
   size,
 }: WidgetRenderProps<HrRequestsTableConfig>) {
   const display = config.display;
-  const dens = listCardDensity(display.density as Density);
+  const dens = cardDensityClasses(display.density as Density);
 
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDeferredValue(searchInput);
@@ -652,22 +670,21 @@ function ListPanel({
   selectedId,
   onSelect,
   dens,
-  accentDot,
-  striping,
-  gridLines,
-  hoverHighlight,
 }: {
   rows: SecullumRequest[];
   selectedId: number | null;
   onSelect: (id: number) => void;
-  dens: CardDensity;
+  dens: ReturnType<typeof cardDensityClasses>;
   accentDot: string;
   striping: boolean;
   gridLines: boolean;
   hoverHighlight: boolean;
 }) {
+  // Inner padding + small inter-card gap matches the page layout. The
+  // bordered cards do the row-separation job that striping/gridLines did
+  // before, so we don't need extra dividers.
   return (
-    <div>
+    <div className="p-2 space-y-1.5">
       {rows.map((r, i) => (
         <ListCard
           key={r.Id}
@@ -676,10 +693,10 @@ function ListPanel({
           selected={r.Id === selectedId}
           onSelect={onSelect}
           dens={dens}
-          accentDot={accentDot}
-          striping={striping}
-          gridLines={gridLines}
-          hoverHighlight={hoverHighlight}
+          accentDot=""
+          striping={false}
+          gridLines={false}
+          hoverHighlight
         />
       ))}
     </div>
@@ -688,57 +705,67 @@ function ListPanel({
 
 function ListCard({
   r,
-  index,
   selected,
   onSelect,
   dens,
-  accentDot,
-  striping,
-  gridLines,
-  hoverHighlight,
 }: {
   r: SecullumRequest;
   index: number;
   selected: boolean;
   onSelect: (id: number) => void;
-  dens: CardDensity;
+  dens: ReturnType<typeof cardDensityClasses>;
   accentDot: string;
   striping: boolean;
   gridLines: boolean;
   hoverHighlight: boolean;
 }) {
   const tipoLabel = TIPO_LABELS[r.Tipo] || r.TipoDescricao || "—";
-  const stripeBg = !selected && striping && index % 2 === 1 ? "bg-muted/15" : "";
-  const hoverBg = !selected && hoverHighlight ? "hover:bg-secondary/40" : "";
-  const selectedBg = selected ? "bg-emerald-500/10" : "";
-  const border = gridLines ? "border-b border-border/40 last:border-b-0" : "";
 
   return (
     <button
       type="button"
       onClick={() => onSelect(r.Id)}
-      className={`w-full text-left ${dens.card} ${border} ${stripeBg} ${hoverBg} ${selectedBg} transition-colors min-w-0`}
+      // Mirrors the real page's list card chrome: primary-blue fill when
+      // selected (with a pulsing dot), neutral hover otherwise. The widget
+      // version drops striping/gridLines on purpose — at tile widths a
+      // selected card already reads as "current"; extra row chrome adds
+      // visual noise without information value.
+      className={`relative w-full text-left ${dens.card} rounded-md border transition-colors min-w-0 ${
+        selected
+          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+          : "border-border/40 hover:bg-secondary/40"
+      }`}
     >
       <div className={`flex items-center gap-2 min-w-0 ${dens.primary}`}>
-        <IconUser className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <IconUser
+          className={`h-3.5 w-3.5 shrink-0 ${
+            selected ? "text-primary-foreground" : "text-muted-foreground"
+          }`}
+        />
         <span className="font-semibold truncate flex-1 min-w-0 uppercase tracking-tight">
           {r.FuncionarioNome || "—"}
         </span>
         {selected && (
           <span
-            className={`h-2 w-2 rounded-full shrink-0 ${accentDot}`}
+            className="h-2 w-2 rounded-full shrink-0 bg-primary-foreground animate-pulse shadow-sm"
             aria-hidden="true"
           />
         )}
       </div>
       <div
-        className={`mt-1 flex items-center gap-1.5 text-muted-foreground ${dens.meta} min-w-0`}
+        className={`mt-1 flex items-center gap-1.5 ${dens.meta} min-w-0 ${
+          selected ? "text-primary-foreground/80" : "text-muted-foreground"
+        }`}
       >
         <IconCalendar className="h-3 w-3 shrink-0" />
         <span className="tabular-nums">{formatDate(r.Data)}</span>
         <Badge
-          variant="secondary"
-          className="ml-auto text-[10px] py-0 px-1.5 shrink-0 font-normal"
+          variant={selected ? "secondary" : "outline"}
+          className={`ml-auto text-[10px] py-0 px-1.5 shrink-0 font-normal ${
+            selected
+              ? "bg-primary-foreground/20 text-primary-foreground border-primary-foreground/30"
+              : ""
+          }`}
         >
           {tipoLabel}
         </Badge>
@@ -773,47 +800,65 @@ function DetailPanel({ r }: { r: SecullumRequest }) {
     ESTADO_TONES[r.Estado] ?? "border-border text-muted-foreground";
   const estadoLabel = ESTADO_LABELS[r.Estado] ?? String(r.Estado);
 
+  const [attachmentOpen, setAttachmentOpen] = useState(false);
+
   return (
     <div className="p-3 space-y-3">
-      {/* Type pill + long date + status (only when not pending). */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
-          {tipoLabel}
-        </Badge>
-        <span className="text-xs text-muted-foreground">·</span>
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {longDate}
-        </span>
-        {r.Estado !== 0 && (
-          <Badge
-            variant="outline"
-            className={`text-[10px] py-0 px-1.5 ml-auto ${estadoTone}`}
-          >
-            {estadoLabel}
+      {/* Header — name + tipo badge + long date. Mirrors the page's
+          px-8 py-6 detail header, scaled to widget tile size. */}
+      <div className="space-y-1.5 pb-2 border-b border-border">
+        <div className="flex items-center gap-2 min-w-0">
+          <IconUser className="h-4 w-4 text-primary shrink-0" />
+          <h2 className="text-sm font-semibold truncate">
+            {r.FuncionarioNome || "—"}
+          </h2>
+          {r.Estado !== 0 && (
+            <Badge
+              variant="outline"
+              className={`text-[10px] py-0 px-1.5 ml-auto shrink-0 ${estadoTone}`}
+            >
+              {estadoLabel}
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+          <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+            {tipoLabel}
           </Badge>
-        )}
+          <span>·</span>
+          <span className="tabular-nums">{longDate}</span>
+        </div>
       </div>
 
-      {/* Compact info row: Ponto · Solicitado · Observação inline. */}
-      <div className="flex flex-wrap items-start gap-x-4 gap-y-1.5 text-xs">
-        <InfoChip
-          icon={IconCalendar}
-          label="Ponto"
-          value={formatDate(r.Data)}
-        />
-        <InfoChip
-          icon={IconClock}
-          label="Solicitado"
-          value={formatDateTime(r.DataSolicitacao)}
-        />
+      {/* Information block — vertical metadata stack matching the real page.
+          Same grouping (Data do Ponto / Solicitado em / Solicitado por /
+          Observação / Foto Anexada) just smaller padding for tile widths. */}
+      <div className="rounded-md bg-muted/30 p-3 space-y-2.5">
+        <h3 className="text-[11px] font-semibold flex items-center gap-1.5 text-foreground">
+          <IconFileDescription className="h-3.5 w-3.5 text-primary" />
+          Informações da Solicitação
+        </h3>
+        <InfoRow label="Data do Ponto" value={formatDate(r.Data)} />
+        <InfoRow label="Solicitado em" value={formatDateTime(r.DataSolicitacao)} />
+        <InfoRow label="Solicitado por" value={r.FuncionarioNome || "—"} />
         {r.Observacoes && (
-          <InfoChip
-            icon={IconNotes}
-            label="Observação"
-            value={`“${r.Observacoes}”`}
-            italic
-            grow
-          />
+          <InfoRow label="Observação" value={r.Observacoes} multiline />
+        )}
+        {r.SolicitacaoFotoId != null && (
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Foto Anexada
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 h-7 text-xs"
+              onClick={() => setAttachmentOpen(true)}
+            >
+              <IconPaperclip className="h-3.5 w-3.5" />
+              Ver foto anexada
+            </Button>
+          </div>
         )}
       </div>
 
@@ -823,36 +868,150 @@ function DetailPanel({ r }: { r: SecullumRequest }) {
       ) : (
         <ComparisonGrid r={r} />
       )}
+
+      {r.SolicitacaoFotoId != null && (
+        <RequestAttachmentDialog
+          solicitacaoId={r.SolicitacaoFotoId}
+          open={attachmentOpen}
+          onOpenChange={setAttachmentOpen}
+        />
+      )}
     </div>
   );
 }
 
-function InfoChip({
-  icon: Icon,
+function InfoRow({
   label,
   value,
-  italic = false,
-  grow = false,
+  multiline = false,
 }: {
-  icon: typeof IconCalendar;
   label: string;
   value: string;
-  italic?: boolean;
-  grow?: boolean;
+  multiline?: boolean;
 }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 min-w-0 ${grow ? "flex-1" : ""}`}
-      title={value}
-    >
-      <Icon className="h-3 w-3 shrink-0 text-muted-foreground" />
-      <span className="text-muted-foreground shrink-0">{label}:</span>
-      <span
-        className={`tabular-nums truncate ${italic ? "italic text-muted-foreground" : "text-foreground"}`}
+    <div className="space-y-0.5">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className={`text-xs ${multiline ? "whitespace-pre-wrap" : "tabular-nums"} text-foreground`}
       >
         {value}
-      </span>
+      </p>
+    </div>
+  );
+}
+
+// Lightweight TimeCell — shows the time value with an inline origin icon
+// (mobile-online / mobile-offline / manual). Matches the real page's
+// component but inline-flex sized for the tile-width comparison grid.
+function TimeCell({
+  value,
+  icon: Icon,
+  tooltipLabel,
+  tooltipReason,
+}: {
+  value: string | null;
+  icon: TablerIcon | null;
+  tooltipLabel?: string;
+  tooltipReason?: string | null;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="tabular-nums">{value || "—"}</span>
+      {value && Icon && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Icon className="h-3 w-3 text-muted-foreground" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="space-y-1 max-w-xs">
+                <p className="text-xs font-medium">{tooltipLabel}</p>
+                {tooltipReason && (
+                  <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                    {tooltipReason}
+                  </p>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
     </span>
+  );
+}
+
+// Side dialog showing the attached photo (e.g. medical certificate).
+// Lazy-loads the photo from the Secullum service when opened.
+function RequestAttachmentDialog({
+  solicitacaoId,
+  open,
+  onOpenChange,
+}: {
+  solicitacaoId: number | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || solicitacaoId == null) {
+      setPhoto(null);
+      setError(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    secullumService
+      .getRequestAttachmentPhoto(solicitacaoId)
+      .then((res: any) => {
+        if (cancelled) return;
+        const base64 = res?.data?.data?.Foto;
+        if (base64) setPhoto(`data:image/jpeg;base64,${base64}`);
+        else setError("Foto não disponível para esta solicitação.");
+      })
+      .catch(() => {
+        if (!cancelled) setError("Falha ao carregar a foto anexada.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, solicitacaoId]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[700px]">
+        <DialogHeader>
+          <DialogTitle>Foto anexada à solicitação</DialogTitle>
+          <DialogDescription>
+            Documento enviado pelo colaborador (ex: atestado médico).
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center justify-center min-h-[300px] bg-muted/30 rounded-lg overflow-hidden">
+          {isLoading && <LoadingSpinner size="lg" />}
+          {!isLoading && error && (
+            <p className="text-sm text-muted-foreground p-6">{error}</p>
+          )}
+          {!isLoading && !error && photo && (
+            <img
+              src={photo}
+              alt="Foto anexada"
+              className="max-w-full max-h-[70vh] object-contain"
+            />
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -864,11 +1023,12 @@ function ComparisonGrid({ r }: { r: SecullumRequest }) {
   }, 0);
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Comparação de marcações
-        </h4>
+        <h3 className="text-[11px] font-semibold flex items-center gap-1.5">
+          <IconArrowsExchange className="h-3.5 w-3.5 text-primary" />
+          Comparação de Marcações
+        </h3>
         {changedCount > 0 && (
           <Badge variant="outline" className="text-[10px] py-0 px-1.5">
             {changedCount === 1
@@ -878,64 +1038,79 @@ function ComparisonGrid({ r }: { r: SecullumRequest }) {
         )}
       </div>
 
-      <div className="grid grid-cols-[auto_repeat(6,minmax(0,1fr))] gap-px bg-border rounded-md overflow-hidden text-[11px]">
-        {/* ----- header ----- */}
-        <div className="bg-muted/60 px-2 py-1 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
-          Marcação
-        </div>
-        {TIME_FIELDS.map((f) => (
-          <div
-            key={`h-${f.short}`}
-            className="bg-muted/60 px-1 py-1 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground text-center"
-          >
-            {f.short}
+      <div className="overflow-hidden rounded-md border border-border">
+        <div className="grid grid-cols-[auto_repeat(6,minmax(0,1fr))] gap-px bg-border text-[11px]">
+          {/* ----- header ----- */}
+          <div className="bg-muted/60 px-2 py-1.5 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
+            Marcação
           </div>
-        ))}
-
-        {/* ----- original row ----- */}
-        <div className="bg-card px-2 py-1.5">
-          <Badge variant="outline" className="text-[10px] py-0 px-1.5">
-            Original
-          </Badge>
-        </div>
-        {TIME_FIELDS.map((f) => {
-          const orig = (r[f.origKey] as string | null) ?? "";
-          return (
+          {TIME_FIELDS.map((f) => (
             <div
-              key={`o-${f.short}`}
-              className="bg-card px-1 py-1.5 text-center font-mono text-muted-foreground tabular-nums"
+              key={`h-${f.short}`}
+              className="bg-muted/60 px-1 py-1.5 font-semibold uppercase tracking-wider text-[10px] text-muted-foreground text-center"
             >
-              {orig || "—"}
+              {f.short}
             </div>
-          );
-        })}
+          ))}
 
-        {/* ----- requested row ----- */}
-        <div className="bg-card px-2 py-1.5">
-          <Badge
-            variant="outline"
-            className="text-[10px] py-0 px-1.5 border-emerald-500/40 text-emerald-500"
-          >
-            Solicitado
-          </Badge>
+          {/* ----- original row ----- */}
+          <div className="bg-card px-2 py-1.5">
+            <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+              Original
+            </Badge>
+          </div>
+          {TIME_FIELDS.map((f) => {
+            const value = (r[f.origKey] as string | null) ?? null;
+            const origin = (r[f.originKey] as number | null | undefined) ?? null;
+            const info = getOriginInfo(origin);
+            return (
+              <div
+                key={`o-${f.short}`}
+                className="bg-card px-1 py-1.5 text-center font-mono text-muted-foreground"
+              >
+                <TimeCell
+                  value={value}
+                  icon={value ? info.icon : null}
+                  tooltipLabel={info.label}
+                />
+              </div>
+            );
+          })}
+
+          {/* ----- requested row ----- */}
+          <div className="bg-card px-2 py-1.5">
+            <Badge className="text-[10px] py-0 px-1.5">Solicitado</Badge>
+          </div>
+          {TIME_FIELDS.map((f) => {
+            const orig = (r[f.origKey] as string | null) ?? "";
+            const cur = (r[f.key] as string | null) ?? null;
+            const changed = orig !== (cur ?? "");
+            const origin = (r[f.originKey] as number | null | undefined) ?? null;
+            // Changed cells render with the Solicitado-pelo-colaborador icon
+            // (matches real page: an explicit edit beats whatever origin the
+            // entry happened to have before).
+            const info = changed
+              ? { icon: IconUser, label: "Solicitado pelo colaborador" }
+              : getOriginInfo(origin);
+            return (
+              <div
+                key={`s-${f.short}`}
+                className={`px-1 py-1.5 text-center font-mono transition-colors ${
+                  changed
+                    ? "bg-green-100 dark:bg-green-950/30 font-semibold text-green-700 dark:text-green-400"
+                    : "bg-card text-muted-foreground"
+                }`}
+              >
+                <TimeCell
+                  value={cur}
+                  icon={cur ? info.icon : null}
+                  tooltipLabel={info.label}
+                  tooltipReason={changed ? r.Observacoes : null}
+                />
+              </div>
+            );
+          })}
         </div>
-        {TIME_FIELDS.map((f) => {
-          const orig = (r[f.origKey] as string | null) ?? "";
-          const cur = (r[f.key] as string | null) ?? "";
-          const changed = orig !== cur;
-          return (
-            <div
-              key={`s-${f.short}`}
-              className={`bg-card px-1 py-1.5 text-center font-mono tabular-nums ${
-                changed
-                  ? "font-semibold text-emerald-600 dark:text-emerald-400"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {cur || "—"}
-            </div>
-          );
-        })}
       </div>
     </div>
   );
@@ -949,17 +1124,14 @@ function JustificationCard({
   observacoes: string | null;
 }) {
   return (
-    <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2.5 space-y-1.5">
+    <div className="rounded-md border border-amber-700 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5 space-y-1.5">
       <div className="flex items-center gap-2">
-        <Badge
-          variant="outline"
-          className="text-[10px] py-0 px-1.5 border-amber-500/40 text-amber-500"
-        >
+        <Badge className="text-[10px] py-0 px-1.5 bg-amber-600 text-white border-amber-700">
           Justificativa de ausência
         </Badge>
       </div>
       {token ? (
-        <div className="font-mono text-sm font-semibold text-amber-700 dark:text-amber-400">
+        <div className="font-mono text-sm font-semibold text-amber-800 dark:text-amber-300">
           {token}
         </div>
       ) : (
@@ -1084,7 +1256,7 @@ function HrRequestsTableConfigComponent({
               }
             />
           </Section>
-          <Section title="Densidade e cartões" defaultOpen>
+          <Section title="Densidade e visibilidade" defaultOpen>
             <div>
               <Label className="text-xs">Densidade</Label>
               <Combobox
@@ -1101,21 +1273,6 @@ function HrRequestsTableConfigComponent({
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <ToggleRow
-                label="Listras alternadas"
-                checked={c.display.striping}
-                onCheckedChange={(v) => setDisplay("striping", v)}
-              />
-              <ToggleRow
-                label="Linhas divisórias"
-                checked={c.display.gridLines}
-                onCheckedChange={(v) => setDisplay("gridLines", v)}
-              />
-              <ToggleRow
-                label="Realce ao passar"
-                checked={c.display.hoverHighlight}
-                onCheckedChange={(v) => setDisplay("hoverHighlight", v)}
-              />
               <ToggleRow
                 label="Caixa de busca"
                 hint="Mostra um campo de busca em tempo real no cabeçalho do widget."
@@ -1134,6 +1291,9 @@ function HrRequestsTableConfigComponent({
                 onCheckedChange={(v) => set("showActionButtons", v)}
               />
             </div>
+            {/* striping / gridLines / hoverHighlight remain in the saved
+                config for backward compat but no longer drive visuals — the
+                new bordered-card list uses primary-blue selection instead. */}
           </Section>
           <Section title="Mensagem quando vazio">
             <Input

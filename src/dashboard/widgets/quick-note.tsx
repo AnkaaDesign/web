@@ -6,12 +6,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
-import {
-  IconAdjustments,
-  IconChevronDown,
-  IconNotebook,
-} from "@tabler/icons-react";
+import { IconAdjustments, IconNotebook } from "@tabler/icons-react";
 import { WidgetCard } from "../components/widget-card";
+import { Section } from "./_shared";
 import { AccentPicker, resolveAccent } from "../components/widget-accent";
 import type {
   WidgetAccentColor,
@@ -26,11 +23,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "../../components/ui/collapsible";
 import type {
   WidgetConfigProps,
   WidgetDefinition,
@@ -175,26 +167,6 @@ function Render({ instanceId, config }: WidgetRenderProps<Config>) {
         onChange={(e) => setText(e.target.value)}
       />
     </WidgetCard>
-  );
-}
-
-function Section({
-  title,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Collapsible defaultOpen={defaultOpen} className="border border-border rounded-md">
-      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
-        {title}
-        <IconChevronDown className="h-4 w-4 transition-transform" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
-    </Collapsible>
   );
 }
 

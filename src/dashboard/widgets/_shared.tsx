@@ -60,16 +60,21 @@ export function HomeDashboardWidgetBody<TSlice>({
 export function Section({
   title,
   defaultOpen = false,
+  icon,
   children,
 }: {
   title: string;
   defaultOpen?: boolean;
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <Collapsible defaultOpen={defaultOpen} className="border border-border rounded-md">
       <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
-        {title}
+        <span className="flex items-center gap-2">
+          {icon}
+          {title}
+        </span>
         <IconChevronDown className="h-4 w-4 transition-transform" />
       </CollapsibleTrigger>
       <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
@@ -134,6 +139,28 @@ export function densityClasses(d: Density): { row: string; header: string } {
     return { row: "px-3 py-3 text-sm", header: "px-3 py-2 text-[10px]" };
   }
   return { row: "px-3 py-2 text-sm", header: "px-3 py-1.5 text-[10px]" };
+}
+
+/**
+ * Card-list density → padding + text sizes. Sibling to `densityClasses` for
+ * widgets that render selectable card lists (HR requests, PPE schedules, etc.)
+ * instead of grid tables. Returns shape `{ card, primary, meta }`:
+ *   - card:    padding for the card container
+ *   - primary: text size for primary content (employee name, request title)
+ *   - meta:    text size for metadata (date, status)
+ */
+export function cardDensityClasses(d: Density): {
+  card: string;
+  primary: string;
+  meta: string;
+} {
+  if (d === "compact") {
+    return { card: "px-2.5 py-1.5", primary: "text-xs", meta: "text-[10px]" };
+  }
+  if (d === "spacious") {
+    return { card: "px-3 py-2.5", primary: "text-sm", meta: "text-xs" };
+  }
+  return { card: "px-3 py-2", primary: "text-sm", meta: "text-[11px]" };
 }
 
 export const SORT_DIRECTION_OPTIONS = [

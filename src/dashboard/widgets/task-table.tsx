@@ -34,6 +34,7 @@ import {
   IMPLEMENT_TYPE_LABELS,
   PAINT_FINISH,
   PAINT_FINISH_LABELS,
+  SECTOR_PRIVILEGES,
   SERVICE_ORDER_TYPE,
   SERVICE_ORDER_TYPE_LABELS,
   TASK_QUOTE_STATUS,
@@ -86,7 +87,15 @@ import { QuoteStatusBadge } from "../../components/production/task/quote/quote-s
 import { WidgetCard } from "../components/widget-card";
 import { ColumnPicker } from "../components/column-picker";
 import { AccentPicker, resolveAccent } from "../components/widget-accent";
-import { Section, ToggleRow, LimitInput } from "./_shared";
+import {
+  Section,
+  ToggleRow,
+  LimitInput,
+  DENSITY_OPTIONS,
+  DENSITY_VALUES,
+  REFETCH_INTERVAL_OPTIONS,
+  densityClasses,
+} from "./_shared";
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
@@ -164,24 +173,23 @@ function asArray(v: unknown): string[] {
 // without depending on its variant API.
 // ============================================================================
 
+// Status badges follow the centralized BADGE_COLORS workflow (solid bg + white
+// text). Hues match ENTITY_BADGE_CONFIG.TASK in constants/badge-colors.ts:
+//   preparation = orange, waiting = gray, in-production = blue,
+//   completed = green, cancelled = red.
 const STATUS_BADGE_CLASSES: Record<TASK_STATUS, string> = {
-  [TASK_STATUS.PREPARATION]:
-    "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
-  [TASK_STATUS.WAITING_PRODUCTION]:
-    "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30",
-  [TASK_STATUS.IN_PRODUCTION]:
-    "bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30",
-  [TASK_STATUS.COMPLETED]:
-    "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
-  [TASK_STATUS.CANCELLED]:
-    "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30",
+  [TASK_STATUS.PREPARATION]: "bg-orange-600 text-white border-orange-700",
+  [TASK_STATUS.WAITING_PRODUCTION]: "bg-neutral-500 text-white border-neutral-600",
+  [TASK_STATUS.IN_PRODUCTION]: "bg-blue-700 text-white border-blue-800",
+  [TASK_STATUS.COMPLETED]: "bg-green-700 text-white border-green-800",
+  [TASK_STATUS.CANCELLED]: "bg-red-700 text-white border-red-800",
 };
 const STATUS_DOT_CLASSES: Record<TASK_STATUS, string> = {
-  [TASK_STATUS.PREPARATION]: "bg-amber-500",
-  [TASK_STATUS.WAITING_PRODUCTION]: "bg-blue-500",
-  [TASK_STATUS.IN_PRODUCTION]: "bg-violet-500",
-  [TASK_STATUS.COMPLETED]: "bg-emerald-500",
-  [TASK_STATUS.CANCELLED]: "bg-rose-500",
+  [TASK_STATUS.PREPARATION]: "bg-orange-600",
+  [TASK_STATUS.WAITING_PRODUCTION]: "bg-neutral-500",
+  [TASK_STATUS.IN_PRODUCTION]: "bg-blue-700",
+  [TASK_STATUS.COMPLETED]: "bg-green-700",
+  [TASK_STATUS.CANCELLED]: "bg-red-700",
 };
 
 function StatusCell({
@@ -949,7 +957,6 @@ const SORT_KEYS = [
   "updatedAt",
 ] as const;
 const TRI_STATE = ["any", "yes", "no"] as const;
-const DENSITY = ["compact", "comfortable", "spacious"] as const;
 const LAYOUT_MODES = ["flat", "grouped-by-status", "tabs"] as const;
 const SO_CELL_MODES = ["count", "progress-bar"] as const;
 const PAINT_CELL_MODES = ["swatch", "swatch-name", "name"] as const;
@@ -1046,7 +1053,7 @@ export const taskTableConfigSchema = z.object({
 
   display: z
     .object({
-      density: z.enum(DENSITY).default("comfortable"),
+      density: z.enum(DENSITY_VALUES).default("comfortable"),
       striping: z.boolean().default(true),
       gridLines: z.boolean().default(true),
       hoverHighlight: z.boolean().default(true),
@@ -1366,12 +1373,6 @@ const TASK_INCLUDE = {
   artworks: true,
   responsibles: true,
 } as const;
-
-function densityClasses(d: TaskTableConfig["display"]["density"]) {
-  if (d === "compact") return { row: "px-2 py-1 text-xs", header: "px-2 py-1 text-[10px]" };
-  if (d === "spacious") return { row: "px-3 py-3 text-sm", header: "px-3 py-2 text-[10px]" };
-  return { row: "px-3 py-2 text-sm", header: "px-3 py-1.5 text-[10px]" };
-}
 
 function statusGroupClass(status: TASK_STATUS): string {
   return STATUS_BADGE_CLASSES[status] ?? "";
@@ -1878,11 +1879,6 @@ const SO_TYPE_LABELS_LOCAL: Record<SERVICE_ORDER_TYPE, string> = {
   [SERVICE_ORDER_TYPE.LOGISTIC]: SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.LOGISTIC] ?? "Logística",
   [SERVICE_ORDER_TYPE.ARTWORK]: SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.ARTWORK] ?? "Arte",
 };
-const DENSITY_LABELS: Record<(typeof DENSITY)[number], string> = {
-  compact: "Compacto",
-  comfortable: "Confortável",
-  spacious: "Espaçoso",
-};
 const LAYOUT_LABELS: Record<(typeof LAYOUT_MODES)[number], string> = {
   flat: "Lista única",
   "grouped-by-status": "Agrupado por status",
@@ -1902,14 +1898,6 @@ const STATUS_CELL_LABELS: Record<(typeof STATUS_CELL_MODES)[number], string> = {
   "dot-label": "Bolinha + texto",
   text: "Apenas texto",
 };
-const REFETCH_OPTIONS: Array<{ value: number; label: string }> = [
-  { value: 0, label: "Desligado" },
-  { value: 30_000, label: "A cada 30 s" },
-  { value: 60_000, label: "A cada 1 min" },
-  { value: 5 * 60_000, label: "A cada 5 min" },
-  { value: 15 * 60_000, label: "A cada 15 min" },
-];
-
 const COLOR_TOKEN_OPTIONS = DEADLINE_COLOR_TOKENS.map((t) => ({
   value: t,
   label: DEADLINE_COLOR_LABELS[t],
@@ -2246,10 +2234,10 @@ function TaskTableConfigComponent({
                 onValueChange={(v) =>
                   setDisplay(
                     "density",
-                    (typeof v === "string" ? v : "comfortable") as (typeof DENSITY)[number],
+                    (typeof v === "string" ? v : "comfortable") as (typeof DENSITY_VALUES)[number],
                   )
                 }
-                options={DENSITY.map((d) => ({ value: d, label: DENSITY_LABELS[d] }))}
+                options={DENSITY_OPTIONS}
                 clearable={false}
               />
             </div>
@@ -2984,10 +2972,7 @@ function TaskTableConfigComponent({
                   const n = Number(typeof v === "string" ? v : 0);
                   setBehavior("refetchIntervalMs", Number.isFinite(n) ? n : 0);
                 }}
-                options={REFETCH_OPTIONS.map((o) => ({
-                  value: String(o.value),
-                  label: o.label,
-                }))}
+                options={REFETCH_INTERVAL_OPTIONS}
                 clearable={false}
               />
               <p className="text-[11px] text-muted-foreground mt-1">
@@ -3046,7 +3031,21 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
     "Tabela de tarefas com paridade visual à página de preparação: OSs ricas, pintura em canvas, contagem regressiva, cores de prazo configuráveis, multi-ordenação, presets e modo abas/agrupado.",
   icon: IconClipboardText,
   category: "production",
-  allowedSectors: "*",
+  // Mirror /producao/cronograma — every sector that has a "Cronograma" entry
+  // in their navigation tree (DESIGNER, LOGISTIC, PRODUCTION_MANAGER,
+  // COMMERCIAL, PLOTTING) plus the parent /producao users (PRODUCTION,
+  // HUMAN_RESOURCES, WAREHOUSE, ADMIN).
+  allowedSectors: [
+    SECTOR_PRIVILEGES.PRODUCTION,
+    SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    SECTOR_PRIVILEGES.DESIGNER,
+    SECTOR_PRIVILEGES.PLOTTING,
+    SECTOR_PRIVILEGES.LOGISTIC,
+    SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.HUMAN_RESOURCES,
+    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.ADMIN,
+  ],
   defaultSize: { cols: 2, rows: 2 },
   minSize: { cols: 1, rows: 1 },
   maxSize: { cols: 4, rows: 4 },

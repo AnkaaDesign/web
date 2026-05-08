@@ -86,6 +86,17 @@ export function WidgetTile({
   const ConfigComponent = def.ConfigComponent;
   const hasConfigUi = !!ConfigComponent || !isEmptyConfigSchema(def.configSchema);
 
+  // Run the saved config through the widget's Zod schema so any newly-added
+  // fields with defaults are backfilled on layouts saved before the field
+  // existed. Falls back to `defaultConfig` if the saved config is unparseable
+  // (corruption / a renamed field with no migration). Without this, adding a
+  // new sub-object like `display: { density, ... }` would crash render for
+  // every existing instance until the user opens-and-saves the widget.
+  const parsedConfig = useMemo(() => {
+    const result = def.configSchema.safeParse(instance.config);
+    return result.success ? result.data : def.defaultConfig;
+  }, [def.configSchema, def.defaultConfig, instance.config]);
+
   return (
     <div
       ref={setNodeRef}
@@ -140,7 +151,7 @@ export function WidgetTile({
         >
           <Render
             instanceId={instance.instanceId}
-            config={instance.config}
+            config={parsedConfig}
             size={instance.size}
             isEditing={isEditing}
           />

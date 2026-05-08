@@ -1289,10 +1289,6 @@ export const ALERT_TYPE_LABELS: Record<ALERT_TYPE, string> = {
   [ALERT_TYPE.HIGH_DEMAND]: "Alta Demanda",
   [ALERT_TYPE.USER_VIOLATION]: "Violação do Usuário",
 
-  // Vacation Alerts
-  [ALERT_TYPE.EXPIRING_DAYS]: "Dias Expirando",
-  [ALERT_TYPE.PLANNING_CONFLICT]: "Conflito de Planejamento",
-
   // Warning Alerts
   [ALERT_TYPE.REPEAT_OFFENDER]: "Reincidente",
   [ALERT_TYPE.ESCALATION_NEEDED]: "Escalonamento Necessário",

@@ -51,6 +51,7 @@ import {
   INSTALLMENT_STATUS,
   BANK_SLIP_STATUS,
   TASK_QUOTE_STATUS,
+  SECTOR_PRIVILEGES,
 } from "../../constants/enums";
 import {
   INSTALLMENT_STATUS_LABELS,
@@ -80,6 +81,11 @@ import {
   ToggleRow,
   LimitInput,
   SORT_DIRECTION_OPTIONS,
+  REFETCH_INTERVAL_OPTIONS,
+  DENSITY_OPTIONS,
+  DENSITY_VALUES,
+  densityClasses,
+  type Density,
 } from "./_shared";
 import type {
   WidgetAccentColor,
@@ -95,14 +101,6 @@ import type {
 // ============================================================================
 // Constants
 // ============================================================================
-
-const DENSITY = ["compact", "comfortable", "spacious"] as const;
-type Density = (typeof DENSITY)[number];
-const DENSITY_LABELS: Record<Density, string> = {
-  compact: "Compacto",
-  comfortable: "Confortável",
-  spacious: "Espaçoso",
-};
 
 /**
  * Quick bucket the user picks from a chip row. Each maps to a (clientside)
@@ -189,13 +187,6 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   quoteStatus: "Status do orçamento",
 };
 
-const REFETCH_OPTIONS: Array<{ value: number; label: string }> = [
-  { value: 0, label: "Desligado" },
-  { value: 60_000, label: "A cada 1 min" },
-  { value: 5 * 60_000, label: "A cada 5 min" },
-  { value: 15 * 60_000, label: "A cada 15 min" },
-];
-
 // Quote statuses that may have installments worth tracking. We exclude
 // PENDING/BUDGET_APPROVED/COMMERCIAL_APPROVED because those quotes haven't
 // been turned into bills yet.
@@ -221,7 +212,7 @@ export const installmentTableConfigSchema = z.object({
 
   display: z
     .object({
-      density: z.enum(DENSITY).default("comfortable"),
+      density: z.enum(DENSITY_VALUES).default("comfortable"),
       striping: z.boolean().default(true),
       gridLines: z.boolean().default(true),
       hoverHighlight: z.boolean().default(true),
@@ -602,16 +593,6 @@ function BucketChip({
       </span>
     </button>
   );
-}
-
-// ============================================================================
-// Density classes
-// ============================================================================
-
-function densityClasses(d: Density) {
-  if (d === "compact") return { row: "px-2 py-1 text-xs", header: "px-2 py-1 text-[10px]" };
-  if (d === "spacious") return { row: "px-3 py-3 text-sm", header: "px-3 py-2 text-[10px]" };
-  return { row: "px-3 py-2 text-sm", header: "px-3 py-1.5 text-[10px]" };
 }
 
 // ============================================================================
@@ -1279,7 +1260,7 @@ function ConfigComp({
                     (typeof v === "string" ? v : "comfortable") as Density,
                   )
                 }
-                options={DENSITY.map((d) => ({ value: d, label: DENSITY_LABELS[d] }))}
+                options={DENSITY_OPTIONS}
                 clearable={false}
               />
             </div>
@@ -1505,10 +1486,7 @@ function ConfigComp({
                   const n = typeof v === "string" ? Number(v) : 0;
                   set("refetchInterval", Number.isFinite(n) ? n : 0);
                 }}
-                options={REFETCH_OPTIONS.map((o) => ({
-                  value: String(o.value),
-                  label: o.label,
-                }))}
+                options={REFETCH_INTERVAL_OPTIONS}
                 clearable={false}
               />
             </div>
@@ -1530,7 +1508,13 @@ export const installmentTableWidget: WidgetDefinition<InstallmentTableConfig> = 
     "Acompanhamento de boletos e parcelas. Filtros por vencimento (hoje, 7 dias, 30 dias), status, cliente. Suporta agrupamento, busca, densidade e colunas configuráveis.",
   icon: IconReceipt,
   category: "financial",
-  allowedSectors: "*",
+  // Mirror /financeiro/orcamento page privileges. Financial data — production
+  // managers do not get visibility here.
+  allowedSectors: [
+    SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.FINANCIAL,
+  ],
   defaultSize: { cols: 4, rows: 2 },
   minSize: { cols: 2, rows: 1 },
   maxSize: { cols: 4, rows: 4 },

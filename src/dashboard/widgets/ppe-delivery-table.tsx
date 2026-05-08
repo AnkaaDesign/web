@@ -124,15 +124,18 @@ function asArray(v: unknown): string[] {
 // Status badge
 // ============================================================
 
+// Solid BADGE_COLORS palette (centralized in src/constants/badge-colors.ts):
+//   pending → amber, approved → blue, delivered → cyan,
+//   waiting-signature → orange, completed → green, reproved/rejected → red.
 const STATUS_BADGE_TONES: Record<string, string> = {
-  PENDING: "border-amber-500/40 text-amber-500",
-  APPROVED: "border-blue-500/40 text-blue-500",
-  DELIVERED: "border-cyan-500/40 text-cyan-500",
-  WAITING_SIGNATURE: "border-orange-500/40 text-orange-500",
-  COMPLETED: "border-emerald-500/40 text-emerald-500",
-  REPROVED: "border-rose-500/40 text-rose-500",
-  SIGNATURE_REJECTED: "border-rose-500/40 text-rose-500",
-  CANCELLED: "border-zinc-500/40 text-zinc-500",
+  PENDING: "bg-amber-600 text-white border-amber-700",
+  APPROVED: "bg-blue-700 text-white border-blue-800",
+  DELIVERED: "bg-cyan-600 text-white border-cyan-700",
+  WAITING_SIGNATURE: "bg-orange-600 text-white border-orange-700",
+  COMPLETED: "bg-green-700 text-white border-green-800",
+  REPROVED: "bg-red-700 text-white border-red-800",
+  SIGNATURE_REJECTED: "bg-red-700 text-white border-red-800",
+  CANCELLED: "bg-neutral-500 text-white border-neutral-600",
 };
 
 function StatusBadge({ status }: { status: PPE_DELIVERY_STATUS }) {
@@ -613,7 +616,7 @@ function PpeDeliveryTableRender({
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 w-7 p-0 border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                className="h-7 w-7 p-0 bg-green-700 hover:bg-green-800 text-white border-green-800"
                                 disabled={
                                   approveMutation.isPending ||
                                   rejectMutation.isPending
@@ -633,7 +636,7 @@ function PpeDeliveryTableRender({
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 w-7 p-0 border-rose-500/40 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                                className="h-7 w-7 p-0 bg-red-700 hover:bg-red-800 text-white border-red-800"
                                 disabled={
                                   approveMutation.isPending ||
                                   rejectMutation.isPending
@@ -1079,12 +1082,16 @@ export const ppeDeliveryTableWidget: WidgetDefinition<PpeDeliveryTableConfig> = 
   id: "table.ppe-deliveries",
   name: "Entregas de EPI",
   description:
-    "Aprove ou reprove entregas de EPI direto do dashboard. Filtros por status, EPI, colaborador. Apenas RH e Admin podem agir; outros sectores veem em modo somente leitura.",
+    "Aprove, reprove ou registre a entrega de EPIs direto do dashboard. RH e Admin aprovam/reprovam solicitações; o estoque registra a entrega física.",
   icon: IconShieldCheck,
   category: "hr",
+  // PPE is a shared concern: HR/Admin approve the request, Warehouse records
+  // the physical delivery. Each sector still sees only the actions it can take
+  // (action-button visibility is gated inline at render time).
   allowedSectors: [
     SECTOR_PRIVILEGES.HUMAN_RESOURCES,
     SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.WAREHOUSE,
   ],
   defaultSize: { cols: 4, rows: 2 },
   minSize: { cols: 2, rows: 1 },

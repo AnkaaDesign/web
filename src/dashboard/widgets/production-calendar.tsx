@@ -17,7 +17,6 @@ import { ptBR } from "date-fns/locale";
 import {
   IconCalendarStats,
   IconAdjustments,
-  IconChevronDown,
   IconFlag,
   IconCalendarDue,
   IconBolt,
@@ -43,11 +42,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "../../components/ui/collapsible";
 import { cn } from "../../lib/utils";
 
 import { WidgetCard } from "../components/widget-card";
@@ -66,7 +60,7 @@ import type {
   WidgetDefinition,
   WidgetRenderProps,
 } from "../types";
-import { ToggleRow } from "./_shared";
+import { Section, ToggleRow } from "./_shared";
 import {
   CalendarGrid,
   PeriodHeader,
@@ -90,27 +84,26 @@ const EVENT_LABELS: Record<EventType, string> = {
   finishedAt: "Concluída",
 };
 
+// Each event type owns a unique hue so the legend reads at a glance:
+//   purple = prazo (deadline marker), orange = previsão (forecast),
+//   blue   = iniciada, green = concluída, red = vencido (escalated overdue —
+//   distinct from purple/term so a past-due deadline doesn't visually collide
+//   with the deadline itself, which is what the user pointed out previously).
 const EVENT_BAR_CLASSES: Record<EventType, string> = {
-  term:
-    "bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/30",
-  forecastDate:
-    "bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30",
-  startedAt:
-    "bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30",
-  finishedAt:
-    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30",
+  term: "bg-purple-600 text-white border border-purple-700",
+  forecastDate: "bg-orange-600 text-white border border-orange-700",
+  startedAt: "bg-blue-600 text-white border border-blue-700",
+  finishedAt: "bg-green-700 text-white border border-green-800",
 };
 
-// Stronger styling for term bars on tasks already past the deadline (and not
-// yet completed) — we want overdue work to read as escalated, not informational.
 const EVENT_BAR_OVERDUE =
-  "bg-red-600/30 text-red-800 dark:text-red-200 border border-red-600/50 font-semibold";
+  "bg-red-700 text-white border border-red-800 font-semibold";
 
 const EVENT_DOT_CLASSES: Record<EventType, string> = {
-  term: "bg-red-500",
-  forecastDate: "bg-orange-500",
-  startedAt: "bg-blue-500",
-  finishedAt: "bg-emerald-500",
+  term: "bg-purple-600",
+  forecastDate: "bg-orange-600",
+  startedAt: "bg-blue-600",
+  finishedAt: "bg-green-700",
 };
 
 const EVENT_ICONS: Record<EventType, React.ComponentType<{ className?: string }>> = {
@@ -522,10 +515,10 @@ function SummaryChip({
 }) {
   const Icon = EVENT_ICONS[type];
   const colorText = {
-    term: "text-red-700 dark:text-red-300",
-    forecastDate: "text-orange-700 dark:text-orange-300",
-    startedAt: "text-blue-700 dark:text-blue-300",
-    finishedAt: "text-emerald-700 dark:text-emerald-300",
+    term: "text-purple-600 dark:text-purple-300",
+    forecastDate: "text-orange-600 dark:text-orange-300",
+    startedAt: "text-blue-600 dark:text-blue-300",
+    finishedAt: "text-green-700 dark:text-green-300",
   }[type];
   return (
     <span className="inline-flex items-center gap-1">
@@ -539,26 +532,6 @@ function SummaryChip({
 // ============================================================
 // Config component
 // ============================================================
-
-function Section({
-  title,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Collapsible defaultOpen={defaultOpen} className="border border-border rounded-md">
-      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
-        {title}
-        <IconChevronDown className="h-4 w-4 transition-transform" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-3 pt-1 space-y-3">{children}</CollapsibleContent>
-    </Collapsible>
-  );
-}
 
 function ProductionCalendarConfigComponent({
   config,
@@ -597,22 +570,39 @@ function ProductionCalendarConfigComponent({
         />
       </div>
 
-      <Tabs defaultValue="display" className="flex flex-col gap-2">
+      <Tabs defaultValue="appearance" className="flex flex-col gap-2">
         <TabsList className="self-start">
+          <TabsTrigger value="appearance" className="gap-1">
+            <IconAdjustments className="h-3.5 w-3.5" /> Aparência
+          </TabsTrigger>
           <TabsTrigger value="display" className="gap-1">
-            <IconAdjustments className="h-3.5 w-3.5" /> Exibição
+            <IconCalendarStats className="h-3.5 w-3.5" /> Exibição
           </TabsTrigger>
           <TabsTrigger value="filters" className="gap-1">
-            <IconCalendarStats className="h-3.5 w-3.5" /> Filtros
+            <IconFlag className="h-3.5 w-3.5" /> Filtros
           </TabsTrigger>
-          <TabsTrigger value="appearance">Aparência</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="appearance" className="space-y-3 mt-0">
+          <Section title="Acento (cor, ícone, borda)" defaultOpen>
+            <AccentPicker
+              value={{ color: accentColor, icon: accentIcon, borderColor }}
+              onChange={(next) =>
+                set("accent", {
+                  color: next.color,
+                  icon: next.icon,
+                  borderColor: next.borderColor,
+                } as ProductionCalendarConfig["accent"])
+              }
+            />
+          </Section>
+        </TabsContent>
 
         <TabsContent value="display" className="space-y-3 mt-0">
           <Section title="Tipos de evento" defaultOpen>
             <ToggleRow
               label="Prazo (term)"
-              hint="Bara vermelha; vermelho mais forte quando vencido."
+              hint="Barra roxa; vermelho mais forte quando vencido."
               checked={config.display.showTerm}
               onCheckedChange={(v) => setDisplay("showTerm", v)}
             />
@@ -683,20 +673,6 @@ function ProductionCalendarConfigComponent({
           </Section>
         </TabsContent>
 
-        <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{ color: accentColor, icon: accentIcon, borderColor }}
-              onChange={(next) =>
-                set("accent", {
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                } as ProductionCalendarConfig["accent"])
-              }
-            />
-          </Section>
-        </TabsContent>
       </Tabs>
     </div>
   );

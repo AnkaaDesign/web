@@ -100,24 +100,28 @@ const EVENT_LABELS: Record<EventType, string> = {
   finishedAt: "Concluída",
 };
 
+// Each event type owns a unique hue so the legend reads at a glance:
+//   purple = prazo (deadline date marker)
+//   orange = previsão (forecast / projected delivery)
+//   blue   = iniciada (in-progress signal)
+//   green  = concluída (success)
+//   red    = vencido (escalated overdue — kept distinct from purple/term so a
+//            past-due deadline doesn't visually collide with the deadline itself)
 const EVENT_BAR_CLASSES: Record<EventType, string> = {
-  term: "bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/30",
-  forecastDate:
-    "bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30",
-  startedAt:
-    "bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30",
-  finishedAt:
-    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30",
+  term: "bg-purple-600 text-white border border-purple-700",
+  forecastDate: "bg-orange-600 text-white border border-orange-700",
+  startedAt: "bg-blue-600 text-white border border-blue-700",
+  finishedAt: "bg-green-700 text-white border border-green-800",
 };
 
 const EVENT_BAR_OVERDUE =
-  "bg-red-600/30 text-red-800 dark:text-red-200 border border-red-600/50 font-semibold";
+  "bg-red-700 text-white border border-red-800 font-semibold";
 
 const EVENT_DOT_CLASSES: Record<EventType, string> = {
-  term: "bg-red-500",
-  forecastDate: "bg-orange-500",
-  startedAt: "bg-blue-500",
-  finishedAt: "bg-emerald-500",
+  term: "bg-purple-600",
+  forecastDate: "bg-orange-600",
+  startedAt: "bg-blue-600",
+  finishedAt: "bg-green-700",
 };
 
 const EVENT_ICONS: Record<EventType, React.ComponentType<{ className?: string }>> = {
@@ -569,7 +573,7 @@ function StatsRow({
         label="Prazos"
         value={stats.term}
         suffix={stats.term === 1 ? "tarefa" : "tarefas"}
-        tone="red"
+        tone="purple"
         active={showTerm}
         onClick={onToggleTerm}
       />
@@ -596,7 +600,7 @@ function StatsRow({
         label="Concluídas"
         value={stats.finished}
         suffix={stats.finished === 1 ? "tarefa" : "tarefas"}
-        tone="emerald"
+        tone="green"
         active={showFinished}
         onClick={onToggleFinished}
       />
@@ -605,7 +609,7 @@ function StatsRow({
         label="Vencidos"
         value={stats.overdue}
         suffix={stats.overdue === 1 ? "prazo" : "prazos"}
-        tone="rose"
+        tone="red"
       />
     </div>
   );
@@ -624,16 +628,19 @@ function StatTile({
   label: string;
   value: number;
   suffix?: string;
-  tone: "red" | "orange" | "blue" | "emerald" | "rose";
+  tone: "purple" | "orange" | "blue" | "green" | "red";
   active?: boolean;
   onClick?: () => void;
 }) {
+  // Tile hue mirrors the bar palette so the legend reads as the same story:
+  //   purple = term, orange = forecast, blue = started, green = finished,
+  //   red    = overdue (escalated tile — slightly stronger ring to draw the eye).
   const toneClasses: Record<typeof tone, string> = {
-    red: "bg-red-500/10 text-red-600 dark:text-red-400 ring-red-500/20",
+    purple: "bg-purple-500/10 text-purple-600 dark:text-purple-400 ring-purple-500/20",
     orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/20",
     blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20",
-    emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
-    rose: "bg-rose-600/15 text-rose-700 dark:text-rose-300 ring-rose-600/40",
+    green: "bg-green-500/10 text-green-600 dark:text-green-400 ring-green-500/20",
+    red: "bg-red-500/15 text-red-700 dark:text-red-300 ring-red-500/40",
   };
   const isToggleable = typeof onClick === "function";
   const inactiveClasses = isToggleable && active === false ? "opacity-40 grayscale" : "";
@@ -711,7 +718,7 @@ function DayEventList({
           <div
             key={`${ev.type}-${ev.task.id}-${i}`}
             className={cn(
-              "text-[10px] px-1.5 py-0.5 rounded-sm truncate font-medium flex-shrink-0",
+              "text-[11px] px-1.5 py-0.5 rounded-sm truncate font-medium flex-shrink-0",
               cls,
             )}
           >
@@ -1061,7 +1068,7 @@ function MiniMonth({
           ) : (
             <>
               {summaryTerm > 0 && (
-                <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-300">
+                <span className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-300">
                   <IconFlag className="h-3.5 w-3.5" strokeWidth={2.5} />
                   {summaryTerm}
                 </span>
@@ -1079,7 +1086,7 @@ function MiniMonth({
                 </span>
               )}
               {summaryFinished > 0 && (
-                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-300">
+                <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-300">
                   <IconCircleCheck className="h-3.5 w-3.5" strokeWidth={2.5} />
                   {summaryFinished}
                 </span>
@@ -1157,7 +1164,7 @@ function MiniMonth({
                         <IconFlag className="h-3.5 w-3.5 text-red-700 dark:text-red-300" strokeWidth={2.5} />
                       ) : (
                         presentTypes.has("term") && (
-                          <IconFlag className="h-3.5 w-3.5 text-red-600 dark:text-red-400" strokeWidth={2.5} />
+                          <IconFlag className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" strokeWidth={2.5} />
                         )
                       )}
                       {presentTypes.has("forecastDate") && (
@@ -1167,7 +1174,7 @@ function MiniMonth({
                         <IconBolt className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" strokeWidth={2.5} />
                       )}
                       {presentTypes.has("finishedAt") && (
-                        <IconCircleCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" strokeWidth={2.5} />
+                        <IconCircleCheck className="h-3.5 w-3.5 text-green-600 dark:text-green-400" strokeWidth={2.5} />
                       )}
                     </div>
                   )}

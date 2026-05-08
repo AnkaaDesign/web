@@ -321,8 +321,12 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
   const corporateName = task.customer?.corporateName || task.customer?.fantasyName || "Cliente";
   // Find the first customer config to read per-config fields
   const firstConfig = task.quote?.customerConfigs?.[0];
-  // Prefer the explicitly selected budget responsible; default to the first task responsible
+  // Prefer the explicitly selected budget responsible; then OWNER-role task responsible; then the first
+  const ownerResponsible = (task.responsibles as Array<{ name?: string; role?: string }> | undefined)?.find(
+    (r) => r?.role === "OWNER",
+  );
   const contactName = firstConfig?.responsible?.name
+    || ownerResponsible?.name
     || task.responsibles?.[0]?.name
     || "";
 

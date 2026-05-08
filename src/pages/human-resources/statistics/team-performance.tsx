@@ -30,7 +30,6 @@ import {
   IconUsers,
   IconStar,
   IconAlertTriangle,
-  IconBeach,
   IconChartArea,
   IconStack2,
   IconBuilding,
@@ -459,7 +458,7 @@ const TeamPerformancePage = () => {
     }
 
     try {
-      const headers = ['Período', 'Efetivo', 'Admissões', 'Demissões', 'Turnover %', 'Advertências', 'Férias'];
+      const headers = ['Período', 'Efetivo', 'Admissões', 'Demissões', 'Turnover %', 'Advertências'];
       const rows = items.map((item) => [
         item.label,
         item.headcount.toString(),
@@ -467,7 +466,6 @@ const TeamPerformancePage = () => {
         item.dismissals.toString(),
         item.turnoverRate.toFixed(1),
         item.totalWarnings.toString(),
-        item.vacationCount.toString(),
       ]);
 
       const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
@@ -684,21 +682,6 @@ const TeamPerformancePage = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Em Férias</CardTitle>
-              <IconBeach className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-7 w-[60px]" />
-              ) : (
-                <div className="text-2xl font-bold">
-                  {summary ? formatNumber(summary.onVacationCount) : '0'}
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
 
         {/* Chart */}
@@ -828,7 +811,6 @@ const TeamPerformancePage = () => {
                       <TableHead className="text-right">Demissões</TableHead>
                       <TableHead className="text-right">Turnover</TableHead>
                       <TableHead className="text-right">Advertências</TableHead>
-                      <TableHead className="text-right">Férias</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -840,7 +822,6 @@ const TeamPerformancePage = () => {
                         <TableCell className="text-right">{formatNumber(item.dismissals)}</TableCell>
                         <TableCell className="text-right">{formatPercentage(item.turnoverRate)}</TableCell>
                         <TableCell className="text-right">{formatNumber(item.totalWarnings)}</TableCell>
-                        <TableCell className="text-right">{formatNumber(item.vacationCount)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

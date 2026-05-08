@@ -30,21 +30,20 @@ import {
 // Category-level color tokens. The cell bars and the summary stat tiles share
 // these so the visual story is consistent. Hues are spaced around the wheel
 // so the four categories never bleed together visually:
-//   violet = ausência (planejada)
-//   amber  = falta justificada (atestado, esquecimento, óbito, etc.) — soft warning
+//   purple = ausência (planejada)
+//   amber  = falta justificada (atestado, esquecimento, óbito, etc.) — warning
 //   red    = falta não justificada (Cálculos de Ponto, Id < 0) — escalated, alarming
-//   sky    = feriado (cool, off the warm spectrum entirely)
+//   cyan   = feriado (cool, off the warm spectrum entirely)
+// Bars use solid backgrounds + white text so they read as proper status badges
+// (matching the centralized BADGE_COLORS workflow), not faded pastel chips.
 const CATEGORY_BAR_CLASSES = {
-  AUSENCIA:
-    "bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-500/20",
-  FALTA_JUSTIFIED:
-    "bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30",
+  AUSENCIA: "bg-purple-600 text-white border border-purple-700",
+  FALTA_JUSTIFIED: "bg-amber-600 text-white border border-amber-700",
   FALTA_UNJUSTIFIED:
-    "bg-red-600/25 text-red-800 dark:text-red-200 border border-red-600/50 font-semibold",
+    "bg-red-700 text-white border border-red-800 font-semibold",
 } as const;
 type BarCategory = keyof typeof CATEGORY_BAR_CLASSES;
-const HOLIDAY_BAR_CLASS =
-  "bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/20";
+const HOLIDAY_BAR_CLASS = "bg-cyan-600 text-white border border-cyan-700";
 import type { SecullumAggregatedAbsence } from "../../../../types";
 import {
   useSecullumAggregatedAbsences,
@@ -549,7 +548,7 @@ function StatsRow({
         label="Ausências"
         value={stats.vacationDays}
         suffix={`dias · ${colabSuffix(stats.usersOnVacation)}`}
-        tone="violet"
+        tone="purple"
         active={showVacation}
         onClick={onToggleVacation}
       />
@@ -576,7 +575,7 @@ function StatsRow({
         label="Feriados úteis"
         value={stats.holidayDays}
         suffix={stats.holidayDays === 1 ? "dia" : "dias"}
-        tone="sky"
+        tone="cyan"
         active={showHoliday}
         onClick={onToggleHoliday}
       />
@@ -597,16 +596,20 @@ function StatTile({
   label: string;
   value: number;
   suffix?: string;
-  tone: "emerald" | "violet" | "red" | "amber" | "sky";
+  tone: "emerald" | "purple" | "red" | "amber" | "cyan";
   active?: boolean;
   onClick?: () => void;
 }) {
+  // Tile hue mirrors the bar palette so the legend reads as the same story:
+  //   purple = ausência, amber = falta justificada, red = falta n.j., cyan = feriado.
+  // Tiles use a soft tint (vs the bars' solid bg) so the dashboard's stat
+  // header doesn't compete visually with the calendar grid below it.
   const toneClasses: Record<typeof tone, string> = {
     emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
-    violet: "bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-violet-500/20",
-    amber: "bg-amber-500/15 text-amber-700 dark:text-amber-400 ring-amber-500/30",
-    red: "bg-red-600/15 text-red-700 dark:text-red-300 ring-red-600/40",
-    sky: "bg-sky-500/10 text-sky-600 dark:text-sky-400 ring-sky-500/20",
+    purple: "bg-purple-500/10 text-purple-600 dark:text-purple-400 ring-purple-500/20",
+    amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
+    red: "bg-red-500/15 text-red-700 dark:text-red-300 ring-red-500/40",
+    cyan: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 ring-cyan-500/20",
   };
   const isToggleable = typeof onClick === "function";
   // When the tile is toggleable and inactive, mute it heavily so the user
@@ -939,10 +942,10 @@ function CategoryBadge({
   label: string;
 }) {
   const tone = {
-    AUSENCIA: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-    FALTA_JUSTIFIED: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-    FALTA_UNJUSTIFIED: "bg-red-600/25 text-red-800 dark:text-red-200",
-    HOLIDAY: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+    AUSENCIA: "bg-purple-600 text-white",
+    FALTA_JUSTIFIED: "bg-amber-600 text-white",
+    FALTA_UNJUSTIFIED: "bg-red-700 text-white",
+    HOLIDAY: "bg-cyan-600 text-white",
   }[category];
   const Icon =
     category === "AUSENCIA"
@@ -1160,7 +1163,7 @@ function MiniMonth({
           ) : (
             <>
               {vacationDays > 0 && (
-                <span className="inline-flex items-center gap-1 text-violet-600 dark:text-violet-400">
+                <span className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-400">
                   <IconBeach className="h-3.5 w-3.5" strokeWidth={2.5} />
                   {vacationDays}
                 </span>
@@ -1178,7 +1181,7 @@ function MiniMonth({
                 </span>
               )}
               {holidayDays > 0 && (
-                <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400">
+                <span className="inline-flex items-center gap-1 text-cyan-600 dark:text-cyan-400">
                   <IconConfetti className="h-3.5 w-3.5" strokeWidth={2.5} />
                   {holidayDays}
                 </span>
@@ -1275,13 +1278,13 @@ function MiniMonth({
                     <div className="absolute top-0.5 right-0.5 flex items-center gap-0.5">
                       {showHoliday && (
                         <IconConfetti
-                          className="h-4 w-4 text-sky-600 dark:text-sky-400"
+                          className="h-4 w-4 text-cyan-600 dark:text-cyan-400"
                           strokeWidth={2.5}
                         />
                       )}
                       {showAusencia && (
                         <IconBeach
-                          className="h-4 w-4 text-violet-600 dark:text-violet-400"
+                          className="h-4 w-4 text-purple-600 dark:text-purple-400"
                           strokeWidth={2.5}
                         />
                       )}
@@ -1543,10 +1546,10 @@ function DayTooltip({
             {collectives.map((b) => {
               const dotColor =
                 b.category === "AUSENCIA"
-                  ? "bg-violet-500"
+                  ? "bg-purple-600"
                   : b.category === "FALTA_JUSTIFIED"
-                    ? "bg-amber-500"
-                    : "bg-red-600";
+                    ? "bg-amber-600"
+                    : "bg-red-700";
               const label = getCollectiveLabel(b);
               return (
                 <div key={b.key} className="space-y-0.5">
@@ -1577,11 +1580,11 @@ function DayTooltip({
                   const meta = getJustificativaMeta(a.JustificativaId);
                   const dotColor =
                     barCat === "AUSENCIA"
-                      ? "bg-violet-500"
+                      ? "bg-purple-600"
                       : barCat === "FALTA_JUSTIFIED"
-                        ? "bg-amber-500"
+                        ? "bg-amber-600"
                         : barCat === "FALTA_UNJUSTIFIED"
-                          ? "bg-red-600"
+                          ? "bg-red-700"
                           : "bg-muted-foreground";
                   return (
                     <li key={a.Id} className="text-xs flex items-center gap-2 whitespace-nowrap">

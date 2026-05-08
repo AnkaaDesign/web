@@ -127,7 +127,6 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
                 reprimand: z.boolean().optional(),
                 airbrushingReceipts: z.boolean().optional(),
                 airbrushingInvoices: z.boolean().optional(),
-                vacation: z.boolean().optional(),
                 externalWithdrawalBudget: z.boolean().optional(),
                 externalWithdrawalNfe: z.boolean().optional(),
                 externalWithdrawalReceipt: z.boolean().optional(),

@@ -118,7 +118,11 @@ const EditCollaboratorPage = () => {
   // Map user data to form default values
   // Memoize to prevent unnecessary re-renders
   // MUST be called before any conditional returns to maintain consistent hook order
-  const defaultValues = useMemo<Partial<UserUpdateFormData>>(() => {
+  const defaultValues = useMemo<Partial<UserUpdateFormData> & {
+    // Not part of UserUpdateFormData (read-only at the API). Carried so the
+    // SecullumSyncSwitch can show "Vinculado ao funcionário Secullum #N".
+    secullumEmployeeId?: number | null;
+  }>(() => {
     if (!user) {
       return {};
     }
@@ -179,6 +183,18 @@ const EditCollaboratorPage = () => {
         gloves: null,
         rainBoots: null,
       },
+
+      // Secullum sync fields. The User type doesn't yet declare these but
+      // Prisma includes them on the wire — cast and pull through so the
+      // SecullumSyncSwitch / HorarioSelector reflect the persisted state.
+      // Without these, opening an already-synced user in the form shows the
+      // toggle as OFF and would silently disable sync on save.
+      secullumSyncEnabled:
+        (user as unknown as { secullumSyncEnabled?: boolean }).secullumSyncEnabled ?? false,
+      secullumHorarioId:
+        (user as unknown as { secullumHorarioId?: number | null }).secullumHorarioId ?? null,
+      secullumEmployeeId:
+        (user as unknown as { secullumEmployeeId?: number | null }).secullumEmployeeId ?? null,
     };
 
     return values;

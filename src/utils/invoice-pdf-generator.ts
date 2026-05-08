@@ -46,19 +46,17 @@ export function exportInvoicePdf(options: ServiceReportPdfOptions): void {
   ].filter(Boolean).join(" | ");
 
   // ── Page 1: Services Summary ──
+  // Discount lives on customerConfig (post per-customer discount migration). Services no longer
+  // carry their own discount fields, so render each service at its raw amount and surface the
+  // global discount in the totals block below.
   const servicesHtml = services.map((s: any, i: number) => {
     const desc = toTitleCase(s.description || "");
     const obs = s.observation ? ` - ${s.observation}` : "";
     const amount = Number(s.amount) || 0;
-    const discount = computeDiscount(s);
-    const net = amount - discount;
 
     return `<div class="service-item">
       <span class="service-desc">${i + 1} - ${escapeHtml(desc)}${obs ? escapeHtml(obs) : ""}</span>
-      <span class="service-value">${discount > 0
-        ? `<span style="text-decoration:line-through;color:${textGray};font-size:8pt">${formatCurrency(amount)}</span> ${formatCurrency(net)}`
-        : formatCurrency(amount)
-      }</span>
+      <span class="service-value">${formatCurrency(amount)}</span>
     </div>`;
   }).join("");
 
@@ -311,14 +309,6 @@ export function exportInvoicePdf(options: ServiceReportPdfOptions): void {
         </div>
       </footer>`;
   }
-}
-
-function computeDiscount(service: any): number {
-  const amount = Number(service.amount) || 0;
-  const discountValue = Number(service.discountValue) || 0;
-  if (!discountValue || service.discountType === "NONE") return 0;
-  if (service.discountType === "PERCENTAGE") return amount * discountValue / 100;
-  return Math.min(discountValue, amount);
 }
 
 function getInstallmentStatusLabel(status: string): string {

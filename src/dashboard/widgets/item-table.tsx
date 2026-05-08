@@ -23,7 +23,7 @@ import {
   IconColumns,
   IconFilter,
 } from "@tabler/icons-react";
-import { STOCK_LEVEL, STOCK_LEVEL_LABELS, ABC_CATEGORY, XYZ_CATEGORY } from "../../constants";
+import { STOCK_LEVEL, STOCK_LEVEL_LABELS, ABC_CATEGORY, XYZ_CATEGORY, SECTOR_PRIVILEGES } from "../../constants";
 import type { Item } from "../../types";
 import { useItems } from "../../hooks/inventory/use-item";
 import { useItemBrands } from "../../hooks/inventory/use-item-brand";
@@ -42,6 +42,10 @@ import {
   ToggleRow,
   LimitInput,
   SORT_DIRECTION_OPTIONS,
+  DENSITY_VALUES,
+  DENSITY_OPTIONS,
+  densityClasses,
+  type Density,
 } from "./_shared";
 import type {
   WidgetAccentColor,
@@ -465,6 +469,21 @@ export const itemTableConfigSchema = z.object({
   limit: z.number().int().min(5).max(200).default(20),
   showHeader: z.boolean().default(true),
   showRowDot: z.boolean().default(true),
+  display: z
+    .object({
+      density: z.enum(DENSITY_VALUES).default("comfortable"),
+      striping: z.boolean().default(true),
+      gridLines: z.boolean().default(true),
+      hoverHighlight: z.boolean().default(true),
+      stickyHeader: z.boolean().default(true),
+    })
+    .default({
+      density: "comfortable",
+      striping: true,
+      gridLines: true,
+      hoverHighlight: true,
+      stickyHeader: true,
+    }),
 });
 
 export type ItemTableConfig = z.infer<typeof itemTableConfigSchema>;
@@ -542,6 +561,11 @@ function ItemTableRender({ config }: WidgetRenderProps<ItemTableConfig>) {
   const showRowDot =
     config.showRowDot &&
     (config.columns[0] === "name" || config.columns[0] === "uniCode");
+  const display = config.display;
+  const dens = densityClasses(display.density as Density);
+  const stickyClass = display.stickyHeader ? "sticky top-0 z-20" : "";
+  const rowBorder = display.gridLines ? "border-b border-border last:border-b-0" : "";
+  const rowHover = display.hoverHighlight ? "hover:bg-secondary/50" : "";
 
   return (
     <WidgetCard
@@ -554,7 +578,7 @@ function ItemTableRender({ config }: WidgetRenderProps<ItemTableConfig>) {
     >
       <>
         <div
-          className="sticky top-0 z-20 grid gap-x-3 px-3 py-1.5 bg-muted/95 backdrop-blur-sm border-b border-border text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+          className={`${stickyClass} grid gap-x-3 ${dens.header} bg-muted/95 backdrop-blur-sm border-b border-border font-semibold uppercase tracking-wider text-muted-foreground`}
           style={{ gridTemplateColumns: gridTemplate }}
         >
           {cols.map((c) => (
@@ -565,7 +589,7 @@ function ItemTableRender({ config }: WidgetRenderProps<ItemTableConfig>) {
         </div>
 
         {isLoading ? (
-          <SkeletonRows columns={cols.length} count={6} gridTemplate={gridTemplate} />
+          <SkeletonRows columns={cols.length} count={6} gridTemplate={gridTemplate} dens={dens} />
         ) : isError ? (
           <div className="p-6 text-center text-sm text-muted-foreground">
             Erro ao carregar itens.
@@ -578,8 +602,8 @@ function ItemTableRender({ config }: WidgetRenderProps<ItemTableConfig>) {
           items.map((item, i) => (
             <div
               key={item.id}
-              className={`grid gap-x-3 items-center px-3 py-2 cursor-pointer border-b border-border last:border-b-0 transition-colors hover:bg-secondary/50 ${
-                i % 2 === 1 ? "bg-muted/20" : ""
+              className={`grid gap-x-3 items-center ${dens.row} cursor-pointer ${rowBorder} transition-colors ${rowHover} ${
+                display.striping && i % 2 === 1 ? "bg-muted/20" : ""
               }`}
               style={{ gridTemplateColumns: gridTemplate }}
               onClick={() => navigate(`/estoque/produtos/detalhes/${item.id}`)}
@@ -611,17 +635,19 @@ function SkeletonRows({
   columns,
   count,
   gridTemplate,
+  dens,
 }: {
   columns: number;
   count: number;
   gridTemplate: string;
+  dens: { row: string; header: string };
 }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="grid gap-x-3 items-center px-3 py-2 border-b border-border last:border-b-0"
+          className={`grid gap-x-3 items-center ${dens.row} border-b border-border last:border-b-0`}
           style={{ gridTemplateColumns: gridTemplate }}
         >
           {Array.from({ length: columns }).map((__, j) => (
@@ -678,6 +704,10 @@ function ItemTableConfigComponent({
     key: K,
     value: ItemTableConfig["sort"][K],
   ) => onChange({ ...c, sort: { ...c.sort, [key]: value } });
+  const setDisplay = <K extends keyof ItemTableConfig["display"]>(
+    key: K,
+    value: ItemTableConfig["display"][K],
+  ) => onChange({ ...c, display: { ...c.display, [key]: value } });
 
   const { data: brandsData } = useItemBrands({ orderBy: { name: "asc" } } as any);
   const { data: categoriesData } = useItemCategories({ orderBy: { name: "asc" } } as any);
@@ -807,6 +837,47 @@ function ItemTableConfigComponent({
                 hint="Marca cada linha com a cor do acento. Aparece apenas quando a primeira coluna é Nome ou Código."
                 checked={c.showRowDot}
                 onCheckedChange={(v) => set("showRowDot", v)}
+              />
+            </div>
+          </Section>
+          <Section title="Densidade e linhas" defaultOpen>
+            <div className="space-y-1">
+              <Label className="text-xs">Densidade</Label>
+              <Combobox
+                mode="single"
+                value={c.display?.density ?? "comfortable"}
+                onValueChange={(v) =>
+                  setDisplay(
+                    "density",
+                    (typeof v === "string" ? v : "comfortable") as Density,
+                  )
+                }
+                options={DENSITY_OPTIONS}
+                clearable={false}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <ToggleRow
+                label="Listras zebra"
+                hint="Alterna fundo nas linhas pares para facilitar leitura."
+                checked={c.display?.striping ?? true}
+                onCheckedChange={(v) => setDisplay("striping", v)}
+              />
+              <ToggleRow
+                label="Linhas divisórias"
+                checked={c.display?.gridLines ?? true}
+                onCheckedChange={(v) => setDisplay("gridLines", v)}
+              />
+              <ToggleRow
+                label="Realçar linha sob o cursor"
+                checked={c.display?.hoverHighlight ?? true}
+                onCheckedChange={(v) => setDisplay("hoverHighlight", v)}
+              />
+              <ToggleRow
+                label="Cabeçalho fixo"
+                hint="O cabeçalho permanece visível ao rolar."
+                checked={c.display?.stickyHeader ?? true}
+                onCheckedChange={(v) => setDisplay("stickyHeader", v)}
               />
             </div>
           </Section>
@@ -1069,7 +1140,11 @@ export const itemTableWidget: WidgetDefinition<ItemTableConfig> = {
     "Tabela de itens / estoque totalmente configurável: 16 colunas, filtros por estoque, marca, categoria, fornecedor, ABC/XYZ. Crie quantas instâncias quiser.",
   icon: IconPackage,
   category: "inventory",
-  allowedSectors: "*",
+  // Mirror /estoque/produtos page (parent /estoque is [WAREHOUSE, ADMIN]).
+  allowedSectors: [
+    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.ADMIN,
+  ],
   defaultSize: { cols: 2, rows: 2 },
   minSize: { cols: 1, rows: 1 },
   maxSize: { cols: 4, rows: 4 },
@@ -1097,6 +1172,13 @@ export const itemTableWidget: WidgetDefinition<ItemTableConfig> = {
     limit: 20,
     showHeader: true,
     showRowDot: true,
+    display: {
+      density: "comfortable",
+      striping: true,
+      gridLines: true,
+      hoverHighlight: true,
+      stickyHeader: true,
+    },
   },
   RenderComponent: ItemTableRender,
   ConfigComponent: ItemTableConfigComponent,

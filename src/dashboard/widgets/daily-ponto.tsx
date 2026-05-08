@@ -40,6 +40,7 @@ import {
   TabsTrigger,
 } from "../../components/ui/tabs";
 import { routes } from "../../constants/routes";
+import { SECTOR_PRIVILEGES } from "../../constants";
 import { useSecullumTimeEntriesByDay } from "../../hooks/integrations/use-secullum";
 import {
   renderHourValue,
@@ -64,6 +65,10 @@ import {
   ToggleRow,
   LimitInput,
   SORT_DIRECTION_OPTIONS,
+  DENSITY_VALUES,
+  DENSITY_OPTIONS,
+  densityClasses,
+  type Density,
 } from "./_shared";
 
 // ============================================================================
@@ -377,7 +382,6 @@ const FILTER_MODES = [
   "day-off",
   "compensated",
 ] as const;
-const DENSITY = ["compact", "comfortable", "spacious"] as const;
 const LAYOUT_MODES = ["flat", "grouped-by-sector"] as const;
 const SORT_KEYS = [
   "userName",
@@ -399,7 +403,7 @@ export const dailyPontoConfigSchema = z.object({
 
   display: z
     .object({
-      density: z.enum(DENSITY).default("comfortable"),
+      density: z.enum(DENSITY_VALUES).default("comfortable"),
       striping: z.boolean().default(true),
       gridLines: z.boolean().default(true),
       hoverHighlight: z.boolean().default(true),
@@ -499,12 +503,6 @@ interface DayRow {
     positionName?: string | null;
   };
   entry: any | null;
-}
-
-function densityClasses(d: DailyPontoConfig["display"]["density"]) {
-  if (d === "compact") return { row: "px-2 py-1 text-xs", header: "px-2 py-1 text-[10px]" };
-  if (d === "spacious") return { row: "px-3 py-3 text-sm", header: "px-3 py-2 text-[10px]" };
-  return { row: "px-3 py-2 text-sm", header: "px-3 py-1.5 text-[10px]" };
 }
 
 // ============================================================================
@@ -712,7 +710,7 @@ function DailyPontoRender({
   });
   const AccentIcon = accent.Icon;
   const display = config.display;
-  const dens = densityClasses(display.density);
+  const dens = densityClasses(display.density as Density);
   const stickyClass = display.stickyHeader ? "sticky top-0 z-20" : "";
   const rowBorder = display.gridLines ? "border-b border-border last:border-b-0" : "";
   const rowHover = display.hoverHighlight ? "hover:bg-secondary/50" : "";
@@ -944,11 +942,6 @@ const FILTER_MODE_LABELS: Record<(typeof FILTER_MODES)[number], string> = {
   "day-off": "Apenas em folga",
   compensated: "Apenas compensados",
 };
-const DENSITY_LABELS: Record<(typeof DENSITY)[number], string> = {
-  compact: "Compacto",
-  comfortable: "Confortável",
-  spacious: "Espaçoso",
-};
 const LAYOUT_LABELS: Record<(typeof LAYOUT_MODES)[number], string> = {
   flat: "Lista única",
   "grouped-by-sector": "Agrupado por setor",
@@ -1077,10 +1070,10 @@ function DailyPontoConfigComponent({
                 onValueChange={(v) =>
                   setDisplay(
                     "density",
-                    (typeof v === "string" ? v : "comfortable") as (typeof DENSITY)[number],
+                    (typeof v === "string" ? v : "comfortable") as Density,
                   )
                 }
-                options={DENSITY.map((d) => ({ value: d, label: DENSITY_LABELS[d] }))}
+                options={DENSITY_OPTIONS}
                 clearable={false}
               />
             </div>
@@ -1322,7 +1315,11 @@ export const dailyPontoWidget: WidgetDefinition<DailyPontoConfig> = {
     "Resumo diário do ponto: colunas configuráveis (incluindo setor, cargo, justificativa), filtros por ausência/justificativa/atraso, busca, agrupamento por setor e largura ajustável arrastando a borda da coluna.",
   icon: IconClock24,
   category: "hr",
-  allowedSectors: "*",
+  allowedSectors: [
+    SECTOR_PRIVILEGES.HUMAN_RESOURCES,
+    SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    SECTOR_PRIVILEGES.ADMIN,
+  ],
   defaultSize: { cols: 4, rows: 3 },
   minSize: { cols: 1, rows: 1 },
   maxSize: { cols: 4, rows: 4 },
