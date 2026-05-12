@@ -9,7 +9,7 @@ export const invoiceService = {
     apiClient.get(`/invoices/${id}`, {
       params: {
         include: {
-          installments: { include: { bankSlip: { include: { pdfFile: true } }, receiptFile: true } },
+          installments: { include: { bankSlip: { include: { pdfFile: true } }, receiptFiles: true } },
           nfseDocuments: true,
           customer: true,
           task: true,
@@ -22,7 +22,7 @@ export const invoiceService = {
     apiClient.get(`/invoices/task/${taskId}`, {
       params: {
         include: {
-          installments: { include: { bankSlip: { include: { pdfFile: true } }, receiptFile: true } },
+          installments: { include: { bankSlip: { include: { pdfFile: true } }, receiptFiles: true } },
           nfseDocuments: true,
           customer: true,
         },
@@ -65,15 +65,19 @@ export const invoiceService = {
   cancelNfse: (invoiceId: string, data: any) =>
     apiClient.put(`/invoices/${invoiceId}/nfse/cancel`, data),
 
-  // Mark boleto as paid via PIX/cash
-  markBoletoPaid: (installmentId: string, data: { paymentMethod: string; receiptFileId?: string }) =>
-    apiClient.put(`/invoices/${installmentId}/boleto/mark-paid`, data),
+  // Mark boleto as paid via PIX/cash (with optional multiple receipts + observations)
+  markBoletoPaid: (
+    installmentId: string,
+    data: { paymentMethod: string; receiptFileIds?: string[]; observations?: string | null },
+  ) => apiClient.put(`/invoices/${installmentId}/boleto/mark-paid`, data),
 
-  // Update installment receipt
-  updateInstallmentReceipt: (installmentId: string, receiptFileId: string) =>
-    apiClient.put(`/invoices/${installmentId}/receipt`, { receiptFileId }),
+  // Replace receipt file list and/or update observations on a paid installment
+  updateInstallmentReceipts: (
+    installmentId: string,
+    data: { receiptFileIds?: string[]; observations?: string | null },
+  ) => apiClient.put(`/invoices/${installmentId}/receipts`, data),
 
-  // Get installment receipt file
-  getInstallmentReceipt: (installmentId: string) =>
-    apiClient.get(`/invoices/${installmentId}/receipt/download`, { responseType: 'blob' }),
+  // Download a single receipt file attached to an installment
+  getInstallmentReceipt: (installmentId: string, fileId: string) =>
+    apiClient.get(`/invoices/${installmentId}/receipts/${fileId}/download`, { responseType: 'blob' }),
 };

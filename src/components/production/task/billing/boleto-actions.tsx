@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   IconRefresh,
@@ -9,17 +9,28 @@ import {
   IconCalendarEvent,
   IconCurrencyReal,
   IconPaperclip,
-  IconUpload,
   IconCopy,
+  IconFile,
+  IconTrash,
 } from '@tabler/icons-react';
-import { useRegenerateBoleto, useCancelBoleto, useChangeBankSlipDueDate, useMarkBoletoPaid, useUpdateInstallmentReceipt } from '@/hooks/production/use-invoice';
+import {
+  useRegenerateBoleto,
+  useCancelBoleto,
+  useChangeBankSlipDueDate,
+  useMarkBoletoPaid,
+  useUpdateInstallmentReceipts,
+} from '@/hooks/production/use-invoice';
 import { Combobox } from '@/components/ui/combobox';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { invoiceService } from '@/api-client/invoice';
 import { uploadSingleFile } from '@/api-client/file';
 import { toast } from '@/components/ui/sonner';
 import type { BankSlip, Installment } from '@/types/invoice';
+import { FileUploadField } from '@/components/common/file/file-upload-field';
+import type { FileWithPreview } from '@/components/common/file/file-uploader';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +47,15 @@ const PAYMENT_METHOD_OPTIONS = [
   { value: 'OTHER', label: 'Outro' },
 ];
 
+const RECEIPT_ACCEPTED_TYPES: Record<string, string[]> = {
+  'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
+  'application/pdf': ['.pdf'],
+};
+const RECEIPT_MAX_SIZE = 50 * 1024 * 1024; // 50MB
+const RECEIPT_MAX_FILES = 20;
+
+type AttachedReceipt = NonNullable<Installment['receiptFiles']>[number];
+
 interface BoletoActionsProps {
   installmentId: string;
   bankSlip: BankSlip | null | undefined;
@@ -45,8 +65,10 @@ interface BoletoActionsProps {
   installmentStatus?: string | null;
   /** Payment method used (PIX, CASH, TRANSFER, BANK_SLIP, etc.) */
   installmentPaymentMethod?: string | null;
-  /** Receipt file attached to this installment */
-  receiptFile?: Installment['receiptFile'];
+  /** Receipt files attached to this installment */
+  receiptFiles?: Installment['receiptFiles'];
+  /** Free-text observations on the installment */
+  observations?: string | null;
 }
 
 function getDefaultRegenerateDate(dueDate?: string | Date | null, bankSlipDueDate?: string | Date | null): Date {
@@ -66,26 +88,52 @@ function getDefaultRegenerateDate(dueDate?: string | Date | null, bankSlipDueDat
   return tomorrow;
 }
 
-export function BoletoActions({ installmentId, bankSlip, dueDate, installmentStatus, installmentPaymentMethod: _installmentPaymentMethod, receiptFile }: BoletoActionsProps) {
+export function BoletoActions({
+  installmentId,
+  bankSlip,
+  dueDate,
+  installmentStatus,
+  installmentPaymentMethod: _installmentPaymentMethod,
+  receiptFiles,
+  observations: observationsProp,
+}: BoletoActionsProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showDueDateDialog, setShowDueDateDialog] = useState(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
-  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+  const [showReceiptsDialog, setShowReceiptsDialog] = useState(false);
   const [newDueDate, setNewDueDate] = useState<Date | null>(null);
   const [regenerateDate, setRegenerateDate] = useState<Date | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [isDownloading, setIsDownloading] = useState(false);
-  const [receiptFileName, setReceiptFileName] = useState<string>('');
-  const [receiptFileForUpload, setReceiptFileForUpload] = useState<File | null>(null);
+  const [isViewing, setIsViewing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const receiptFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Mark Paid dialog state
+  const [markPaidFiles, setMarkPaidFiles] = useState<FileWithPreview[]>([]);
+  const [markPaidObservations, setMarkPaidObservations] = useState<string>('');
+
+  // Manage Receipts dialog state — initialized from props when the dialog opens.
+  // Existing files are tracked outside the FileUploadField so they keep view/download
+  // affordances; the FileUploadField is used only to pick new uploads.
+  const [keptReceipts, setKeptReceipts] = useState<AttachedReceipt[]>([]);
+  const [newReceiptFiles, setNewReceiptFiles] = useState<FileWithPreview[]>([]);
+  const [receiptObservations, setReceiptObservations] = useState<string>('');
+
   const regenerateBoleto = useRegenerateBoleto();
   const cancelBoleto = useCancelBoleto();
   const changeDueDate = useChangeBankSlipDueDate();
   const markPaid = useMarkBoletoPaid();
-  const updateReceipt = useUpdateInstallmentReceipt();
+  const updateReceipts = useUpdateInstallmentReceipts();
+
+  // Sync the Manage Receipts dialog state with the latest props every time it opens.
+  useEffect(() => {
+    if (showReceiptsDialog) {
+      setKeptReceipts(receiptFiles ?? []);
+      setNewReceiptFiles([]);
+      setReceiptObservations(observationsProp ?? '');
+    }
+  }, [showReceiptsDialog, receiptFiles, observationsProp]);
 
   const openRegenerateDialog = () => {
     setRegenerateDate(getDefaultRegenerateDate(dueDate, bankSlip?.dueDate));
@@ -112,7 +160,6 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
         onSuccess: () => {
           setShowRegenerateDialog(false);
           setRegenerateDate(null);
-          toast.success('Boleto será recriado em instantes.');
         },
       },
     );
@@ -125,7 +172,7 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
         onSuccess: () => {
           setShowCancelDialog(false);
         },
-      }
+      },
     );
   };
 
@@ -166,16 +213,9 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
     );
   };
 
-  const [isViewing, setIsViewing] = useState(false);
-
   const fetchBoletoPdf = async () => {
     const response = await invoiceService.getBoletoPdf(installmentId);
     return new Blob([response.data], { type: 'application/pdf' });
-  };
-
-  const fetchReceipt = async () => {
-    const response = await invoiceService.getInstallmentReceipt(installmentId);
-    return new Blob([response.data], { type: receiptFile?.mimetype || 'application/pdf' });
   };
 
   const handleViewPdf = async () => {
@@ -185,8 +225,6 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 30000);
-    } catch {
-      toast.error('Erro ao visualizar boleto.');
     } finally {
       setIsViewing(false);
     }
@@ -204,44 +242,60 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Erro ao baixar boleto.');
     } finally {
       setIsDownloading(false);
     }
   };
 
-  const handleViewReceipt = async () => {
+  const fetchReceiptBlob = async (file: AttachedReceipt) => {
+    const response = await invoiceService.getInstallmentReceipt(installmentId, file.id);
+    return new Blob([response.data], { type: file.mimetype || 'application/pdf' });
+  };
+
+  const handleViewReceipt = async (file: AttachedReceipt) => {
     setIsViewing(true);
     try {
-      const blob = await fetchReceipt();
+      const blob = await fetchReceiptBlob(file);
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 30000);
-    } catch {
-      toast.error('Erro ao visualizar comprovante.');
     } finally {
       setIsViewing(false);
     }
   };
 
-  const handleDownloadReceipt = async () => {
+  const handleDownloadReceipt = async (file: AttachedReceipt) => {
     setIsDownloading(true);
     try {
-      const blob = await fetchReceipt();
+      const blob = await fetchReceiptBlob(file);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = receiptFile?.originalName || `comprovante-${installmentId.slice(0, 8)}`;
+      a.download = file.originalName || `comprovante-${file.id.slice(0, 8)}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Erro ao baixar comprovante.');
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const uploadFiles = async (files: Array<File | FileWithPreview>): Promise<string[]> => {
+    const uploadedIds: string[] = [];
+    for (const file of files) {
+      const result = await uploadSingleFile(file as File, {
+        fileContext: 'receipt',
+        entityId: installmentId,
+        entityType: 'installment',
+      });
+      if (result.success && result.data) {
+        uploadedIds.push(result.data.id);
+      } else {
+        throw new Error(`Falha ao enviar ${file.name}`);
+      }
+    }
+    return uploadedIds;
   };
 
   const handleMarkPaid = async () => {
@@ -252,73 +306,54 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
 
     setIsUploading(true);
     try {
-      let receiptFileId: string | undefined;
-
-      // Upload receipt file if provided
-      if (receiptFileForUpload) {
-        const uploadResult = await uploadSingleFile(receiptFileForUpload, {
-          fileContext: 'receipt',
-          entityId: installmentId,
-          entityType: 'installment',
-        });
-        if (uploadResult.success && uploadResult.data) {
-          receiptFileId = uploadResult.data.id;
-        }
-      }
+      const filesToUpload = markPaidFiles.filter((f) => !f.uploaded && !f.error);
+      const uploadedIds = filesToUpload.length > 0 ? await uploadFiles(filesToUpload) : [];
 
       markPaid.mutate(
-        { installmentId, paymentMethod, receiptFileId },
+        {
+          installmentId,
+          paymentMethod,
+          receiptFileIds: uploadedIds.length > 0 ? uploadedIds : undefined,
+          observations: markPaidObservations.trim() ? markPaidObservations.trim() : undefined,
+        },
         {
           onSuccess: () => {
             setShowMarkPaidDialog(false);
             setPaymentMethod('');
-            setReceiptFileForUpload(null);
-            setReceiptFileName('');
+            setMarkPaidFiles([]);
+            setMarkPaidObservations('');
           },
         },
       );
-    } catch {
-      toast.error('Erro ao enviar comprovante.');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleReceiptFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setReceiptFileForUpload(file);
-      setReceiptFileName(file.name);
-    }
-  };
-
-  const handleAttachReceipt = async () => {
-    const input = receiptFileInputRef.current;
-    if (!input?.files?.[0]) {
-      toast.error('Selecione um arquivo.');
-      return;
-    }
-
+  const handleSaveReceipts = async () => {
     setIsUploading(true);
     try {
-      const uploadResult = await uploadSingleFile(input.files[0], {
-        fileContext: 'receipt',
-        entityId: installmentId,
-        entityType: 'installment',
-      });
-      if (uploadResult.success && uploadResult.data) {
-        updateReceipt.mutate(
-          { installmentId, receiptFileId: uploadResult.data.id },
-          {
-            onSuccess: () => {
-              setShowReceiptDialog(false);
-              toast.success('Comprovante anexado com sucesso.');
-            },
+      const filesToUpload = newReceiptFiles.filter((f) => !f.uploaded && !f.error);
+      const newUploadedIds = filesToUpload.length > 0 ? await uploadFiles(filesToUpload) : [];
+      const finalReceiptIds = [...keptReceipts.map((r) => r.id), ...newUploadedIds];
+      const trimmedObservations = receiptObservations.trim();
+
+      updateReceipts.mutate(
+        {
+          installmentId,
+          receiptFileIds: finalReceiptIds,
+          observations:
+            trimmedObservations === (observationsProp ?? '')
+              ? undefined
+              : trimmedObservations || null,
+        },
+        {
+          onSuccess: () => {
+            setShowReceiptsDialog(false);
+            setNewReceiptFiles([]);
           },
-        );
-      }
-    } catch {
-      toast.error('Erro ao enviar comprovante.');
+        },
+      );
     } finally {
       setIsUploading(false);
     }
@@ -341,7 +376,8 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
   // Determine what actions to show
   const isPaid = installmentStatus === 'PAID';
   const isPaidByBankSlip = isPaid && bankSlip?.status === 'PAID';
-  const hasReceipt = !!receiptFile;
+  const receiptCount = receiptFiles?.length ?? 0;
+  const hasReceipts = receiptCount > 0;
 
   const canGenerate = !bankSlip && !isPaid && installmentStatus !== 'CANCELLED';
   const canRegenerate = bankSlip && ['ERROR', 'REJECTED', 'CANCELLED'].includes(bankSlip.status);
@@ -352,55 +388,55 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
   const canChangeDueDate = bankSlip && (bankSlip.status === 'OVERDUE' || bankSlip.status === 'ACTIVE');
   // Allow mark-as-paid whenever the installment itself is unpaid (PENDING, ACTIVE, or OVERDUE).
   // PENDING is included for the generateBankSlip=false flow where no bank slip is created (PIX/transfer).
-  const canMarkPaid = installmentStatus === 'ACTIVE' || installmentStatus === 'OVERDUE' || installmentStatus === 'PENDING';
+  const canMarkPaid =
+    installmentStatus === 'ACTIVE' || installmentStatus === 'OVERDUE' || installmentStatus === 'PENDING';
 
-  // Receipt actions: only for paid installments
-  const showReceiptView = isPaid && hasReceipt;
-  const showAttachReceipt = isPaid && !hasReceipt;
-  // Sicredi removes the PDF after payment; only show if we have a locally stored copy
-  const showBoletoPdfForPaid = isPaidByBankSlip && !hasReceipt && !!bankSlip?.pdfFileId;
+  // Receipt management: any paid installment can open the manage-receipts dialog.
+  const canManageReceipts = isPaid;
+  // Sicredi removes the PDF after payment; only show boleto PDF if we have a locally stored copy
+  // and the user hasn't already attached their own receipts.
+  const showBoletoPdfForPaid = isPaidByBankSlip && !hasReceipts && !!bankSlip?.pdfFileId;
 
-  const hasAnyAction = canGenerate || canRegenerate || canCancel || canDownloadPdf || canCopyDigitableLine || canChangeDueDate || canMarkPaid || showBoletoPdfForPaid || showReceiptView || showAttachReceipt;
+  const hasAnyAction =
+    canGenerate ||
+    canRegenerate ||
+    canCancel ||
+    canDownloadPdf ||
+    canCopyDigitableLine ||
+    canChangeDueDate ||
+    canMarkPaid ||
+    showBoletoPdfForPaid ||
+    canManageReceipts;
 
   if (!hasAnyAction) return null;
 
   return (
     <>
       <div className="flex items-center gap-1">
-        {/* For PAID installments: receipt view/download/attach + boleto PDF fallback */}
+        {/* For PAID installments: receipt management + boleto PDF fallback */}
         {isPaid && (
           <>
-            {showReceiptView && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleViewReceipt}
-                  disabled={isViewing}
-                  title="Visualizar Comprovante"
-                  className="h-7 w-7 p-0"
-                >
-                  {isViewing ? (
-                    <IconLoader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <IconEye className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDownloadReceipt}
-                  disabled={isDownloading}
-                  title="Baixar Comprovante"
-                  className="h-7 w-7 p-0"
-                >
-                  {isDownloading ? (
-                    <IconLoader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <IconDownload className="h-4 w-4" />
-                  )}
-                </Button>
-              </>
+            {canManageReceipts && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowReceiptsDialog(true)}
+                title={
+                  hasReceipts
+                    ? `Comprovantes (${receiptCount})${observationsProp ? ' / Observações' : ''}`
+                    : 'Anexar Comprovantes'
+                }
+                className={`h-7 ${hasReceipts ? 'px-1.5' : 'w-7 p-0'} ${
+                  hasReceipts ? 'text-foreground' : 'text-blue-600 hover:text-blue-700'
+                }`}
+              >
+                <IconPaperclip className="h-4 w-4" />
+                {hasReceipts && (
+                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                    {receiptCount}
+                  </Badge>
+                )}
+              </Button>
             )}
 
             {showBoletoPdfForPaid && (
@@ -434,18 +470,6 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
                   )}
                 </Button>
               </>
-            )}
-
-            {showAttachReceipt && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowReceiptDialog(true)}
-                title="Anexar Comprovante"
-                className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700"
-              >
-                <IconPaperclip className="h-4 w-4" />
-              </Button>
             )}
           </>
         )}
@@ -580,27 +604,33 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
             <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
               Voltar
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleCancel}
-              disabled={cancelBoleto.isPending}
-            >
+            <Button variant="destructive" onClick={handleCancel} disabled={cancelBoleto.isPending}>
               {cancelBoleto.isPending ? 'Cancelando...' : 'Confirmar Cancelamento'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Mark Paid Dialog */}
-      <Dialog open={showMarkPaidDialog} onOpenChange={setShowMarkPaidDialog}>
-        <DialogContent>
+      {/* Mark Paid Dialog — payment method + optional multi-receipt + observations */}
+      <Dialog
+        open={showMarkPaidDialog}
+        onOpenChange={(open) => {
+          setShowMarkPaidDialog(open);
+          if (!open) {
+            setPaymentMethod('');
+            setMarkPaidFiles([]);
+            setMarkPaidObservations('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Marcar como Pago</DialogTitle>
             <DialogDescription>
               O boleto será cancelado no banco e a parcela será marcada como paga.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-3">
+          <div className="py-4 space-y-4">
             <div>
               <Label className="text-sm font-medium mb-1.5 block">Método de Pagamento</Label>
               <Combobox
@@ -612,43 +642,30 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
                 clearable={false}
               />
             </div>
+
             <div>
-              <Label className="text-sm font-medium mb-1.5 block">Comprovante (opcional)</Label>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <IconUpload className="h-3.5 w-3.5" />
-                  {receiptFileName || 'Selecionar arquivo'}
-                </Button>
-                {receiptFileName && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 text-muted-foreground"
-                    onClick={() => {
-                      setReceiptFileForUpload(null);
-                      setReceiptFileName('');
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                    }}
-                  >
-                    <IconX className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept=".pdf,.png,.jpg,.jpeg,.webp"
-                onChange={handleReceiptFileChange}
+              <Label className="text-sm font-medium mb-1.5 block">Comprovantes (opcional)</Label>
+              <FileUploadField
+                onFilesChange={setMarkPaidFiles}
+                existingFiles={markPaidFiles}
+                maxFiles={RECEIPT_MAX_FILES}
+                maxSize={RECEIPT_MAX_SIZE}
+                acceptedFileTypes={RECEIPT_ACCEPTED_TYPES}
+                variant="compact"
+                placeholder="Arraste ou clique para enviar os comprovantes (PDF ou imagens)"
+                showPreview
+                className="w-full"
               />
-              <p className="text-xs text-muted-foreground mt-1">PDF ou imagem do comprovante de pagamento</p>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium mb-1.5 block">Observações (opcional)</Label>
+              <Textarea
+                value={markPaidObservations}
+                onChange={(e) => setMarkPaidObservations(e.target.value)}
+                placeholder="Detalhes adicionais sobre o pagamento..."
+                rows={3}
+              />
             </div>
           </div>
           <DialogFooter>
@@ -665,53 +682,113 @@ export function BoletoActions({ installmentId, bankSlip, dueDate, installmentSta
         </DialogContent>
       </Dialog>
 
-      {/* Attach Receipt Dialog (for already-paid installments) */}
-      <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
-        <DialogContent>
+      {/* Manage Receipts Dialog — view, add, remove receipts + edit observations */}
+      <Dialog open={showReceiptsDialog} onOpenChange={setShowReceiptsDialog}>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Anexar Comprovante</DialogTitle>
+            <DialogTitle>Comprovantes e Observações</DialogTitle>
             <DialogDescription>
-              Anexe o comprovante de pagamento para esta parcela.
+              Anexe, visualize ou remova comprovantes e edite as observações desta parcela.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => receiptFileInputRef.current?.click()}
-              >
-                <IconUpload className="h-3.5 w-3.5" />
-                Selecionar arquivo
-              </Button>
-              {receiptFileInputRef.current?.files?.[0] && (
-                <span className="text-sm text-muted-foreground truncate max-w-[200px]">
-                  {receiptFileInputRef.current.files[0].name}
-                </span>
-              )}
+          <div className="py-4 space-y-4">
+            {keptReceipts.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium mb-1.5 block">
+                  Comprovantes anexados
+                </Label>
+                <ul className="space-y-1">
+                  {keptReceipts.map((file) => (
+                    <li
+                      key={file.id}
+                      className="flex items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm"
+                    >
+                      <IconFile className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="truncate flex-1">{file.originalName}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleViewReceipt(file)}
+                        disabled={isViewing}
+                        title="Visualizar"
+                      >
+                        {isViewing ? (
+                          <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <IconEye className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => handleDownloadReceipt(file)}
+                        disabled={isDownloading}
+                        title="Baixar"
+                      >
+                        {isDownloading ? (
+                          <IconLoader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <IconDownload className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() =>
+                          setKeptReceipts((prev) => prev.filter((r) => r.id !== file.id))
+                        }
+                        title="Remover"
+                      >
+                        <IconTrash className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div>
+              <Label className="text-sm font-medium mb-1.5 block">
+                {keptReceipts.length > 0 ? 'Adicionar novos comprovantes' : 'Comprovantes'}
+              </Label>
+              <FileUploadField
+                onFilesChange={setNewReceiptFiles}
+                existingFiles={newReceiptFiles}
+                maxFiles={RECEIPT_MAX_FILES}
+                maxSize={RECEIPT_MAX_SIZE}
+                acceptedFileTypes={RECEIPT_ACCEPTED_TYPES}
+                variant="compact"
+                placeholder="Arraste ou clique para enviar comprovantes (PDF ou imagens)"
+                showPreview
+                className="w-full"
+              />
             </div>
-            <input
-              ref={receiptFileInputRef}
-              type="file"
-              className="hidden"
-              accept=".pdf,.png,.jpg,.jpeg,.webp"
-              onChange={() => {
-                setReceiptFileName(receiptFileInputRef.current?.files?.[0]?.name || '');
-              }}
-            />
-            <p className="text-xs text-muted-foreground mt-1">PDF ou imagem do comprovante de pagamento</p>
+
+            <div>
+              <Label className="text-sm font-medium mb-1.5 block">Observações</Label>
+              <Textarea
+                value={receiptObservations}
+                onChange={(e) => setReceiptObservations(e.target.value)}
+                placeholder="Detalhes adicionais sobre o pagamento..."
+                rows={3}
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReceiptDialog(false)}>
+            <Button variant="outline" onClick={() => setShowReceiptsDialog(false)}>
               Cancelar
             </Button>
             <Button
-              onClick={handleAttachReceipt}
-              disabled={isUploading || updateReceipt.isPending}
+              onClick={handleSaveReceipts}
+              disabled={isUploading || updateReceipts.isPending}
             >
-              {isUploading || updateReceipt.isPending ? 'Enviando...' : 'Anexar Comprovante'}
+              {isUploading || updateReceipts.isPending ? 'Salvando...' : 'Salvar'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -39,7 +39,8 @@ export function InstallmentRow({ installment }: InstallmentRowProps) {
           dueDate={installment.dueDate}
           installmentStatus={installment.status}
           installmentPaymentMethod={installment.paymentMethod}
-          receiptFile={installment.receiptFile}
+          receiptFiles={installment.receiptFiles}
+          observations={installment.observations}
         />
       </TableCell>
     </TableRow>

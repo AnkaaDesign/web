@@ -235,6 +235,51 @@ export const secullumService = {
 
   deleteHoliday: (holidayId: string | number) => apiClient.delete<{ success: boolean; message: string }>(`/integrations/secullum/holidays/${holidayId}`),
 
+  // Electronic Signature of Time Card (Assinatura Digital de Cartão Ponto)
+  // Read-only viewer for already-signed apurações. Create/edit flows would
+  // require POST/DELETE endpoints not yet captured upstream.
+  getAssinaturas: () =>
+    apiClient.get<{
+      success: boolean;
+      message: string;
+      data: Array<{
+        Id: number;
+        Descricao: string;
+        DataInicio: string;
+        DataFim: string;
+        DataInclusao: string;
+        NumeroCartoes: number;
+        Aprovados: number;
+        Rejeitados: number;
+        Compactada: boolean;
+      }>;
+    }>("/integrations/secullum/assinatura-digital"),
+
+  getAssinaturaById: (id: number) =>
+    apiClient.get<{
+      success: boolean;
+      message: string;
+      data?: {
+        ListaItensAssinatura: Array<{
+          Id: number;
+          FuncionarioId: number;
+          Funcionario: string;
+          Status: number;
+          DataResposta: string | null;
+          Resposta: string | null;
+          RespostasGerentes: unknown[];
+        }>;
+      };
+    }>(`/integrations/secullum/assinatura-digital/${id}`),
+
+  // Downloads the per-employee signed time-card PDF as a Blob.
+  // Secullum keys the PDF by funcionarioId, not by the signature item's Id.
+  downloadAssinaturaItemPdf: (apuracaoId: number, funcionarioId: number) =>
+    apiClient.get<Blob>(
+      `/integrations/secullum/assinatura-digital/${apuracaoId}/funcionarios/${funcionarioId}/pdf`,
+      { responseType: "blob" },
+    ),
+
   // Schedules (Horarios)
   getHorarios: (params?: { incluirDesativados?: boolean }) =>
     apiClient.get<{ success: boolean; data: any[]; message: string }>("/integrations/secullum/horarios", {

@@ -408,6 +408,8 @@ export function getPageIconName(path: string): string {
     "/recursos-humanos/bonus/:id": "coins",
     "/recursos-humanos/calculos": "device-ipad-dollar",
     "/recursos-humanos/controle-ponto": "fingerprint",
+    "/recursos-humanos/controle-ponto/assinatura-digital": "signature",
+    "/recursos-humanos/controle-ponto/assinatura-digital/:id": "signature",
     "/recursos-humanos/bonus/nivel-de-performance": "trending-up",
     "/recursos-humanos/requisicoes": "clipboard-list",
     "/recursos-humanos/simulacao-bonus": "calculator",

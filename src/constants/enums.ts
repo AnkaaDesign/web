@@ -1997,6 +1997,8 @@ export enum FAVORITE_PAGES {
   RECURSOS_HUMANOS_FERIADOS_LISTAR = "/recursos-humanos/feriados",
   RECURSOS_HUMANOS_AVISOS_LISTAR = "/recursos-humanos/avisos",
   RECURSOS_HUMANOS_CALCULOS = "/recursos-humanos/calculos",
+  RECURSOS_HUMANOS_CONTROLE_PONTO_LISTAR = "/recursos-humanos/controle-ponto",
+  RECURSOS_HUMANOS_CONTROLE_PONTO_ASSINATURA_DIGITAL_LISTAR = "/recursos-humanos/controle-ponto/assinatura-digital",
   RECURSOS_HUMANOS_EPI_LISTAR = "/recursos-humanos/epi",
   RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR = "/recursos-humanos/epi/entregas",
   RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR = "/recursos-humanos/epi/agendamentos",

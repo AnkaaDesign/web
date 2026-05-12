@@ -21,6 +21,7 @@ import { ColumnVisibilityManager } from "@/components/integrations/secullum/calc
 import type { ColumnDef } from "@/components/integrations/secullum/calculations/list";
 import { USER_STATUS } from "../../../constants";
 import type { EditExportRow } from "./time-clock-entry-edit-export";
+import type { User } from "@/types";
 
 const TIME_CLOCK_COLUMNS: ColumnDef[] = [
   { key: "entry1", header: "Entrada 1" },
@@ -52,7 +53,8 @@ interface TimeClockEntryEditListProps {
     data: {
       rows: EditExportRow[];
       visibleColumns: Set<string>;
-      userName: string | null;
+      user: User | null;
+      userId: string | null;
       startDate: Date | null;
       endDate: Date | null;
     } | null,
@@ -249,6 +251,7 @@ export function TimeClockEntryEditList({
     where: { secullumEmployeeId: { not: null } },
     orderBy: { name: "asc" },
     take: 100,
+    include: { position: true, sector: true },
   });
 
   useEffect(() => {
@@ -442,9 +445,9 @@ export function TimeClockEntryEditList({
 
   // Push the export-friendly entry list up to the unified page so it can render
   // the export popover in the page header for this mode.
-  const selectedUserName: string | null = useMemo(() => {
+  const selectedUser: User | null = useMemo(() => {
     if (!selectedUserId || !usersData?.data) return null;
-    return usersData.data.find((u) => u.id === selectedUserId)?.name ?? null;
+    return (usersData.data.find((u) => u.id === selectedUserId) as User | undefined) ?? null;
   }, [selectedUserId, usersData]);
 
   const exportRows: EditExportRow[] = useMemo(() => {
@@ -486,11 +489,12 @@ export function TimeClockEntryEditList({
     onExportDataChange?.({
       rows: exportRows,
       visibleColumns: exportVisibleColumns,
-      userName: selectedUserName,
+      user: selectedUser,
+      userId: selectedUserId || null,
       startDate,
       endDate,
     });
-  }, [exportRows, exportVisibleColumns, selectedUserName, startDate, endDate, onExportDataChange]);
+  }, [exportRows, exportVisibleColumns, selectedUser, selectedUserId, startDate, endDate, onExportDataChange]);
 
   return (
     <Card className={cn("flex flex-col shadow-sm border border-border", className)}>

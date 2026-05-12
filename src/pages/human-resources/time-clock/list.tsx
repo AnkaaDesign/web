@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
-import { IconDeviceFloppy, IconRestore } from "@tabler/icons-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { IconDeviceFloppy, IconRestore, IconSignature } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -24,6 +24,7 @@ import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useAuth } from "@/contexts/auth-context";
 import { hasAnyPrivilege } from "@/utils/user";
+import type { User } from "@/types";
 
 type ViewMode = "colaborador-unico" | "multiplos-colaboradores" | "edit";
 const DEFAULT_VIEW: ViewMode = "colaborador-unico";
@@ -80,6 +81,7 @@ function ViewSelector({ view, options, onChange }: ViewSelectorProps) {
 }
 
 export default function TimeClockListPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user: currentUser } = useAuth();
 
@@ -152,7 +154,8 @@ export default function TimeClockListPage() {
   const [editExport, setEditExport] = useState<{
     rows: EditExportRow[];
     visibleColumns: Set<string>;
-    userName: string | null;
+    user: User | null;
+    userId: string | null;
     startDate: Date | null;
     endDate: Date | null;
   } | null>(null);
@@ -179,6 +182,20 @@ export default function TimeClockListPage() {
         headerExtra={
           <div className="flex items-center gap-2">
             <ViewSelector view={view} options={viewOptions} onChange={handleViewChange} />
+            {canEdit && (
+              <Button
+                type="button"
+                variant="outline"
+                size="default"
+                onClick={() =>
+                  navigate(routes.humanResources.timeClock.assinaturaDigital.list)
+                }
+                title="Abrir Assinatura Digital de Cartão Ponto"
+              >
+                <IconSignature className="h-4 w-4 mr-2" />
+                Assinatura Digital
+              </Button>
+            )}
             {view === "colaborador-unico" && calcExport && (
               <CalculationExport
                 filters={calcExport.filters}
@@ -198,7 +215,8 @@ export default function TimeClockListPage() {
               <TimeClockEntryEditExport
                 currentItems={editExport.rows}
                 visibleColumns={editExport.visibleColumns}
-                userName={editExport.userName}
+                user={editExport.user}
+                userId={editExport.userId}
                 startDate={editExport.startDate}
                 endDate={editExport.endDate}
               />

@@ -22,6 +22,8 @@ export const secullumKeys = {
   timeEntries: (params?: any) => [...secullumKeys.all, "time-entries", params] as const,
   horarios: (params?: any) => [...secullumKeys.all, "horarios", params] as const,
   horarioDetail: (id: number | string) => [...secullumKeys.all, "horarios", "detail", id] as const,
+  assinaturas: () => [...secullumKeys.all, "assinaturas"] as const,
+  assinaturaDetail: (id: number | string) => [...secullumKeys.all, "assinaturas", "detail", id] as const,
 };
 
 // Authentication hooks
@@ -675,5 +677,64 @@ export const useSecullumHorarioById = (id: number | string, options?: { enabled?
     queryFn: () => secullumService.getHorarioById(id),
     staleTime: 10 * 60 * 1000, // 10 minutes
     enabled: options?.enabled !== false && !!id,
+  });
+};
+
+// Electronic Signature of Time Card (Assinatura Digital de Cartão Ponto)
+// Read-only viewer; matches Secullum's /AssinaturaDigitalCartaoPonto endpoint.
+export const useSecullumAssinaturas = () => {
+  return useQuery({
+    queryKey: secullumKeys.assinaturas(),
+    queryFn: () => secullumService.getAssinaturas(),
+    staleTime: 60 * 1000, // 1 minute — updates only when an apuração is created/closed
+  });
+};
+
+export const useSecullumAssinaturaById = (
+  id: number | string | undefined,
+  options?: { enabled?: boolean },
+) => {
+  return useQuery({
+    queryKey: secullumKeys.assinaturaDetail(id ?? ""),
+    queryFn: () => secullumService.getAssinaturaById(Number(id)),
+    staleTime: 60 * 1000,
+    enabled: options?.enabled !== false && id !== undefined && id !== "" && !Number.isNaN(Number(id)),
+  });
+};
+
+/**
+ * Trigger a browser download of an employee's signed time-card PDF.
+ * Returns a mutation so callers can show loading state and toast on error.
+ */
+export const useDownloadAssinaturaItemPdf = () => {
+  return useMutation({
+    mutationFn: async (params: {
+      apuracaoId: number;
+      funcionarioId: number;
+      funcionarioName?: string;
+    }) => {
+      const res = await secullumService.downloadAssinaturaItemPdf(
+        params.apuracaoId,
+        params.funcionarioId,
+      );
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data as any], { type: "application/pdf" });
+      const safeName = (params.funcionarioName || `funcionario_${params.funcionarioId}`)
+        .trim()
+        .replace(/\s+/g, "_")
+        .replace(/[^A-Za-z0-9_.-]/g, "");
+      const filename = `CartaoPonto_${params.apuracaoId}_${safeName}.pdf`;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      return { filename };
+    },
+    onError: () => {
+      toast.error("Falha ao baixar o cartão ponto. Tente novamente.");
+    },
   });
 };

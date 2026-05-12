@@ -340,6 +340,12 @@ const HumanResourcesAbsences = lazy(() => import("@/pages/human-resources/absenc
 const HumanResourcesFaltas = lazy(() => import("@/pages/human-resources/faltas/list").then((module) => ({ default: module.FaltasListPage })));
 const HumanResourcesHRCalendar = lazy(() => import("@/pages/human-resources/calendar").then((module) => ({ default: module.HRCalendarPage })));
 const HumanResourcesTimeClock = lazy(() => import("@/pages/human-resources/time-clock/list"));
+const HumanResourcesAssinaturaDigitalList = lazy(
+  () => import("@/pages/human-resources/time-clock/assinatura-digital/list"),
+);
+const HumanResourcesAssinaturaDigitalDetails = lazy(
+  () => import("@/pages/human-resources/time-clock/assinatura-digital/details"),
+);
 const HumanResourcesPerformanceLevels = lazy(() => import("@/pages/human-resources/performance-levels/list").then((module) => ({ default: module.default })));
 
 // Catalog
@@ -2353,6 +2359,22 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesTimeClock />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.humanResources.timeClock.assinaturaDigital.list}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <HumanResourcesAssinaturaDigitalList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.humanResources.timeClock.assinaturaDigital.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <HumanResourcesAssinaturaDigitalDetails />
                     </Suspense>
                   }
                 />

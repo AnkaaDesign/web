@@ -138,31 +138,51 @@ export function useCancelNfse() {
   });
 }
 
-// Mark boleto as paid via PIX/cash
+// Mark boleto as paid via PIX/cash (multiple receipts + observations)
 export function useMarkBoletoPaid() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ installmentId, paymentMethod, receiptFileId }: {
+    mutationFn: ({
+      installmentId,
+      paymentMethod,
+      receiptFileIds,
+      observations,
+    }: {
       installmentId: string;
       paymentMethod: string;
-      receiptFileId?: string;
-    }) => invoiceService.markBoletoPaid(installmentId, { paymentMethod, receiptFileId }),
+      receiptFileIds?: string[];
+      observations?: string | null;
+    }) =>
+      invoiceService.markBoletoPaid(installmentId, {
+        paymentMethod,
+        receiptFileIds,
+        observations,
+      }),
     onSuccess: () => {
       invalidateAllBillingCaches(queryClient);
     },
   });
 }
 
-// Update installment receipt
-export function useUpdateInstallmentReceipt() {
+// Replace the installment's receipt files and/or update observations
+export function useUpdateInstallmentReceipts() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ installmentId, receiptFileId }: {
+    mutationFn: ({
+      installmentId,
+      receiptFileIds,
+      observations,
+    }: {
       installmentId: string;
-      receiptFileId: string;
-    }) => invoiceService.updateInstallmentReceipt(installmentId, receiptFileId),
+      receiptFileIds?: string[];
+      observations?: string | null;
+    }) =>
+      invoiceService.updateInstallmentReceipts(installmentId, {
+        receiptFileIds,
+        observations,
+      }),
     onSuccess: () => {
       invalidateAllBillingCaches(queryClient);
     },

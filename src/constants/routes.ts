@@ -198,6 +198,12 @@ export const routes = {
     timeClock: {
       list: "/recursos-humanos/controle-ponto",
       root: "/recursos-humanos/controle-ponto",
+      assinaturaDigital: {
+        root: "/recursos-humanos/controle-ponto/assinatura-digital",
+        list: "/recursos-humanos/controle-ponto/assinatura-digital",
+        details: (id: string | number) =>
+          `/recursos-humanos/controle-ponto/assinatura-digital/${id}`,
+      },
     },
     absences: {
       root: "/recursos-humanos/ausencias",

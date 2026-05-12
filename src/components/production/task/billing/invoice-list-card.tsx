@@ -270,7 +270,8 @@ export function InvoiceListCard({ taskId }: InvoiceListCardProps) {
                                         bankSlip={installment.bankSlip}
                                         installmentStatus={installment.status}
                                         installmentPaymentMethod={installment.paymentMethod}
-                                        receiptFile={installment.receiptFile}
+                                        receiptFiles={installment.receiptFiles}
+                                        observations={installment.observations}
                                       />
                                     </div>
                                     {boletoPdfFile && (

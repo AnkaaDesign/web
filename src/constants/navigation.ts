@@ -336,6 +336,7 @@ export const TABLER_ICONS = {
 
   // Biometrics
   fingerprint: "IconFingerprint",
+  signature: "IconSignature",
 
   // ==================== AUTENTICAÇÃO ====================
   login: "IconLogin",
@@ -1509,7 +1510,21 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "cargos-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/cargos/editar/:id", isDynamic: true },
         ],
       },
-      { id: "controle-ponto", title: "Controle de Ponto", icon: "fingerprint", path: "/recursos-humanos/controle-ponto" },
+      {
+        id: "controle-ponto",
+        title: "Controle de Ponto",
+        icon: "fingerprint",
+        path: "/recursos-humanos/controle-ponto",
+        children: [
+          {
+            id: "controle-ponto-assinatura-digital",
+            title: "Assinatura Digital",
+            icon: "signature",
+            path: "/recursos-humanos/controle-ponto/assinatura-digital",
+            requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
+          },
+        ],
+      },
       {
         // Secullum integration — admin tool for mapping sectors↔departamentos
         // and positions↔funções, plus an overview of active/dismissed funcionários.
