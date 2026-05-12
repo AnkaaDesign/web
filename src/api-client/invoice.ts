@@ -76,4 +76,11 @@ export const invoiceService = {
   // Get installment receipt file
   getInstallmentReceipt: (installmentId: string) =>
     apiClient.get(`/invoices/${installmentId}/receipt/download`, { responseType: 'blob' }),
+
+  // Trigger manual boleto reconciliation for a date range (defaults to last 14 days)
+  reconcileBoletos: (params?: { fromDate?: string; toDate?: string }) =>
+    apiClient.post<{ reconciled: number; total: number; datesChecked: string[] }>(
+      '/webhooks/sicredi/reconcile',
+      params ?? {},
+    ),
 };

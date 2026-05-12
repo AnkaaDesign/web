@@ -10,7 +10,10 @@ import type { BillingFilters } from "@/components/financial/billing/billing-filt
 import { SECTOR_PRIVILEGES, FAVORITE_PAGES, routes } from "@/constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useTableFilters } from "@/hooks/common/use-table-filters";
-import { IconFileInvoice, IconFilter } from "@tabler/icons-react";
+import { useUserPrivileges } from "@/hooks/common/use-auth";
+import { useReconcileBoletos } from "@/hooks/production/use-invoice";
+import { useToast } from "@/hooks/common/use-toast";
+import { IconFileInvoice, IconFilter, IconRefresh } from "@tabler/icons-react";
 
 export const BillingPage = () => {
   usePageTracker({
@@ -30,6 +33,28 @@ export const BillingPage = () => {
 
   const [filters, setFilters] = useState<BillingFilters>(defaultBillingFilters);
   const [showFilters, setShowFilters] = useState(false);
+
+  const privileges = useUserPrivileges();
+  const canReconcile =
+    privileges?.includes(SECTOR_PRIVILEGES.ADMIN) ||
+    privileges?.includes(SECTOR_PRIVILEGES.FINANCIAL);
+
+  const { mutate: reconcile, isPending: isReconciling } = useReconcileBoletos();
+  const { toast } = useToast();
+
+  const handleReconcile = () => {
+    reconcile(undefined, {
+      onSuccess: (data) => {
+        toast({
+          title: "Conciliação concluída",
+          description:
+            data.reconciled > 0
+              ? `${data.reconciled} boleto(s) reconciliado(s) de ${data.total} pagamento(s) encontrado(s) nos últimos 14 dias.`
+              : `Nenhum boleto novo encontrado. ${data.total} pagamento(s) verificado(s) nos últimos 14 dias.`,
+        });
+      },
+    });
+  };
 
   const handleFilterApply = useCallback((newFilters: BillingFilters) => {
     setFilters(newFilters);
@@ -60,6 +85,16 @@ export const BillingPage = () => {
             { label: "Faturamento" },
           ]}
           className="flex-shrink-0"
+          actions={canReconcile ? [
+            {
+              key: "reconcile",
+              label: "Conciliar Boletos",
+              icon: IconRefresh,
+              onClick: handleReconcile,
+              loading: isReconciling,
+              variant: "outline",
+            },
+          ] : []}
         />
 
         <div className="flex-1 min-h-0 pb-6 flex flex-col">

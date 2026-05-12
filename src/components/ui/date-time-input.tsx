@@ -315,11 +315,22 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
             newDate.setHours(currentValue.getHours(), currentValue.getMinutes(), 0, 0);
             date = newDate;
           }
+          // For datetime mode with no existing value, default time to 18:00
+          else if (mode === "datetime") {
+            const newDate = new Date(date);
+            newDate.setHours(18, 0, 0, 0);
+            date = newDate;
+          }
           // For date mode, set default time to 13:00
           else if (mode === "date") {
             const newDate = new Date(date);
             newDate.setHours(13, 0, 0, 0);
             date = newDate;
+          }
+
+          // Keep calendarMonth in sync so handleTimeChange uses the correct base date
+          if (mode === "datetime") {
+            setCalendarMonth(date as Date);
           }
 
           const changeHandler = field?.onChange || onChange;
