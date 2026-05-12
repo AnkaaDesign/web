@@ -381,7 +381,7 @@ export function TimeClockEntryEditExport({
   );
 }
 
-interface BuildHtmlOptions {
+export interface BuildHtmlOptions {
   user: User | null;
   startDate: Date;
   endDate: Date;
@@ -390,7 +390,9 @@ interface BuildHtmlOptions {
   horario: HorarioInfo | null;
 }
 
-function buildControlePontoHtml({ user, startDate, endDate, rows, totals, horario }: BuildHtmlOptions): string {
+export { parseSecullumCalculations, fetchHorarioForUser };
+
+export function buildControlePontoHtml({ user, startDate, endDate, rows, totals, horario }: BuildHtmlOptions): string {
   const periodLabel = `${format(startDate, "dd/MM/yyyy")} a ${format(endDate, "dd/MM/yyyy")}`;
   const emissionDate = formatDate(new Date());
 
@@ -545,7 +547,6 @@ function buildControlePontoHtml({ user, startDate, endDate, rows, totals, horari
 
     .page {
       width: 100%;
-      min-height: 279mm; /* A4 (297mm) - top/bottom margins (9mm × 2) */
       display: flex;
       flex-direction: column;
     }
@@ -844,8 +845,8 @@ function buildControlePontoHtml({ user, startDate, endDate, rows, totals, horari
 
     /* ===== Footer (matches dossie pdf) ===== */
     .footer {
-      margin-top: auto;
-      padding-top: 6mm;
+      margin-top: 8mm;
+      padding-top: 0;
     }
     .footer-line {
       height: 1px;

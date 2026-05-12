@@ -188,3 +188,17 @@ export function useUpdateInstallmentReceipts() {
     },
   });
 }
+
+// Manually trigger boleto reconciliation for a date range (defaults to last 14 days).
+// Returns { reconciled, total, datesChecked } from the API.
+export function useReconcileBoletos() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params?: { fromDate?: string; toDate?: string }) =>
+      invoiceService.reconcileBoletos(params).then(r => r.data),
+    onSuccess: () => {
+      invalidateAllBillingCaches(queryClient);
+    },
+  });
+}

@@ -132,6 +132,7 @@ export function CalculationList({ className, mode = 'hr', onExportDataChange, he
         USER_STATUS.EXPERIENCE_PERIOD_2,
         USER_STATUS.EFFECTED
       ],
+      where: { secullumEmployeeId: { not: null } },
       orderBy: { name: "asc" },
       take: 100,
     }
@@ -407,12 +408,18 @@ export function CalculationList({ className, mode = 'hr', onExportDataChange, he
     }));
   }, [usersData]);
 
+  const selectedUser = useMemo(
+    () => usersData?.data?.find((u) => u.id === selectedUserId) ?? (isPersonalMode ? currentUser : null),
+    [usersData, selectedUserId, isPersonalMode, currentUser],
+  );
+
   const exportFilters = useMemo(() => ({
     selectedMonth,
     userId: selectedUserId,
     customStartDate,
     customEndDate,
-  }), [selectedMonth, selectedUserId, customStartDate, customEndDate]);
+    selectedUser,
+  }), [selectedMonth, selectedUserId, customStartDate, customEndDate, selectedUser]);
 
   useEffect(() => {
     onExportDataChange?.({ rows: calculationRows, visibleColumns, filters: exportFilters });

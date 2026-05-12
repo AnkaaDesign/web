@@ -187,7 +187,7 @@ export function AbsenceList({ category, className }: AbsenceListProps) {
       }
     }
     rows.sort((a, b) => {
-      const t = a.dayDate.getTime() - b.dayDate.getTime();
+      const t = b.dayDate.getTime() - a.dayDate.getTime();
       if (t !== 0) return t;
       return a.userName.localeCompare(b.userName, "pt-BR");
     });

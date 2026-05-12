@@ -27,11 +27,14 @@ import {
   IconColumns,
   IconFilter,
   IconLayout,
+  IconPencil,
   IconSearch,
+  IconUser,
 } from "@tabler/icons-react";
 
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../components/ui/tooltip";
 import { Combobox } from "../../components/ui/combobox";
 import {
   Tabs,
@@ -191,6 +194,33 @@ const PUNCH_KEYS: readonly ColumnKey[] = [
 ];
 const BAD_KEYS = new Set<ColumnKey>(["faltas", "atras", "adian"]);
 
+const FONTE_DADOS_MAP: Partial<Record<ColumnKey, string>> = {
+  entrada1: "FonteDadosEntrada1",
+  saida1: "FonteDadosSaida1",
+  entrada2: "FonteDadosEntrada2",
+  saida2: "FonteDadosSaida2",
+  entrada3: "FonteDadosEntrada3",
+  saida3: "FonteDadosSaida3",
+  entrada4: "FonteDadosEntrada4",
+  saida4: "FonteDadosSaida4",
+  entrada5: "FonteDadosEntrada5",
+  saida5: "FonteDadosSaida5",
+};
+
+type ManualMarkerKind = "user-request" | "pencil";
+
+function getManualEntryMarker(
+  entry: any,
+  key: ColumnKey,
+): { kind: ManualMarkerKind; motivo: string | null } | null {
+  const fdField = FONTE_DADOS_MAP[key];
+  if (!fdField || !entry) return null;
+  const fd = entry[fdField];
+  if (!fd || typeof fd !== "object" || fd.Tipo !== 1) return null;
+  const motivo = fd.Motivo ? String(fd.Motivo) : null;
+  return { kind: fd.Origem === 9 ? "user-request" : "pencil", motivo };
+}
+
 // True when a slot value isn't HH:MM and isn't blank — those are the
 // justification tokens (FÉRIAS / FOLGA / ATESTAD / FALTA / FERIADO / …).
 function looksLikeJustification(v: unknown): boolean {
@@ -290,7 +320,42 @@ const COLUMN_CATALOG: DayColumnDef[] = [
         : `Saída ${key.slice(5)}`,
       track: "minmax(0, 0.7fr)",
       align: "center",
-      render: (r) => renderTimeValue(getEntryField(r.entry, key) as string | undefined),
+      render: (r) => {
+        const value = getEntryField(r.entry, key) as string | undefined;
+        const content = renderTimeValue(value);
+        const marker = getManualEntryMarker(r.entry, key);
+        if (!marker || !value) return content;
+        return (
+          <div className="relative inline-flex items-center justify-center w-full">
+            {content}
+            <Tooltip delayDuration={500}>
+              <TooltipTrigger asChild>
+                {marker.kind === "user-request" ? (
+                  <IconUser
+                    className="absolute right-0 top-1/2 -translate-y-1/2 h-3 w-3 text-blue-500 dark:text-blue-400 cursor-default"
+                    strokeWidth={2.5}
+                  />
+                ) : (
+                  <IconPencil
+                    className="absolute right-0 top-1/2 -translate-y-1/2 h-3 w-3 text-rose-500 dark:text-rose-400 cursor-default"
+                    strokeWidth={2.5}
+                  />
+                )}
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[280px]">
+                <div className="space-y-0.5">
+                  <div className="font-semibold">
+                    {marker.kind === "user-request" ? "Solicitado pelo colaborador" : "Inclusão manual"}
+                  </div>
+                  {marker.motivo && (
+                    <div className="text-xs opacity-90 whitespace-pre-wrap">{marker.motivo}</div>
+                  )}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        );
+      },
     }),
   ),
   // ---- aggregates ----

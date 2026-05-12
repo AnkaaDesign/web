@@ -67,6 +67,8 @@ export interface WidgetDefinition<TConfig = unknown> {
   category: WidgetCategory;
   /** Sectors that can use this widget. Use `"*"` to allow everyone. ADMIN always bypasses. */
   allowedSectors: SECTOR_PRIVILEGES[] | "*";
+  /** Sectors explicitly blocked from this widget — takes precedence over allowedSectors and the ADMIN bypass. */
+  blockedSectors?: SECTOR_PRIVILEGES[];
   /** Default size when first added. */
   defaultSize: WidgetSize;
   /** Minimum size constraint (user can't shrink below this). */

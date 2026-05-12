@@ -896,13 +896,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
         }
 
 
-        // Set term date to 18:00 (end of work day) if provided
-        if (changedData.term) {
-          const termDate = new Date(changedData.term);
-          termDate.setHours(18, 0, 0, 0);
-          changedData.term = termDate;
-
-        }
 
         // =====================
         // NORMALIZE DATA TYPES AND FIX ARRAY SERIALIZATION
@@ -1469,7 +1462,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
 
           // CRITICAL: Clean up malformed data before creating FormData
           const fileIdFields = ['artworkIds', 'baseFileIds'];
-          const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate'];
+          const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate', 'term'];
 
           for (const field of fileIdFields) {
             if (field in dataForFormData) {
@@ -1842,7 +1835,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute, navigation
           // CRITICAL: Clean up malformed data before sending
           // Remove empty objects that should be arrays or dates
           const fileIdFields = ['artworkIds', 'baseFileIds'];
-          const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate'];
+          const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate', 'term'];
 
           for (const field of fileIdFields) {
             if (field in submitData) {

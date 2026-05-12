@@ -388,7 +388,8 @@ export function TaskScheduleCalendar() {
             />
           </div>
 
-          <div className="flex items-center rounded-md border border-border bg-muted/40 h-10 p-0.5 flex-shrink-0">
+          <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+          <div className="flex items-center rounded-md border border-border bg-muted/40 h-10 p-0.5">
             <Button
               type="button"
               size="sm"
@@ -409,7 +410,7 @@ export function TaskScheduleCalendar() {
             </Button>
           </div>
 
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1">
             <Button
               type="button"
               variant="outline"
@@ -461,6 +462,7 @@ export function TaskScheduleCalendar() {
             >
               <IconRefresh className={cn("h-4 w-4", isFetching && "animate-spin")} />
             </Button>
+          </div>
           </div>
         </div>
 

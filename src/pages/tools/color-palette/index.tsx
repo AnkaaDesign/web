@@ -747,7 +747,7 @@ export default function TrueColorSystemPage() {
 
   return (
     <PrivilegeRoute
-      requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]}
+      requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}
     >
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         {/* Page Header */}

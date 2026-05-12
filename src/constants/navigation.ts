@@ -1008,11 +1008,17 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
   },
   {
-    id: "minhas-mensagens-logistic",
-    title: "Minhas Mensagens",
-    icon: "message",
-    path: "/pessoal/mensagens",
+    id: "pessoal-logistic",
+    title: "Pessoal",
+    icon: "users",
+    path: "/pessoal/advertencias",
     requiredPrivilege: SECTOR_PRIVILEGES.LOGISTIC,
+    children: [
+      { id: "pessoal-logistic-advertencias", title: "Advertências", icon: "alertTriangle", path: "/pessoal/advertencias" },
+      { id: "pessoal-logistic-calculos", title: "Meus Pontos", icon: "deviceIpadDollar", path: "/pessoal/meus-pontos" },
+      { id: "pessoal-logistic-feriados", title: "Feriados", icon: "holiday", path: "/pessoal/feriados" },
+      { id: "pessoal-logistic-mensagens", title: "Minhas Mensagens", icon: "message", path: "/pessoal/mensagens" },
+    ],
   },
 
   // PRODUCTION_MANAGER - Direct menu items (flat structure, sorted alphabetically)
@@ -1061,6 +1067,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   },
   {
+    id: "controle-de-ponto-production-manager",
+    title: "Controle de Ponto",
+    icon: "fingerprint",
+    path: "/recursos-humanos/controle-ponto",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  },
+  {
     id: "gerenciador-de-arquivos-production-manager",
     title: "Gerenciador de Arquivos",
     icon: "fileManager",
@@ -1077,7 +1090,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
   {
     id: "mensagens-production-manager",
     title: "Mensagens",
-    icon: "messagePlus",
+    icon: "message",
     path: "/administracao/mensagens",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
     children: [
@@ -1093,18 +1106,19 @@ export const NAVIGATION_MENU: MenuItem[] = [
     path: "/pessoal/mensagens",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   },
-  // Pessoal - Company/team HR data section (exclusively for PRODUCTION_MANAGER)
+  // PRODUCTION_MANAGER - Ferramentas (flat items mirroring the full tools section)
   {
-    id: "pessoal-production-manager",
-    title: "Pessoal",
-    icon: "users",
-    path: "/pessoal/advertencias",
+    id: "ferramentas-production-manager",
+    title: "Ferramentas",
+    icon: "tools",
+    path: "/ferramentas",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
     children: [
-      { id: "pessoal-pm-advertencias", title: "Advertências", icon: "alertTriangle", path: "/pessoal/advertencias" },
-      { id: "pessoal-pm-calculos", title: "Cálculos de Ponto", icon: "deviceIpadDollar", path: "/pessoal/calculos-ponto" },
-      { id: "pessoal-pm-feriados", title: "Feriados", icon: "holiday", path: "/pessoal/feriados" },
-      { id: "pessoal-pm-horarios", title: "Horários", icon: "clock", path: "/pessoal/horarios" },
+      { id: "ferramentas-qr-code-pm", title: "Gerador de QR Code", icon: "qrcode", path: "/ferramentas/qr-code" },
+      { id: "ferramentas-paleta-pm", title: "Paleta de Cores", icon: "palette", path: "/ferramentas/paleta" },
+      { id: "ferramentas-calculadora-de-horas-pm", title: "Calculadora de Horas", icon: "clock", path: "/ferramentas/calculadora-de-horas" },
+      { id: "ferramentas-custo-horas-extras-pm", title: "Custo de Horas Extras", icon: "calendarDollar", path: "/ferramentas/custo-horas-extras" },
+      { id: "ferramentas-calculadora-de-mistura-pm", title: "Calculadora de Mistura", icon: "flask", path: "/ferramentas/calculadora-de-mistura" },
     ],
   },
 
@@ -1180,16 +1194,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     icon: "note",
     path: "/producao/observacoes",
     requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
-  },
-  {
-    id: "orcamento-commercial",
-    title: "Orçamentos",
-    icon: "fileDescription",
-    path: "/financeiro/orcamento",
-    requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
-    children: [
-      { id: "orcamento-commercial-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/orcamento/detalhes/:id", isDynamic: true },
-    ],
   },
 
   // PLOTTING - Direct menu items (flat structure, sorted alphabetically)
@@ -1625,11 +1629,14 @@ export const NAVIGATION_MENU: MenuItem[] = [
   },
 
   // FERRAMENTAS
+  // Shown only for hierarchical-nav roles; flat-nav roles (COMMERCIAL, FINANCIAL, DESIGNER,
+  // LOGISTIC, PLOTTING, MAINTENANCE, PRODUCTION_MANAGER) have their own specific items or no tools access.
   {
     id: "ferramentas",
     title: "Ferramentas",
     icon: "tools",
     path: "/ferramentas",
+    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.BASIC, SECTOR_PRIVILEGES.EXTERNAL, TEAM_LEADER],
     children: [
       {
         id: "ferramentas-qr-code",

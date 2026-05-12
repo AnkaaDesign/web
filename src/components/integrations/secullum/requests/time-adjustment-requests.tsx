@@ -380,6 +380,10 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
           // Secullum's TipoSolicitacao on the wire mirrors the request's `Tipo` field
           // (0 = adjust markings, 2 = justify absence).
           TipoSolicitacao: selectedRequest.Tipo ?? 0,
+          // Used server-side to invalidate the Batidas day-cache so the
+          // day view fetches fresh data immediately after approval.
+          FuncionarioId: selectedRequest.FuncionarioId,
+          Data: selectedRequest.Data,
         },
       });
 

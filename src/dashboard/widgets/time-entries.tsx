@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { z } from "zod";
 import { IconClock, IconAdjustments } from "@tabler/icons-react";
+import { SECTOR_PRIVILEGES } from "../../constants";
 import { TimeEntriesCard } from "../../components/home-dashboard";
 import { WidgetCard } from "../components/widget-card";
 import { Section, SectionGroup, ToggleRow } from "./_shared";
@@ -128,6 +129,7 @@ export const timeEntriesWidget: WidgetDefinition<Config> = {
   icon: IconClock,
   category: "hr",
   allowedSectors: "*",
+  blockedSectors: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.PRODUCTION_MANAGER, SECTOR_PRIVILEGES.ADMIN],
   defaultSize: { cols: 2, rows: 2 },
   minSize: { cols: 1, rows: 1 },
   maxSize: { cols: 4, rows: 4 },

@@ -49,6 +49,7 @@ class WidgetRegistry {
     if (!userSector) return [];
     const isAdmin = userSector === SECTOR_PRIVILEGES.ADMIN;
     return this.all().filter((def) => {
+      if (def.blockedSectors?.includes(userSector)) return false;
       if (def.allowedSectors === "*") return true;
       if (isAdmin) return true;
       return def.allowedSectors.includes(userSector);
@@ -79,6 +80,7 @@ class WidgetRegistry {
     if (!userSector) return false;
     const def = this.get(widgetId);
     if (!def) return false;
+    if (def.blockedSectors?.includes(userSector)) return false;
     if (def.allowedSectors === "*") return true;
     if (userSector === SECTOR_PRIVILEGES.ADMIN) return true;
     return def.allowedSectors.includes(userSector);

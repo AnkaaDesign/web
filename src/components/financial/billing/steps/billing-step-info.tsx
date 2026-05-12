@@ -3,11 +3,13 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
-import { formatCNPJ } from "@/utils";
-import { IconUsers, IconAlertTriangle, IconTrash } from "@tabler/icons-react";
+import { formatCNPJ, formatBrazilianPhone } from "@/utils";
+import { IconUsers, IconUser, IconAlertTriangle, IconTrash } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { getCustomers } from "@/api-client/customer";
+import { useResponsibles } from "@/hooks/administration/use-responsible";
 
 interface BillingStepInfoProps {
   task?: any;
@@ -18,6 +20,14 @@ interface BillingStepInfoProps {
 export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoProps) {
   const { control, setValue, getValues } = useFormContext();
   const customerConfigs = useWatch({ control, name: "customerConfigs" }) || [];
+
+  const { data: responsiblesData } = useResponsibles({ isActive: true, pageSize: 200 });
+  const allResponsibles = responsiblesData?.data || [];
+  const responsibleOptions = allResponsibles.map((r: any) => ({
+    value: r.id,
+    label: r.name,
+    description: r.phone ? formatBrazilianPhone(r.phone) : undefined,
+  }));
 
   // Pin Ankaa customer first
   const PINNED_CUSTOMER_ID = "93dfbeb1-aec0-4829-a297-6a2f09fcfe08";
@@ -86,7 +96,6 @@ export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoPro
           subtotal: 0,
           total: 0,
           paymentCondition: null,
-
           customPaymentText: null,
           generateInvoice: true,
           generateBankSlip: true,
@@ -130,8 +139,8 @@ export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoPro
   };
 
   return (
-    <div>
-      {/* Invoice-To Customers */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Faturar Para */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -223,7 +232,62 @@ export function BillingStepInfo({ disabled, customersCache }: BillingStepInfoPro
           )}
         </CardContent>
       </Card>
+
+      {/* Responsável pelo Orçamento */}
+      {customerConfigs.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <IconUser className="h-4 w-4 text-muted-foreground" />
+              Responsável pelo Orçamento
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {customerConfigs.map((config: any, i: number) => {
+              const cached = customersCache.current.get(config.customerId);
+              const customerName = config.customerData?.corporateName || config.customerData?.fantasyName || cached?.corporateName || cached?.fantasyName || "Cliente";
+              const selectedResp = allResponsibles.find((r: any) => r.id === config.responsibleId);
+
+              return (
+                <div key={config.customerId} className="space-y-4">
+                  <div className="space-y-2">
+                    {customerConfigs.length > 1 && (
+                      <Label className="text-xs text-muted-foreground">{customerName}</Label>
+                    )}
+                    <Combobox
+                      value={config.responsibleId || ""}
+                      onValueChange={(v) =>
+                        setValue(`customerConfigs.${i}.responsibleId`, v || null, { shouldDirty: true })
+                      }
+                      options={responsibleOptions}
+                      placeholder="Selecione o responsável..."
+                      searchPlaceholder="Buscar responsável..."
+                      emptyText="Nenhum responsável encontrado"
+                      clearable
+                      searchable
+                      disabled={disabled}
+                      className="w-full"
+                    />
+                  </div>
+                  {selectedResp && (
+                    <div className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-3">
+                      <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                        <IconUser className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{selectedResp.name}</div>
+                        {selectedResp.phone && (
+                          <div className="text-xs text-muted-foreground">{formatBrazilianPhone(selectedResp.phone)}</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
-

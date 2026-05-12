@@ -64,6 +64,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      emptyOutDir: false,
       target: "es2022",
       // Enable source maps for production debugging
       sourcemap: mode === "production" ? "hidden" : true,

@@ -8,13 +8,16 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconLoader2,
+  IconPencil,
+  IconUser,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { useSecullumTimeEntriesByDay } from "../../../hooks";
+import { useSecullumTimeEntriesByDay, useSecullumHolidays } from "../../../hooks";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import { ColumnVisibilityManager } from "@/components/integrations/secullum/calculations/list";
 import type { ColumnDef } from "@/components/integrations/secullum/calculations/list";
 import { renderTimeValue, renderHourValue } from "@/components/integrations/secullum/cell-renderers";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { DayExportRow } from "./time-clock-day-view-export";
 
 // Visualização Dia mirrors Visualização Colaborador's column set so the two
@@ -109,6 +112,36 @@ const HOUR_KEYS = new Set([
 // Debit columns — positive value is bad (red), see renderHourValue("bad").
 const BAD_KEYS = new Set(["faltas", "atras", "adian"]);
 
+// Map column keys to Secullum FonteDados<Field> — present only on time-entry columns.
+const DAY_VIEW_FONTE_DADOS_MAP: Record<string, string> = {
+  entrada1: "FonteDadosEntrada1",
+  saida1: "FonteDadosSaida1",
+  entrada2: "FonteDadosEntrada2",
+  saida2: "FonteDadosSaida2",
+  entrada3: "FonteDadosEntrada3",
+  saida3: "FonteDadosSaida3",
+  entrada4: "FonteDadosEntrada4",
+  saida4: "FonteDadosSaida4",
+  entrada5: "FonteDadosEntrada5",
+  saida5: "FonteDadosSaida5",
+};
+
+type ManualEntryKind = "user-request" | "pencil";
+
+// FonteDados<Field>.Tipo: 0 = electronic punch, 1 = manual entry.
+// Origem 9 = employee-requested adjustment; all others = HR edit.
+function getManualEntryMarker(
+  entry: any,
+  key: string,
+): { kind: ManualEntryKind; motivo: string | null } | null {
+  const fdField = DAY_VIEW_FONTE_DADOS_MAP[key];
+  if (!fdField || !entry) return null;
+  const fd = entry[fdField];
+  if (!fd || typeof fd !== "object" || fd.Tipo !== 1) return null;
+  const motivo = fd.Motivo ? String(fd.Motivo) : null;
+  return { kind: fd.Origem === 9 ? "user-request" : "pencil", motivo };
+}
+
 interface TimeClockDayViewProps {
   className?: string;
   onExportDataChange?: (
@@ -159,6 +192,23 @@ export function TimeClockDayView({ className, onExportDataChange }: TimeClockDay
   );
 
   const isVisible = (key: string) => !visibleColumns || visibleColumns.has(key);
+
+  const { data: holidaysData } = useSecullumHolidays({ year: selectedDate.getFullYear() });
+
+  const holidayDates = useMemo(() => {
+    const set = new Set<string>();
+    const root = holidaysData?.data;
+    const list: any[] = Array.isArray(root) ? root : Array.isArray((root as any)?.data) ? (root as any).data : [];
+    for (const h of list) {
+      const raw = h?.Data;
+      if (!raw) continue;
+      const ymd = String(raw).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(ymd)) set.add(ymd);
+    }
+    return set;
+  }, [holidaysData]);
+
+  const isHoliday = holidayDates.has(dateStr);
 
   const handleDateChange = (date: Date | null | any) => {
     if (date && typeof date === "object" && "getTime" in date && !isNaN(date.getTime())) {
@@ -240,13 +290,76 @@ export function TimeClockDayView({ className, onExportDataChange }: TimeClockDay
     if (!entry) return <span className="text-muted-foreground">-</span>;
     const secullumKey = SECULLUM_FIELD_MAP[key];
     const value = entry[secullumKey];
+
     if (BOOL_KEYS.has(key)) {
       return value ? <span className="text-sm">Sim</span> : <span className="text-muted-foreground">-</span>;
     }
     if (HOUR_KEYS.has(key)) {
       return renderHourValue(value, BAD_KEYS.has(key) ? "bad" : "good");
     }
-    return renderTimeValue(value);
+
+    // Time entry cell (entrada1..saida5):
+    // /Batidas leaves time cells null on holidays/folga days — derive the
+    // label client-side the same way the Edit view does.
+    const derivedLabel: string | null = !value
+      ? isHoliday
+        ? "FERIADO"
+        : entry["Folga"]
+          ? "FOLGA"
+          : null
+      : null;
+
+    let content: React.ReactNode;
+    if (derivedLabel) {
+      content = (
+        <span
+          className={cn(
+            "text-xs font-semibold uppercase tracking-wide",
+            derivedLabel === "FERIADO"
+              ? "text-cyan-700 dark:text-cyan-300"
+              : "text-emerald-700 dark:text-emerald-400",
+          )}
+        >
+          {derivedLabel}
+        </span>
+      );
+    } else {
+      content = renderTimeValue(value);
+    }
+
+    const marker = getManualEntryMarker(entry, key);
+    if (!marker || !value) return content;
+
+    return (
+      <div className="relative inline-flex items-center justify-center w-full">
+        {content}
+        <Tooltip delayDuration={500}>
+          <TooltipTrigger asChild>
+            {marker.kind === "user-request" ? (
+              <IconUser
+                className="absolute right-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-blue-500 dark:text-blue-400 cursor-default"
+                strokeWidth={2.5}
+              />
+            ) : (
+              <IconPencil
+                className="absolute right-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-rose-500 dark:text-rose-400 cursor-default"
+                strokeWidth={2.5}
+              />
+            )}
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[280px]">
+            <div className="space-y-0.5">
+              <div className="font-semibold">
+                {marker.kind === "user-request" ? "Solicitado pelo colaborador" : "Inclusão manual"}
+              </div>
+              {marker.motivo && (
+                <div className="text-xs opacity-90 whitespace-pre-wrap">{marker.motivo}</div>
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    );
   };
 
   return (

@@ -2,7 +2,12 @@ import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/compo
 import { toast } from "@/components/ui/sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { formatDate, formatDateTime } from "../../../../../utils";
+import { secullumService } from "@/api-client";
+import {
+  buildControlePontoHtml,
+  parseSecullumCalculations,
+  fetchHorarioForUser,
+} from "@/components/human-resources/time-clock-entry/time-clock-entry-edit-export";
 
 interface CalculationRow {
   id: string;
@@ -111,16 +116,15 @@ export function CalculationExport({
     switch (format) {
       case "csv":
         await exportToCSV(cleanedItems, columns);
+        toast.success("Exportação CSV concluída com sucesso!");
         break;
       case "excel":
         await exportToExcel(cleanedItems, columns);
         break;
       case "pdf":
-        await exportToPDF(cleanedItems, columns);
+        await exportToPDF();
         break;
     }
-
-    toast.success(`Exportação ${format.toUpperCase()} concluída com sucesso!`);
   };
 
   const fetchAllItems = async (): Promise<CalculationRow[]> => {
@@ -165,233 +169,59 @@ export function CalculationExport({
     toast.info("Formato Excel não disponível - arquivo exportado como CSV");
   };
 
-  const exportToPDF = async (items: CalculationRow[], columns: ExportColumn<CalculationRow>[]) => {
-    const columnCount = columns.length;
-    const fontSize = columnCount <= 8 ? "10px" : columnCount <= 14 ? "9px" : "8px";
-    const headerFontSize = columnCount <= 8 ? "9px" : columnCount <= 14 ? "8px" : "7px";
-    const cellPadding = columnCount <= 8 ? "5px 4px" : "3px 3px";
-    const headerPadding = columnCount <= 8 ? "6px 4px" : "4px 3px";
+  const exportToPDF = async () => {
+    const userId = filters.userId as string | undefined;
+    const startDate = filters.customStartDate as Date | null;
+    const endDate = filters.customEndDate as Date | null;
+    const user = filters.selectedUser ?? null;
 
-    const periodLabel = (() => {
-      if (filters.customStartDate && filters.customEndDate) {
-        return `${formatDate(filters.customStartDate)} a ${formatDate(filters.customEndDate)}`;
+    if (!userId || !startDate || !endDate) {
+      toast.error("Selecione um colaborador e o período antes de exportar o PDF");
+      return;
+    }
+
+    const loadingId = toast.loading("Gerando PDF do controle de ponto…");
+    try {
+      const startStr = format(startDate, "yyyy-MM-dd");
+      const endStr = format(endDate, "yyyy-MM-dd");
+
+      const [calcResp, horario] = await Promise.all([
+        secullumService.getCalculations({ userId, startDate: startStr, endDate: endStr, page: 1, take: 100 }),
+        fetchHorarioForUser(user),
+      ]);
+
+      const { rows, totals } = parseSecullumCalculations(calcResp?.data);
+
+      if (!rows.length) {
+        toast.dismiss(loadingId);
+        toast.error("Nenhum registro encontrado para o período selecionado");
+        return;
       }
-      if (filters.selectedMonth) {
-        return format(filters.selectedMonth, "MMMM 'de' yyyy", { locale: ptBR });
+
+      const html = buildControlePontoHtml({ user, startDate, endDate, rows, totals, horario });
+
+      const win = window.open("", "_blank");
+      if (!win) {
+        toast.dismiss(loadingId);
+        toast.error("Bloqueador de pop-up impediu a exportação");
+        return;
       }
-      return "Período não especificado";
-    })();
-
-    const pdfContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Cálculos de Ponto - ${formatDate(new Date())}</title>
-        <style>
-          @page {
-            size: A4;
-            margin: 10mm;
-          }
-
-          * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-          }
-
-          html, body {
-            height: 100vh;
-            width: 100vw;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: white;
-            font-size: ${fontSize};
-            line-height: 1.2;
-          }
-
-          body {
-            display: grid;
-            grid-template-rows: auto 1fr auto;
-            min-height: 100vh;
-            padding: 0;
-          }
-
-          .header {
-            margin-bottom: 12px;
-            flex-shrink: 0;
-          }
-
-          .logo {
-            width: 140px;
-            height: auto;
-            margin-bottom: 8px;
-          }
-
-          .header-info {
-          }
-
-          .header-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #1f2937;
-            margin-bottom: 4px;
-          }
-
-          .info {
-            color: #6b7280;
-            font-size: 10px;
-          }
-
-          .info p {
-            margin: 1px 0;
-          }
-
-          .content-wrapper {
-            flex: 1;
-            overflow: auto;
-            min-height: 0;
-            padding-bottom: 35px;
-          }
-
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: ${fontSize};
-          }
-
-          th {
-            background-color: hsl(142, 72%, 29%);
-            font-weight: 600;
-            color: #ffffff;
-            padding: ${headerPadding};
-            border: 1px solid hsl(142, 72%, 25%);
-            font-size: ${headerFontSize};
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            text-align: left;
-          }
-
-          td {
-            padding: ${cellPadding};
-            border-left: 1px solid #e5e7eb;
-            border-right: 1px solid #e5e7eb;
-            border-bottom: 1px solid #e5e7eb;
-            border-top: none;
-            vertical-align: middle;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-            color: #374151;
-          }
-
-          tbody tr:nth-child(even) {
-            background-color: #fafafa;
-          }
-
-          .text-left { text-align: left; }
-          .text-center { text-align: center; }
-          .text-right { text-align: right; }
-
-          .footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 10px;
-            border-top: 1px solid #e5e7eb;
-            color: #6b7280;
-            font-size: 9px;
-            flex-shrink: 0;
-            background: white;
-          }
-
-          .footer-left {
-            flex: 1;
-          }
-
-          .footer-right {
-            text-align: right;
-          }
-
-          @media print {
-            @page {
-              size: A4;
-              margin: 8mm;
-            }
-
-            .footer {
-              position: fixed;
-              bottom: 6mm;
-              left: 6mm;
-              right: 6mm;
-              background: white;
-              font-size: 7px;
-            }
-
-            .content-wrapper {
-              padding-bottom: 50px;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
-          <h1 class="header-title">Cálculos de Ponto</h1>
-          <div class="header-info">
-            <div class="info">
-              <p><strong>Período:</strong> ${periodLabel}</p>
-              <p><strong>Total de registros:</strong> ${items.length}</p>
-              <p><strong>Colunas:</strong> ${columnCount}</p>
-              <p><strong>Gerado em:</strong> ${formatDateTime(new Date())}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="content-wrapper">
-          <table>
-            <thead>
-              <tr>
-                ${columns.map((col) => `<th class="text-left">${col.label}</th>`).join("")}
-              </tr>
-            </thead>
-            <tbody>
-              ${items.map((item) => `
-                <tr>
-                  ${columns.map((col) => `<td class="text-left">${col.getValue(item) || "-"}</td>`).join("")}
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="footer">
-          <div class="footer-left">
-            <p>Cálculos de Ponto - Sistema Ankaa</p>
-          </div>
-          <div class="footer-right">
-            <p><strong>Gerado em:</strong> ${formatDate(new Date())} ${new Date().toLocaleTimeString('pt-BR')}</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(pdfContent);
-      printWindow.document.close();
-      printWindow.focus();
-
-      printWindow.onload = () => {
-        printWindow.print();
-        printWindow.onafterprint = () => {
-          printWindow.close();
-        };
+      win.document.write(html);
+      win.document.close();
+      win.onload = () => {
+        win.focus();
+        win.print();
+        win.onafterprint = () => { try { win.close(); } catch { /* ignore */ } };
       };
+      toast.dismiss(loadingId);
+      toast.success("PDF gerado — janela de impressão aberta");
+    } catch (err) {
+      toast.dismiss(loadingId);
+      const message =
+        (err as any)?.response?.data?.message ||
+        (err as any)?.message ||
+        "Erro ao gerar PDF do controle de ponto";
+      toast.error(message);
     }
   };
 

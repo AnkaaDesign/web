@@ -379,7 +379,8 @@ export function AbsencesCalendar() {
             />
           </div>
 
-          <div className="flex items-center gap-1 rounded-md border border-border p-0.5 bg-background flex-shrink-0">
+          <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+          <div className="flex items-center gap-1 rounded-md border border-border p-0.5 bg-background">
             <Button
               type="button"
               size="sm"
@@ -400,7 +401,7 @@ export function AbsencesCalendar() {
             </Button>
           </div>
 
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1">
             <Button
               type="button"
               variant="outline"
@@ -441,6 +442,7 @@ export function AbsencesCalendar() {
             >
               <IconChevronRight className="h-4 w-4" />
             </Button>
+          </div>
           </div>
         </div>
 

@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:with-tsc": "tsc -b && vite build",
+    "build": "rm -rf dist/assets dist/index.html && vite build",
+    "build:with-tsc": "rm -rf dist/assets dist/index.html && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
