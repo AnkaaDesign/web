@@ -6,7 +6,7 @@
 // list page uses. Combobox is used for every dropdown to match the rest of the
 // dashboard table widgets.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import {
@@ -17,7 +17,7 @@ import {
 } from "@tabler/icons-react";
 
 import { BORROW_STATUS, BORROW_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../constants";
-import { useBorrows } from "../../hooks/inventory/use-borrow";
+import { useBorrows, useBorrowMutations } from "../../hooks/inventory/use-borrow";
 import { useItemBrands } from "../../hooks/inventory/use-item-brand";
 import { useItemCategories } from "../../hooks/inventory/use-item-category";
 import { useItems } from "../../hooks/inventory/use-item";
@@ -28,9 +28,26 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Combobox } from "../../components/ui/combobox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "../../components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
+import { IconArrowBackUp, IconEye, IconTrash } from "@tabler/icons-react";
 
 import { WidgetCard } from "../components/widget-card";
-import { ColumnPicker } from "../components/column-picker";
+import { ColumnPicker, type ColumnSort } from "../components/column-picker";
 import {
   AccentPicker,
   makeAccentSchema,
@@ -39,7 +56,7 @@ import {
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
 import type {
   WidgetConfigProps,
@@ -48,9 +65,9 @@ import type {
 } from "../types";
 import {
   Section,
+  SectionGroup,
   ToggleRow,
   LimitInput,
-  SORT_DIRECTION_OPTIONS,
   DENSITY_VALUES,
   DENSITY_OPTIONS,
   densityClasses,
@@ -291,16 +308,6 @@ const SORT_KEYS = [
   "updatedAt",
 ] as const;
 
-const SORT_LABELS: Record<(typeof SORT_KEYS)[number], string> = {
-  createdAt: "Emprestado em",
-  returnedAt: "Devolvido em",
-  status: "Status",
-  quantity: "Quantidade",
-  itemName: "Nome do item",
-  userName: "Nome do usuário",
-  updatedAt: "Atualizado em",
-};
-
 const CREATED_PRESETS = [
   "any",
   "today",
@@ -322,7 +329,6 @@ export const borrowTableConfigSchema = z.object({
   accent: makeAccentSchema({
     color: "violet",
     icon: "Package",
-    borderColor: "none",
   }),
   columns: z
     .array(z.enum(COLUMN_KEY_VALUES))
@@ -351,22 +357,27 @@ export const borrowTableConfigSchema = z.object({
       hideReturned: true,
       onlyOverdue: false,
     }),
-  sort: z
-    .object({
-      key: z.enum(SORT_KEYS).default("createdAt"),
-      direction: z.enum(["asc", "desc"]).default("desc"),
-    })
-    .default({ key: "createdAt", direction: "desc" }),
+  // Multi-sort. The list is consumed in order — first item is the primary sort
+  // key. Per-column sort chips inside `<ColumnPicker>` add/remove/reorder them.
+  sorts: z
+    .array(
+      z.object({
+        key: z.string(),
+        direction: z.enum(["asc", "desc"]),
+      }),
+    )
+    .default([{ key: "createdAt", direction: "desc" }]),
   limit: z.number().int().min(5).max(200).default(30),
-  showHeader: z.boolean().default(true),
-  showRowDot: z.boolean().default(true),
   display: z
     .object({
       density: z.enum(DENSITY_VALUES).default("comfortable"),
+      // striping/gridLines/hoverHighlight kept for back-compat but hardcoded ON.
       striping: z.boolean().default(true),
       gridLines: z.boolean().default(true),
       hoverHighlight: z.boolean().default(true),
       stickyHeader: z.boolean().default(true),
+      showHeader: z.boolean().default(true),
+      showCount: z.boolean().default(true),
     })
     .default({
       density: "comfortable",
@@ -374,6 +385,8 @@ export const borrowTableConfigSchema = z.object({
       gridLines: true,
       hoverHighlight: true,
       stickyHeader: true,
+      showHeader: true,
+      showCount: true,
     }),
 });
 
@@ -426,22 +439,27 @@ const SORT_KEY_TO_API: Record<(typeof SORT_KEYS)[number], string> = {
 };
 
 function buildOrderBy(
-  sort: BorrowTableConfig["sort"],
-): Record<string, unknown> | Record<string, unknown>[] {
-  const apiKey = SORT_KEY_TO_API[sort.key];
-  // Nested keys like "item.name" need the Prisma nested orderBy shape.
-  if (apiKey.includes(".")) {
-    const [rel, field] = apiKey.split(".");
-    return { [rel]: { [field]: sort.direction } };
-  }
-  return { [apiKey]: sort.direction };
+  sorts: BorrowTableConfig["sorts"],
+): Record<string, unknown>[] {
+  // Multi-sort: each entry maps to its API key, falling back to the raw key
+  // when the alias map doesn't have it. Nested keys like "item.name" need the
+  // Prisma nested orderBy shape.
+  return (sorts ?? []).map((s) => {
+    const apiKey =
+      (SORT_KEY_TO_API as Record<string, string>)[s.key] ?? s.key;
+    if (apiKey.includes(".")) {
+      const [rel, field] = apiKey.split(".");
+      return { [rel]: { [field]: s.direction } };
+    }
+    return { [apiKey]: s.direction };
+  });
 }
 
 function buildParams(config: BorrowTableConfig): Record<string, unknown> {
   const f = config.filters;
   const params: Record<string, unknown> = {
     take: config.limit,
-    orderBy: buildOrderBy(config.sort),
+    orderBy: buildOrderBy(config.sorts),
     include: {
       item: { include: { brand: true, category: true } },
       user: { include: { sector: true } },
@@ -480,7 +498,30 @@ function BorrowTableRender({
   const params = useMemo(() => buildParams(config), [config]);
 
   const { data, isLoading, isError } = useBorrows(params as any);
+  const { updateAsync, deleteAsync: deleteBorrowAsync } = useBorrowMutations();
   const allRows = (data?.data ?? []) as any[];
+
+  // Right-click context menu state.
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    borrow: any;
+  } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ borrow: any } | null>(null);
+
+  const handleContextMenu = (e: React.MouseEvent, borrow: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, borrow });
+  };
+
+  const markAsReturned = async (borrow: any) => {
+    try {
+      await updateAsync({ id: borrow.id, data: { status: BORROW_STATUS.RETURNED } } as any);
+    } catch {
+      // mutation hooks fire toasts on failure
+    }
+  };
 
   // onlyOverdue is a client-side filter — the API doesn't expose it directly.
   const rows = useMemo(() => {
@@ -504,27 +545,27 @@ function BorrowTableRender({
       resolveAccent({
         color: config.accent?.color as WidgetAccentColor,
         icon: config.accent?.icon as WidgetAccentIcon,
+        shade: config.accent?.shade as WidgetAccentShade | undefined,
       }),
-    [config.accent?.color, config.accent?.icon],
+    [config.accent?.color, config.accent?.icon, config.accent?.shade],
   );
   const AccentIcon = accent.Icon;
-  const showRowDot =
-    config.showRowDot &&
-    (config.columns[0] === "itemName" || config.columns[0] === "itemUniCode");
   const display = config.display;
   const dens = densityClasses(display.density as Density);
   const stickyClass = display.stickyHeader ? "sticky top-0 z-20" : "";
-  const rowBorder = display.gridLines ? "border-b border-border last:border-b-0" : "";
-  const rowHover = display.hoverHighlight ? "hover:bg-secondary/50" : "";
+  // Hardcoded chrome — striping/gridLines/hoverHighlight no longer configurable.
+  const rowBorder = "border-b border-border last:border-b-0";
+  const rowHover = "hover:bg-secondary/50";
 
   return (
     <WidgetCard
-      showHeader={config.showHeader}
+      showHeader={config.display.showHeader ?? true}
       title={<span className={accent.classes.text}>{config.title}</span>}
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       viewAllHref={routes.inventory.loans.list}
-      count={!isLoading ? visibleCount : null}
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      count={(config.display.showCount ?? true) && !isLoading ? visibleCount : null}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
     >
       <>
         <div
@@ -553,29 +594,94 @@ function BorrowTableRender({
             <div
               key={b.id}
               className={`grid gap-x-3 items-center ${dens.row} cursor-pointer ${rowBorder} transition-colors ${rowHover} ${
-                display.striping && i % 2 === 1 ? "bg-muted/20" : ""
+                i % 2 === 1 ? "bg-muted/20" : ""
               }`}
               style={{ gridTemplateColumns: gridTemplate }}
               onClick={() => navigate(routes.inventory.loans.details(b.id))}
+              onContextMenu={(e) => handleContextMenu(e, b)}
             >
-              {cols.map((c, idx) => (
+              {cols.map((c) => (
                 <div key={c.key} className="min-w-0 overflow-hidden">
-                  {idx === 0 && showRowDot ? (
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className={`h-2 w-2 rounded-full shrink-0 ${accent.classes.dot}`}
-                        aria-hidden="true"
-                      />
-                      {c.render(b)}
-                    </div>
-                  ) : (
-                    c.render(b)
-                  )}
+                  {c.render(b)}
                 </div>
               ))}
             </div>
           ))
         )}
+
+        {/* Right-click context menu — Radix manages open state and click-out
+            on its own; no manual document listener (it would intercept the
+            item's onClick and the action would never fire). */}
+        <DropdownMenu
+          open={!!contextMenu}
+          onOpenChange={(open) => !open && setContextMenu(null)}
+        >
+          <DropdownMenuContent
+            style={{
+              position: "fixed",
+              left: contextMenu?.x,
+              top: contextMenu?.y,
+            }}
+            className="w-48"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            <DropdownMenuItem
+              onClick={() =>
+                contextMenu &&
+                navigate(routes.inventory.loans.details(contextMenu.borrow.id))
+              }
+            >
+              <IconEye className="mr-2 h-4 w-4" />
+              Abrir detalhes
+            </DropdownMenuItem>
+            {contextMenu?.borrow.status === BORROW_STATUS.ACTIVE && (
+              <DropdownMenuItem onClick={() => markAsReturned(contextMenu.borrow)}>
+                <IconArrowBackUp className="mr-2 h-4 w-4 text-green-700" />
+                Marcar como devolvido
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() =>
+                contextMenu && setDeleteDialog({ borrow: contextMenu.borrow })
+              }
+              className="text-destructive"
+            >
+              <IconTrash className="mr-2 h-4 w-4" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <AlertDialog
+          open={!!deleteDialog}
+          onOpenChange={(open) => !open && setDeleteDialog(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir empréstimo?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  if (!deleteDialog) return;
+                  try {
+                    await deleteBorrowAsync(deleteDialog.borrow.id);
+                  } finally {
+                    setDeleteDialog(null);
+                  }
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </>
     </WidgetCard>
   );
@@ -639,10 +745,8 @@ function BorrowTableConfigComponent({
     key: K,
     value: BorrowTableConfig["filters"][K],
   ) => onChange({ ...c, filters: { ...c.filters, [key]: value } });
-  const setSort = <K extends keyof BorrowTableConfig["sort"]>(
-    key: K,
-    value: BorrowTableConfig["sort"][K],
-  ) => onChange({ ...c, sort: { ...c.sort, [key]: value } });
+  // Sort state is now driven by the column-picker's per-row chips — no
+  // explicit setSort is needed; ColumnPicker calls onSortsChange directly.
   const setDisplay = <K extends keyof BorrowTableConfig["display"]>(
     key: K,
     value: BorrowTableConfig["display"][K],
@@ -692,24 +796,9 @@ function BorrowTableConfigComponent({
     [usersData?.data],
   );
 
-  const resetFilters = () => set("filters", borrowTableWidget.defaultConfig.filters);
-
   const currentAccentColor = (c.accent?.color ?? "violet") as WidgetAccentColor;
   const currentAccentIcon = (c.accent?.icon ?? "Package") as WidgetAccentIcon;
-  const currentBorderColor = (c.accent?.borderColor ?? "none") as WidgetBorderColor;
-  const setAccent = (
-    patch: Partial<{
-      color: WidgetAccentColor;
-      icon: WidgetAccentIcon;
-      borderColor: WidgetBorderColor;
-    }>,
-  ) =>
-    set("accent", {
-      color: currentAccentColor,
-      icon: currentAccentIcon,
-      borderColor: currentBorderColor,
-      ...patch,
-    } as BorrowTableConfig["accent"]);
+  const currentAccentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
 
   return (
     <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1 -mr-1">
@@ -737,257 +826,179 @@ function BorrowTableConfigComponent({
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{
-                color: currentAccentColor,
-                icon: currentAccentIcon,
-                borderColor: currentBorderColor,
-              }}
-              onChange={(next) =>
-                setAccent({
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                })
-              }
-            />
-          </Section>
-          <Section title="Visibilidade" defaultOpen>
-            <div className="grid grid-cols-2 gap-2">
-              <ToggleRow
-                label="Exibir cabeçalho do widget"
-                checked={c.showHeader}
-                onCheckedChange={(v) => set("showHeader", v)}
-              />
-              <ToggleRow
-                label="Bolinha colorida nas linhas"
-                hint="Marca cada linha com a cor do acento. Aparece apenas quando a primeira coluna é Item ou Código."
-                checked={c.showRowDot}
-                onCheckedChange={(v) => set("showRowDot", v)}
-              />
-            </div>
-          </Section>
-          <Section title="Densidade e linhas" defaultOpen>
-            <div className="space-y-1">
-              <Label className="text-xs">Densidade</Label>
-              <Combobox
-                mode="single"
-                value={c.display?.density ?? "comfortable"}
-                onValueChange={(v) =>
-                  setDisplay(
-                    "density",
-                    (typeof v === "string" ? v : "comfortable") as Density,
-                  )
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{
+                  color: currentAccentColor,
+                  icon: currentAccentIcon,
+                  shade: currentAccentShade,
+                }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || currentAccentColor,
+                    icon: next.icon || currentAccentIcon,
+                    shade: next.shade || currentAccentShade,
+                  } as BorrowTableConfig["accent"])
                 }
-                options={DENSITY_OPTIONS}
-                clearable={false}
               />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <ToggleRow
-                label="Listras zebra"
-                hint="Alterna fundo nas linhas pares para facilitar leitura."
-                checked={c.display?.striping ?? true}
-                onCheckedChange={(v) => setDisplay("striping", v)}
-              />
-              <ToggleRow
-                label="Linhas divisórias"
-                checked={c.display?.gridLines ?? true}
-                onCheckedChange={(v) => setDisplay("gridLines", v)}
-              />
-              <ToggleRow
-                label="Realçar linha sob o cursor"
-                checked={c.display?.hoverHighlight ?? true}
-                onCheckedChange={(v) => setDisplay("hoverHighlight", v)}
-              />
-              <ToggleRow
-                label="Cabeçalho fixo"
-                hint="O cabeçalho permanece visível ao rolar."
-                checked={c.display?.stickyHeader ?? true}
-                onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-              />
-            </div>
-          </Section>
+            </Section>
+            <Section title="Densidade e linhas">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Densidade</Label>
+                  <Combobox
+                    mode="single"
+                    value={c.display?.density ?? "comfortable"}
+                    onValueChange={(v) =>
+                      setDisplay(
+                        "density",
+                        (typeof v === "string" ? v : "comfortable") as Density,
+                      )
+                    }
+                    options={DENSITY_OPTIONS}
+                    clearable={false}
+                  />
+                </div>
+                <ToggleRow
+                  label="Cabeçalho fixo"
+                  checked={c.display?.stickyHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Cabeçalho e link">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={c.display?.showHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("showHeader", v)}
+                />
+                <ToggleRow
+                  label="Exibir contagem"
+                  checked={c.display?.showCount ?? true}
+                  onCheckedChange={(v) => setDisplay("showCount", v)}
+                />
+              </div>
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         {/* ---- COLUMNS & SORTING ---- */}
         <TabsContent value="columns" className="space-y-3 mt-0">
-          <Section title="Selecionar e reordenar" defaultOpen>
-            <ColumnPicker
-              catalog={COLUMN_CATALOG.map((col) => ({
-                key: col.key,
-                label: col.label,
-              }))}
-              selected={c.columns}
-              onChange={(next) =>
-                set("columns", next as BorrowTableConfig["columns"])
-              }
-            />
-          </Section>
-          <Section title="Ordenação e limite" defaultOpen>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Ordenar por</Label>
-                <Combobox
-                  mode="single"
-                  value={c.sort.key}
-                  onValueChange={(v) =>
-                    setSort(
-                      "key",
-                      (typeof v === "string"
-                        ? v
-                        : "createdAt") as BorrowTableConfig["sort"]["key"],
-                    )
-                  }
-                  options={SORT_KEYS.map((k) => ({
-                    value: k,
-                    label: SORT_LABELS[k],
-                  }))}
-                  clearable={false}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Direção</Label>
-                <Combobox
-                  mode="single"
-                  value={c.sort.direction}
-                  onValueChange={(v) =>
-                    setSort(
-                      "direction",
-                      (typeof v === "string"
-                        ? v
-                        : "desc") as BorrowTableConfig["sort"]["direction"],
-                    )
-                  }
-                  options={SORT_DIRECTION_OPTIONS}
-                  clearable={false}
-                />
-              </div>
-            </div>
-            <LimitInput value={c.limit} onChange={(n) => set("limit", n)} />
-          </Section>
+          <ColumnPicker
+            catalog={COLUMN_CATALOG.map((col) => ({
+              key: col.key,
+              label: col.label,
+            }))}
+            selected={c.columns}
+            onChange={(next) =>
+              set("columns", next as BorrowTableConfig["columns"])
+            }
+            sorts={c.sorts as ColumnSort<ColumnKey>[]}
+            onSortsChange={(next) =>
+              set("sorts", next as BorrowTableConfig["sorts"])
+            }
+          />
+          <LimitInput value={c.limit} onChange={(n) => set("limit", n)} />
         </TabsContent>
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Limpar filtros
-            </button>
+          <div>
+            <Label className="text-xs">Busca</Label>
+            <Input
+              value={c.filters.searchingFor}
+              onChange={(v) =>
+                setFilter("searchingFor", typeof v === "string" ? v : "")
+              }
+              placeholder="Item, código, usuário..."
+            />
           </div>
-
-          <Section title="Busca e status" defaultOpen>
-            <div>
-              <Label className="text-xs">Busca</Label>
-              <Input
-                value={c.filters.searchingFor}
-                onChange={(v) =>
-                  setFilter("searchingFor", typeof v === "string" ? v : "")
-                }
-                placeholder="Item, código, usuário..."
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Status</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.statuses}
-                onValueChange={(v) =>
-                  setFilter("statuses", asArray(v) as BORROW_STATUS[])
-                }
-                options={BORROW_STATUS_OPTIONS}
-                placeholder="Todos os status"
-                searchPlaceholder="Buscar status..."
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Período (Emprestado em)</Label>
-              <Combobox
-                mode="single"
-                value={c.filters.createdPreset}
-                onValueChange={(v) =>
-                  setFilter(
-                    "createdPreset",
-                    (typeof v === "string" ? v : "any") as CreatedPreset,
-                  )
-                }
-                options={CREATED_PRESET_OPTIONS}
-                clearable={false}
-              />
-            </div>
-          </Section>
-
-          <Section title="Item">
-            <div>
-              <Label className="text-xs">Itens</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.itemIds}
-                onValueChange={(v) => setFilter("itemIds", asArray(v))}
-                options={itemOptions}
-                placeholder="Todos os itens"
-                searchPlaceholder="Buscar item..."
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Categorias</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.categoryIds}
-                onValueChange={(v) => setFilter("categoryIds", asArray(v))}
-                options={categoryOptions}
-                placeholder="Todas as categorias"
-                searchPlaceholder="Buscar categoria..."
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Marcas</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.brandIds}
-                onValueChange={(v) => setFilter("brandIds", asArray(v))}
-                options={brandOptions}
-                placeholder="Todas as marcas"
-                searchPlaceholder="Buscar marca..."
-              />
-            </div>
-          </Section>
-
-          <Section title="Usuário">
-            <div>
-              <Label className="text-xs">Usuários</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.userIds}
-                onValueChange={(v) => setFilter("userIds", asArray(v))}
-                options={userOptions}
-                placeholder="Todos os usuários"
-                searchPlaceholder="Buscar usuário..."
-              />
-            </div>
-          </Section>
-
-          <Section title="Comportamento">
-            <div className="grid grid-cols-2 gap-2">
-              <ToggleRow
-                label="Esconder devolvidos"
-                hint="Oculta empréstimos com status DEVOLVIDO quando nenhum status específico está selecionado."
-                checked={c.filters.hideReturned}
-                onCheckedChange={(v) => setFilter("hideReturned", v)}
-              />
-              <ToggleRow
-                label="Apenas atrasados"
-                hint="Mostra somente empréstimos ATIVOS há mais de 30 dias."
-                checked={c.filters.onlyOverdue}
-                onCheckedChange={(v) => setFilter("onlyOverdue", v)}
-              />
-            </div>
-          </Section>
+          <div>
+            <Label className="text-xs">Status</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.statuses}
+              onValueChange={(v) =>
+                setFilter("statuses", asArray(v) as BORROW_STATUS[])
+              }
+              options={BORROW_STATUS_OPTIONS}
+              placeholder="Todos os status"
+              searchPlaceholder="Buscar status..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Período (Emprestado em)</Label>
+            <Combobox
+              mode="single"
+              value={c.filters.createdPreset}
+              onValueChange={(v) =>
+                setFilter(
+                  "createdPreset",
+                  (typeof v === "string" ? v : "any") as CreatedPreset,
+                )
+              }
+              options={CREATED_PRESET_OPTIONS}
+              clearable={false}
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Itens</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.itemIds}
+              onValueChange={(v) => setFilter("itemIds", asArray(v))}
+              options={itemOptions}
+              placeholder="Todos os itens"
+              searchPlaceholder="Buscar item..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Categorias</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.categoryIds}
+              onValueChange={(v) => setFilter("categoryIds", asArray(v))}
+              options={categoryOptions}
+              placeholder="Todas as categorias"
+              searchPlaceholder="Buscar categoria..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Marcas</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.brandIds}
+              onValueChange={(v) => setFilter("brandIds", asArray(v))}
+              options={brandOptions}
+              placeholder="Todas as marcas"
+              searchPlaceholder="Buscar marca..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Usuários</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.userIds}
+              onValueChange={(v) => setFilter("userIds", asArray(v))}
+              options={userOptions}
+              placeholder="Todos os usuários"
+              searchPlaceholder="Buscar usuário..."
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <ToggleRow
+              label="Esconder devolvidos"
+              checked={c.filters.hideReturned}
+              onCheckedChange={(v) => setFilter("hideReturned", v)}
+            />
+            <ToggleRow
+              label="Apenas atrasados"
+              checked={c.filters.onlyOverdue}
+              onCheckedChange={(v) => setFilter("onlyOverdue", v)}
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
@@ -1016,7 +1027,7 @@ export const borrowTableWidget: WidgetDefinition<BorrowTableConfig> = {
   configSchema: borrowTableConfigSchema,
   defaultConfig: {
     title: "Empréstimos",
-    accent: { color: "violet", icon: "Package", borderColor: "none" },
+    accent: { color: "violet", icon: "Package", shade: "500" },
     columns: ["itemUniCode", "itemName", "status", "borrowedAt"],
     filters: {
       searchingFor: "",
@@ -1029,16 +1040,16 @@ export const borrowTableWidget: WidgetDefinition<BorrowTableConfig> = {
       hideReturned: true,
       onlyOverdue: false,
     },
-    sort: { key: "createdAt", direction: "desc" },
+    sorts: [{ key: "createdAt", direction: "desc" }],
     limit: 30,
-    showHeader: true,
-    showRowDot: true,
     display: {
       density: "comfortable",
       striping: true,
       gridLines: true,
       hoverHighlight: true,
       stickyHeader: true,
+      showHeader: true,
+      showCount: true,
     },
   },
   RenderComponent: BorrowTableRender,

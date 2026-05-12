@@ -140,7 +140,7 @@ export function AbsenceList({ category, className }: AbsenceListProps) {
   // Unjustified absences (Cálculos de Ponto) only relevant for Faltas page —
   // they belong to FALTA category by definition. Skip the heavier fetch on
   // Ausências.
-  const { data: unjustifiedData, isLoading: unjustifiedLoading } = useSecullumUnjustifiedAbsences(
+  const { data: unjustifiedData } = useSecullumUnjustifiedAbsences(
     aggregatedParams,
     { enabled: category === "FALTA" },
   );

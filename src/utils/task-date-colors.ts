@@ -2,9 +2,13 @@
 // and the production task preparation page both need the same urgency tiers,
 // but the widget lets each instance override thresholds and color tokens.
 //
-// All Tailwind class strings are listed as LITERAL members of TIER_CLASS so the
-// JIT compiler picks them up at build time. Don't construct class names at
-// runtime — they'd be tree-shaken.
+// Tokens may be either bare colors (e.g. "red") for legacy configs, or
+// shade-aware tokens (e.g. "red-700") for new configs that pick a Tailwind
+// shade. Bare tokens are treated as shade "500".
+//
+// All Tailwind class strings are listed as LITERAL members of the lookup
+// tables so the JIT compiler picks them up at build time. Don't construct
+// class names at runtime — they'd be tree-shaken.
 
 export type DeadlineColorToken =
   | "red"
@@ -25,6 +29,19 @@ export type DeadlineColorToken =
   | "neutral"
   | "gray";
 
+export type DeadlineColorShade =
+  | "50"
+  | "100"
+  | "200"
+  | "300"
+  | "400"
+  | "500"
+  | "600"
+  | "700"
+  | "800"
+  | "900"
+  | "950";
+
 export const DEADLINE_COLOR_TOKENS: readonly DeadlineColorToken[] = [
   "red",
   "rose",
@@ -43,6 +60,20 @@ export const DEADLINE_COLOR_TOKENS: readonly DeadlineColorToken[] = [
   "pink",
   "neutral",
   "gray",
+] as const;
+
+export const DEADLINE_SHADE_VALUES: readonly DeadlineColorShade[] = [
+  "50",
+  "100",
+  "200",
+  "300",
+  "400",
+  "500",
+  "600",
+  "700",
+  "800",
+  "900",
+  "950",
 ] as const;
 
 export const DEADLINE_COLOR_LABELS: Record<DeadlineColorToken, string> = {
@@ -65,52 +96,416 @@ export const DEADLINE_COLOR_LABELS: Record<DeadlineColorToken, string> = {
   gray: "Cinza",
 };
 
-const TEXT_CLASS: Record<DeadlineColorToken, string> = {
-  red: "text-red-500",
-  rose: "text-rose-500",
-  orange: "text-orange-500",
-  amber: "text-amber-500",
-  yellow: "text-yellow-500",
-  lime: "text-lime-500",
-  green: "text-green-500",
-  emerald: "text-emerald-500",
-  teal: "text-teal-500",
-  cyan: "text-cyan-500",
-  sky: "text-sky-500",
-  blue: "text-blue-500",
-  violet: "text-violet-500",
-  fuchsia: "text-fuchsia-500",
-  pink: "text-pink-500",
-  neutral: "text-neutral-500",
-  gray: "text-gray-500",
-};
-
-const SWATCH_CLASS: Record<DeadlineColorToken, string> = {
-  red: "bg-red-500",
-  rose: "bg-rose-500",
-  orange: "bg-orange-500",
-  amber: "bg-amber-500",
-  yellow: "bg-yellow-500",
-  lime: "bg-lime-500",
-  green: "bg-green-500",
-  emerald: "bg-emerald-500",
-  teal: "bg-teal-500",
-  cyan: "bg-cyan-500",
-  sky: "bg-sky-500",
-  blue: "bg-blue-500",
-  violet: "bg-violet-500",
-  fuchsia: "bg-fuchsia-500",
-  pink: "bg-pink-500",
-  neutral: "bg-neutral-500",
-  gray: "bg-gray-500",
-};
-
-export function deadlineColorTextClass(token: DeadlineColorToken): string {
-  return TEXT_CLASS[token] ?? "";
+export function parseDeadlineColor(
+  value: string | undefined | null,
+): { color: DeadlineColorToken; shade: DeadlineColorShade } {
+  if (!value) return { color: "gray", shade: "500" };
+  const dashIdx = value.lastIndexOf("-");
+  let color: string;
+  let shade: string;
+  if (dashIdx < 0) {
+    color = value;
+    shade = "500";
+  } else {
+    color = value.slice(0, dashIdx);
+    shade = value.slice(dashIdx + 1);
+  }
+  if (!(DEADLINE_COLOR_TOKENS as readonly string[]).includes(color)) color = "gray";
+  if (!(DEADLINE_SHADE_VALUES as readonly string[]).includes(shade)) shade = "500";
+  return {
+    color: color as DeadlineColorToken,
+    shade: shade as DeadlineColorShade,
+  };
 }
 
-export function deadlineColorSwatchClass(token: DeadlineColorToken): string {
-  return SWATCH_CLASS[token] ?? "bg-muted";
+const TEXT_CLASS: Record<string, string> = {
+  "red-50": "text-red-50",
+  "red-100": "text-red-100",
+  "red-200": "text-red-200",
+  "red-300": "text-red-300",
+  "red-400": "text-red-400",
+  "red-500": "text-red-500",
+  "red-600": "text-red-600",
+  "red-700": "text-red-700",
+  "red-800": "text-red-800",
+  "red-900": "text-red-900",
+  "red-950": "text-red-950",
+  "rose-50": "text-rose-50",
+  "rose-100": "text-rose-100",
+  "rose-200": "text-rose-200",
+  "rose-300": "text-rose-300",
+  "rose-400": "text-rose-400",
+  "rose-500": "text-rose-500",
+  "rose-600": "text-rose-600",
+  "rose-700": "text-rose-700",
+  "rose-800": "text-rose-800",
+  "rose-900": "text-rose-900",
+  "rose-950": "text-rose-950",
+  "orange-50": "text-orange-50",
+  "orange-100": "text-orange-100",
+  "orange-200": "text-orange-200",
+  "orange-300": "text-orange-300",
+  "orange-400": "text-orange-400",
+  "orange-500": "text-orange-500",
+  "orange-600": "text-orange-600",
+  "orange-700": "text-orange-700",
+  "orange-800": "text-orange-800",
+  "orange-900": "text-orange-900",
+  "orange-950": "text-orange-950",
+  "amber-50": "text-amber-50",
+  "amber-100": "text-amber-100",
+  "amber-200": "text-amber-200",
+  "amber-300": "text-amber-300",
+  "amber-400": "text-amber-400",
+  "amber-500": "text-amber-500",
+  "amber-600": "text-amber-600",
+  "amber-700": "text-amber-700",
+  "amber-800": "text-amber-800",
+  "amber-900": "text-amber-900",
+  "amber-950": "text-amber-950",
+  "yellow-50": "text-yellow-50",
+  "yellow-100": "text-yellow-100",
+  "yellow-200": "text-yellow-200",
+  "yellow-300": "text-yellow-300",
+  "yellow-400": "text-yellow-400",
+  "yellow-500": "text-yellow-500",
+  "yellow-600": "text-yellow-600",
+  "yellow-700": "text-yellow-700",
+  "yellow-800": "text-yellow-800",
+  "yellow-900": "text-yellow-900",
+  "yellow-950": "text-yellow-950",
+  "lime-50": "text-lime-50",
+  "lime-100": "text-lime-100",
+  "lime-200": "text-lime-200",
+  "lime-300": "text-lime-300",
+  "lime-400": "text-lime-400",
+  "lime-500": "text-lime-500",
+  "lime-600": "text-lime-600",
+  "lime-700": "text-lime-700",
+  "lime-800": "text-lime-800",
+  "lime-900": "text-lime-900",
+  "lime-950": "text-lime-950",
+  "green-50": "text-green-50",
+  "green-100": "text-green-100",
+  "green-200": "text-green-200",
+  "green-300": "text-green-300",
+  "green-400": "text-green-400",
+  "green-500": "text-green-500",
+  "green-600": "text-green-600",
+  "green-700": "text-green-700",
+  "green-800": "text-green-800",
+  "green-900": "text-green-900",
+  "green-950": "text-green-950",
+  "emerald-50": "text-emerald-50",
+  "emerald-100": "text-emerald-100",
+  "emerald-200": "text-emerald-200",
+  "emerald-300": "text-emerald-300",
+  "emerald-400": "text-emerald-400",
+  "emerald-500": "text-emerald-500",
+  "emerald-600": "text-emerald-600",
+  "emerald-700": "text-emerald-700",
+  "emerald-800": "text-emerald-800",
+  "emerald-900": "text-emerald-900",
+  "emerald-950": "text-emerald-950",
+  "teal-50": "text-teal-50",
+  "teal-100": "text-teal-100",
+  "teal-200": "text-teal-200",
+  "teal-300": "text-teal-300",
+  "teal-400": "text-teal-400",
+  "teal-500": "text-teal-500",
+  "teal-600": "text-teal-600",
+  "teal-700": "text-teal-700",
+  "teal-800": "text-teal-800",
+  "teal-900": "text-teal-900",
+  "teal-950": "text-teal-950",
+  "cyan-50": "text-cyan-50",
+  "cyan-100": "text-cyan-100",
+  "cyan-200": "text-cyan-200",
+  "cyan-300": "text-cyan-300",
+  "cyan-400": "text-cyan-400",
+  "cyan-500": "text-cyan-500",
+  "cyan-600": "text-cyan-600",
+  "cyan-700": "text-cyan-700",
+  "cyan-800": "text-cyan-800",
+  "cyan-900": "text-cyan-900",
+  "cyan-950": "text-cyan-950",
+  "sky-50": "text-sky-50",
+  "sky-100": "text-sky-100",
+  "sky-200": "text-sky-200",
+  "sky-300": "text-sky-300",
+  "sky-400": "text-sky-400",
+  "sky-500": "text-sky-500",
+  "sky-600": "text-sky-600",
+  "sky-700": "text-sky-700",
+  "sky-800": "text-sky-800",
+  "sky-900": "text-sky-900",
+  "sky-950": "text-sky-950",
+  "blue-50": "text-blue-50",
+  "blue-100": "text-blue-100",
+  "blue-200": "text-blue-200",
+  "blue-300": "text-blue-300",
+  "blue-400": "text-blue-400",
+  "blue-500": "text-blue-500",
+  "blue-600": "text-blue-600",
+  "blue-700": "text-blue-700",
+  "blue-800": "text-blue-800",
+  "blue-900": "text-blue-900",
+  "blue-950": "text-blue-950",
+  "violet-50": "text-violet-50",
+  "violet-100": "text-violet-100",
+  "violet-200": "text-violet-200",
+  "violet-300": "text-violet-300",
+  "violet-400": "text-violet-400",
+  "violet-500": "text-violet-500",
+  "violet-600": "text-violet-600",
+  "violet-700": "text-violet-700",
+  "violet-800": "text-violet-800",
+  "violet-900": "text-violet-900",
+  "violet-950": "text-violet-950",
+  "fuchsia-50": "text-fuchsia-50",
+  "fuchsia-100": "text-fuchsia-100",
+  "fuchsia-200": "text-fuchsia-200",
+  "fuchsia-300": "text-fuchsia-300",
+  "fuchsia-400": "text-fuchsia-400",
+  "fuchsia-500": "text-fuchsia-500",
+  "fuchsia-600": "text-fuchsia-600",
+  "fuchsia-700": "text-fuchsia-700",
+  "fuchsia-800": "text-fuchsia-800",
+  "fuchsia-900": "text-fuchsia-900",
+  "fuchsia-950": "text-fuchsia-950",
+  "pink-50": "text-pink-50",
+  "pink-100": "text-pink-100",
+  "pink-200": "text-pink-200",
+  "pink-300": "text-pink-300",
+  "pink-400": "text-pink-400",
+  "pink-500": "text-pink-500",
+  "pink-600": "text-pink-600",
+  "pink-700": "text-pink-700",
+  "pink-800": "text-pink-800",
+  "pink-900": "text-pink-900",
+  "pink-950": "text-pink-950",
+  "neutral-50": "text-neutral-50",
+  "neutral-100": "text-neutral-100",
+  "neutral-200": "text-neutral-200",
+  "neutral-300": "text-neutral-300",
+  "neutral-400": "text-neutral-400",
+  "neutral-500": "text-neutral-500",
+  "neutral-600": "text-neutral-600",
+  "neutral-700": "text-neutral-700",
+  "neutral-800": "text-neutral-800",
+  "neutral-900": "text-neutral-900",
+  "neutral-950": "text-neutral-950",
+  "gray-50": "text-gray-50",
+  "gray-100": "text-gray-100",
+  "gray-200": "text-gray-200",
+  "gray-300": "text-gray-300",
+  "gray-400": "text-gray-400",
+  "gray-500": "text-gray-500",
+  "gray-600": "text-gray-600",
+  "gray-700": "text-gray-700",
+  "gray-800": "text-gray-800",
+  "gray-900": "text-gray-900",
+  "gray-950": "text-gray-950",
+};
+
+const SWATCH_CLASS: Record<string, string> = {
+  "red-50": "bg-red-50",
+  "red-100": "bg-red-100",
+  "red-200": "bg-red-200",
+  "red-300": "bg-red-300",
+  "red-400": "bg-red-400",
+  "red-500": "bg-red-500",
+  "red-600": "bg-red-600",
+  "red-700": "bg-red-700",
+  "red-800": "bg-red-800",
+  "red-900": "bg-red-900",
+  "red-950": "bg-red-950",
+  "rose-50": "bg-rose-50",
+  "rose-100": "bg-rose-100",
+  "rose-200": "bg-rose-200",
+  "rose-300": "bg-rose-300",
+  "rose-400": "bg-rose-400",
+  "rose-500": "bg-rose-500",
+  "rose-600": "bg-rose-600",
+  "rose-700": "bg-rose-700",
+  "rose-800": "bg-rose-800",
+  "rose-900": "bg-rose-900",
+  "rose-950": "bg-rose-950",
+  "orange-50": "bg-orange-50",
+  "orange-100": "bg-orange-100",
+  "orange-200": "bg-orange-200",
+  "orange-300": "bg-orange-300",
+  "orange-400": "bg-orange-400",
+  "orange-500": "bg-orange-500",
+  "orange-600": "bg-orange-600",
+  "orange-700": "bg-orange-700",
+  "orange-800": "bg-orange-800",
+  "orange-900": "bg-orange-900",
+  "orange-950": "bg-orange-950",
+  "amber-50": "bg-amber-50",
+  "amber-100": "bg-amber-100",
+  "amber-200": "bg-amber-200",
+  "amber-300": "bg-amber-300",
+  "amber-400": "bg-amber-400",
+  "amber-500": "bg-amber-500",
+  "amber-600": "bg-amber-600",
+  "amber-700": "bg-amber-700",
+  "amber-800": "bg-amber-800",
+  "amber-900": "bg-amber-900",
+  "amber-950": "bg-amber-950",
+  "yellow-50": "bg-yellow-50",
+  "yellow-100": "bg-yellow-100",
+  "yellow-200": "bg-yellow-200",
+  "yellow-300": "bg-yellow-300",
+  "yellow-400": "bg-yellow-400",
+  "yellow-500": "bg-yellow-500",
+  "yellow-600": "bg-yellow-600",
+  "yellow-700": "bg-yellow-700",
+  "yellow-800": "bg-yellow-800",
+  "yellow-900": "bg-yellow-900",
+  "yellow-950": "bg-yellow-950",
+  "lime-50": "bg-lime-50",
+  "lime-100": "bg-lime-100",
+  "lime-200": "bg-lime-200",
+  "lime-300": "bg-lime-300",
+  "lime-400": "bg-lime-400",
+  "lime-500": "bg-lime-500",
+  "lime-600": "bg-lime-600",
+  "lime-700": "bg-lime-700",
+  "lime-800": "bg-lime-800",
+  "lime-900": "bg-lime-900",
+  "lime-950": "bg-lime-950",
+  "green-50": "bg-green-50",
+  "green-100": "bg-green-100",
+  "green-200": "bg-green-200",
+  "green-300": "bg-green-300",
+  "green-400": "bg-green-400",
+  "green-500": "bg-green-500",
+  "green-600": "bg-green-600",
+  "green-700": "bg-green-700",
+  "green-800": "bg-green-800",
+  "green-900": "bg-green-900",
+  "green-950": "bg-green-950",
+  "emerald-50": "bg-emerald-50",
+  "emerald-100": "bg-emerald-100",
+  "emerald-200": "bg-emerald-200",
+  "emerald-300": "bg-emerald-300",
+  "emerald-400": "bg-emerald-400",
+  "emerald-500": "bg-emerald-500",
+  "emerald-600": "bg-emerald-600",
+  "emerald-700": "bg-emerald-700",
+  "emerald-800": "bg-emerald-800",
+  "emerald-900": "bg-emerald-900",
+  "emerald-950": "bg-emerald-950",
+  "teal-50": "bg-teal-50",
+  "teal-100": "bg-teal-100",
+  "teal-200": "bg-teal-200",
+  "teal-300": "bg-teal-300",
+  "teal-400": "bg-teal-400",
+  "teal-500": "bg-teal-500",
+  "teal-600": "bg-teal-600",
+  "teal-700": "bg-teal-700",
+  "teal-800": "bg-teal-800",
+  "teal-900": "bg-teal-900",
+  "teal-950": "bg-teal-950",
+  "cyan-50": "bg-cyan-50",
+  "cyan-100": "bg-cyan-100",
+  "cyan-200": "bg-cyan-200",
+  "cyan-300": "bg-cyan-300",
+  "cyan-400": "bg-cyan-400",
+  "cyan-500": "bg-cyan-500",
+  "cyan-600": "bg-cyan-600",
+  "cyan-700": "bg-cyan-700",
+  "cyan-800": "bg-cyan-800",
+  "cyan-900": "bg-cyan-900",
+  "cyan-950": "bg-cyan-950",
+  "sky-50": "bg-sky-50",
+  "sky-100": "bg-sky-100",
+  "sky-200": "bg-sky-200",
+  "sky-300": "bg-sky-300",
+  "sky-400": "bg-sky-400",
+  "sky-500": "bg-sky-500",
+  "sky-600": "bg-sky-600",
+  "sky-700": "bg-sky-700",
+  "sky-800": "bg-sky-800",
+  "sky-900": "bg-sky-900",
+  "sky-950": "bg-sky-950",
+  "blue-50": "bg-blue-50",
+  "blue-100": "bg-blue-100",
+  "blue-200": "bg-blue-200",
+  "blue-300": "bg-blue-300",
+  "blue-400": "bg-blue-400",
+  "blue-500": "bg-blue-500",
+  "blue-600": "bg-blue-600",
+  "blue-700": "bg-blue-700",
+  "blue-800": "bg-blue-800",
+  "blue-900": "bg-blue-900",
+  "blue-950": "bg-blue-950",
+  "violet-50": "bg-violet-50",
+  "violet-100": "bg-violet-100",
+  "violet-200": "bg-violet-200",
+  "violet-300": "bg-violet-300",
+  "violet-400": "bg-violet-400",
+  "violet-500": "bg-violet-500",
+  "violet-600": "bg-violet-600",
+  "violet-700": "bg-violet-700",
+  "violet-800": "bg-violet-800",
+  "violet-900": "bg-violet-900",
+  "violet-950": "bg-violet-950",
+  "fuchsia-50": "bg-fuchsia-50",
+  "fuchsia-100": "bg-fuchsia-100",
+  "fuchsia-200": "bg-fuchsia-200",
+  "fuchsia-300": "bg-fuchsia-300",
+  "fuchsia-400": "bg-fuchsia-400",
+  "fuchsia-500": "bg-fuchsia-500",
+  "fuchsia-600": "bg-fuchsia-600",
+  "fuchsia-700": "bg-fuchsia-700",
+  "fuchsia-800": "bg-fuchsia-800",
+  "fuchsia-900": "bg-fuchsia-900",
+  "fuchsia-950": "bg-fuchsia-950",
+  "pink-50": "bg-pink-50",
+  "pink-100": "bg-pink-100",
+  "pink-200": "bg-pink-200",
+  "pink-300": "bg-pink-300",
+  "pink-400": "bg-pink-400",
+  "pink-500": "bg-pink-500",
+  "pink-600": "bg-pink-600",
+  "pink-700": "bg-pink-700",
+  "pink-800": "bg-pink-800",
+  "pink-900": "bg-pink-900",
+  "pink-950": "bg-pink-950",
+  "neutral-50": "bg-neutral-50",
+  "neutral-100": "bg-neutral-100",
+  "neutral-200": "bg-neutral-200",
+  "neutral-300": "bg-neutral-300",
+  "neutral-400": "bg-neutral-400",
+  "neutral-500": "bg-neutral-500",
+  "neutral-600": "bg-neutral-600",
+  "neutral-700": "bg-neutral-700",
+  "neutral-800": "bg-neutral-800",
+  "neutral-900": "bg-neutral-900",
+  "neutral-950": "bg-neutral-950",
+  "gray-50": "bg-gray-50",
+  "gray-100": "bg-gray-100",
+  "gray-200": "bg-gray-200",
+  "gray-300": "bg-gray-300",
+  "gray-400": "bg-gray-400",
+  "gray-500": "bg-gray-500",
+  "gray-600": "bg-gray-600",
+  "gray-700": "bg-gray-700",
+  "gray-800": "bg-gray-800",
+  "gray-900": "bg-gray-900",
+  "gray-950": "bg-gray-950",
+};
+
+export function deadlineColorTextClass(value: string | undefined | null): string {
+  const { color, shade } = parseDeadlineColor(value);
+  return TEXT_CLASS[`${color}-${shade}`] ?? "";
+}
+
+export function deadlineColorSwatchClass(value: string | undefined | null): string {
+  const { color, shade } = parseDeadlineColor(value);
+  return SWATCH_CLASS[`${color}-${shade}`] ?? "bg-muted";
 }
 
 export interface ForecastColorConfig {
@@ -118,17 +513,18 @@ export interface ForecastColorConfig {
   criticalDays: number;
   warningDays: number;
   noticeDays: number;
-  criticalColor: DeadlineColorToken;
-  warningColor: DeadlineColorToken;
-  noticeColor: DeadlineColorToken;
+  /** Shade-aware token like "red-500", or legacy bare token like "red". */
+  criticalColor: string;
+  warningColor: string;
+  noticeColor: string;
 }
 
 export interface TermColorConfig {
   enabled: boolean;
-  overdueColor: DeadlineColorToken;
+  overdueColor: string;
   criticalHours: number;
-  criticalColor: DeadlineColorToken;
-  onTrackColor: DeadlineColorToken;
+  criticalColor: string;
+  onTrackColor: string;
 }
 
 export const DEFAULT_FORECAST_COLOR_CONFIG: ForecastColorConfig = {
@@ -136,17 +532,17 @@ export const DEFAULT_FORECAST_COLOR_CONFIG: ForecastColorConfig = {
   criticalDays: 3,
   warningDays: 7,
   noticeDays: 10,
-  criticalColor: "red",
-  warningColor: "orange",
-  noticeColor: "yellow",
+  criticalColor: "red-500",
+  warningColor: "orange-500",
+  noticeColor: "yellow-500",
 };
 
 export const DEFAULT_TERM_COLOR_CONFIG: TermColorConfig = {
   enabled: true,
-  overdueColor: "red",
+  overdueColor: "red-500",
   criticalHours: 4,
-  criticalColor: "amber",
-  onTrackColor: "green",
+  criticalColor: "amber-500",
+  onTrackColor: "green-500",
 };
 
 export function getForecastColorClass(
@@ -162,9 +558,9 @@ export function getForecastColorClass(
     (forecast.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
   );
 
-  if (diffDays <= config.criticalDays) return TEXT_CLASS[config.criticalColor];
-  if (diffDays <= config.warningDays) return TEXT_CLASS[config.warningColor];
-  if (diffDays <= config.noticeDays) return TEXT_CLASS[config.noticeColor];
+  if (diffDays <= config.criticalDays) return deadlineColorTextClass(config.criticalColor);
+  if (diffDays <= config.warningDays) return deadlineColorTextClass(config.warningColor);
+  if (diffDays <= config.noticeDays) return deadlineColorTextClass(config.noticeColor);
   return "";
 }
 
@@ -178,11 +574,11 @@ export function getTermColorClass(
   if (Number.isNaN(deadline.getTime())) return "";
 
   const diffMs = deadline.getTime() - now.getTime();
-  if (diffMs < 0) return TEXT_CLASS[config.overdueColor];
+  if (diffMs < 0) return deadlineColorTextClass(config.overdueColor);
 
   const hoursRemaining = diffMs / (1000 * 60 * 60);
-  if (hoursRemaining <= config.criticalHours) return TEXT_CLASS[config.criticalColor];
-  return TEXT_CLASS[config.onTrackColor];
+  if (hoursRemaining <= config.criticalHours) return deadlineColorTextClass(config.criticalColor);
+  return deadlineColorTextClass(config.onTrackColor);
 }
 
 export function isOverdue(term: Date | string | null | undefined): boolean {

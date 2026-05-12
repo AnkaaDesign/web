@@ -1,4 +1,3 @@
-import * as React from "react";
 import type { DecoratorBlock as DecoratorBlockType } from "./types";
 
 const DECORATOR_IMAGES: Record<string, string> = {

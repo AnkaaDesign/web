@@ -3,7 +3,7 @@ import { z } from "zod";
 import { IconClock, IconAdjustments } from "@tabler/icons-react";
 import { TimeEntriesCard } from "../../components/home-dashboard";
 import { WidgetCard } from "../components/widget-card";
-import { Section } from "./_shared";
+import { Section, SectionGroup, ToggleRow } from "./_shared";
 import {
   AccentPicker,
   makeAccentSchema,
@@ -12,7 +12,7 @@ import {
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -28,8 +28,12 @@ const configSchema = z.object({
   accent: makeAccentSchema({
     color: "teal",
     icon: "Clock",
-    borderColor: "none",
   }),
+  display: z
+    .object({
+      showHeader: z.boolean().default(true),
+    })
+    .default({ showHeader: true }),
 });
 type Config = z.infer<typeof configSchema>;
 
@@ -39,8 +43,9 @@ function Render({ config }: WidgetRenderProps<Config>) {
       resolveAccent({
         color: config.accent?.color as WidgetAccentColor,
         icon: config.accent?.icon as WidgetAccentIcon,
+        shade: config.accent?.shade as WidgetAccentShade | undefined,
       }),
-    [config.accent?.color, config.accent?.icon],
+    [config.accent?.color, config.accent?.icon, config.accent?.shade],
   );
   const AccentIcon = accent.Icon;
 
@@ -53,7 +58,9 @@ function Render({ config }: WidgetRenderProps<Config>) {
       }
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       viewAllHref="/pessoal/meus-pontos"
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      showHeader={config.display?.showHeader ?? true}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
     >
       <TimeEntriesCard embedded />
     </WidgetCard>
@@ -65,7 +72,7 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
     onChange({ ...config, [key]: value });
   const accentColor = (config.accent?.color ?? "teal") as WidgetAccentColor;
   const accentIcon = (config.accent?.icon ?? "Clock") as WidgetAccentIcon;
-  const borderColor = (config.accent?.borderColor ?? "none") as WidgetBorderColor;
+  const accentShade = (config.accent?.shade ?? "500") as WidgetAccentShade;
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -84,18 +91,29 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
         </TabsList>
 
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{ color: accentColor, icon: accentIcon, borderColor }}
-              onChange={(next) =>
-                set("accent", {
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                } as Config["accent"])
-              }
-            />
-          </Section>
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || accentColor,
+                    icon: next.icon || accentIcon,
+                    shade: next.shade || accentShade,
+                  } as Config["accent"])
+                }
+              />
+            </Section>
+            <Section title="Cabeçalho">
+              <ToggleRow
+                label="Exibir cabeçalho"
+                checked={config.display?.showHeader ?? true}
+                onCheckedChange={(v) =>
+                  set("display", { ...(config.display ?? {}), showHeader: v } as Config["display"])
+                }
+              />
+            </Section>
+          </SectionGroup>
         </TabsContent>
       </Tabs>
     </div>
@@ -106,13 +124,9 @@ export const timeEntriesWidget: WidgetDefinition<Config> = {
   id: "home.time-entries",
   name: "Ponto da Semana",
   description:
-    "Registros de ponto da semana atual. Configurável: título e aparência (cor / ícone / borda).",
+    "Registros de ponto da semana atual. Configurável: título e aparência.",
   icon: IconClock,
   category: "hr",
-  // Personal data (your own punch-clock entries). The widget body itself shows
-  // "Sem cadastro no sistema de ponto" when the API reports the user lacks a
-  // Secullum link, so granting "*" is safe — users without Secullum just see
-  // a graceful empty state instead of the widget being hidden from the picker.
   allowedSectors: "*",
   defaultSize: { cols: 2, rows: 2 },
   minSize: { cols: 1, rows: 1 },
@@ -120,7 +134,8 @@ export const timeEntriesWidget: WidgetDefinition<Config> = {
   configSchema,
   defaultConfig: {
     title: "Ponto da Semana",
-    accent: { color: "teal", icon: "Clock", borderColor: "none" },
+    accent: { color: "teal", icon: "Clock", shade: "500" },
+    display: { showHeader: true },
   },
   RenderComponent: Render,
   ConfigComponent: ConfigComp,

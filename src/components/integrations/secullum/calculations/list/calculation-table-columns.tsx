@@ -1,5 +1,4 @@
 import React from "react";
-import { Badge } from "@/components/ui/badge";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { cn } from "@/lib/utils";
 import { renderTimeValue, renderHourValue } from "../../cell-renderers";

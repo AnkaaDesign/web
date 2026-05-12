@@ -28,7 +28,6 @@ import {
   PieChart as LucidePieChart,
   AlertTriangle as LucideAlertTriangle,
   Percent as LucidePercent,
-  Activity as LucideActivity,
   ClipboardList as LucideClipboardList,
   FileCheck as LucideFileCheck,
   Banknote as LucideBanknote,
@@ -217,11 +216,6 @@ export const FinancialRootPage = () => {
 
   // --- Quote Status ---
   const totalQuotes = data?.quoteMetrics?.totalQuotes?.value ?? 0;
-  const quoteStatusData = [
-    { status: "Pendentes", quantity: data?.quoteMetrics?.pendingQuotes?.value ?? 0, total: totalQuotes, icon: LucideClock, color: "orange" as const },
-    { status: "Aprovados", quantity: data?.quoteMetrics?.approvedQuotes?.value ?? 0, total: totalQuotes, icon: LucideCheckCircle, color: "green" as const },
-    { status: "Liquidados", quantity: data?.quoteMetrics?.settledQuotes?.value ?? 0, total: totalQuotes, icon: LucideDollarSign, color: "blue" as const },
-  ];
 
   // --- Customer Analysis ---
   const getCustomerAnalysis = (): AnalysisData[] => {

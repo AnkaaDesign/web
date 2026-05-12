@@ -137,9 +137,11 @@ export function AdminUserSelector<_T extends FieldValues = FieldValues>({
         isSectorLeader: false, // Required field
         email: null,
         phone: null,
-        cpf: null,
+        cpf: null as any,
         positionId: null,
         sectorId: null,
+        exp1StartAt: null as any,
+        payrollNumber: null as any,
       });
 
       if (result.success && result.data) {

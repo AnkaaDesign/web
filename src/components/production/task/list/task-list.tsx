@@ -220,8 +220,10 @@ export function TaskList({ className }: TaskListProps) {
     excludeFromUrl: ["limit", "orderBy"],
   });
 
-  // Create columns for column visibility manager
-  const columns = useMemo(() => createTaskColumns(), []);
+  // Create columns for column visibility manager (sector-aware: hides
+  // financial columns from sectors that shouldn't see them).
+  const userSectorPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
+  const columns = useMemo(() => createTaskColumns(userSectorPrivilege), [userSectorPrivilege]);
 
   // Get default visible columns
   const defaultVisibleColumns = useMemo(() => getDefaultVisibleColumns(columns), [columns]);

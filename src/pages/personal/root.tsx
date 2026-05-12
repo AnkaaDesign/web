@@ -15,7 +15,6 @@ import {
   Shield,
   Wrench,
   Activity as ActivityIcon,
-  Calendar,
   Mail,
   Phone,
   Building,

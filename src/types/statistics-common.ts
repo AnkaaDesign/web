@@ -130,6 +130,7 @@ export const getYAxisOptions = (modes: YAxisMode[]): Array<{ value: YAxisMode; l
     days: 'Dias',
     percentage: 'Porcentagem (%)',
     count: 'Contagem',
+    both: 'Ambos',
   };
   return modes.map(mode => ({ value: mode, label: labels[mode] }));
 };

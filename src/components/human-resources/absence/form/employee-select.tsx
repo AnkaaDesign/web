@@ -61,7 +61,7 @@ export function EmployeeSelect({ control, name = "userId", disabled, required, i
     <FormField
       control={control}
       name={name}
-      render={({ field, fieldState }) => (
+      render={({ field }) => (
         <FormItem className="flex flex-col">
           <FormLabel>
             <div className="flex items-center gap-2">
@@ -81,7 +81,6 @@ export function EmployeeSelect({ control, name = "userId", disabled, required, i
               getOptionLabel={getOptionLabel}
               getOptionValue={getOptionValue}
               renderOption={renderOption}
-              error={!!fieldState.error}
             />
           </FormControl>
           <FormMessage />

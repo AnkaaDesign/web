@@ -5,12 +5,17 @@ import { IconPlus } from "@tabler/icons-react";
 import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { useNavigate } from "react-router-dom";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { useAuth } from "@/contexts/auth-context";
+import { hasPrivilege } from "@/utils";
 
 export const ObservationsList = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Track page for analytics
   usePageTracker({ title: "Observações - Lista", icon: "observations_list" });
+
+  const canCreate = user && (hasPrivilege(user, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(user, SECTOR_PRIVILEGES.COMMERCIAL));
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
@@ -20,7 +25,7 @@ export const ObservationsList = () => {
           title="Observações"
           favoritePage={FAVORITE_PAGES.PRODUCAO_OBSERVACOES_LISTAR}
           breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Produção", href: routes.production.root }, { label: "Observações" }]}
-          actions={[
+          actions={canCreate ? [
             {
               key: "create",
               label: "Nova Observação",
@@ -28,7 +33,7 @@ export const ObservationsList = () => {
               onClick: () => navigate(routes.production.observations.create),
               variant: "default",
             },
-          ]}
+          ] : []}
           className="flex-shrink-0"
         />
 

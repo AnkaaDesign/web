@@ -1,19 +1,16 @@
 // Quick-note widget — a per-instance scratchpad. Persisted in localStorage so
 // it works across refreshes without bloating Preferences with arbitrary text.
-// (The widget's `config` only stores display options, not the note content.)
-//
-// Configurable: title, accent color + icon (consistent with task/item tables).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { IconAdjustments, IconNotebook } from "@tabler/icons-react";
 import { WidgetCard } from "../components/widget-card";
-import { Section } from "./_shared";
+import { Section, SectionGroup, ToggleRow } from "./_shared";
 import { AccentPicker, resolveAccent } from "../components/widget-accent";
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -82,32 +79,14 @@ const configSchema = z.object({
           "Factory",
         ])
         .default("FileText"),
-      borderColor: z
-        .enum([
-          "none",
-          "gray",
-          "slate",
-          "red",
-          "orange",
-          "amber",
-          "yellow",
-          "lime",
-          "green",
-          "emerald",
-          "teal",
-          "cyan",
-          "sky",
-          "blue",
-          "indigo",
-          "violet",
-          "purple",
-          "fuchsia",
-          "pink",
-          "rose",
-        ])
-        .default("none"),
+      shade: z.string().optional(),
     })
-    .default({ color: "amber", icon: "FileText", borderColor: "none" }),
+    .default({ color: "amber", icon: "FileText", shade: "500" }),
+  display: z
+    .object({
+      showHeader: z.boolean().default(true),
+    })
+    .default({ showHeader: true }),
 });
 type Config = z.infer<typeof configSchema>;
 
@@ -125,7 +104,6 @@ function Render({ instanceId, config }: WidgetRenderProps<Config>) {
   });
   const debounceRef = useRef<number | null>(null);
 
-  // Debounce writes — typing on every keystroke would hammer localStorage.
   useEffect(() => {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(() => {
@@ -145,8 +123,9 @@ function Render({ instanceId, config }: WidgetRenderProps<Config>) {
       resolveAccent({
         color: config.accent?.color as WidgetAccentColor,
         icon: config.accent?.icon as WidgetAccentIcon,
+        shade: config.accent?.shade as WidgetAccentShade | undefined,
       }),
-    [config.accent?.color, config.accent?.icon],
+    [config.accent?.color, config.accent?.icon, config.accent?.shade],
   );
   const AccentIcon = accent.Icon;
 
@@ -158,7 +137,9 @@ function Render({ instanceId, config }: WidgetRenderProps<Config>) {
         </span>
       }
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      showHeader={config.display?.showHeader ?? true}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
     >
       <textarea
         className="h-full w-full resize-none p-3 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
@@ -176,7 +157,7 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
     onChange({ ...c, [key]: value });
   const accentColor = (c.accent?.color ?? "amber") as WidgetAccentColor;
   const accentIcon = (c.accent?.icon ?? "FileText") as WidgetAccentIcon;
-  const borderColor = (c.accent?.borderColor ?? "none") as WidgetBorderColor;
+  const accentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -197,18 +178,29 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{ color: accentColor, icon: accentIcon, borderColor }}
-              onChange={(next) =>
-                set("accent", {
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                } as Config["accent"])
-              }
-            />
-          </Section>
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || accentColor,
+                    icon: next.icon || accentIcon,
+                    shade: next.shade || accentShade,
+                  } as Config["accent"])
+                }
+              />
+            </Section>
+            <Section title="Cabeçalho">
+              <ToggleRow
+                label="Exibir cabeçalho"
+                checked={c.display?.showHeader ?? true}
+                onCheckedChange={(v) =>
+                  set("display", { ...(c.display ?? {}), showHeader: v } as Config["display"])
+                }
+              />
+            </Section>
+          </SectionGroup>
         </TabsContent>
       </Tabs>
     </div>
@@ -228,7 +220,8 @@ export const quickNoteWidget: WidgetDefinition<Config> = {
   configSchema,
   defaultConfig: {
     title: "Anotações",
-    accent: { color: "amber", icon: "FileText", borderColor: "none" },
+    accent: { color: "amber", icon: "FileText", shade: "500" },
+    display: { showHeader: true },
   },
   RenderComponent: Render,
   ConfigComponent: ConfigComp,

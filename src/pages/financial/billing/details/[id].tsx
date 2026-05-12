@@ -668,13 +668,7 @@ export const BillingDetailPage = () => {
   // Step detection: 1=Tarefa, 2=Proposta (COMMERCIAL/ADMIN only), then Serviços, Cliente(s), Resumo
   const isProposalStep = proposalStepIdx !== null && currentStep === proposalStepIdx;
   const isServicesStep = currentStep === servicesStepIdx;
-  const isCustomerStep = currentStep >= firstCustomerStepIdx && currentStep < totalSteps;
   const isReviewStep = currentStep === totalSteps;
-  const customerStepIndex = currentStep - firstCustomerStepIdx; // 0-based
-  const currentConfig = isCustomerStep ? customerConfigs[customerStepIndex] : null;
-  const currentCustomer = currentConfig
-    ? customersCache.current.get(currentConfig.customerId)
-    : null;
 
   const taskDisplayName = [task.name, task.serialNumber || task.truck?.plate]
     .filter(Boolean)

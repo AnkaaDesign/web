@@ -88,7 +88,7 @@ import {
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
 import type {
   WidgetConfigProps,
@@ -97,6 +97,7 @@ import type {
 } from "../types";
 import {
   Section,
+  SectionGroup,
   ToggleRow,
   LimitInput,
   SORT_DIRECTION_OPTIONS,
@@ -281,14 +282,17 @@ export const hrRequestsTableConfigSchema = z.object({
   accent: makeAccentSchema({
     color: "indigo",
     icon: "Clock",
-    borderColor: "none",
   }),
   display: z
     .object({
       density: z.enum(DENSITY_VALUES).default("comfortable"),
+      // striping/gridLines/hoverHighlight kept in schema for back-compat but
+      // hardcoded ON in render — no longer surfaced in the UI.
       striping: z.boolean().default(true),
       gridLines: z.boolean().default(true),
       hoverHighlight: z.boolean().default(true),
+      showHeader: z.boolean().default(true),
+      showCount: z.boolean().default(true),
       showSearchBox: z.boolean().default(true),
       emptyStateMessage: z.string().max(160).default(""),
     })
@@ -297,6 +301,8 @@ export const hrRequestsTableConfigSchema = z.object({
       striping: true,
       gridLines: true,
       hoverHighlight: true,
+      showHeader: true,
+      showCount: true,
       showSearchBox: true,
       emptyStateMessage: "",
     }),
@@ -307,14 +313,15 @@ export const hrRequestsTableConfigSchema = z.object({
       tipos: z.array(z.number().int()).default([]),
     })
     .default({ searchingFor: "", estados: [0], tipos: [] }),
-  sort: z
-    .object({
-      key: z.enum(SORT_KEYS).default("dataSolicitacao"),
-      direction: z.enum(["asc", "desc"]).default("desc"),
-    })
-    .default({ key: "dataSolicitacao", direction: "desc" }),
+  sorts: z
+    .array(
+      z.object({
+        key: z.string(),
+        direction: z.enum(["asc", "desc"]),
+      }),
+    )
+    .default([{ key: "dataSolicitacao", direction: "desc" }]),
   limit: z.number().int().min(5).max(200).default(30),
-  showHeader: z.boolean().default(true),
   showActionButtons: z.boolean().default(true),
 });
 
@@ -326,7 +333,6 @@ export type HrRequestsTableConfig = z.infer<typeof hrRequestsTableConfigSchema>;
 
 function HrRequestsTableRender({
   config,
-  size,
 }: WidgetRenderProps<HrRequestsTableConfig>) {
   const display = config.display;
   const dens = cardDensityClasses(display.density as Density);
@@ -381,34 +387,43 @@ function HrRequestsTableRender({
       );
     }
 
-    const sign = config.sort.direction === "asc" ? 1 : -1;
-    const sortKey = config.sort.key;
-    out = out.slice().sort((a, b) => {
+    // Multi-sort: walk each sorts entry and use the first one that yields a
+    // non-zero comparison.
+    const cmpByKey = (a: SecullumRequest, b: SecullumRequest, key: string) => {
       let av: string | number = "";
       let bv: string | number = "";
-      if (sortKey === "funcionarioName") {
+      if (key === "funcionarioName") {
         av = a.FuncionarioNome || "";
         bv = b.FuncionarioNome || "";
-      } else if (sortKey === "estado") {
+      } else if (key === "estado") {
         av = a.Estado;
         bv = b.Estado;
-      } else if (sortKey === "tipo") {
+      } else if (key === "tipo") {
         av = a.Tipo;
         bv = b.Tipo;
-      } else if (sortKey === "data") {
+      } else if (key === "data") {
         av = new Date(a.Data || 0).getTime();
         bv = new Date(b.Data || 0).getTime();
       } else {
         av = new Date(a.DataSolicitacao || 0).getTime();
         bv = new Date(b.DataSolicitacao || 0).getTime();
       }
-      if (av < bv) return -1 * sign;
-      if (av > bv) return 1 * sign;
+      if (av < bv) return -1;
+      if (av > bv) return 1;
+      return 0;
+    };
+    const sorts = config.sorts ?? [];
+    out = out.slice().sort((a, b) => {
+      for (const s of sorts) {
+        const sign = s.direction === "asc" ? 1 : -1;
+        const c = cmpByKey(a, b, s.key);
+        if (c !== 0) return sign * c;
+      }
       return 0;
     });
 
     return out.slice(0, config.limit);
-  }, [allRows, config.filters, config.sort, config.limit, debouncedSearch]);
+  }, [allRows, config.filters, config.sorts, config.limit, debouncedSearch]);
 
   // Drop any open accordion ids that no longer correspond to a visible row
   // (filters/search changed). All-closed-by-default is preserved otherwise.
@@ -425,8 +440,9 @@ function HrRequestsTableRender({
       resolveAccent({
         color: config.accent?.color as WidgetAccentColor,
         icon: config.accent?.icon as WidgetAccentIcon,
+        shade: config.accent?.shade as WidgetAccentShade | undefined,
       }),
-    [config.accent?.color, config.accent?.icon],
+    [config.accent?.color, config.accent?.icon, config.accent?.shade],
   );
   const AccentIcon = accent.Icon;
 
@@ -509,13 +525,14 @@ function HrRequestsTableRender({
 
   return (
     <WidgetCard
-      showHeader={config.showHeader}
+      showHeader={config.display.showHeader ?? true}
       title={<span className={accent.classes.text}>{config.title}</span>}
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       viewAllHref={routes.humanResources.requisicoes.list}
       headerExtra={headerExtra}
-      count={!isLoading ? rows.length : null}
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      count={(config.display.showCount ?? true) && !isLoading ? rows.length : null}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
     >
       <>
         {isLoading ? (
@@ -1059,30 +1076,17 @@ function HrRequestsTableConfigComponent({
     key: K,
     value: HrRequestsTableConfig["filters"][K],
   ) => onChange({ ...c, filters: { ...c.filters, [key]: value } });
-  const setSort = <K extends keyof HrRequestsTableConfig["sort"]>(
-    key: K,
-    value: HrRequestsTableConfig["sort"][K],
-  ) => onChange({ ...c, sort: { ...c.sort, [key]: value } });
-
-  const resetFilters = () =>
-    set("filters", hrRequestsTableWidget.defaultConfig.filters);
+  // Multi-sort: this widget has no column-picker (master-detail layout), so
+  // the UI exposes only the primary sort. We read/write `sorts[0]`.
+  const primarySort = (c.sorts && c.sorts[0]) ?? { key: "dataSolicitacao", direction: "desc" as const };
+  const setPrimarySort = (next: { key: string; direction: "asc" | "desc" }) => {
+    const rest = (c.sorts ?? []).slice(1);
+    onChange({ ...c, sorts: [next, ...rest] as HrRequestsTableConfig["sorts"] });
+  };
 
   const currentAccentColor = (c.accent?.color ?? "indigo") as WidgetAccentColor;
   const currentAccentIcon = (c.accent?.icon ?? "Clock") as WidgetAccentIcon;
-  const currentBorderColor = (c.accent?.borderColor ?? "none") as WidgetBorderColor;
-  const setAccent = (
-    patch: Partial<{
-      color: WidgetAccentColor;
-      icon: WidgetAccentIcon;
-      borderColor: WidgetBorderColor;
-    }>,
-  ) =>
-    set("accent", {
-      color: currentAccentColor,
-      icon: currentAccentIcon,
-      borderColor: currentBorderColor,
-      ...patch,
-    } as HrRequestsTableConfig["accent"]);
+  const currentAccentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
 
   return (
     <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1 -mr-1">
@@ -1110,88 +1114,95 @@ function HrRequestsTableConfigComponent({
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{
-                color: currentAccentColor,
-                icon: currentAccentIcon,
-                borderColor: currentBorderColor,
-              }}
-              onChange={(next) =>
-                setAccent({
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                })
-              }
-            />
-          </Section>
-          <Section title="Densidade e visibilidade" defaultOpen>
-            <div>
-              <Label className="text-xs">Densidade</Label>
-              <Combobox
-                mode="single"
-                value={c.display.density}
-                onValueChange={(v) =>
-                  setDisplay(
-                    "density",
-                    (typeof v === "string" ? v : "comfortable") as Density,
-                  )
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{
+                  color: currentAccentColor,
+                  icon: currentAccentIcon,
+                  shade: currentAccentShade,
+                }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || currentAccentColor,
+                    icon: next.icon || currentAccentIcon,
+                    shade: next.shade || currentAccentShade,
+                  } as HrRequestsTableConfig["accent"])
                 }
-                options={DENSITY_OPTIONS}
-                clearable={false}
               />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <ToggleRow
-                label="Caixa de busca"
-                hint="Mostra um campo de busca em tempo real no cabeçalho do widget."
-                checked={c.display.showSearchBox}
-                onCheckedChange={(v) => setDisplay("showSearchBox", v)}
+            </Section>
+            <Section title="Densidade e linhas">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Densidade</Label>
+                  <Combobox
+                    mode="single"
+                    value={c.display.density}
+                    onValueChange={(v) =>
+                      setDisplay(
+                        "density",
+                        (typeof v === "string" ? v : "comfortable") as Density,
+                      )
+                    }
+                    options={DENSITY_OPTIONS}
+                    clearable={false}
+                  />
+                </div>
+                <LimitInput value={c.limit} onChange={(n) => set("limit", n)} />
+              </div>
+            </Section>
+            <Section title="Cabeçalho e link">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={c.display.showHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("showHeader", v)}
+                />
+                <ToggleRow
+                  label="Exibir contagem"
+                  checked={c.display.showCount ?? true}
+                  onCheckedChange={(v) => setDisplay("showCount", v)}
+                />
+                <ToggleRow
+                  label="Caixa de busca"
+                  checked={c.display.showSearchBox}
+                  onCheckedChange={(v) => setDisplay("showSearchBox", v)}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                <ToggleRow
+                  label="Botões Aprovar/Rejeitar"
+                  checked={c.showActionButtons}
+                  onCheckedChange={(v) => set("showActionButtons", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Mensagem quando vazio">
+              <Input
+                value={c.display.emptyStateMessage}
+                onChange={(v) =>
+                  setDisplay("emptyStateMessage", typeof v === "string" ? v : "")
+                }
+                placeholder="Nenhuma requisição encontrada com os filtros atuais."
               />
-              <ToggleRow
-                label="Cabeçalho do widget"
-                checked={c.showHeader}
-                onCheckedChange={(v) => set("showHeader", v)}
-              />
-              <ToggleRow
-                label="Botões Aprovar/Rejeitar"
-                hint="Mostra os botões de ação no cabeçalho quando uma requisição PENDENTE está selecionada."
-                checked={c.showActionButtons}
-                onCheckedChange={(v) => set("showActionButtons", v)}
-              />
-            </div>
-            {/* striping / gridLines / hoverHighlight remain in the saved
-                config for backward compat but no longer drive visuals — the
-                new bordered-card list uses primary-blue selection instead. */}
-          </Section>
-          <Section title="Mensagem quando vazio">
-            <Input
-              value={c.display.emptyStateMessage}
-              onChange={(v) =>
-                setDisplay("emptyStateMessage", typeof v === "string" ? v : "")
-              }
-              placeholder="Nenhuma requisição encontrada com os filtros atuais."
-            />
-          </Section>
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         {/* ---- ORDERING ---- */}
         <TabsContent value="ordering" className="space-y-3 mt-0">
-          <Section title="Ordenação e limite" defaultOpen>
+          <Section title="Ordenação" defaultOpen>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="text-xs">Ordenar por</Label>
                 <Combobox
                   mode="single"
-                  value={c.sort.key}
+                  value={primarySort.key}
                   onValueChange={(v) =>
-                    setSort(
-                      "key",
-                      (typeof v === "string"
-                        ? v
-                        : "dataSolicitacao") as HrRequestsTableConfig["sort"]["key"],
-                    )
+                    setPrimarySort({
+                      ...primarySort,
+                      key: typeof v === "string" ? v : "dataSolicitacao",
+                    })
                   }
                   options={SORT_KEYS.map((k) => ({
                     value: k,
@@ -1204,80 +1215,61 @@ function HrRequestsTableConfigComponent({
                 <Label className="text-xs">Direção</Label>
                 <Combobox
                   mode="single"
-                  value={c.sort.direction}
+                  value={primarySort.direction}
                   onValueChange={(v) =>
-                    setSort(
-                      "direction",
-                      (typeof v === "string"
-                        ? v
-                        : "desc") as HrRequestsTableConfig["sort"]["direction"],
-                    )
+                    setPrimarySort({
+                      ...primarySort,
+                      direction: (typeof v === "string" ? v : "desc") as "asc" | "desc",
+                    })
                   }
                   options={SORT_DIRECTION_OPTIONS}
                   clearable={false}
                 />
               </div>
             </div>
-            <LimitInput value={c.limit} onChange={(n) => set("limit", n)} />
           </Section>
         </TabsContent>
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Limpar filtros
-            </button>
+          <div>
+            <Label className="text-xs">Busca padrão</Label>
+            <Input
+              value={c.filters.searchingFor}
+              onChange={(v) =>
+                setFilter("searchingFor", typeof v === "string" ? v : "")
+              }
+              placeholder="Colaborador, observação, dispositivo..."
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Aplicado sempre. A caixa de busca em tempo real (se ativada)
+              prevalece.
+            </p>
           </div>
-
-          <Section title="Busca, status e tipo" defaultOpen>
-            <div>
-              <Label className="text-xs">Busca padrão</Label>
-              <Input
-                value={c.filters.searchingFor}
-                onChange={(v) =>
-                  setFilter("searchingFor", typeof v === "string" ? v : "")
-                }
-                placeholder="Colaborador, observação, dispositivo..."
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Aplicado sempre. A caixa de busca em tempo real (se ativada)
-                prevalece.
-              </p>
-            </div>
-            <div>
-              <Label className="text-xs">Status</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.estados.map((n) => String(n))}
-                onValueChange={(v) =>
-                  setFilter("estados", asArray(v).map((s) => Number(s)))
-                }
-                options={ESTADO_OPTIONS}
-                placeholder="Todos os status"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Apenas requisições PENDENTES podem ser aprovadas ou rejeitadas
-                pelos botões do cabeçalho.
-              </p>
-            </div>
-            <div>
-              <Label className="text-xs">Tipo</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.tipos.map((n) => String(n))}
-                onValueChange={(v) =>
-                  setFilter("tipos", asArray(v).map((s) => Number(s)))
-                }
-                options={TIPO_OPTIONS}
-                placeholder="Todos os tipos"
-              />
-            </div>
-          </Section>
+          <div>
+            <Label className="text-xs">Status</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.estados.map((n) => String(n))}
+              onValueChange={(v) =>
+                setFilter("estados", asArray(v).map((s) => Number(s)))
+              }
+              options={ESTADO_OPTIONS}
+              placeholder="Todos os status"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Tipo</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.tipos.map((n) => String(n))}
+              onValueChange={(v) =>
+                setFilter("tipos", asArray(v).map((s) => Number(s)))
+              }
+              options={TIPO_OPTIONS}
+              placeholder="Todos os tipos"
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
@@ -1305,19 +1297,20 @@ export const hrRequestsTableWidget: WidgetDefinition<HrRequestsTableConfig> = {
   configSchema: hrRequestsTableConfigSchema,
   defaultConfig: {
     title: "Requisições de RH",
-    accent: { color: "indigo", icon: "Clock", borderColor: "none" },
+    accent: { color: "indigo", icon: "Clock", shade: "500" },
     display: {
       density: "comfortable",
       striping: true,
       gridLines: true,
       hoverHighlight: true,
+      showHeader: true,
+      showCount: true,
       showSearchBox: true,
       emptyStateMessage: "",
     },
     filters: { searchingFor: "", estados: [0], tipos: [] },
-    sort: { key: "dataSolicitacao", direction: "desc" },
+    sorts: [{ key: "dataSolicitacao", direction: "desc" }],
     limit: 30,
-    showHeader: true,
     showActionButtons: true,
   },
   RenderComponent: HrRequestsTableRender,

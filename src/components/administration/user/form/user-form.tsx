@@ -68,7 +68,7 @@ export function UserForm(props: UserFormProps) {
     email: null,
     status: USER_STATUS.EXPERIENCE_PERIOD_1,
     phone: null,
-    cpf: null,
+    cpf: null as any,
     pis: null,
     verified: false,
     isActive: true,
@@ -91,7 +91,7 @@ export function UserForm(props: UserFormProps) {
     birth: null as any, // Will be validated by schema when submitted
 
     // Status tracking dates
-    exp1StartAt: null,
+    exp1StartAt: null as any,
     exp1EndAt: null,
     exp2StartAt: null,
     exp2EndAt: null,
@@ -99,7 +99,7 @@ export function UserForm(props: UserFormProps) {
     dismissedAt: null,
 
     // Payroll info
-    payrollNumber: null,
+    payrollNumber: null as any,
 
     // PPE Sizes
     ppeSize: {

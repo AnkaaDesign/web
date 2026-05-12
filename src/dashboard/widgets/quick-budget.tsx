@@ -51,7 +51,7 @@ import { useCustomers } from "../../hooks/administration/use-customer";
 import { useTaskMutations } from "../../hooks/production/use-task";
 import { useCreateTaskQuote } from "../../hooks/production/use-task-quote";
 import { WidgetCard } from "../components/widget-card";
-import { Section } from "./_shared";
+import { Section, SectionGroup, ToggleRow } from "./_shared";
 import {
   AccentPicker,
   makeAccentSchema,
@@ -60,7 +60,7 @@ import {
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
 import { SECTOR_PRIVILEGES, TASK_STATUS } from "../../constants";
 import type {
@@ -74,10 +74,14 @@ const configSchema = z.object({
   accent: makeAccentSchema({
     color: "emerald",
     icon: "Receipt",
-    borderColor: "none",
   }),
   defaultCustomerId: z.string().uuid().optional(),
   defaultGuaranteeYears: z.number().int().min(0).max(5).optional(),
+  display: z
+    .object({
+      showHeader: z.boolean().default(true),
+    })
+    .default({ showHeader: true }),
 });
 type Config = z.infer<typeof configSchema>;
 
@@ -212,6 +216,7 @@ function Render({ config }: WidgetRenderProps<Config>) {
   const accent = resolveAccent({
     color: config.accent?.color as WidgetAccentColor,
     icon: config.accent?.icon as WidgetAccentIcon,
+    shade: config.accent?.shade as WidgetAccentShade | undefined,
   });
   const AccentIcon = accent.Icon;
 
@@ -223,7 +228,9 @@ function Render({ config }: WidgetRenderProps<Config>) {
         </span>
       }
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      showHeader={config.display?.showHeader ?? true}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
       footerExtra={
         <Link
           to="/financeiro/orcamento/cadastrar"
@@ -431,7 +438,7 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
     onChange({ ...config, [key]: value });
   const accentColor = (config.accent?.color ?? "emerald") as WidgetAccentColor;
   const accentIcon = (config.accent?.icon ?? "Receipt") as WidgetAccentIcon;
-  const borderColor = (config.accent?.borderColor ?? "none") as WidgetBorderColor;
+  const accentShade = (config.accent?.shade ?? "500") as WidgetAccentShade;
 
   const { data: customersData } = useCustomers({
     orderBy: { fantasyName: "asc" },
@@ -479,18 +486,29 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
         </TabsList>
 
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{ color: accentColor, icon: accentIcon, borderColor }}
-              onChange={(next) =>
-                set("accent", {
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                } as Config["accent"])
-              }
-            />
-          </Section>
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || accentColor,
+                    icon: next.icon || accentIcon,
+                    shade: next.shade || accentShade,
+                  } as Config["accent"])
+                }
+              />
+            </Section>
+            <Section title="Cabeçalho">
+              <ToggleRow
+                label="Exibir cabeçalho"
+                checked={config.display?.showHeader ?? true}
+                onCheckedChange={(v) =>
+                  set("display", { ...(config.display ?? {}), showHeader: v } as Config["display"])
+                }
+              />
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         <TabsContent value="behavior" className="space-y-3 mt-0">
@@ -567,7 +585,8 @@ export const quickBudgetWidget: WidgetDefinition<Config> = {
   configSchema,
   defaultConfig: {
     title: "Novo Orçamento",
-    accent: { color: "emerald", icon: "Receipt", borderColor: "none" },
+    accent: { color: "emerald", icon: "Receipt", shade: "500" },
+    display: { showHeader: true },
   },
   RenderComponent: Render,
   ConfigComponent: ConfigComp,

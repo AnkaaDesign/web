@@ -58,8 +58,6 @@ interface CalculationRow {
   refeicao?: string;
 }
 
-const DEFAULT_PAGE_SIZE = 40;
-
 // Helper function to convert selected month to 26th-to-25th period
 const getPayrollPeriod = (selectedMonth: Date) => {
   // For selected month, get from 26th of previous month to 25th of selected month
@@ -178,8 +176,8 @@ export function CalculationList({ className, mode = 'hr', onExportDataChange, he
   }, [selectedUserId, isPersonalMode, customStartDate, customEndDate]);
 
   // Fetch calculations from Secullum - use personal endpoint in personal mode
-  const hrCalculations = useSecullumCalculations(!isPersonalMode ? queryParams : null);
-  const personalCalculations = useMySecullumCalculations(isPersonalMode ? queryParams : undefined);
+  const hrCalculations = useSecullumCalculations(!isPersonalMode && queryParams ? queryParams : undefined);
+  const personalCalculations = useMySecullumCalculations(isPersonalMode && queryParams ? queryParams : undefined);
 
   // Select the active query based on mode
   const { data, isLoading, error } = isPersonalMode ? personalCalculations : hrCalculations;

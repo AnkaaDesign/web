@@ -11,7 +11,9 @@ import {
   SERVICE_ORDER_TYPE,
   SERVICE_ORDER_TYPE_LABELS,
   SERVICE_ORDER_TYPE_COLUMN_LABELS,
+  SECTOR_PRIVILEGES,
 } from "../../../../constants";
+import { canViewTaskFinancialColumns, isTaskFinancialColumn } from "@/utils/permissions/task-column-permissions";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { IconClock, IconCalendar, IconCheck, IconX, IconAlertCircle } from "@tabler/icons-react";
@@ -66,8 +68,16 @@ const renderDateWithIcon = (date: Date | null) => {
 };
 
 
-// Define all available columns
-export const createTaskColumns = (): TaskColumn[] => [
+// Define all available columns.
+// Pass `sectorPrivilege` to strip columns the current user is not allowed
+// to see (e.g. financial fields hidden from PRODUCTION/WAREHOUSE/etc).
+export const createTaskColumns = (sectorPrivilege?: SECTOR_PRIVILEGES): TaskColumn[] => {
+  const all: TaskColumn[] = createAllTaskColumns();
+  if (canViewTaskFinancialColumns(sectorPrivilege)) return all;
+  return all.filter((c) => !isTaskFinancialColumn(c.id));
+};
+
+const createAllTaskColumns = (): TaskColumn[] => [
   {
     id: "name",
     header: "LOGOMARCA",

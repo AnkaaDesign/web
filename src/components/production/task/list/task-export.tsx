@@ -3,10 +3,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Button } from "@/components/ui/button";
 import { IconDownload, IconFileTypeCsv, IconFileTypeXls } from "@tabler/icons-react";
 import { useToast } from "@/hooks/common/use-toast";
+import { useAuth } from "@/hooks/common/use-auth";
 import { formatDate, formatDateTime, formatCurrency, getTaskStatusLabel } from "../../../../utils";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { taskService } from "../../../../api-client";
+import { SECTOR_PRIVILEGES } from "../../../../constants";
 import { createTaskColumns } from "./task-table-columns";
 
 interface TaskExportProps {
@@ -18,9 +20,11 @@ interface TaskExportProps {
 
 export function TaskExport({ filters, currentItems, totalRecords, visibleColumns }: TaskExportProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isExporting, setIsExporting] = useState(false);
 
-  const columns = createTaskColumns().filter((col) => visibleColumns.has(col.id));
+  const userSectorPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
+  const columns = createTaskColumns(userSectorPrivilege).filter((col) => visibleColumns.has(col.id));
 
   const handleExportCurrentPage = async (format: "csv" | "xlsx") => {
     try {

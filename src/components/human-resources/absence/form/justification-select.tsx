@@ -34,7 +34,7 @@ export function JustificationSelect({ control, name = "justificativaId", categor
     <FormField
       control={control}
       name={name}
-      render={({ field, fieldState }) => (
+      render={({ field }) => (
         <FormItem className="flex flex-col">
           <FormLabel>
             <div className="flex items-center gap-2">
@@ -57,7 +57,6 @@ export function JustificationSelect({ control, name = "justificativaId", categor
                   <p className="text-xs text-muted-foreground">{o.description}</p>
                 </div>
               )}
-              error={!!fieldState.error}
             />
           </FormControl>
           <FormMessage />

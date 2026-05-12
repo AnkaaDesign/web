@@ -211,7 +211,7 @@ export function BudgetStepTask({
                           <FormControl>
                             <Input
                               value={field.value || ""}
-                              onChange={(e) => field.onChange(e.target.value)}
+                              onChange={(value) => field.onChange(value ?? "")}
                               placeholder="Ex: ABC-123"
                               disabled={disabled}
                               className="bg-transparent"
@@ -233,7 +233,7 @@ export function BudgetStepTask({
                           <FormControl>
                             <Input
                               value={field.value || ""}
-                              onChange={(e) => field.onChange(e.target.value)}
+                              onChange={(value) => field.onChange(value ?? "")}
                               placeholder="Ex: ABC-1234"
                               disabled={disabled}
                               className="bg-transparent"
@@ -255,7 +255,7 @@ export function BudgetStepTask({
                           <FormControl>
                             <Input
                               value={field.value || ""}
-                              onChange={(e) => field.onChange(e.target.value)}
+                              onChange={(value) => field.onChange(value ?? "")}
                               placeholder="Ex: 9BW..."
                               disabled={disabled}
                               className="bg-transparent font-mono"
@@ -337,7 +337,7 @@ export function BudgetStepTask({
                       <FormControl>
                         <Textarea
                           value={field.value || ""}
-                          onChange={(e) => field.onChange(e.target.value)}
+                          onChange={(value) => field.onChange(value ?? "")}
                           placeholder="Detalhes adicionais sobre a tarefa..."
                           rows={3}
                           disabled={disabled}

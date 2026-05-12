@@ -103,19 +103,23 @@ export function WidgetTile({
       style={style}
       className={`relative h-full min-h-0 ${isEditing ? "ring-2 ring-primary/40 ring-offset-2 ring-offset-background rounded-lg" : ""}`}
     >
-      {/* Edit-mode floating toolbars — drag handle on the left next to the title, action toolbar on the right */}
+      {/* Edit-mode floating toolbars — drag handle on the left next to the
+          title, action toolbar on the right. Sit above the card content with
+          high z-index so they're always clickable, even when the widget hides
+          its own header (`showHeader=false`) and the table content reaches
+          the very top edge. */}
       {isEditing && (
         <>
           <button
             type="button"
-            className="absolute top-1 left-1 z-20 cursor-grab active:cursor-grabbing rounded-md border border-border bg-card/95 backdrop-blur-sm shadow-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent"
+            className="absolute top-2 left-2 z-50 cursor-grab active:cursor-grabbing rounded-md border border-border bg-card shadow-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent pointer-events-auto"
             aria-label={`Arrastar ${def.name}`}
             {...attributes}
             {...listeners}
           >
             <IconGripVertical className="h-4 w-4" />
           </button>
-          <div className="absolute top-1 right-1 z-20 flex items-center gap-0.5 rounded-md border border-border bg-card/95 backdrop-blur-sm shadow-md p-0.5">
+          <div className="absolute top-2 right-2 z-50 flex items-center gap-0.5 rounded-md border border-border bg-card shadow-md p-0.5 pointer-events-auto">
             <SizeSelector
               value={instance.size}
               min={def.minSize}

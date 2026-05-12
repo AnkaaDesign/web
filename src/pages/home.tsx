@@ -78,12 +78,25 @@ export function HomePage() {
 
   return (
     <div className="m-4 p-4 rounded-xl flex flex-col gap-5 bg-card border border-border shadow-sm min-h-[calc(100vh-6rem)]">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h1 className="text-base sm:text-xl md:text-2xl font-bold text-secondary-foreground">
+      <div className="flex flex-col gap-0.5">
+        {/* Row 1 — greeting on the left, running clock on the right. */}
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-base sm:text-xl md:text-2xl font-bold text-secondary-foreground truncate">
             {getGreeting()}, {user?.name || "Usuário"}!
           </h1>
-          <p className="text-muted-foreground text-xs sm:text-sm mt-1">
+          <span className="text-sm sm:text-base md:text-lg text-secondary-foreground tabular-nums w-[5.5em] text-right shrink-0">
+            {currentTime.toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+          </span>
+        </div>
+        {/* Row 2 — date on the left, edit toolbar on the right. The two
+            rows share the same horizontal axis so the date aligns with the
+            Editar/Salvar buttons and the greeting aligns with the clock. */}
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-muted-foreground text-xs sm:text-sm truncate">
             {new Date().toLocaleDateString("pt-BR", {
               weekday: "long",
               year: "numeric",
@@ -91,26 +104,19 @@ export function HomePage() {
               day: "numeric",
             })}
           </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <EditToolbar
-            isEditing={isEditing}
-            isDirty={isDirty}
-            isSaving={isSaving}
-            onEnterEdit={enterEdit}
-            onSave={() => {
-              void saveAndExit();
-            }}
-            onDiscard={discardAndExit}
-            onAddWidget={() => setAddWidgetOpen(true)}
-          />
-          <span className="text-sm sm:text-base md:text-lg text-secondary-foreground tabular-nums w-[5.5em] text-right">
-            {currentTime.toLocaleTimeString("pt-BR", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })}
-          </span>
+          <div className="shrink-0">
+            <EditToolbar
+              isEditing={isEditing}
+              isDirty={isDirty}
+              isSaving={isSaving}
+              onEnterEdit={enterEdit}
+              onSave={() => {
+                void saveAndExit();
+              }}
+              onDiscard={discardAndExit}
+              onAddWidget={() => setAddWidgetOpen(true)}
+            />
+          </div>
         </div>
       </div>
 

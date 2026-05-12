@@ -13,7 +13,7 @@
 // Data source: useItems() with the same `where` shape the inventory page
 // uses. Combobox is used for all filter dropdowns (per user preference).
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import {
@@ -25,7 +25,7 @@ import {
 } from "@tabler/icons-react";
 import { STOCK_LEVEL, STOCK_LEVEL_LABELS, ABC_CATEGORY, XYZ_CATEGORY, SECTOR_PRIVILEGES } from "../../constants";
 import type { Item } from "../../types";
-import { useItems } from "../../hooks/inventory/use-item";
+import { useItems, useItemMutations } from "../../hooks/inventory/use-item";
 import { useItemBrands } from "../../hooks/inventory/use-item-brand";
 import { useItemCategories } from "../../hooks/inventory/use-item-category";
 import { useSuppliers } from "../../hooks/inventory/use-supplier";
@@ -34,14 +34,31 @@ import { Label } from "../../components/ui/label";
 import { Combobox } from "../../components/ui/combobox";
 import { Badge } from "../../components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "../../components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
+import { IconEdit, IconEye, IconTrash } from "@tabler/icons-react";
 import { WidgetCard } from "../components/widget-card";
-import { ColumnPicker } from "../components/column-picker";
+import { ColumnPicker, type ColumnSort } from "../components/column-picker";
 import { AccentPicker, resolveAccent } from "../components/widget-accent";
 import {
   Section,
+  SectionGroup,
   ToggleRow,
   LimitInput,
-  SORT_DIRECTION_OPTIONS,
   DENSITY_VALUES,
   DENSITY_OPTIONS,
   densityClasses,
@@ -50,7 +67,7 @@ import {
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
 import { determineStockLevel, getStockLevelTextColor } from "../../utils/stock-level";
 import type {
@@ -314,17 +331,6 @@ const COLUMN_BY_KEY: Record<ColumnKey, ColumnDef> = COLUMN_CATALOG.reduce(
 // Config schema
 // ============================================================
 
-const SORT_KEYS = [
-  "name",
-  "uniCode",
-  "quantity",
-  "monthlyConsumption",
-  "price",
-  "totalPrice",
-  "createdAt",
-  "isActive",
-] as const;
-
 const TRI_STATE = ["any", "yes", "no"] as const;
 
 export const itemTableConfigSchema = z.object({
@@ -380,32 +386,9 @@ export const itemTableConfigSchema = z.object({
           "Factory",
         ])
         .default("Package"),
-      borderColor: z
-        .enum([
-          "none",
-          "gray",
-          "slate",
-          "red",
-          "orange",
-          "amber",
-          "yellow",
-          "lime",
-          "green",
-          "emerald",
-          "teal",
-          "cyan",
-          "sky",
-          "blue",
-          "indigo",
-          "violet",
-          "purple",
-          "fuchsia",
-          "pink",
-          "rose",
-        ])
-        .default("none"),
+      shade: z.string().optional(),
     })
-    .default({ color: "yellow", icon: "Package", borderColor: "none" }),
+    .default({ color: "yellow", icon: "Package", shade: "500" }),
   columns: z
     .array(
       z.enum([
@@ -460,22 +443,26 @@ export const itemTableConfigSchema = z.object({
       quantityMin: null,
       quantityMax: null,
     }),
-  sort: z
-    .object({
-      key: z.enum(SORT_KEYS).default("name"),
-      direction: z.enum(["asc", "desc"]).default("asc"),
-    })
-    .default({ key: "name", direction: "asc" }),
+  // Multi-sort. Each entry maps to a `{ [key]: direction }` orderBy clause.
+  sorts: z
+    .array(
+      z.object({
+        key: z.string(),
+        direction: z.enum(["asc", "desc"]),
+      }),
+    )
+    .default([{ key: "name", direction: "asc" }]),
   limit: z.number().int().min(5).max(200).default(20),
-  showHeader: z.boolean().default(true),
-  showRowDot: z.boolean().default(true),
   display: z
     .object({
       density: z.enum(DENSITY_VALUES).default("comfortable"),
+      // striping/gridLines/hoverHighlight kept for back-compat but hardcoded ON.
       striping: z.boolean().default(true),
       gridLines: z.boolean().default(true),
       hoverHighlight: z.boolean().default(true),
       stickyHeader: z.boolean().default(true),
+      showHeader: z.boolean().default(true),
+      showCount: z.boolean().default(true),
     })
     .default({
       density: "comfortable",
@@ -483,6 +470,8 @@ export const itemTableConfigSchema = z.object({
       gridLines: true,
       hoverHighlight: true,
       stickyHeader: true,
+      showHeader: true,
+      showCount: true,
     }),
 });
 
@@ -498,7 +487,7 @@ function buildParams(config: ItemTableConfig): Record<string, unknown> {
   const f = config.filters;
   const params: Record<string, unknown> = {
     take: config.limit,
-    orderBy: { [config.sort.key]: config.sort.direction },
+    orderBy: (config.sorts ?? []).map((s) => ({ [s.key]: s.direction })),
     include: { brand: true, category: true, supplier: true, prices: true } as any,
   };
   if (f.searchingFor) params.searchingFor = f.searchingFor;
@@ -539,7 +528,22 @@ function ItemTableRender({ config }: WidgetRenderProps<ItemTableConfig>) {
   const params = useMemo(() => buildParams(config), [config]);
 
   const { data, isLoading, isError } = useItems(params as any);
+  const { deleteAsync: deleteItemAsync } = useItemMutations();
   const items = data?.data ?? [];
+
+  // Right-click context menu state.
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    item: Item;
+  } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ item: Item } | null>(null);
+
+  const handleContextMenu = (e: React.MouseEvent, item: Item) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, item });
+  };
   // Visible row count — see task-table for why we don't trust meta.totalRecords.
   const visibleCount = items.length;
 
@@ -554,27 +558,27 @@ function ItemTableRender({ config }: WidgetRenderProps<ItemTableConfig>) {
       resolveAccent({
         color: config.accent?.color as WidgetAccentColor,
         icon: config.accent?.icon as WidgetAccentIcon,
+        shade: config.accent?.shade as WidgetAccentShade | undefined,
       }),
-    [config.accent?.color, config.accent?.icon],
+    [config.accent?.color, config.accent?.icon, config.accent?.shade],
   );
   const AccentIcon = accent.Icon;
-  const showRowDot =
-    config.showRowDot &&
-    (config.columns[0] === "name" || config.columns[0] === "uniCode");
   const display = config.display;
   const dens = densityClasses(display.density as Density);
   const stickyClass = display.stickyHeader ? "sticky top-0 z-20" : "";
-  const rowBorder = display.gridLines ? "border-b border-border last:border-b-0" : "";
-  const rowHover = display.hoverHighlight ? "hover:bg-secondary/50" : "";
+  // Hardcoded chrome — striping/gridLines/hoverHighlight no longer configurable.
+  const rowBorder = "border-b border-border last:border-b-0";
+  const rowHover = "hover:bg-secondary/50";
 
   return (
     <WidgetCard
-      showHeader={config.showHeader}
+      showHeader={config.display.showHeader ?? true}
       title={<span className={accent.classes.text}>{config.title}</span>}
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       viewAllHref="/estoque/produtos"
-      count={!isLoading ? visibleCount : null}
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      count={(config.display.showCount ?? true) && !isLoading ? visibleCount : null}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
     >
       <>
         <div
@@ -603,29 +607,100 @@ function ItemTableRender({ config }: WidgetRenderProps<ItemTableConfig>) {
             <div
               key={item.id}
               className={`grid gap-x-3 items-center ${dens.row} cursor-pointer ${rowBorder} transition-colors ${rowHover} ${
-                display.striping && i % 2 === 1 ? "bg-muted/20" : ""
+                i % 2 === 1 ? "bg-muted/20" : ""
               }`}
               style={{ gridTemplateColumns: gridTemplate }}
               onClick={() => navigate(`/estoque/produtos/detalhes/${item.id}`)}
+              onContextMenu={(e) => handleContextMenu(e, item)}
             >
-              {cols.map((c, idx) => (
+              {cols.map((c) => (
                 <div key={c.key} className="min-w-0 overflow-hidden">
-                  {idx === 0 && showRowDot ? (
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className={`h-2 w-2 rounded-full shrink-0 ${accent.classes.dot}`}
-                        aria-hidden="true"
-                      />
-                      {c.render(item)}
-                    </div>
-                  ) : (
-                    c.render(item)
-                  )}
+                  {c.render(item)}
                 </div>
               ))}
             </div>
           ))
         )}
+
+        {/* Right-click context menu — controlled via `open`. Radix handles
+            outside-click and item-click closing on its own; no manual document
+            listener needed (it intercepts the item's onClick if you add one). */}
+        <DropdownMenu
+          open={!!contextMenu}
+          onOpenChange={(open) => !open && setContextMenu(null)}
+        >
+          <DropdownMenuContent
+            style={{
+              position: "fixed",
+              left: contextMenu?.x,
+              top: contextMenu?.y,
+            }}
+            className="w-48"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            <DropdownMenuItem
+              onClick={() =>
+                contextMenu &&
+                navigate(`/estoque/produtos/detalhes/${contextMenu.item.id}`)
+              }
+            >
+              <IconEye className="mr-2 h-4 w-4" />
+              Abrir detalhes
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                contextMenu &&
+                navigate(`/estoque/produtos/editar/${contextMenu.item.id}`)
+              }
+            >
+              <IconEdit className="mr-2 h-4 w-4" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() =>
+                contextMenu && setDeleteDialog({ item: contextMenu.item })
+              }
+              className="text-destructive"
+            >
+              <IconTrash className="mr-2 h-4 w-4" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <AlertDialog
+          open={!!deleteDialog}
+          onOpenChange={(open) => !open && setDeleteDialog(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir item?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação não pode ser desfeita.{" "}
+                {deleteDialog?.item.name && (
+                  <span className="font-medium">{deleteDialog.item.name}</span>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  if (!deleteDialog) return;
+                  try {
+                    await deleteItemAsync(deleteDialog.item.id);
+                  } finally {
+                    setDeleteDialog(null);
+                  }
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </>
     </WidgetCard>
   );
@@ -672,17 +747,6 @@ const TRI_STATE_LABELS: Record<(typeof TRI_STATE)[number], string> = {
   yes: "Sim",
   no: "Não",
 };
-const SORT_LABELS: Record<(typeof SORT_KEYS)[number], string> = {
-  name: "Nome",
-  uniCode: "Código",
-  quantity: "Quantidade",
-  monthlyConsumption: "Consumo mensal",
-  price: "Preço",
-  totalPrice: "Valor total",
-  createdAt: "Cadastrado em",
-  isActive: "Status",
-};
-
 function asArray(v: unknown): string[] {
   if (Array.isArray(v)) return v;
   if (typeof v === "string" && v) return [v];
@@ -700,10 +764,7 @@ function ItemTableConfigComponent({
     key: K,
     value: ItemTableConfig["filters"][K],
   ) => onChange({ ...c, filters: { ...c.filters, [key]: value } });
-  const setSort = <K extends keyof ItemTableConfig["sort"]>(
-    key: K,
-    value: ItemTableConfig["sort"][K],
-  ) => onChange({ ...c, sort: { ...c.sort, [key]: value } });
+  // Sort state is now driven by the column-picker's per-row chips.
   const setDisplay = <K extends keyof ItemTableConfig["display"]>(
     key: K,
     value: ItemTableConfig["display"][K],
@@ -760,25 +821,9 @@ function ItemTableConfigComponent({
     string,
   ][]).map(([value, label]) => ({ value, label }));
 
-  const resetFilters = () =>
-    set("filters", itemTableWidget.defaultConfig.filters);
-
   const currentAccentColor = (c.accent?.color ?? "yellow") as WidgetAccentColor;
   const currentAccentIcon = (c.accent?.icon ?? "Package") as WidgetAccentIcon;
-  const currentBorderColor = (c.accent?.borderColor ?? "none") as WidgetBorderColor;
-  const setAccent = (
-    patch: Partial<{
-      color: WidgetAccentColor;
-      icon: WidgetAccentIcon;
-      borderColor: WidgetBorderColor;
-    }>,
-  ) =>
-    set("accent", {
-      color: currentAccentColor,
-      icon: currentAccentIcon,
-      borderColor: currentBorderColor,
-      ...patch,
-    } as ItemTableConfig["accent"]);
+  const currentAccentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
 
   return (
     <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1 -mr-1">
@@ -809,320 +854,244 @@ function ItemTableConfigComponent({
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{
-                color: currentAccentColor,
-                icon: currentAccentIcon,
-                borderColor: currentBorderColor,
-              }}
-              onChange={(next) =>
-                setAccent({
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                })
-              }
-            />
-          </Section>
-          <Section title="Visibilidade" defaultOpen>
-            <div className="grid grid-cols-2 gap-2">
-              <ToggleRow
-                label="Exibir cabeçalho do widget"
-                checked={c.showHeader}
-                onCheckedChange={(v) => set("showHeader", v)}
-              />
-              <ToggleRow
-                label="Bolinha colorida nas linhas"
-                hint="Marca cada linha com a cor do acento. Aparece apenas quando a primeira coluna é Nome ou Código."
-                checked={c.showRowDot}
-                onCheckedChange={(v) => set("showRowDot", v)}
-              />
-            </div>
-          </Section>
-          <Section title="Densidade e linhas" defaultOpen>
-            <div className="space-y-1">
-              <Label className="text-xs">Densidade</Label>
-              <Combobox
-                mode="single"
-                value={c.display?.density ?? "comfortable"}
-                onValueChange={(v) =>
-                  setDisplay(
-                    "density",
-                    (typeof v === "string" ? v : "comfortable") as Density,
-                  )
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{
+                  color: currentAccentColor,
+                  icon: currentAccentIcon,
+                  shade: currentAccentShade,
+                }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || currentAccentColor,
+                    icon: next.icon || currentAccentIcon,
+                    shade: next.shade || currentAccentShade,
+                  } as ItemTableConfig["accent"])
                 }
-                options={DENSITY_OPTIONS}
-                clearable={false}
               />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <ToggleRow
-                label="Listras zebra"
-                hint="Alterna fundo nas linhas pares para facilitar leitura."
-                checked={c.display?.striping ?? true}
-                onCheckedChange={(v) => setDisplay("striping", v)}
-              />
-              <ToggleRow
-                label="Linhas divisórias"
-                checked={c.display?.gridLines ?? true}
-                onCheckedChange={(v) => setDisplay("gridLines", v)}
-              />
-              <ToggleRow
-                label="Realçar linha sob o cursor"
-                checked={c.display?.hoverHighlight ?? true}
-                onCheckedChange={(v) => setDisplay("hoverHighlight", v)}
-              />
-              <ToggleRow
-                label="Cabeçalho fixo"
-                hint="O cabeçalho permanece visível ao rolar."
-                checked={c.display?.stickyHeader ?? true}
-                onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-              />
-            </div>
-          </Section>
+            </Section>
+            <Section title="Densidade e linhas">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Densidade</Label>
+                  <Combobox
+                    mode="single"
+                    value={c.display?.density ?? "comfortable"}
+                    onValueChange={(v) =>
+                      setDisplay(
+                        "density",
+                        (typeof v === "string" ? v : "comfortable") as Density,
+                      )
+                    }
+                    options={DENSITY_OPTIONS}
+                    clearable={false}
+                  />
+                </div>
+                <ToggleRow
+                  label="Cabeçalho fixo"
+                  checked={c.display?.stickyHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Cabeçalho e link">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={c.display?.showHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("showHeader", v)}
+                />
+                <ToggleRow
+                  label="Exibir contagem"
+                  checked={c.display?.showCount ?? true}
+                  onCheckedChange={(v) => setDisplay("showCount", v)}
+                />
+              </div>
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         {/* ---- COLUMNS & SORTING ---- */}
         <TabsContent value="columns" className="space-y-3 mt-0">
-          <Section title="Selecionar e reordenar" defaultOpen>
-            <ColumnPicker
-              catalog={COLUMN_CATALOG.map((col) => ({ key: col.key, label: col.label }))}
-              selected={c.columns}
-              onChange={(next) => set("columns", next as ItemTableConfig["columns"])}
-            />
-          </Section>
-          <Section title="Ordenação e limite" defaultOpen>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Ordenar por</Label>
-                <Combobox
-                  mode="single"
-                  value={c.sort.key}
-                  onValueChange={(v) =>
-                    setSort(
-                      "key",
-                      (typeof v === "string" ? v : "name") as ItemTableConfig["sort"]["key"],
-                    )
-                  }
-                  options={SORT_KEYS.map((k) => ({ value: k, label: SORT_LABELS[k] }))}
-                  clearable={false}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Direção</Label>
-                <Combobox
-                  mode="single"
-                  value={c.sort.direction}
-                  onValueChange={(v) =>
-                    setSort(
-                      "direction",
-                      (typeof v === "string" ? v : "asc") as ItemTableConfig["sort"]["direction"],
-                    )
-                  }
-                  options={SORT_DIRECTION_OPTIONS}
-                  clearable={false}
-                />
-              </div>
-            </div>
-            <LimitInput
-              value={c.limit}
-              onChange={(n) => set("limit", n)}
-            />
-          </Section>
+          <ColumnPicker
+            catalog={COLUMN_CATALOG.map((col) => ({ key: col.key, label: col.label }))}
+            selected={c.columns}
+            onChange={(next) => set("columns", next as ItemTableConfig["columns"])}
+            sorts={c.sorts as ColumnSort<ColumnKey>[]}
+            onSortsChange={(next) => set("sorts", next as ItemTableConfig["sorts"])}
+          />
+          <LimitInput value={c.limit} onChange={(n) => set("limit", n)} />
         </TabsContent>
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Limpar filtros
-            </button>
+          <div>
+            <Label className="text-xs">Busca</Label>
+            <Input
+              value={c.filters.searchingFor}
+              onChange={(v) => setFilter("searchingFor", typeof v === "string" ? v : "")}
+              placeholder="Nome, código, marca, categoria..."
+            />
           </div>
-
-          <Section title="Busca e estoque" defaultOpen>
+          <div>
+            <Label className="text-xs">Níveis de estoque</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.stockLevels}
+              onValueChange={(v) => setFilter("stockLevels", asArray(v) as STOCK_LEVEL[])}
+              options={stockLevelOptions}
+              placeholder="Todos os níveis"
+              searchPlaceholder="Buscar nível..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Marcas</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.brandIds}
+              onValueChange={(v) => setFilter("brandIds", asArray(v))}
+              options={brandOptions}
+              placeholder="Todas as marcas"
+              searchPlaceholder="Buscar marca..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Categorias</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.categoryIds}
+              onValueChange={(v) => setFilter("categoryIds", asArray(v))}
+              options={categoryOptions}
+              placeholder="Todas as categorias"
+              searchPlaceholder="Buscar categoria..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Fornecedores</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.supplierIds}
+              onValueChange={(v) => setFilter("supplierIds", asArray(v))}
+              options={supplierOptions}
+              placeholder="Todos os fornecedores"
+              searchPlaceholder="Buscar fornecedor..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">ABC</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.abcCategories}
+              onValueChange={(v) =>
+                setFilter("abcCategories", asArray(v) as ABC_CATEGORY[])
+              }
+              options={abcOptions}
+              placeholder="Todas as classes ABC"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">XYZ</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.xyzCategories}
+              onValueChange={(v) =>
+                setFilter("xyzCategories", asArray(v) as XYZ_CATEGORY[])
+              }
+              options={xyzOptions}
+              placeholder="Todas as classes XYZ"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs">Busca</Label>
+              <Label className="text-xs">Ativo</Label>
+              <Combobox
+                mode="single"
+                value={c.filters.isActive}
+                onValueChange={(v) =>
+                  setFilter(
+                    "isActive",
+                    (typeof v === "string" ? v : "any") as ItemTableConfig["filters"]["isActive"],
+                  )
+                }
+                options={triStateOptions}
+                clearable={false}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Tem ponto de reposição</Label>
+              <Combobox
+                mode="single"
+                value={c.filters.hasReorderPoint}
+                onValueChange={(v) =>
+                  setFilter(
+                    "hasReorderPoint",
+                    (typeof v === "string"
+                      ? v
+                      : "any") as ItemTableConfig["filters"]["hasReorderPoint"],
+                  )
+                }
+                options={triStateOptions}
+                clearable={false}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Tem qtde máxima</Label>
+              <Combobox
+                mode="single"
+                value={c.filters.hasMaxQuantity}
+                onValueChange={(v) =>
+                  setFilter(
+                    "hasMaxQuantity",
+                    (typeof v === "string"
+                      ? v
+                      : "any") as ItemTableConfig["filters"]["hasMaxQuantity"],
+                  )
+                }
+                options={triStateOptions}
+                clearable={false}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Atribuir ao usuário</Label>
+              <Combobox
+                mode="single"
+                value={c.filters.shouldAssignToUser}
+                onValueChange={(v) =>
+                  setFilter(
+                    "shouldAssignToUser",
+                    (typeof v === "string"
+                      ? v
+                      : "any") as ItemTableConfig["filters"]["shouldAssignToUser"],
+                  )
+                }
+                options={triStateOptions}
+                clearable={false}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Quant. mínima</Label>
               <Input
-                value={c.filters.searchingFor}
-                onChange={(v) => setFilter("searchingFor", typeof v === "string" ? v : "")}
-                placeholder="Nome, código, marca, categoria..."
+                type="number"
+                value={c.filters.quantityMin ?? ""}
+                onChange={(v) => {
+                  const n = typeof v === "number" ? v : v ? Number(v) : null;
+                  setFilter("quantityMin", Number.isFinite(n) ? (n as number) : null);
+                }}
               />
             </div>
             <div>
-              <Label className="text-xs">Níveis de estoque</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.stockLevels}
-                onValueChange={(v) => setFilter("stockLevels", asArray(v) as STOCK_LEVEL[])}
-                options={stockLevelOptions}
-                placeholder="Todos os níveis"
-                searchPlaceholder="Buscar nível..."
+              <Label className="text-xs">Quant. máxima</Label>
+              <Input
+                type="number"
+                value={c.filters.quantityMax ?? ""}
+                onChange={(v) => {
+                  const n = typeof v === "number" ? v : v ? Number(v) : null;
+                  setFilter("quantityMax", Number.isFinite(n) ? (n as number) : null);
+                }}
               />
             </div>
-          </Section>
-
-          <Section title="Marca, Categoria, Fornecedor">
-            <div>
-              <Label className="text-xs">Marcas</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.brandIds}
-                onValueChange={(v) => setFilter("brandIds", asArray(v))}
-                options={brandOptions}
-                placeholder="Todas as marcas"
-                searchPlaceholder="Buscar marca..."
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Categorias</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.categoryIds}
-                onValueChange={(v) => setFilter("categoryIds", asArray(v))}
-                options={categoryOptions}
-                placeholder="Todas as categorias"
-                searchPlaceholder="Buscar categoria..."
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Fornecedores</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.supplierIds}
-                onValueChange={(v) => setFilter("supplierIds", asArray(v))}
-                options={supplierOptions}
-                placeholder="Todos os fornecedores"
-                searchPlaceholder="Buscar fornecedor..."
-              />
-            </div>
-          </Section>
-
-          <Section title="Classificação ABC / XYZ">
-            <div>
-              <Label className="text-xs">ABC</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.abcCategories}
-                onValueChange={(v) =>
-                  setFilter("abcCategories", asArray(v) as ABC_CATEGORY[])
-                }
-                options={abcOptions}
-                placeholder="Todas as classes ABC"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">XYZ</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.xyzCategories}
-                onValueChange={(v) =>
-                  setFilter("xyzCategories", asArray(v) as XYZ_CATEGORY[])
-                }
-                options={xyzOptions}
-                placeholder="Todas as classes XYZ"
-              />
-            </div>
-          </Section>
-
-          <Section title="Características">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Ativo</Label>
-                <Combobox
-                  mode="single"
-                  value={c.filters.isActive}
-                  onValueChange={(v) =>
-                    setFilter(
-                      "isActive",
-                      (typeof v === "string" ? v : "any") as ItemTableConfig["filters"]["isActive"],
-                    )
-                  }
-                  options={triStateOptions}
-                  clearable={false}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Tem ponto de reposição</Label>
-                <Combobox
-                  mode="single"
-                  value={c.filters.hasReorderPoint}
-                  onValueChange={(v) =>
-                    setFilter(
-                      "hasReorderPoint",
-                      (typeof v === "string"
-                        ? v
-                        : "any") as ItemTableConfig["filters"]["hasReorderPoint"],
-                    )
-                  }
-                  options={triStateOptions}
-                  clearable={false}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Tem qtde máxima</Label>
-                <Combobox
-                  mode="single"
-                  value={c.filters.hasMaxQuantity}
-                  onValueChange={(v) =>
-                    setFilter(
-                      "hasMaxQuantity",
-                      (typeof v === "string"
-                        ? v
-                        : "any") as ItemTableConfig["filters"]["hasMaxQuantity"],
-                    )
-                  }
-                  options={triStateOptions}
-                  clearable={false}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Atribuir ao usuário</Label>
-                <Combobox
-                  mode="single"
-                  value={c.filters.shouldAssignToUser}
-                  onValueChange={(v) =>
-                    setFilter(
-                      "shouldAssignToUser",
-                      (typeof v === "string"
-                        ? v
-                        : "any") as ItemTableConfig["filters"]["shouldAssignToUser"],
-                    )
-                  }
-                  options={triStateOptions}
-                  clearable={false}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Quant. mínima</Label>
-                <Input
-                  type="number"
-                  value={c.filters.quantityMin ?? ""}
-                  onChange={(v) => {
-                    const n = typeof v === "number" ? v : v ? Number(v) : null;
-                    setFilter("quantityMin", Number.isFinite(n) ? (n as number) : null);
-                  }}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Quant. máxima</Label>
-                <Input
-                  type="number"
-                  value={c.filters.quantityMax ?? ""}
-                  onChange={(v) => {
-                    const n = typeof v === "number" ? v : v ? Number(v) : null;
-                    setFilter("quantityMax", Number.isFinite(n) ? (n as number) : null);
-                  }}
-                />
-              </div>
-            </div>
-          </Section>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
@@ -1151,7 +1120,7 @@ export const itemTableWidget: WidgetDefinition<ItemTableConfig> = {
   configSchema: itemTableConfigSchema,
   defaultConfig: {
     title: "Itens",
-    accent: { color: "yellow", icon: "Package", borderColor: "none" },
+    accent: { color: "yellow", icon: "Package", shade: "500" },
     columns: ["name", "brand", "quantity", "monthlyConsumption"],
     filters: {
       searchingFor: "",
@@ -1168,16 +1137,16 @@ export const itemTableWidget: WidgetDefinition<ItemTableConfig> = {
       quantityMin: null,
       quantityMax: null,
     },
-    sort: { key: "name", direction: "asc" },
+    sorts: [{ key: "name", direction: "asc" }],
     limit: 20,
-    showHeader: true,
-    showRowDot: true,
     display: {
       density: "comfortable",
       striping: true,
       gridLines: true,
       hoverHighlight: true,
       stickyHeader: true,
+      showHeader: true,
+      showCount: true,
     },
   },
   RenderComponent: ItemTableRender,

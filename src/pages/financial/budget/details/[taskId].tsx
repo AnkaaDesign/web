@@ -190,7 +190,7 @@ export const FinancialBudgetDetailPage = () => {
       details: task.details || "",
       serviceOrders: task.serviceOrders || [],
       paintId: task.paintId || null,
-      paintIds: task.paintIds?.map((p: any) => p.id || p) || [],
+      paintIds: (task as any).paintIds?.map((p: any) => p.id || p) || task.logoPaints?.map((p) => p.id) || [],
     };
 
     if (!existingQuote) {
@@ -415,7 +415,7 @@ export const FinancialBudgetDetailPage = () => {
     if (!task) return;
 
     // Responsibles
-    if (task.responsibles?.length > 0) {
+    if (task.responsibles && task.responsibles.length > 0) {
       setResponsibleRows(
         task.responsibles.map((r: any) => ({
           id: r.id,
@@ -433,7 +433,7 @@ export const FinancialBudgetDetailPage = () => {
     }
 
     // Artworks
-    if (task.artworks?.length > 0) {
+    if (task.artworks && task.artworks.length > 0) {
       const artworkFilesList = task.artworks.map((artwork: any) => {
         const file = artwork.file || artwork;
         return {
@@ -451,7 +451,7 @@ export const FinancialBudgetDetailPage = () => {
       setArtworkFiles(artworkFilesList);
 
       const statuses: Record<string, string> = {};
-      task.artworks.forEach((artwork: any) => {
+      task.artworks!.forEach((artwork: any) => {
         const fileId = (artwork.file || artwork).id;
         if (artwork.status) statuses[fileId] = artwork.status;
       });

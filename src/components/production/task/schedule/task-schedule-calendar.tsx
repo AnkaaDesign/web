@@ -117,13 +117,6 @@ const EVENT_BAR_CLASSES: Record<EventType, string> = {
 const EVENT_BAR_OVERDUE =
   "bg-red-700 text-white border border-red-800 font-semibold";
 
-const EVENT_DOT_CLASSES: Record<EventType, string> = {
-  term: "bg-purple-600",
-  forecastDate: "bg-orange-600",
-  startedAt: "bg-blue-600",
-  finishedAt: "bg-green-700",
-};
-
 const EVENT_ICONS: Record<EventType, React.ComponentType<{ className?: string }>> = {
   term: IconFlag,
   forecastDate: IconCalendarDue,

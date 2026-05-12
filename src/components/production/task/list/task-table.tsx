@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Task } from "../../../../types";
-import { routes, TASK_STATUS } from "../../../../constants";
+import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { isValidTaskStatusTransition, getTaskStatusLabel } from "../../../../utils";
 import { shouldShowInteractiveElements, canEditTasks, canDeleteTasks } from "@/utils/permissions/entity-permissions";
 import { useAuth } from "@/hooks/common/use-auth";
@@ -193,8 +193,10 @@ export function TaskTable({
     isBulk: boolean;
   } | null>(null);
 
-  // Get column definitions
-  const columns = React.useMemo(() => createTaskColumns(), []);
+  // Get column definitions (sector-aware: financial columns hidden from
+  // sectors without canViewTaskFinancialColumns).
+  const userSectorPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
+  const columns = React.useMemo(() => createTaskColumns(userSectorPrivilege), [userSectorPrivilege]);
 
   // Filter visible columns
   const displayColumns = React.useMemo(() => columns.filter((col) => visibleColumns.has(col.id)), [columns, visibleColumns]);

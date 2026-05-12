@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { secullumMappingService } from "../../api-client/services/secullum-mapping";
-import { toast } from "@/components/ui/sonner";
 
 export const secullumMappingKeys = {
   all: ["secullum-mapping"] as const,

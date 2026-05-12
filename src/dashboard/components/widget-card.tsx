@@ -3,12 +3,22 @@
 // matching footer strip. The fixed header height (h-9) is what keeps every
 // widget's header visually aligned regardless of whether the widget shows a
 // search input, day navigator, or other taller controls inside `headerExtra`.
+//
+// When the caller passes `accentColor` + `accentShade`, a thin colored
+// stripe is rendered flush at the very top of the card (clipped to the
+// card's rounded corners by the wrapper's `overflow-hidden`). This mirrors
+// the gallery card design from `add-widget-modal.tsx` so the user can
+// recognize each widget at a glance by its picked accent.
 
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { IconChevronRight } from "@tabler/icons-react";
-import { borderClassFor } from "./widget-accent";
-import type { WidgetBorderColor } from "./widget-accent";
+import { borderClassFor, resolveAccentClasses } from "./widget-accent";
+import type {
+  WidgetAccentColor,
+  WidgetAccentShade,
+  WidgetBorderColor,
+} from "./widget-accent";
 
 interface WidgetCardProps {
   title?: ReactNode;
@@ -27,6 +37,14 @@ interface WidgetCardProps {
   showFooter?: boolean;
   /** Optional border accent color — overrides the default `border-border`. */
   borderColor?: WidgetBorderColor;
+  /**
+   * Top accent stripe color. When BOTH `accentColor` and `accentShade` are
+   * provided, a thin colored bar is rendered flush at the top of the card
+   * (mirrors the gallery card design). When either is missing, no stripe
+   * renders — backward compatible with existing callers.
+   */
+  accentColor?: WidgetAccentColor;
+  accentShade?: WidgetAccentShade;
   className?: string;
   children: ReactNode;
 }
@@ -41,17 +59,30 @@ export function WidgetCard({
   showHeader = true,
   showFooter = true,
   borderColor,
+  accentColor,
+  accentShade,
   className,
   children,
 }: WidgetCardProps) {
-  const borderClass = borderClassFor(borderColor);
   const renderFooter = showFooter && (viewAllHref || footerExtra);
+  // When the caller provides an `accentColor`, the card border itself adopts
+  // that color/shade (auto-derived — there's no longer a separate borderColor
+  // config field). Falls back to the legacy `borderColor` prop for any caller
+  // that hasn't migrated yet, then to the neutral `border-border` token.
+  const accentClasses = accentColor
+    ? resolveAccentClasses(accentColor, accentShade ?? "500")
+    : null;
+  const borderClass = accentClasses?.cardBorder ?? borderClassFor(borderColor);
+  const stripeClass = accentClasses?.dot ?? null;
   return (
     <div
       className={`h-full w-full flex flex-col min-h-0 rounded-lg bg-card border ${borderClass} shadow-sm overflow-hidden ${
         className ?? ""
       }`}
     >
+      {stripeClass && (
+        <div className={`h-1.5 w-full shrink-0 ${stripeClass}`} />
+      )}
       {showHeader && (title || icon || headerExtra || count != null) && (
         <div className="flex items-center justify-between gap-3 px-3 h-9 border-b border-border shrink-0 bg-muted/30">
           <div className="flex items-center gap-2 min-w-0">

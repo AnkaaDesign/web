@@ -48,12 +48,12 @@ import {
 } from "../../components/integrations/secullum/cell-renderers";
 
 import { WidgetCard } from "../components/widget-card";
-import { ColumnPicker } from "../components/column-picker";
+import { ColumnPicker, type ColumnSort } from "../components/column-picker";
 import { AccentPicker, makeAccentSchema, resolveAccent } from "../components/widget-accent";
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
 import type {
   WidgetConfigProps,
@@ -62,9 +62,9 @@ import type {
 } from "../types";
 import {
   Section,
+  SectionGroup,
   ToggleRow,
   LimitInput,
-  SORT_DIRECTION_OPTIONS,
   DENSITY_VALUES,
   DENSITY_OPTIONS,
   densityClasses,
@@ -109,7 +109,7 @@ type ColumnKey =
   | "dayOff"
   | "freeLunch";
 
-const COLUMN_KEY_VALUES: readonly ColumnKey[] = [
+const COLUMN_KEY_VALUES = [
   "userName",
   "sectorName",
   "positionName",
@@ -138,7 +138,7 @@ const COLUMN_KEY_VALUES: readonly ColumnKey[] = [
   "neutral",
   "dayOff",
   "freeLunch",
-] as const;
+] as const satisfies readonly ColumnKey[];
 
 interface DayColumnDef {
   key: ColumnKey;
@@ -189,25 +189,7 @@ const PUNCH_KEYS: readonly ColumnKey[] = [
   "entrada5",
   "saida5",
 ];
-const HOUR_KEYS = new Set<ColumnKey>([
-  "normais",
-  "faltas",
-  "ex50",
-  "ex100",
-  "ex150",
-  "dsr",
-  "dsrDeb",
-  "ajuste",
-  "atras",
-  "adian",
-]);
 const BAD_KEYS = new Set<ColumnKey>(["faltas", "atras", "adian"]);
-const BOOL_KEYS = new Set<ColumnKey>([
-  "compensated",
-  "neutral",
-  "dayOff",
-  "freeLunch",
-]);
 
 // True when a slot value isn't HH:MM and isn't blank — those are the
 // justification tokens (FÉRIAS / FOLGA / ATESTAD / FALTA / FERIADO / …).
@@ -383,31 +365,24 @@ const FILTER_MODES = [
   "compensated",
 ] as const;
 const LAYOUT_MODES = ["flat", "grouped-by-sector"] as const;
-const SORT_KEYS = [
-  "userName",
-  "sectorName",
-  "positionName",
-  "faltas",
-  "atras",
-  "normais",
-] as const;
 
 export const dailyPontoConfigSchema = z.object({
   title: z.string().min(1).max(80).default("Ponto do Dia"),
   accent: makeAccentSchema({
     color: "teal",
     icon: "Clock24",
-    borderColor: "none",
   }),
-  showHeader: z.boolean().default(true),
 
   display: z
     .object({
       density: z.enum(DENSITY_VALUES).default("comfortable"),
+      // striping/gridLines/hoverHighlight kept for back-compat but hardcoded ON.
       striping: z.boolean().default(true),
       gridLines: z.boolean().default(true),
       hoverHighlight: z.boolean().default(true),
       stickyHeader: z.boolean().default(true),
+      showHeader: z.boolean().default(true),
+      showCount: z.boolean().default(true),
       showSearchBox: z.boolean().default(true),
       showDayNavigator: z.boolean().default(true),
       showViewAllLink: z.boolean().default(true),
@@ -420,6 +395,8 @@ export const dailyPontoConfigSchema = z.object({
       gridLines: true,
       hoverHighlight: true,
       stickyHeader: true,
+      showHeader: true,
+      showCount: true,
       showSearchBox: true,
       showDayNavigator: true,
       showViewAllLink: true,
@@ -450,12 +427,14 @@ export const dailyPontoConfigSchema = z.object({
     })
     .default({ mode: "all", sectorNames: [], positionNames: [], defaultSearch: "" }),
 
-  sort: z
-    .object({
-      key: z.enum(SORT_KEYS).default("userName"),
-      direction: z.enum(["asc", "desc"]).default("asc"),
-    })
-    .default({ key: "userName", direction: "asc" }),
+  sorts: z
+    .array(
+      z.object({
+        key: z.string(),
+        direction: z.enum(["asc", "desc"]),
+      }),
+    )
+    .default([{ key: "userName", direction: "asc" }]),
 
   limit: z.number().int().min(5).max(200).default(50),
 });
@@ -596,10 +575,9 @@ function applyFilters(rows: DayRow[], config: DailyPontoConfig, search: string):
 }
 
 function applySort(rows: DayRow[], config: DailyPontoConfig): DayRow[] {
-  const { key, direction } = config.sort;
-  const sign = direction === "asc" ? 1 : -1;
-  const out = rows.slice();
-  out.sort((a, b) => {
+  const sorts = config.sorts ?? [];
+  if (sorts.length === 0) return rows;
+  const cmpByKey = (a: DayRow, b: DayRow, key: string): number => {
     let av: string | number = "";
     let bv: string | number = "";
     if (key === "userName") {
@@ -612,11 +590,20 @@ function applySort(rows: DayRow[], config: DailyPontoConfig): DayRow[] {
       av = a.user.positionName ?? "";
       bv = b.user.positionName ?? "";
     } else {
-      av = String(getEntryField(a.entry, key) ?? "");
-      bv = String(getEntryField(b.entry, key) ?? "");
+      av = String(getEntryField(a.entry, key as ColumnKey) ?? "");
+      bv = String(getEntryField(b.entry, key as ColumnKey) ?? "");
     }
-    if (av < bv) return -1 * sign;
-    if (av > bv) return 1 * sign;
+    if (av < bv) return -1;
+    if (av > bv) return 1;
+    return 0;
+  };
+  const out = rows.slice();
+  out.sort((a, b) => {
+    for (const s of sorts) {
+      const sign = s.direction === "asc" ? 1 : -1;
+      const c = cmpByKey(a, b, s.key);
+      if (c !== 0) return sign * c;
+    }
     return 0;
   });
   return out;
@@ -707,13 +694,15 @@ function DailyPontoRender({
   const accent = resolveAccent({
     color: config.accent?.color as WidgetAccentColor,
     icon: config.accent?.icon as WidgetAccentIcon,
+    shade: config.accent?.shade as WidgetAccentShade | undefined,
   });
   const AccentIcon = accent.Icon;
   const display = config.display;
   const dens = densityClasses(display.density as Density);
   const stickyClass = display.stickyHeader ? "sticky top-0 z-20" : "";
-  const rowBorder = display.gridLines ? "border-b border-border last:border-b-0" : "";
-  const rowHover = display.hoverHighlight ? "hover:bg-secondary/50" : "";
+  // Hardcoded chrome — striping/gridLines/hoverHighlight no longer configurable.
+  const rowBorder = "border-b border-border last:border-b-0";
+  const rowHover = "hover:bg-secondary/50";
   const emptyMsg =
     display.emptyStateMessage?.trim() || "Nenhum registro de ponto neste dia.";
 
@@ -784,7 +773,7 @@ function DailyPontoRender({
         }
       }}
       className={`grid gap-x-3 items-center cursor-pointer transition-colors ${dens.row} ${rowBorder} ${rowHover} ${
-        display.striping && i % 2 === 1 ? "bg-muted/20" : ""
+        i % 2 === 1 ? "bg-muted/20" : ""
       }`}
       style={{ gridTemplateColumns: gridTemplate }}
     >
@@ -844,7 +833,7 @@ function DailyPontoRender({
 
   return (
     <WidgetCard
-      showHeader={config.showHeader}
+      showHeader={display.showHeader ?? true}
       title={
         <span className={accent.classes.text}>{config.title || "Ponto do Dia"}</span>
       }
@@ -852,9 +841,10 @@ function DailyPontoRender({
       viewAllHref={
         display.showViewAllLink ? `/recursos-humanos/controle-ponto?date=${dateStr}` : undefined
       }
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
       headerExtra={headerExtra}
-      count={!isLoading ? rows.length : null}
+      count={(display.showCount ?? true) && !isLoading ? rows.length : null}
     >
       <>
         <div
@@ -946,14 +936,6 @@ const LAYOUT_LABELS: Record<(typeof LAYOUT_MODES)[number], string> = {
   flat: "Lista única",
   "grouped-by-sector": "Agrupado por setor",
 };
-const SORT_LABELS: Record<(typeof SORT_KEYS)[number], string> = {
-  userName: "Colaborador",
-  sectorName: "Setor",
-  positionName: "Cargo",
-  faltas: "Faltas",
-  atras: "Atraso",
-  normais: "Horas normais",
-};
 function asArray(v: unknown): string[] {
   if (Array.isArray(v)) return v;
   if (typeof v === "string" && v) return [v];
@@ -975,10 +957,7 @@ function DailyPontoConfigComponent({
     key: K,
     value: DailyPontoConfig["filters"][K],
   ) => onChange({ ...c, filters: { ...c.filters, [key]: value } });
-  const setSort = <K extends keyof DailyPontoConfig["sort"]>(
-    key: K,
-    value: DailyPontoConfig["sort"][K],
-  ) => onChange({ ...c, sort: { ...c.sort, [key]: value } });
+  // Sort is now driven by the column-picker's per-row chips.
 
   // Discover unique sector / position names from today's response so the
   // Combobox options aren't hand-typed.
@@ -1002,14 +981,7 @@ function DailyPontoConfigComponent({
 
   const accentColor = (c.accent?.color ?? "teal") as WidgetAccentColor;
   const accentIcon = (c.accent?.icon ?? "Clock24") as WidgetAccentIcon;
-  const borderColor = (c.accent?.borderColor ?? "none") as WidgetBorderColor;
-
-  const resetDisplay = () => set("display", dailyPontoWidget.defaultConfig.display);
-  const resetColumns = () => set("columns", dailyPontoWidget.defaultConfig.columns);
-  const resetFilters = () => set("filters", dailyPontoWidget.defaultConfig.filters);
-  const resetBehavior = () => {
-    set("sort", dailyPontoWidget.defaultConfig.sort);
-  };
+  const accentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
 
   return (
     <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 -mr-1">
@@ -1040,176 +1012,107 @@ function DailyPontoConfigComponent({
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetDisplay}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Restaurar aparência
-            </button>
-          </div>
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{ color: accentColor, icon: accentIcon, borderColor }}
-              onChange={(next) =>
-                set("accent", {
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                } as DailyPontoConfig["accent"])
-              }
-            />
-          </Section>
-          <Section title="Densidade e linhas" defaultOpen>
-            <div>
-              <Label className="text-xs">Densidade</Label>
-              <Combobox
-                mode="single"
-                value={c.display.density}
-                onValueChange={(v) =>
-                  setDisplay(
-                    "density",
-                    (typeof v === "string" ? v : "comfortable") as Density,
-                  )
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || accentColor,
+                    icon: next.icon || accentIcon,
+                    shade: next.shade || accentShade,
+                  } as DailyPontoConfig["accent"])
                 }
-                options={DENSITY_OPTIONS}
-                clearable={false}
               />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <ToggleRow
-                label="Listras alternadas"
-                checked={c.display.striping}
-                onCheckedChange={(v) => setDisplay("striping", v)}
+            </Section>
+            <Section title="Densidade e linhas">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Densidade</Label>
+                  <Combobox
+                    mode="single"
+                    value={c.display.density}
+                    onValueChange={(v) =>
+                      setDisplay(
+                        "density",
+                        (typeof v === "string" ? v : "comfortable") as Density,
+                      )
+                    }
+                    options={DENSITY_OPTIONS}
+                    clearable={false}
+                  />
+                </div>
+                <ToggleRow
+                  label="Cabeçalho fixo"
+                  checked={c.display.stickyHeader}
+                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Cabeçalho e link">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={c.display.showHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("showHeader", v)}
+                />
+                <ToggleRow
+                  label="Exibir contagem"
+                  checked={c.display.showCount ?? true}
+                  onCheckedChange={(v) => setDisplay("showCount", v)}
+                />
+                <ToggleRow
+                  label='Link "Ver todos"'
+                  checked={c.display.showViewAllLink}
+                  onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                <ToggleRow
+                  label="Caixa de busca"
+                  checked={c.display.showSearchBox}
+                  onCheckedChange={(v) => setDisplay("showSearchBox", v)}
+                />
+                <ToggleRow
+                  label="Navegador de dia"
+                  checked={c.display.showDayNavigator}
+                  onCheckedChange={(v) => setDisplay("showDayNavigator", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Mensagem quando vazio">
+              <Input
+                value={c.display.emptyStateMessage}
+                onChange={(v) =>
+                  setDisplay("emptyStateMessage", typeof v === "string" ? v : "")
+                }
+                placeholder="Nenhum registro de ponto neste dia."
               />
-              <ToggleRow
-                label="Linhas divisórias"
-                checked={c.display.gridLines}
-                onCheckedChange={(v) => setDisplay("gridLines", v)}
-              />
-              <ToggleRow
-                label="Destaque ao passar mouse"
-                checked={c.display.hoverHighlight}
-                onCheckedChange={(v) => setDisplay("hoverHighlight", v)}
-              />
-              <ToggleRow
-                label="Cabeçalho fixo"
-                checked={c.display.stickyHeader}
-                onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-              />
-              <ToggleRow
-                label="Caixa de busca"
-                checked={c.display.showSearchBox}
-                onCheckedChange={(v) => setDisplay("showSearchBox", v)}
-              />
-              <ToggleRow
-                label="Navegador de dia"
-                hint="Setas e botão Hoje no cabeçalho."
-                checked={c.display.showDayNavigator}
-                onCheckedChange={(v) => setDisplay("showDayNavigator", v)}
-              />
-              <ToggleRow
-                label='Link "Ver todos"'
-                checked={c.display.showViewAllLink}
-                onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
-              />
-              <ToggleRow
-                label="Cabeçalho do widget"
-                checked={c.showHeader}
-                onCheckedChange={(v) => set("showHeader", v)}
-              />
-            </div>
-          </Section>
-          <Section title="Mensagem quando vazio">
-            <Input
-              value={c.display.emptyStateMessage}
-              onChange={(v) =>
-                setDisplay("emptyStateMessage", typeof v === "string" ? v : "")
-              }
-              placeholder="Nenhum registro de ponto neste dia."
-            />
-          </Section>
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         {/* ---- COLUMNS + SORT ---- */}
         <TabsContent value="columns" className="space-y-3 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetColumns}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Restaurar colunas
-            </button>
-          </div>
-          <Section
-            title={`Selecionar e reordenar (${c.columns.length})`}
-            defaultOpen
-          >
-            <ColumnPicker
-              catalog={COLUMN_CATALOG.map((col) => ({ key: col.key, label: col.label }))}
-              selected={c.columns}
-              onChange={(next) => set("columns", next as DailyPontoConfig["columns"])}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Para ajustar a largura, arraste a borda direita do cabeçalho da coluna
-              diretamente na tabela. Duplo clique reseta para o padrão.
-            </p>
-          </Section>
-          <Section title="Ordenação e limite">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Ordenar por</Label>
-                <Combobox
-                  mode="single"
-                  value={c.sort.key}
-                  onValueChange={(v) =>
-                    setSort(
-                      "key",
-                      (typeof v === "string"
-                        ? v
-                        : "userName") as (typeof SORT_KEYS)[number],
-                    )
-                  }
-                  options={SORT_KEYS.map((k) => ({ value: k, label: SORT_LABELS[k] }))}
-                  clearable={false}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Direção</Label>
-                <Combobox
-                  mode="single"
-                  value={c.sort.direction}
-                  onValueChange={(v) =>
-                    setSort(
-                      "direction",
-                      (typeof v === "string" ? v : "asc") as DailyPontoConfig["sort"]["direction"],
-                    )
-                  }
-                  options={SORT_DIRECTION_OPTIONS}
-                  clearable={false}
-                />
-              </div>
-            </div>
-            <LimitInput
-              value={c.limit}
-              onChange={(n) => set("limit", n)}
-            />
-          </Section>
+          <ColumnPicker
+            catalog={COLUMN_CATALOG.map((col) => ({ key: col.key, label: col.label }))}
+            selected={c.columns}
+            onChange={(next) => set("columns", next as DailyPontoConfig["columns"])}
+            sorts={c.sorts as ColumnSort<ColumnKey>[]}
+            onSortsChange={(next) => set("sorts", next as DailyPontoConfig["sorts"])}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Para ajustar a largura, arraste a borda direita do cabeçalho da coluna
+            diretamente na tabela. Duplo clique reseta para o padrão.
+          </p>
+          <LimitInput
+            value={c.limit}
+            onChange={(n) => set("limit", n)}
+          />
         </TabsContent>
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Limpar filtros
-            </button>
-          </div>
           <div>
             <Label className="text-xs">Quem mostrar</Label>
             <Combobox
@@ -1268,15 +1171,6 @@ function DailyPontoConfigComponent({
 
         {/* ---- BEHAVIOR ---- */}
         <TabsContent value="behavior" className="space-y-3 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetBehavior}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Restaurar comportamento
-            </button>
-          </div>
           <Section title="Layout" defaultOpen>
             <div>
               <Label className="text-xs">Modo de exibição</Label>
@@ -1326,14 +1220,15 @@ export const dailyPontoWidget: WidgetDefinition<DailyPontoConfig> = {
   configSchema: dailyPontoConfigSchema,
   defaultConfig: {
     title: "Ponto do Dia",
-    accent: { color: "teal", icon: "Clock24", borderColor: "none" },
-    showHeader: true,
+    accent: { color: "teal", icon: "Clock24", shade: "500" },
     display: {
       density: "comfortable",
       striping: true,
       gridLines: true,
       hoverHighlight: true,
       stickyHeader: true,
+      showHeader: true,
+      showCount: true,
       showSearchBox: true,
       showDayNavigator: true,
       showViewAllLink: true,
@@ -1351,7 +1246,7 @@ export const dailyPontoWidget: WidgetDefinition<DailyPontoConfig> = {
       "faltas",
     ],
     filters: { mode: "all", sectorNames: [], positionNames: [], defaultSearch: "" },
-    sort: { key: "userName", direction: "asc" },
+    sorts: [{ key: "userName", direction: "asc" }],
     limit: 50,
   },
   RenderComponent: DailyPontoRender,

@@ -37,8 +37,6 @@ import {
   IconCircleCheck,
   IconCalendarDue,
   IconCash,
-  IconFileInvoice,
-  IconExternalLink,
   IconAdjustments,
   IconColumns,
   IconFilter,
@@ -70,7 +68,7 @@ import { BankSlipStatusBadge } from "../../components/production/task/billing/ba
 import { QuoteStatusBadge } from "../../components/production/task/quote/quote-status-badge";
 
 import { WidgetCard } from "../components/widget-card";
-import { ColumnPicker } from "../components/column-picker";
+import { ColumnPicker, type ColumnSort } from "../components/column-picker";
 import {
   AccentPicker,
   makeAccentSchema,
@@ -78,9 +76,9 @@ import {
 } from "../components/widget-accent";
 import {
   Section,
+  SectionGroup,
   ToggleRow,
   LimitInput,
-  SORT_DIRECTION_OPTIONS,
   REFETCH_INTERVAL_OPTIONS,
   DENSITY_OPTIONS,
   DENSITY_VALUES,
@@ -90,7 +88,7 @@ import {
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
 import type {
   WidgetConfigProps,
@@ -139,22 +137,6 @@ const LAYOUT_LABELS: Record<LayoutMode, string> = {
   flat: "Lista única",
   "grouped-by-bucket": "Agrupado por vencimento",
   "grouped-by-status": "Agrupado por status",
-};
-
-const SORT_KEYS = [
-  "dueDate",
-  "amount",
-  "customer",
-  "installmentStatus",
-  "bankSlipStatus",
-] as const;
-type SortKey = (typeof SORT_KEYS)[number];
-const SORT_LABELS: Record<SortKey, string> = {
-  dueDate: "Vencimento",
-  amount: "Valor",
-  customer: "Cliente",
-  installmentStatus: "Status da parcela",
-  bankSlipStatus: "Status do boleto",
 };
 
 const COLUMN_KEYS = [
@@ -207,16 +189,17 @@ export const installmentTableConfigSchema = z.object({
   accent: makeAccentSchema({
     color: "blue",
     icon: "Receipt",
-    borderColor: "none",
   }),
 
   display: z
     .object({
       density: z.enum(DENSITY_VALUES).default("comfortable"),
+      // striping/gridLines/hoverHighlight kept for back-compat but hardcoded ON.
       striping: z.boolean().default(true),
       gridLines: z.boolean().default(true),
       hoverHighlight: z.boolean().default(true),
       stickyHeader: z.boolean().default(true),
+      showHeader: z.boolean().default(true),
       showSearchBox: z.boolean().default(true),
       showBucketChips: z.boolean().default(true),
       showCount: z.boolean().default(true),
@@ -230,6 +213,7 @@ export const installmentTableConfigSchema = z.object({
       gridLines: true,
       hoverHighlight: true,
       stickyHeader: true,
+      showHeader: true,
       showSearchBox: true,
       showBucketChips: true,
       showCount: true,
@@ -269,12 +253,14 @@ export const installmentTableConfigSchema = z.object({
       hideMissingBankSlip: false,
     }),
 
-  sort: z
-    .object({
-      key: z.enum(SORT_KEYS).default("dueDate"),
-      direction: z.enum(["asc", "desc"]).default("asc"),
-    })
-    .default({ key: "dueDate", direction: "asc" }),
+  sorts: z
+    .array(
+      z.object({
+        key: z.string(),
+        direction: z.enum(["asc", "desc"]),
+      }),
+    )
+    .default([{ key: "dueDate", direction: "asc" }]),
 
   limit: z.number().int().min(5).max(200).default(50),
 
@@ -458,7 +444,7 @@ function applyFilters(
   });
 }
 
-function compareRows(a: FlatInstallment, b: FlatInstallment, key: SortKey): number {
+function compareRows(a: FlatInstallment, b: FlatInstallment, key: string): number {
   switch (key) {
     case "dueDate":
       return a.dueDate.getTime() - b.dueDate.getTime();
@@ -470,15 +456,24 @@ function compareRows(a: FlatInstallment, b: FlatInstallment, key: SortKey): numb
       return a.installmentStatus.localeCompare(b.installmentStatus);
     case "bankSlipStatus":
       return (a.bankSlipStatus ?? "ZZZ").localeCompare(b.bankSlipStatus ?? "ZZZ");
+    default:
+      return 0;
   }
 }
 
 function applySort(
   rows: FlatInstallment[],
-  sort: InstallmentTableConfig["sort"],
+  sorts: InstallmentTableConfig["sorts"],
 ): FlatInstallment[] {
-  const sign = sort.direction === "asc" ? 1 : -1;
-  return [...rows].sort((a, b) => sign * compareRows(a, b, sort.key));
+  if (!sorts || sorts.length === 0) return rows;
+  return [...rows].sort((a, b) => {
+    for (const s of sorts) {
+      const sign = s.direction === "asc" ? 1 : -1;
+      const c = compareRows(a, b, s.key);
+      if (c !== 0) return sign * c;
+    }
+    return 0;
+  });
 }
 
 // ============================================================================
@@ -897,7 +892,7 @@ function Render({ config, instanceId }: WidgetRenderProps<InstallmentTableConfig
 
   const rows = useMemo(() => {
     const filtered = applyFilters(rawRows, config, bucket, debouncedSearch);
-    const sorted = applySort(filtered, config.sort);
+    const sorted = applySort(filtered, config.sorts);
     return sorted.slice(0, config.limit);
   }, [rawRows, config, bucket, debouncedSearch]);
 
@@ -906,8 +901,9 @@ function Render({ config, instanceId }: WidgetRenderProps<InstallmentTableConfig
       resolveAccent({
         color: config.accent?.color as WidgetAccentColor,
         icon: config.accent?.icon as WidgetAccentIcon,
+        shade: config.accent?.shade as WidgetAccentShade | undefined,
       }),
-    [config.accent?.color, config.accent?.icon],
+    [config.accent?.color, config.accent?.icon, config.accent?.shade],
   );
   const AccentIcon = accent.Icon;
 
@@ -991,15 +987,14 @@ function Render({ config, instanceId }: WidgetRenderProps<InstallmentTableConfig
   );
 
   const renderRow = (r: FlatInstallment, i: number) => {
-    const rowBorder = display.gridLines
-      ? "border-b border-border last:border-b-0"
-      : "";
-    const rowHover = display.hoverHighlight ? "hover:bg-secondary/50" : "";
+    // Hardcoded chrome — striping/gridLines/hoverHighlight no longer configurable.
+    const rowBorder = "border-b border-border last:border-b-0";
+    const rowHover = "hover:bg-secondary/50";
     return (
       <div
         key={r.id}
         className={`grid gap-x-3 items-center cursor-pointer transition-colors ${dens.row} ${rowBorder} ${rowHover} ${
-          display.striping && i % 2 === 1 ? "bg-muted/20" : ""
+          i % 2 === 1 ? "bg-muted/20" : ""
         }`}
         style={{ gridTemplateColumns: gridTemplate }}
         onClick={() => onRowClick(r)}
@@ -1139,6 +1134,7 @@ function Render({ config, instanceId }: WidgetRenderProps<InstallmentTableConfig
 
   return (
     <WidgetCard
+      showHeader={display.showHeader ?? true}
       title={
         <span className={accent.classes.text}>{config.title || "Boletos"}</span>
       }
@@ -1146,7 +1142,8 @@ function Render({ config, instanceId }: WidgetRenderProps<InstallmentTableConfig
       count={display.showCount && !isLoading ? rows.length : null}
       headerExtra={headerExtra}
       viewAllHref={display.showViewAllLink ? routes.financial.billing.root : undefined}
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
     >
       <div className="flex flex-col h-full min-h-0">
         {display.showBucketChips && (
@@ -1191,14 +1188,11 @@ function ConfigComp({
     key: K,
     value: InstallmentTableConfig["filters"][K],
   ) => set("filters", { ...config.filters, [key]: value });
-  const setSort = <K extends keyof InstallmentTableConfig["sort"]>(
-    key: K,
-    value: InstallmentTableConfig["sort"][K],
-  ) => set("sort", { ...config.sort, [key]: value });
+  // Sort is now driven by the column-picker's per-row chips.
 
   const accentColor = (config.accent?.color ?? "blue") as WidgetAccentColor;
   const accentIcon = (config.accent?.icon ?? "Receipt") as WidgetAccentIcon;
-  const borderColor = (config.accent?.borderColor ?? "none") as WidgetBorderColor;
+  const accentShade = (config.accent?.shade ?? "500") as WidgetAccentShade;
 
   const { data: customersData } = useCustomers({
     page: 1,
@@ -1236,78 +1230,75 @@ function ConfigComp({
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{ color: accentColor, icon: accentIcon, borderColor }}
-              onChange={(next) =>
-                set("accent", {
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                } as InstallmentTableConfig["accent"])
-              }
-            />
-          </Section>
-          <Section title="Densidade e exibição" defaultOpen>
-            <div>
-              <Label className="text-xs">Densidade</Label>
-              <Combobox
-                mode="single"
-                value={config.display.density}
-                onValueChange={(v) =>
-                  setDisplay(
-                    "density",
-                    (typeof v === "string" ? v : "comfortable") as Density,
-                  )
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || accentColor,
+                    icon: next.icon || accentIcon,
+                    shade: next.shade || accentShade,
+                  } as InstallmentTableConfig["accent"])
                 }
-                options={DENSITY_OPTIONS}
-                clearable={false}
               />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <ToggleRow
-                label="Listras alternadas"
-                checked={config.display.striping}
-                onCheckedChange={(v) => setDisplay("striping", v)}
-              />
-              <ToggleRow
-                label="Linhas divisórias"
-                checked={config.display.gridLines}
-                onCheckedChange={(v) => setDisplay("gridLines", v)}
-              />
-              <ToggleRow
-                label="Realce ao passar"
-                checked={config.display.hoverHighlight}
-                onCheckedChange={(v) => setDisplay("hoverHighlight", v)}
-              />
-              <ToggleRow
-                label="Cabeçalho fixo"
-                checked={config.display.stickyHeader}
-                onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-              />
-              <ToggleRow
-                label="Caixa de busca"
-                checked={config.display.showSearchBox}
-                onCheckedChange={(v) => setDisplay("showSearchBox", v)}
-              />
-              <ToggleRow
-                label="Chips de vencimento"
-                checked={config.display.showBucketChips}
-                onCheckedChange={(v) => setDisplay("showBucketChips", v)}
-              />
-              <ToggleRow
-                label="Contador no cabeçalho"
-                checked={config.display.showCount}
-                onCheckedChange={(v) => setDisplay("showCount", v)}
-              />
-              <ToggleRow
-                label='Link "Ver todos"'
-                checked={config.display.showViewAllLink}
-                onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Mensagem de estado vazio</Label>
+            </Section>
+            <Section title="Densidade e linhas">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Densidade</Label>
+                  <Combobox
+                    mode="single"
+                    value={config.display.density}
+                    onValueChange={(v) =>
+                      setDisplay(
+                        "density",
+                        (typeof v === "string" ? v : "comfortable") as Density,
+                      )
+                    }
+                    options={DENSITY_OPTIONS}
+                    clearable={false}
+                  />
+                </div>
+                <ToggleRow
+                  label="Cabeçalho fixo"
+                  checked={config.display.stickyHeader}
+                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Cabeçalho e link">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={config.display.showHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("showHeader", v)}
+                />
+                <ToggleRow
+                  label="Exibir contagem"
+                  checked={config.display.showCount}
+                  onCheckedChange={(v) => setDisplay("showCount", v)}
+                />
+                <ToggleRow
+                  label='Link "Ver todos"'
+                  checked={config.display.showViewAllLink}
+                  onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                <ToggleRow
+                  label="Caixa de busca"
+                  checked={config.display.showSearchBox}
+                  onCheckedChange={(v) => setDisplay("showSearchBox", v)}
+                />
+                <ToggleRow
+                  label="Chips de vencimento"
+                  checked={config.display.showBucketChips}
+                  onCheckedChange={(v) => setDisplay("showBucketChips", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Mensagem quando vazio">
               <Input
                 value={config.display.emptyStateMessage}
                 onChange={(v) =>
@@ -1318,129 +1309,96 @@ function ConfigComp({
                 }
                 placeholder="Nenhum boleto encontrado com os filtros atuais."
               />
-            </div>
-          </Section>
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         {/* ---- COLUMNS & SORT ---- */}
         <TabsContent value="columns" className="space-y-3 mt-0">
-          <Section title="Selecionar e reordenar" defaultOpen>
-            <ColumnPicker
-              catalog={COLUMN_KEYS.map((k) => ({ key: k, label: COLUMN_LABELS[k] }))}
-              selected={config.columns}
-              onChange={(next) =>
-                set("columns", next as InstallmentTableConfig["columns"])
-              }
-            />
-          </Section>
-
-          <Section title="Ordenação e limite" defaultOpen>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Ordenar por</Label>
-                <Combobox
-                  mode="single"
-                  value={config.sort.key}
-                  onValueChange={(v) =>
-                    setSort("key", (typeof v === "string" ? v : "dueDate") as SortKey)
-                  }
-                  options={SORT_KEYS.map((k) => ({ value: k, label: SORT_LABELS[k] }))}
-                  clearable={false}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Direção</Label>
-                <Combobox
-                  mode="single"
-                  value={config.sort.direction}
-                  onValueChange={(v) =>
-                    setSort(
-                      "direction",
-                      (typeof v === "string" ? v : "asc") as "asc" | "desc",
-                    )
-                  }
-                  options={SORT_DIRECTION_OPTIONS}
-                  clearable={false}
-                />
-              </div>
-            </div>
-            <LimitInput
-              value={config.limit}
-              onChange={(n) => set("limit", n)}
-            />
-          </Section>
+          <ColumnPicker
+            catalog={COLUMN_KEYS.map((k) => ({ key: k, label: COLUMN_LABELS[k] }))}
+            selected={config.columns}
+            onChange={(next) =>
+              set("columns", next as InstallmentTableConfig["columns"])
+            }
+            sorts={config.sorts as ColumnSort<ColumnKey>[]}
+            onSortsChange={(next) =>
+              set("sorts", next as InstallmentTableConfig["sorts"])
+            }
+          />
+          <LimitInput value={config.limit} onChange={(n) => set("limit", n)} />
         </TabsContent>
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <Section title="Vencimento e status" defaultOpen>
-            <div>
-              <Label className="text-xs">Vencimento padrão</Label>
-              <Combobox
-                mode="single"
-                value={config.filters.defaultBucket}
-                onValueChange={(v) =>
-                  setFilter(
-                    "defaultBucket",
-                    (typeof v === "string" ? v : "next-30-days") as DueBucket,
-                  )
-                }
-                options={DUE_BUCKETS.map((b) => ({
-                  value: b,
-                  label: DUE_BUCKET_LABELS[b],
-                }))}
-                clearable={false}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Status da parcela (vazio = todos)</Label>
-              <Combobox
-                mode="multiple"
-                value={config.filters.installmentStatuses}
-                onValueChange={(v) =>
-                  setFilter(
-                    "installmentStatuses",
-                    (Array.isArray(v) ? v : []) as INSTALLMENT_STATUS[],
-                  )
-                }
-                options={Object.values(INSTALLMENT_STATUS).map((s) => ({
-                  value: s,
-                  label: INSTALLMENT_STATUS_LABELS[s],
-                }))}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Status do boleto (vazio = todos)</Label>
-              <Combobox
-                mode="multiple"
-                value={config.filters.bankSlipStatuses}
-                onValueChange={(v) =>
-                  setFilter(
-                    "bankSlipStatuses",
-                    (Array.isArray(v) ? v : []) as BANK_SLIP_STATUS[],
-                  )
-                }
-                options={Object.values(BANK_SLIP_STATUS).map((s) => ({
-                  value: s,
-                  label: BANK_SLIP_STATUS_LABELS[s],
-                }))}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Clientes (vazio = todos)</Label>
-              <Combobox
-                mode="multiple"
-                value={config.filters.customerIds}
-                onValueChange={(v) =>
-                  setFilter("customerIds", (Array.isArray(v) ? v : []) as string[])
-                }
-                options={customers.map((c: any) => ({
-                  value: c.id,
-                  label: c.fantasyName ?? c.corporateName ?? c.id,
-                }))}
-                searchPlaceholder="Buscar cliente..."
-              />
-            </div>
+          <div>
+            <Label className="text-xs">Vencimento padrão</Label>
+            <Combobox
+              mode="single"
+              value={config.filters.defaultBucket}
+              onValueChange={(v) =>
+                setFilter(
+                  "defaultBucket",
+                  (typeof v === "string" ? v : "next-30-days") as DueBucket,
+                )
+              }
+              options={DUE_BUCKETS.map((b) => ({
+                value: b,
+                label: DUE_BUCKET_LABELS[b],
+              }))}
+              clearable={false}
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Status da parcela (vazio = todos)</Label>
+            <Combobox
+              mode="multiple"
+              value={config.filters.installmentStatuses}
+              onValueChange={(v) =>
+                setFilter(
+                  "installmentStatuses",
+                  (Array.isArray(v) ? v : []) as INSTALLMENT_STATUS[],
+                )
+              }
+              options={Object.values(INSTALLMENT_STATUS).map((s) => ({
+                value: s,
+                label: INSTALLMENT_STATUS_LABELS[s],
+              }))}
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Status do boleto (vazio = todos)</Label>
+            <Combobox
+              mode="multiple"
+              value={config.filters.bankSlipStatuses}
+              onValueChange={(v) =>
+                setFilter(
+                  "bankSlipStatuses",
+                  (Array.isArray(v) ? v : []) as BANK_SLIP_STATUS[],
+                )
+              }
+              options={Object.values(BANK_SLIP_STATUS).map((s) => ({
+                value: s,
+                label: BANK_SLIP_STATUS_LABELS[s],
+              }))}
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Clientes (vazio = todos)</Label>
+            <Combobox
+              mode="multiple"
+              value={config.filters.customerIds}
+              onValueChange={(v) =>
+                setFilter("customerIds", (Array.isArray(v) ? v : []) as string[])
+              }
+              options={customers.map((c: any) => ({
+                value: c.id,
+                label: c.fantasyName ?? c.corporateName ?? c.id,
+              }))}
+              searchPlaceholder="Buscar cliente..."
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
             <ToggleRow
               label="Esconder pagas"
               checked={config.filters.hideFullyPaid}
@@ -1451,7 +1409,7 @@ function ConfigComp({
               checked={config.filters.hideMissingBankSlip}
               onCheckedChange={(v) => setFilter("hideMissingBankSlip", v)}
             />
-          </Section>
+          </div>
         </TabsContent>
 
         {/* ---- BEHAVIOR ---- */}
@@ -1521,13 +1479,14 @@ export const installmentTableWidget: WidgetDefinition<InstallmentTableConfig> = 
   configSchema: installmentTableConfigSchema,
   defaultConfig: {
     title: "Boletos",
-    accent: { color: "blue", icon: "Receipt", borderColor: "none" },
+    accent: { color: "blue", icon: "Receipt", shade: "500" },
     display: {
       density: "comfortable",
       striping: true,
       gridLines: true,
       hoverHighlight: true,
       stickyHeader: true,
+      showHeader: true,
       showSearchBox: true,
       showBucketChips: true,
       showCount: true,
@@ -1553,7 +1512,7 @@ export const installmentTableWidget: WidgetDefinition<InstallmentTableConfig> = 
       hideFullyPaid: false,
       hideMissingBankSlip: false,
     },
-    sort: { key: "dueDate", direction: "asc" },
+    sorts: [{ key: "dueDate", direction: "asc" }],
     limit: 50,
     refetchInterval: 0,
   },

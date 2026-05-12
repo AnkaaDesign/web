@@ -72,7 +72,7 @@ export function BillingStepTask({
                   <FormControl>
                     <Input
                       value={field.value || ""}
-                      onChange={(e) => field.onChange(e.target.value)}
+                      onChange={(value) => field.onChange(value ?? "")}
                       placeholder="Ex: Pintura completa do caminhão"
                       disabled={disabled}
                       className="bg-transparent"
@@ -160,7 +160,7 @@ export function BillingStepTask({
                   <FormControl>
                     <Input
                       value={field.value || ""}
-                      onChange={(e) => field.onChange(e.target.value)}
+                      onChange={(value) => field.onChange(value ?? "")}
                       placeholder="Ex: ABC-123"
                       disabled={disabled}
                       className="bg-transparent"
@@ -183,7 +183,7 @@ export function BillingStepTask({
                   <FormControl>
                     <Input
                       value={field.value || ""}
-                      onChange={(e) => field.onChange(e.target.value)}
+                      onChange={(value) => field.onChange(value ?? "")}
                       placeholder="Ex: ABC-1234"
                       disabled={disabled}
                       className="bg-transparent"
@@ -206,7 +206,7 @@ export function BillingStepTask({
                   <FormControl>
                     <Input
                       value={field.value || ""}
-                      onChange={(e) => field.onChange(e.target.value)}
+                      onChange={(value) => field.onChange(value ?? "")}
                       placeholder="Ex: 9BW..."
                       disabled={disabled}
                       className="bg-transparent font-mono"

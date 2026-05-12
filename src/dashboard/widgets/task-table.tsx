@@ -2,8 +2,8 @@
 //
 // Mirrors the production task preparation page's column + filter set, plus
 // per-instance overrides for visual density, deadline color thresholds,
-// runtime search, layout mode (flat / grouped-by-status / tabs), refetch
-// interval, and named local presets.
+// runtime search, layout mode (flat / grouped-by-status / tabs) and refetch
+// interval.
 //
 // File is organized in clearly labeled sections. The catalog and config UI
 // are intentionally co-located so adding a new column means touching one file.
@@ -16,15 +16,11 @@ import {
   IconClipboardText,
   IconColumns,
   IconCornerDownLeft,
-  IconDownload,
-  IconFileImport,
   IconFilter,
   IconLayout,
   IconPalette,
   IconRefresh,
   IconSearch,
-  IconTrash,
-  IconX,
 } from "@tabler/icons-react";
 
 import {
@@ -47,7 +43,12 @@ import {
   TRUCK_CATEGORY_LABELS,
 } from "../../constants";
 import type { Task } from "../../types";
-import { useTasks } from "../../hooks/production/use-task";
+import { useTasks, useTaskMutations } from "../../hooks/production/use-task";
+import {
+  TaskTableContextMenu,
+  type TaskAction,
+} from "../../components/production/task/schedule/task-table-context-menu";
+import { isTaskQuoteBillingPhase } from "../../constants/enum-labels";
 import { useSectors } from "../../hooks/administration/use-sector";
 import { useCustomers } from "../../hooks/administration/use-customer";
 import {
@@ -56,10 +57,10 @@ import {
   DEFAULT_FORECAST_COLOR_CONFIG,
   DEFAULT_TERM_COLOR_CONFIG,
   deadlineColorSwatchClass,
-  deadlineColorTextClass,
   getForecastColorClass,
   getTermColorClass,
   isOverdue as isTaskOverdue,
+  parseDeadlineColor,
   type DeadlineColorToken,
   type ForecastColorConfig,
   type TermColorConfig,
@@ -69,7 +70,6 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Combobox } from "../../components/ui/combobox";
 import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
 import {
   Tabs,
   TabsContent,
@@ -83,6 +83,8 @@ import {
 } from "../../components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "../../components/painting/effects/canvas-normal-map-renderer";
 import { ServiceOrderCell } from "../../components/production/task/history/service-order-cell";
+import { useAuth } from "@/hooks/common/use-auth";
+import { canViewTaskFinancialColumns, isTaskFinancialColumn } from "@/utils/permissions/task-column-permissions";
 import { DeadlineCountdown } from "../../components/production/task/schedule/deadline-countdown";
 import { QuoteStatusBadge } from "../../components/production/task/quote/quote-status-badge";
 import { FilePreviewModal } from "../../components/common/file/file-preview-modal";
@@ -93,11 +95,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
 import { getFileThumbnailUrl } from "../../utils/file";
 
 import { WidgetCard } from "../components/widget-card";
 import { ColumnPicker } from "../components/column-picker";
-import { AccentPicker, resolveAccent } from "../components/widget-accent";
+import type { ColumnSort } from "../components/column-picker";
+import {
+  AccentPicker,
+  ColorPaletteDialog,
+  resolveAccent,
+} from "../components/widget-accent";
 import {
   Section,
   ToggleRow,
@@ -110,6 +127,7 @@ import {
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
+  WidgetAccentShade,
   WidgetBorderColor,
 } from "../components/widget-accent";
 import type {
@@ -122,14 +140,6 @@ import type {
 // Helpers
 // ============================================================================
 
-function formatDate(d: Date | string | null | undefined): string {
-  if (!d) return "—";
-  try {
-    return new Date(d).toLocaleDateString("pt-BR");
-  } catch {
-    return "—";
-  }
-}
 function formatDateTimeShort(d: Date | string | null | undefined): string {
   if (!d) return "—";
   try {
@@ -168,9 +178,6 @@ function startOfMonth(d = new Date()): Date {
 }
 function endOfMonth(d = new Date()): Date {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-function isoOrNull(d: Date | undefined): string | null {
-  return d ? d.toISOString() : null;
 }
 function asArray(v: unknown): string[] {
   if (Array.isArray(v)) return v;
@@ -394,7 +401,7 @@ type ColumnKey =
   | "hasBudget"
   | "hasObservation";
 
-const COLUMN_KEY_VALUES: readonly ColumnKey[] = [
+const COLUMN_KEY_VALUES = [
   "name",
   "customerName",
   "responsibles",
@@ -436,7 +443,7 @@ const COLUMN_KEY_VALUES: readonly ColumnKey[] = [
   "hasOpenSO",
   "hasBudget",
   "hasObservation",
-] as const;
+] as const satisfies readonly ColumnKey[];
 
 interface RenderCtx {
   cellModes: { serviceOrder: "count" | "progress-bar"; paint: "swatch" | "swatch-name" | "name"; status: "badge" | "dot-label" | "text" };
@@ -1235,6 +1242,10 @@ export const taskTableConfigSchema = z.object({
           "rose",
         ])
         .default("none"),
+      borderThickness: z.enum(["none", "thin", "medium", "thick"]).optional(),
+      shade: z
+        .enum(["50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"])
+        .optional(),
     })
     .default({ color: "gray", icon: "ClipboardText", borderColor: "none" }),
 
@@ -1250,7 +1261,7 @@ export const taskTableConfigSchema = z.object({
       showRowDot: z.boolean().default(true),
       showSearchBox: z.boolean().default(false),
       showViewAllLink: z.boolean().default(true),
-      emptyStateMessage: z.string().max(160).default(""),
+      showCount: z.boolean().default(true),
       layoutMode: z.enum(LAYOUT_MODES).default("flat"),
     })
     .default({
@@ -1262,7 +1273,7 @@ export const taskTableConfigSchema = z.object({
       showRowDot: true,
       showSearchBox: false,
       showViewAllLink: true,
-      emptyStateMessage: "",
+      showCount: true,
       layoutMode: "flat",
     }),
 
@@ -1281,13 +1292,15 @@ export const taskTableConfigSchema = z.object({
       forecastCriticalDays: z.number().int().min(0).max(60).default(3),
       forecastWarningDays: z.number().int().min(0).max(120).default(7),
       forecastNoticeDays: z.number().int().min(0).max(180).default(10),
-      forecastCriticalColor: z.enum(DEADLINE_COLOR_TOKENS).default("red"),
-      forecastWarningColor: z.enum(DEADLINE_COLOR_TOKENS).default("orange"),
-      forecastNoticeColor: z.enum(DEADLINE_COLOR_TOKENS).default("yellow"),
-      termOverdueColor: z.enum(DEADLINE_COLOR_TOKENS).default("red"),
+      // Shade-aware tokens (e.g. "red-500"). Bare tokens like "red" still
+      // parse as legacy data and resolve to shade 500 at render time.
+      forecastCriticalColor: z.string().default("red-500"),
+      forecastWarningColor: z.string().default("orange-500"),
+      forecastNoticeColor: z.string().default("yellow-500"),
+      termOverdueColor: z.string().default("red-500"),
       termCriticalHours: z.number().min(0).max(72).default(4),
-      termCriticalColor: z.enum(DEADLINE_COLOR_TOKENS).default("amber"),
-      termOnTrackColor: z.enum(DEADLINE_COLOR_TOKENS).default("green"),
+      termCriticalColor: z.string().default("amber-500"),
+      termOnTrackColor: z.string().default("green-500"),
     })
     .default({
       enabled: true,
@@ -1295,13 +1308,13 @@ export const taskTableConfigSchema = z.object({
       forecastCriticalDays: 3,
       forecastWarningDays: 7,
       forecastNoticeDays: 10,
-      forecastCriticalColor: "red",
-      forecastWarningColor: "orange",
-      forecastNoticeColor: "yellow",
-      termOverdueColor: "red",
+      forecastCriticalColor: "red-500",
+      forecastWarningColor: "orange-500",
+      forecastNoticeColor: "yellow-500",
+      termOverdueColor: "red-500",
       termCriticalHours: 4,
-      termCriticalColor: "amber",
-      termOnTrackColor: "green",
+      termCriticalColor: "amber-500",
+      termOnTrackColor: "green-500",
     }),
 
   columns: z
@@ -1378,10 +1391,14 @@ export const taskTableConfigSchema = z.object({
     })
     .default({ key: "term", direction: "asc" }),
 
+  // Multi-sort accepts ANY column key (z.string()), not just the strict
+  // SORT_KEYS subset — users should be able to sort by any visible column
+  // (Cliente, Identificador, Setor, etc.). The Prisma orderBy accepts the
+  // raw key for native fields; nested fields are handled by the API layer.
   sorts: z
     .array(
       z.object({
-        key: z.enum(SORT_KEYS),
+        key: z.string(),
         direction: z.enum(["asc", "desc"]),
       }),
     )
@@ -1396,15 +1413,6 @@ export const taskTableConfigSchema = z.object({
       viewAllRouteOverride: z.string().default(""),
     })
     .default({ refetchIntervalMs: 0, viewAllRouteOverride: "" }),
-
-  presets: z
-    .array(
-      z.object({
-        name: z.string().min(1).max(40),
-        config: z.unknown(),
-      }),
-    )
-    .default([]),
 });
 
 export type TaskTableConfig = z.infer<typeof taskTableConfigSchema>;
@@ -1749,9 +1757,120 @@ function TaskTableRender({
   const tasks = data?.data ?? [];
   const visibleCount = tasks.length;
 
+  // ----- Right-click context menu -----
+  // Mirrors the production schedule page's menu (start/finish/edit/quote/delete).
+  // We don't replicate the full advanced-actions surface (bulk arts, cutting
+  // plans, etc.) — those need modals the widget shouldn't carry. The menu
+  // component shows only the items the user has permission for, so unprivileged
+  // sectors will see no menu at all.
+  const { updateAsync, deleteAsync: deleteTaskAsync } = useTaskMutations();
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    tasks: Task[];
+  } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ tasks: Task[] } | null>(
+    null,
+  );
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, task: Task) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, tasks: [task] });
+  }, []);
+
+  // Click anywhere closes the menu.
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [contextMenu]);
+
+  const handleAction = useCallback(
+    async (action: TaskAction, actionTasks: Task[]) => {
+      try {
+        switch (action) {
+          case "start":
+            for (const t of actionTasks) {
+              if (
+                t.status === TASK_STATUS.WAITING_PRODUCTION ||
+                t.status === TASK_STATUS.PREPARATION
+              ) {
+                await updateAsync({
+                  id: t.id,
+                  data: { status: TASK_STATUS.IN_PRODUCTION },
+                } as any);
+              }
+            }
+            break;
+          case "finish":
+            for (const t of actionTasks) {
+              if (t.status === TASK_STATUS.IN_PRODUCTION) {
+                await updateAsync({
+                  id: t.id,
+                  data: { status: TASK_STATUS.COMPLETED },
+                } as any);
+              }
+            }
+            break;
+          case "view":
+          case "edit":
+            if (actionTasks.length === 1) {
+              navigate(detailHref(actionTasks[0].id));
+            }
+            break;
+          case "quote":
+            if (actionTasks.length === 1) {
+              const t = actionTasks[0];
+              const quoteRoute = isTaskQuoteBillingPhase(t.quote?.status as any)
+                ? `/financeiro/cobranca/detalhes/${t.id}`
+                : `/financeiro/orcamento/detalhes/${t.id}`;
+              navigate(quoteRoute);
+            }
+            break;
+          case "delete":
+            setDeleteDialog({ tasks: actionTasks });
+            break;
+          // Other actions (duplicate / setSector / setStatus / bulkArts / etc.)
+          // need standalone modals the widget doesn't carry. Fall through —
+          // the menu still renders them when the user is permitted, but they
+          // become no-ops in the dashboard context.
+          default:
+            break;
+        }
+      } catch {
+        // Mutation hooks fire toasts on failure.
+      }
+    },
+    [updateAsync, navigate],
+  );
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteDialog) return;
+    try {
+      for (const t of deleteDialog.tasks) {
+        await deleteTaskAsync(t.id);
+      }
+    } finally {
+      setDeleteDialog(null);
+    }
+  }, [deleteDialog, deleteTaskAsync]);
+
+  // Strip financial columns (price/quoteTotal/quoteStatus) for sectors
+  // that aren't allowed to see them. The widget allowlist gates access to
+  // the widget overall; this is the per-column layer for sensitive fields.
+  const { user } = useAuth();
+  const sectorPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
+  const canSeeFinancials = canViewTaskFinancialColumns(sectorPrivilege);
+
   const cols = useMemo(
-    () => config.columns.map((k) => COLUMN_BY_KEY[k]).filter(Boolean),
-    [config.columns],
+    () =>
+      config.columns
+        .map((k) => COLUMN_BY_KEY[k])
+        .filter(Boolean)
+        .filter((c) => canSeeFinancials || !isTaskFinancialColumn(c.key)),
+    [config.columns, canSeeFinancials],
   );
 
   // Resolve column widths — live drag wins over saved config wins over catalog.
@@ -1775,7 +1894,6 @@ function TaskTableRender({
     [config.accent?.color, config.accent?.icon],
   );
   const AccentIcon = accent.Icon;
-  const showRowDot = (config.display?.showRowDot ?? true) && config.columns[0] === "name";
 
   const target = config.rowClickTarget ?? "task";
   const detailHref = (taskId: string): string =>
@@ -1829,15 +1947,15 @@ function TaskTableRender({
     showRowDot: true,
     showSearchBox: false,
     showViewAllLink: true,
-    emptyStateMessage: "",
+    showCount: true,
     layoutMode: "flat" as const,
   };
   const dens = densityClasses(display.density);
   const stickyClass = display.stickyHeader ? "sticky top-0 z-20" : "";
   const rowBorder = display.gridLines ? "border-b border-border last:border-b-0" : "";
-  const rowHover = display.hoverHighlight ? "hover:bg-secondary/50" : "";
-  const emptyMsg =
-    display.emptyStateMessage?.trim() || "Nenhuma tarefa encontrada com os filtros atuais.";
+  // Striping and hover-highlight are always on — non-configurable now.
+  const rowHover = "hover:bg-secondary/50";
+  const emptyMsg = "Nenhuma tarefa encontrada";
 
   const headerExtra = (
     <div className="flex items-center gap-2">
@@ -1912,10 +2030,11 @@ function TaskTableRender({
       tabIndex={0}
       aria-label={`Abrir tarefa ${task.name ?? task.serialNumber ?? task.id}`}
       className={`grid gap-x-3 items-center cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${dens.row} ${rowBorder} ${rowHover} ${
-        display.striping && i % 2 === 1 ? "bg-muted/20" : ""
+        i % 2 === 1 ? "bg-muted/20" : ""
       }`}
       style={{ gridTemplateColumns: gridTemplate }}
       onClick={() => navigate(detailHref(task.id))}
+      onContextMenu={(e) => handleContextMenu(e, task)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -1923,22 +2042,12 @@ function TaskTableRender({
         }
       }}
     >
-      {cols.map((c, idx) => (
+      {cols.map((c) => (
         <div
           key={c.key}
           className={`min-w-0 ${c.needsRelative ? "relative" : "overflow-hidden"}`}
         >
-          {idx === 0 && showRowDot ? (
-            <div className="flex items-center gap-2 min-w-0">
-              <span
-                className={`h-2 w-2 rounded-full shrink-0 ${accent.classes.dot}`}
-                aria-hidden="true"
-              />
-              {c.render(task, ctx)}
-            </div>
-          ) : (
-            c.render(task, ctx)
-          )}
+          {c.render(task, ctx)}
         </div>
       ))}
     </div>
@@ -2023,10 +2132,43 @@ function TaskTableRender({
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       viewAllHref={display.showViewAllLink ? viewAllHref : undefined}
       headerExtra={headerExtra}
-      count={!isLoading ? visibleCount : null}
+      count={display.showCount && !isLoading ? visibleCount : null}
       borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      accentColor={config.accent?.color}
+      accentShade={config.accent?.shade}
     >
       {body}
+      <TaskTableContextMenu
+        contextMenu={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onAction={handleAction}
+      />
+      <AlertDialog
+        open={!!deleteDialog}
+        onOpenChange={(open) => !open && setDeleteDialog(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteDialog && deleteDialog.tasks.length > 1
+                ? `Excluir ${deleteDialog.tasks.length} tarefas?`
+                : "Excluir tarefa?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </WidgetCard>
   );
 }
@@ -2101,19 +2243,9 @@ const TRI_STATE_LABELS: Record<(typeof TRI_STATE)[number], string> = {
   yes: "Sim",
   no: "Não",
 };
-const SORT_LABELS: Record<(typeof SORT_KEYS)[number], string> = {
-  term: "Prazo",
-  forecastDate: "Previsão",
-  createdAt: "Data de criação",
-  startedAt: "Data de início",
-  finishedAt: "Data de conclusão",
-  name: "Logomarca / Nome",
-  statusOrder: "Ordem de status",
-  entryDate: "Data de entrada",
-  price: "Valor",
-  commissionOrder: "Ordem de comissão",
-  updatedAt: "Atualizado em",
-};
+// SORT_LABELS removed: the standalone sort UI was replaced by inline chips on
+// the column picker, which uses each column's own label rather than a separate
+// sort-key label table.
 const SO_TYPE_LABELS_LOCAL: Record<SERVICE_ORDER_TYPE, string> = {
   [SERVICE_ORDER_TYPE.PRODUCTION]: SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.PRODUCTION] ?? "Produção",
   [SERVICE_ORDER_TYPE.COMMERCIAL]: SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.COMMERCIAL] ?? "Comercial",
@@ -2139,36 +2271,64 @@ const STATUS_CELL_LABELS: Record<(typeof STATUS_CELL_MODES)[number], string> = {
   "dot-label": "Bolinha + texto",
   text: "Apenas texto",
 };
-const COLOR_TOKEN_OPTIONS = DEADLINE_COLOR_TOKENS.map((t) => ({
-  value: t,
-  label: DEADLINE_COLOR_LABELS[t],
-}));
-
+// Deadline-color picker: full Tailwind grid (rows = colors × cols = shades),
+// shares ColorPaletteDialog with the appearance accent picker. Stores the
+// full `<color>-<shade>` token (e.g. "red-700") so the user's exact pick is
+// preserved. Legacy bare tokens like "red" still parse and render via
+// `parseDeadlineColor` (treated as shade 500).
+const HIDDEN_DEADLINE_COLORS = new Set<DeadlineColorToken>([
+  "amber",
+  "emerald",
+  "sky",
+  "pink",
+]);
+const VISIBLE_DEADLINE_TOKENS = DEADLINE_COLOR_TOKENS.filter(
+  (t) => !HIDDEN_DEADLINE_COLORS.has(t),
+);
 function ColorTokenPicker({
   value,
   onChange,
 }: {
-  value: DeadlineColorToken;
-  onChange: (v: DeadlineColorToken) => void;
+  value: string;
+  onChange: (v: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const parsed = parseDeadlineColor(value);
+  const normalized = `${parsed.color}-${parsed.shade}`;
   return (
-    <div className="flex items-center gap-2">
-      <span
-        className={`h-5 w-5 rounded-full shrink-0 border border-border ${deadlineColorSwatchClass(value)}`}
-        aria-hidden="true"
-      />
-      <div className="flex-1">
-        <Combobox
-          mode="single"
-          value={value}
-          onValueChange={(v) =>
-            onChange((typeof v === "string" ? v : "red") as DeadlineColorToken)
-          }
-          options={COLOR_TOKEN_OPTIONS}
-          clearable={false}
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-3 w-full rounded-md border border-border bg-card hover:bg-accent/30 hover:border-primary/40 transition-colors px-3 py-2.5 text-left min-w-0"
+      >
+        <span
+          className={`h-6 w-6 rounded-md shrink-0 ring-2 ring-border ${deadlineColorSwatchClass(value)}`}
+          aria-hidden="true"
         />
-      </div>
-    </div>
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Cor
+          </div>
+          <div className="text-sm font-medium truncate">
+            {DEADLINE_COLOR_LABELS[parsed.color]}
+            <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+              · {parsed.shade}
+            </span>
+          </div>
+        </div>
+      </button>
+      <ColorPaletteDialog
+        open={open}
+        onOpenChange={setOpen}
+        value={normalized}
+        onSelect={(token) => onChange(token)}
+        palette={VISIBLE_DEADLINE_TOKENS}
+        paletteLabels={DEADLINE_COLOR_LABELS}
+        title="Selecione uma cor"
+        description="A cor é aplicada ao texto da célula correspondente conforme a urgência do prazo."
+      />
+    </>
   );
 }
 
@@ -2179,6 +2339,16 @@ function TaskTableConfigComponent({
   // Same normalization the render component does — guards against stale
   // instances saved before newer schema fields existed.
   const c = useMemo(() => normalizeConfig(rawConfig), [rawConfig]);
+  const { user: authUser } = useAuth();
+  const configSectorPrivilege = authUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
+  const canSeeFinancialColsInPicker = canViewTaskFinancialColumns(configSectorPrivilege);
+  const pickerCatalog = useMemo(
+    () =>
+      COLUMN_CATALOG.filter(
+        (col) => canSeeFinancialColsInPicker || !isTaskFinancialColumn(col.key),
+      ).map((col) => ({ key: col.key, label: col.label })),
+    [canSeeFinancialColsInPicker],
+  );
   const set = <K extends keyof TaskTableConfig>(key: K, value: TaskTableConfig[K]) =>
     onChange({ ...c, [key]: value });
   const setFilter = <K extends keyof TaskTableConfig["filters"]>(
@@ -2275,228 +2445,92 @@ function TaskTableConfigComponent({
     string,
   ][]).map(([value, label]) => ({ value, label }));
 
-  // Reset helpers — per-tab
-  const resetDisplay = () => set("display", taskTableWidget.defaultConfig.display);
-  const resetCellModes = () => set("cellModes", taskTableWidget.defaultConfig.cellModes);
-  const resetColumns = () => {
-    set("columns", taskTableWidget.defaultConfig.columns);
-    set("columnWidths", {});
-  };
-  const resetFilters = () => set("filters", taskTableWidget.defaultConfig.filters);
-  const resetDeadlineColors = () =>
-    set("deadlineColors", taskTableWidget.defaultConfig.deadlineColors);
-  const resetBehavior = () => set("behavior", taskTableWidget.defaultConfig.behavior);
-
-  // Multi-sort manipulators
-  const addSort = () => {
-    const used = new Set(c.sorts.map((s) => s.key));
-    const nextKey = (SORT_KEYS as readonly string[]).find((k) => !used.has(k as any)) as
-      | (typeof SORT_KEYS)[number]
-      | undefined;
-    if (!nextKey) return;
-    set("sorts", [...c.sorts, { key: nextKey, direction: "asc" }]);
-  };
-  const removeSort = (i: number) => {
-    if (c.sorts.length <= 1) return;
-    set("sorts", c.sorts.filter((_, idx) => idx !== i));
-  };
-  const updateSort = (
-    i: number,
-    patch: Partial<TaskTableConfig["sorts"][number]>,
-  ) => {
-    set(
-      "sorts",
-      c.sorts.map((s, idx) => (idx === i ? { ...s, ...patch } : s)),
-    );
-  };
-  const moveSort = (i: number, dir: -1 | 1) => {
-    const j = i + dir;
-    if (j < 0 || j >= c.sorts.length) return;
-    const next = c.sorts.slice();
-    [next[i], next[j]] = [next[j], next[i]];
-    set("sorts", next);
-  };
-
-  // Presets
-  const savePreset = () => {
-    const name = window.prompt("Nome do preset?");
-    if (!name) return;
-    const trimmed = name.trim().slice(0, 40);
-    if (!trimmed) return;
-    const without = c.presets.filter((p) => p.name !== trimmed);
-    const snapshot: TaskTableConfig = { ...c, presets: [] };
-    set("presets", [...without, { name: trimmed, config: snapshot }]);
-  };
-  const loadPreset = (i: number) => {
-    const p = c.presets[i];
-    if (!p) return;
-    const parsed = taskTableConfigSchema.safeParse(p.config);
-    if (!parsed.success) return;
-    onChange({ ...parsed.data, presets: c.presets });
-  };
-  const deletePreset = (i: number) => {
-    set("presets", c.presets.filter((_, idx) => idx !== i));
-  };
-  const exportConfig = () => {
-    const json = JSON.stringify({ ...c, presets: [] }, null, 2);
-    navigator.clipboard?.writeText(json);
-    window.alert("Configuração copiada para a área de transferência.");
-  };
-  const importConfig = () => {
-    const txt = window.prompt("Cole o JSON de configuração:");
-    if (!txt) return;
-    try {
-      const parsed = taskTableConfigSchema.safeParse(JSON.parse(txt));
-      if (!parsed.success) {
-        window.alert("JSON inválido para esta configuração.");
-        return;
-      }
-      onChange({ ...parsed.data, presets: c.presets });
-    } catch {
-      window.alert("JSON inválido.");
-    }
-  };
+  // Multi-sort manipulation now lives inside <ColumnPicker> via its `sorts` /
+  // `onSortsChange` props — no standalone helpers needed.
 
   // Accent helpers
   const currentAccentColor = (c.accent?.color ?? "gray") as WidgetAccentColor;
   const currentAccentIcon = (c.accent?.icon ?? "ClipboardText") as WidgetAccentIcon;
-  const currentBorderColor = (c.accent?.borderColor ?? "none") as WidgetBorderColor;
+  const currentAccentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
 
   return (
-    <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1 -mr-1">
-      {/* Title row + presets */}
-      <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
-        <div className="space-y-1.5">
-          <Label className="text-sm">Título</Label>
-          <Input
-            value={c.title}
-            onChange={(v) => set("title", typeof v === "string" ? v : "")}
-            placeholder="Tarefas"
-          />
-        </div>
-        <div className="flex gap-1.5">
-          <Button type="button" size="sm" variant="outline" onClick={savePreset} title="Salvar preset">
-            <IconBookmark className="h-3.5 w-3.5" />
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={exportConfig} title="Exportar JSON">
-            <IconDownload className="h-3.5 w-3.5" />
-          </Button>
-          <Button type="button" size="sm" variant="outline" onClick={importConfig} title="Importar JSON">
-            <IconFileImport className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
-
-      {c.presets.length > 0 && (
-        <div className="rounded-md border border-border p-2">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-            Presets ({c.presets.length})
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {c.presets.map((p, i) => (
-              <div
-                key={`${p.name}-${i}`}
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 pl-2 pr-1 py-0.5 text-xs"
-              >
-                <button
-                  type="button"
-                  onClick={() => loadPreset(i)}
-                  className="hover:underline"
-                  title="Carregar preset"
-                >
-                  {p.name}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deletePreset(i)}
-                  className="text-muted-foreground hover:text-destructive"
-                  title="Remover preset"
-                >
-                  <IconX className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
+    <div className="space-y-3">
       <Tabs defaultValue="appearance" className="flex flex-col gap-2">
-        <TabsList className="self-start">
-          <TabsTrigger value="appearance" className="gap-1">
-            <IconAdjustments className="h-3.5 w-3.5" /> Aparência
-          </TabsTrigger>
-          <TabsTrigger value="columns" className="gap-1">
-            <IconColumns className="h-3.5 w-3.5" /> Colunas e ordenação
-          </TabsTrigger>
-          <TabsTrigger value="filters" className="gap-1">
-            <IconFilter className="h-3.5 w-3.5" /> Filtros
-          </TabsTrigger>
-          <TabsTrigger value="colors" className="gap-1">
-            <IconPalette className="h-3.5 w-3.5" /> Cores de prazo
-          </TabsTrigger>
-          <TabsTrigger value="behavior" className="gap-1">
-            <IconLayout className="h-3.5 w-3.5" /> Comportamento
-          </TabsTrigger>
-        </TabsList>
+        {/* Sticky header: Título input + outer tabs strip stay pinned at top.
+         * Uses bg-card to blend with the modal's DialogContent background so
+         * there's no visible color step underneath the sticky bar. */}
+        <div className="sticky top-0 z-20 bg-card -mx-1 px-1 pt-2 pb-3 space-y-3 border-b border-border mb-2">
+          {/* Title row */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Título</Label>
+            <Input
+              value={c.title}
+              onChange={(v) => set("title", typeof v === "string" ? v : "")}
+              placeholder="Tarefas"
+            />
+          </div>
+          <TabsList className="self-start bg-muted/50 h-9">
+            <TabsTrigger value="appearance" className="gap-1 px-3">
+              <IconAdjustments className="h-3.5 w-3.5" /> Aparência
+            </TabsTrigger>
+            <TabsTrigger value="columns" className="gap-1 px-3">
+              <IconColumns className="h-3.5 w-3.5" /> Colunas e ordenação
+            </TabsTrigger>
+            <TabsTrigger value="filters" className="gap-1 px-3">
+              <IconFilter className="h-3.5 w-3.5" /> Filtros
+            </TabsTrigger>
+            <TabsTrigger value="colors" className="gap-1 px-3">
+              <IconPalette className="h-3.5 w-3.5" /> Cores de prazo
+            </TabsTrigger>
+            <TabsTrigger value="behavior" className="gap-1 px-3">
+              <IconLayout className="h-3.5 w-3.5" /> Comportamento
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetDisplay}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Restaurar aparência
-            </button>
-          </div>
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
+          <Section title="Acento (cor e ícone)" defaultOpen>
             <AccentPicker
               value={{
                 color: currentAccentColor,
                 icon: currentAccentIcon,
-                borderColor: currentBorderColor,
+                shade: currentAccentShade,
               }}
               onChange={(next) =>
+                // Defensive: fall back to existing accent fields if any
+                // emitted field is missing/falsy. Prevents a partial
+                // emission (e.g. from a stale closure) from clobbering
+                // the saved color/icon back to defaults on parse failure.
                 set("accent", {
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
+                  color: next.color || currentAccentColor,
+                  icon: next.icon || currentAccentIcon,
+                  shade: next.shade || currentAccentShade,
                 } as TaskTableConfig["accent"])
               }
             />
           </Section>
           <Section title="Densidade e linhas" defaultOpen>
-            <div>
-              <Label className="text-xs">Densidade</Label>
-              <Combobox
-                mode="single"
-                value={c.display.density}
-                onValueChange={(v) =>
-                  setDisplay(
-                    "density",
-                    (typeof v === "string" ? v : "comfortable") as (typeof DENSITY_VALUES)[number],
-                  )
-                }
-                options={DENSITY_OPTIONS}
-                clearable={false}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <ToggleRow
-                label="Listras alternadas"
-                checked={c.display.striping}
-                onCheckedChange={(v) => setDisplay("striping", v)}
-              />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs">Densidade</Label>
+                <Combobox
+                  mode="single"
+                  value={c.display.density}
+                  onValueChange={(v) =>
+                    setDisplay(
+                      "density",
+                      (typeof v === "string" ? v : "comfortable") as (typeof DENSITY_VALUES)[number],
+                    )
+                  }
+                  options={DENSITY_OPTIONS}
+                  clearable={false}
+                />
+              </div>
               <ToggleRow
                 label="Linhas divisórias"
                 checked={c.display.gridLines}
                 onCheckedChange={(v) => setDisplay("gridLines", v)}
-              />
-              <ToggleRow
-                label="Destaque ao passar mouse"
-                checked={c.display.hoverHighlight}
-                onCheckedChange={(v) => setDisplay("hoverHighlight", v)}
               />
               <ToggleRow
                 label="Cabeçalho fixo"
@@ -2504,106 +2538,89 @@ function TaskTableConfigComponent({
                 onCheckedChange={(v) => setDisplay("stickyHeader", v)}
               />
               <ToggleRow
-                label="Bolinha colorida na 1ª coluna"
-                hint="Mostra um ponto da cor de acento ao lado da Logomarca."
-                checked={c.display.showRowDot}
-                onCheckedChange={(v) => setDisplay("showRowDot", v)}
-              />
-              <ToggleRow
-                label="Mostrar caixa de busca"
-                hint="Permite buscar tarefas em tempo real no widget."
+                label="Caixa de busca"
                 checked={c.display.showSearchBox}
                 onCheckedChange={(v) => setDisplay("showSearchBox", v)}
               />
             </div>
           </Section>
           <Section title="Renderização das células">
-            <div>
-              <Label className="text-xs">Ordens de Serviço</Label>
-              <Combobox
-                mode="single"
-                value={c.cellModes.serviceOrder}
-                onValueChange={(v) =>
-                  setCellMode(
-                    "serviceOrder",
-                    (typeof v === "string"
-                      ? v
-                      : "progress-bar") as (typeof SO_CELL_MODES)[number],
-                  )
-                }
-                options={SO_CELL_MODES.map((m) => ({ value: m, label: SO_CELL_LABELS[m] }))}
-                clearable={false}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Pintura</Label>
-              <Combobox
-                mode="single"
-                value={c.cellModes.paint}
-                onValueChange={(v) =>
-                  setCellMode(
-                    "paint",
-                    (typeof v === "string"
-                      ? v
-                      : "swatch-name") as (typeof PAINT_CELL_MODES)[number],
-                  )
-                }
-                options={PAINT_CELL_MODES.map((m) => ({
-                  value: m,
-                  label: PAINT_CELL_LABELS[m],
-                }))}
-                clearable={false}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Status</Label>
-              <Combobox
-                mode="single"
-                value={c.cellModes.status}
-                onValueChange={(v) =>
-                  setCellMode(
-                    "status",
-                    (typeof v === "string"
-                      ? v
-                      : "badge") as (typeof STATUS_CELL_MODES)[number],
-                  )
-                }
-                options={STATUS_CELL_MODES.map((m) => ({
-                  value: m,
-                  label: STATUS_CELL_LABELS[m],
-                }))}
-                clearable={false}
-              />
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={resetCellModes}
-                className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-              >
-                Restaurar células
-              </button>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Ordens de Serviço</Label>
+                <Combobox
+                  mode="single"
+                  value={c.cellModes.serviceOrder}
+                  onValueChange={(v) =>
+                    setCellMode(
+                      "serviceOrder",
+                      (typeof v === "string"
+                        ? v
+                        : "progress-bar") as (typeof SO_CELL_MODES)[number],
+                    )
+                  }
+                  options={SO_CELL_MODES.map((m) => ({ value: m, label: SO_CELL_LABELS[m] }))}
+                  clearable={false}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Pintura</Label>
+                <Combobox
+                  mode="single"
+                  value={c.cellModes.paint}
+                  onValueChange={(v) =>
+                    setCellMode(
+                      "paint",
+                      (typeof v === "string"
+                        ? v
+                        : "swatch-name") as (typeof PAINT_CELL_MODES)[number],
+                    )
+                  }
+                  options={PAINT_CELL_MODES.map((m) => ({
+                    value: m,
+                    label: PAINT_CELL_LABELS[m],
+                  }))}
+                  clearable={false}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Status</Label>
+                <Combobox
+                  mode="single"
+                  value={c.cellModes.status}
+                  onValueChange={(v) =>
+                    setCellMode(
+                      "status",
+                      (typeof v === "string"
+                        ? v
+                        : "badge") as (typeof STATUS_CELL_MODES)[number],
+                    )
+                  }
+                  options={STATUS_CELL_MODES.map((m) => ({
+                    value: m,
+                    label: STATUS_CELL_LABELS[m],
+                  }))}
+                  clearable={false}
+                />
+              </div>
             </div>
           </Section>
           <Section title="Cabeçalho e link">
-            <ToggleRow
-              label="Exibir cabeçalho do widget"
-              checked={c.showHeader}
-              onCheckedChange={(v) => set("showHeader", v)}
-            />
-            <ToggleRow
-              label='Exibir link "Ver todos"'
-              checked={c.display.showViewAllLink}
-              onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
-            />
-            <div>
-              <Label className="text-xs">Mensagem quando vazio</Label>
-              <Input
-                value={c.display.emptyStateMessage}
-                onChange={(v) =>
-                  setDisplay("emptyStateMessage", typeof v === "string" ? v : "")
-                }
-                placeholder="Nenhuma tarefa encontrada com os filtros atuais."
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <ToggleRow
+                label="Exibir cabeçalho"
+                checked={c.showHeader}
+                onCheckedChange={(v) => set("showHeader", v)}
+              />
+              <ToggleRow
+                label='Exibir "Ver todos"'
+                checked={c.display.showViewAllLink}
+                onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
+              />
+              <ToggleRow
+                label="Exibir contagem"
+                checked={c.display.showCount}
+                onCheckedChange={(v) => setDisplay("showCount", v)}
               />
             </div>
           </Section>
@@ -2611,188 +2628,54 @@ function TaskTableConfigComponent({
 
         {/* ---- COLUMNS ---- */}
         <TabsContent value="columns" className="space-y-3 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetColumns}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Restaurar colunas
-            </button>
-          </div>
-          <Section
-            title={`Selecionar e reordenar (${c.columns.length})`}
-            defaultOpen
-          >
-            <ColumnPicker
-              catalog={COLUMN_CATALOG.map((col) => ({ key: col.key, label: col.label }))}
-              selected={c.columns}
-              onChange={(next) => set("columns", next as TaskTableConfig["columns"])}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Para ajustar a largura, arraste a borda direita do cabeçalho da coluna
-              diretamente na tabela (mesma forma da página de preparação).
-            </p>
-          </Section>
-          <Section title="Renomear cabeçalhos" defaultOpen={false}>
-            <div className="space-y-1.5">
-              {c.columns.map((colKey) => {
-                const col = COLUMN_BY_KEY[colKey];
-                if (!col) return null;
-                const override = c.columnLabels?.[colKey] ?? "";
-                return (
-                  <div key={colKey} className="flex items-center gap-2">
-                    <Label className="text-xs w-32 shrink-0 truncate" title={col.label}>
-                      {col.label}
-                    </Label>
-                    <Input
-                      type="text"
-                      value={override}
-                      placeholder={col.label}
-                      onChange={(v) => {
-                        // The shared Input component invokes onChange with the
-                        // raw value, not a ChangeEvent.
-                        const value = typeof v === "string" ? v : "";
-                        const next = { ...(c.columnLabels ?? {}) };
-                        if (value.trim()) next[colKey] = value;
-                        else delete next[colKey];
-                        set("columnLabels", next);
-                      }}
-                      className="h-7 text-xs"
-                    />
-                  </div>
-                );
-              })}
-              {Object.keys(c.columnLabels ?? {}).length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => set("columnLabels", {})}
-                  className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  Restaurar todos os rótulos
-                </button>
-              )}
-            </div>
-          </Section>
-          <Section title="Navegação ao clicar na linha">
-            <div>
-              <Label className="text-xs">Destino do clique</Label>
-              <Combobox
-                mode="single"
-                value={c.rowClickTarget ?? "task"}
-                onValueChange={(v) =>
-                  set(
-                    "rowClickTarget",
-                    (typeof v === "string"
-                      ? v
-                      : "task") as TaskTableConfig["rowClickTarget"],
-                  )
-                }
-                options={[
-                  { value: "task", label: "Tarefa (detalhe da tarefa)" },
-                  { value: "budget", label: "Orçamento (Faturamento → Orçamento)" },
-                  {
-                    value: "billing",
-                    label: "Faturamento (Faturamento → Detalhe)",
-                  },
-                ]}
-                clearable={false}
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Define para onde o usuário vai ao clicar em uma linha — útil para
-                criar tabelas dedicadas a orçamentos ou faturamento.
-              </p>
-            </div>
-          </Section>
-          <Section title="Ordenação multi-coluna" defaultOpen>
-            <p className="text-[11px] text-muted-foreground">
-              A ordem aqui define a precedência: a primeira é o critério principal.
-            </p>
-            <ul className="space-y-1.5">
-              {c.sorts.map((s, i) => (
-                <li
-                  key={`${s.key}-${i}`}
-                  className="flex items-center gap-1.5 rounded-md border border-border p-1.5"
-                >
-                  <span className="text-[11px] text-muted-foreground w-5 tabular-nums">
-                    {i + 1}.
-                  </span>
-                  <div className="flex-1">
-                    <Combobox
-                      mode="single"
-                      value={s.key}
-                      onValueChange={(v) =>
-                        updateSort(i, {
-                          key: (typeof v === "string" ? v : "term") as (typeof SORT_KEYS)[number],
-                        })
-                      }
-                      options={SORT_KEYS.map((k) => ({ value: k, label: SORT_LABELS[k] }))}
-                      clearable={false}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2"
-                    onClick={() =>
-                      updateSort(i, { direction: s.direction === "asc" ? "desc" : "asc" })
-                    }
-                    title={s.direction === "asc" ? "Crescente" : "Decrescente"}
-                  >
-                    {s.direction === "asc" ? "↑" : "↓"}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2"
-                    onClick={() => moveSort(i, -1)}
-                    disabled={i === 0}
-                    title="Subir"
-                  >
-                    ▲
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2"
-                    onClick={() => moveSort(i, 1)}
-                    disabled={i === c.sorts.length - 1}
-                    title="Descer"
-                  >
-                    ▼
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2"
-                    onClick={() => removeSort(i)}
-                    disabled={c.sorts.length <= 1}
-                    title="Remover"
-                  >
-                    <IconTrash className="h-3.5 w-3.5" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-            <div className="flex justify-between items-center pt-1">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={addSort}
-                disabled={c.sorts.length >= SORT_KEYS.length}
-              >
-                + Adicionar critério
-              </Button>
-              <span className="text-[11px] text-muted-foreground">
-                {c.sorts.length} de {SORT_KEYS.length}
-              </span>
-            </div>
-          </Section>
+          {/*
+            Single unified column picker: each row has a drag handle, a
+            visibility checkbox, an inline rename input (the column name
+            doubles as an editable input), a reset-to-default button, and an
+            inline sort chip that drives multi-column ordering. The dedicated
+            "Ordenação" section was retired in favor of these per-row chips.
+          */}
+          <ColumnPicker
+            catalog={pickerCatalog}
+            selected={c.columns}
+            onChange={(next) => set("columns", next as TaskTableConfig["columns"])}
+            labelOverrides={c.columnLabels}
+            onLabelChange={(colKey, value) => {
+              const next = { ...(c.columnLabels ?? {}) };
+              if (value.trim()) next[colKey] = value;
+              else delete next[colKey];
+              set("columnLabels", next);
+            }}
+            // SortKey is a superset of ColumnKey — it also covers virtual
+            // keys like `statusOrder`, `commissionOrder`, `updatedAt` that
+            // have no matching column row. Drop those from the chip-driven
+            // list so the picker only juggles sorts that map to a real
+            // visible row. The trade-off: virtual sorts can no longer be
+            // edited from this UI — they survive untouched if already
+            // present, but new ones can only be created from columns the
+            // user can actually see.
+            sorts={
+              c.sorts.filter((s) =>
+                (COLUMN_KEY_VALUES as readonly string[]).includes(s.key),
+              ) as ColumnSort<ColumnKey>[]
+            }
+            onSortsChange={(next) => {
+              // Preserve any pre-existing virtual sorts (keys not in the
+              // ColumnKey universe) at the END of the list so chip edits
+              // don't silently drop them.
+              const virtual = c.sorts.filter(
+                (s) => !(COLUMN_KEY_VALUES as readonly string[]).includes(s.key),
+              );
+              set("sorts", [
+                ...(next as TaskTableConfig["sorts"]),
+                ...virtual,
+              ]);
+            }}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Para ajustar a largura, arraste a borda direita do cabeçalho da coluna
+            diretamente na tabela (mesma forma da página de preparação).
+          </p>
           <Section title="Quantidade máxima">
             <LimitInput
               value={c.limit}
@@ -2803,15 +2686,6 @@ function TaskTableConfigComponent({
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Limpar filtros
-            </button>
-          </div>
           <div>
             <Label className="text-xs">Status</Label>
             <Combobox
@@ -2844,6 +2718,19 @@ function TaskTableConfigComponent({
               placeholder="Todos os clientes"
               searchPlaceholder="Buscar cliente..."
             />
+          </div>
+          <div>
+            <Label className="text-xs">Termo de busca padrão</Label>
+            <Input
+              value={c.filters.defaultSearch}
+              onChange={(v) =>
+                setFilter("defaultSearch", typeof v === "string" ? v : "")
+              }
+              placeholder='Ex.: "ABC1234" — busca em nome, série, cliente, observação'
+            />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Aplicado sempre. A caixa de busca em tempo real (se ativada) prevalece.
+            </p>
           </div>
           <div>
             <Label className="text-xs">Categoria do caminhão</Label>
@@ -2908,6 +2795,23 @@ function TaskTableConfigComponent({
               options={soTypeOptions}
               placeholder="Qualquer tipo"
               searchPlaceholder="Buscar tipo..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Tem orçamento</Label>
+            <Combobox
+              mode="single"
+              value={c.filters.hasBudget}
+              onValueChange={(v) =>
+                setFilter(
+                  "hasBudget",
+                  (typeof v === "string"
+                    ? v
+                    : "any") as TaskTableConfig["filters"]["hasBudget"],
+                )
+              }
+              options={triStateOptions}
+              clearable={false}
             />
           </div>
           <div>
@@ -3058,50 +2962,11 @@ function TaskTableConfigComponent({
               clearable={false}
             />
           </div>
-          <div>
-            <Label className="text-xs">Tem orçamento</Label>
-            <Combobox
-              mode="single"
-              value={c.filters.hasBudget}
-              onValueChange={(v) =>
-                setFilter(
-                  "hasBudget",
-                  (typeof v === "string"
-                    ? v
-                    : "any") as TaskTableConfig["filters"]["hasBudget"],
-                )
-              }
-              options={triStateOptions}
-              clearable={false}
-            />
-          </div>
-          <div>
-            <Label className="text-xs">Termo de busca padrão</Label>
-            <Input
-              value={c.filters.defaultSearch}
-              onChange={(v) =>
-                setFilter("defaultSearch", typeof v === "string" ? v : "")
-              }
-              placeholder='Ex.: "ABC1234" — busca em nome, série, cliente, observação'
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Aplicado sempre. A caixa de busca em tempo real (se ativada) prevalece.
-            </p>
-          </div>
         </TabsContent>
 
         {/* ---- SORT ---- */}
         {/* ---- COLORS ---- */}
         <TabsContent value="colors" className="space-y-3 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetDeadlineColors}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Restaurar cores
-            </button>
-          </div>
           <Section title="Geral" defaultOpen>
             <ToggleRow
               label="Ativar cores de prazo/previsão"
@@ -3211,15 +3076,6 @@ function TaskTableConfigComponent({
 
         {/* ---- BEHAVIOR ---- */}
         <TabsContent value="behavior" className="space-y-3 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetBehavior}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Restaurar comportamento
-            </button>
-          </div>
           <Section title="Layout" defaultOpen>
             <div>
               <Label className="text-xs">Modo de exibição</Label>
@@ -3261,9 +3117,37 @@ function TaskTableConfigComponent({
               </p>
             </div>
           </Section>
-          <Section title='Sobrescrever rota "Ver todos"'>
+          <Section title="Navegação">
             <div>
-              <Label className="text-xs">Rota personalizada</Label>
+              <Label className="text-xs">Destino ao clicar na linha</Label>
+              <Combobox
+                mode="single"
+                value={c.rowClickTarget ?? "task"}
+                onValueChange={(v) =>
+                  set(
+                    "rowClickTarget",
+                    (typeof v === "string"
+                      ? v
+                      : "task") as TaskTableConfig["rowClickTarget"],
+                  )
+                }
+                options={[
+                  { value: "task", label: "Tarefa (detalhe da tarefa)" },
+                  { value: "budget", label: "Orçamento (Faturamento → Orçamento)" },
+                  {
+                    value: "billing",
+                    label: "Faturamento (Faturamento → Detalhe)",
+                  },
+                ]}
+                clearable={false}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Define para onde o usuário vai ao clicar em uma linha — útil para
+                criar tabelas dedicadas a orçamentos ou faturamento.
+              </p>
+            </div>
+            <div>
+              <Label className="text-xs">Sobrescrever rota "Ver todos"</Label>
               <Input
                 value={c.behavior.viewAllRouteOverride}
                 onChange={(v) =>
@@ -3272,32 +3156,13 @@ function TaskTableConfigComponent({
                 placeholder="Ex.: /producao/agenda?status=COMPLETED"
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                Vazio = usa a rota padrão do destino selecionado em "Colunas → Navegação".
+                Vazio = usa a rota padrão do destino selecionado acima.
               </p>
             </div>
           </Section>
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-// Inline icon — local lightweight (not in tabler-react bundle import group above
-// to avoid bloating the main import block above with one-offs).
-function IconBookmark(props: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={props.className}
-    >
-      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-    </svg>
   );
 }
 
@@ -3309,13 +3174,12 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
   id: "table.tasks",
   name: "Tabela de Tarefas",
   description:
-    "Tabela de tarefas com paridade visual à página de preparação: OSs ricas, pintura em canvas, contagem regressiva, cores de prazo configuráveis, multi-ordenação, presets e modo abas/agrupado.",
+    "Tabela de tarefas com paridade visual à página de preparação: OSs ricas, pintura em canvas, contagem regressiva, cores de prazo configuráveis, multi-ordenação e modo abas/agrupado.",
   icon: IconClipboardText,
   category: "production",
-  // Mirror /producao/cronograma — every sector that has a "Cronograma" entry
-  // in their navigation tree (DESIGNER, LOGISTIC, PRODUCTION_MANAGER,
-  // COMMERCIAL, PLOTTING) plus the parent /producao users (PRODUCTION,
-  // HUMAN_RESOURCES, WAREHOUSE, ADMIN).
+  // Mirror /producao/cronograma route privileges. Financial columns
+  // (price, quoteTotal, quoteStatus) are gated per-column inside the
+  // catalog — see canViewTaskFinancialColumns().
   allowedSectors: [
     SECTOR_PRIVILEGES.PRODUCTION,
     SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
@@ -3323,7 +3187,7 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
     SECTOR_PRIVILEGES.PLOTTING,
     SECTOR_PRIVILEGES.LOGISTIC,
     SECTOR_PRIVILEGES.COMMERCIAL,
-    SECTOR_PRIVILEGES.HUMAN_RESOURCES,
+    SECTOR_PRIVILEGES.FINANCIAL,
     SECTOR_PRIVILEGES.WAREHOUSE,
     SECTOR_PRIVILEGES.ADMIN,
   ],
@@ -3344,7 +3208,7 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
       showRowDot: true,
       showSearchBox: false,
       showViewAllLink: true,
-      emptyStateMessage: "",
+      showCount: true,
       layoutMode: "flat",
     },
     cellModes: {
@@ -3368,6 +3232,7 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
     },
     columns: ["name", "customerName", "serialNumber", "term"],
     columnWidths: {},
+    columnLabels: {},
     filters: {
       status: [],
       sectorIds: [],
@@ -3400,7 +3265,6 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
     limit: 20,
     showHeader: true,
     behavior: { refetchIntervalMs: 0, viewAllRouteOverride: "" },
-    presets: [],
   },
   RenderComponent: TaskTableRender,
   ConfigComponent: TaskTableConfigComponent,
@@ -3409,4 +3273,3 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
 // Silence unused-imports lint for items kept for future use
 void IconRefresh;
 void IconCornerDownLeft;
-void deadlineColorTextClass;

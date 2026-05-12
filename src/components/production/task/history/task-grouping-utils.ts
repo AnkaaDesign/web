@@ -55,35 +55,6 @@ function levenshteinDistance(str1: string, str2: string): number {
 }
 
 /**
- * Parse serial number to extract numeric part
- * Handles formats like: "37057", "RHF3D61", "EQX9C19", etc.
- */
-function parseSerialNumber(serialNumber: string | null | undefined): number | null {
-  if (!serialNumber) return null;
-
-  // Try to extract trailing digits
-  const match = serialNumber.match(/(\d+)$/);
-  if (match) {
-    return parseInt(match[1], 10);
-  }
-
-  // Try to extract any digits
-  const allDigits = serialNumber.match(/\d+/);
-  if (allDigits) {
-    return parseInt(allDigits[0], 10);
-  }
-
-  return null;
-}
-
-/**
- * Get the identifier value for a task (serial number or truck plate)
- */
-function getIdentifier(task: Task): string {
-  return task.serialNumber || task.truck?.plate || "";
-}
-
-/**
  * Check if two tasks should be grouped together
  * Groups by name similarity - serial number distance is no longer a requirement
  */
@@ -103,22 +74,6 @@ export interface TaskGroup {
   groupId?: string;
   collapsedTasks?: Task[];
   totalCount?: number;
-}
-
-/**
- * Sort tasks by serial number (numeric extraction)
- */
-function sortBySerialNumber(tasks: Task[]): Task[] {
-  return [...tasks].sort((a, b) => {
-    const numA = parseSerialNumber(getIdentifier(a));
-    const numB = parseSerialNumber(getIdentifier(b));
-
-    if (numA === null && numB === null) return 0;
-    if (numA === null) return 1;
-    if (numB === null) return -1;
-
-    return numA - numB;
-  });
 }
 
 /**

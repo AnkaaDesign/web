@@ -44,7 +44,11 @@ import { routes } from "../../constants/routes";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Combobox } from "../../components/ui/combobox";
-import { Button } from "../../components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "../../components/ui/dropdown-menu";
 import { Badge } from "../../components/ui/badge";
 import { Textarea } from "../../components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
@@ -58,15 +62,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "../../components/ui/tooltip";
-
 import { WidgetCard } from "../components/widget-card";
-import { ColumnPicker } from "../components/column-picker";
+import { ColumnPicker, type ColumnSort } from "../components/column-picker";
 import {
   AccentPicker,
   makeAccentSchema,
@@ -75,7 +72,7 @@ import {
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
 import type {
   WidgetConfigProps,
@@ -84,9 +81,9 @@ import type {
 } from "../types";
 import {
   Section,
+  SectionGroup,
   ToggleRow,
   LimitInput,
-  SORT_DIRECTION_OPTIONS,
   DENSITY_VALUES,
   DENSITY_OPTIONS,
   densityClasses,
@@ -298,16 +295,6 @@ const SORT_KEYS = [
   "updatedAt",
 ] as const;
 
-const SORT_LABELS: Record<(typeof SORT_KEYS)[number], string> = {
-  createdAt: "Solicitado em",
-  scheduledDate: "Agendado",
-  actualDeliveryDate: "Entregue",
-  status: "Status",
-  itemName: "Nome do EPI",
-  userName: "Nome do colaborador",
-  updatedAt: "Atualizado em",
-};
-
 const SORT_KEY_TO_API: Record<(typeof SORT_KEYS)[number], string> = {
   createdAt: "createdAt",
   scheduledDate: "scheduledDate",
@@ -323,15 +310,17 @@ export const ppeDeliveryTableConfigSchema = z.object({
   accent: makeAccentSchema({
     color: "amber",
     icon: "ClipboardCheck",
-    borderColor: "none",
   }),
   display: z
     .object({
       density: z.enum(DENSITY_VALUES).default("comfortable"),
+      // striping/hoverHighlight kept for back-compat but hardcoded ON in render.
       striping: z.boolean().default(true),
       gridLines: z.boolean().default(true),
       hoverHighlight: z.boolean().default(true),
       stickyHeader: z.boolean().default(true),
+      showHeader: z.boolean().default(true),
+      showCount: z.boolean().default(true),
       showSearchBox: z.boolean().default(true),
       emptyStateMessage: z.string().max(160).default(""),
     })
@@ -341,6 +330,8 @@ export const ppeDeliveryTableConfigSchema = z.object({
       gridLines: true,
       hoverHighlight: true,
       stickyHeader: true,
+      showHeader: true,
+      showCount: true,
       showSearchBox: true,
       emptyStateMessage: "",
     }),
@@ -371,16 +362,17 @@ export const ppeDeliveryTableConfigSchema = z.object({
       userIds: [],
       onlyActionable: false,
     }),
-  sort: z
-    .object({
-      key: z.enum(SORT_KEYS).default("createdAt"),
-      direction: z.enum(["asc", "desc"]).default("desc"),
-    })
-    .default({ key: "createdAt", direction: "desc" }),
+  sorts: z
+    .array(
+      z.object({
+        key: z.string(),
+        direction: z.enum(["asc", "desc"]),
+      }),
+    )
+    .default([{ key: "createdAt", direction: "desc" }]),
   limit: z.number().int().min(5).max(200).default(30),
-  showHeader: z.boolean().default(true),
-  showRowDot: z.boolean().default(true),
-  showActionButtons: z.boolean().default(true),
+  // showActionButtons removed — actions are now exposed via the right-click
+  // context menu (mirrors the original list page).
 });
 
 export type PpeDeliveryTableConfig = z.infer<typeof ppeDeliveryTableConfigSchema>;
@@ -390,14 +382,17 @@ export type PpeDeliveryTableConfig = z.infer<typeof ppeDeliveryTableConfigSchema
 // ============================================================
 
 function buildOrderBy(
-  sort: PpeDeliveryTableConfig["sort"],
-): Record<string, unknown> {
-  const apiKey = SORT_KEY_TO_API[sort.key];
-  if (apiKey.includes(".")) {
-    const [rel, field] = apiKey.split(".");
-    return { [rel]: { [field]: sort.direction } };
-  }
-  return { [apiKey]: sort.direction };
+  sorts: PpeDeliveryTableConfig["sorts"],
+): Record<string, unknown>[] {
+  return (sorts ?? []).map((s) => {
+    const apiKey =
+      (SORT_KEY_TO_API as Record<string, string>)[s.key] ?? s.key;
+    if (apiKey.includes(".")) {
+      const [rel, field] = apiKey.split(".");
+      return { [rel]: { [field]: s.direction } };
+    }
+    return { [apiKey]: s.direction };
+  });
 }
 
 function buildParams(
@@ -407,7 +402,7 @@ function buildParams(
   const f = config.filters;
   const params: Record<string, unknown> = {
     take: config.limit,
-    orderBy: buildOrderBy(config.sort),
+    orderBy: buildOrderBy(config.sorts),
     include: {
       item: true,
       user: { include: { sector: true } },
@@ -465,30 +460,22 @@ function PpeDeliveryTableRender({
 
   const visibleCount = rows.length;
 
-  const showActions = config.showActionButtons && canManageHR;
-
-  // Build column list — append a virtual "actions" column when actions are shown.
   const cols = useMemo(
     () => config.columns.map((k) => COLUMN_BY_KEY[k]).filter(Boolean),
     [config.columns],
   );
-  const baseTemplate = cols.map((c) => c.track).join(" ");
-  const gridTemplate = showActions
-    ? `${baseTemplate} minmax(0, 0.9fr)`
-    : baseTemplate;
+  const gridTemplate = cols.map((c) => c.track).join(" ");
 
   const accent = useMemo(
     () =>
       resolveAccent({
         color: config.accent?.color as WidgetAccentColor,
         icon: config.accent?.icon as WidgetAccentIcon,
+        shade: config.accent?.shade as WidgetAccentShade | undefined,
       }),
-    [config.accent?.color, config.accent?.icon],
+    [config.accent?.color, config.accent?.icon, config.accent?.shade],
   );
   const AccentIcon = accent.Icon;
-  const showRowDot =
-    config.showRowDot &&
-    (config.columns[0] === "itemName" || config.columns[0] === "itemUniCode");
 
   // ---- Mutations + Reject dialog state ----
   const approveMutation = useBatchApprovePpeDeliveries();
@@ -498,6 +485,21 @@ function PpeDeliveryTableRender({
     label: string;
   } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+
+  // ---- Right-click context menu (replaces inline action buttons) ----
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    delivery: any;
+  } | null>(null);
+  const canAct = canManageHR;
+
+  const handleContextMenu = (e: React.MouseEvent, delivery: any) => {
+    if (!canAct) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, delivery });
+  };
 
   const onApprove = (deliveryId: string) => {
     approveMutation.mutate({ deliveryIds: [deliveryId] });
@@ -531,21 +533,21 @@ function PpeDeliveryTableRender({
     </div>
   ) : undefined;
 
-  const rowBorder = display.gridLines
-    ? "border-b border-border last:border-b-0"
-    : "";
-  const rowHover = display.hoverHighlight ? "hover:bg-secondary/50" : "";
+  // Hardcoded chrome — striping/hoverHighlight/gridLines no longer configurable.
+  const rowBorder = "border-b border-border last:border-b-0";
+  const rowHover = "hover:bg-secondary/50";
   const headerSticky = display.stickyHeader ? "sticky top-0 z-20" : "";
 
   return (
     <WidgetCard
-      showHeader={config.showHeader}
+      showHeader={config.display.showHeader ?? true}
       title={<span className={accent.classes.text}>{config.title}</span>}
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       viewAllHref={routes.humanResources.ppe.deliveries.root}
       headerExtra={headerExtra}
-      count={!isLoading ? visibleCount : null}
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      count={(config.display.showCount ?? true) && !isLoading ? visibleCount : null}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
     >
       <>
         <div
@@ -557,12 +559,11 @@ function PpeDeliveryTableRender({
               {c.label}
             </div>
           ))}
-          {showActions && <div className="truncate text-right">Ações</div>}
         </div>
 
         {isLoading ? (
           <SkeletonRows
-            columns={cols.length + (showActions ? 1 : 0)}
+            columns={cols.length}
             count={6}
             gridTemplate={gridTemplate}
             rowClass={dens.row}
@@ -577,92 +578,85 @@ function PpeDeliveryTableRender({
               "Nenhuma entrega encontrada com os filtros atuais."}
           </div>
         ) : (
-          <TooltipProvider delayDuration={250}>
-            {rows.map((d, i) => {
-              const isActionable = ACTIONABLE_STATUSES.has(d.status);
-              const itemLabel = d.item?.name || d.item?.uniCode || d.id;
-              const stripeBg =
-                display.striping && i % 2 === 1 ? "bg-muted/20" : "";
-              return (
-                <div
-                  key={d.id}
-                  className={`grid gap-x-3 items-center ${dens.row} cursor-pointer ${rowBorder} ${rowHover} ${stripeBg} transition-colors`}
-                  style={{ gridTemplateColumns: gridTemplate }}
-                  onClick={() =>
-                    navigate(routes.humanResources.ppe.deliveries.details(d.id))
-                  }
-                >
-                  {cols.map((c, idx) => (
-                    <div key={c.key} className="min-w-0 overflow-hidden">
-                      {idx === 0 && showRowDot ? (
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span
-                            className={`h-2 w-2 rounded-full shrink-0 ${accent.classes.dot}`}
-                            aria-hidden="true"
-                          />
-                          {c.render(d)}
-                        </div>
-                      ) : (
-                        c.render(d)
-                      )}
-                    </div>
-                  ))}
-                  {showActions && (
-                    <div className="flex items-center justify-end gap-1">
-                      {isActionable ? (
-                        <>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 w-7 p-0 bg-green-700 hover:bg-green-800 text-white border-green-800"
-                                disabled={
-                                  approveMutation.isPending ||
-                                  rejectMutation.isPending
-                                }
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onApprove(d.id);
-                                }}
-                              >
-                                <IconCircleCheck className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Aprovar</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 w-7 p-0 bg-red-700 hover:bg-red-800 text-white border-red-800"
-                                disabled={
-                                  approveMutation.isPending ||
-                                  rejectMutation.isPending
-                                }
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRejectTarget({ id: d.id, label: itemLabel });
-                                  setRejectReason("");
-                                }}
-                              >
-                                <IconCircleX className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Reprovar</TooltipContent>
-                          </Tooltip>
-                        </>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </TooltipProvider>
+          rows.map((d, i) => {
+            // Striping is hardcoded ON.
+            const stripeBg = i % 2 === 1 ? "bg-muted/20" : "";
+            return (
+              <div
+                key={d.id}
+                className={`grid gap-x-3 items-center ${dens.row} cursor-pointer ${rowBorder} ${rowHover} ${stripeBg} transition-colors`}
+                style={{ gridTemplateColumns: gridTemplate }}
+                onClick={() =>
+                  navigate(routes.humanResources.ppe.deliveries.details(d.id))
+                }
+                onContextMenu={(e) => handleContextMenu(e, d)}
+              >
+                {cols.map((c) => (
+                  <div key={c.key} className="min-w-0 overflow-hidden">
+                    {c.render(d)}
+                  </div>
+                ))}
+              </div>
+            );
+          })
         )}
+
+        {/* Right-click action menu — approve / reject. Only visible to users
+            with HR/Admin privileges (canManageHR). Mirrors the original list
+            page's pattern (controlled `open` + Radix's built-in outside-click
+            and item-click handling — no manual document listener needed). */}
+        <DropdownMenu
+          open={!!contextMenu}
+          onOpenChange={(open) => !open && setContextMenu(null)}
+        >
+          <DropdownMenuContent
+            style={{
+              position: "fixed",
+              left: contextMenu?.x,
+              top: contextMenu?.y,
+            }}
+            className="w-56"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            <DropdownMenuItem
+              onClick={() =>
+                contextMenu &&
+                navigate(routes.humanResources.ppe.deliveries.details(contextMenu.delivery.id))
+              }
+            >
+              <IconCircleCheck className="mr-2 h-4 w-4 opacity-0" />
+              Abrir detalhes
+            </DropdownMenuItem>
+            {contextMenu?.delivery.status === PPE_DELIVERY_STATUS.PENDING && (
+              <DropdownMenuItem
+                onClick={() => onApprove(contextMenu.delivery.id)}
+                disabled={approveMutation.isPending || rejectMutation.isPending}
+              >
+                <IconCircleCheck className="mr-2 h-4 w-4 text-green-700" />
+                Aprovar entrega
+              </DropdownMenuItem>
+            )}
+            {(contextMenu?.delivery.status === PPE_DELIVERY_STATUS.PENDING ||
+              contextMenu?.delivery.status === PPE_DELIVERY_STATUS.APPROVED) && (
+              <DropdownMenuItem
+                onClick={() => {
+                  setRejectTarget({
+                    id: contextMenu.delivery.id,
+                    label:
+                      contextMenu.delivery.item?.name ||
+                      contextMenu.delivery.item?.uniCode ||
+                      contextMenu.delivery.id,
+                  });
+                  setRejectReason("");
+                }}
+                disabled={approveMutation.isPending || rejectMutation.isPending}
+              >
+                <IconCircleX className="mr-2 h-4 w-4 text-destructive" />
+                Reprovar entrega
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <AlertDialog
           open={!!rejectTarget}
@@ -772,10 +766,7 @@ function PpeDeliveryTableConfigComponent({
     key: K,
     value: PpeDeliveryTableConfig["filters"][K],
   ) => onChange({ ...c, filters: { ...c.filters, [key]: value } });
-  const setSort = <K extends keyof PpeDeliveryTableConfig["sort"]>(
-    key: K,
-    value: PpeDeliveryTableConfig["sort"][K],
-  ) => onChange({ ...c, sort: { ...c.sort, [key]: value } });
+  // Sort state is now driven by the column-picker's per-row chips.
 
   const { data: usersData } = useUsers({ orderBy: { name: "asc" } } as any);
   const { data: itemsData } = useItems({
@@ -800,25 +791,9 @@ function PpeDeliveryTableConfigComponent({
     [itemsData?.data],
   );
 
-  const resetFilters = () =>
-    set("filters", ppeDeliveryTableWidget.defaultConfig.filters);
-
   const currentAccentColor = (c.accent?.color ?? "amber") as WidgetAccentColor;
   const currentAccentIcon = (c.accent?.icon ?? "ClipboardCheck") as WidgetAccentIcon;
-  const currentBorderColor = (c.accent?.borderColor ?? "none") as WidgetBorderColor;
-  const setAccent = (
-    patch: Partial<{
-      color: WidgetAccentColor;
-      icon: WidgetAccentIcon;
-      borderColor: WidgetBorderColor;
-    }>,
-  ) =>
-    set("accent", {
-      color: currentAccentColor,
-      icon: currentAccentIcon,
-      borderColor: currentBorderColor,
-      ...patch,
-    } as PpeDeliveryTableConfig["accent"]);
+  const currentAccentShade = (c.accent?.shade ?? "500") as WidgetAccentShade;
 
   return (
     <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1 -mr-1">
@@ -846,228 +821,154 @@ function PpeDeliveryTableConfigComponent({
 
         {/* ---- APPEARANCE ---- */}
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{
-                color: currentAccentColor,
-                icon: currentAccentIcon,
-                borderColor: currentBorderColor,
-              }}
-              onChange={(next) =>
-                setAccent({
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                })
-              }
-            />
-          </Section>
-          <Section title="Densidade e linhas" defaultOpen>
-            <div>
-              <Label className="text-xs">Densidade</Label>
-              <Combobox
-                mode="single"
-                value={c.display.density}
-                onValueChange={(v) =>
-                  setDisplay(
-                    "density",
-                    (typeof v === "string" ? v : "comfortable") as Density,
-                  )
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{
+                  color: currentAccentColor,
+                  icon: currentAccentIcon,
+                  shade: currentAccentShade,
+                }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || currentAccentColor,
+                    icon: next.icon || currentAccentIcon,
+                    shade: next.shade || currentAccentShade,
+                  } as PpeDeliveryTableConfig["accent"])
                 }
-                options={DENSITY_OPTIONS}
-                clearable={false}
               />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <ToggleRow
-                label="Listras alternadas"
-                checked={c.display.striping}
-                onCheckedChange={(v) => setDisplay("striping", v)}
+            </Section>
+            <Section title="Densidade e linhas">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Densidade</Label>
+                  <Combobox
+                    mode="single"
+                    value={c.display.density}
+                    onValueChange={(v) =>
+                      setDisplay(
+                        "density",
+                        (typeof v === "string" ? v : "comfortable") as Density,
+                      )
+                    }
+                    options={DENSITY_OPTIONS}
+                    clearable={false}
+                  />
+                </div>
+                <ToggleRow
+                  label="Cabeçalho fixo"
+                  checked={c.display.stickyHeader}
+                  onCheckedChange={(v) => setDisplay("stickyHeader", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Cabeçalho e link">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={c.display.showHeader ?? true}
+                  onCheckedChange={(v) => setDisplay("showHeader", v)}
+                />
+                <ToggleRow
+                  label="Exibir contagem"
+                  checked={c.display.showCount ?? true}
+                  onCheckedChange={(v) => setDisplay("showCount", v)}
+                />
+                <ToggleRow
+                  label="Caixa de busca"
+                  checked={c.display.showSearchBox}
+                  onCheckedChange={(v) => setDisplay("showSearchBox", v)}
+                />
+              </div>
+            </Section>
+            <Section title="Mensagem quando vazio">
+              <Input
+                value={c.display.emptyStateMessage}
+                onChange={(v) =>
+                  setDisplay("emptyStateMessage", typeof v === "string" ? v : "")
+                }
+                placeholder="Nenhuma entrega encontrada com os filtros atuais."
               />
-              <ToggleRow
-                label="Linhas divisórias"
-                checked={c.display.gridLines}
-                onCheckedChange={(v) => setDisplay("gridLines", v)}
-              />
-              <ToggleRow
-                label="Realce ao passar"
-                checked={c.display.hoverHighlight}
-                onCheckedChange={(v) => setDisplay("hoverHighlight", v)}
-              />
-              <ToggleRow
-                label="Cabeçalho fixo"
-                checked={c.display.stickyHeader}
-                onCheckedChange={(v) => setDisplay("stickyHeader", v)}
-              />
-              <ToggleRow
-                label="Caixa de busca"
-                hint="Renderiza um campo de busca em tempo real no cabeçalho do widget."
-                checked={c.display.showSearchBox}
-                onCheckedChange={(v) => setDisplay("showSearchBox", v)}
-              />
-              <ToggleRow
-                label="Cabeçalho do widget"
-                checked={c.showHeader}
-                onCheckedChange={(v) => set("showHeader", v)}
-              />
-              <ToggleRow
-                label="Bolinha colorida nas linhas"
-                hint="Marca cada linha com a cor do acento. Aparece apenas quando a primeira coluna é EPI ou Código."
-                checked={c.showRowDot}
-                onCheckedChange={(v) => set("showRowDot", v)}
-              />
-              <ToggleRow
-                label="Botões de ação na linha"
-                hint="Mostra Aprovar/Reprovar nas linhas com status Pendente ou Aguardando Assinatura. Visível apenas para RH e Admin."
-                checked={c.showActionButtons}
-                onCheckedChange={(v) => set("showActionButtons", v)}
-              />
-            </div>
-          </Section>
-          <Section title="Mensagem quando vazio">
-            <Input
-              value={c.display.emptyStateMessage}
-              onChange={(v) =>
-                setDisplay("emptyStateMessage", typeof v === "string" ? v : "")
-              }
-              placeholder="Nenhuma entrega encontrada com os filtros atuais."
-            />
-          </Section>
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         {/* ---- COLUMNS & SORTING ---- */}
         <TabsContent value="columns" className="space-y-3 mt-0">
-          <Section title="Selecionar e reordenar" defaultOpen>
-            <ColumnPicker
-              catalog={COLUMN_CATALOG.map((col) => ({
-                key: col.key,
-                label: col.label,
-              }))}
-              selected={c.columns}
-              onChange={(next) =>
-                set("columns", next as PpeDeliveryTableConfig["columns"])
-              }
-            />
-          </Section>
-          <Section title="Ordenação e limite" defaultOpen>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Ordenar por</Label>
-                <Combobox
-                  mode="single"
-                  value={c.sort.key}
-                  onValueChange={(v) =>
-                    setSort(
-                      "key",
-                      (typeof v === "string"
-                        ? v
-                        : "createdAt") as PpeDeliveryTableConfig["sort"]["key"],
-                    )
-                  }
-                  options={SORT_KEYS.map((k) => ({
-                    value: k,
-                    label: SORT_LABELS[k],
-                  }))}
-                  clearable={false}
-                />
-              </div>
-              <div>
-                <Label className="text-xs">Direção</Label>
-                <Combobox
-                  mode="single"
-                  value={c.sort.direction}
-                  onValueChange={(v) =>
-                    setSort(
-                      "direction",
-                      (typeof v === "string"
-                        ? v
-                        : "desc") as PpeDeliveryTableConfig["sort"]["direction"],
-                    )
-                  }
-                  options={SORT_DIRECTION_OPTIONS}
-                  clearable={false}
-                />
-              </div>
-            </div>
-            <LimitInput value={c.limit} onChange={(n) => set("limit", n)} />
-          </Section>
+          <ColumnPicker
+            catalog={COLUMN_CATALOG.map((col) => ({
+              key: col.key,
+              label: col.label,
+            }))}
+            selected={c.columns}
+            onChange={(next) =>
+              set("columns", next as PpeDeliveryTableConfig["columns"])
+            }
+            sorts={c.sorts as ColumnSort<ColumnKey>[]}
+            onSortsChange={(next) =>
+              set("sorts", next as PpeDeliveryTableConfig["sorts"])
+            }
+          />
+          <LimitInput value={c.limit} onChange={(n) => set("limit", n)} />
         </TabsContent>
 
         {/* ---- FILTERS ---- */}
         <TabsContent value="filters" className="space-y-2.5 mt-0">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-            >
-              Limpar filtros
-            </button>
-          </div>
-
-          <Section title="Busca e status" defaultOpen>
-            <div>
-              <Label className="text-xs">Busca padrão</Label>
-              <Input
-                value={c.filters.searchingFor}
-                onChange={(v) =>
-                  setFilter("searchingFor", typeof v === "string" ? v : "")
-                }
-                placeholder="EPI, código, colaborador..."
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Aplicado sempre. A caixa de busca em tempo real (se ativada)
-                prevalece.
-              </p>
-            </div>
-            <div>
-              <Label className="text-xs">Status</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.statuses}
-                onValueChange={(v) =>
-                  setFilter("statuses", asArray(v) as PPE_DELIVERY_STATUS[])
-                }
-                options={PPE_STATUS_OPTIONS}
-                placeholder="Todos os status"
-                searchPlaceholder="Buscar status..."
-              />
-            </div>
-          </Section>
-
-          <Section title="EPIs e colaboradores">
-            <div>
-              <Label className="text-xs">EPIs</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.itemIds}
-                onValueChange={(v) => setFilter("itemIds", asArray(v))}
-                options={itemOptions}
-                placeholder="Todos os EPIs"
-                searchPlaceholder="Buscar EPI..."
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Colaboradores</Label>
-              <Combobox
-                mode="multiple"
-                value={c.filters.userIds}
-                onValueChange={(v) => setFilter("userIds", asArray(v))}
-                options={userOptions}
-                placeholder="Todos os colaboradores"
-                searchPlaceholder="Buscar colaborador..."
-              />
-            </div>
-          </Section>
-
-          <Section title="Comportamento">
-            <ToggleRow
-              label="Apenas acionáveis"
-              hint="Filtra para mostrar somente entregas com status PENDENTE ou AGUARDANDO ASSINATURA, que podem ser aprovadas ou reprovadas."
-              checked={c.filters.onlyActionable}
-              onCheckedChange={(v) => setFilter("onlyActionable", v)}
+          <div>
+            <Label className="text-xs">Busca padrão</Label>
+            <Input
+              value={c.filters.searchingFor}
+              onChange={(v) =>
+                setFilter("searchingFor", typeof v === "string" ? v : "")
+              }
+              placeholder="EPI, código, colaborador..."
             />
-          </Section>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Aplicado sempre. A caixa de busca em tempo real (se ativada)
+              prevalece.
+            </p>
+          </div>
+          <div>
+            <Label className="text-xs">Status</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.statuses}
+              onValueChange={(v) =>
+                setFilter("statuses", asArray(v) as PPE_DELIVERY_STATUS[])
+              }
+              options={PPE_STATUS_OPTIONS}
+              placeholder="Todos os status"
+              searchPlaceholder="Buscar status..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">EPIs</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.itemIds}
+              onValueChange={(v) => setFilter("itemIds", asArray(v))}
+              options={itemOptions}
+              placeholder="Todos os EPIs"
+              searchPlaceholder="Buscar EPI..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Colaboradores</Label>
+            <Combobox
+              mode="multiple"
+              value={c.filters.userIds}
+              onValueChange={(v) => setFilter("userIds", asArray(v))}
+              options={userOptions}
+              placeholder="Todos os colaboradores"
+              searchPlaceholder="Buscar colaborador..."
+            />
+          </div>
+          <ToggleRow
+            label="Apenas acionáveis"
+            hint="Mostra somente entregas com status PENDENTE ou AGUARDANDO ASSINATURA."
+            checked={c.filters.onlyActionable}
+            onCheckedChange={(v) => setFilter("onlyActionable", v)}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -1099,13 +1000,15 @@ export const ppeDeliveryTableWidget: WidgetDefinition<PpeDeliveryTableConfig> = 
   configSchema: ppeDeliveryTableConfigSchema,
   defaultConfig: {
     title: "Entregas de EPI",
-    accent: { color: "amber", icon: "ClipboardCheck", borderColor: "none" },
+    accent: { color: "amber", icon: "ClipboardCheck", shade: "500" },
     display: {
       density: "comfortable",
       striping: true,
       gridLines: true,
       hoverHighlight: true,
       stickyHeader: true,
+      showHeader: true,
+      showCount: true,
       showSearchBox: true,
       emptyStateMessage: "",
     },
@@ -1120,11 +1023,8 @@ export const ppeDeliveryTableWidget: WidgetDefinition<PpeDeliveryTableConfig> = 
       userIds: [],
       onlyActionable: false,
     },
-    sort: { key: "createdAt", direction: "desc" },
+    sorts: [{ key: "createdAt", direction: "desc" }],
     limit: 30,
-    showHeader: true,
-    showRowDot: true,
-    showActionButtons: true,
   },
   RenderComponent: PpeDeliveryTableRender,
   ConfigComponent: PpeDeliveryTableConfigComponent,

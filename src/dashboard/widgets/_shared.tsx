@@ -3,7 +3,7 @@
 // dedupes the request so the call cost is one network round-trip regardless of
 // how many widgets the user has configured.
 
-import { type ReactNode } from "react";
+import { createContext, useContext, useId, useMemo, useState, type ReactNode } from "react";
 import { IconChevronDown } from "@tabler/icons-react";
 import { useHomeDashboard } from "../../hooks/common/use-dashboard";
 import type { HomeDashboardData } from "../../types";
@@ -56,6 +56,28 @@ export function HomeDashboardWidgetBody<TSlice>({
 // behaviourally identical.
 // ---------------------------------------------------------------------------
 
+// Coordinates which `Section` is open inside a single config form.
+// When a SectionGroup wraps a tree of Sections, only one Section can be open
+// at a time — opening another auto-closes the previous one. Without a wrapper,
+// each Section behaves independently (backward-compatible with old configs).
+interface SectionGroupContextValue {
+  openId: string | null;
+  setOpenId: (id: string | null) => void;
+}
+const SectionGroupContext = createContext<SectionGroupContextValue | null>(null);
+
+export function SectionGroup({
+  defaultOpenId,
+  children,
+}: {
+  defaultOpenId?: string | null;
+  children: ReactNode;
+}) {
+  const [openId, setOpenId] = useState<string | null>(defaultOpenId ?? null);
+  const value = useMemo(() => ({ openId, setOpenId }), [openId]);
+  return <SectionGroupContext.Provider value={value}>{children}</SectionGroupContext.Provider>;
+}
+
 /** Collapsible bordered section used as the building block of every config tab. */
 export function Section({
   title,
@@ -68,8 +90,25 @@ export function Section({
   icon?: ReactNode;
   children: ReactNode;
 }) {
+  const ctx = useContext(SectionGroupContext);
+  const id = useId();
+  const [localOpen, setLocalOpen] = useState(defaultOpen);
+
+  const open = ctx ? ctx.openId === id : localOpen;
+  const setOpen = (next: boolean) => {
+    if (ctx) {
+      ctx.setOpenId(next ? id : null);
+    } else {
+      setLocalOpen(next);
+    }
+  };
+
   return (
-    <Collapsible defaultOpen={defaultOpen} className="border border-border rounded-md">
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="border border-border rounded-md"
+    >
       <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium hover:bg-accent/50 [&[data-state=open]>svg]:rotate-180">
         <span className="flex items-center gap-2">
           {icon}

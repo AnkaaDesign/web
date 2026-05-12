@@ -20,7 +20,8 @@ import { getIconInfoByPath, isPageCadastrar } from "../../utils";
 import { WidgetCard } from "../components/widget-card";
 import {
   Section,
-  DENSITY_OPTIONS,
+  SectionGroup,
+  ToggleRow,
   DENSITY_VALUES,
   type Density,
 } from "./_shared";
@@ -32,12 +33,12 @@ import {
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
-import { Combobox } from "../../components/ui/combobox";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
+import { cn } from "../../lib/utils";
 import type {
   WidgetConfigProps,
   WidgetDefinition,
@@ -46,10 +47,16 @@ import type {
 
 const configSchema = z.object({
   title: z.string().min(1).max(80).default("Favoritos"),
-  accent: makeAccentSchema({ color: "yellow", icon: "Star", borderColor: "none" }),
+  accent: makeAccentSchema({ color: "yellow", icon: "Star" }),
   itemsPerRow: z.number().int().min(1).max(10).default(4),
   itemsPerColumn: z.number().int().min(1).max(6).default(1),
   density: z.enum(DENSITY_VALUES).default("comfortable"),
+  display: z
+    .object({
+      showHeader: z.boolean().default(true),
+      showCount: z.boolean().default(true),
+    })
+    .default({ showHeader: true, showCount: true }),
 });
 type Config = z.infer<typeof configSchema>;
 
@@ -136,10 +143,12 @@ function FavoritesRender({ config, size: tileSize }: WidgetRenderProps<Config>) 
       resolveAccent({
         color: config.accent?.color as WidgetAccentColor,
         icon: config.accent?.icon as WidgetAccentIcon,
+        shade: config.accent?.shade as WidgetAccentShade | undefined,
       }),
-    [config.accent?.color, config.accent?.icon],
+    [config.accent?.color, config.accent?.icon, config.accent?.shade],
   );
   const AccentIcon = accent.Icon;
+  const showCount = config.display?.showCount ?? true;
 
   return (
     <WidgetCard
@@ -147,9 +156,11 @@ function FavoritesRender({ config, size: tileSize }: WidgetRenderProps<Config>) 
         <span className={accent.classes.text}>{config.title || "Favoritos"}</span>
       }
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
-      count={favorites.length || null}
+      count={showCount ? favorites.length || null : null}
       viewAllHref={routes.favorites}
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      showHeader={config.display?.showHeader ?? true}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
     >
       {favorites.length === 0 ? (
         <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-4">
@@ -216,7 +227,7 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
     onChange({ ...config, [key]: value });
   const accentColor = (config.accent?.color ?? "yellow") as WidgetAccentColor;
   const accentIcon = (config.accent?.icon ?? "Star") as WidgetAccentIcon;
-  const borderColor = (config.accent?.borderColor ?? "none") as WidgetBorderColor;
+  const accentShade = (config.accent?.shade ?? "500") as WidgetAccentShade;
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -239,64 +250,126 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
         </TabsList>
 
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{ color: accentColor, icon: accentIcon, borderColor }}
-              onChange={(next) =>
-                set("accent", {
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                } as Config["accent"])
-              }
-            />
-          </Section>
-          <Section title="Densidade" defaultOpen>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Densidade</Label>
-              <Combobox
-                mode="single"
-                value={config.density ?? "comfortable"}
-                onValueChange={(v) =>
-                  set("density", (typeof v === "string" ? v : "comfortable") as Density)
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || accentColor,
+                    icon: next.icon || accentIcon,
+                    shade: next.shade || accentShade,
+                  } as Config["accent"])
                 }
-                options={DENSITY_OPTIONS}
-                clearable={false}
               />
-            </div>
-          </Section>
+            </Section>
+            <Section title="Cabeçalho">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <ToggleRow
+                  label="Exibir cabeçalho"
+                  checked={config.display?.showHeader ?? true}
+                  onCheckedChange={(v) =>
+                    set("display", {
+                      ...(config.display ?? { showCount: true }),
+                      showHeader: v,
+                    } as Config["display"])
+                  }
+                />
+                <ToggleRow
+                  label="Exibir contagem"
+                  checked={config.display?.showCount ?? true}
+                  onCheckedChange={(v) =>
+                    set("display", {
+                      ...(config.display ?? { showHeader: true }),
+                      showCount: v,
+                    } as Config["display"])
+                  }
+                />
+              </div>
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         <TabsContent value="behavior" className="space-y-3 mt-0">
-          <Section title="Grade" defaultOpen>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Cartões por linha (1–10)</Label>
-                <Input
-                  type="number"
-                  value={config.itemsPerRow}
-                  onChange={(v) => {
-                    const n = typeof v === "number" ? v : Number(v);
-                    if (Number.isFinite(n)) set("itemsPerRow", Math.max(1, Math.min(10, n)));
-                  }}
-                />
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Grade e densidade" defaultOpen>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Densidade</Label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: "compact", label: "Compacta" },
+                      { value: "comfortable", label: "Confortável" },
+                      { value: "spacious", label: "Espaçosa" },
+                    ].map((opt) => (
+                      <DensityPill
+                        key={opt.value}
+                        active={(config.density ?? "comfortable") === opt.value}
+                        label={opt.label}
+                        onClick={() => set("density", opt.value as Density)}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Cartões por linha (1–10)</Label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                      <NumberPill key={n} value={n} fill active={config.itemsPerRow === n} onClick={() => set("itemsPerRow", n)} />
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Linhas visíveis (1–6)</Label>
+                  <div className="flex gap-2 flex-wrap">
+                    {[1, 2, 3, 4, 5, 6].map((n) => (
+                      <NumberPill key={n} value={n} active={config.itemsPerColumn === n} onClick={() => set("itemsPerColumn", n)} />
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Linhas visíveis (1–6)</Label>
-                <Input
-                  type="number"
-                  value={config.itemsPerColumn}
-                  onChange={(v) => {
-                    const n = typeof v === "number" ? v : Number(v);
-                    if (Number.isFinite(n)) set("itemsPerColumn", Math.max(1, Math.min(6, n)));
-                  }}
-                />
-              </div>
-            </div>
-          </Section>
+            </Section>
+          </SectionGroup>
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function NumberPill({ value, active, fill, onClick }: { value: number; active: boolean; fill?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "h-9 rounded-md border-[1.5px] font-bold text-sm transition-colors",
+        fill ? "flex-1" : "min-w-[44px] px-3",
+        active
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border bg-muted/30 text-foreground hover:bg-muted/50"
+      )}
+    >
+      {value}
+    </button>
+  );
+}
+
+function DensityPill({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "flex-1 h-9 px-2 rounded-md border-[1.5px] font-medium text-xs transition-colors",
+        active
+          ? "border-primary bg-primary text-primary-foreground font-bold"
+          : "border-border bg-muted/30 text-foreground hover:bg-muted/50"
+      )}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -314,10 +387,11 @@ export const favoritesWidget: WidgetDefinition<Config> = {
   configSchema,
   defaultConfig: {
     title: "Favoritos",
-    accent: { color: "yellow", icon: "Star", borderColor: "none" },
+    accent: { color: "yellow", icon: "Star", shade: "500" },
     itemsPerRow: 4,
     itemsPerColumn: 1,
     density: "comfortable",
+    display: { showHeader: true, showCount: true },
   },
   RenderComponent: FavoritesRender,
   ConfigComponent: ConfigComp,

@@ -1,4 +1,4 @@
-// Widget picker. Category tabs + square card grid.
+// Widget picker. Category tabs + colored card grid.
 // Filters automatically by user's sector. Search across name/description.
 
 import { useMemo, useState } from "react";
@@ -25,6 +25,61 @@ interface AddWidgetModalProps {
 }
 
 type TabKey = "all" | WidgetCategory;
+
+// Per-category palette — chosen so each WidgetCategory is visually distinct
+// at a glance. All tokens use Tailwind palette names that are already used
+// elsewhere in the codebase, with explicit dark-mode variants so contrast
+// holds in both themes.
+interface CategoryPalette {
+  /** Top accent stripe shown across the card head. */
+  stripe: string;
+  /** Soft tinted background for the icon tile. */
+  iconBg: string;
+  /** Icon stroke color. */
+  iconText: string;
+  /** Badge background + text used for the in-card category pill. */
+  badge: string;
+  /** Subtle hover-state border accent. */
+  hoverBorder: string;
+}
+
+const CATEGORY_PALETTE: Record<WidgetCategory, CategoryPalette> = {
+  inventory: {
+    stripe: "bg-emerald-500/80 dark:bg-emerald-400/80",
+    iconBg: "bg-emerald-500/10 dark:bg-emerald-400/10",
+    iconText: "text-emerald-600 dark:text-emerald-400",
+    badge: "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300",
+    hoverBorder: "group-hover:border-emerald-500/50 dark:group-hover:border-emerald-400/50",
+  },
+  hr: {
+    stripe: "bg-violet-500/80 dark:bg-violet-400/80",
+    iconBg: "bg-violet-500/10 dark:bg-violet-400/10",
+    iconText: "text-violet-600 dark:text-violet-400",
+    badge: "bg-violet-500/10 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300",
+    hoverBorder: "group-hover:border-violet-500/50 dark:group-hover:border-violet-400/50",
+  },
+  production: {
+    stripe: "bg-amber-500/80 dark:bg-amber-400/80",
+    iconBg: "bg-amber-500/10 dark:bg-amber-400/10",
+    iconText: "text-amber-600 dark:text-amber-400",
+    badge: "bg-amber-500/10 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300",
+    hoverBorder: "group-hover:border-amber-500/50 dark:group-hover:border-amber-400/50",
+  },
+  financial: {
+    stripe: "bg-blue-500/80 dark:bg-blue-400/80",
+    iconBg: "bg-blue-500/10 dark:bg-blue-400/10",
+    iconText: "text-blue-600 dark:text-blue-400",
+    badge: "bg-blue-500/10 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300",
+    hoverBorder: "group-hover:border-blue-500/50 dark:group-hover:border-blue-400/50",
+  },
+  other: {
+    stripe: "bg-sky-500/80 dark:bg-sky-400/80",
+    iconBg: "bg-sky-500/10 dark:bg-sky-400/10",
+    iconText: "text-sky-600 dark:text-sky-400",
+    badge: "bg-sky-500/10 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300",
+    hoverBorder: "group-hover:border-sky-500/50 dark:group-hover:border-sky-400/50",
+  },
+};
 
 export function AddWidgetModal({ open, onClose, onAdd }: AddWidgetModalProps) {
   const { currentPrivilege } = usePrivileges();
@@ -62,7 +117,9 @@ export function AddWidgetModal({ open, onClose, onAdd }: AddWidgetModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => (!v ? onClose() : undefined)}>
-      <DialogContent className="max-w-3xl h-[80vh] flex flex-col gap-4">
+      {/* Fixed dimensions so the dialog never resizes when switching tabs.
+          1080×800 with viewport caps so it still fits smaller screens. */}
+      <DialogContent className="!max-w-[1080px] w-[1080px] max-w-[calc(100vw-2rem)] h-[800px] max-h-[calc(100vh-2rem)] flex flex-col gap-4 p-6">
         <DialogHeader className="shrink-0">
           <DialogTitle>Adicionar widget</DialogTitle>
           <DialogDescription>
@@ -83,7 +140,9 @@ export function AddWidgetModal({ open, onClose, onAdd }: AddWidgetModalProps) {
         </div>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="shrink-0">
-          <TabsList className="h-auto flex-wrap justify-start gap-1 p-1 bg-muted/60">
+          {/* min-h reserves vertical space so the body below stays anchored even
+              if the wrap behavior changes between tab counts. */}
+          <TabsList className="h-auto min-h-9 flex flex-wrap justify-start gap-1 p-1 bg-muted/60 w-full">
             <TabsTrigger value="all" className="text-xs h-8">
               Todos
               <span className="ml-1.5 text-[10px] tabular-nums opacity-70">
@@ -114,9 +173,13 @@ export function AddWidgetModal({ open, onClose, onAdd }: AddWidgetModalProps) {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pb-2">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-2">
               {filteredWidgets.map((w) => (
-                <WidgetCard key={w.id} widget={w} onPick={() => handlePick(w.id)} />
+                <WidgetGalleryCard
+                  key={w.id}
+                  widget={w}
+                  onPick={() => handlePick(w.id)}
+                />
               ))}
             </div>
           )}
@@ -126,31 +189,44 @@ export function AddWidgetModal({ open, onClose, onAdd }: AddWidgetModalProps) {
   );
 }
 
-function WidgetCard({ widget, onPick }: { widget: WidgetDefinition; onPick: () => void }) {
+function WidgetGalleryCard({
+  widget,
+  onPick,
+}: {
+  widget: WidgetDefinition;
+  onPick: () => void;
+}) {
   const Icon = widget.icon;
+  const palette = CATEGORY_PALETTE[widget.category];
   return (
     <button
       type="button"
       onClick={onPick}
-      // NOTE: in this theme, --accent === --primary (same green) in dark mode.
-      // We use bg-secondary for the hover background so the foreground stays
-      // legible, then flip the icon to filled-primary for visual feedback.
-      className="group relative aspect-square rounded-lg border border-border bg-card hover:bg-secondary hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-all p-3 flex flex-col items-start text-left overflow-hidden"
+      className={`group relative min-h-[200px] rounded-xl border border-border bg-card hover:bg-accent/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-all overflow-hidden flex flex-col text-left ${palette.hoverBorder}`}
       title={widget.description}
     >
-      <div className="rounded-md bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground p-2.5 mb-2 transition-all">
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="flex-1 min-h-0 w-full">
-        <div className="text-sm font-semibold leading-tight line-clamp-2 text-foreground">
-          {widget.name}
+      <div className={`h-1.5 w-full shrink-0 ${palette.stripe}`} />
+      <div className="flex-1 min-h-0 flex flex-col p-4 gap-3">
+        <div className="flex items-start justify-between gap-2">
+          <div
+            className={`rounded-lg p-2.5 shrink-0 ${palette.iconBg} ${palette.iconText}`}
+          >
+            <Icon className="h-6 w-6" />
+          </div>
+          <span
+            className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium tracking-wide ${palette.badge}`}
+          >
+            {WIDGET_CATEGORY_LABELS[widget.category]}
+          </span>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1 line-clamp-3 leading-tight">
-          {widget.description}
-        </p>
-      </div>
-      <div className="absolute top-2 right-2 text-[9px] uppercase tracking-wider text-muted-foreground/60 font-semibold">
-        {WIDGET_CATEGORY_LABELS[widget.category]}
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="text-base font-semibold leading-snug text-foreground line-clamp-2">
+            {widget.name}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1.5 line-clamp-3 leading-relaxed">
+            {widget.description}
+          </p>
+        </div>
       </div>
     </button>
   );

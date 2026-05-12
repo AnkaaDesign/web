@@ -67,14 +67,14 @@ import {
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
 import type {
   WidgetConfigProps,
   WidgetDefinition,
   WidgetRenderProps,
 } from "../types";
-import { Section, ToggleRow } from "./_shared";
+import { Section, SectionGroup, ToggleRow } from "./_shared";
 import {
   CalendarGrid,
   PeriodHeader,
@@ -154,10 +154,10 @@ const hrCalendarConfigSchema = z.object({
   accent: makeAccentSchema({
     color: "violet",
     icon: "Calendar",
-    borderColor: "none",
   }),
   display: z
     .object({
+      showHeader: z.boolean().default(true),
       showFilters: z.boolean().default(true),
       showVacation: z.boolean().default(true),
       showJustifiedFalta: z.boolean().default(true),
@@ -167,6 +167,7 @@ const hrCalendarConfigSchema = z.object({
       showSaturday: z.boolean().default(true),
     })
     .default({
+      showHeader: true,
       showFilters: true,
       showVacation: true,
       showJustifiedFalta: true,
@@ -194,8 +195,9 @@ function HrCalendarRender({ config, size }: WidgetRenderProps<HrCalendarConfig>)
       resolveAccent({
         color: config.accent?.color as WidgetAccentColor,
         icon: config.accent?.icon as WidgetAccentIcon,
+        shade: config.accent?.shade as WidgetAccentShade | undefined,
       }),
-    [config.accent?.color, config.accent?.icon],
+    [config.accent?.color, config.accent?.icon, config.accent?.shade],
   );
   const AccentIcon = accent.Icon;
 
@@ -516,7 +518,9 @@ function HrCalendarRender({ config, size }: WidgetRenderProps<HrCalendarConfig>)
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       headerExtra={headerExtra}
       viewAllHref={routes.humanResources.calendar.root}
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      showHeader={config.display.showHeader ?? true}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
     >
       <div className="h-full flex flex-col p-2 gap-2">
         <CalendarGrid
@@ -594,7 +598,7 @@ function HrCalendarConfigComponent({
 
   const accentColor = (config.accent?.color ?? "violet") as WidgetAccentColor;
   const accentIcon = (config.accent?.icon ?? "Calendar") as WidgetAccentIcon;
-  const borderColor = (config.accent?.borderColor ?? "none") as WidgetBorderColor;
+  const accentShade = (config.accent?.shade ?? "500") as WidgetAccentShade;
 
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" }, take: 100 } as any);
   const { data: usersData } = useUsers({
@@ -645,68 +649,80 @@ function HrCalendarConfigComponent({
         </TabsList>
 
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{ color: accentColor, icon: accentIcon, borderColor }}
-              onChange={(next) =>
-                set("accent", {
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                } as HrCalendarConfig["accent"])
-              }
-            />
-          </Section>
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || accentColor,
+                    icon: next.icon || accentIcon,
+                    shade: next.shade || accentShade,
+                  } as HrCalendarConfig["accent"])
+                }
+              />
+            </Section>
+            <Section title="Cabeçalho">
+              <ToggleRow
+                label="Exibir cabeçalho"
+                checked={config.display.showHeader ?? true}
+                onCheckedChange={(v) => setDisplay("showHeader", v)}
+              />
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         <TabsContent value="display" className="space-y-3 mt-0">
-          <Section title="Categorias visíveis" defaultOpen>
-            <ToggleRow
-              label="Férias / Ausência"
-              checked={config.display.showVacation}
-              onCheckedChange={(v) => setDisplay("showVacation", v)}
-            />
-            <ToggleRow
-              label="Faltas justificadas"
-              checked={config.display.showJustifiedFalta}
-              onCheckedChange={(v) => setDisplay("showJustifiedFalta", v)}
-            />
-            <ToggleRow
-              label="Faltas não justificadas"
-              checked={config.display.showUnjustifiedFalta}
-              onCheckedChange={(v) => setDisplay("showUnjustifiedFalta", v)}
-            />
-            <ToggleRow
-              label="Feriados"
-              checked={config.display.showHoliday}
-              onCheckedChange={(v) => setDisplay("showHoliday", v)}
-            />
-          </Section>
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Categorias visíveis" defaultOpen>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <ToggleRow
+                  label="Férias / Ausência"
+                  checked={config.display.showVacation}
+                  onCheckedChange={(v) => setDisplay("showVacation", v)}
+                />
+                <ToggleRow
+                  label="Faltas justificadas"
+                  checked={config.display.showJustifiedFalta}
+                  onCheckedChange={(v) => setDisplay("showJustifiedFalta", v)}
+                />
+                <ToggleRow
+                  label="Faltas não justificadas"
+                  checked={config.display.showUnjustifiedFalta}
+                  onCheckedChange={(v) => setDisplay("showUnjustifiedFalta", v)}
+                />
+                <ToggleRow
+                  label="Feriados"
+                  checked={config.display.showHoliday}
+                  onCheckedChange={(v) => setDisplay("showHoliday", v)}
+                />
+              </div>
+            </Section>
 
-          <Section title="Layout">
-            <ToggleRow
-              label="Mostrar filtros no cabeçalho"
-              hint="Permite trocar de colaborador / setor sem abrir as configurações."
-              checked={config.display.showFilters}
-              onCheckedChange={(v) => setDisplay("showFilters", v)}
-            />
-            <ToggleRow
-              label="Mostrar domingo"
-              hint="Oculta a coluna de domingo quando desativado."
-              checked={config.display.showSunday}
-              onCheckedChange={(v) => setDisplay("showSunday", v)}
-            />
-            <ToggleRow
-              label="Mostrar sábado"
-              hint="Oculta a coluna de sábado quando desativado."
-              checked={config.display.showSaturday}
-              onCheckedChange={(v) => setDisplay("showSaturday", v)}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Quando um dia tem mais eventos do que cabem, a célula rola
-              verticalmente. A tooltip continua mostrando todos.
-            </p>
-          </Section>
+            <Section title="Layout">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <ToggleRow
+                  label="Filtros no cabeçalho"
+                  checked={config.display.showFilters}
+                  onCheckedChange={(v) => setDisplay("showFilters", v)}
+                />
+                <ToggleRow
+                  label="Mostrar domingo"
+                  checked={config.display.showSunday}
+                  onCheckedChange={(v) => setDisplay("showSunday", v)}
+                />
+                <ToggleRow
+                  label="Mostrar sábado"
+                  checked={config.display.showSaturday}
+                  onCheckedChange={(v) => setDisplay("showSaturday", v)}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Quando um dia tem mais eventos do que cabem, a célula rola
+                verticalmente. A tooltip continua mostrando todos.
+              </p>
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         <TabsContent value="filters" className="space-y-3 mt-0">
@@ -769,8 +785,9 @@ export const hrCalendarWidget: WidgetDefinition<HrCalendarConfig> = {
   configSchema: hrCalendarConfigSchema,
   defaultConfig: {
     title: "Calendário de Colaboradores",
-    accent: { color: "violet", icon: "Calendar", borderColor: "none" },
+    accent: { color: "violet", icon: "Calendar", shade: "500" },
     display: {
+      showHeader: true,
       showFilters: true,
       showVacation: true,
       showJustifiedFalta: true,

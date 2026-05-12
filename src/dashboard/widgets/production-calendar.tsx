@@ -46,21 +46,27 @@ import { cn } from "../../lib/utils";
 
 import { WidgetCard } from "../components/widget-card";
 import {
+  ACCENT_COLOR_VALUES,
   AccentPicker,
+  ColorPaletteDialog,
   makeAccentSchema,
   resolveAccent,
 } from "../components/widget-accent";
 import type {
   WidgetAccentColor,
   WidgetAccentIcon,
-  WidgetBorderColor,
+  WidgetAccentShade,
 } from "../components/widget-accent";
 import type {
   WidgetConfigProps,
   WidgetDefinition,
   WidgetRenderProps,
 } from "../types";
-import { Section, ToggleRow } from "./_shared";
+import { Section, SectionGroup, ToggleRow } from "./_shared";
+import {
+  deadlineColorSwatchClass,
+  deadlineColorTextClass,
+} from "../../utils/task-date-colors";
 import {
   CalendarGrid,
   PeriodHeader,
@@ -84,27 +90,17 @@ const EVENT_LABELS: Record<EventType, string> = {
   finishedAt: "Concluída",
 };
 
-// Each event type owns a unique hue so the legend reads at a glance:
-//   purple = prazo (deadline marker), orange = previsão (forecast),
-//   blue   = iniciada, green = concluída, red = vencido (escalated overdue —
-//   distinct from purple/term so a past-due deadline doesn't visually collide
-//   with the deadline itself, which is what the user pointed out previously).
-const EVENT_BAR_CLASSES: Record<EventType, string> = {
-  term: "bg-purple-600 text-white border border-purple-700",
-  forecastDate: "bg-orange-600 text-white border border-orange-700",
-  startedAt: "bg-blue-600 text-white border border-blue-700",
-  finishedAt: "bg-green-700 text-white border border-green-800",
+// Default event colors (Tailwind shade-aware tokens). Each is overridable per
+// instance via the ColorPaletteDialog in the configure modal — the runtime
+// looks up the bg/text class with `deadlineColorSwatchClass` /
+// `deadlineColorTextClass` so any (color, shade) pair from the palette renders.
+const DEFAULT_EVENT_COLORS: Record<EventType, string> = {
+  term: "purple-600",
+  forecastDate: "orange-600",
+  startedAt: "blue-600",
+  finishedAt: "green-700",
 };
-
-const EVENT_BAR_OVERDUE =
-  "bg-red-700 text-white border border-red-800 font-semibold";
-
-const EVENT_DOT_CLASSES: Record<EventType, string> = {
-  term: "bg-purple-600",
-  forecastDate: "bg-orange-600",
-  startedAt: "bg-blue-600",
-  finishedAt: "bg-green-700",
-};
+const DEFAULT_OVERDUE_COLOR = "red-700";
 
 interface DayEvent {
   type: EventType;
@@ -120,10 +116,10 @@ const productionCalendarConfigSchema = z.object({
   accent: makeAccentSchema({
     color: "indigo",
     icon: "Calendar",
-    borderColor: "none",
   }),
   display: z
     .object({
+      showHeader: z.boolean().default(true),
       showFilters: z.boolean().default(true),
       showTerm: z.boolean().default(true),
       showForecast: z.boolean().default(true),
@@ -131,8 +127,24 @@ const productionCalendarConfigSchema = z.object({
       showFinished: z.boolean().default(true),
       showSunday: z.boolean().default(true),
       showSaturday: z.boolean().default(true),
+      eventColors: z
+        .object({
+          term: z.string().default("purple-600"),
+          forecastDate: z.string().default("orange-600"),
+          startedAt: z.string().default("blue-600"),
+          finishedAt: z.string().default("green-700"),
+          overdue: z.string().default("red-700"),
+        })
+        .default({
+          term: "purple-600",
+          forecastDate: "orange-600",
+          startedAt: "blue-600",
+          finishedAt: "green-700",
+          overdue: "red-700",
+        }),
     })
     .default({
+      showHeader: true,
       showFilters: true,
       showTerm: true,
       showForecast: true,
@@ -140,6 +152,13 @@ const productionCalendarConfigSchema = z.object({
       showFinished: true,
       showSunday: true,
       showSaturday: true,
+      eventColors: {
+        term: "purple-600",
+        forecastDate: "orange-600",
+        startedAt: "blue-600",
+        finishedAt: "green-700",
+        overdue: "red-700",
+      },
     }),
   filters: z
     .object({
@@ -183,10 +202,18 @@ function ProductionCalendarRender({
       resolveAccent({
         color: config.accent?.color as WidgetAccentColor,
         icon: config.accent?.icon as WidgetAccentIcon,
+        shade: config.accent?.shade as WidgetAccentShade | undefined,
       }),
-    [config.accent?.color, config.accent?.icon],
+    [config.accent?.color, config.accent?.icon, config.accent?.shade],
   );
   const AccentIcon = accent.Icon;
+
+  // Per-event-type color tokens (configurable). Default values come from the
+  // schema; legacy configs without `eventColors` fall back to literal defaults.
+  const eventColors = config.display.eventColors ?? DEFAULT_EVENT_COLORS;
+  const overdueColor =
+    (config.display.eventColors as { overdue?: string } | undefined)?.overdue ??
+    DEFAULT_OVERDUE_COLOR;
 
   const [refMonth, setRefMonth] = useState<Date>(() => defaultRefMonth());
 
@@ -400,21 +427,24 @@ function ProductionCalendarRender({
           {events.map((ev, i) => {
             const isOverdueTerm =
               ev.type === "term" && date < today && ev.task.status !== TASK_STATUS.COMPLETED;
-            const cls = isOverdueTerm ? EVENT_BAR_OVERDUE : EVENT_BAR_CLASSES[ev.type];
+            const colorToken = isOverdueTerm
+              ? overdueColor
+              : eventColors[ev.type] ?? DEFAULT_EVENT_COLORS[ev.type];
+            const bgClass = deadlineColorSwatchClass(colorToken);
             const customerName = (ev.task as any).customer?.fantasyName ?? null;
             const label = customerName ?? ev.task.name ?? "—";
             return (
               <div
                 key={`${ev.type}-${ev.task.id}-${i}`}
                 className={cn(
-                  "text-[9px] px-1 py-px rounded-sm truncate cursor-pointer",
-                  cls,
+                  "text-[9px] px-1 py-px rounded-sm truncate cursor-pointer text-white",
+                  isOverdueTerm && "font-semibold",
+                  bgClass,
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
                   openTaskModal(ev.task.id);
                 }}
-                title={label}
               >
                 {label}
               </div>
@@ -439,10 +469,14 @@ function ProductionCalendarRender({
               const label = customerName ?? ev.task.name ?? "—";
               const isOverdueTerm =
                 ev.type === "term" && date < today && ev.task.status !== TASK_STATUS.COMPLETED;
+              const dotToken = eventColors[ev.type] ?? DEFAULT_EVENT_COLORS[ev.type];
               return (
                 <div key={`tt-${ev.type}-${ev.task.id}-${i}`} className="flex items-start gap-1.5">
                   <span
-                    className={cn("inline-block w-1.5 h-1.5 rounded-full mt-1 shrink-0", EVENT_DOT_CLASSES[ev.type])}
+                    className={cn(
+                      "inline-block w-1.5 h-1.5 rounded-full mt-1 shrink-0",
+                      deadlineColorSwatchClass(dotToken),
+                    )}
                   />
                   <span className="min-w-0">
                     <span className="font-medium">{label}</span>
@@ -450,7 +484,7 @@ function ProductionCalendarRender({
                       {" "}
                       · {EVENT_LABELS[ev.type]}
                       {isOverdueTerm && (
-                        <span className="ml-1 text-red-500 font-semibold">(vencido)</span>
+                        <span className={cn("ml-1 font-semibold", deadlineColorTextClass(overdueColor))}>(vencido)</span>
                       )}
                     </span>
                   </span>
@@ -469,7 +503,9 @@ function ProductionCalendarRender({
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       headerExtra={headerExtra}
       viewAllHref={routes.production.schedule.list}
-      borderColor={config.accent?.borderColor as WidgetBorderColor | undefined}
+      showHeader={config.display.showHeader ?? true}
+      accentColor={config.accent?.color as WidgetAccentColor}
+      accentShade={config.accent?.shade as WidgetAccentShade | undefined}
     >
       <div className="h-full flex flex-col p-2 gap-2">
         <CalendarGrid
@@ -487,7 +523,7 @@ function ProductionCalendarRender({
             icon={IconFlag}
             label="Prazos"
             value={stats.term}
-            tone="purple"
+            colorToken={eventColors.term ?? DEFAULT_EVENT_COLORS.term}
             active={showTerm}
             onClick={() => setShowTerm((v) => !v)}
           />
@@ -495,7 +531,7 @@ function ProductionCalendarRender({
             icon={IconCalendarDue}
             label="Previsões"
             value={stats.forecast}
-            tone="orange"
+            colorToken={eventColors.forecastDate ?? DEFAULT_EVENT_COLORS.forecastDate}
             active={showForecast}
             onClick={() => setShowForecast((v) => !v)}
           />
@@ -503,7 +539,7 @@ function ProductionCalendarRender({
             icon={IconBolt}
             label="Iniciadas"
             value={stats.started}
-            tone="blue"
+            colorToken={eventColors.startedAt ?? DEFAULT_EVENT_COLORS.startedAt}
             active={showStarted}
             onClick={() => setShowStarted((v) => !v)}
           />
@@ -511,7 +547,7 @@ function ProductionCalendarRender({
             icon={IconCircleCheck}
             label="Concluídas"
             value={stats.finished}
-            tone="green"
+            colorToken={eventColors.finishedAt ?? DEFAULT_EVENT_COLORS.finishedAt}
             active={showFinished}
             onClick={() => setShowFinished((v) => !v)}
           />
@@ -542,39 +578,31 @@ function LegendTile({
   icon: Icon,
   label,
   value,
-  tone,
+  colorToken,
   active,
   onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
-  tone: "purple" | "orange" | "blue" | "green";
+  colorToken: string;
   active: boolean;
   onClick: () => void;
 }) {
-  const toneClasses: Record<typeof tone, string> = {
-    purple: "bg-purple-500/10 text-purple-600 dark:text-purple-400 ring-purple-500/20",
-    orange: "bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-orange-500/20",
-    blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20",
-    green: "bg-green-500/10 text-green-600 dark:text-green-400 ring-green-500/20",
-  };
+  // Icon container uses the configured color/shade as the icon foreground; the
+  // background is a soft neutral so the saturated icon stands out.
+  const iconColorClass = deadlineColorTextClass(colorToken);
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      title={
-        active
-          ? `Ocultar ${label.toLowerCase()} no calendário`
-          : `Mostrar ${label.toLowerCase()} no calendário`
-      }
       className={cn(
         "flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-left transition-all hover:border-primary/40 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40",
         !active && "opacity-40 grayscale",
       )}
     >
-      <div className={cn("rounded p-1 ring-1 relative", toneClasses[tone])}>
+      <div className={cn("rounded p-1 ring-1 ring-border bg-muted/40 relative", iconColorClass)}>
         <Icon className="h-3.5 w-3.5" />
         {!active && (
           <span className="absolute inset-1 flex items-center justify-center pointer-events-none">
@@ -615,7 +643,21 @@ function ProductionCalendarConfigComponent({
 
   const accentColor = (config.accent?.color ?? "indigo") as WidgetAccentColor;
   const accentIcon = (config.accent?.icon ?? "Calendar") as WidgetAccentIcon;
-  const borderColor = (config.accent?.borderColor ?? "none") as WidgetBorderColor;
+  const accentShade = (config.accent?.shade ?? "500") as WidgetAccentShade;
+  const eventColors = config.display.eventColors ?? DEFAULT_EVENT_COLORS;
+
+  const setEventColor = (
+    key: keyof ProductionCalendarConfig["display"]["eventColors"],
+    value: string,
+  ) =>
+    setDisplay("eventColors", {
+      ...(eventColors as ProductionCalendarConfig["display"]["eventColors"]),
+      [key]: value,
+    });
+
+  const [openColor, setOpenColor] = useState<
+    keyof ProductionCalendarConfig["display"]["eventColors"] | null
+  >(null);
 
   const statusOptions = useMemo<ComboboxOption[]>(
     () => Object.entries(TASK_STATUS_LABELS).map(([value, label]) => ({ value, label })),
@@ -647,76 +689,135 @@ function ProductionCalendarConfigComponent({
         </TabsList>
 
         <TabsContent value="appearance" className="space-y-3 mt-0">
-          <Section title="Acento (cor, ícone, borda)" defaultOpen>
-            <AccentPicker
-              value={{ color: accentColor, icon: accentIcon, borderColor }}
-              onChange={(next) =>
-                set("accent", {
-                  color: next.color,
-                  icon: next.icon,
-                  borderColor: next.borderColor,
-                } as ProductionCalendarConfig["accent"])
-              }
-            />
-          </Section>
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Acento (cor e ícone)" defaultOpen>
+              <AccentPicker
+                value={{ color: accentColor, icon: accentIcon, shade: accentShade }}
+                onChange={(next) =>
+                  set("accent", {
+                    color: next.color || accentColor,
+                    icon: next.icon || accentIcon,
+                    shade: next.shade || accentShade,
+                  } as ProductionCalendarConfig["accent"])
+                }
+              />
+            </Section>
+            <Section title="Cabeçalho">
+              <ToggleRow
+                label="Exibir cabeçalho"
+                checked={config.display.showHeader ?? true}
+                onCheckedChange={(v) => setDisplay("showHeader", v)}
+              />
+            </Section>
+            <Section title="Cores dos eventos">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {(["term", "forecastDate", "startedAt", "finishedAt", "overdue"] as const).map(
+                  (key) => {
+                    const labels = {
+                      term: "Prazo",
+                      forecastDate: "Previsão",
+                      startedAt: "Iniciada",
+                      finishedAt: "Concluída",
+                      overdue: "Vencido",
+                    } as const;
+                    const value = eventColors[key] ?? DEFAULT_EVENT_COLORS[key as EventType] ?? DEFAULT_OVERDUE_COLOR;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setOpenColor(key)}
+                        className="flex items-center gap-2 rounded-md border border-border bg-card hover:bg-accent/30 hover:border-primary/40 transition-colors px-3 py-2 text-left"
+                      >
+                        <span
+                          className={cn(
+                            "h-5 w-5 rounded-md ring-2 ring-border shrink-0",
+                            deadlineColorSwatchClass(value),
+                          )}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-medium truncate">{labels[key]}</div>
+                          <div className="text-[10px] text-muted-foreground truncate font-mono">
+                            {value}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  },
+                )}
+              </div>
+              {openColor && (
+                <ColorPaletteDialog
+                  open={!!openColor}
+                  onOpenChange={(open) => !open && setOpenColor(null)}
+                  value={eventColors[openColor] ?? "purple-600"}
+                  onSelect={(token) => {
+                    setEventColor(openColor, token);
+                    setOpenColor(null);
+                  }}
+                  palette={ACCENT_COLOR_VALUES}
+                  title="Selecionar cor do evento"
+                />
+              )}
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         <TabsContent value="display" className="space-y-3 mt-0">
-          <Section title="Tipos de evento" defaultOpen>
-            <ToggleRow
-              label="Prazo (term)"
-              hint="Barra roxa; vermelho mais forte quando vencido."
-              checked={config.display.showTerm}
-              onCheckedChange={(v) => setDisplay("showTerm", v)}
-            />
-            <ToggleRow
-              label="Previsão (forecastDate)"
-              hint="Barra laranja."
-              checked={config.display.showForecast}
-              onCheckedChange={(v) => setDisplay("showForecast", v)}
-            />
-            <ToggleRow
-              label="Iniciada (startedAt)"
-              hint="Barra azul — data em que a tarefa entrou em produção."
-              checked={config.display.showStarted}
-              onCheckedChange={(v) => setDisplay("showStarted", v)}
-            />
-            <ToggleRow
-              label="Concluída (finishedAt)"
-              hint="Barra verde."
-              checked={config.display.showFinished}
-              onCheckedChange={(v) => setDisplay("showFinished", v)}
-            />
-          </Section>
+          <SectionGroup defaultOpenId={null}>
+            <Section title="Tipos de evento" defaultOpen>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <ToggleRow
+                  label="Prazo (term)"
+                  checked={config.display.showTerm}
+                  onCheckedChange={(v) => setDisplay("showTerm", v)}
+                />
+                <ToggleRow
+                  label="Previsão (forecastDate)"
+                  checked={config.display.showForecast}
+                  onCheckedChange={(v) => setDisplay("showForecast", v)}
+                />
+                <ToggleRow
+                  label="Iniciada (startedAt)"
+                  checked={config.display.showStarted}
+                  onCheckedChange={(v) => setDisplay("showStarted", v)}
+                />
+                <ToggleRow
+                  label="Concluída (finishedAt)"
+                  checked={config.display.showFinished}
+                  onCheckedChange={(v) => setDisplay("showFinished", v)}
+                />
+              </div>
+            </Section>
 
-          <Section title="Layout">
-            <ToggleRow
-              label="Mostrar filtros no cabeçalho"
-              hint="Permite trocar status sem abrir as configurações."
-              checked={config.display.showFilters}
-              onCheckedChange={(v) => setDisplay("showFilters", v)}
-            />
-            <ToggleRow
-              label="Mostrar domingo"
-              hint="Oculta a coluna de domingo quando desativado."
-              checked={config.display.showSunday}
-              onCheckedChange={(v) => setDisplay("showSunday", v)}
-            />
-            <ToggleRow
-              label="Mostrar sábado"
-              hint="Oculta a coluna de sábado quando desativado."
-              checked={config.display.showSaturday}
-              onCheckedChange={(v) => setDisplay("showSaturday", v)}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Quando um dia tem mais eventos do que cabem, a célula rola
-              verticalmente. A tooltip continua mostrando todos.
-            </p>
-          </Section>
+            <Section title="Layout">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <ToggleRow
+                  label="Filtros no cabeçalho"
+                  checked={config.display.showFilters}
+                  onCheckedChange={(v) => setDisplay("showFilters", v)}
+                />
+                <ToggleRow
+                  label="Mostrar domingo"
+                  checked={config.display.showSunday}
+                  onCheckedChange={(v) => setDisplay("showSunday", v)}
+                />
+                <ToggleRow
+                  label="Mostrar sábado"
+                  checked={config.display.showSaturday}
+                  onCheckedChange={(v) => setDisplay("showSaturday", v)}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Quando um dia tem mais eventos do que cabem, a célula rola
+                verticalmente. A tooltip continua mostrando todos.
+              </p>
+            </Section>
+          </SectionGroup>
         </TabsContent>
 
         <TabsContent value="filters" className="space-y-3 mt-0">
-          <Section title="Status das tarefas" defaultOpen>
+          <div>
+            <Label className="text-xs">Status das tarefas</Label>
             <Combobox
               mode="multiple"
               options={statusOptions}
@@ -728,12 +829,12 @@ function ProductionCalendarConfigComponent({
               emptyText="Nenhum"
               searchable
             />
-            <ToggleRow
-              label="Incluir tarefas canceladas"
-              checked={config.filters.includeCancelled}
-              onCheckedChange={(v) => setFilters("includeCancelled", v)}
-            />
-          </Section>
+          </div>
+          <ToggleRow
+            label="Incluir tarefas canceladas"
+            checked={config.filters.includeCancelled}
+            onCheckedChange={(v) => setFilters("includeCancelled", v)}
+          />
         </TabsContent>
 
       </Tabs>
@@ -769,8 +870,9 @@ export const productionCalendarWidget: WidgetDefinition<ProductionCalendarConfig
   configSchema: productionCalendarConfigSchema,
   defaultConfig: {
     title: "Calendário de Produção",
-    accent: { color: "indigo", icon: "Calendar", borderColor: "none" },
+    accent: { color: "indigo", icon: "Calendar", shade: "500" },
     display: {
+      showHeader: true,
       showFilters: true,
       showTerm: true,
       showForecast: true,
@@ -778,6 +880,13 @@ export const productionCalendarWidget: WidgetDefinition<ProductionCalendarConfig
       showFinished: true,
       showSunday: true,
       showSaturday: true,
+      eventColors: {
+        term: "purple-600",
+        forecastDate: "orange-600",
+        startedAt: "blue-600",
+        finishedAt: "green-700",
+        overdue: "red-700",
+      },
     },
     filters: {
       statuses: [
