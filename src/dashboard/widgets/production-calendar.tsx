@@ -12,7 +12,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import {
   IconCalendarStats,
   IconAdjustments,
@@ -31,11 +30,6 @@ import type { ComboboxOption } from "../../components/ui/combobox";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { TruckDetailModal } from "../../components/production/garage/truck-detail-modal";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "../../components/ui/tooltip";
 import {
   Tabs,
   TabsContent,
@@ -437,7 +431,7 @@ function ProductionCalendarRender({
               <div
                 key={`${ev.type}-${ev.task.id}-${i}`}
                 className={cn(
-                  "text-[9px] px-1 py-px rounded-sm truncate cursor-pointer text-white",
+                  "text-[9px] px-1 py-1 rounded-sm truncate cursor-pointer text-white",
                   isOverdueTerm && "font-semibold",
                   bgClass,
                 )}
@@ -454,47 +448,7 @@ function ProductionCalendarRender({
       </div>
     );
 
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="h-full">{cell}</div>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-sm">
-          <div className="space-y-1 text-xs">
-            <div className="font-semibold">
-              {format(date, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-            </div>
-            {events.map((ev, i) => {
-              const customerName = (ev.task as any).customer?.fantasyName ?? null;
-              const label = customerName ?? ev.task.name ?? "—";
-              const isOverdueTerm =
-                ev.type === "term" && date < today && ev.task.status !== TASK_STATUS.COMPLETED;
-              const dotToken = eventColors[ev.type] ?? DEFAULT_EVENT_COLORS[ev.type];
-              return (
-                <div key={`tt-${ev.type}-${ev.task.id}-${i}`} className="flex items-start gap-1.5">
-                  <span
-                    className={cn(
-                      "inline-block w-1.5 h-1.5 rounded-full mt-1 shrink-0",
-                      deadlineColorSwatchClass(dotToken),
-                    )}
-                  />
-                  <span className="min-w-0">
-                    <span className="font-medium">{label}</span>
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {EVENT_LABELS[ev.type]}
-                      {isOverdueTerm && (
-                        <span className={cn("ml-1 font-semibold", deadlineColorTextClass(overdueColor))}>(vencido)</span>
-                      )}
-                    </span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    );
+    return cell;
   };
 
   return (

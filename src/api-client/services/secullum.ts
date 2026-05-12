@@ -404,6 +404,14 @@ export const secullumService = {
       `/integrations/secullum/absences/${absenceId}`,
       body,
     ),
+
+  // Per-day absence rows derived from /Calculos + /FuncionariosAfastamentos.
+  // Includes partial-day absences (employee clocked in but still has Faltas).
+  getAbsenceDays: (params: { startDate: string; endDate: string; sectorId?: string }) =>
+    apiClient.get<{ success: boolean; message: string; data?: SecullumAbsenceDayRow[] }>(
+      "/integrations/secullum/absence-days",
+      { params },
+    ),
 };
 
 export interface SecullumAbsence {
@@ -421,6 +429,23 @@ export interface SecullumAggregatedAbsence extends SecullumAbsence {
   userName: string;
   sectorId: string | null;
   sectorName: string | null;
+}
+
+export interface SecullumAbsenceDayRow {
+  date: string;
+  userId: string;
+  userName: string;
+  sectorId: string | null;
+  sectorName: string | null;
+  FuncionarioId: number;
+  JustificativaId: number;
+  JustificativaDescricao: string;
+  Motivo: string;
+  faltas: string | null;
+  normais: string | null;
+  carga: string | null;
+  isPartialDay: boolean;
+  absenceRecordId?: number;
 }
 
 export interface SecullumCreateAbsencePayload {

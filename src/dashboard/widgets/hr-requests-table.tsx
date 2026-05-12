@@ -20,7 +20,6 @@ import {
   IconFilter,
   IconUser,
   IconCalendar,
-  IconRefresh,
   IconSearch,
   IconArrowsSort,
   IconCloudOff,
@@ -344,7 +343,7 @@ function HrRequestsTableRender({
   const onlyPendingApi =
     config.filters.estados.length === 1 && config.filters.estados[0] === 0;
 
-  const { data, isLoading, isError, refetch, isFetching } = useSecullumRequests(
+  const { data, isLoading, isError } = useSecullumRequests(
     onlyPendingApi || undefined,
   );
   const approveMutation = useSecullumApproveRequest();
@@ -491,37 +490,17 @@ function HrRequestsTableRender({
     );
   };
 
-  // ---- Header search + refresh ----
-  // Per-card Aprovar/Rejeitar live inside each accordion's content now —
-  // the header only owns the global concerns (search + refresh).
-  const headerExtra = (
-    <>
-      {display.showSearchBox && (
-        <div className="relative">
-          <IconSearch className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            value={searchInput}
-            onChange={(v) => setSearchInput(typeof v === "string" ? v : "")}
-            placeholder="Buscar..."
-            className="h-7 pl-7 text-xs w-36"
-          />
-        </div>
-      )}
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="h-7 px-2"
-        onClick={() => refetch()}
-        disabled={isFetching}
-        title="Atualizar"
-      >
-        <IconRefresh
-          className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}
-        />
-      </Button>
-    </>
-  );
+  const headerExtra = display.showSearchBox ? (
+    <div className="relative">
+      <IconSearch className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      <Input
+        value={searchInput}
+        onChange={(v) => setSearchInput(typeof v === "string" ? v : "")}
+        placeholder="Buscar..."
+        className="h-7 pl-7 text-xs w-36"
+      />
+    </div>
+  ) : undefined;
 
   return (
     <WidgetCard
@@ -559,7 +538,7 @@ function HrRequestsTableRender({
                   key={r.Id}
                   r={r}
                   dens={dens}
-                  showActions={config.showActionButtons}
+                  showActions={true}
                   approvePending={approveMutation.isPending}
                   rejectPending={rejectMutation.isPending}
                   onApprove={() => onApprove(r)}
@@ -1169,13 +1148,7 @@ function HrRequestsTableConfigComponent({
                   onCheckedChange={(v) => setDisplay("showSearchBox", v)}
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                <ToggleRow
-                  label="Botões Aprovar/Rejeitar"
-                  checked={c.showActionButtons}
-                  onCheckedChange={(v) => set("showActionButtons", v)}
-                />
-              </div>
+
             </Section>
             <Section title="Mensagem quando vazio">
               <Input

@@ -7,7 +7,6 @@ import {
   IconChartBar,
   IconTrendingUp,
   IconAlertTriangle,
-  IconReceipt,
   IconArrowRight,
 } from "@tabler/icons-react";
 
@@ -23,12 +22,6 @@ const pages = [
     description: "Identifique etapas que estão atrasando o fluxo produtivo e seus impactos",
     route: routes.statistics.production.bottlenecks,
     icon: IconAlertTriangle,
-  },
-  {
-    title: "Receita",
-    description: "Análise de receita gerada, margem de contribuição e faturamento por período",
-    route: routes.statistics.production.revenue,
-    icon: IconReceipt,
   },
 ];
 

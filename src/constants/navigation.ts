@@ -639,7 +639,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [
           { id: "stats-producao-rendimento", title: "Rendimento", icon: "chartBar", path: "/estatisticas/producao/rendimento" },
           { id: "stats-producao-gargalos", title: "Gargalos", icon: "alertTriangle", path: "/estatisticas/producao/gargalos" },
-          { id: "stats-producao-receita", title: "Receita", icon: "dollarSign", path: "/estatisticas/producao/receita" },
         ],
       },
       {

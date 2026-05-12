@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { DateTimeInput } from '@/components/ui/date-time-input';
@@ -629,53 +628,6 @@ const BottlenecksPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Data Table */}
-              <Card className="flex-1 flex flex-col">
-                <CardHeader>
-                  <CardTitle>Detalhamento dos Dados</CardTitle>
-                  <CardDescription>
-                    {stageDistribution.length > 0
-                      ? `Exibindo ${stageDistribution.length} ${stageDistribution.length === 1 ? 'etapa' : 'etapas'}`
-                      : 'Nenhuma etapa para exibir'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <ScrollArea className="h-[400px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Etapa</TableHead>
-                          <TableHead className="text-right">Quantidade</TableHead>
-                          <TableHead className="text-right">Média de Dias</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {isLoading ? (
-                          <TableRow>
-                            <TableCell colSpan={3} className="text-center">
-                              Carregando...
-                            </TableCell>
-                          </TableRow>
-                        ) : stageDistribution.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={3} className="text-center">
-                              Nenhum dado disponível
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          stageDistribution.map((item, index) => (
-                            <TableRow key={item.stage || index}>
-                              <TableCell className="font-medium">{item.stageLabel}</TableCell>
-                              <TableCell className="text-right">{formatNumber(item.count)}</TableCell>
-                              <TableCell className="text-right">{(item.avgDays ?? 0).toFixed(1)}</TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
             </CardContent>
           </Card>
 

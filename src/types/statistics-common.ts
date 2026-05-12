@@ -1,6 +1,8 @@
 // Shared types for all statistics pages
 
-export type StatisticsChartType = 'bar' | 'line' | 'area' | 'pie' | 'bar-stacked' | 'line-stacked';
+export type StatisticsChartType = 'bar' | 'line' | 'line-smooth' | 'area' | 'area-smooth' | 'pie' | 'bar-stacked' | 'line-stacked';
+
+export type TrendLineType = 'linear' | 'sma3' | 'sma6' | 'sma12';
 
 export type YAxisMode = 'quantity' | 'value' | 'days' | 'percentage' | 'count' | 'both';
 

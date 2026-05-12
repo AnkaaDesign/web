@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Combobox } from '@/components/ui/combobox';
@@ -23,8 +22,9 @@ import type {
   TaskProductionItem,
 } from '@/types/production-analytics';
 import { StatisticsChart } from '@/components/statistics/statistics-chart';
+import { ProductionPeriodTasksModal } from '@/components/production/production-period-tasks-modal';
 import { formatNumber } from '@/types/statistics-common';
-import type { YAxisMode, StatisticsChartType } from '@/types/statistics-common';
+import type { YAxisMode, StatisticsChartType, TrendLineType } from '@/types/statistics-common';
 import { getSectors } from '@/api-client/sector';
 import { sectorKeys } from '@/hooks/common/query-keys';
 import {
@@ -42,13 +42,15 @@ import {
   IconUsers,
   IconCheckbox,
   IconChartArcs3,
-  IconWaveSine,
-  IconMinus,
   IconTrendingUp,
   IconFileTypePdf,
   IconFileTypeCsv,
   IconFileTypeXls,
+  IconTarget,
+  IconArrowsExchange2,
 } from '@tabler/icons-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { toast } from '@/components/ui/sonner';
@@ -93,12 +95,29 @@ const generateYearOptions = (yearsBack = 6) => {
 };
 const YEAR_OPTIONS = generateYearOptions();
 
+const MONTH_NAMES = [
+  'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
+];
+
+const MONTH_NAME_TO_NUM: Record<string, string> = {
+  'Janeiro':'01','Fevereiro':'02','Março':'03','Abril':'04',
+  'Maio':'05','Junho':'06','Julho':'07','Agosto':'08',
+  'Setembro':'09','Outubro':'10','Novembro':'11','Dezembro':'12',
+};
+
+const TREND_LABELS: Record<TrendLineType, string> = {
+  linear: 'Linear', sma3: 'Média 3m', sma6: 'Média 6m', sma12: 'Média 12m',
+};
+
 type ChartTypeOption = { value: TaskProductionChartType; label: string; icon: typeof IconChartBar; description: string };
 
 const BASE_CHART_TYPE_OPTIONS: ChartTypeOption[] = [
-  { value: 'bar',  label: 'Colunas', icon: IconChartBar,  description: 'Colunas agrupadas' },
-  { value: 'line', label: 'Linhas',  icon: IconChartLine, description: 'Gráfico de linhas' },
-  { value: 'area', label: 'Área',    icon: IconChartArea, description: 'Gráfico de área preenchida' },
+  { value: 'bar',         label: 'Colunas',     icon: IconChartBar,  description: 'Colunas agrupadas' },
+  { value: 'line',        label: 'Linha Reta',  icon: IconChartLine, description: 'Gráfico de linhas retas' },
+  { value: 'line-smooth', label: 'Linha Suave', icon: IconChartLine, description: 'Gráfico de linhas suavizadas' },
+  { value: 'area',        label: 'Área Reta',   icon: IconChartArea, description: 'Área preenchida com linhas retas' },
+  { value: 'area-smooth', label: 'Área Suave',  icon: IconChartArea, description: 'Área preenchida suavizada' },
 ];
 
 const STACKED_CHART_TYPE_OPTIONS: ChartTypeOption[] = [
@@ -106,13 +125,10 @@ const STACKED_CHART_TYPE_OPTIONS: ChartTypeOption[] = [
   { value: 'line-stacked', label: 'Linhas Empilhadas',  icon: IconStack2, description: 'Linhas empilhadas por setor' },
 ];
 
-// In "both" mode only these two chart types make sense (single series per metric, no comparison)
 const BOTH_MODE_CHART_TYPE_OPTIONS: ChartTypeOption[] = [
   { value: 'bar-stacked',  label: 'Colunas', icon: IconChartBar,  description: 'Colunas com Total + Média/Usuário' },
   { value: 'line-stacked', label: 'Linhas',  icon: IconChartLine, description: 'Linhas com Total + Média/Usuário' },
 ];
-
-const SMOOTH_APPLICABLE: TaskProductionChartType[] = ['line', 'line-stacked', 'area'];
 
 const X_AXIS_OPTIONS: Array<{ value: TaskProductionXAxisMode; label: string }> = [
   { value: 'month', label: 'Meses' },
@@ -199,11 +215,12 @@ interface FilterSheetProps {
   filters: TaskProductionFilters;
   selectedYears: string[];
   selectedMonths: string[];
-  onApply: (filters: TaskProductionFilters, years: string[], months: string[]) => void;
+  yearCompareMode: boolean;
+  onApply: (filters: TaskProductionFilters, years: string[], months: string[], yearCompare: boolean) => void;
 }
 
 function TaskProductionFiltersSheet({
-  open, onOpenChange, filters, selectedYears, selectedMonths, onApply,
+  open, onOpenChange, filters, selectedYears, selectedMonths, yearCompareMode, onApply,
 }: FilterSheetProps) {
   const [localX, setLocalX]     = useState<TaskProductionXAxisMode>(filters.xAxisMode || 'month');
   const [localY, setLocalY]     = useState<TaskProductionYAxisMode>(filters.yAxisMode || 'count');
@@ -211,6 +228,7 @@ function TaskProductionFiltersSheet({
   const [localSectors, setLocalSectors] = useState<string[]>(filters.sectorIds || []);
   const [localYears, setLocalYears]     = useState<string[]>(selectedYears);
   const [localMonths, setLocalMonths]   = useState<string[]>(selectedMonths);
+  const [localYearCompare, setLocalYearCompare] = useState(yearCompareMode);
 
   useEffect(() => {
     if (open) {
@@ -220,8 +238,9 @@ function TaskProductionFiltersSheet({
       setLocalSectors(filters.sectorIds || []);
       setLocalYears(selectedYears);
       setLocalMonths(selectedMonths);
+      setLocalYearCompare(yearCompareMode);
     }
-  }, [open, filters, selectedYears, selectedMonths]);
+  }, [open, filters, selectedYears, selectedMonths, yearCompareMode]);
 
   const fetchSectors = useCallback(async (search: string, page = 1) => {
     const res = await getSectors({
@@ -253,9 +272,10 @@ function TaskProductionFiltersSheet({
       compareMode: canCompare ? localCmp : 'combined',
       sectorIds: localSectors.length > 0 ? localSectors : undefined,
     };
-    onApply(finalFilters, localYears, localMonths);
+    const yearCompare = localYears.length >= 2 && localX !== 'year' ? localYearCompare : false;
+    onApply(finalFilters, localYears, localMonths, yearCompare);
     onOpenChange(false);
-  }, [localX, localY, localCmp, localSectors, localYears, localMonths, canCompare, onApply, onOpenChange]);
+  }, [localX, localY, localCmp, localSectors, localYears, localMonths, localYearCompare, canCompare, onApply, onOpenChange]);
 
   const handleClear = useCallback(() => {
     setLocalX('month');
@@ -377,6 +397,39 @@ function TaskProductionFiltersSheet({
               </div>
             )}
 
+            {/* Year-over-year comparison toggle — only when 2+ years and month mode */}
+            {localYears.length >= 2 && localX !== 'year' && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <IconArrowsExchange2 className="h-4 w-4" />
+                  Comparação Ano a Ano
+                </Label>
+                <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                  <div className="space-y-0.5">
+                    <p className="text-sm">Comparar meses entre anos</p>
+                    <p className="text-xs text-muted-foreground">
+                      Exibe Janeiro dos {localYears.length} anos lado a lado, depois Fevereiro, etc.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={localYearCompare}
+                    onClick={() => setLocalYearCompare(v => !v)}
+                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+                      localYearCompare ? 'bg-primary' : 'bg-input'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                        localYearCompare ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Sectors — hidden in 'both' mode */}
             {localY !== 'both' && (
               <div className="space-y-2">
@@ -459,17 +512,22 @@ const TaskProductionPage = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const [chartType, setChartType] = useState<TaskProductionChartType>('bar');
-  const [smooth, setSmooth] = useState(false);
+  const [trendLine, setTrendLine] = useState<TrendLineType | null>(null);
+  const [goalValue, setGoalValue] = useState<number | null>(null);
+  const [goalInput, setGoalInput] = useState('');
+  const [goalPopoverOpen, setGoalPopoverOpen] = useState(false);
+  const [yearCompareMode, setYearCompareMode] = useState(false);
+  const [clickedPeriod, setClickedPeriod] = useState<{ period: string; label: string } | null>(null);
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
-  const [filters, setFilters] = useState<TaskProductionFilters>({
-    xAxisMode: 'month',
-    yAxisMode: 'count',
-    compareMode: 'combined',
+  const [filters, setFilters] = useState<TaskProductionFilters>(() => {
+    const y = new Date().getFullYear().toString();
+    const { startDate, endDate } = computeDateRange([y], []);
+    return { xAxisMode: 'month', yAxisMode: 'count', compareMode: 'combined', startDate, endDate };
   });
 
-  const [selectedYears, setSelectedYears]   = useState<string[]>([]);
+  const [selectedYears, setSelectedYears]   = useState<string[]>(() => [new Date().getFullYear().toString()]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
 
   const isBothMode = filters.yAxisMode === 'both';
@@ -491,9 +549,6 @@ const TaskProductionPage = () => {
   // User picks the exact chart type — StatisticsChart renders it directly
   const effectiveChartType: StatisticsChartType = chartType;
 
-  // Smooth toggle: applicable to line/area types, and to both mode (controls the avg line)
-  const showSmoothToggle = SMOOTH_APPLICABLE.includes(chartType) || isBothMode;
-
   // Available chart types depend on the current mode
   const availableChartTypes = useMemo(() => {
     if (isBothMode) return BOTH_MODE_CHART_TYPE_OPTIONS;
@@ -511,10 +566,13 @@ const TaskProductionPage = () => {
     }
   }, [availableChartTypes, chartType, isBothMode, isStackedType]);
 
-  // Reset smooth default when chart type changes
+  // Disable year-compare when not enough years or in year-axis mode
   useEffect(() => {
-    setSmooth(chartType === 'line' || chartType === 'line-stacked');
-  }, [chartType]);
+    if (filters.xAxisMode === 'year' || selectedYears.length < 2) {
+      setYearCompareMode(false);
+    }
+  }, [filters.xAxisMode, selectedYears.length]);
+
 
   // Always fetch monthly data; year aggregation is done on the frontend
   const apiFilters = useMemo(
@@ -569,10 +627,11 @@ const TaskProductionPage = () => {
       .sort((a, b) => a.period.localeCompare(b.period));
   }, [rawItems, filters.xAxisMode, selectedYears, selectedMonths]);
 
-  const handleFilterApply = useCallback((f: TaskProductionFilters, years: string[], months: string[]) => {
+  const handleFilterApply = useCallback((f: TaskProductionFilters, years: string[], months: string[], yearCompare: boolean) => {
     setFilters(f);
     setSelectedYears(years);
     setSelectedMonths(months);
+    setYearCompareMode(yearCompare);
   }, []);
 
   const activeFilterCount = useMemo(() => {
@@ -635,7 +694,36 @@ const TaskProductionPage = () => {
     }));
   }, [items, isComparisonMode, includeAmbos, useAvg, isBothMode, activeSectorIds]);
 
-  const chartDataKey = `${isComparisonMode}-${filters.yAxisMode}-${filters.compareMode}`;
+  // Year-over-year comparison: x = month name, series = one per year
+  const yearCompareChartData = useMemo(() => {
+    if (!yearCompareMode || filters.xAxisMode === 'year' || selectedYears.length < 2) return null;
+    const sortedYears = [...selectedYears].sort();
+    const monthsToShow = selectedMonths.length > 0 ? [...selectedMonths].sort() : ['01','02','03','04','05','06','07','08','09','10','11','12'];
+
+    return monthsToShow
+      .map(month => {
+        const monthIdx = parseInt(month) - 1;
+        const comparisons = sortedYears.map(year => {
+          const item = rawItems.find(i => i.period === `${year}-${month}`);
+          return {
+            entityName: year,
+            value: item ? (useAvg ? item.avgPerUser : item.totalCount) : 0,
+            secondaryValue: isBothMode && item ? item.avgPerUser : undefined,
+          };
+        });
+        return {
+          name: MONTH_NAMES[monthIdx],
+          value: comparisons[0]?.value ?? 0,
+          comparisons,
+        };
+      })
+      .filter(row => row.comparisons.some(c => c.value > 0));
+  }, [rawItems, yearCompareMode, filters.xAxisMode, selectedYears, selectedMonths, useAvg, isBothMode]);
+
+  const effectiveChartData  = yearCompareChartData ?? chartData;
+  const effectiveIsComparison = yearCompareMode && yearCompareChartData != null ? true : isComparisonMode;
+
+  const chartDataKey = `${effectiveIsComparison}-${filters.yAxisMode}-${filters.compareMode}-${yearCompareMode}`;
 
   // Average per display period (month or year) computed from aggregated items
   const avgPerDisplayPeriod = useMemo(
@@ -660,6 +748,19 @@ const TaskProductionPage = () => {
   }, [useAvg]);
 
   const secondaryValueFormatter = useCallback((value: number) => value.toFixed(1), []);
+
+  const handleChartClick = useCallback((dataIndex: number, name: string, seriesName: string) => {
+    if (yearCompareChartData) {
+      // In year-compare mode: seriesName = year (e.g. "2025"), name = month label (e.g. "Janeiro")
+      const monthNum = MONTH_NAME_TO_NUM[name];
+      if (monthNum && /^\d{4}$/.test(seriesName)) {
+        setClickedPeriod({ period: `${seriesName}-${monthNum}`, label: `${name} ${seriesName}` });
+      }
+    } else {
+      const item = items[dataIndex];
+      if (item) setClickedPeriod({ period: item.period, label: item.periodLabel });
+    }
+  }, [yearCompareChartData, items]);
 
   const maxPeriodCount = useMemo(
     () => (items.length ? Math.max(...items.map(i => i.totalCount)) : 0),
@@ -848,7 +949,7 @@ const TaskProductionPage = () => {
         </div>
       );
     }
-    if (!chartData.length) {
+    if (!effectiveChartData.length) {
       return (
         <div className="h-[480px] flex flex-col items-center justify-center gap-4">
           <IconCalendarStats className="h-12 w-12 text-muted-foreground" />
@@ -862,10 +963,10 @@ const TaskProductionPage = () => {
     return (
       <StatisticsChart
         key={chartDataKey}
-        data={chartData}
+        data={effectiveChartData}
         chartType={effectiveChartType}
         yAxisMode={chartYAxisMode}
-        isComparisonMode={isComparisonMode}
+        isComparisonMode={effectiveIsComparison}
         height="480px"
         yAxisLabel={useAvg ? 'Média/Usuário' : 'Tarefas Concluídas'}
         valueFormatter={valueFormatter}
@@ -874,7 +975,9 @@ const TaskProductionPage = () => {
           primary:   isBothMode ? 'Total Tarefas' : (useAvg ? 'Média por Usuário' : 'Tarefas Concluídas'),
           secondary: isBothMode ? 'Média/Usuário' : undefined,
         }}
-        smooth={smooth}
+        trendLine={trendLine}
+        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
+        onDataPointClick={handleChartClick}
       />
     );
   };
@@ -912,6 +1015,15 @@ const TaskProductionPage = () => {
                       <Badge variant="secondary" className="text-xs">
                         {filters.compareMode === 'separatedWithTotal' ? 'Comparação + Ambos' : 'Comparação Setores'}
                       </Badge>
+                    )}
+                    {yearCompareMode && (
+                      <Badge variant="secondary" className="text-xs">Ano a Ano</Badge>
+                    )}
+                    {trendLine && (
+                      <Badge variant="outline" className="text-xs">{TREND_LABELS[trendLine]}</Badge>
+                    )}
+                    {goalValue != null && (
+                      <Badge variant="outline" className="text-xs">Meta: {goalValue}</Badge>
                     )}
                     {selectedYears.length > 0 && (
                       <Badge variant="outline" className="text-xs">{selectedYears.sort().join(', ')}</Badge>
@@ -958,19 +1070,97 @@ const TaskProductionPage = () => {
                     </DropdownMenuContent>
                   </DropdownMenu>
 
-                  {/* Smooth toggle */}
-                  {showSmoothToggle && (
+                  {/* Year-over-year comparison toggle */}
+                  {selectedYears.length >= 2 && filters.xAxisMode !== 'year' && (
                     <Button
-                      variant={smooth ? 'default' : 'outline'}
+                      variant={yearCompareMode ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => setSmooth(s => !s)}
-                      title={smooth ? 'Traçado suave (clique para reto)' : 'Traçado reto (clique para suave)'}
+                      onClick={() => setYearCompareMode(m => !m)}
+                      title="Comparar os mesmos meses entre anos selecionados"
                     >
-                      {smooth
-                        ? <><IconWaveSine className="h-4 w-4 mr-1.5" />Suave</>
-                        : <><IconMinus   className="h-4 w-4 mr-1.5" />Reto</>}
+                      <IconArrowsExchange2 className="h-4 w-4 mr-2" />
+                      Ano a Ano
                     </Button>
                   )}
+
+                  {/* Trend line selector */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant={trendLine ? 'default' : 'outline'} size="sm">
+                        <IconTrendingUp className="h-4 w-4 mr-2" />
+                        {trendLine ? TREND_LABELS[trendLine] : 'Tendência'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuLabel>Linha de Tendência</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuRadioGroup
+                        value={trendLine ?? ''}
+                        onValueChange={v => setTrendLine(v ? (v as TrendLineType) : null)}
+                      >
+                        <DropdownMenuRadioItem value="">Desativada</DropdownMenuRadioItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuRadioItem value="linear">Linear</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="sma3">Média Móvel 3 meses</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="sma6">Média Móvel 6 meses</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="sma12">Média Móvel 12 meses</DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Goal line */}
+                  <Popover open={goalPopoverOpen} onOpenChange={setGoalPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant={goalValue != null ? 'default' : 'outline'} size="sm">
+                        <IconTarget className="h-4 w-4 mr-2" />
+                        {goalValue != null ? `Meta: ${goalValue}` : 'Meta'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-52">
+                      <div className="space-y-3">
+                        <p className="text-sm font-medium">Definir Meta</p>
+                        <Input
+                          type="number"
+                          min={0}
+                          placeholder="Ex: 100"
+                          value={goalInput}
+                          onChange={v => setGoalInput(v == null ? '' : String(v))}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              const v = parseFloat(goalInput);
+                              setGoalValue(isNaN(v) ? null : v);
+                              setGoalPopoverOpen(false);
+                            }
+                          }}
+                          className="bg-transparent"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              const v = parseFloat(goalInput);
+                              setGoalValue(isNaN(v) ? null : v);
+                              setGoalPopoverOpen(false);
+                            }}
+                          >
+                            Aplicar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setGoalValue(null);
+                              setGoalInput('');
+                              setGoalPopoverOpen(false);
+                            }}
+                          >
+                            Limpar
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
 
                   {/* Filters */}
                   <Button
@@ -1122,81 +1312,6 @@ const TaskProductionPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Data Table */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Detalhamento</CardTitle>
-                  <CardDescription>
-                    {items.length > 0
-                      ? `${items.length} ${items.length === 1 ? 'período' : 'períodos'} exibidos`
-                      : 'Nenhum período para exibir'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[360px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Período</TableHead>
-                          <TableHead className="text-right">Tarefas</TableHead>
-                          {(useAvg || isBothMode) && (
-                            <>
-                              <TableHead className="text-right">Usu. Ativos</TableHead>
-                              <TableHead className="text-right">Média/Usu.</TableHead>
-                            </>
-                          )}
-                          {isComparisonMode && sectorColumns.map(col => (
-                            <TableHead key={col} className="text-right">{col}</TableHead>
-                          ))}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {isLoading ? (
-                          <TableRow>
-                            <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                              Carregando...
-                            </TableCell>
-                          </TableRow>
-                        ) : items.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                              Nenhum dado disponível
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          items.map((item, idx) => (
-                            <TableRow key={item.period || idx}>
-                              <TableCell className="font-medium">{item.periodLabel}</TableCell>
-                              <TableCell className="text-right">{formatNumber(item.totalCount)}</TableCell>
-                              {(useAvg || isBothMode) && (
-                                <>
-                                  <TableCell className="text-right">{formatNumber(item.activeUsers)}</TableCell>
-                                  <TableCell className="text-right">{item.avgPerUser.toFixed(2)}</TableCell>
-                                </>
-                              )}
-                              {isComparisonMode && sectorColumns.map(col => {
-                                if (col === 'Ambos') {
-                                  return (
-                                    <TableCell key="Ambos" className="text-right font-medium">
-                                      {formatNumber(item.totalCount)}
-                                    </TableCell>
-                                  );
-                                }
-                                const sector = item.comparisons?.find(c => c.sectorName === col);
-                                return (
-                                  <TableCell key={col} className="text-right">
-                                    {formatNumber(sector?.count ?? 0)}
-                                  </TableCell>
-                                );
-                              })}
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
             </CardContent>
           </Card>
 
@@ -1206,10 +1321,21 @@ const TaskProductionPage = () => {
             filters={filters}
             selectedYears={selectedYears}
             selectedMonths={selectedMonths}
+            yearCompareMode={yearCompareMode}
             onApply={handleFilterApply}
           />
         </div>
       </div>
+
+      {clickedPeriod && (
+        <ProductionPeriodTasksModal
+          open={!!clickedPeriod}
+          onOpenChange={open => { if (!open) setClickedPeriod(null); }}
+          period={clickedPeriod.period}
+          label={clickedPeriod.label}
+          sectorIds={filters.sectorIds}
+        />
+      )}
     </div>
   );
 };

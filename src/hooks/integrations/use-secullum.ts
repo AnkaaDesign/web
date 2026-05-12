@@ -558,6 +558,21 @@ export const useSecullumUnjustifiedAbsences = (
   });
 };
 
+// Per-day absence rows from /Calculos + /FuncionariosAfastamentos.
+// Replaces the aggregated-absence + unjustified-absence pair for the Ausências
+// overview table, since it correctly includes partial-day absences.
+export const useSecullumAbsenceDays = (
+  params: { startDate: string; endDate: string; sectorId?: string },
+  options?: { enabled?: boolean },
+) => {
+  return useQuery({
+    queryKey: [...secullumKeys.all, "absence-days", params] as const,
+    queryFn: () => secullumService.getAbsenceDays(params),
+    staleTime: 5 * 60 * 1000,
+    enabled: (options?.enabled ?? true) && !!params.startDate && !!params.endDate,
+  });
+};
+
 const invalidateAllAbsences = (queryClient: ReturnType<typeof useQueryClient>) => {
   queryClient.invalidateQueries({ queryKey: [...secullumKeys.all, "absences"] });
 };

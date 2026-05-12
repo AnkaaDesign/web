@@ -92,7 +92,16 @@ export interface ConsumptionAnalyticsFilters {
   operation?: 'OUTBOUND' | 'INBOUND' | 'ALL';
 }
 
-export type ConsumptionChartType = 'bar' | 'pie' | 'area' | 'line' | 'bar-stacked';
+export type ConsumptionChartType =
+  | 'bar' | 'bar-stacked'
+  | 'line' | 'line-smooth' | 'line-stacked'
+  | 'area' | 'area-smooth'
+  | 'pie';
+
+// UI-only axis / display options (not sent to API)
+export type ConsumptionXAxisMode = 'item' | 'category' | 'brand' | 'month' | 'year';
+export type ConsumptionYAxisMode = 'quantity' | 'value' | 'both';
+export type ConsumptionCompareMode = 'combined' | 'separated' | 'separatedWithTotal';
 
 export function isComparisonItem(item: ConsumptionItem): item is ConsumptionItemComparison {
   return 'comparisons' in item;

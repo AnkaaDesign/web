@@ -17,6 +17,26 @@ export interface SecullumAggregatedAbsence extends SecullumAbsence {
   sectorName: string | null;
 }
 
+// Per-day row returned by GET /integrations/secullum/absence-days.
+// Unlike SecullumAggregatedAbsence (date-range records from /FuncionariosAfastamentos),
+// each row represents a single calendar day — partial-day absences included.
+export interface SecullumAbsenceDayRow {
+  date: string; // YYYY-MM-DD
+  userId: string;
+  userName: string;
+  sectorId: string | null;
+  sectorName: string | null;
+  FuncionarioId: number;
+  JustificativaId: number;
+  JustificativaDescricao: string;
+  Motivo: string;
+  faltas: string | null; // "HH:MM" from Faltas column, null when day comes from afastamento only
+  normais: string | null;
+  carga: string | null;
+  isPartialDay: boolean;
+  absenceRecordId?: number;
+}
+
 export interface SecullumAbsenceFormData {
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD

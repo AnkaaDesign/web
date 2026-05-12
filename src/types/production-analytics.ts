@@ -129,7 +129,7 @@ export type ProductionChartType = 'bar' | 'pie' | 'area' | 'line' | 'bar-stacked
 export type TaskProductionXAxisMode = 'month' | 'year';
 export type TaskProductionYAxisMode = 'count' | 'avgPerUser' | 'both';
 export type TaskProductionCompareMode = 'combined' | 'separated' | 'separatedWithTotal';
-export type TaskProductionChartType = 'bar' | 'bar-stacked' | 'line' | 'line-stacked' | 'area';
+export type TaskProductionChartType = 'bar' | 'bar-stacked' | 'line' | 'line-smooth' | 'line-stacked' | 'area' | 'area-smooth';
 
 export interface TaskProductionFilters {
   startDate?: Date;

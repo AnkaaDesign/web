@@ -20,15 +20,16 @@ import {
   CalculationList,
   CalculationExport,
 } from "@/components/integrations/secullum/calculations/list";
+import { TimeClockAbsenceOverview } from "@/components/human-resources/time-clock-entry/time-clock-absence-overview";
 import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useAuth } from "@/contexts/auth-context";
 import { hasAnyPrivilege } from "@/utils/user";
 import type { User } from "@/types";
 
-type ViewMode = "colaborador-unico" | "multiplos-colaboradores" | "edit";
+type ViewMode = "colaborador-unico" | "multiplos-colaboradores" | "edit" | "ausencias";
 const DEFAULT_VIEW: ViewMode = "colaborador-unico";
-const VALID_VIEWS: ViewMode[] = ["colaborador-unico", "multiplos-colaboradores", "edit"];
+const VALID_VIEWS: ViewMode[] = ["colaborador-unico", "multiplos-colaboradores", "edit", "ausencias"];
 const VIEW_STORAGE_KEY = "time-clock-view-mode";
 
 function isValidView(v: string | null): v is ViewMode {
@@ -113,9 +114,10 @@ export default function TimeClockListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Bounce off ?view=edit when the user can't edit, or off any unknown value.
+  // Bounce off ?view=edit or ?view=ausencias when the user can't edit,
+  // or off any unknown value.
   useEffect(() => {
-    if (rawView === "edit" && !canEdit) {
+    if ((rawView === "edit" || rawView === "ausencias") && !canEdit) {
       const params = new URLSearchParams(searchParams);
       params.set("view", DEFAULT_VIEW);
       setSearchParams(params, { replace: true });
@@ -127,7 +129,7 @@ export default function TimeClockListPage() {
   }, [rawView, canEdit, searchParams, setSearchParams]);
 
   const handleViewChange = (next: ViewMode) => {
-    if (next === "edit" && !canEdit) return;
+    if ((next === "edit" || next === "ausencias") && !canEdit) return;
     try {
       window.localStorage.setItem(VIEW_STORAGE_KEY, next);
     } catch {
@@ -165,6 +167,7 @@ export default function TimeClockListPage() {
   const viewOptions: ViewOption[] = [
     { value: "colaborador-unico", label: "Visualização Colaborador", visible: true },
     { value: "multiplos-colaboradores", label: "Visualização Dia", visible: true },
+    { value: "ausencias", label: "Ausências", visible: canEdit },
     { value: "edit", label: "Edição", visible: canEdit },
   ];
 
@@ -243,6 +246,9 @@ export default function TimeClockListPage() {
         )}
         {view === "multiplos-colaboradores" && (
           <TimeClockDayView className="h-full" onExportDataChange={setDayExport} />
+        )}
+        {view === "ausencias" && canEdit && (
+          <TimeClockAbsenceOverview className="h-full" />
         )}
         {view === "edit" && canEdit && (
           <TimeClockEntryEditList

@@ -51,6 +51,7 @@ const configSchema = z.object({
   itemsPerRow: z.number().int().min(1).max(10).default(4),
   itemsPerColumn: z.number().int().min(1).max(6).default(1),
   density: z.enum(DENSITY_VALUES).default("comfortable"),
+  layout: z.enum(["row", "stacked"]).default("row"),
   display: z
     .object({
       showHeader: z.boolean().default(true),
@@ -73,7 +74,7 @@ const SPACIOUS_MIN_HEIGHT_PX = 70;
 //   compact      → horizontal-tight   (icon-left, single-line title, list-like)
 //   comfortable  → horizontal-roomy   (icon-left, two-line title, breathing room)
 //   spacious     → vertical-centered  (icon top-center, large title centered below)
-type LayoutVariant = "h-tight" | "h-roomy" | "v-centered";
+type LayoutVariant = "h-tight" | "h-roomy" | "h-spacious" | "v-compact" | "v-centered" | "v-spacious";
 
 interface VariantStyles {
   flex: string;
@@ -87,26 +88,50 @@ interface VariantStyles {
 const VARIANT_STYLES: Record<LayoutVariant, VariantStyles> = {
   "h-tight": {
     flex: "flex-row items-center gap-2",
-    cardPad: "px-2 py-1.5",
+    cardPad: "px-1.5 py-1",
     iconBox: "p-1 rounded-md",
     iconSize: "h-3.5 w-3.5",
     title: "text-[11px] font-medium flex-1 min-w-0 truncate",
     showChevron: true,
   },
   "h-roomy": {
-    flex: "flex-row items-center gap-3",
-    cardPad: "p-2.5",
-    iconBox: "p-2 rounded-lg",
+    flex: "flex-row items-center gap-2.5",
+    cardPad: "p-2",
+    iconBox: "p-1.5 rounded-lg",
     iconSize: "h-[18px] w-[18px]",
     title: "text-sm font-semibold flex-1 min-w-0 line-clamp-2 leading-tight",
     showChevron: true,
   },
+  "h-spacious": {
+    flex: "flex-row items-center gap-3",
+    cardPad: "p-2.5",
+    iconBox: "p-2 rounded-xl",
+    iconSize: "h-6 w-6",
+    title: "text-[15px] font-semibold flex-1 min-w-0 line-clamp-2 leading-tight",
+    showChevron: true,
+  },
+  "v-compact": {
+    flex: "flex-col items-center justify-center text-center gap-1",
+    cardPad: "p-1",
+    iconBox: "p-1 rounded-md",
+    iconSize: "h-3.5 w-3.5",
+    title: "text-[10px] font-medium line-clamp-2 leading-tight",
+    showChevron: false,
+  },
   "v-centered": {
     flex: "flex-col items-center justify-center text-center gap-1.5",
-    cardPad: "p-2",
-    iconBox: "p-2 rounded-lg",
+    cardPad: "p-1.5",
+    iconBox: "p-1.5 rounded-lg",
     iconSize: "h-5 w-5",
     title: "text-[13px] font-semibold line-clamp-2 leading-tight",
+    showChevron: false,
+  },
+  "v-spacious": {
+    flex: "flex-col items-center justify-center text-center gap-2",
+    cardPad: "p-2",
+    iconBox: "p-2 rounded-xl",
+    iconSize: "h-7 w-7",
+    title: "text-[15px] font-semibold line-clamp-2 leading-tight",
     showChevron: false,
   },
 };
@@ -126,14 +151,23 @@ function FavoritesRender({ config, size: tileSize }: WidgetRenderProps<Config>) 
   const cardHeightPx =
     (widgetBodyHeight - (perCol - 1) * GRID_GAP_PX) / perCol;
 
+  const layout = config.layout ?? "row";
   const variant: LayoutVariant =
-    density === "compact"
-      ? "h-tight"
-      : density === "spacious"
-        ? cardHeightPx >= SPACIOUS_MIN_HEIGHT_PX
-          ? "v-centered"
+    layout === "stacked"
+      ? cardHeightPx >= SPACIOUS_MIN_HEIGHT_PX
+        ? density === "compact"
+          ? "v-compact"
+          : density === "spacious"
+            ? "v-spacious"
+            : "v-centered"
+        : density === "compact"
+          ? "h-tight"
           : "h-roomy"
-        : "h-roomy";
+      : density === "compact"
+        ? "h-tight"
+        : density === "spacious"
+          ? "h-spacious"
+          : "h-roomy";
   const styles = VARIANT_STYLES[variant];
 
   const rowHeight = `calc((100% - ${(perCol - 1) * GRID_GAP_PX}px) / ${perCol})`;
@@ -295,6 +329,22 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
             <Section title="Grade e densidade" defaultOpen>
               <div className="space-y-3">
                 <div className="space-y-1.5">
+                  <Label className="text-xs">Layout do texto</Label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: "row", label: "Em linha" },
+                      { value: "stacked", label: "Empilhado" },
+                    ].map((opt) => (
+                      <DensityPill
+                        key={opt.value}
+                        active={(config.layout ?? "row") === opt.value}
+                        label={opt.label}
+                        onClick={() => set("layout", opt.value as Config["layout"])}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
                   <Label className="text-xs">Densidade</Label>
                   <div className="flex gap-2">
                     {[
@@ -391,6 +441,7 @@ export const favoritesWidget: WidgetDefinition<Config> = {
     itemsPerRow: 4,
     itemsPerColumn: 1,
     density: "comfortable",
+    layout: "row",
     display: { showHeader: true, showCount: true },
   },
   RenderComponent: FavoritesRender,

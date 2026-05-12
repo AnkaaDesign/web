@@ -214,7 +214,6 @@ const OrderStatistics = lazy(() => import("@/pages/order/statistics/orders").the
 // Production Statistics
 const ProductionThroughputStatistics = lazy(() => import("@/pages/production/statistics/throughput").then((module) => ({ default: module.default })));
 const ProductionBottlenecksStatistics = lazy(() => import("@/pages/production/statistics/bottlenecks").then((module) => ({ default: module.default })));
-const ProductionRevenueStatistics = lazy(() => import("@/pages/production/statistics/revenue").then((module) => ({ default: module.default })));
 
 // Financial Statistics
 const FinancialCollectionStatistics = lazy(() => import("@/pages/financial/statistics/collection").then((module) => ({ default: module.default })));
@@ -1157,11 +1156,6 @@ function App() {
                   path={routes.statistics.production.bottlenecks}
                   element={<Suspense fallback={<PageLoader />}><ProductionBottlenecksStatistics /></Suspense>}
                 />
-                <Route
-                  path={routes.statistics.production.revenue}
-                  element={<Suspense fallback={<PageLoader />}><ProductionRevenueStatistics /></Suspense>}
-                />
-
                 {/* Financial Statistics routes */}
                 <Route
                   path={routes.statistics.financial.collection}
