@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getTasks } from '@/api-client/task';
 import { format } from 'date-fns';
@@ -14,6 +13,7 @@ interface ProductionPeriodTasksModalProps {
   period: string;     // "2025-05" or "2025"
   label: string;      // "Maio 2025"
   sectorIds?: string[];
+  activeUsers?: number;
 }
 
 // Business period: month M of year Y covers 26th of M-1 through 25th of M.
@@ -40,6 +40,7 @@ export function ProductionPeriodTasksModal({
   period,
   label,
   sectorIds,
+  activeUsers,
 }: ProductionPeriodTasksModalProps) {
   const { from, to } = getBusinessPeriodRange(period);
 
@@ -59,8 +60,14 @@ export function ProductionPeriodTasksModal({
     enabled: open,
   });
 
-  const tasks: any[] = (response as any)?.data ?? [];
-  const total = (response as any)?.meta?.total ?? tasks.length;
+  const rawTasks: any[] = (response as any)?.data ?? [];
+  const total = (response as any)?.meta?.total ?? rawTasks.length;
+  // Most recent first — completed-at desc, falling back to 0 for missing dates
+  const tasks = [...rawTasks].sort((a, b) => {
+    const da = a.finishedAt ? new Date(a.finishedAt).getTime() : 0;
+    const db = b.finishedAt ? new Date(b.finishedAt).getTime() : 0;
+    return db - da;
+  });
 
   const taskLabel = (task: any) => task.name || '—';
 
@@ -72,7 +79,7 @@ export function ProductionPeriodTasksModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl flex flex-col" style={{ maxHeight: '85vh' }}>
+      <DialogContent className="max-w-3xl flex flex-col max-h-[85vh] h-[85vh]">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Tarefas — {label}</DialogTitle>
           <DialogDescription>
@@ -84,6 +91,13 @@ export function ProductionPeriodTasksModal({
                 <>
                   <span className="font-medium">{total}</span>{' '}
                   tarefa{total !== 1 ? 's' : ''} concluída{total !== 1 ? 's' : ''} neste período
+                  {activeUsers != null && activeUsers > 0 && (
+                    <>
+                      {' · '}
+                      <span className="font-medium">{activeUsers}</span>{' '}
+                      colaborador{activeUsers !== 1 ? 'es' : ''} efetivo{activeUsers !== 1 ? 's' : ''} durante o período
+                    </>
+                  )}
                   {sectorIds?.length ? ` · ${sectorIds.length} setor${sectorIds.length > 1 ? 'es' : ''} filtrado${sectorIds.length > 1 ? 's' : ''}` : ''}
                 </>
               )
@@ -91,66 +105,69 @@ export function ProductionPeriodTasksModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden min-h-0">
-          <ScrollArea className="h-full">
-            <Table>
-              <TableHeader>
+        {/* Plain overflow-y-auto (not Radix ScrollArea) — Radix wraps content
+            in display:table which breaks position:sticky on <thead>. The
+            "[&>div]:border-0" sentinel tells our Table component to skip its
+            internal `overflow-auto` wrapper, so this outer div is the scroll
+            container the sticky thead anchors to. */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <Table className="[&>div]:border-0">
+            <TableHeader className="sticky top-0 z-10 bg-muted shadow-[inset_0_-1px_0_hsl(var(--border))]">
+              <TableRow>
+                <TableHead>Nome da Tarefa</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Identificador</TableHead>
+                <TableHead className="text-right">Finalizado em</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 4 }).map((_, j) => (
+                      <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : isError ? (
                 <TableRow>
-                  <TableHead>Nome da Tarefa</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Identificador</TableHead>
-                  <TableHead className="text-right">Finalizado em</TableHead>
+                  <TableCell colSpan={4} className="text-center text-destructive py-10">
+                    Erro ao carregar as tarefas. Tente novamente.
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {Array.from({ length: 4 }).map((_, j) => (
-                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : isError ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-destructive py-10">
-                      Erro ao carregar as tarefas. Tente novamente.
-                    </TableCell>
-                  </TableRow>
-                ) : tasks.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-10">
-                      Nenhuma tarefa encontrada neste período
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  tasks.map((task: any) => {
-                    const name = customerName(task);
-                    const finishedDate = task.finishedAt
-                      ? format(new Date(task.finishedAt), 'dd/MM/yyyy', { locale: ptBR })
-                      : '—';
+              ) : tasks.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-10">
+                    Nenhuma tarefa encontrada neste período
+                  </TableCell>
+                </TableRow>
+              ) : (
+                tasks.map((task: any) => {
+                  const name = customerName(task);
+                  const finishedDate = task.finishedAt
+                    ? format(new Date(task.finishedAt), 'dd/MM/yyyy', { locale: ptBR })
+                    : '—';
 
-                    return (
-                      <TableRow key={task.id} className="text-sm">
-                        <TableCell className="font-medium max-w-[200px] truncate">
-                          {taskLabel(task)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground max-w-[180px] truncate">
-                          {name || '—'}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground font-mono">
-                          {indicator(task)}
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
-                          {finishedDate}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </ScrollArea>
+                  return (
+                    <TableRow key={task.id} className="text-sm">
+                      <TableCell className="font-medium max-w-[200px] truncate">
+                        {taskLabel(task)}
+                      </TableCell>
+                      <TableCell className="text-foreground/85 max-w-[180px] truncate">
+                        {name || '—'}
+                      </TableCell>
+                      <TableCell className="text-xs text-foreground/75 font-mono">
+                        {indicator(task)}
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-foreground/80 whitespace-nowrap">
+                        {finishedDate}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
         </div>
       </DialogContent>
     </Dialog>

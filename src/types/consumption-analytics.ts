@@ -99,7 +99,7 @@ export type ConsumptionChartType =
   | 'pie';
 
 // UI-only axis / display options (not sent to API)
-export type ConsumptionXAxisMode = 'item' | 'category' | 'brand' | 'month' | 'year';
+export type ConsumptionXAxisMode = 'item' | 'month' | 'year';
 export type ConsumptionYAxisMode = 'quantity' | 'value' | 'both';
 export type ConsumptionCompareMode = 'combined' | 'separated' | 'separatedWithTotal';
 

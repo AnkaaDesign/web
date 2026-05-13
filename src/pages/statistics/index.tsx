@@ -47,9 +47,9 @@ const modules: StatModule[] = [
     icon: IconBuildingFactory2,
     links: [
       {
-        label: "Rendimento",
-        description: "Métricas de produtividade e rendimento da produção",
-        route: routes.statistics.production.throughput,
+        label: "Produtividade",
+        description: "Métricas de produtividade dos colaboradores efetivos da produção",
+        route: routes.statistics.production.productivity,
         icon: IconTrendingUp,
       },
       {

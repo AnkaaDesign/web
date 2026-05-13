@@ -76,7 +76,7 @@ const VALID_ROUTES = [
   // Statistics routes
   routes.statistics.root,
   routes.statistics.production.root,
-  routes.statistics.production.throughput,
+  routes.statistics.production.productivity,
   routes.statistics.production.bottlenecks,
   routes.statistics.production.revenue,
   routes.statistics.administration.root,

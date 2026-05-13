@@ -1,4 +1,4 @@
-// web/src/pages/production/statistics/throughput.tsx
+// web/src/pages/production/statistics/productivity.tsx
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
@@ -21,7 +21,8 @@ import type {
   TaskProductionCompareMode,
   TaskProductionItem,
 } from '@/types/production-analytics';
-import { StatisticsChart } from '@/components/statistics/statistics-chart';
+import { StatisticsChart, type StatisticsChartHandle } from '@/components/statistics/statistics-chart';
+import { exportProductivityPdf } from '@/utils/productivity-pdf-generator';
 import { ProductionPeriodTasksModal } from '@/components/production/production-period-tasks-modal';
 import { formatNumber } from '@/types/statistics-common';
 import type { YAxisMode, StatisticsChartType, TrendLineType } from '@/types/statistics-common';
@@ -126,8 +127,8 @@ const STACKED_CHART_TYPE_OPTIONS: ChartTypeOption[] = [
 ];
 
 const BOTH_MODE_CHART_TYPE_OPTIONS: ChartTypeOption[] = [
-  { value: 'bar-stacked',  label: 'Colunas', icon: IconChartBar,  description: 'Colunas com Total + Média/Usuário' },
-  { value: 'line-stacked', label: 'Linhas',  icon: IconChartLine, description: 'Linhas com Total + Média/Usuário' },
+  { value: 'bar-stacked',  label: 'Colunas', icon: IconChartBar,  description: 'Colunas com Total + Média/Colaborador' },
+  { value: 'line-stacked', label: 'Linhas',  icon: IconChartLine, description: 'Linhas com Total + Média/Colaborador' },
 ];
 
 const X_AXIS_OPTIONS: Array<{ value: TaskProductionXAxisMode; label: string }> = [
@@ -137,8 +138,8 @@ const X_AXIS_OPTIONS: Array<{ value: TaskProductionXAxisMode; label: string }> =
 
 const Y_AXIS_OPTIONS: Array<{ value: TaskProductionYAxisMode; label: string }> = [
   { value: 'count',      label: 'Quantidade de Tarefas' },
-  { value: 'avgPerUser', label: 'Média por Usuário Ativo' },
-  { value: 'both',       label: 'Ambos (Total + Média/Usuário)' },
+  { value: 'avgPerUser', label: 'Média por Colaborador Ativo' },
+  { value: 'both',       label: 'Ambos (Total + Média/Colaborador)' },
 ];
 
 const COMPARE_MODE_OPTIONS: Array<{ value: TaskProductionCompareMode; label: string }> = [
@@ -181,28 +182,43 @@ function computeDateRange(
   };
 }
 
-// Aggregate monthly comparison data into yearly buckets
+// Aggregate monthly comparison data into yearly buckets.
+//
+// Math rules:
+//  - count: Σ monthly counts (annual total tasks).
+//  - activeUsers: mean of monthly headcounts (rounded). Represents an "avg
+//    monthly FTE" for the year; sector history isn't tracked finely enough
+//    to compute a true distinct-user count per year client-side.
+//  - avgPerUser: count / activeUsers — derived from the aggregated values
+//    above so the math is self-consistent. NOT the mean of monthly avgs,
+//    which is wrong when staffing varies month to month (e.g. annual=500
+//    with months [100/10, 400/20] → mean-of-avgs = 15, but correct = 33.3).
 function aggregateComparisons(
   monthItems: TaskProductionItem[],
 ): TaskProductionItem['comparisons'] {
   if (!monthItems.length || !monthItems[0]?.comparisons) return undefined;
-  const map = new Map<string, { name: string; counts: number[]; avgPerUsers: number[]; activeUsersList: number[] }>();
+  const map = new Map<string, { name: string; counts: number[]; activeUsersList: number[] }>();
   monthItems.forEach(item => {
     item.comparisons?.forEach(comp => {
-      if (!map.has(comp.sectorId)) map.set(comp.sectorId, { name: comp.sectorName, counts: [], avgPerUsers: [], activeUsersList: [] });
+      if (!map.has(comp.sectorId)) map.set(comp.sectorId, { name: comp.sectorName, counts: [], activeUsersList: [] });
       const s = map.get(comp.sectorId)!;
       s.counts.push(comp.count);
-      s.avgPerUsers.push(comp.avgPerUser);
       s.activeUsersList.push(comp.activeUsers);
     });
   });
-  return Array.from(map.entries()).map(([sectorId, s]) => ({
-    sectorId,
-    sectorName: s.name,
-    count: s.counts.reduce((a, b) => a + b, 0),
-    activeUsers: Math.round(s.activeUsersList.reduce((a, b) => a + b, 0) / s.activeUsersList.length),
-    avgPerUser: s.avgPerUsers.length ? s.avgPerUsers.reduce((a, b) => a + b, 0) / s.avgPerUsers.length : 0,
-  }));
+  return Array.from(map.entries()).map(([sectorId, s]) => {
+    const count = s.counts.reduce((a, b) => a + b, 0);
+    const activeUsers = s.activeUsersList.length
+      ? Math.round(s.activeUsersList.reduce((a, b) => a + b, 0) / s.activeUsersList.length)
+      : 0;
+    return {
+      sectorId,
+      sectorName: s.name,
+      count,
+      activeUsers,
+      avgPerUser: activeUsers > 0 ? +(count / activeUsers).toFixed(2) : 0,
+    };
+  });
 }
 
 // =====================
@@ -335,12 +351,12 @@ function TaskProductionFiltersSheet({
               />
               {localY === 'avgPerUser' && (
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Considera apenas usuários ativos no período (26–25). Usuários demitidos não contam no mês após a demissão.
+                  Considera apenas colaboradores ativos no período (26–25). Colaboradores desligados não contam no mês após a demissão.
                 </p>
               )}
               {localY === 'both' && (
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Exibe Total de Tarefas e Média por Usuário Ativo no mesmo gráfico. Seleção de setores não disponível neste modo.
+                  Exibe Total de Tarefas e Média por Colaborador Ativo no mesmo gráfico. Seleção de setores não disponível neste modo.
                 </p>
               )}
             </div>
@@ -404,7 +420,7 @@ function TaskProductionFiltersSheet({
                   <IconArrowsExchange2 className="h-4 w-4" />
                   Comparação Ano a Ano
                 </Label>
-                <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-transparent px-3 py-2">
                   <div className="space-y-0.5">
                     <p className="text-sm">Comparar meses entre anos</p>
                     <p className="text-xs text-muted-foreground">
@@ -507,7 +523,7 @@ function TaskProductionFiltersSheet({
 // =====================
 
 const TaskProductionPage = () => {
-  usePageTracker({ page: 'production-task-statistics', title: 'Produção de Tarefas' });
+  usePageTracker({ page: 'production-productivity-statistics', title: 'Produtividade' });
 
   const [showFilters, setShowFilters] = useState(false);
 
@@ -517,9 +533,10 @@ const TaskProductionPage = () => {
   const [goalInput, setGoalInput] = useState('');
   const [goalPopoverOpen, setGoalPopoverOpen] = useState(false);
   const [yearCompareMode, setYearCompareMode] = useState(false);
-  const [clickedPeriod, setClickedPeriod] = useState<{ period: string; label: string } | null>(null);
+  const [clickedPeriod, setClickedPeriod] = useState<{ period: string; label: string; activeUsers?: number } | null>(null);
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartHandleRef = useRef<StatisticsChartHandle>(null);
 
   const [filters, setFilters] = useState<TaskProductionFilters>(() => {
     const y = new Date().getFullYear().toString();
@@ -573,6 +590,13 @@ const TaskProductionPage = () => {
     }
   }, [filters.xAxisMode, selectedYears.length]);
 
+  // A goal set in one metric (e.g. 100 tasks) is meaningless after switching
+  // to a different scale (e.g. 2.36 tasks/colaborador). Reset on metric change.
+  useEffect(() => {
+    setGoalValue(null);
+    setGoalInput('');
+  }, [filters.yAxisMode]);
+
 
   // Always fetch monthly data; year aggregation is done on the frontend
   const apiFilters = useMemo(
@@ -611,19 +635,23 @@ const TaskProductionPage = () => {
     });
 
     return Array.from(yearGroups.entries())
-      .map(([year, monthItems]) => ({
-        period: year,
-        periodLabel: year,
-        totalCount: monthItems.reduce((s, i) => s + i.totalCount, 0),
-        // Mean of monthly averages — matches expected yearly avg/user
-        avgPerUser: monthItems.length
-          ? monthItems.reduce((s, i) => s + i.avgPerUser, 0) / monthItems.length
-          : 0,
-        activeUsers: monthItems.length
+      .map(([year, monthItems]) => {
+        const totalCount = monthItems.reduce((s, i) => s + i.totalCount, 0);
+        const activeUsers = monthItems.length
           ? Math.round(monthItems.reduce((s, i) => s + i.activeUsers, 0) / monthItems.length)
-          : 0,
-        comparisons: aggregateComparisons(monthItems),
-      }))
+          : 0;
+        // Derive avgPerUser from aggregated values so the trio (count,
+        // activeUsers, avgPerUser) stays mathematically self-consistent.
+        // mean(monthly avgs) is wrong when staffing varies between months.
+        return {
+          period: year,
+          periodLabel: year,
+          totalCount,
+          activeUsers,
+          avgPerUser: activeUsers > 0 ? +(totalCount / activeUsers).toFixed(2) : 0,
+          comparisons: aggregateComparisons(monthItems),
+        };
+      })
       .sort((a, b) => a.period.localeCompare(b.period));
   }, [rawItems, filters.xAxisMode, selectedYears, selectedMonths]);
 
@@ -666,11 +694,15 @@ const TaskProductionPage = () => {
     return cols;
   }, [isComparisonMode, items, includeAmbos, activeSectorIds]);
 
-  // Build chart data — exclude sectors with no activity in the selected period
+  // Build chart data — exclude sectors with no activity in the selected period.
+  // When all displayed months share a single year, drop the year suffix from
+  // the chart's x-axis labels ("Janeiro 2026" → "Janeiro"); the modal and
+  // exports still receive the full periodLabel via items[i].periodLabel.
+  const stripYearOnAxis = filters.xAxisMode !== 'year' && selectedYears.length === 1;
   const chartData = useMemo(() => {
     if (!items.length) return [];
     return items.map(item => ({
-      name: item.periodLabel,
+      name: stripYearOnAxis ? item.periodLabel.replace(/\s+\d{4}\s*$/, '').trim() : item.periodLabel,
       value: useAvg ? item.avgPerUser : item.totalCount,
       secondaryValue: isBothMode ? item.avgPerUser : undefined,
       comparisons: isComparisonMode && item.comparisons
@@ -692,7 +724,7 @@ const TaskProductionPage = () => {
           ]
         : undefined,
     }));
-  }, [items, isComparisonMode, includeAmbos, useAvg, isBothMode, activeSectorIds]);
+  }, [items, isComparisonMode, includeAmbos, useAvg, isBothMode, activeSectorIds, stripYearOnAxis]);
 
   // Year-over-year comparison: x = month name, series = one per year
   const yearCompareChartData = useMemo(() => {
@@ -725,18 +757,41 @@ const TaskProductionPage = () => {
 
   const chartDataKey = `${effectiveIsComparison}-${filters.yAxisMode}-${filters.compareMode}-${yearCompareMode}`;
 
-  // Average per display period (month or year) computed from aggregated items
-  const avgPerDisplayPeriod = useMemo(
-    () => (items.length ? items.reduce((s, i) => s + i.totalCount, 0) / items.length : 0),
+  // Periods that actually contributed production — used as the denominator
+  // for averages and as the "Períodos Analisados" count so empty future
+  // months left on the x-axis (e.g. Jun-Dec of the current year) don't drag
+  // statistics down. They still render on the chart as empty slots.
+  const periodsWithData = useMemo(
+    () => items.filter(i => (i.totalCount ?? 0) > 0),
     [items],
   );
 
-  // Mean of period-level avgPerUser values — always represents monthly productivity
-  // (month mode: each period is one month; year mode: each item is already the mean of its months)
+  const avgPerDisplayPeriod = useMemo(
+    () => (periodsWithData.length
+      ? periodsWithData.reduce((s, i) => s + i.totalCount, 0) / periodsWithData.length
+      : 0),
+    [periodsWithData],
+  );
+
+  // Mean of period-level avgPerUser values across periods that produced.
+  // Uses periodsWithData (totalCount > 0) so the filter agrees with
+  // every other summary metric and the "Períodos Analisados" card.
   const summaryAvgPerUser = useMemo(() => {
-    const active = items.filter(i => i.activeUsers > 0);
-    if (!active.length) return 0;
-    return active.reduce((s, i) => s + i.avgPerUser, 0) / active.length;
+    if (!periodsWithData.length) return 0;
+    return periodsWithData.reduce((s, i) => s + (i.avgPerUser ?? 0), 0) / periodsWithData.length;
+  }, [periodsWithData]);
+
+  // "Melhor Média" — the best (highest) avgPerUser across displayed periods.
+  const bestAvgPerUser = useMemo(
+    () => (items.length ? Math.max(...items.map(i => i.avgPerUser ?? 0)) : 0),
+    [items],
+  );
+
+  // "Média de Colaboradores Efetivos" — mean of effective colaborador count per period.
+  const avgActiveUsers = useMemo(() => {
+    const periods = items.filter(i => (i.activeUsers ?? 0) > 0);
+    if (!periods.length) return 0;
+    return periods.reduce((s, i) => s + (i.activeUsers ?? 0), 0) / periods.length;
   }, [items]);
 
   // yAxisMode passed to the chart component
@@ -754,24 +809,40 @@ const TaskProductionPage = () => {
       // In year-compare mode: seriesName = year (e.g. "2025"), name = month label (e.g. "Janeiro")
       const monthNum = MONTH_NAME_TO_NUM[name];
       if (monthNum && /^\d{4}$/.test(seriesName)) {
-        setClickedPeriod({ period: `${seriesName}-${monthNum}`, label: `${name} ${seriesName}` });
+        const period = `${seriesName}-${monthNum}`;
+        const raw = rawItems.find(i => i.period === period);
+        setClickedPeriod({ period, label: `${name} ${seriesName}`, activeUsers: raw?.activeUsers });
       }
     } else {
       const item = items[dataIndex];
-      if (item) setClickedPeriod({ period: item.period, label: item.periodLabel });
+      if (item) setClickedPeriod({ period: item.period, label: item.periodLabel, activeUsers: item.activeUsers });
     }
-  }, [yearCompareChartData, items]);
+  }, [yearCompareChartData, items, rawItems]);
 
   const maxPeriodCount = useMemo(
     () => (items.length ? Math.max(...items.map(i => i.totalCount)) : 0),
     [items],
   );
 
+  // Label for the peak inside the "Pico de Produção" card title.
+  // - year mode → "2026"
+  // - month mode, single year selected → "Março"
+  // - month mode, multiple years selected → "Março 2026"
+  const peakLabel = useMemo(() => {
+    if (!items.length || maxPeriodCount === 0) return '';
+    const peak = items.find(i => i.totalCount === maxPeriodCount);
+    if (!peak) return '';
+    if (filters.xAxisMode === 'year') return peak.period; // "2026"
+    const [yearPart, monthPart] = peak.period.split('-');
+    const monthName = MONTH_NAMES[parseInt(monthPart, 10) - 1] ?? monthPart;
+    return selectedYears.length > 1 ? `${monthName} ${yearPart}` : monthName;
+  }, [items, maxPeriodCount, filters.xAxisMode, selectedYears]);
+
   const handleExportCSV = useCallback(() => {
     if (!items.length) { toast.error('Nenhum dado para exportar'); return; }
     try {
       const baseHeaders = ['Período', 'Total de Tarefas'];
-      if (useAvg || isBothMode) baseHeaders.push('Usuários Ativos', 'Média/Usuário');
+      if (useAvg || isBothMode) baseHeaders.push('Colaboradores Ativos', 'Média/Colaborador');
       if (isComparisonMode) sectorColumns.forEach(col => baseHeaders.push(col));
 
       const rows = items.map(item => {
@@ -808,7 +879,7 @@ const TaskProductionPage = () => {
     if (!items.length) { toast.error('Nenhum dado para exportar'); return; }
     try {
       const headers: string[] = ['Período', 'Total de Tarefas'];
-      if (useAvg || isBothMode) headers.push('Usuários Ativos', 'Média/Usuário');
+      if (useAvg || isBothMode) headers.push('Colaboradores Ativos', 'Média/Colaborador');
       if (isComparisonMode) sectorColumns.forEach(col => headers.push(col));
 
       const rows = items.map(item => {
@@ -833,7 +904,7 @@ const TaskProductionPage = () => {
       ws['!cols'] = headers.map((_, i) => ({ wch: i === 0 ? 18 : 14 }));
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Rendimento');
+      XLSX.utils.book_append_sheet(wb, ws, 'Produtividade');
       XLSX.writeFile(wb, `producao-tarefas-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.xlsx`);
       toast.success('Planilha exportada com sucesso!');
     } catch {
@@ -843,77 +914,54 @@ const TaskProductionPage = () => {
 
   const handleExportPDF = useCallback(async () => {
     if (!chartData.length) { toast.error('Nenhum dado para exportar'); return; }
-    if (!chartContainerRef.current) return;
+    const chartOption = chartHandleRef.current?.getOption();
+    if (!chartOption) { toast.error('Gráfico ainda não está pronto'); return; }
 
     const toastId = toast.loading('Gerando PDF...');
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ]);
+      // Filter chips reproduced in the PDF header, matching the on-screen
+      // description so the export is self-explanatory.
+      const filterLines: string[] = [];
+      filterLines.push(
+        filters.xAxisMode === 'year' ? 'Agrupamento: Anos' : 'Agrupamento: Meses (26–25)',
+      );
+      if (selectedYears.length) filterLines.push(`Anos: ${[...selectedYears].sort().join(', ')}`);
+      if (selectedMonths.length) filterLines.push(`Meses: ${selectedMonths.length} selecionados`);
+      if (useAvg) filterLines.push('Métrica: Média/Colaborador');
+      else if (isBothMode) filterLines.push('Métrica: Total + Média/Colaborador');
+      if (isComparisonMode && sectorColumns.length) {
+        filterLines.push(`Setores: ${sectorColumns.filter(c => c !== 'Ambos').join(', ')}`);
+      }
+      if (trendLine) {
+        filterLines.push(`Tendência: ${TREND_LABELS[trendLine]}`);
+      }
+      if (goalValue != null) {
+        filterLines.push(`Meta: ${goalValue}`);
+      }
 
-      const canvas = await html2canvas(chartContainerRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
+      const summaryStats: Array<{ label: string; value: string }> = [
+        { label: 'Total Concluídas', value: formatNumber(summary?.totalCompleted ?? 0) },
+        {
+          label: `Média/${filters.xAxisMode === 'year' ? 'Ano' : 'Mês'}`,
+          value: formatNumber(avgPerDisplayPeriod, 1),
+        },
+      ];
+      if (useAvg || isBothMode) {
+        summaryStats.push({ label: 'Média/Colaborador', value: summaryAvgPerUser.toFixed(2) });
+      } else {
+        summaryStats.push({ label: 'Pico', value: formatNumber(maxPeriodCount) });
+      }
+      summaryStats.push({ label: 'Períodos', value: String(periodsWithData.length) });
+
+      await exportProductivityPdf({
+        title: 'Produtividade',
+        subtitle: 'Produção de Tarefas por Período',
+        filterLines,
+        chartOption,
+        summaryStats,
+        fileSuffix: 'produtividade',
       });
 
-      const imgData = canvas.toDataURL('image/png');
-
-      // A4 Landscape: 297 x 210 mm
-      const pageW = 297;
-      const pageH = 210;
-      const margin = 12;
-      const contentW = pageW - margin * 2;
-
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-
-      doc.setFontSize(15);
-      doc.setTextColor(40, 40, 40);
-      doc.text('Produção de Tarefas por Período', pageW / 2, 14, { align: 'center' });
-
-      doc.setFontSize(8);
-      doc.setTextColor(110, 110, 110);
-      doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`, pageW / 2, 20, { align: 'center' });
-
-      const filterParts: string[] = [];
-      filterParts.push(filters.xAxisMode === 'year' ? 'Agrupamento: Anos' : 'Agrupamento: Meses (26–25)');
-      if (selectedYears.length) filterParts.push(`Anos: ${[...selectedYears].sort().join(', ')}`);
-      if (selectedMonths.length) filterParts.push(`Meses: ${selectedMonths.length} selecionados`);
-      if (useAvg) filterParts.push('Métrica: Média/Usuário');
-      else if (isBothMode) filterParts.push('Métrica: Total + Média/Usuário');
-      if (isComparisonMode && sectorColumns.length) {
-        filterParts.push(`Setores: ${sectorColumns.filter(c => c !== 'Ambos').join(', ')}`);
-      }
-
-      doc.setFontSize(7.5);
-      doc.setTextColor(130, 130, 130);
-      doc.text(filterParts.join('  •  '), pageW / 2, 25.5, { align: 'center' });
-
-      const chartAreaY = 30;
-      const maxChartH = pageH - chartAreaY - 18;
-      const imgAspect = canvas.height / canvas.width;
-      const chartH = Math.min(contentW * imgAspect, maxChartH);
-      const chartW = chartH / imgAspect;
-      const chartX = margin + (contentW - chartW) / 2;
-
-      doc.addImage(imgData, 'PNG', chartX, chartAreaY, chartW, chartH);
-
-      const footerY = chartAreaY + chartH + 6;
-      if (footerY < pageH - 3) {
-        doc.setFontSize(8);
-        doc.setTextColor(70, 70, 70);
-        const stats: string[] = [
-          `Total Concluídas: ${formatNumber(summary?.totalCompleted ?? 0)}`,
-          `Média/${filters.xAxisMode === 'year' ? 'Ano' : 'Mês'}: ${formatNumber(avgPerDisplayPeriod, 1)}`,
-        ];
-        if (useAvg || isBothMode) stats.push(`Média/Usuário: ${summaryAvgPerUser.toFixed(2)}`);
-        else stats.push(`Pico: ${formatNumber(maxPeriodCount)}`);
-        stats.push(`Períodos: ${items.length}`);
-        doc.text(stats.join('   |   '), pageW / 2, footerY, { align: 'center' });
-      }
-
-      doc.save(`producao-tarefas-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.pdf`);
       toast.dismiss(toastId);
       toast.success('PDF exportado com sucesso!');
     } catch (err) {
@@ -921,7 +969,7 @@ const TaskProductionPage = () => {
       toast.dismiss(toastId);
       toast.error('Erro ao exportar PDF');
     }
-  }, [chartData, filters, selectedYears, selectedMonths, useAvg, isBothMode, isComparisonMode, sectorColumns, summary, avgPerDisplayPeriod, summaryAvgPerUser, maxPeriodCount, items]);
+  }, [chartData, filters, selectedYears, selectedMonths, useAvg, isBothMode, isComparisonMode, sectorColumns, summary, avgPerDisplayPeriod, summaryAvgPerUser, maxPeriodCount, periodsWithData, trendLine, goalValue]);
 
   const renderChart = () => {
     if (isLoading) {
@@ -962,18 +1010,19 @@ const TaskProductionPage = () => {
     }
     return (
       <StatisticsChart
+        ref={chartHandleRef}
         key={chartDataKey}
         data={effectiveChartData}
         chartType={effectiveChartType}
         yAxisMode={chartYAxisMode}
         isComparisonMode={effectiveIsComparison}
-        height="480px"
-        yAxisLabel={useAvg ? 'Média/Usuário' : 'Tarefas Concluídas'}
+        height="min(720px, calc(100vh - 360px))"
+        yAxisLabel={useAvg ? 'Média/Colaborador' : 'Tarefas Concluídas'}
         valueFormatter={valueFormatter}
         secondaryValueFormatter={secondaryValueFormatter}
         tooltipLabels={{
-          primary:   isBothMode ? 'Total Tarefas' : (useAvg ? 'Média por Usuário' : 'Tarefas Concluídas'),
-          secondary: isBothMode ? 'Média/Usuário' : undefined,
+          primary:   isBothMode ? 'Total Tarefas' : (useAvg ? 'Média por Colaborador' : 'Tarefas Concluídas'),
+          secondary: isBothMode ? 'Média/Colaborador' : undefined,
         }}
         trendLine={trendLine}
         goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
@@ -995,7 +1044,7 @@ const TaskProductionPage = () => {
             { label: 'Início', href: routes.home },
             { label: 'Estatísticas', href: routes.statistics.root },
             { label: 'Produção', href: routes.statistics.production.root },
-            { label: 'Rendimento' },
+            { label: 'Produtividade' },
           ]}
         />
       </div>
@@ -1009,8 +1058,8 @@ const TaskProductionPage = () => {
                   <CardTitle>Produção de Tarefas por Período</CardTitle>
                   <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
                     <span>Tarefas concluídas por {filters.xAxisMode === 'year' ? 'ano' : 'mês (período 26–25)'}</span>
-                    {isBothMode  && <Badge variant="outline"  className="text-xs">Total + Média/Usuário</Badge>}
-                    {useAvg      && <Badge variant="outline"  className="text-xs">Média/Usuário</Badge>}
+                    {isBothMode  && <Badge variant="outline"  className="text-xs">Total + Média/Colaborador</Badge>}
+                    {useAvg      && <Badge variant="outline"  className="text-xs">Média/Colaborador</Badge>}
                     {isComparisonMode && (
                       <Badge variant="secondary" className="text-xs">
                         {filters.compareMode === 'separatedWithTotal' ? 'Comparação + Ambos' : 'Comparação Setores'}
@@ -1069,19 +1118,6 @@ const TaskProductionPage = () => {
                       </DropdownMenuRadioGroup>
                     </DropdownMenuContent>
                   </DropdownMenu>
-
-                  {/* Year-over-year comparison toggle */}
-                  {selectedYears.length >= 2 && filters.xAxisMode !== 'year' && (
-                    <Button
-                      variant={yearCompareMode ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setYearCompareMode(m => !m)}
-                      title="Comparar os mesmos meses entre anos selecionados"
-                    >
-                      <IconArrowsExchange2 className="h-4 w-4 mr-2" />
-                      Ano a Ano
-                    </Button>
-                  )}
 
                   {/* Trend line selector */}
                   <DropdownMenu>
@@ -1226,14 +1262,22 @@ const TaskProductionPage = () => {
                 <Card className="py-2">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
                     <CardTitle className="text-xs font-medium">
-                      Média por {filters.xAxisMode === 'year' ? 'Ano' : 'Mês'}
+                      {useAvg
+                        ? `Média por Colaborador ao ${filters.xAxisMode === 'year' ? 'Ano' : 'Mês'}`
+                        : `Média por ${filters.xAxisMode === 'year' ? 'Ano' : 'Mês'}`}
                     </CardTitle>
                     <IconCalendarStats className="h-3.5 w-3.5 text-muted-foreground" />
                   </CardHeader>
                   <CardContent className="pb-0 px-4">
                     {isLoading
                       ? <Skeleton className="h-7 w-20" />
-                      : <div className="text-xl font-bold">{formatNumber(avgPerDisplayPeriod, 1)}</div>
+                      : (
+                        <div className="text-xl font-bold">
+                          {useAvg
+                            ? summaryAvgPerUser.toFixed(2)
+                            : formatNumber(avgPerDisplayPeriod, 1)}
+                        </div>
+                      )
                     }
                   </CardContent>
                 </Card>
@@ -1243,26 +1287,26 @@ const TaskProductionPage = () => {
                   <>
                     <Card className="py-2">
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                        <CardTitle className="text-xs font-medium">Média/Usuário (geral)</CardTitle>
+                        <CardTitle className="text-xs font-medium">Melhor Média</CardTitle>
                         <IconUsers className="h-3.5 w-3.5 text-muted-foreground" />
                       </CardHeader>
                       <CardContent className="pb-0 px-4">
                         {isLoading
                           ? <Skeleton className="h-7 w-20" />
-                          : <div className="text-xl font-bold">{summaryAvgPerUser.toFixed(2)}</div>
+                          : <div className="text-xl font-bold">{bestAvgPerUser.toFixed(2)}</div>
                         }
                       </CardContent>
                     </Card>
 
                     <Card className="py-2">
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                        <CardTitle className="text-xs font-medium">Usuários no Período</CardTitle>
+                        <CardTitle className="text-xs font-medium">Média de Colaboradores Efetivos</CardTitle>
                         <IconBuilding className="h-3.5 w-3.5 text-muted-foreground" />
                       </CardHeader>
                       <CardContent className="pb-0 px-4">
                         {isLoading
                           ? <Skeleton className="h-7 w-20" />
-                          : <div className="text-xl font-bold">{formatNumber(summary?.totalActiveUsers ?? 0)}</div>
+                          : <div className="text-xl font-bold">{formatNumber(avgActiveUsers, 1)}</div>
                         }
                       </CardContent>
                     </Card>
@@ -1271,7 +1315,9 @@ const TaskProductionPage = () => {
                   <>
                     <Card className="py-2">
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                        <CardTitle className="text-xs font-medium">Pico de Produção</CardTitle>
+                        <CardTitle className="text-xs font-medium">
+                          Pico de Produção{peakLabel ? ` (${peakLabel})` : ''}
+                        </CardTitle>
                         <IconTrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
                       </CardHeader>
                       <CardContent className="pb-0 px-4">
@@ -1279,11 +1325,6 @@ const TaskProductionPage = () => {
                           ? <Skeleton className="h-7 w-20" />
                           : <div className="text-xl font-bold">{formatNumber(maxPeriodCount)}</div>
                         }
-                        {!isLoading && items.length > 0 && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            {items.find(i => i.totalCount === maxPeriodCount)?.periodLabel}
-                          </p>
-                        )}
                       </CardContent>
                     </Card>
 
@@ -1295,7 +1336,7 @@ const TaskProductionPage = () => {
                       <CardContent className="pb-0 px-4">
                         {isLoading
                           ? <Skeleton className="h-7 w-20" />
-                          : <div className="text-xl font-bold">{formatNumber(items.length)}</div>
+                          : <div className="text-xl font-bold">{formatNumber(periodsWithData.length)}</div>
                         }
                       </CardContent>
                     </Card>
@@ -1334,11 +1375,12 @@ const TaskProductionPage = () => {
           period={clickedPeriod.period}
           label={clickedPeriod.label}
           sectorIds={filters.sectorIds}
+          activeUsers={clickedPeriod.activeUsers}
         />
       )}
     </div>
   );
 };
 
-export const ProductionThroughputStatisticsPage = () => <TaskProductionPage />;
-export default ProductionThroughputStatisticsPage;
+export const ProductionProductivityStatisticsPage = () => <TaskProductionPage />;
+export default ProductionProductivityStatisticsPage;

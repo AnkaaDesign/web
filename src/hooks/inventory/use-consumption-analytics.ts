@@ -16,6 +16,7 @@ export const consumptionAnalyticsKeys = {
 
 export function useConsumptionAnalytics(
   filters: ConsumptionAnalyticsFilters,
+  options?: { enabled?: boolean },
 ) {
   return useQuery<ConsumptionAnalyticsResponse, Error>({
     queryKey: consumptionAnalyticsKeys.comparison(filters),
@@ -23,6 +24,7 @@ export function useConsumptionAnalytics(
       const response = await getConsumptionComparison(filters);
       return response;
     },
+    enabled: options?.enabled ?? true,
     staleTime: 3 * 60 * 1000, // 3 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     retry: 2,

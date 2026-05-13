@@ -576,7 +576,7 @@ export const routes = {
     },
     production: {
       root: "/estatisticas/producao",
-      throughput: "/estatisticas/producao/rendimento",
+      productivity: "/estatisticas/producao/produtividade",
       bottlenecks: "/estatisticas/producao/gargalos",
     },
     financial: {

@@ -12,9 +12,9 @@ import {
 
 const pages = [
   {
-    title: "Rendimento",
-    description: "Métricas de produtividade, tempo de ciclo e eficiência da linha de produção",
-    route: routes.statistics.production.throughput,
+    title: "Produtividade",
+    description: "Tarefas concluídas e média por colaborador efetivo, por mês ou ano",
+    route: routes.statistics.production.productivity,
     icon: IconTrendingUp,
   },
   {

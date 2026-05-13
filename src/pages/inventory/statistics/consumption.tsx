@@ -8,13 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Combobox } from '@/components/ui/combobox';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DateTimeInput } from '@/components/ui/date-time-input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -22,7 +19,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { routes, FAVORITE_PAGES, ACTIVITY_OPERATION } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
-import { useConsumptionAnalytics } from '@/hooks/inventory/use-consumption-analytics';
+import { useConsumptionAnalytics, consumptionAnalyticsKeys } from '@/hooks/inventory/use-consumption-analytics';
+import { useSectors } from '@/hooks/administration/use-sector';
+import { useUsers } from '@/hooks/human-resources/use-user';
+import { getConsumptionComparison } from '@/api-client';
+import { useQueries } from '@tanstack/react-query';
+import type { ConsumptionAnalyticsResponse } from '@/types/consumption-analytics';
 import type {
   ConsumptionAnalyticsFilters,
   ConsumptionChartType,
@@ -46,16 +48,14 @@ import {
 import { getSectors } from '@/api-client/sector';
 import { getUsers } from '@/api-client/user';
 import { getItems } from '@/api-client/item';
-import { getItemBrands } from '@/api-client/item-brand';
-import { getItemCategories } from '@/api-client/item-category';
-import { sectorKeys, userKeys, itemKeys, itemBrandKeys, itemCategoryKeys } from '@/hooks/common/query-keys';
+import { sectorKeys, userKeys, itemKeys } from '@/hooks/common/query-keys';
 import {
   IconChartBar, IconChartPie, IconChartLine, IconChartArea, IconStack2,
   IconFilter, IconDownload, IconRefresh, IconAlertCircle,
   IconPackage, IconCash, IconBox, IconCalendarStats, IconChartArcs3,
-  IconUsers, IconBuilding, IconX, IconInfoCircle, IconTag, IconNumbers,
-  IconFileTypeCsv, IconFileTypeXls, IconTarget, IconTrendingUp,
-  IconArrowsExchange2, IconCategory,
+  IconUsers, IconBuilding, IconX, IconNumbers,
+  IconFileTypeCsv, IconFileTypeXls, IconFileTypePdf, IconTrendingUp,
+  IconArrowsExchange2,
 } from '@tabler/icons-react';
 import {
   format, startOfDay, endOfDay, subMonths,
@@ -86,9 +86,11 @@ const BASE_CHART_TYPE_OPTIONS: ChartTypeOption[] = [
   { value: 'area-smooth', label: 'Área Suave',  icon: IconChartArea, description: 'Área preenchida suavizada' },
 ];
 
+// Line/area chart types already render one series per entity, so a "stacked
+// lines" option visually collapses to the same picture as "Linha Reta" — we
+// only keep the stacked variant for bars, where the geometry actually changes.
 const STACKED_CHART_TYPE_OPTIONS: ChartTypeOption[] = [
-  { value: 'bar-stacked',  label: 'Colunas Empilhadas', icon: IconStack2,    description: 'Colunas empilhadas' },
-  { value: 'line-stacked', label: 'Linhas Empilhadas',  icon: IconChartLine, description: 'Linhas empilhadas' },
+  { value: 'bar-stacked', label: 'Colunas Empilhadas', icon: IconStack2, description: 'Colunas empilhadas' },
 ];
 
 const BOTH_MODE_CHART_TYPE_OPTIONS: ChartTypeOption[] = [
@@ -101,11 +103,9 @@ const PIE_OPTION: ChartTypeOption = {
 };
 
 const X_AXIS_OPTIONS: Array<{ value: ConsumptionXAxisMode; label: string }> = [
-  { value: 'item',     label: 'Itens' },
-  { value: 'category', label: 'Categorias' },
-  { value: 'brand',    label: 'Marcas' },
-  { value: 'month',    label: 'Meses' },
-  { value: 'year',     label: 'Anos' },
+  { value: 'item',  label: 'Itens' },
+  { value: 'month', label: 'Meses' },
+  { value: 'year',  label: 'Anos' },
 ];
 
 const Y_AXIS_OPTIONS: Array<{ value: ConsumptionYAxisMode; label: string }> = [
@@ -121,6 +121,10 @@ const COMPARE_MODE_OPTIONS: Array<{ value: ConsumptionCompareMode; label: string
 ];
 
 const YEAR_OPTIONS = generateYearOptions(4);
+
+const TREND_LABELS: Record<TrendLineType, string> = {
+  linear: 'Linear', sma3: 'Média 3m', sma6: 'Média 6m', sma12: 'Média 12m',
+};
 
 // =====================
 // Helpers
@@ -293,22 +297,25 @@ function ConsumptionFiltersSheet({
     return { data: unique.map(u => ({ value: u.id, label: u.name })), hasMore: res.meta?.hasNextPage ?? false };
   }, []);
 
+  // Items API expects `searchingFor` (not `search`) — using `search` silently
+  // returns unfiltered results, which is why the original async items filter
+  // never appeared to "work" from the user's perspective.
   const fetchItems = useCallback(async (search: string, page = 1) => {
-    const res = await getItems({ search: search || undefined, page, limit: COMBOBOX_PAGE_SIZE });
+    const res = await getItems({
+      searchingFor: search || undefined,
+      page,
+      limit: COMBOBOX_PAGE_SIZE,
+      orderBy: { name: 'asc' },
+      include: { brand: true, category: true },
+    });
     return {
-      data: (res.data || []).map(i => ({ value: i.id, label: i.name, description: i.brand?.name || i.category?.name })),
+      data: (res.data || []).map(i => ({
+        value: i.id,
+        label: i.uniCode ? `${i.name} (${i.uniCode})` : i.name,
+        description: i.brand?.name || i.category?.name,
+      })),
       hasMore: res.meta?.hasNextPage ?? false,
     };
-  }, []);
-
-  const fetchBrands = useCallback(async (search: string, page = 1) => {
-    const res = await getItemBrands({ search: search || undefined, page, limit: COMBOBOX_PAGE_SIZE });
-    return { data: (res.data || []).map(b => ({ value: b.id, label: b.name })), hasMore: res.meta?.hasNextPage ?? false };
-  }, []);
-
-  const fetchCategories = useCallback(async (search: string, page = 1) => {
-    const res = await getItemCategories({ search: search || undefined, page, limit: COMBOBOX_PAGE_SIZE });
-    return { data: (res.data || []).map(c => ({ value: c.id, label: c.name })), hasMore: res.meta?.hasNextPage ?? false };
   }, []);
 
   const activeFilterCount = useMemo(() => {
@@ -316,8 +323,6 @@ function ConsumptionFiltersSheet({
     if (localSectors.length > 0) count++;
     if (localUsers.length > 0) count++;
     if ((localFilters.itemIds?.length ?? 0) > 0) count++;
-    if ((localFilters.brandIds?.length ?? 0) > 0) count++;
-    if ((localFilters.categoryIds?.length ?? 0) > 0) count++;
     if (localYears.length > 0) count++;
     if (localMonths.length > 0) count++;
     if (localX !== 'item') count++;
@@ -414,11 +419,9 @@ function ConsumptionFiltersSheet({
                 clearable={false}
               />
               <p className="text-xs text-muted-foreground">
-                {localX === 'item'     && 'Cada item no eixo X. Comparação por setor/usuário/período disponível.'}
-                {localX === 'category' && 'Itens agrupados por categoria no eixo X.'}
-                {localX === 'brand'    && 'Itens agrupados por marca no eixo X.'}
-                {localX === 'month'    && 'Evolução temporal mês a mês. Os itens são exibidos como séries.'}
-                {localX === 'year'     && 'Evolução temporal ano a ano. Os itens são exibidos como séries.'}
+                {localX === 'item'  && 'Cada item no eixo X. Comparação por setor/usuário/período disponível.'}
+                {localX === 'month' && 'Evolução temporal mês a mês. Os itens são exibidos como séries.'}
+                {localX === 'year'  && 'Evolução temporal ano a ano. Os itens são exibidos como séries.'}
               </p>
             </div>
 
@@ -566,7 +569,7 @@ function ConsumptionFiltersSheet({
               </div>
             )}
 
-            {/* Items filter */}
+            {/* Items filter — async combobox with proper `searchingFor` param */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2 text-sm font-medium">
                 <IconPackage className="h-4 w-4" />
@@ -588,56 +591,6 @@ function ConsumptionFiltersSheet({
                 clearable={true}
               />
             </div>
-
-            {/* Categories — hidden when X-axis IS category */}
-            {localX !== 'category' && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2 text-sm font-medium">
-                  <IconCategory className="h-4 w-4" />
-                  Categorias
-                </Label>
-                <Combobox
-                  mode="multiple"
-                  async
-                  value={localFilters.categoryIds ?? []}
-                  onValueChange={v => setLocalFilters(f => ({ ...f, categoryIds: Array.isArray(v) && v.length > 0 ? v : undefined }))}
-                  queryKey={[...itemCategoryKeys.lists()]}
-                  queryFn={fetchCategories}
-                  minSearchLength={0}
-                  placeholder="Todas as categorias..."
-                  searchPlaceholder="Buscar categoria..."
-                  emptyText="Nenhuma categoria encontrada"
-                  loadingText="Carregando..."
-                  searchable={true}
-                  clearable={true}
-                />
-              </div>
-            )}
-
-            {/* Brands — hidden when X-axis IS brand */}
-            {localX !== 'brand' && (
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2 text-sm font-medium">
-                  <IconTag className="h-4 w-4" />
-                  Marcas
-                </Label>
-                <Combobox
-                  mode="multiple"
-                  async
-                  value={localFilters.brandIds ?? []}
-                  onValueChange={v => setLocalFilters(f => ({ ...f, brandIds: Array.isArray(v) && v.length > 0 ? v : undefined }))}
-                  queryKey={[...itemBrandKeys.lists()]}
-                  queryFn={fetchBrands}
-                  minSearchLength={0}
-                  placeholder="Todas as marcas..."
-                  searchPlaceholder="Buscar marca..."
-                  emptyText="Nenhuma marca encontrada"
-                  loadingText="Carregando..."
-                  searchable={true}
-                  clearable={true}
-                />
-              </div>
-            )}
 
             {/* Sectors — hidden in 'both' y-mode */}
             {localY !== 'both' && (
@@ -663,27 +616,19 @@ function ConsumptionFiltersSheet({
                 />
                 <p className="text-xs text-muted-foreground">
                   {isTemporalLocal
-                    ? 'Filtra consumo por setor(es).'
+                    ? 'Em modo temporal, cada setor selecionado vira uma série no gráfico.'
                     : 'Sem seleção = todos. Selecione 2+ para habilitar comparação.'}
                 </p>
               </div>
             )}
 
-            {/* Users — hidden in 'both' y-mode and temporal mode */}
-            {localY !== 'both' && !isTemporalLocal && (
+            {/* Users — hidden when 'both' y-mode or sector comparison/multi-sector is active */}
+            {localY !== 'both' && localSectors.length < 2 && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2 text-sm font-medium">
                   <IconUsers className="h-4 w-4" />
                   Usuários
                 </Label>
-                {localSectors.length >= 2 && (
-                  <Alert variant="default" className="py-2">
-                    <IconInfoCircle className="h-4 w-4" />
-                    <AlertDescription className="text-xs">
-                      Comparação por setor ativa. Filtro de usuários desativado.
-                    </AlertDescription>
-                  </Alert>
-                )}
                 <Combobox
                   mode="multiple"
                   async
@@ -698,27 +643,41 @@ function ConsumptionFiltersSheet({
                   loadingText="Carregando..."
                   searchable={true}
                   clearable={true}
-                  disabled={localSectors.length >= 2}
                 />
-                <p className="text-xs text-muted-foreground">Sem seleção = todos. Selecione 2+ para habilitar comparação.</p>
+                <p className="text-xs text-muted-foreground">
+                  {isTemporalLocal
+                    ? 'Em modo temporal, cada usuário selecionado vira uma série no gráfico.'
+                    : 'Sem seleção = todos. Selecione 2+ para habilitar comparação.'}
+                </p>
               </div>
             )}
 
-            {/* Limit */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2 text-sm font-medium">
-                <IconNumbers className="h-4 w-4" />
-                Número de Resultados
-              </Label>
-              <Input
-                type="number"
-                min={1}
-                max={200}
-                value={localFilters.limit ?? 50}
-                onChange={e => setLocalFilters(f => ({ ...f, limit: parseInt(e.target.value) || 50 }))}
-                className="h-9"
-              />
-            </div>
+            {/* Limit — only meaningful when items are on the x-axis. In temporal
+                modes the limit is overridden internally (MAX_TEMPORAL_ITEMS for
+                single-query and 100 for per-entity), so showing the input would
+                mislead the user. */}
+            {localX === 'item' && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <IconNumbers className="h-4 w-4" />
+                  Número de Resultados
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={localFilters.limit ?? 50}
+                  onChange={v => {
+                    const parsed = typeof v === 'number' ? v : parseInt(String(v ?? ''));
+                    setLocalFilters(f => ({ ...f, limit: Number.isFinite(parsed) && parsed > 0 ? parsed : 50 }));
+                  }}
+                  className="h-9"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Máximo de itens exibidos no gráfico (1–100).
+                </p>
+              </div>
+            )}
 
           </div>
         </ScrollArea>
@@ -747,9 +706,6 @@ const ConsumptionPage = () => {
   const [showFilters, setShowFilters]   = useState(false);
   const [chartType, setChartType]       = useState<ConsumptionChartType>('bar');
   const [trendLine, setTrendLine]       = useState<TrendLineType | null>(null);
-  const [goalValue, setGoalValue]       = useState<number | null>(null);
-  const [goalInput, setGoalInput]       = useState('');
-  const [goalPopoverOpen, setGoalPopoverOpen] = useState(false);
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
@@ -773,9 +729,19 @@ const ConsumptionPage = () => {
   const isBothMode     = yAxisMode === 'both';
   const isStackedType  = chartType === 'bar-stacked' || chartType === 'line-stacked';
 
+  const sectorIdsSelected = filters.sectorIds ?? [];
+  const userIdsSelected   = filters.userIds   ?? [];
+
+  // Temporal × entity comparison: the API can't compare periods AND entities in
+  // one call, so we fan out one request per entity and merge client-side. We
+  // prefer sectors if both are selected.
+  const isMultiSectorTemporal = isTemporalMode && sectorIdsSelected.length >= 2;
+  const isMultiUserTemporal   = isTemporalMode && !isMultiSectorTemporal && userIdsSelected.length >= 2;
+  const isMultiEntityTemporal = isMultiSectorTemporal || isMultiUserTemporal;
+
   const isEntityComparisonMode = !isTemporalMode && !isBothMode &&
     (compareMode === 'separated' || compareMode === 'separatedWithTotal') &&
-    ((filters.sectorIds?.length ?? 0) >= 2 || (filters.userIds?.length ?? 0) >= 2);
+    ((sectorIdsSelected.length) >= 2 || (userIdsSelected.length) >= 2);
 
   const isPeriodComparisonMode = !isTemporalMode &&
     (filters.periods?.length ?? 0) >= 2;
@@ -801,6 +767,12 @@ const ConsumptionPage = () => {
   }, [availableChartTypes, chartType, isBothMode]);
 
   // ── API filters: auto-generate periods for temporal modes ──
+  //
+  // The `/consumption-comparison` endpoint enforces a single comparison axis:
+  // periods + sectorIds≥2 + userIds≥2 cannot coexist. The single-query path
+  // therefore strips multi-entity lists down to 1 (it's the scope filter for
+  // a single sector/user). When the user picks 2+ entities in temporal mode
+  // we fan out — see multiEntityIds + parallel queries below.
   const apiFilters = useMemo((): ConsumptionAnalyticsFilters => {
     const base = { ...filters, operation: ACTIVITY_OPERATION.OUTBOUND };
     if (!isTemporalMode) return base;
@@ -811,13 +783,122 @@ const ConsumptionPage = () => {
 
     if (periods.length === 0) return base;
 
-    return { ...base, periods, limit: MAX_TEMPORAL_ITEMS, sortBy: 'quantity', sortOrder: 'desc' };
+    return {
+      ...base,
+      sectorIds: base.sectorIds && base.sectorIds.length > 0 ? [base.sectorIds[0]] : undefined,
+      userIds:   base.userIds   && base.userIds.length   > 0 ? [base.userIds[0]]   : undefined,
+      periods,
+      limit:     MAX_TEMPORAL_ITEMS,
+      sortBy:    'quantity',
+      sortOrder: 'desc',
+    };
   }, [filters, isTemporalMode, xAxisMode, selectedYears, selectedMonths]);
 
-  const { data, isLoading, isError, error, refetch } = useConsumptionAnalytics(apiFilters);
+  // Multi-entity temporal: per-sector (or per-user) queries with a stripped
+  // base. We bump the limit so item-level aggregation includes everything
+  // matching the other filters (the API caps at 500).
+  const multiEntityIds = isMultiSectorTemporal
+    ? sectorIdsSelected
+    : isMultiUserTemporal ? userIdsSelected : [];
 
+  const multiBaseFilters = useMemo((): ConsumptionAnalyticsFilters | null => {
+    if (!isMultiEntityTemporal) return null;
+    return {
+      ...apiFilters,
+      sectorIds: undefined,
+      userIds:   undefined,
+      // The analytics endpoint caps `limit` at 100; we use the max so
+      // per-period aggregations include as many items as possible per entity.
+      limit:     100,
+    };
+  }, [apiFilters, isMultiEntityTemporal]);
+
+  const singleQuery = useConsumptionAnalytics(apiFilters, { enabled: !isMultiEntityTemporal });
+
+  const multiQueries = useQueries({
+    queries: isMultiEntityTemporal && multiBaseFilters
+      ? multiEntityIds.map(id => ({
+          queryKey: [
+            ...consumptionAnalyticsKeys.comparisons(),
+            isMultiSectorTemporal ? 'by-sector' : 'by-user',
+            id,
+            multiBaseFilters,
+          ],
+          queryFn: async (): Promise<ConsumptionAnalyticsResponse> =>
+            getConsumptionComparison({
+              ...multiBaseFilters,
+              ...(isMultiSectorTemporal ? { sectorIds: [id] } : { userIds: [id] }),
+            }),
+          staleTime: 3 * 60 * 1000,
+          gcTime:    10 * 60 * 1000,
+          retry:     2,
+        }))
+      : [],
+  });
+
+  // Resolve entity ids to display names so chart series carry human-readable labels.
+  const { data: sectorsData } = useSectors(
+    { where: { id: { in: sectorIdsSelected } }, limit: 100 },
+    { enabled: isMultiSectorTemporal && sectorIdsSelected.length > 0 },
+  );
+  const { data: usersData } = useUsers(
+    { where: { id: { in: userIdsSelected } }, limit: 100 },
+    { enabled: isMultiUserTemporal && userIdsSelected.length > 0 },
+  );
+
+  const entityNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    if (isMultiSectorTemporal) {
+      (sectorsData?.data ?? []).forEach((s: { id: string; name: string }) => map.set(s.id, s.name));
+    } else if (isMultiUserTemporal) {
+      (usersData?.data ?? []).forEach((u: { id: string; name: string }) => map.set(u.id, u.name));
+    }
+    return map;
+  }, [sectorsData, usersData, isMultiSectorTemporal, isMultiUserTemporal]);
+
+  // Unified loading / error / refetch surface so renderChart doesn't need to
+  // branch on which query path is active.
+  const isLoading = isMultiEntityTemporal
+    ? multiQueries.some(q => q.isLoading)
+    : singleQuery.isLoading;
+  const isError = isMultiEntityTemporal
+    ? multiQueries.some(q => q.isError)
+    : singleQuery.isError;
+  const error = isMultiEntityTemporal
+    ? (multiQueries.find(q => q.isError)?.error as Error | undefined)
+    : singleQuery.error;
+  const refetch = useCallback(() => {
+    if (isMultiEntityTemporal) {
+      void Promise.all(multiQueries.map(q => q.refetch()));
+    } else {
+      void singleQuery.refetch();
+    }
+  }, [isMultiEntityTemporal, multiQueries, singleQuery]);
+
+  const data = singleQuery.data;
   const rawItems: ConsumptionItem[] = data?.data?.items ?? [];
-  const summary = data?.data?.summary;
+
+  // Summary is aggregated when multi-entity (sum totals across per-entity
+  // responses); otherwise it's just the single response's summary.
+  const summary = useMemo(() => {
+    if (!isMultiEntityTemporal) return data?.data?.summary;
+    if (multiQueries.some(q => !q.data)) return undefined;
+    let totalQty = 0, totalVal = 0;
+    const itemIds = new Set<string>();
+    multiQueries.forEach(q => {
+      const s = q.data?.data?.summary;
+      if (s) { totalQty += s.totalQuantity; totalVal += s.totalValue; }
+      (q.data?.data?.items ?? []).forEach(item => itemIds.add(item.itemId));
+    });
+    const itemCount = itemIds.size;
+    return {
+      totalQuantity: totalQty,
+      totalValue:    totalVal,
+      itemCount,
+      averageConsumptionPerItem: itemCount > 0 ? totalQty / itemCount : 0,
+      averageValuePerItem:       itemCount > 0 ? totalVal / itemCount : 0,
+    };
+  }, [isMultiEntityTemporal, data, multiQueries]);
 
   // ── Y value accessors ──
   const getValue = useCallback((qty: number, val: number) =>
@@ -828,12 +909,62 @@ const ConsumptionPage = () => {
 
   // ── Client-side data transforms ──
   const chartData = useMemo(() => {
-    if (!rawItems.length) return [] as Array<{
+    const empty = [] as Array<{
       name: string;
       value: number;
       secondaryValue?: number;
       comparisons?: Array<{ entityName: string; value: number; secondaryValue?: number }>;
     }>;
+
+    // MULTI-ENTITY TEMPORAL MODE: pivot per-entity responses → periods × entities.
+    // Each parallel response is item-level data for one sector/user. For each
+    // (period, entity) we sum the item-level period totals to get a single
+    // consumption value, then assemble periods on x-axis with one series per
+    // selected entity.
+    if (isMultiEntityTemporal && multiBaseFilters?.periods?.length) {
+      const periods = multiBaseFilters.periods;
+      // Bail out until every per-entity response has loaded — partial data
+      // would render a chart with missing series and confuse trend analysis.
+      if (multiQueries.some(q => !q.data)) return empty;
+
+      const entityTotals = new Map<string, Map<string, { qty: number; val: number }>>();
+      multiQueries.forEach((q, idx) => {
+        const id = multiEntityIds[idx];
+        if (!id) return;
+        const perPeriod = new Map<string, { qty: number; val: number }>();
+        (q.data?.data?.items ?? []).forEach(item => {
+          if (!isComparisonItem(item)) return;
+          item.comparisons.forEach(c => {
+            const cur = perPeriod.get(c.entityId) ?? { qty: 0, val: 0 };
+            perPeriod.set(c.entityId, { qty: cur.qty + c.quantity, val: cur.val + c.value });
+          });
+        });
+        entityTotals.set(id, perPeriod);
+      });
+
+      return periods.map(period => {
+        const comparisons = multiEntityIds.map(id => {
+          const totals = entityTotals.get(id)?.get(period.id) ?? { qty: 0, val: 0 };
+          return {
+            entityName:     entityNameById.get(id) ?? id,
+            value:          getValue(totals.qty, totals.val),
+            secondaryValue: getSecondary(totals.qty, totals.val),
+          };
+        });
+        const periodTotal = comparisons.reduce(
+          (acc, c) => ({ value: acc.value + c.value, sec: acc.sec + (c.secondaryValue ?? 0) }),
+          { value: 0, sec: 0 },
+        );
+        return {
+          name:           period.label,
+          value:          periodTotal.value,
+          secondaryValue: isBothMode ? periodTotal.sec : undefined,
+          comparisons,
+        };
+      });
+    }
+
+    if (!rawItems.length) return empty;
 
     // TEMPORAL MODE: pivot → periods × items
     if (isTemporalMode && apiFilters.periods && apiFilters.periods.length > 0) {
@@ -867,41 +998,6 @@ const ConsumptionPage = () => {
       });
     }
 
-    // CATEGORY / BRAND MODE: client-side group + aggregate
-    if (xAxisMode === 'category' || xAxisMode === 'brand') {
-      type GroupEntry = { name: string; totalQty: number; totalVal: number; compMap: Map<string, { qty: number; val: number }> };
-      const map = new Map<string, GroupEntry>();
-      rawItems.forEach(item => {
-        const key = xAxisMode === 'category'
-          ? (item.categoryName || 'Sem Categoria')
-          : (item.brandName    || 'Sem Marca');
-        if (!map.has(key)) map.set(key, { name: key, totalQty: 0, totalVal: 0, compMap: new Map() });
-        const g = map.get(key)!;
-        g.totalQty += item.totalQuantity;
-        g.totalVal += item.totalValue;
-        if (isComparisonItem(item)) {
-          item.comparisons.forEach(comp => {
-            const ex = g.compMap.get(comp.entityName) ?? { qty: 0, val: 0 };
-            g.compMap.set(comp.entityName, { qty: ex.qty + comp.quantity, val: ex.val + comp.value });
-          });
-        }
-      });
-      return [...map.values()]
-        .sort((a, b) => yAxisMode === 'value' ? b.totalVal - a.totalVal : b.totalQty - a.totalQty)
-        .map(g => ({
-          name:           g.name,
-          value:          getValue(g.totalQty, g.totalVal),
-          secondaryValue: getSecondary(g.totalQty, g.totalVal),
-          comparisons:    g.compMap.size > 0
-            ? [...g.compMap.entries()].map(([entityName, v]) => ({
-                entityName,
-                value:          getValue(v.qty, v.val),
-                secondaryValue: getSecondary(v.qty, v.val),
-              }))
-            : undefined,
-        }));
-    }
-
     // ITEM MODE (default)
     return rawItems.map(item => {
       const primary   = getValue(item.totalQuantity, item.totalValue);
@@ -920,7 +1016,8 @@ const ConsumptionPage = () => {
       return { name: item.itemName, value: primary, secondaryValue: secondary, comparisons: comps };
     });
   }, [rawItems, xAxisMode, yAxisMode, isTemporalMode, isEntityComparisonMode, isPeriodComparisonMode,
-      includeAmbos, apiFilters.periods, getValue, getSecondary]);
+      includeAmbos, apiFilters.periods, getValue, getSecondary, isBothMode,
+      isMultiEntityTemporal, multiBaseFilters, multiQueries, multiEntityIds, entityNameById]);
 
   // ── StatisticsChart props ──
   const chartYAxisMode: YAxisMode = isBothMode ? 'both' : yAxisMode === 'value' ? 'value' : 'quantity';
@@ -938,14 +1035,29 @@ const ConsumptionPage = () => {
 
   const yAxisLabel = yAxisMode === 'value' ? 'Valor (R$)' : 'Quantidade';
 
+  // ── Per-x-axis derived stats ──
+  //
+  // The API's summary.averageConsumptionPerItem / averageValuePerItem are
+  // total ÷ itemCount — useful in item mode but wrong as a "Média por Mês"
+  // label in temporal mode. We compute everything off chartData so the cards
+  // always reflect what the chart is actually showing.
+  const peakRow = useMemo(() => {
+    if (!chartData.length) return null;
+    return chartData.reduce((max, d) => d.value > max.value ? d : max, chartData[0]);
+  }, [chartData]);
+
+  const averagePerXAxis = useMemo(() => {
+    if (!chartData.length) return 0;
+    const total = chartData.reduce((s, d) => s + d.value, 0);
+    return total / chartData.length;
+  }, [chartData]);
+
   // ── Active filter badge count ──
   const activeFilterCount = useMemo(() => {
     let c = 0;
     if (filters.sectorIds?.length) c++;
     if (filters.userIds?.length) c++;
     if (filters.itemIds?.length) c++;
-    if (filters.brandIds?.length) c++;
-    if (filters.categoryIds?.length) c++;
     if (selectedYears.length) c++;
     if (selectedMonths.length) c++;
     if (xAxisMode !== 'item') c++;
@@ -1024,11 +1136,92 @@ const ConsumptionPage = () => {
     }
   }, [chartData, isChartComparisonMode, yAxisMode]);
 
+  const handleExportPDF = useCallback(async () => {
+    if (!chartData.length) { toast.error('Nenhum dado para exportar'); return; }
+    if (!chartContainerRef.current) return;
+
+    const toastId = toast.loading('Gerando PDF...');
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+
+      const canvas = await html2canvas(chartContainerRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+
+      // A4 Landscape: 297 x 210 mm
+      const pageW = 297;
+      const pageH = 210;
+      const margin = 12;
+      const contentW = pageW - margin * 2;
+
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+      doc.setFontSize(15);
+      doc.setTextColor(40, 40, 40);
+      doc.text(cardTitle[xAxisMode], pageW / 2, 14, { align: 'center' });
+
+      doc.setFontSize(8);
+      doc.setTextColor(110, 110, 110);
+      doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`, pageW / 2, 20, { align: 'center' });
+
+      const filterParts: string[] = [];
+      filterParts.push(`Agrupamento: ${xAxisPluralLabel[xAxisMode]}`);
+      if (selectedYears.length) filterParts.push(`Anos: ${[...selectedYears].sort().join(', ')}`);
+      if (selectedMonths.length) filterParts.push(`Meses: ${selectedMonths.length} selecionados`);
+      filterParts.push(`Métrica: ${isBothMode ? 'Quantidade + Valor' : yAxisMode === 'value' ? 'Valor (R$)' : 'Quantidade'}`);
+      if (isEntityComparisonMode && comparisonEntities.length) {
+        filterParts.push(`Comparação: ${comparisonEntities.filter(e => e !== 'Total').join(', ')}`);
+      }
+
+      doc.setFontSize(7.5);
+      doc.setTextColor(130, 130, 130);
+      doc.text(filterParts.join('  •  '), pageW / 2, 25.5, { align: 'center' });
+
+      const chartAreaY = 30;
+      const maxChartH = pageH - chartAreaY - 18;
+      const imgAspect = canvas.height / canvas.width;
+      const chartH = Math.min(contentW * imgAspect, maxChartH);
+      const chartW = chartH / imgAspect;
+      const chartX = margin + (contentW - chartW) / 2;
+
+      doc.addImage(imgData, 'PNG', chartX, chartAreaY, chartW, chartH);
+
+      const footerY = chartAreaY + chartH + 6;
+      if (footerY < pageH - 3 && summary) {
+        doc.setFontSize(8);
+        doc.setTextColor(70, 70, 70);
+        const stats: string[] = [
+          `Quantidade Total: ${formatNumber(summary.totalQuantity, 0)}`,
+          `Valor Total: ${formatCurrency(summary.totalValue)}`,
+          `${isTemporalMode ? 'Períodos' : xAxisPluralLabel[xAxisMode]}: ${isTemporalMode ? (apiFilters.periods?.length ?? 0) : chartData.length}`,
+        ];
+        doc.text(stats.join('   |   '), pageW / 2, footerY, { align: 'center' });
+      }
+
+      doc.save(`consumo-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.pdf`);
+      toast.dismiss(toastId);
+      toast.success('PDF exportado com sucesso!');
+    } catch (err) {
+      console.error('Erro ao exportar PDF:', err);
+      toast.dismiss(toastId);
+      toast.error('Erro ao exportar PDF');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chartData, xAxisMode, yAxisMode, isBothMode, isTemporalMode, isEntityComparisonMode,
+      selectedYears, selectedMonths, summary, apiFilters.periods]);
+
   // ── Chart render ──
   const renderChart = () => {
     if (isLoading) {
       return (
-        <div className="h-[480px] flex items-center justify-center">
+        <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 460px)', minHeight: '320px' }}>
           <div className="space-y-3 w-full px-8">
             <Skeleton className="h-4 w-1/3" />
             <Skeleton className="h-[380px] w-full" />
@@ -1038,7 +1231,7 @@ const ConsumptionPage = () => {
     }
     if (isError) {
       return (
-        <div className="h-[480px] flex flex-col items-center justify-center gap-4">
+        <div className="flex flex-col items-center justify-center gap-4" style={{ height: 'calc(100vh - 460px)', minHeight: '320px' }}>
           <IconAlertCircle className="h-12 w-12 text-destructive" />
           <div className="text-center">
             <p className="font-semibold">Erro ao carregar dados</p>
@@ -1053,7 +1246,7 @@ const ConsumptionPage = () => {
     }
     if (!chartData.length) {
       return (
-        <div className="h-[480px] flex flex-col items-center justify-center gap-4">
+        <div className="flex flex-col items-center justify-center gap-4" style={{ height: 'calc(100vh - 460px)', minHeight: '320px' }}>
           <IconPackage className="h-12 w-12 text-muted-foreground" />
           <div className="text-center">
             <p className="font-semibold">Nenhum dado encontrado</p>
@@ -1069,7 +1262,7 @@ const ConsumptionPage = () => {
         chartType={chartType as StatisticsChartType}
         yAxisMode={chartYAxisMode}
         isComparisonMode={isChartComparisonMode}
-        height="480px"
+        height="calc(100vh - 460px)"
         yAxisLabel={yAxisLabel}
         valueFormatter={valueFormatter}
         secondaryValueFormatter={secondaryValueFormatter}
@@ -1078,7 +1271,6 @@ const ConsumptionPage = () => {
           secondary: isBothMode ? 'Valor (R$)' : undefined,
         }}
         trendLine={trendLine}
-        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
       />
     );
   };
@@ -1092,31 +1284,25 @@ const ConsumptionPage = () => {
   }, [isChartComparisonMode, chartData]);
 
   const xAxisSingularLabel: Record<ConsumptionXAxisMode, string> = {
-    item:     'Item',
-    category: 'Categoria',
-    brand:    'Marca',
-    month:    'Mês',
-    year:     'Ano',
+    item:  'Item',
+    month: 'Mês',
+    year:  'Ano',
   };
 
   const xAxisPluralLabel: Record<ConsumptionXAxisMode, string> = {
-    item:     'Itens',
-    category: 'Categorias',
-    brand:    'Marcas',
-    month:    'Meses',
-    year:     'Anos',
+    item:  'Itens',
+    month: 'Meses',
+    year:  'Anos',
   };
 
   const cardTitle: Record<ConsumptionXAxisMode, string> = {
-    item:     'Análise de Consumo de Itens',
-    category: 'Consumo por Categoria',
-    brand:    'Consumo por Marca',
-    month:    'Evolução do Consumo por Mês',
-    year:     'Evolução do Consumo por Ano',
+    item:  'Análise de Consumo de Itens',
+    month: 'Evolução do Consumo por Mês',
+    year:  'Evolução do Consumo por Ano',
   };
 
   return (
-    <div className="h-full flex flex-col px-4 pt-4">
+    <div className="h-full flex flex-col px-4 pt-4 pb-4 overflow-hidden">
       <div className="flex-shrink-0">
         <PageHeader
           title="Análise de Consumo"
@@ -1131,9 +1317,8 @@ const ConsumptionPage = () => {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-6">
-        <div className="mt-4">
-          <Card>
+      <div className="flex-1 min-h-0 mt-4 overflow-hidden">
+        <Card className="h-full flex flex-col">
             <CardHeader>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
@@ -1150,8 +1335,17 @@ const ConsumptionPage = () => {
                       <Badge variant="secondary" className="text-xs">Comparação por Períodos</Badge>
                     )}
                     {isTemporalMode && <Badge variant="secondary" className="text-xs">Modo Temporal</Badge>}
-                    {trendLine && <Badge variant="outline" className="text-xs">Tendência</Badge>}
-                    {goalValue != null && <Badge variant="outline" className="text-xs">Meta: {goalValue}</Badge>}
+                    {isMultiSectorTemporal && (
+                      <Badge variant="secondary" className="text-xs">
+                        {multiEntityIds.length} setores × períodos
+                      </Badge>
+                    )}
+                    {isMultiUserTemporal && (
+                      <Badge variant="secondary" className="text-xs">
+                        {multiEntityIds.length} usuários × períodos
+                      </Badge>
+                    )}
+                    {trendLine && <Badge variant="outline" className="text-xs">{TREND_LABELS[trendLine]}</Badge>}
                     {selectedYears.length > 0 && (
                       <Badge variant="outline" className="text-xs">{[...selectedYears].sort().join(', ')}</Badge>
                     )}
@@ -1173,7 +1367,7 @@ const ConsumptionPage = () => {
                         {currentChartTypeOption.label}
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="w-60">
                       <DropdownMenuLabel>Tipo de Gráfico</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuRadioGroup value={chartType} onValueChange={v => setChartType(v as ConsumptionChartType)}>
@@ -1184,7 +1378,7 @@ const ConsumptionPage = () => {
                               <Icon className="h-4 w-4 mr-2" />
                               <div className="flex flex-col">
                                 <span>{opt.label}</span>
-                                <span className="text-xs text-muted-foreground group-data-[highlighted]:text-white/90">
+                                <span className="text-xs text-muted-foreground group-data-[highlighted]:text-white/80">
                                   {opt.description}
                                 </span>
                               </div>
@@ -1198,62 +1392,35 @@ const ConsumptionPage = () => {
                   {/* Trend line */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant={trendLine ? 'secondary' : 'outline'} size="sm">
+                      <Button variant={trendLine ? 'default' : 'outline'} size="sm">
                         <IconTrendingUp className="h-4 w-4 mr-2" />
-                        Tendência
+                        {trendLine ? TREND_LABELS[trendLine] : 'Tendência'}
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="w-52">
                       <DropdownMenuLabel>Linha de Tendência</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuRadioGroup value={trendLine ?? 'none'} onValueChange={v => setTrendLine(v === 'none' ? null : v as TrendLineType)}>
-                        <DropdownMenuRadioItem value="none">Nenhuma</DropdownMenuRadioItem>
+                      <DropdownMenuRadioGroup value={trendLine ?? ''} onValueChange={v => setTrendLine(v ? (v as TrendLineType) : null)}>
+                        <DropdownMenuRadioItem value="">Desativada</DropdownMenuRadioItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuRadioItem value="linear">Linear</DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="sma3">Média Móvel 3</DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="sma6">Média Móvel 6</DropdownMenuRadioItem>
-                        <DropdownMenuRadioItem value="sma12">Média Móvel 12</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="sma3">Média Móvel 3 meses</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="sma6">Média Móvel 6 meses</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="sma12">Média Móvel 12 meses</DropdownMenuRadioItem>
                       </DropdownMenuRadioGroup>
                     </DropdownMenuContent>
                   </DropdownMenu>
 
-                  {/* Goal line */}
-                  <Popover open={goalPopoverOpen} onOpenChange={setGoalPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant={goalValue != null ? 'secondary' : 'outline'} size="sm">
-                        <IconTarget className="h-4 w-4 mr-2" />
-                        Meta
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-52">
-                      <div className="space-y-3">
-                        <p className="text-sm font-medium">Definir Meta</p>
-                        <Input
-                          type="number"
-                          min={0}
-                          placeholder="Ex: 500"
-                          value={goalInput}
-                          onChange={e => setGoalInput(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              const v = parseFloat(goalInput);
-                              setGoalValue(isNaN(v) ? null : v);
-                              setGoalPopoverOpen(false);
-                            }
-                          }}
-                        />
-                        <div className="flex gap-2">
-                          <Button size="sm" className="flex-1" onClick={() => {
-                            const v = parseFloat(goalInput);
-                            setGoalValue(isNaN(v) ? null : v);
-                            setGoalPopoverOpen(false);
-                          }}>Aplicar</Button>
-                          <Button size="sm" variant="outline" onClick={() => {
-                            setGoalValue(null); setGoalInput(''); setGoalPopoverOpen(false);
-                          }}>Limpar</Button>
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                  {/* Filters */}
+                  <Button
+                    variant={activeFilterCount > 0 ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setShowFilters(true)}
+                  >
+                    <IconFilter className="h-4 w-4 mr-2" />
+                    Filtros
+                    {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>}
+                  </Button>
 
                   {/* Export */}
                   <DropdownMenu>
@@ -1264,45 +1431,103 @@ const ConsumptionPage = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Exportar Dados</DropdownMenuLabel>
+                      <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleExportPDF}>
+                        <IconFileTypePdf className="h-4 w-4 mr-2" />
+                        PDF do Gráfico
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleExportCSV}>
-                        <IconFileTypeCsv className="h-4 w-4 mr-2" />CSV
+                        <IconFileTypeCsv className="h-4 w-4 mr-2" />
+                        CSV dos Dados
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={handleExportXLSX}>
-                        <IconFileTypeXls className="h-4 w-4 mr-2" />XLSX
+                        <IconFileTypeXls className="h-4 w-4 mr-2" />
+                        Excel (XLSX) dos Dados
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-
-                  {/* Filters */}
-                  <Button
-                    variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
-                    size="sm"
-                    onClick={() => setShowFilters(true)}
-                  >
-                    <IconFilter className="h-4 w-4 mr-2" />
-                    Filtros
-                    {activeFilterCount > 0 && (
-                      <Badge variant="secondary" className="ml-2 h-4 w-4 p-0 flex items-center justify-center text-xs">
-                        {activeFilterCount}
-                      </Badge>
-                    )}
-                  </Button>
 
                 </div>
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-6 p-4">
+            <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 pb-4">
 
-              {/* Summary Cards */}
+              {/* Summary Cards — order mirrors productivity: Total → Média → Pico → Períodos */}
               {summary && (
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                  {/* 1. Total (quantity or value depending on y-mode) */}
                   <Card className="py-2">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
                       <CardTitle className="text-xs font-medium">
-                        {isTemporalMode ? 'Períodos' : xAxisPluralLabel[xAxisMode]}
+                        {yAxisMode === 'value' ? 'Valor Total' : 'Quantidade Total'}
+                      </CardTitle>
+                      {yAxisMode === 'value'
+                        ? <IconCash className="h-3.5 w-3.5 text-muted-foreground" />
+                        : <IconBox  className="h-3.5 w-3.5 text-muted-foreground" />}
+                    </CardHeader>
+                    <CardContent className="pb-0 px-4">
+                      <div className="text-xl font-bold">
+                        {yAxisMode === 'value'
+                          ? formatCurrency(summary.totalValue)
+                          : formatNumber(summary.totalQuantity, 0)}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* 2. Média per X-axis category */}
+                  <Card className="py-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                      <CardTitle className="text-xs font-medium">
+                        Média por {xAxisSingularLabel[xAxisMode]}
+                      </CardTitle>
+                      <IconCalendarStats className="h-3.5 w-3.5 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent className="pb-0 px-4">
+                      <div className="text-xl font-bold">
+                        {yAxisMode === 'value'
+                          ? formatCurrency(averagePerXAxis)
+                          : formatNumber(averagePerXAxis, 1)}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* 3. Peak (or Valor Total when y-mode = both, since Pico would duplicate the qty signal) */}
+                  {yAxisMode === 'both' ? (
+                    <Card className="py-2">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                        <CardTitle className="text-xs font-medium">Valor Total</CardTitle>
+                        <IconCash className="h-3.5 w-3.5 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent className="pb-0 px-4">
+                        <div className="text-xl font-bold">{formatCurrency(summary.totalValue)}</div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card className="py-2">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                        <CardTitle className="text-xs font-medium">
+                          Pico de Uso{peakRow ? ` (${peakRow.name})` : ''}
+                        </CardTitle>
+                        <IconTrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent className="pb-0 px-4">
+                        <div className="text-xl font-bold">
+                          {yAxisMode === 'value'
+                            ? formatCurrency(peakRow?.value ?? 0)
+                            : formatNumber(peakRow?.value ?? 0, 0)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* 4. Períodos / Itens analisados */}
+                  <Card className="py-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                      <CardTitle className="text-xs font-medium">
+                        {isTemporalMode ? 'Períodos Analisados' : `${xAxisPluralLabel[xAxisMode]} Analisados`}
                       </CardTitle>
                       <IconPackage className="h-3.5 w-3.5 text-muted-foreground" />
                     </CardHeader>
@@ -1312,144 +1537,20 @@ const ConsumptionPage = () => {
                       </div>
                     </CardContent>
                   </Card>
-
-                  <Card className="py-2">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                      <CardTitle className="text-xs font-medium">Quantidade Total</CardTitle>
-                      <IconBox className="h-3.5 w-3.5 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent className="pb-0 px-4">
-                      <div className="text-xl font-bold">{formatNumber(summary.totalQuantity, 0)}</div>
-                      {isTemporalMode && chartData.length > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          {formatNumber(summary.totalQuantity / chartData.length, 1)} / {xAxisSingularLabel[xAxisMode].toLowerCase()}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card className="py-2">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                      <CardTitle className="text-xs font-medium">Valor Total</CardTitle>
-                      <IconCash className="h-3.5 w-3.5 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent className="pb-0 px-4">
-                      <div className="text-xl font-bold">{formatCurrency(summary.totalValue)}</div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="py-2">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                      <CardTitle className="text-xs font-medium">
-                        Média por {xAxisSingularLabel[xAxisMode]}
-                      </CardTitle>
-                      <IconCash className="h-3.5 w-3.5 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent className="pb-0 px-4">
-                      <div className="text-xl font-bold">
-                        {yAxisMode === 'value'
-                          ? formatCurrency(summary.averageValuePerItem)
-                          : formatNumber(summary.averageConsumptionPerItem, 1)}
-                      </div>
-                    </CardContent>
-                  </Card>
                 </div>
               )}
 
               {/* Chart */}
-              <div ref={chartContainerRef}>
-                {renderChart()}
-              </div>
-
-              {/* Data Table */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Detalhamento</CardTitle>
-                  <CardDescription>
-                    {chartData.length > 0
-                      ? `${chartData.length} ${xAxisPluralLabel[xAxisMode].toLowerCase()}`
-                      : 'Nenhum dado'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <ScrollArea className="h-[360px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>{xAxisSingularLabel[xAxisMode]}</TableHead>
-                          {isChartComparisonMode && comparisonEntities.length > 0
-                            ? comparisonEntities.map(e => (
-                                <TableHead key={e} className="text-right">{e}</TableHead>
-                              ))
-                            : <>
-                                <TableHead className="text-right">Quantidade</TableHead>
-                                <TableHead className="text-right">Valor (R$)</TableHead>
-                              </>
-                          }
-                          {isChartComparisonMode && comparisonEntities.length > 0 && (
-                            <TableHead className="text-right">Total</TableHead>
-                          )}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {isLoading ? (
-                          Array.from({ length: 8 }).map((_, i) => (
-                            <TableRow key={i}>
-                              <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                            </TableRow>
-                          ))
-                        ) : chartData.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                              Nenhum dado para exibir
-                            </TableCell>
-                          </TableRow>
-                        ) : isChartComparisonMode && comparisonEntities.length > 0 ? (
-                          chartData.map((row, i) => (
-                            <TableRow key={i}>
-                              <TableCell className="font-medium">{row.name}</TableCell>
-                              {comparisonEntities.map(entity => {
-                                const comp = row.comparisons?.find(c => c.entityName === entity);
-                                return (
-                                  <TableCell key={entity} className="text-right text-sm">
-                                    {comp
-                                      ? (yAxisMode === 'value' ? formatCurrency(comp.value) : formatNumber(comp.value))
-                                      : '—'}
-                                  </TableCell>
-                                );
-                              })}
-                              <TableCell className="text-right text-sm font-medium">
-                                {yAxisMode === 'value' ? formatCurrency(row.value) : formatNumber(row.value)}
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        ) : (
-                          chartData.map((row, i) => {
-                            const srcItem = xAxisMode === 'item' ? (rawItems[i] ?? null) : null;
-                            return (
-                              <TableRow key={i}>
-                                <TableCell className="font-medium">{row.name}</TableCell>
-                                <TableCell className="text-right text-sm">
-                                  {formatNumber(srcItem ? srcItem.totalQuantity : (yAxisMode !== 'value' ? row.value : 0))}
-                                </TableCell>
-                                <TableCell className="text-right text-sm">
-                                  {formatCurrency(srcItem ? srcItem.totalValue : (yAxisMode === 'value' ? row.value : 0))}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                <CardContent className="p-4">
+                  <div ref={chartContainerRef}>
+                    {renderChart()}
+                  </div>
                 </CardContent>
               </Card>
 
             </CardContent>
           </Card>
-        </div>
       </div>
 
       <ConsumptionFiltersSheet
