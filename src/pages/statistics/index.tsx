@@ -77,12 +77,6 @@ const modules: StatModule[] = [
         route: routes.statistics.financial.collection,
         icon: IconReportMoney,
       },
-      {
-        label: "Boletos",
-        description: "Controle e análise de boletos emitidos",
-        route: routes.statistics.financial.bankSlips,
-        icon: IconFileInvoice,
-      },
     ],
   },
   {

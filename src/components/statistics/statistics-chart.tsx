@@ -792,11 +792,20 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   const hasZoom = (data?.length ?? 0) > 8;
   const legendBottomPx = hasZoom ? 70 : 8;
 
+  // `height` from the page can be a fixed CSS string ('600px'), '100%' to fill
+  // the parent (most common — see collection/revenue-quotes/nfse pages), or a
+  // number meant as px. We forward it to the outer wrapper so the *flex
+  // container* is the one that owns the height, and let ReactECharts fill it
+  // at 100%. Without this, '100%' on the chart collapses because the
+  // intermediate `flex-col` had no height of its own and the chart fell back
+  // to its minHeight (380px) — that's the "empty space below the chart" bug.
+  const resolvedHeight = typeof height === 'number' ? `${height}px` : height;
+
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col" style={{ height: resolvedHeight, minHeight: 380 }}>
       <div
         className={cn(
-          'relative',
+          'relative flex-1 min-h-0',
           hasClickHandler && '[&_canvas]:!cursor-pointer [&>div]:!cursor-pointer',
         )}
         style={{ cursor: hasClickHandler ? 'pointer' : 'default' }}
@@ -811,10 +820,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           key={`${chartType}-${isComparisonMode}-${yAxisMode}`}
           option={option}
           notMerge={true}
-          // gridBottom (124) + legend (~22) + zoom (38) + axis labels (~40)
-          // reserves ~225px below the plot. minHeight keeps the plot area
-          // visible even at small viewport heights.
-          style={{ height, minHeight: '380px', width: '100%', cursor: hasClickHandler ? 'pointer' : 'default' }}
+          style={{ height: '100%', width: '100%', cursor: hasClickHandler ? 'pointer' : 'default' }}
           opts={{ renderer: 'canvas' }}
           onEvents={onEvents}
         />

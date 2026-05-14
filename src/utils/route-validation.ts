@@ -86,7 +86,6 @@ const VALID_ROUTES = [
   routes.statistics.humanResources.teamPerformance,
   routes.statistics.financial.root,
   routes.statistics.financial.collection,
-  routes.statistics.financial.bankSlips,
   routes.statistics.painting.root,
   routes.statistics.painting.production,
   routes.statistics.inventory.root,

@@ -6,6 +6,8 @@ import type {
   ProductionAnalyticsFilters,
   TaskProductionFilters,
   TaskProductionResponse,
+  BonusValueTimelineFilters,
+  BonusValueTimelineResponse,
 } from '../types/production-analytics';
 
 export class ProductionAnalyticsService {
@@ -42,6 +44,16 @@ export class ProductionAnalyticsService {
     );
     return response.data;
   }
+
+  async getBonusValueTimeline(
+    filters: BonusValueTimelineFilters,
+  ): Promise<BonusValueTimelineResponse> {
+    const response = await apiClient.post<BonusValueTimelineResponse>(
+      '/bonus/timeline',
+      filters,
+    );
+    return response.data;
+  }
 }
 
 export const productionAnalyticsService = new ProductionAnalyticsService();
@@ -57,3 +69,6 @@ export const getProductionRevenue = (filters: ProductionAnalyticsFilters) =>
 
 export const getTaskProductionStats = (filters: TaskProductionFilters) =>
   productionAnalyticsService.getTaskProductionStats(filters);
+
+export const getBonusValueTimeline = (filters: BonusValueTimelineFilters) =>
+  productionAnalyticsService.getBonusValueTimeline(filters);

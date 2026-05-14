@@ -174,3 +174,46 @@ export interface TaskProductionResponse {
   message: string;
   data: TaskProductionData;
 }
+
+// Bonus Value Timeline — day-by-day aggregate bonus value over a single
+// business period (26th → 25th). Powers the "Valor do Bônus" stats page.
+export interface BonusValueTimelineFilters {
+  year: number;
+  month: number;
+  sectorIds?: string[];
+}
+
+export interface BonusValueTimelineDay {
+  dayIndex: number; // 1-based, 1 = first day of the business period
+  date: string; // ISO date for the day
+  dateLabel: string; // e.g. "26 Abr"
+  taskCount: number;
+  weightedTaskCount: number;
+  activeUsers: number;
+  averageTasksPerUser: number;
+  totalBonusValue: number;
+  isForecast: boolean;
+}
+
+export interface BonusValueTimelineSummary {
+  currentBonusValue: number;
+  forecastedFinalBonusValue: number;
+  currentTaskCount: number;
+  currentWeightedTaskCount: number;
+  dailyTaskRate: number;
+  remainingDays: number;
+  periodStart: string;
+  periodEnd: string;
+}
+
+export interface BonusValueTimelineData {
+  period: { year: number; month: number; isClosed: boolean };
+  days: BonusValueTimelineDay[];
+  summary: BonusValueTimelineSummary;
+}
+
+export interface BonusValueTimelineResponse {
+  success: boolean;
+  message: string;
+  data: BonusValueTimelineData;
+}

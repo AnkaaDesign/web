@@ -1,11 +1,18 @@
+import { useState } from "react";
+import { IconPlus } from "@tabler/icons-react";
+
 import { PageHeader } from "@/components/ui/page-header";
-import { AssinaturaList } from "@/components/human-resources/time-clock/assinatura-digital/assinatura-list";
+import {
+  AssinaturaList,
+  AssinaturaCreateModal,
+} from "@/components/human-resources/time-clock/assinatura-digital";
 import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 
 export default function AssinaturaDigitalListPage() {
   usePageTracker({ title: "Assinatura Digital de Cartão Ponto", icon: "signature" });
+  const [createOpen, setCreateOpen] = useState(false);
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
@@ -20,11 +27,21 @@ export default function AssinaturaDigitalListPage() {
             { label: "Assinatura Digital" },
           ]}
           favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CONTROLE_PONTO_ASSINATURA_DIGITAL_LISTAR}
+          actions={[
+            {
+              key: "new",
+              label: "Nova Apuração",
+              icon: IconPlus,
+              onClick: () => setCreateOpen(true),
+              variant: "default",
+            },
+          ]}
           className="flex-shrink-0"
         />
         <div className="flex-1 min-h-0 pb-6 flex flex-col">
           <AssinaturaList className="h-full" />
         </div>
+        <AssinaturaCreateModal open={createOpen} onOpenChange={setCreateOpen} />
       </div>
     </PrivilegeRoute>
   );

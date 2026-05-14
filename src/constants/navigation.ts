@@ -639,6 +639,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [
           { id: "stats-producao-produtividade", title: "Produtividade", icon: "chartBar", path: "/estatisticas/producao/produtividade" },
           { id: "stats-producao-gargalos", title: "Gargalos", icon: "alertTriangle", path: "/estatisticas/producao/gargalos" },
+          { id: "stats-producao-valor-bonus", title: "Relação Bônus / Produção", icon: "coins", path: "/estatisticas/producao/valor-bonus" },
         ],
       },
       {
@@ -647,8 +648,10 @@ export const NAVIGATION_MENU: MenuItem[] = [
         icon: "dollarSign",
         path: "/estatisticas/financeiro",
         children: [
-          { id: "stats-financeiro-cobrancas", title: "Cobranças", icon: "chartBar", path: "/estatisticas/financeiro/cobrancas" },
-          { id: "stats-financeiro-boletos", title: "Boletos", icon: "fileText", path: "/estatisticas/financeiro/boletos" },
+          { id: "stats-financeiro-receita-orcamentos", title: "Receita & Orçamentos", icon: "coins", path: "/estatisticas/financeiro/receita-orcamentos" },
+          { id: "stats-financeiro-cobrancas", title: "Cobranças & Fluxo de Caixa", icon: "chartBar", path: "/estatisticas/financeiro/cobrancas" },
+          { id: "stats-financeiro-recebiveis", title: "Recebíveis & Clientes", icon: "users", path: "/estatisticas/financeiro/recebiveis" },
+          { id: "stats-financeiro-nfse", title: "NFS-e", icon: "receipt", path: "/estatisticas/financeiro/nfse" },
         ],
       },
       {

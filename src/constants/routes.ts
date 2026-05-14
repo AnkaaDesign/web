@@ -578,11 +578,14 @@ export const routes = {
       root: "/estatisticas/producao",
       productivity: "/estatisticas/producao/produtividade",
       bottlenecks: "/estatisticas/producao/gargalos",
+      bonusValue: "/estatisticas/producao/valor-bonus",
     },
     financial: {
       root: "/estatisticas/financeiro",
       collection: "/estatisticas/financeiro/cobrancas",
-      bankSlips: "/estatisticas/financeiro/boletos",
+      revenueQuotes: "/estatisticas/financeiro/receita-orcamentos",
+      receivables: "/estatisticas/financeiro/recebiveis",
+      nfse: "/estatisticas/financeiro/nfse",
     },
     humanResources: {
       root: "/estatisticas/recursos-humanos",

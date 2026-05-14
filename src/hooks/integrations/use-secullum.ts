@@ -718,6 +718,46 @@ export const useSecullumAssinaturaById = (
 };
 
 /**
+ * Create signature batch(es) for one or many users. Server resolves internal
+ * userIds → secullumEmployeeIds and POSTs one batch per user. Returns a
+ * per-user result list so the form can show partial-success toasts.
+ *
+ * Toasts are emitted here (not the axios interceptor) because the response
+ * shape is partial-success — the interceptor's "success: false" check would
+ * otherwise show a generic error toast for any partial failure.
+ */
+export const useCreateAssinaturaForUsers = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      userIds?: string[];
+      applyToAll?: boolean;
+      DataInicio: string;
+      DataFim: string;
+      EmpresaId?: number;
+    }) => secullumService.createAssinaturaForUsers(data),
+    onSuccess: (response) => {
+      const r = response.data;
+      if (r?.success && r.data) {
+        toast.success(`${r.data.created} apuração(ões) criada(s) com sucesso`);
+      } else if (r?.data && (r.data.created ?? 0) > 0) {
+        toast.warning(
+          `${r.data.created} criada(s), ${r.data.failed} falharam. Verifique os detalhes abaixo.`,
+        );
+      } else {
+        toast.error(r?.message || "Falha ao criar apurações");
+      }
+      queryClient.invalidateQueries({ queryKey: secullumKeys.assinaturas() });
+    },
+    onError: (err: any) => {
+      toast.error(
+        err?.response?.data?.message || "Falha ao criar apurações no Secullum",
+      );
+    },
+  });
+};
+
+/**
  * Trigger a browser download of an employee's signed time-card PDF.
  * Returns a mutation so callers can show loading state and toast on error.
  */

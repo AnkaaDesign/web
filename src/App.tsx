@@ -214,10 +214,13 @@ const OrderStatistics = lazy(() => import("@/pages/order/statistics/orders").the
 // Production Statistics
 const ProductionProductivityStatistics = lazy(() => import("@/pages/production/statistics/productivity").then((module) => ({ default: module.default })));
 const ProductionBottlenecksStatistics = lazy(() => import("@/pages/production/statistics/bottlenecks").then((module) => ({ default: module.default })));
+const ProductionBonusValueStatistics = lazy(() => import("@/pages/production/statistics/bonus-value").then((module) => ({ default: module.default })));
 
 // Financial Statistics
 const FinancialCollectionStatistics = lazy(() => import("@/pages/financial/statistics/collection").then((module) => ({ default: module.default })));
-const FinancialBankSlipsStatistics = lazy(() => import("@/pages/financial/statistics/bank-slips").then((module) => ({ default: module.default })));
+const FinancialRevenueQuotesStatistics = lazy(() => import("@/pages/financial/statistics/revenue-quotes").then((module) => ({ default: module.default })));
+const FinancialReceivablesStatistics = lazy(() => import("@/pages/financial/statistics/receivables").then((module) => ({ default: module.default })));
+const FinancialNfseStatistics = lazy(() => import("@/pages/financial/statistics/nfse").then((module) => ({ default: module.default })));
 
 // HR Statistics
 const HRPayrollStatistics = lazy(() => import("@/pages/human-resources/statistics/payroll").then((module) => ({ default: module.default })));
@@ -1156,14 +1159,26 @@ function App() {
                   path={routes.statistics.production.bottlenecks}
                   element={<Suspense fallback={<PageLoader />}><ProductionBottlenecksStatistics /></Suspense>}
                 />
+                <Route
+                  path={routes.statistics.production.bonusValue}
+                  element={<Suspense fallback={<PageLoader />}><ProductionBonusValueStatistics /></Suspense>}
+                />
                 {/* Financial Statistics routes */}
                 <Route
                   path={routes.statistics.financial.collection}
                   element={<Suspense fallback={<PageLoader />}><FinancialCollectionStatistics /></Suspense>}
                 />
                 <Route
-                  path={routes.statistics.financial.bankSlips}
-                  element={<Suspense fallback={<PageLoader />}><FinancialBankSlipsStatistics /></Suspense>}
+                  path={routes.statistics.financial.revenueQuotes}
+                  element={<Suspense fallback={<PageLoader />}><FinancialRevenueQuotesStatistics /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.financial.receivables}
+                  element={<Suspense fallback={<PageLoader />}><FinancialReceivablesStatistics /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.financial.nfse}
+                  element={<Suspense fallback={<PageLoader />}><FinancialNfseStatistics /></Suspense>}
                 />
 
                 {/* HR Statistics routes */}

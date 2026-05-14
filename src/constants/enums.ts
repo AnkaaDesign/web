@@ -1904,6 +1904,11 @@ export enum FAVORITE_PAGES {
   ESTATISTICAS_PEDIDOS = "/estatisticas/pedidos",
   ESTATISTICAS_RECURSOS_HUMANOS = "/estatisticas/recursos-humanos",
   ESTATISTICAS_FINANCEIRO = "/estatisticas/financeiro",
+  ESTATISTICAS_FINANCEIRO_COBRANCAS = "/estatisticas/financeiro/cobrancas",
+  ESTATISTICAS_FINANCEIRO_BOLETOS = "/estatisticas/financeiro/boletos",
+  ESTATISTICAS_FINANCEIRO_RECEITA = "/estatisticas/financeiro/receita-orcamentos",
+  ESTATISTICAS_FINANCEIRO_RECEBIVEIS = "/estatisticas/financeiro/recebiveis",
+  ESTATISTICAS_FINANCEIRO_NFSE = "/estatisticas/financeiro/nfse",
   // Advanced Analytics
   ESTATISTICAS_ANALYTICS_PREDITIVA = "/estatisticas/analytics/preditiva",
   ESTATISTICAS_ANALYTICS_COMPARATIVA = "/estatisticas/analytics/comparativa",

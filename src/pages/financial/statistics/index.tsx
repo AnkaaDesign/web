@@ -6,22 +6,36 @@ import { useNavigate } from "react-router-dom";
 import {
   IconChartBar,
   IconReportMoney,
-  IconFileInvoice,
   IconArrowRight,
+  IconBuildingBank,
+  IconReceipt2,
+  IconCash,
 } from "@tabler/icons-react";
 
 const pages = [
   {
-    title: "Cobranças",
-    description: "Acompanhamento de cobranças, inadimplência e taxa de recuperação de crédito",
-    route: routes.statistics.financial.collection,
+    title: "Receita & Orçamentos",
+    description: "Funil de vendas, ticket médio, ciclo de fechamento e backlog ativo",
+    route: routes.statistics.financial.revenueQuotes,
     icon: IconReportMoney,
   },
   {
-    title: "Boletos",
-    description: "Controle de boletos emitidos, pagos, vencidos e taxas de liquidação",
-    route: routes.statistics.financial.bankSlips,
-    icon: IconFileInvoice,
+    title: "Cobranças & Fluxo de Caixa",
+    description: "Faturado vs recebido por período, taxa de recebimento e envelhecimento",
+    route: routes.statistics.financial.collection,
+    icon: IconCash,
+  },
+  {
+    title: "Recebíveis & Clientes",
+    description: "Maiores devedores, DSO por cliente, previsão de caixa e curva de recuperação",
+    route: routes.statistics.financial.receivables,
+    icon: IconBuildingBank,
+  },
+  {
+    title: "NFS-e",
+    description: "Emissão, status de autorização e impostos estimados sobre o serviço",
+    route: routes.statistics.financial.nfse,
+    icon: IconReceipt2,
   },
 ];
 
@@ -48,7 +62,7 @@ export const FinancialStatisticsHubPage = () => {
         />
       </div>
       <div className="flex-1 overflow-y-auto pb-6">
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {pages.map((page) => {
             const PageIcon = page.icon;
             return (
@@ -66,7 +80,7 @@ export const FinancialStatisticsHubPage = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription className="text-sm">
+                  <CardDescription className="text-sm text-foreground/75">
                     {page.description}
                   </CardDescription>
                   <div className="mt-4 flex items-center text-sm text-primary font-medium group">

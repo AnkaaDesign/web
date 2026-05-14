@@ -10,7 +10,6 @@ import {
 } from "@tabler/icons-react";
 
 import type { SecullumAbsenceDayRow } from "@/types";
-import type { SecullumHolidayData } from "@/schemas/secullum";
 import {
   SECULLUM_JUSTIFICATIVAS,
   getJustificativaCategory,
@@ -18,11 +17,7 @@ import {
   USER_STATUS,
   TONE_CLASSES,
 } from "@/constants";
-import {
-  useSecullumAbsenceDays,
-  useSecullumHolidays,
-  useUsers,
-} from "@/hooks";
+import { useSecullumAbsenceDays, useUsers } from "@/hooks";
 import { AbsenceFormDialog } from "@/components/human-resources/absence/form/absence-form-dialog";
 import type { SecullumAggregatedAbsence } from "@/types";
 
@@ -56,7 +51,6 @@ type AbsenceFilterMode =
   | "FALTA"
   | "AUSENCIA"
   | "FERIAS"
-  | "FERIADO"
   | string; // `JUSTIFICATIVA_${number}` for specific justificativas
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -101,17 +95,25 @@ const fmtWeekday = (dateStr: string) => {
 
 // ─── Filter options ───────────────────────────────────────────────────────────
 
+// JustificativaIds that already have a dedicated aggregate filter above
+// (excluded from the spread to avoid duplicate labels in the combobox).
+const AGGREGATE_DUPLICATE_IDS = new Set<number>([
+  FERIAS_JUSTIFICATIVA_ID, // matches "FERIAS" aggregate (label: "Férias")
+  3, // matches "FALTA_NAO_JUSTIFICADA" aggregate (label: "Falta sem Justificativa")
+]);
+
 const ABSENCE_FILTER_OPTIONS: ComboboxOption[] = [
   { value: "TODOS", label: "Todos os registros" },
   { value: "FALTA_NAO_JUSTIFICADA", label: "Faltas Não Justificadas" },
-  { value: "FALTA", label: "Faltas (com justificativa)" },
+  { value: "FALTA", label: "Todas as Faltas" },
   { value: "AUSENCIA", label: "Ausências" },
   { value: "FERIAS", label: "Férias" },
-  { value: "FERIADO", label: "Feriados" },
-  ...Object.values(SECULLUM_JUSTIFICATIVAS).map((j) => ({
-    value: `JUSTIFICATIVA_${j.id}`,
-    label: j.label,
-  })),
+  ...Object.values(SECULLUM_JUSTIFICATIVAS)
+    .filter((j) => !AGGREGATE_DUPLICATE_IDS.has(j.id))
+    .map((j) => ({
+      value: `JUSTIFICATIVA_${j.id}`,
+      label: j.label,
+    })),
 ];
 
 // ─── Tipo label pill (no background, just colored text + dot) ─────────────────
@@ -250,115 +252,6 @@ function AbsenceOverviewTable({
   );
 }
 
-// ─── Feriados table ───────────────────────────────────────────────────────────
-
-const FERIADO_TABLE_HEADS = ["Data", "Dia", "Descrição", "Tipo"];
-
-function FeriadosTable({
-  holidays,
-  isLoading,
-  startDate,
-  endDate,
-}: {
-  holidays: SecullumHolidayData[];
-  isLoading: boolean;
-  startDate: Date;
-  endDate: Date;
-}) {
-  const startStr = format(startDate, "yyyy-MM-dd");
-  const endStr = format(endDate, "yyyy-MM-dd");
-
-  const filtered = useMemo(
-    () =>
-      holidays
-        .filter((h) => h.Data >= startStr && h.Data <= endStr)
-        .sort((a, b) => a.Data.localeCompare(b.Data)),
-    [holidays, startStr, endStr],
-  );
-
-  if (isLoading) {
-    return (
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted hover:bg-muted">
-            {FERIADO_TABLE_HEADS.map((h) => (
-              <TableHead
-                key={h}
-                className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border"
-              >
-                {h}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <TableRow key={i}>
-              {Array.from({ length: 4 }).map((_, j) => (
-                <TableCell key={j} className="px-4">
-                  <Skeleton className="h-4 w-full" />
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    );
-  }
-
-  if (filtered.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-        <IconCalendar className="h-8 w-8 opacity-40" />
-        <p className="text-sm">Nenhum feriado no período</p>
-      </div>
-    );
-  }
-
-  return (
-    <Table>
-      <TableHeader className="sticky top-0 z-10">
-        <TableRow className="bg-muted hover:bg-muted">
-          {FERIADO_TABLE_HEADS.map((h) => (
-            <TableHead
-              key={h}
-              className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border"
-            >
-              {h}
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filtered.map((h, i) => (
-          <TableRow
-            key={h.Id}
-            className={cn(
-              "transition-colors border-b border-border [&>td]:py-2",
-              i % 2 === 1 && "bg-muted/10",
-              "hover:bg-muted/20",
-            )}
-          >
-            <TableCell className="tabular-nums px-4 font-medium whitespace-nowrap">
-              {fmtDate(h.Data)}
-            </TableCell>
-            <TableCell className="text-muted-foreground px-4">{fmtWeekday(h.Data)}</TableCell>
-            <TableCell className="px-4">{h.Descricao}</TableCell>
-            <TableCell className="px-4">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full flex-shrink-0 bg-cyan-500" />
-                <span className="text-sm text-cyan-700 dark:text-cyan-300 whitespace-nowrap">
-                  {h.Tipo ?? "Nacional"}
-                </span>
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface TimeClockAbsenceOverviewProps {
@@ -400,14 +293,8 @@ export function TimeClockAbsenceOverview({ className }: TimeClockAbsenceOverview
     [startDate, endDate],
   );
 
-  const { data: absenceDaysData, isLoading: absenceDaysLoading } = useSecullumAbsenceDays(
-    fetchParams,
-    { enabled: filterMode !== "FERIADO" },
-  );
-
-  const { data: holidaysData, isLoading: holidaysLoading } = useSecullumHolidays({
-    year: startDate.getFullYear(),
-  });
+  const { data: absenceDaysData, isLoading: absenceDaysLoading } =
+    useSecullumAbsenceDays(fetchParams);
 
   const { data: usersData } = useUsers({
     statuses: [
@@ -435,8 +322,6 @@ export function TimeClockAbsenceOverview({ className }: TimeClockAbsenceOverview
   }, [absenceDaysData]);
 
   const filteredAbsences = useMemo<SecullumAbsenceDayRow[]>(() => {
-    if (filterMode === "FERIADO") return [];
-
     return allAbsenceDays.filter((r) => {
       // Exclude today for unjustified — current workday may be unfinished
       if (r.JustificativaId === 3) {
@@ -459,13 +344,6 @@ export function TimeClockAbsenceOverview({ className }: TimeClockAbsenceOverview
       return true;
     });
   }, [allAbsenceDays, filterMode, selectedUserId, today]);
-
-  const holidays: SecullumHolidayData[] = useMemo(() => {
-    const root = holidaysData?.data;
-    if (Array.isArray(root)) return root;
-    if (root && Array.isArray((root as any).data)) return (root as any).data;
-    return [];
-  }, [holidaysData]);
 
   const userOptions = useMemo<ComboboxOption[]>(() => {
     const list: any[] = usersData?.data ?? [];
@@ -493,17 +371,15 @@ export function TimeClockAbsenceOverview({ className }: TimeClockAbsenceOverview
         {/* ── Filter bar ── */}
         <div className="flex items-center gap-2">
           {/* Left: colaborador → tipo */}
-          {filterMode !== "FERIADO" && (
-            <Combobox
-              value={selectedUserId}
-              onValueChange={(v) => setSelectedUserId(v || ALL_USERS)}
-              options={userOptions}
-              placeholder="Todos os colaboradores"
-              className="w-[260px]"
-              searchable
-              clearable={false}
-            />
-          )}
+          <Combobox
+            value={selectedUserId}
+            onValueChange={(v) => setSelectedUserId(v || ALL_USERS)}
+            options={userOptions}
+            placeholder="Todos os colaboradores"
+            className="w-[260px]"
+            searchable
+            clearable={false}
+          />
           <Combobox
             value={filterMode}
             onValueChange={(v) =>
@@ -570,20 +446,11 @@ export function TimeClockAbsenceOverview({ className }: TimeClockAbsenceOverview
 
         {/* ── Table ── */}
         <div className="flex-1 min-h-0 overflow-auto rounded-md border border-border">
-          {filterMode === "FERIADO" ? (
-            <FeriadosTable
-              holidays={holidays}
-              isLoading={holidaysLoading}
-              startDate={startDate}
-              endDate={endDate}
-            />
-          ) : (
-            <AbsenceOverviewTable
-              records={filteredAbsences}
-              isLoading={absenceDaysLoading}
-              onEdit={(r) => setEditing(rowToAggregated(r))}
-            />
-          )}
+          <AbsenceOverviewTable
+            records={filteredAbsences}
+            isLoading={absenceDaysLoading}
+            onEdit={(r) => setEditing(rowToAggregated(r))}
+          />
         </div>
       </CardContent>
 

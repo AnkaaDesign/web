@@ -8,6 +8,7 @@ import {
   IconTrendingUp,
   IconAlertTriangle,
   IconArrowRight,
+  IconCoins,
 } from "@tabler/icons-react";
 
 const pages = [
@@ -22,6 +23,12 @@ const pages = [
     description: "Identifique etapas que estão atrasando o fluxo produtivo e seus impactos",
     route: routes.statistics.production.bottlenecks,
     icon: IconAlertTriangle,
+  },
+  {
+    title: "Relação Bônus / Produção",
+    description: "Acúmulo diário do bônus em relação às tarefas concluídas no período (26–25), com previsão até o fechamento",
+    route: routes.statistics.production.bonusValue,
+    icon: IconCoins,
   },
 ];
 

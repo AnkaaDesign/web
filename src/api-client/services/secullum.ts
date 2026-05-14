@@ -280,6 +280,34 @@ export const secullumService = {
       { responseType: "blob" },
     ),
 
+  // Create signature batch(es) for one or many internal users.
+  // - userIds: array of internal user IDs to send to
+  // - applyToAll: ignores userIds and fans out to every active linked user
+  // Server resolves userId → secullumEmployeeId and POSTs one batch per user.
+  createAssinaturaForUsers: (data: {
+    userIds?: string[];
+    applyToAll?: boolean;
+    DataInicio: string; // YYYY-MM-DD or ISO datetime
+    DataFim: string;
+    EmpresaId?: number;
+  }) =>
+    apiClient.post<{
+      success: boolean;
+      message: string;
+      data?: {
+        created: number;
+        failed: number;
+        results: Array<{
+          userId: string;
+          userName: string;
+          funcionarioId?: number;
+          ok: boolean;
+          apuracaoId?: number;
+          error?: string;
+        }>;
+      };
+    }>("/integrations/secullum/assinatura-digital", data),
+
   // Schedules (Horarios)
   getHorarios: (params?: { incluirDesativados?: boolean }) =>
     apiClient.get<{ success: boolean; data: any[]; message: string }>("/integrations/secullum/horarios", {
