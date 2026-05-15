@@ -20,7 +20,11 @@ import {
   CalculationList,
   CalculationExport,
 } from "@/components/integrations/secullum/calculations/list";
-import { TimeClockAbsenceOverview } from "@/components/human-resources/time-clock-entry/time-clock-absence-overview";
+import {
+  TimeClockAbsenceOverview,
+  type AbsenceOverviewExportData,
+} from "@/components/human-resources/time-clock-entry/time-clock-absence-overview";
+import { TimeClockAbsenceExport } from "@/components/human-resources/time-clock-entry/time-clock-absence-export";
 import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { useAuth } from "@/contexts/auth-context";
@@ -164,6 +168,8 @@ export default function TimeClockListPage() {
 
   const [editActions, setEditActions] = useState<TimeClockEntryEditActions | null>(null);
 
+  const [absenceExport, setAbsenceExport] = useState<AbsenceOverviewExportData | null>(null);
+
   const viewOptions: ViewOption[] = [
     { value: "colaborador-unico", label: "Visualização Colaborador", visible: true },
     { value: "multiplos-colaboradores", label: "Visualização Dia", visible: true },
@@ -224,6 +230,14 @@ export default function TimeClockListPage() {
                 endDate={editExport.endDate}
               />
             )}
+            {view === "ausencias" && absenceExport && (
+              <TimeClockAbsenceExport
+                currentItems={absenceExport.rows}
+                startDate={absenceExport.startDate}
+                endDate={absenceExport.endDate}
+                filterLabel={absenceExport.filterLabel}
+              />
+            )}
             {view === "edit" && editActions && editActions.changedRowsCount > 0 && (
               <div className="flex items-center gap-1">
                 <Button type="button" variant="outline" onClick={editActions.onRestore}>
@@ -248,7 +262,10 @@ export default function TimeClockListPage() {
           <TimeClockDayView className="h-full" onExportDataChange={setDayExport} />
         )}
         {view === "ausencias" && canEdit && (
-          <TimeClockAbsenceOverview className="h-full" />
+          <TimeClockAbsenceOverview
+            className="h-full"
+            onExportDataChange={setAbsenceExport}
+          />
         )}
         {view === "edit" && canEdit && (
           <TimeClockEntryEditList

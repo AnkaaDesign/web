@@ -10,6 +10,10 @@
 
 export type SecullumJustificativaCategory = "AUSENCIA" | "FALTA";
 
+// JustificativaId for "Férias" (vacation). The vacations page hardcodes this
+// when creating records; the calendar uses it to detect collective bars.
+export const VACATION_JUSTIFICATIVA_ID = 2;
+
 export interface SecullumJustificativaMeta {
   id: number;
   abreviado: string;

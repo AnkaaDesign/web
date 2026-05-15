@@ -10,9 +10,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Combobox } from '@/components/ui/combobox';
-import { routes, SECTOR_PRIVILEGES } from '@/constants';
+import { GOAL_METRIC, routes, SECTOR_PRIVILEGES } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useTaskProductionStats } from '@/hooks/production/use-production-analytics';
+import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
+import { useActiveProductionUserCount } from '@/hooks/administration/use-active-production-user-count';
+import { countWorkingDays } from '@/utils/business-days';
+import { getBusinessPeriodsInRange } from '@/utils/bonus';
 import type {
   TaskProductionFilters,
   TaskProductionChartType,
@@ -87,6 +91,11 @@ const MONTH_OPTIONS = [
   { value: '12', label: 'Dezembro' },
 ];
 
+const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => {
+  const d = String(i + 1).padStart(2, '0');
+  return { value: d, label: d };
+});
+
 const generateYearOptions = (yearsBack = 6) => {
   const currentYear = new Date().getFullYear();
   return Array.from({ length: yearsBack + 1 }, (_, i) => {
@@ -132,6 +141,7 @@ const BOTH_MODE_CHART_TYPE_OPTIONS: ChartTypeOption[] = [
 ];
 
 const X_AXIS_OPTIONS: Array<{ value: TaskProductionXAxisMode; label: string }> = [
+  { value: 'day',   label: 'Dias' },
   { value: 'month', label: 'Meses' },
   { value: 'year',  label: 'Anos' },
 ];
@@ -160,12 +170,17 @@ function businessPeriodEndDate(year: number, month: number): Date {
 function computeDateRange(
   years: string[],
   months: string[],
+  _xAxisMode: TaskProductionXAxisMode = 'month',
 ): { startDate?: Date; endDate?: Date } {
   if (!years.length) return {};
   const yearNums = years.map(Number).sort((a, b) => a - b);
   const minY = yearNums[0];
   const maxY = yearNums[yearNums.length - 1];
 
+  // All modes (month, year, day) share the same business-period date range —
+  // month M of year Y covers day 26 of M-1 through day 25 of M. Day mode
+  // shows each calendar day inside that window (e.g. Apr 26 .. May 25 for
+  // month=Maio), matching the bônus timeline rather than calendar May 1..31.
   if (months.length > 0) {
     const monthNums = months.map(Number).sort((a, b) => a - b);
     const minM = monthNums[0];
@@ -231,12 +246,13 @@ interface FilterSheetProps {
   filters: TaskProductionFilters;
   selectedYears: string[];
   selectedMonths: string[];
+  selectedDays: string[];
   yearCompareMode: boolean;
-  onApply: (filters: TaskProductionFilters, years: string[], months: string[], yearCompare: boolean) => void;
+  onApply: (filters: TaskProductionFilters, years: string[], months: string[], days: string[], yearCompare: boolean) => void;
 }
 
 function TaskProductionFiltersSheet({
-  open, onOpenChange, filters, selectedYears, selectedMonths, yearCompareMode, onApply,
+  open, onOpenChange, filters, selectedYears, selectedMonths, selectedDays, yearCompareMode, onApply,
 }: FilterSheetProps) {
   const [localX, setLocalX]     = useState<TaskProductionXAxisMode>(filters.xAxisMode || 'month');
   const [localY, setLocalY]     = useState<TaskProductionYAxisMode>(filters.yAxisMode || 'count');
@@ -244,6 +260,7 @@ function TaskProductionFiltersSheet({
   const [localSectors, setLocalSectors] = useState<string[]>(filters.sectorIds || []);
   const [localYears, setLocalYears]     = useState<string[]>(selectedYears);
   const [localMonths, setLocalMonths]   = useState<string[]>(selectedMonths);
+  const [localDays, setLocalDays]       = useState<string[]>(selectedDays);
   const [localYearCompare, setLocalYearCompare] = useState(yearCompareMode);
 
   useEffect(() => {
@@ -254,9 +271,10 @@ function TaskProductionFiltersSheet({
       setLocalSectors(filters.sectorIds || []);
       setLocalYears(selectedYears);
       setLocalMonths(selectedMonths);
+      setLocalDays(selectedDays);
       setLocalYearCompare(yearCompareMode);
     }
-  }, [open, filters, selectedYears, selectedMonths, yearCompareMode]);
+  }, [open, filters, selectedYears, selectedMonths, selectedDays, yearCompareMode]);
 
   const fetchSectors = useCallback(async (search: string, page = 1) => {
     const res = await getSectors({
@@ -279,7 +297,7 @@ function TaskProductionFiltersSheet({
   const canCompare = localSectors.length >= 2 && localY !== 'both';
 
   const handleApply = useCallback(() => {
-    const { startDate, endDate } = computeDateRange(localYears, localMonths);
+    const { startDate, endDate } = computeDateRange(localYears, localMonths, localX);
     const finalFilters: TaskProductionFilters = {
       startDate,
       endDate,
@@ -288,10 +306,14 @@ function TaskProductionFiltersSheet({
       compareMode: canCompare ? localCmp : 'combined',
       sectorIds: localSectors.length > 0 ? localSectors : undefined,
     };
-    const yearCompare = localYears.length >= 2 && localX !== 'year' ? localYearCompare : false;
-    onApply(finalFilters, localYears, localMonths, yearCompare);
+    // Day filter only applies when grouping by day — drop it otherwise so it
+    // doesn't silently restrict the months/years modes.
+    const daysOut = localX === 'day' ? localDays : [];
+    // Year-over-year comparison is only meaningful in month mode.
+    const yearCompare = localYears.length >= 2 && localX === 'month' ? localYearCompare : false;
+    onApply(finalFilters, localYears, localMonths, daysOut, yearCompare);
     onOpenChange(false);
-  }, [localX, localY, localCmp, localSectors, localYears, localMonths, localYearCompare, canCompare, onApply, onOpenChange]);
+  }, [localX, localY, localCmp, localSectors, localYears, localMonths, localDays, localYearCompare, canCompare, onApply, onOpenChange]);
 
   const handleClear = useCallback(() => {
     setLocalX('month');
@@ -300,6 +322,7 @@ function TaskProductionFiltersSheet({
     setLocalSectors([]);
     setLocalYears([]);
     setLocalMonths([]);
+    setLocalDays([]);
   }, []);
 
   const activeCount = [localSectors.length > 0, localYears.length > 0].filter(Boolean).length;
@@ -383,7 +406,9 @@ function TaskProductionFiltersSheet({
                   ? 'Sem seleção → últimos 12 períodos'
                   : localX === 'year'
                     ? `${localYears.length} ${localYears.length === 1 ? 'ano' : 'anos'} selecionados`
-                    : `Exibe os meses dos anos: ${localYears.sort().join(', ')}`}
+                    : localX === 'day'
+                      ? `Exibe os dias dos anos: ${localYears.sort().join(', ')}`
+                      : `Exibe os meses dos anos: ${localYears.sort().join(', ')}`}
               </p>
             </div>
 
@@ -413,8 +438,34 @@ function TaskProductionFiltersSheet({
               </div>
             )}
 
+            {/* Day filter — only when grouping by day */}
+            {localX === 'day' && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <IconCalendarStats className="h-4 w-4" />
+                  Dias
+                </Label>
+                <Combobox
+                  mode="multiple"
+                  value={localDays}
+                  onValueChange={v => setLocalDays(Array.isArray(v) ? v : v ? [v] : [])}
+                  options={DAY_OPTIONS}
+                  placeholder="Todos os dias..."
+                  searchPlaceholder="Buscar dia..."
+                  emptyText="Nenhum dia"
+                  searchable={true}
+                  clearable={true}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {localDays.length === 0
+                    ? 'Sem seleção → todos os dias dos meses/anos selecionados'
+                    : `Exibe apenas dia${localDays.length === 1 ? '' : 's'}: ${localDays.sort().join(', ')}`}
+                </p>
+              </div>
+            )}
+
             {/* Year-over-year comparison toggle — only when 2+ years and month mode */}
-            {localYears.length >= 2 && localX !== 'year' && (
+            {localYears.length >= 2 && localX === 'month' && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2 text-sm font-medium">
                   <IconArrowsExchange2 className="h-4 w-4" />
@@ -529,7 +580,9 @@ const TaskProductionPage = () => {
 
   const [chartType, setChartType] = useState<TaskProductionChartType>('bar');
   const [trendLine, setTrendLine] = useState<TrendLineType | null>(null);
-  const [goalValue, setGoalValue] = useState<number | null>(null);
+  // `goalOverride` is the value the user typed in the popover. Null means
+  // "use the admin-configured default from the goals feature". See useDefaultGoal below.
+  const [goalOverride, setGoalOverride] = useState<number | null>(null);
   const [goalInput, setGoalInput] = useState('');
   const [goalPopoverOpen, setGoalPopoverOpen] = useState(false);
   const [yearCompareMode, setYearCompareMode] = useState(false);
@@ -540,12 +593,13 @@ const TaskProductionPage = () => {
 
   const [filters, setFilters] = useState<TaskProductionFilters>(() => {
     const y = new Date().getFullYear().toString();
-    const { startDate, endDate } = computeDateRange([y], []);
+    const { startDate, endDate } = computeDateRange([y], [], 'month');
     return { xAxisMode: 'month', yAxisMode: 'count', compareMode: 'combined', startDate, endDate };
   });
 
   const [selectedYears, setSelectedYears]   = useState<string[]>(() => [new Date().getFullYear().toString()]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [selectedDays, setSelectedDays]     = useState<string[]>([]);
 
   const isBothMode = filters.yAxisMode === 'both';
   const useAvg     = filters.yAxisMode === 'avgPerUser';
@@ -583,24 +637,29 @@ const TaskProductionPage = () => {
     }
   }, [availableChartTypes, chartType, isBothMode, isStackedType]);
 
-  // Disable year-compare when not enough years or in year-axis mode
+  // Disable year-compare when not enough years or outside month mode
   useEffect(() => {
-    if (filters.xAxisMode === 'year' || selectedYears.length < 2) {
+    if (filters.xAxisMode !== 'month' || selectedYears.length < 2) {
       setYearCompareMode(false);
     }
   }, [filters.xAxisMode, selectedYears.length]);
 
-  // A goal set in one metric (e.g. 100 tasks) is meaningless after switching
-  // to a different scale (e.g. 2.36 tasks/colaborador). Reset on metric change.
+  // A goal override set for one metric (e.g. 100 tasks) is meaningless after
+  // switching to a different scale (e.g. 2.36 tasks/colaborador). Clearing the
+  // override falls back to the admin-configured default for the new metric.
   useEffect(() => {
-    setGoalValue(null);
+    setGoalOverride(null);
     setGoalInput('');
   }, [filters.yAxisMode]);
 
 
-  // Always fetch monthly data; year aggregation is done on the frontend
+  // Year mode is aggregated client-side from monthly data; day mode goes
+  // straight through to the API which returns YYYY-MM-DD periods.
   const apiFilters = useMemo(
-    () => ({ ...filters, xAxisMode: 'month' as const }),
+    () => ({
+      ...filters,
+      xAxisMode: filters.xAxisMode === 'day' ? ('day' as const) : ('month' as const),
+    }),
     [filters],
   );
 
@@ -608,12 +667,172 @@ const TaskProductionPage = () => {
   const rawItems: TaskProductionItem[] = data?.data?.items || [];
   const summary = data?.data?.summary;
 
+  // Two user counts: the COMPANY total (denominator of the "tasks per user"
+  // ratio implicit in the goal) and the FILTERED count (the subset of users
+  // whose tasks the chart is currently showing). The goal-line needs to
+  // rescale by filtered/total so the meta matches the chart's actual scope.
+  const hasSectorFilter = (filters.sectorIds?.length ?? 0) > 0;
+  const { count: totalProductionUserCount } = useActiveProductionUserCount({
+    enabled: useAvg || isBothMode || hasSectorFilter,
+  });
+  const { count: filteredProductionUserCount } = useActiveProductionUserCount({
+    sectorIds: filters.sectorIds,
+    enabled: hasSectorFilter,
+  });
+
+  // When the x-axis is days, spread the monthly goal across the WORKING days
+  // of the bonus periods in the range (excludes Saturdays and Sundays). For
+  // the typical full-month view this is ~22 working days. Computed from the
+  // actual filter range so multi-month and partial selections stay accurate.
+  // Falls back to 22 when the range isn't yet known (initial render).
+  const workingDaysInRange = useMemo(() => {
+    if (!filters.startDate || !filters.endDate) return 22;
+    const n = countWorkingDays(filters.startDate, filters.endDate);
+    return n > 0 ? n : 22;
+  }, [filters.startDate, filters.endDate]);
+
+  // How many bonus periods (months) the range spans. The bonus period closing
+  // on day 25 of month M is referenced as month M, so a range Apr-26 → May-25
+  // is ONE period (May), not two calendar months. Use the same enumerator
+  // useDefaultGoal uses internally to stay consistent.
+  const periodCount = useMemo(() => {
+    if (!filters.startDate || !filters.endDate) return 1;
+    return Math.max(1, getBusinessPeriodsInRange(filters.startDate, filters.endDate).length);
+  }, [filters.startDate, filters.endDate]);
+
+  const workingDaysPerPeriod = workingDaysInRange / periodCount;
+
+  // The goal aggregation depends on what each chart bar represents:
+  // - xAxisMode='month' or 'day' → start from per-month average. For 'day' we
+  //   further divide by AVG_DAYS_PER_PERIOD via scaleBy below.
+  // - xAxisMode='year' → one bar per year (12 months summed) → annual TOTAL.
+  // For avgPerUser charts we use AVERAGE_PER_USER which the hook implements as
+  // (per-period avg / activeUserCount), matching what each bar shows.
+  const periodAggregation = useAvg
+    ? 'AVERAGE_PER_USER'
+    : filters.xAxisMode === 'year'
+      ? 'TOTAL'
+      : 'AVERAGE_PER_PERIOD';
+
+  // scaleBy composes two transforms:
+  //   1. Sector slice — when filtered, rescale company-wide goal by
+  //      filtered_users / total_users so the line matches the bars' scope.
+  //      Skipped in avgPerUser mode (the per-user formula already normalises).
+  //   2. Day spread — when the x-axis is days, divide the per-month value by
+  //      AVG_DAYS_PER_PERIOD so each daily bar can be compared to a single
+  //      day's expected share of the monthly target.
+  const scaleBy = useMemo(() => {
+    let num: number | null = null;
+    let denom: number | null = null;
+
+    if (hasSectorFilter && !useAvg) {
+      num = filteredProductionUserCount;
+      denom = totalProductionUserCount;
+    }
+
+    if (filters.xAxisMode === 'day') {
+      if (num == null) {
+        num = 1;
+        denom = workingDaysPerPeriod;
+      } else if (denom != null) {
+        denom = denom * workingDaysPerPeriod;
+      }
+    }
+
+    if (num == null || denom == null || denom <= 0) return null;
+    return { numerator: num, denominator: denom };
+  }, [hasSectorFilter, useAvg, filteredProductionUserCount, totalProductionUserCount, filters.xAxisMode, workingDaysPerPeriod]);
+
+  const defaultGoalRaw = useDefaultGoal({
+    metric: GOAL_METRIC.TASKS_COMPLETED,
+    period:
+      filters.startDate && filters.endDate
+        ? { from: filters.startDate, to: filters.endDate }
+        : null,
+    aggregation: periodAggregation,
+    // For avgPerUser: when no sector filter, use total production count; when
+    // filtered, use the filtered count so the line tracks "tasks per user
+    // inside the filtered scope".
+    activeUserCount: useAvg
+      ? hasSectorFilter
+        ? filteredProductionUserCount
+        : totalProductionUserCount
+      : null,
+    scaleBy,
+    // Year-over-year comparison shows two series with different scales; a
+    // single default goal-line doesn't fit.
+    enabled: !yearCompareMode,
+  });
+
+  // In day-mode the goal-line value comes from dividing a monthly target by
+  // working days (e.g. 65 / 21 ≈ 3.1). Daily task counts can't be fractional,
+  // and the y-axis only renders at integer gridlines, so a 3.1 line floats
+  // above the y=3 gridline and the column tops — perceived as misaligned.
+  // Snap to the nearest integer in count mode for clean visual alignment;
+  // avgPerUser stays decimal because per-user values are intrinsically so.
+  const defaultGoal = useMemo(() => {
+    if (defaultGoalRaw.value == null) return defaultGoalRaw;
+    if (filters.xAxisMode === 'day' && !useAvg) {
+      return { ...defaultGoalRaw, value: Math.round(defaultGoalRaw.value) };
+    }
+    return defaultGoalRaw;
+  }, [defaultGoalRaw, filters.xAxisMode, useAvg]);
+
+  // In separated comparison mode each bar represents ONE sector, so a
+  // company-wide goal (say 65 tasks/period) needs to be divided across the
+  // sectors being compared (65 / 2 = 32.5 per sector) — otherwise every
+  // single-sector bar would look catastrophically under-performing. avgPerUser
+  // stays unsplit: it's already a per-user rate.
+  const goalSectorSplit = useMemo(() => {
+    if (!isComparisonMode || useAvg) return 1;
+    const n = filters.sectorIds?.length ?? 0;
+    return n > 0 ? n : 1;
+  }, [isComparisonMode, useAvg, filters.sectorIds]);
+
+  const goalValue = useMemo(() => {
+    const raw = goalOverride ?? defaultGoal.value;
+    if (raw == null) return null;
+    if (goalSectorSplit <= 1) return raw;
+    const split = raw / goalSectorSplit;
+    // Day-mode count goals stay integer for visual alignment with the y-axis.
+    return filters.xAxisMode === 'day' && !useAvg ? Math.round(split) : split;
+  }, [goalOverride, defaultGoal.value, goalSectorSplit, filters.xAxisMode, useAvg]);
+
+  const goalSource: 'override' | 'default' | 'none' =
+    goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
+
   // Client-side filter + optional year aggregation
   const items = useMemo(() => {
     if (!rawItems.length) return rawItems;
 
     const hasYearFilter  = selectedYears.length > 0;
     const hasMonthFilter = selectedMonths.length > 0;
+    const hasDayFilter   = selectedDays.length > 0;
+
+    if (filters.xAxisMode === 'day') {
+      // Day mode: items have YYYY-MM-DD periods. The year/month filters
+      // operate in BUSINESS-PERIOD terms (day 26 → 25), so a daily item must
+      // be mapped to its business month/year before comparing — otherwise
+      // Apr 26-30 would be excluded when "Maio" is selected, even though they
+      // belong to the business period Maio. The day filter compares the
+      // calendar day-of-month verbatim.
+      if (!hasYearFilter && !hasMonthFilter && !hasDayFilter) return rawItems;
+      return rawItems.filter(item => {
+        const [yearStr, monthStr, dayStr] = item.period.split('-');
+        const d = parseInt(dayStr, 10);
+        let bizYear  = parseInt(yearStr, 10);
+        let bizMonth = parseInt(monthStr, 10);
+        if (d > 25) {
+          bizMonth++;
+          if (bizMonth > 12) { bizMonth = 1; bizYear++; }
+        }
+        const bizYearStr  = String(bizYear);
+        const bizMonthStr = String(bizMonth).padStart(2, '0');
+        return (!hasYearFilter  || selectedYears.includes(bizYearStr)) &&
+               (!hasMonthFilter || selectedMonths.includes(bizMonthStr)) &&
+               (!hasDayFilter   || selectedDays.includes(dayStr));
+      });
+    }
 
     if (filters.xAxisMode !== 'year') {
       // Month mode: filter by selected years and months
@@ -653,12 +872,13 @@ const TaskProductionPage = () => {
         };
       })
       .sort((a, b) => a.period.localeCompare(b.period));
-  }, [rawItems, filters.xAxisMode, selectedYears, selectedMonths]);
+  }, [rawItems, filters.xAxisMode, selectedYears, selectedMonths, selectedDays]);
 
-  const handleFilterApply = useCallback((f: TaskProductionFilters, years: string[], months: string[], yearCompare: boolean) => {
+  const handleFilterApply = useCallback((f: TaskProductionFilters, years: string[], months: string[], days: string[], yearCompare: boolean) => {
     setFilters(f);
     setSelectedYears(years);
     setSelectedMonths(months);
+    setSelectedDays(days);
     setYearCompareMode(yearCompare);
   }, []);
 
@@ -667,10 +887,11 @@ const TaskProductionPage = () => {
     if (filters.sectorIds?.length) c++;
     if (selectedYears.length) c++;
     if (selectedMonths.length) c++;
+    if (selectedDays.length) c++;
     if (filters.xAxisMode !== 'month') c++;
     if (filters.yAxisMode !== 'count') c++;
     return c;
-  }, [filters, selectedYears, selectedMonths]);
+  }, [filters, selectedYears, selectedMonths, selectedDays]);
 
   // Sectors that have at least one non-zero value across all displayed periods
   const activeSectorIds = useMemo(() => {
@@ -726,9 +947,10 @@ const TaskProductionPage = () => {
     }));
   }, [items, isComparisonMode, includeAmbos, useAvg, isBothMode, activeSectorIds, stripYearOnAxis]);
 
-  // Year-over-year comparison: x = month name, series = one per year
+  // Year-over-year comparison: x = month name, series = one per year. Only
+  // applies in month mode — year/day modes have nothing to compare side-by-side.
   const yearCompareChartData = useMemo(() => {
-    if (!yearCompareMode || filters.xAxisMode === 'year' || selectedYears.length < 2) return null;
+    if (!yearCompareMode || filters.xAxisMode !== 'month' || selectedYears.length < 2) return null;
     const sortedYears = [...selectedYears].sort();
     const monthsToShow = selectedMonths.length > 0 ? [...selectedMonths].sort() : ['01','02','03','04','05','06','07','08','09','10','11','12'];
 
@@ -799,8 +1021,12 @@ const TaskProductionPage = () => {
 
   const valueFormatter = useCallback((value: number): string => {
     if (useAvg) return value.toFixed(2);
+    // Day-mode values are derived from a monthly goal divided by working days,
+    // so they're rarely whole numbers. Show one decimal so the chart's goal
+    // label matches its drawn position between y-axis integer gridlines.
+    if (filters.xAxisMode === 'day') return value.toFixed(1);
     return Math.round(value).toString();
-  }, [useAvg]);
+  }, [useAvg, filters.xAxisMode]);
 
   const secondaryValueFormatter = useCallback((value: number) => value.toFixed(1), []);
 
@@ -828,15 +1054,54 @@ const TaskProductionPage = () => {
   // - year mode → "2026"
   // - month mode, single year selected → "Março"
   // - month mode, multiple years selected → "Março 2026"
+  // - day mode → the server-formatted "14 Mai 2026" (strip year if single)
   const peakLabel = useMemo(() => {
     if (!items.length || maxPeriodCount === 0) return '';
     const peak = items.find(i => i.totalCount === maxPeriodCount);
     if (!peak) return '';
     if (filters.xAxisMode === 'year') return peak.period; // "2026"
+    if (filters.xAxisMode === 'day') {
+      return selectedYears.length > 1
+        ? peak.periodLabel
+        : peak.periodLabel.replace(/\s+\d{4}\s*$/, '').trim();
+    }
     const [yearPart, monthPart] = peak.period.split('-');
     const monthName = MONTH_NAMES[parseInt(monthPart, 10) - 1] ?? monthPart;
     return selectedYears.length > 1 ? `${monthName} ${yearPart}` : monthName;
   }, [items, maxPeriodCount, filters.xAxisMode, selectedYears]);
+
+  // Drill-down handlers for summary cards. Pico opens the modal scoped to the
+  // peak period; Total Concluídas opens a year-level rollup when a single year
+  // is selected (the modal already accepts "YYYY" as a period).
+  const peakItem = useMemo(
+    () => (items.length && maxPeriodCount > 0 ? items.find(i => i.totalCount === maxPeriodCount) ?? null : null),
+    [items, maxPeriodCount],
+  );
+
+  const openPeakPeriod = useCallback(() => {
+    if (!peakItem) return;
+    setClickedPeriod({ period: peakItem.period, label: peakItem.periodLabel, activeUsers: peakItem.activeUsers });
+  }, [peakItem]);
+
+  // For "Total Concluídas": when a single year is selected and we're showing
+  // months, open the year-level rollup. Otherwise drill into the most-recent
+  // active period — gives some meaningful navigation without inventing
+  // synthetic ranges the modal can't represent.
+  const openTotalDrilldown = useCallback(() => {
+    if (filters.xAxisMode !== 'year' && selectedYears.length === 1) {
+      const y = selectedYears[0];
+      setClickedPeriod({ period: y, label: y, activeUsers: undefined });
+      return;
+    }
+    const sortedActive = [...periodsWithData].sort((a, b) => b.period.localeCompare(a.period));
+    const target = sortedActive[0];
+    if (target) setClickedPeriod({ period: target.period, label: target.periodLabel, activeUsers: target.activeUsers });
+  }, [filters.xAxisMode, selectedYears, periodsWithData]);
+
+  const canDrillPeak  = !!peakItem;
+  const canDrillTotal = (summary?.totalCompleted ?? 0) > 0 && (
+    (filters.xAxisMode !== 'year' && selectedYears.length === 1) || periodsWithData.length > 0
+  );
 
   const handleExportCSV = useCallback(() => {
     if (!items.length) { toast.error('Nenhum dado para exportar'); return; }
@@ -923,10 +1188,13 @@ const TaskProductionPage = () => {
       // description so the export is self-explanatory.
       const filterLines: string[] = [];
       filterLines.push(
-        filters.xAxisMode === 'year' ? 'Agrupamento: Anos' : 'Agrupamento: Meses (26–25)',
+        filters.xAxisMode === 'year' ? 'Agrupamento: Anos' :
+        filters.xAxisMode === 'day'  ? 'Agrupamento: Dias (26–25)' :
+        'Agrupamento: Meses (26–25)',
       );
       if (selectedYears.length) filterLines.push(`Anos: ${[...selectedYears].sort().join(', ')}`);
       if (selectedMonths.length) filterLines.push(`Meses: ${selectedMonths.length} selecionados`);
+      if (selectedDays.length) filterLines.push(`Dias: ${[...selectedDays].sort().join(', ')}`);
       if (useAvg) filterLines.push('Métrica: Média/Colaborador');
       else if (isBothMode) filterLines.push('Métrica: Total + Média/Colaborador');
       if (isComparisonMode && sectorColumns.length) {
@@ -942,7 +1210,11 @@ const TaskProductionPage = () => {
       const summaryStats: Array<{ label: string; value: string }> = [
         { label: 'Total Concluídas', value: formatNumber(summary?.totalCompleted ?? 0) },
         {
-          label: `Média/${filters.xAxisMode === 'year' ? 'Ano' : 'Mês'}`,
+          label: `Média/${
+            filters.xAxisMode === 'year' ? 'Ano' :
+            filters.xAxisMode === 'day'  ? 'Dia' :
+            'Mês'
+          }`,
           value: formatNumber(avgPerDisplayPeriod, 1),
         },
       ];
@@ -969,12 +1241,12 @@ const TaskProductionPage = () => {
       toast.dismiss(toastId);
       toast.error('Erro ao exportar PDF');
     }
-  }, [chartData, filters, selectedYears, selectedMonths, useAvg, isBothMode, isComparisonMode, sectorColumns, summary, avgPerDisplayPeriod, summaryAvgPerUser, maxPeriodCount, periodsWithData, trendLine, goalValue]);
+  }, [chartData, filters, selectedYears, selectedMonths, selectedDays, useAvg, isBothMode, isComparisonMode, sectorColumns, summary, avgPerDisplayPeriod, summaryAvgPerUser, maxPeriodCount, periodsWithData, trendLine, goalValue]);
 
   const renderChart = () => {
     if (isLoading) {
       return (
-        <div className="h-[480px] flex items-center justify-center">
+        <div style={{ height: '100%' }} className="flex items-center justify-center">
           <div className="space-y-3 w-full px-8">
             <Skeleton className="h-4 w-1/3" />
             <Skeleton className="h-[380px] w-full" />
@@ -984,7 +1256,7 @@ const TaskProductionPage = () => {
     }
     if (isError) {
       return (
-        <div className="h-[480px] flex flex-col items-center justify-center gap-4">
+        <div style={{ height: '100%' }} className="flex flex-col items-center justify-center gap-4">
           <IconAlertCircle className="h-12 w-12 text-destructive" />
           <div className="text-center">
             <p className="font-semibold">Erro ao carregar dados</p>
@@ -999,7 +1271,7 @@ const TaskProductionPage = () => {
     }
     if (!effectiveChartData.length) {
       return (
-        <div className="h-[480px] flex flex-col items-center justify-center gap-4">
+        <div style={{ height: '100%' }} className="flex flex-col items-center justify-center gap-4">
           <IconCalendarStats className="h-12 w-12 text-muted-foreground" />
           <div className="text-center">
             <p className="font-semibold">Nenhum dado encontrado</p>
@@ -1016,7 +1288,7 @@ const TaskProductionPage = () => {
         chartType={effectiveChartType}
         yAxisMode={chartYAxisMode}
         isComparisonMode={effectiveIsComparison}
-        height="min(720px, calc(100vh - 360px))"
+        height="100%"
         yAxisLabel={useAvg ? 'Média/Colaborador' : 'Tarefas Concluídas'}
         valueFormatter={valueFormatter}
         secondaryValueFormatter={secondaryValueFormatter}
@@ -1035,7 +1307,7 @@ const TaskProductionPage = () => {
   const ChartIcon = currentChartType.icon;
 
   return (
-    <div className="h-full flex flex-col px-4 pt-4">
+    <div className="h-full flex flex-col px-4 pt-4 pb-4 overflow-hidden">
       <div className="flex-shrink-0">
         <PageHeader
           title="Produção de Tarefas"
@@ -1049,15 +1321,17 @@ const TaskProductionPage = () => {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-6">
-        <div className="mt-4">
-          <Card>
-            <CardHeader>
+      <Card className="mt-4 flex-1 min-h-0 flex flex-col">
+            <CardHeader className="flex-shrink-0">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <CardTitle>Produção de Tarefas por Período</CardTitle>
                   <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                    <span>Tarefas concluídas por {filters.xAxisMode === 'year' ? 'ano' : 'mês (período 26–25)'}</span>
+                    <span>Tarefas concluídas por {
+                      filters.xAxisMode === 'year' ? 'ano' :
+                      filters.xAxisMode === 'day'  ? 'dia (período 26–25)' :
+                      'mês (período 26–25)'
+                    }</span>
                     {isBothMode  && <Badge variant="outline"  className="text-xs">Total + Média/Colaborador</Badge>}
                     {useAvg      && <Badge variant="outline"  className="text-xs">Média/Colaborador</Badge>}
                     {isComparisonMode && (
@@ -1072,7 +1346,9 @@ const TaskProductionPage = () => {
                       <Badge variant="outline" className="text-xs">{TREND_LABELS[trendLine]}</Badge>
                     )}
                     {goalValue != null && (
-                      <Badge variant="outline" className="text-xs">Meta: {goalValue}</Badge>
+                      <Badge variant="outline" className="text-xs">
+                        Meta{goalSource === 'default' ? ' (padrão)' : ''}: {formatNumber(goalValue, useAvg ? 2 : filters.xAxisMode === 'day' ? 1 : 0)}
+                      </Badge>
                     )}
                     {selectedYears.length > 0 && (
                       <Badge variant="outline" className="text-xs">{selectedYears.sort().join(', ')}</Badge>
@@ -1080,6 +1356,11 @@ const TaskProductionPage = () => {
                     {selectedMonths.length > 0 && (
                       <Badge variant="outline" className="text-xs">
                         {selectedMonths.length} {selectedMonths.length === 1 ? 'mês' : 'meses'}
+                      </Badge>
+                    )}
+                    {selectedDays.length > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        {selectedDays.length} {selectedDays.length === 1 ? 'dia' : 'dias'}
                       </Badge>
                     )}
                   </CardDescription>
@@ -1149,22 +1430,50 @@ const TaskProductionPage = () => {
                     <PopoverTrigger asChild>
                       <Button variant={goalValue != null ? 'default' : 'outline'} size="sm">
                         <IconTarget className="h-4 w-4 mr-2" />
-                        {goalValue != null ? `Meta: ${goalValue}` : 'Meta'}
+                        {goalValue != null
+                          ? `Meta: ${formatNumber(goalValue, useAvg ? 2 : filters.xAxisMode === 'day' ? 1 : 0)}`
+                          : 'Meta'}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent align="end" className="w-52">
+                    <PopoverContent align="end" className="w-64">
                       <div className="space-y-3">
-                        <p className="text-sm font-medium">Definir Meta</p>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Definir Meta</p>
+                          {goalSource === 'default' && (
+                            <p className="text-xs text-muted-foreground">
+                              Padrão de Administração › Metas
+                              {useAvg && defaultGoal.value != null && (hasSectorFilter ? filteredProductionUserCount : totalProductionUserCount)
+                                ? ` (média de tarefas ÷ ${hasSectorFilter ? filteredProductionUserCount : totalProductionUserCount} colaboradores)`
+                                : ''}
+                            </p>
+                          )}
+                          {goalSource === 'override' && (
+                            <p className="text-xs text-muted-foreground">
+                              Sobrescrevendo padrão{defaultGoal.value != null
+                                ? ` (${formatNumber(defaultGoal.value, useAvg ? 2 : filters.xAxisMode === 'day' ? 1 : 0)})`
+                                : ''}
+                            </p>
+                          )}
+                          {goalSource === 'none' && (
+                            <p className="text-xs text-muted-foreground">
+                              Sem meta padrão configurada para este período
+                            </p>
+                          )}
+                        </div>
                         <Input
                           type="number"
                           min={0}
-                          placeholder="Ex: 100"
+                          placeholder={
+                            defaultGoal.value != null
+                              ? `Padrão: ${defaultGoal.value}`
+                              : 'Ex: 100'
+                          }
                           value={goalInput}
                           onChange={v => setGoalInput(v == null ? '' : String(v))}
                           onKeyDown={e => {
                             if (e.key === 'Enter') {
                               const v = parseFloat(goalInput);
-                              setGoalValue(isNaN(v) ? null : v);
+                              setGoalOverride(isNaN(v) ? null : v);
                               setGoalPopoverOpen(false);
                             }
                           }}
@@ -1176,7 +1485,7 @@ const TaskProductionPage = () => {
                             className="flex-1"
                             onClick={() => {
                               const v = parseFloat(goalInput);
-                              setGoalValue(isNaN(v) ? null : v);
+                              setGoalOverride(isNaN(v) ? null : v);
                               setGoalPopoverOpen(false);
                             }}
                           >
@@ -1186,12 +1495,12 @@ const TaskProductionPage = () => {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              setGoalValue(null);
+                              setGoalOverride(null);
                               setGoalInput('');
                               setGoalPopoverOpen(false);
                             }}
                           >
-                            Limpar
+                            {goalSource === 'override' ? 'Usar padrão' : 'Limpar'}
                           </Button>
                         </div>
                       </div>
@@ -1243,10 +1552,21 @@ const TaskProductionPage = () => {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-5">
+            <CardContent className="flex-1 min-h-0 flex flex-col gap-5 overflow-hidden">
               {/* Summary Cards */}
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Card className="py-2">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 flex-shrink-0">
+                <Card
+                  className={`py-2 ${canDrillTotal ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''}`}
+                  onClick={canDrillTotal ? openTotalDrilldown : undefined}
+                  role={canDrillTotal ? 'button' : undefined}
+                  tabIndex={canDrillTotal ? 0 : undefined}
+                  onKeyDown={e => {
+                    if (canDrillTotal && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      openTotalDrilldown();
+                    }
+                  }}
+                >
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
                     <CardTitle className="text-xs font-medium">Total Concluídas</CardTitle>
                     <IconCheckbox className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1313,7 +1633,18 @@ const TaskProductionPage = () => {
                   </>
                 ) : (
                   <>
-                    <Card className="py-2">
+                    <Card
+                      className={`py-2 ${canDrillPeak ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''}`}
+                      onClick={canDrillPeak ? openPeakPeriod : undefined}
+                      role={canDrillPeak ? 'button' : undefined}
+                      tabIndex={canDrillPeak ? 0 : undefined}
+                      onKeyDown={e => {
+                        if (canDrillPeak && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          openPeakPeriod();
+                        }
+                      }}
+                    >
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
                         <CardTitle className="text-xs font-medium">
                           Pico de Produção{peakLabel ? ` (${peakLabel})` : ''}
@@ -1345,9 +1676,9 @@ const TaskProductionPage = () => {
               </div>
 
               {/* Chart */}
-              <Card>
-                <CardContent className="p-4">
-                  <div ref={chartContainerRef}>
+              <Card className="flex-1 min-h-0 flex flex-col">
+                <CardContent className="flex-1 min-h-0 p-4">
+                  <div ref={chartContainerRef} className="h-full">
                     {renderChart()}
                   </div>
                 </CardContent>
@@ -1362,11 +1693,10 @@ const TaskProductionPage = () => {
             filters={filters}
             selectedYears={selectedYears}
             selectedMonths={selectedMonths}
+            selectedDays={selectedDays}
             yearCompareMode={yearCompareMode}
             onApply={handleFilterApply}
           />
-        </div>
-      </div>
 
       {clickedPeriod && (
         <ProductionPeriodTasksModal

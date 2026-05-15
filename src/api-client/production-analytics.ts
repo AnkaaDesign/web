@@ -6,6 +6,8 @@ import type {
   ProductionAnalyticsFilters,
   TaskProductionFilters,
   TaskProductionResponse,
+  TaskPerformanceFilters,
+  TaskPerformanceResponse,
   BonusValueTimelineFilters,
   BonusValueTimelineResponse,
 } from '../types/production-analytics';
@@ -45,6 +47,14 @@ export class ProductionAnalyticsService {
     return response.data;
   }
 
+  async getTaskPerformanceStats(filters: TaskPerformanceFilters): Promise<TaskPerformanceResponse> {
+    const response = await apiClient.post<TaskPerformanceResponse>(
+      `${this.basePath}/task-performance`,
+      filters,
+    );
+    return response.data;
+  }
+
   async getBonusValueTimeline(
     filters: BonusValueTimelineFilters,
   ): Promise<BonusValueTimelineResponse> {
@@ -69,6 +79,9 @@ export const getProductionRevenue = (filters: ProductionAnalyticsFilters) =>
 
 export const getTaskProductionStats = (filters: TaskProductionFilters) =>
   productionAnalyticsService.getTaskProductionStats(filters);
+
+export const getTaskPerformanceStats = (filters: TaskPerformanceFilters) =>
+  productionAnalyticsService.getTaskPerformanceStats(filters);
 
 export const getBonusValueTimeline = (filters: BonusValueTimelineFilters) =>
   productionAnalyticsService.getBonusValueTimeline(filters);

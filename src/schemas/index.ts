@@ -13,6 +13,7 @@ export * from "./cut";
 export * from "./epi";
 export * from "./externalWithdrawal";
 export * from "./file";
+export * from "./goal";
 export * from "./holiday";
 export * from "./item";
 export * from "./maintenance";

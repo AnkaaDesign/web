@@ -126,7 +126,7 @@ export interface ProductionAnalyticsFilters {
 export type ProductionChartType = 'bar' | 'pie' | 'area' | 'line' | 'bar-stacked';
 
 // Task Production Statistics
-export type TaskProductionXAxisMode = 'month' | 'year';
+export type TaskProductionXAxisMode = 'day' | 'month' | 'year';
 export type TaskProductionYAxisMode = 'count' | 'avgPerUser' | 'both';
 export type TaskProductionCompareMode = 'combined' | 'separated' | 'separatedWithTotal';
 export type TaskProductionChartType = 'bar' | 'bar-stacked' | 'line' | 'line-smooth' | 'line-stacked' | 'area' | 'area-smooth';
@@ -173,6 +173,93 @@ export interface TaskProductionResponse {
   success: boolean;
   message: string;
   data: TaskProductionData;
+}
+
+// Task Performance Statistics — productivity, position-adjusted.
+//
+// Same scale as productivity's T/N but compresses the gap between sectors
+// with different position compositions. A senior-heavy sector with high
+// T/N gets pulled DOWN toward what was expected of them; a junior-heavy
+// sector's low T/N is normalized UP symmetrically.
+//
+// Math:
+//   weight(u)         = 1 + step × rank(u)
+//   occupancy(u, P)   = workingDays(u, P) / workingDaysInPeriod
+//   contribution(u,P) = weight(u) × occupancy(u, P)
+//   avgPerformance(P) = T_P / Σ contribution
+//   tasksAllocated(u) = T × contribution(u) / Σ
+export type TaskPerformanceXAxisMode = 'month' | 'year';
+export type TaskPerformanceYAxisMode = 'count' | 'performance' | 'both';
+export type TaskPerformanceCompareMode = 'combined' | 'separated' | 'separatedWithTotal';
+export type TaskPerformanceChartType = TaskProductionChartType;
+
+export interface TaskPerformanceFilters {
+  startDate?: Date;
+  endDate?: Date;
+  sectorIds?: string[];
+  xAxisMode?: TaskPerformanceXAxisMode;
+  yAxisMode?: TaskPerformanceYAxisMode;
+  compareMode?: TaskPerformanceCompareMode;
+  positionStep?: number;
+}
+
+// Per-PERIOD per-user attribution. Same shape returned inside every item
+// and consumed by the period modal — the user table belongs scoped to the
+// period the user clicked, not aggregated across the date range.
+export interface TaskPerformancePeriodUser {
+  userId: string;
+  userName: string;
+  sectorId: string | null;
+  sectorName: string | null;
+  positionId: string | null;
+  positionName: string | null;
+  rank: number;
+  weight: number;
+  workingDays: number;
+  tasksAllocated: number;
+  dailyProductivity: number;
+}
+
+export interface TaskPerformanceSectorComparison {
+  sectorId: string;
+  sectorName: string;
+  totalCount: number;
+  activeUsers: number;
+  workingDays: number;
+  totalContribution: number;
+  avgPerformance: number;
+}
+
+export interface TaskPerformanceItem {
+  period: string;
+  periodLabel: string;
+  totalCount: number;
+  activeUsers: number;
+  workingDays: number;
+  totalContribution: number;
+  avgPerformance: number;
+  users: TaskPerformancePeriodUser[];
+  comparisons?: TaskPerformanceSectorComparison[];
+}
+
+export interface TaskPerformanceSummary {
+  totalCompleted: number;
+  totalActiveUsers: number;
+  totalWorkingDays: number;
+  avgPerformance: number;
+  avgTasksPerPeriod: number;
+}
+
+export interface TaskPerformanceData {
+  summary: TaskPerformanceSummary;
+  items: TaskPerformanceItem[];
+  params: { positionStep: number };
+}
+
+export interface TaskPerformanceResponse {
+  success: boolean;
+  message: string;
+  data: TaskPerformanceData;
 }
 
 // Bonus Value Timeline — day-by-day aggregate bonus value over a single

@@ -125,6 +125,7 @@ export const TABLER_ICONS = {
 
   // Borrowing/Lending
   borrowing: "IconArrowsExchange", // Borrowing cycle
+  arrowsExchange: "IconArrowsExchange", // Alias for HR rotatividade nav
   loan: "IconRepeat",
   repeat: "IconRepeat", // Repeat/cycle icon (for favorites)
   return: "IconArrowLeft", // Return items
@@ -169,6 +170,17 @@ export const TABLER_ICONS = {
   beach: "IconBeach", // Beach icon (for favorites)
   holiday: "IconCalendarEvent",
   timeOff: "IconCalendarMinus",
+
+  // Absence / Secullum justifications
+  stethoscope: "IconStethoscope", // Atestado médico
+  userX: "IconUserX", // Falta sem justificativa
+  userPlus: "IconUserPlus", // Cadastro
+  clockX: "IconClockX", // Esquecimento de marcação
+  babyCarriage: "IconBabyCarriage", // Licença maternidade/paternidade
+  doorExit: "IconDoorExit", // Dispensa
+  arrowsRightLeft: "IconArrowsRightLeft", // Compensação
+  school: "IconSchool", // Treinamento
+  heart: "IconHeart", // Atestado por óbito
 
   // Communication
   warning: "IconAlertTriangle",

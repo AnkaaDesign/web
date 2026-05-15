@@ -640,7 +640,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
 
     const simpleTooltip = {
       ...tooltipBase, trigger: 'axis' as const,
-      axisPointer: { type: baseChartType === 'bar' ? 'shadow' as const : 'line' as const },
+      axisPointer: { type: baseChartType.startsWith('bar') ? 'shadow' as const : 'line' as const },
       formatter: (params: any) => {
         if (!Array.isArray(params) || params.length === 0) return '';
         const real = params.filter((p: any) => p.data != null && typeof p.data === 'object');

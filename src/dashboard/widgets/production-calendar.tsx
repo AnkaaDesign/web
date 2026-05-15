@@ -77,13 +77,6 @@ import {
 const EVENT_TYPES = ["term", "forecastDate", "startedAt", "finishedAt"] as const;
 type EventType = (typeof EVENT_TYPES)[number];
 
-const EVENT_LABELS: Record<EventType, string> = {
-  term: "Prazo",
-  forecastDate: "Previsão",
-  startedAt: "Iniciada",
-  finishedAt: "Concluída",
-};
-
 // Default event colors (Tailwind shade-aware tokens). Each is overridable per
 // instance via the ColorPaletteDialog in the configure modal — the runtime
 // looks up the bg/text class with `deadlineColorSwatchClass` /

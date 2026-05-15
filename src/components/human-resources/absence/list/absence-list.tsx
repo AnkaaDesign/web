@@ -1,21 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { format, addMonths, subMonths, eachDayOfInterval } from "date-fns";
+import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { IconCalendar, IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 
-import type { SecullumJustificativaCategory } from "../../../../constants";
 import type { SecullumAggregatedAbsence } from "../../../../types";
 import {
-  AUSENCIA_JUSTIFICATIVA_IDS,
-  FALTA_JUSTIFICATIVA_IDS,
-  SECULLUM_JUSTIFICATIVAS,
   USER_STATUS,
-  getJustificativaCategory,
+  VACATION_JUSTIFICATIVA_ID,
 } from "../../../../constants";
 import {
   useSecullumAggregatedAbsences,
-  useSecullumUnjustifiedAbsences,
   useSectors,
   useUsers,
 } from "../../../../hooks";
@@ -30,7 +25,6 @@ import { AbsenceTable } from "./absence-table";
 import { AbsenceFormDialog } from "../form/absence-form-dialog";
 
 interface AbsenceListProps {
-  category: SecullumJustificativaCategory;
   className?: string;
 }
 
@@ -52,9 +46,6 @@ const getPayrollPeriod = (month: Date) => {
   return { start, end };
 };
 
-// Resolve the payroll period that contains a given anchor date. Day 25 or
-// earlier → period ending in anchor's month; day 26 or later → period ending
-// next month.
 const periodContaining = (anchor: Date) => {
   const refMonth =
     anchor.getDate() >= 26
@@ -63,16 +54,11 @@ const periodContaining = (anchor: Date) => {
   return { refMonth, ...getPayrollPeriod(refMonth) };
 };
 
-// Default to the payroll period that contains today.
 const defaultPeriod = () => periodContaining(new Date());
 
-export function AbsenceList({ category, className }: AbsenceListProps) {
+export function AbsenceList({ className }: AbsenceListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // If the URL provides only one of startDate/endDate, derive the matching
-  // companion from the payroll period that contains the present date —
-  // otherwise the missing side falls back to today's default and produces an
-  // inverted range (e.g. start=2026-04-26, end=2026-04-25 → no data).
   const initial = useMemo(() => {
     const urlStart = parseLocalDate(searchParams.get("startDate"));
     const urlEnd = parseLocalDate(searchParams.get("endDate"));
@@ -92,10 +78,6 @@ export function AbsenceList({ category, className }: AbsenceListProps) {
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => initial.refMonth);
   const [selectedUserId, setSelectedUserId] = useState<string>(() => searchParams.get("userId") || ALL_USERS);
   const [selectedSectorId, setSelectedSectorId] = useState<string>(() => searchParams.get("sectorId") || "");
-  const [selectedJustificativaId, setSelectedJustificativaId] = useState<number | undefined>(() => {
-    const v = searchParams.get("justificativaId");
-    return v ? Number(v) : undefined;
-  });
   const [editing, setEditing] = useState<SecullumAggregatedAbsence | null>(null);
 
   const { data: usersData, isLoading: usersLoading } = useUsers({
@@ -119,14 +101,6 @@ export function AbsenceList({ category, className }: AbsenceListProps) {
     return arr.map((s: any) => ({ value: s.id, label: s.name }));
   }, [sectorsData]);
 
-  const allowedJustificativaIds = category === "AUSENCIA" ? AUSENCIA_JUSTIFICATIVA_IDS : FALTA_JUSTIFICATIVA_IDS;
-  const justificativaOptions = useMemo<ComboboxOption[]>(() => {
-    return allowedJustificativaIds.map((id) => ({
-      value: String(id),
-      label: SECULLUM_JUSTIFICATIVAS[id]?.label ?? `#${id}`,
-    }));
-  }, [allowedJustificativaIds]);
-
   const aggregatedParams = useMemo(
     () => ({
       startDate: format(startDate, "yyyy-MM-dd"),
@@ -137,62 +111,20 @@ export function AbsenceList({ category, className }: AbsenceListProps) {
   );
 
   const { data, isLoading } = useSecullumAggregatedAbsences(aggregatedParams);
-  // Unjustified absences (Cálculos de Ponto) only relevant for Faltas page —
-  // they belong to FALTA category by definition. Skip the heavier fetch on
-  // Ausências.
-  const { data: unjustifiedData } = useSecullumUnjustifiedAbsences(
-    aggregatedParams,
-    { enabled: category === "FALTA" },
-  );
-
-  // Faltas use per-day rows (each work day José missed = one row); Ausências
-  // keep range rows (one row per record showing Início/Fim).
-  const expandToDays = category === "FALTA";
-
-  // Work days in the visible period (for per-day expansion on Faltas).
-  const workDaysInPeriod = useMemo(() => {
-    const days = eachDayOfInterval({ start: startDate, end: endDate });
-    return days.filter((d) => d.getDay() !== 0 && d.getDay() !== 6);
-  }, [startDate, endDate]);
 
   const records = useMemo<SecullumAggregatedAbsence[]>(() => {
-    const unwrap = (d: any): SecullumAggregatedAbsence[] => {
-      const root: any = d?.data;
-      if (Array.isArray(root)) return root;
-      if (root && Array.isArray(root.data)) return root.data;
-      return [];
-    };
-    const justified = unwrap(data);
-    const unjustified = category === "FALTA" ? unwrap(unjustifiedData) : [];
-    return [...justified, ...unjustified].filter((a) => {
-      if (getJustificativaCategory(a.JustificativaId) !== category) return false;
-      if (selectedJustificativaId && a.JustificativaId !== selectedJustificativaId) return false;
+    const root: any = data?.data;
+    const list: SecullumAggregatedAbsence[] = Array.isArray(root)
+      ? root
+      : root && Array.isArray(root.data)
+        ? root.data
+        : [];
+    return list.filter((a) => {
+      if (a.JustificativaId !== VACATION_JUSTIFICATIVA_ID) return false;
       if (selectedUserId !== ALL_USERS && a.userId !== selectedUserId) return false;
       return true;
     });
-  }, [data, unjustifiedData, category, selectedJustificativaId, selectedUserId]);
-
-  // Per-day expanded rows for Faltas. Each absence × each overlapping work day
-  // produces one row, so a 91-day atestado becomes ~60+ rows in the period.
-  const dayRows = useMemo(() => {
-    if (!expandToDays) return [];
-    const rows: Array<SecullumAggregatedAbsence & { dayDate: Date }> = [];
-    for (const a of records) {
-      const start = new Date(a.Inicio);
-      const end = new Date(a.Fim);
-      const startD = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-      const endD = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-      for (const d of workDaysInPeriod) {
-        if (d >= startD && d <= endD) rows.push({ ...a, dayDate: d });
-      }
-    }
-    rows.sort((a, b) => {
-      const t = b.dayDate.getTime() - a.dayDate.getTime();
-      if (t !== 0) return t;
-      return a.userName.localeCompare(b.userName, "pt-BR");
-    });
-    return rows;
-  }, [expandToDays, records, workDaysInPeriod]);
+  }, [data, selectedUserId]);
 
   const updateParam = (key: string, value: string | null) => {
     const params = new URLSearchParams(searchParams);
@@ -257,8 +189,6 @@ export function AbsenceList({ category, className }: AbsenceListProps) {
     else handleUserChange(list[idx + 1].id);
   };
 
-  // Sync selectedMonth from endDate so the displayed period label tracks the
-  // user's manual date edits. Payroll period ends on day 25 of selectedMonth.
   useEffect(() => {
     setSelectedMonth(new Date(endDate.getFullYear(), endDate.getMonth(), 1));
   }, [endDate]);
@@ -267,7 +197,6 @@ export function AbsenceList({ category, className }: AbsenceListProps) {
     <div className={className}>
       <Card className="h-full flex flex-col shadow-sm border border-border">
         <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
-          {/* Single filter row: user + sector + justificativa + period + date range */}
           <div className="flex items-stretch gap-2 flex-shrink-0">
             <div className="flex items-stretch gap-1 flex-1 min-w-0">
               <Button type="button" variant="outline" size="icon" onClick={handlePreviousUser} disabled={usersLoading} className="h-10 w-10 flex-shrink-0">
@@ -301,24 +230,6 @@ export function AbsenceList({ category, className }: AbsenceListProps) {
                 }}
                 placeholder="Todos os setores"
                 emptyText="Nenhum setor"
-                clearable
-                searchable
-                className="w-full"
-              />
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <Combobox
-                options={justificativaOptions}
-                value={selectedJustificativaId != null ? String(selectedJustificativaId) : ""}
-                onValueChange={(v) => {
-                  const raw = (Array.isArray(v) ? v[0] : v) || "";
-                  const next = raw ? Number(raw) : undefined;
-                  setSelectedJustificativaId(next);
-                  updateParam("justificativaId", next ? String(next) : null);
-                }}
-                placeholder={category === "AUSENCIA" ? "Todas as ausências" : "Todas as faltas"}
-                emptyText="Nenhuma justificativa"
                 clearable
                 searchable
                 className="w-full"
@@ -365,10 +276,9 @@ export function AbsenceList({ category, className }: AbsenceListProps) {
           <div className="flex-1 min-h-0">
             <AbsenceTable
               absences={records}
-              dayRows={expandToDays ? dayRows : undefined}
               isLoading={isLoading}
               onEdit={(rec) => setEditing(rec)}
-              emptyText={`Nenhuma ${category === "AUSENCIA" ? "ausência" : "falta"} no período de ${format(startDate, "dd/MM/yyyy", { locale: ptBR })} a ${format(endDate, "dd/MM/yyyy", { locale: ptBR })}`}
+              emptyText={`Nenhuma férias no período de ${format(startDate, "dd/MM/yyyy", { locale: ptBR })} a ${format(endDate, "dd/MM/yyyy", { locale: ptBR })}`}
             />
           </div>
         </CardContent>
@@ -377,7 +287,6 @@ export function AbsenceList({ category, className }: AbsenceListProps) {
       <AbsenceFormDialog
         open={!!editing}
         onOpenChange={(o) => !o && setEditing(null)}
-        category={category}
         editing={editing}
       />
     </div>

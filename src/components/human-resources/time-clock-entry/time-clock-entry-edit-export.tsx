@@ -547,9 +547,11 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
 
     .page {
       width: 100%;
+      min-height: 268mm; /* slightly under A4 printable area — leaves a safety buffer to avoid spilling to page 2 */
       display: flex;
       flex-direction: column;
     }
+    .page-spacer { flex: 1 0 auto; min-height: 4mm; }
 
     /* ===== Header ===== */
     .header {
@@ -818,7 +820,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
 
     /* ===== Signatures ===== */
     .signatures {
-      margin-top: 10mm;
+      margin-top: 14mm;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 14mm;
@@ -826,9 +828,11 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
 
     .signature-box { text-align: center; }
 
-    .signature-line {
-      border-top: 1px solid ${BRAND_COLORS.textDark};
-      padding-top: 1.4mm;
+    /* Empty area where the user signs by hand; border-bottom is the visible line. */
+    .signature-area {
+      height: 14mm;
+      border-bottom: 0.5mm solid ${BRAND_COLORS.textDark};
+      margin-bottom: 1.4mm;
     }
 
     .signature-name {
@@ -845,7 +849,7 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
 
     /* ===== Footer (matches dossie pdf) ===== */
     .footer {
-      margin-top: 8mm;
+      margin-top: 14mm;
       padding-top: 0;
     }
     .footer-line {
@@ -955,18 +959,18 @@ export function buildControlePontoHtml({ user, startDate, endDate, rows, totals,
       </div>
     </section>
 
+    <div class="page-spacer"></div>
+
     <section class="signatures">
       <div class="signature-box">
-        <div class="signature-line">
-          <div class="signature-name">${escapeHtml(userName)}</div>
-          <div class="signature-role">Colaborador</div>
-        </div>
+        <div class="signature-area"></div>
+        <div class="signature-name">${escapeHtml(userName)}</div>
+        <div class="signature-role">Colaborador</div>
       </div>
       <div class="signature-box">
-        <div class="signature-line">
-          <div class="signature-name">Responsável</div>
-          <div class="signature-role">Recursos Humanos</div>
-        </div>
+        <div class="signature-area"></div>
+        <div class="signature-name">Responsável</div>
+        <div class="signature-role">Recursos Humanos</div>
       </div>
     </section>
 

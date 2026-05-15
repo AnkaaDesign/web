@@ -3,6 +3,12 @@ import type {
   PayrollTrendsResponse,
   TeamPerformanceResponse,
   HrAnalyticsFilters,
+  HeadcountFilters,
+  HeadcountResponse,
+  TurnoverFilters,
+  TurnoverResponse,
+  AbsenteeismFilters,
+  AbsenteeismResponse,
 } from '../types/hr-analytics';
 
 export class HrAnalyticsService {
@@ -21,6 +27,30 @@ export class HrAnalyticsService {
     );
     return response.data;
   }
+
+  async getHeadcount(filters: HeadcountFilters): Promise<HeadcountResponse> {
+    const response = await apiClient.post<HeadcountResponse>(
+      '/human-resources/analytics/headcount',
+      filters,
+    );
+    return response.data;
+  }
+
+  async getTurnover(filters: TurnoverFilters): Promise<TurnoverResponse> {
+    const response = await apiClient.post<TurnoverResponse>(
+      '/human-resources/analytics/turnover',
+      filters,
+    );
+    return response.data;
+  }
+
+  async getAbsenteeism(filters: AbsenteeismFilters): Promise<AbsenteeismResponse> {
+    const response = await apiClient.post<AbsenteeismResponse>(
+      '/human-resources/analytics/absenteeism',
+      filters,
+    );
+    return response.data;
+  }
 }
 
 export const hrAnalyticsService = new HrAnalyticsService();
@@ -30,3 +60,12 @@ export const getPayrollTrends = (filters: HrAnalyticsFilters) =>
 
 export const getTeamPerformance = (filters: HrAnalyticsFilters) =>
   hrAnalyticsService.getTeamPerformance(filters);
+
+export const getHeadcount = (filters: HeadcountFilters) =>
+  hrAnalyticsService.getHeadcount(filters);
+
+export const getTurnover = (filters: TurnoverFilters) =>
+  hrAnalyticsService.getTurnover(filters);
+
+export const getAbsenteeism = (filters: AbsenteeismFilters) =>
+  hrAnalyticsService.getAbsenteeism(filters);

@@ -195,8 +195,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // Read access matches the previous /recursos-humanos/calculos surface; the
   // edit tab is gated client-side to HR + ADMIN.
   "/recursos-humanos/controle-ponto": ["HUMAN_RESOURCES", "ADMIN", "PRODUCTION_MANAGER", "FINANCIAL"],
-  "/recursos-humanos/ausencias": "HUMAN_RESOURCES",
-  "/recursos-humanos/faltas": "HUMAN_RESOURCES",
+  "/recursos-humanos/ferias": "HUMAN_RESOURCES",
   "/recursos-humanos/calendario": "HUMAN_RESOURCES",
   "/recursos-humanos/feriados": "HUMAN_RESOURCES",
   "/recursos-humanos/advertencias": "HUMAN_RESOURCES",

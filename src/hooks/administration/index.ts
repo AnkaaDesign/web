@@ -2,6 +2,9 @@ export * from "./use-customer";
 // NOTE: use-customer-filters excluded from barrel - import directly to avoid
 // convertToApiFilters/convertFromApiFilters name conflicts across domains
 export * from "./use-sector";
+export * from "./use-goal";
+export * from "./use-default-goal";
+export * from "./use-active-production-user-count";
 export * from "./use-layout";
 export * from "./use-layout-list";
 export * from "./use-layout-section";

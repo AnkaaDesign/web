@@ -88,8 +88,8 @@ export interface BankSlipPerformanceResponse extends BaseResponse {
 
 // Shared filter types
 export interface FinancialAnalyticsFilters {
-  startDate: Date;
-  endDate: Date;
+  startDate?: Date;
+  endDate?: Date;
   customerIds?: string[];
   status?: string[];
   sortBy?: string;
@@ -97,6 +97,11 @@ export interface FinancialAnalyticsFilters {
   limit?: number;
   offset?: number;
   groupBy?: string;
+  // Business-period (26→25) filtering. Each entry is a period identified by
+  // the month that *closes* it: e.g., { year: 2026, month: 5 } = 2026-04-26
+  // through 2026-05-25. When set, startDate/endDate are ignored server-side.
+  periods?: Array<{ year: number; month: number }>;
+  periodGroupBy?: 'period' | 'day';
 }
 
 export type FinancialChartType = 'bar' | 'pie' | 'area' | 'line' | 'bar-stacked';
@@ -178,28 +183,6 @@ export interface QuoteFunnelAnalyticsFilters {
 // Receivables Analytics
 // =====================================================================
 
-export interface DelinquentCustomer {
-  customerId: string;
-  customerName: string;
-  overdueAmount: number;
-  overdueCount: number;
-  oldestDueDate: string | null;
-  daysOverdueMax: number;
-  totalReceivable: number;
-}
-
-export interface CustomerAgingRow {
-  customerId: string;
-  customerName: string;
-  current: number;
-  band30: number;
-  band60: number;
-  band90: number;
-  band90Plus: number;
-  total: number;
-  dso: number;
-}
-
 export interface ForecastInstallment {
   installmentId: string;
   invoiceId: string | null;
@@ -212,6 +195,7 @@ export interface ForecastInstallment {
   installmentNumber: number;
   totalInstallments: number;
   dueDate: string;
+  paidAt: string | null;
   amount: number;
   paidAmount: number;
   remaining: number;
@@ -219,9 +203,11 @@ export interface ForecastInstallment {
   daysFromNow: number;
 }
 
-export interface ForecastDayBucket {
-  bucket: string;
-  bucketLabel: string;
+export interface ForecastPeriodBucket {
+  bucket: string;             // 'OVERDUE' | 'P1' | 'P2' | ... | 'P{N}'
+  bucketLabel: string;        // e.g. 'Vencidas', 'Junho 2026', '2027'
+  periodStart: string | null; // ISO; null for OVERDUE
+  periodEnd: string | null;   // ISO; null for OVERDUE
   dueAmount: number;
   installmentCount: number;
   truncated?: boolean;
@@ -244,17 +230,11 @@ export interface ReceivablesSummary {
   totalCurrent: number;
   avgDso: number;
   activeCustomers: number;
-  forecastNext7: number;
-  forecastNext30: number;
-  forecastNext60: number;
-  forecastNext90: number;
 }
 
 export interface ReceivablesAnalyticsData {
   summary: ReceivablesSummary;
-  topDelinquents: DelinquentCustomer[];
-  customerAging: CustomerAgingRow[];
-  forecastBuckets: ForecastDayBucket[];
+  forecastBuckets: ForecastPeriodBucket[];
   recoveryCohorts: RecoveryCohort[];
 }
 
@@ -263,11 +243,13 @@ export interface ReceivablesAnalyticsResponse extends BaseResponse {
 }
 
 export interface ReceivablesAnalyticsFilters {
-  startDate: Date;
-  endDate: Date;
+  startDate?: Date;
+  endDate?: Date;
   customerIds?: string[];
+  status?: string[];
   limit?: number;
-  forecastDays?: number;
+  forecastPeriodType?: 'month' | 'year';
+  forecastPeriodCount?: number;
 }
 
 // =====================================================================

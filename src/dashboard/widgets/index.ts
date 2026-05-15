@@ -18,6 +18,7 @@ import { quickNoteWidget } from "./quick-note";
 // import { quickBudgetWidget } from "./quick-budget"; // Hidden from gallery — pending redesign
 import { hrCalendarWidget } from "./hr-calendar";
 import { productionCalendarWidget } from "./production-calendar";
+import { productivityWidget } from "./productivity";
 
 const allWidgets: any[] = [
   // Configurable workhorses (preferred — instantiate as many as needed)
@@ -40,6 +41,8 @@ const allWidgets: any[] = [
   // Calendar widgets (monthly, period 26→25)
   hrCalendarWidget,
   productionCalendarWidget,
+  // Production analytics widgets
+  productivityWidget,
 ];
 
 let registered = false;

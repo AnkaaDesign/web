@@ -167,6 +167,60 @@ export enum TASK_STATUS {
   CANCELLED = "CANCELLED",
 }
 
+export enum GOAL_METRIC {
+  // Production
+  TASKS_COMPLETED = "TASKS_COMPLETED",
+  TASKS_PER_ACTIVE_USER = "TASKS_PER_ACTIVE_USER",
+  PRODUCTION_AVG_PERFORMANCE = "PRODUCTION_AVG_PERFORMANCE",
+  // HR
+  COLLABORATORS_PER_SECTOR = "COLLABORATORS_PER_SECTOR",
+  HR_HIRES_PER_MONTH = "HR_HIRES_PER_MONTH",
+  HR_DISMISSALS_PER_MONTH = "HR_DISMISSALS_PER_MONTH",
+  HR_TURNOVER_RATE = "HR_TURNOVER_RATE",
+  HR_EXPERIENCE_FAILURE_RATE = "HR_EXPERIENCE_FAILURE_RATE",
+  HR_ABSENTEEISM_RATE = "HR_ABSENTEEISM_RATE",
+  HR_PAYROLL_GROSS = "HR_PAYROLL_GROSS",
+  HR_PAYROLL_BONUSES_TOTAL = "HR_PAYROLL_BONUSES_TOTAL",
+  // Finance
+  INVOICES_PAID = "INVOICES_PAID",
+  FINANCE_DSO_DAYS = "FINANCE_DSO_DAYS",
+  FINANCE_OVERDUE_AMOUNT = "FINANCE_OVERDUE_AMOUNT",
+  FINANCE_COLLECTION_RATE = "FINANCE_COLLECTION_RATE",
+  FINANCE_QUOTES_PER_PERIOD = "FINANCE_QUOTES_PER_PERIOD",
+  FINANCE_CONVERSION_RATE = "FINANCE_CONVERSION_RATE",
+  // Order / inventory
+  ORDER_COUNT_PER_PERIOD = "ORDER_COUNT_PER_PERIOD",
+  ORDER_TOTAL_VALUE = "ORDER_TOTAL_VALUE",
+  INVENTORY_CONSUMPTION_VALUE = "INVENTORY_CONSUMPTION_VALUE",
+  INVENTORY_OUTBOUND_VALUE = "INVENTORY_OUTBOUND_VALUE",
+}
+
+/** Metrics that scope a goal to a specific sector; others are company-wide. */
+export const SECTOR_SCOPED_GOAL_METRICS = [
+  GOAL_METRIC.COLLABORATORS_PER_SECTOR,
+  GOAL_METRIC.HR_PAYROLL_GROSS,
+  GOAL_METRIC.HR_PAYROLL_BONUSES_TOTAL,
+  GOAL_METRIC.HR_HIRES_PER_MONTH,
+  GOAL_METRIC.HR_DISMISSALS_PER_MONTH,
+] as const;
+
+/** Unit of measure for a goal's targetValue — drives formatting in the admin grid and chart axes. */
+export enum GOAL_UNIT {
+  COUNT = "COUNT",
+  DECIMAL = "DECIMAL",
+  CURRENCY = "CURRENCY",
+  PERCENTAGE = "PERCENTAGE",
+  MINUTES = "MINUTES",
+  DAYS = "DAYS",
+  LITERS = "LITERS",
+}
+
+/** Whether reaching the target is a maximize (higher is better) or minimize (lower is better) goal. */
+export enum GOAL_DIRECTION {
+  MAXIMIZE = "MAXIMIZE",
+  MINIMIZE = "MINIMIZE",
+}
+
 export enum SERVICE_ORDER_STATUS {
   PENDING = "PENDING",
   IN_PROGRESS = "IN_PROGRESS",
@@ -1897,8 +1951,6 @@ export enum FAVORITE_PAGES {
   ESTATISTICAS_ESTOQUE = "/estatisticas/estoque",
   ESTOQUE_ESTATISTICAS = "/estatisticas/estoque",
   ESTOQUE_ESTATISTICAS_MOVIMENTACAO = "/estatisticas/estoque/movimentacao",
-  ESTOQUE_ESTATISTICAS_TENDENCIAS = "/estatisticas/estoque/tendencias",
-  ESTOQUE_TOP_ITENS = "/estatisticas/estoque/principais-itens",
   STATISTICS_CONSUMPTION = "/estatisticas/estoque/consumo",
   ESTATISTICAS_PRODUCAO = "/estatisticas/producao",
   ESTATISTICAS_PEDIDOS = "/estatisticas/pedidos",
@@ -1907,7 +1959,6 @@ export enum FAVORITE_PAGES {
   ESTATISTICAS_FINANCEIRO_COBRANCAS = "/estatisticas/financeiro/cobrancas",
   ESTATISTICAS_FINANCEIRO_BOLETOS = "/estatisticas/financeiro/boletos",
   ESTATISTICAS_FINANCEIRO_RECEITA = "/estatisticas/financeiro/receita-orcamentos",
-  ESTATISTICAS_FINANCEIRO_RECEBIVEIS = "/estatisticas/financeiro/recebiveis",
   ESTATISTICAS_FINANCEIRO_NFSE = "/estatisticas/financeiro/nfse",
   // Advanced Analytics
   ESTATISTICAS_ANALYTICS_PREDITIVA = "/estatisticas/analytics/preditiva",
@@ -1972,6 +2023,7 @@ export enum FAVORITE_PAGES {
   ADMINISTRACAO_REGISTROS_ALTERACOES_LISTAR = "/administracao/registros-de-alteracoes",
   ADMINISTRACAO_ARQUIVOS_LISTAR = "/administracao/arquivos",
   ADMINISTRACAO_SETORES_LISTAR = "/administracao/setores",
+  ADMINISTRACAO_METAS_LISTAR = "/administracao/metas",
   ADMINISTRACAO_NOTIFICACOES_LISTAR = "/administracao/notificacoes",
   ADMINISTRACAO_MENSAGENS_LISTAR = "/administracao/mensagens",
   ADMINISTRACAO_FOLHA_DE_PAGAMENTO = "/recursos-humanos/folha-de-pagamento",
@@ -1996,8 +2048,7 @@ export enum FAVORITE_PAGES {
 
   // Human Resources - List Pages
   RECURSOS_HUMANOS_CARGOS_LISTAR = "/recursos-humanos/cargos",
-  RECURSOS_HUMANOS_AUSENCIAS_LISTAR = "/recursos-humanos/ausencias",
-  RECURSOS_HUMANOS_FALTAS_LISTAR = "/recursos-humanos/faltas",
+  RECURSOS_HUMANOS_FERIAS_LISTAR = "/recursos-humanos/ferias",
   RECURSOS_HUMANOS_CALENDARIO = "/recursos-humanos/calendario",
   RECURSOS_HUMANOS_FERIADOS_LISTAR = "/recursos-humanos/feriados",
   RECURSOS_HUMANOS_AVISOS_LISTAR = "/recursos-humanos/avisos",
@@ -2012,8 +2063,7 @@ export enum FAVORITE_PAGES {
 
   // Human Resources - Create Pages
   RECURSOS_HUMANOS_CARGOS_CADASTRAR = "/recursos-humanos/cargos/cadastrar",
-  RECURSOS_HUMANOS_AUSENCIAS_CADASTRAR = "/recursos-humanos/ausencias/cadastrar",
-  RECURSOS_HUMANOS_FALTAS_CADASTRAR = "/recursos-humanos/faltas/cadastrar",
+  RECURSOS_HUMANOS_FERIAS_CADASTRAR = "/recursos-humanos/ferias/cadastrar",
   RECURSOS_HUMANOS_FERIADOS_CADASTRAR = "/recursos-humanos/feriados/cadastrar",
   RECURSOS_HUMANOS_AVISOS_CADASTRAR = "/recursos-humanos/avisos/cadastrar",
   RECURSOS_HUMANOS_EPI_CADASTRAR = "/recursos-humanos/epi/cadastrar",
@@ -2039,16 +2089,14 @@ export enum FAVORITE_PAGES {
 
   // Human Resources - Edit Pages
   RECURSOS_HUMANOS_CARGOS_EDITAR = "/recursos-humanos/cargos/editar/:id",
-  RECURSOS_HUMANOS_AUSENCIAS_EDITAR = "/recursos-humanos/ausencias/editar/:id",
-  RECURSOS_HUMANOS_FALTAS_EDITAR = "/recursos-humanos/faltas/editar/:id",
+  RECURSOS_HUMANOS_FERIAS_EDITAR = "/recursos-humanos/ferias/editar/:id",
   RECURSOS_HUMANOS_FERIADOS_EDITAR = "/recursos-humanos/feriados/editar/:id",
   RECURSOS_HUMANOS_AVISOS_EDITAR = "/recursos-humanos/avisos/editar/:id",
   RECURSOS_HUMANOS_SETORES_EDITAR = "/recursos-humanos/setores/editar/:id",
 
   // Human Resources - Details Pages
   RECURSOS_HUMANOS_CARGOS_DETALHES = "/recursos-humanos/cargos/detalhes/:id",
-  RECURSOS_HUMANOS_AUSENCIAS_DETALHES = "/recursos-humanos/ausencias/detalhes/:id",
-  RECURSOS_HUMANOS_FALTAS_DETALHES = "/recursos-humanos/faltas/detalhes/:id",
+  RECURSOS_HUMANOS_FERIAS_DETALHES = "/recursos-humanos/ferias/detalhes/:id",
   RECURSOS_HUMANOS_FERIADOS_DETALHES = "/recursos-humanos/feriados/detalhes/:id",
   RECURSOS_HUMANOS_AVISOS_DETALHES = "/recursos-humanos/avisos/detalhes/:id",
 

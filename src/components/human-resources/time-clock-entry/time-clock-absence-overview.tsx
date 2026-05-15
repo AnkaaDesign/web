@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -20,6 +20,10 @@ import {
 import { useSecullumAbsenceDays, useUsers } from "@/hooks";
 import { AbsenceFormDialog } from "@/components/human-resources/absence/form/absence-form-dialog";
 import type { SecullumAggregatedAbsence } from "@/types";
+import {
+  toAbsenceExportRow,
+  type AbsenceExportRow,
+} from "./time-clock-absence-export";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -254,8 +258,16 @@ function AbsenceOverviewTable({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+export interface AbsenceOverviewExportData {
+  rows: AbsenceExportRow[];
+  startDate: Date;
+  endDate: Date;
+  filterLabel?: string;
+}
+
 interface TimeClockAbsenceOverviewProps {
   className?: string;
+  onExportDataChange?: (data: AbsenceOverviewExportData | null) => void;
 }
 
 // Adapt SecullumAbsenceDayRow to the shape expected by AbsenceFormDialog
@@ -276,7 +288,7 @@ function rowToAggregated(r: SecullumAbsenceDayRow): SecullumAggregatedAbsence {
   };
 }
 
-export function TimeClockAbsenceOverview({ className }: TimeClockAbsenceOverviewProps) {
+export function TimeClockAbsenceOverview({ className, onExportDataChange }: TimeClockAbsenceOverviewProps) {
   const { refMonth, start, end } = defaultPeriod();
   const [selectedMonth, setSelectedMonth] = useState<Date>(refMonth);
   const [startDate, setStartDate] = useState<Date>(start);
@@ -360,10 +372,21 @@ export function TimeClockAbsenceOverview({ className }: TimeClockAbsenceOverview
     setEndDate(e);
   };
 
-  const editingCategory =
-    editing ? (getJustificativaCategory(editing.JustificativaId) ?? "FALTA") : "FALTA";
-
   const { period, monthName } = getPayrollPeriodDisplay(selectedMonth);
+
+  // Push filtered data up to the parent so the page-header export button
+  // can mirror what the user sees on screen.
+  useEffect(() => {
+    if (!onExportDataChange) return;
+    const filterOpt = ABSENCE_FILTER_OPTIONS.find((o) => o.value === filterMode);
+    onExportDataChange({
+      rows: filteredAbsences.map(toAbsenceExportRow),
+      startDate,
+      endDate,
+      filterLabel: filterOpt?.label,
+    });
+    return () => onExportDataChange(null);
+  }, [filteredAbsences, startDate, endDate, filterMode, onExportDataChange]);
 
   return (
     <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
@@ -373,7 +396,9 @@ export function TimeClockAbsenceOverview({ className }: TimeClockAbsenceOverview
           {/* Left: colaborador → tipo */}
           <Combobox
             value={selectedUserId}
-            onValueChange={(v) => setSelectedUserId(v || ALL_USERS)}
+            onValueChange={(v) =>
+              setSelectedUserId(typeof v === "string" ? v : ALL_USERS)
+            }
             options={userOptions}
             placeholder="Todos os colaboradores"
             className="w-[260px]"
@@ -426,7 +451,9 @@ export function TimeClockAbsenceOverview({ className }: TimeClockAbsenceOverview
               <DateTimeInput
                 mode="date"
                 value={startDate}
-                onChange={(d) => d && setStartDate(d)}
+                onChange={(d) => {
+                  if (d instanceof Date) setStartDate(d);
+                }}
                 className="w-[140px]"
                 placeholder="Data inicial"
                 showClearButton={true}
@@ -435,7 +462,9 @@ export function TimeClockAbsenceOverview({ className }: TimeClockAbsenceOverview
               <DateTimeInput
                 mode="date"
                 value={endDate}
-                onChange={(d) => d && setEndDate(d)}
+                onChange={(d) => {
+                  if (d instanceof Date) setEndDate(d);
+                }}
                 className="w-[140px]"
                 placeholder="Data final"
                 showClearButton={true}
@@ -458,7 +487,6 @@ export function TimeClockAbsenceOverview({ className }: TimeClockAbsenceOverview
         <AbsenceFormDialog
           open
           onOpenChange={(open) => !open && setEditing(null)}
-          category={editingCategory}
           editing={editing}
         />
       )}

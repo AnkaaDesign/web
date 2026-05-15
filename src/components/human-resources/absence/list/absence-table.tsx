@@ -12,11 +12,9 @@ import {
 
 import type { SecullumAggregatedAbsence } from "../../../../types";
 import { groupAbsences } from "../../../../types";
-import { getJustificativaMeta, TONE_CLASSES } from "../../../../constants";
 import { useSecullumDeleteAbsence } from "../../../../hooks";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -34,7 +32,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
@@ -48,10 +45,6 @@ import { cn } from "@/lib/utils";
 
 interface AbsenceTableProps {
   absences: SecullumAggregatedAbsence[];
-  // When provided, the table renders one row per (absence × work-day) instead
-  // of one row per absence record. Used by the Faltas page so a 91-day atestado
-  // appears as ~60 rows (one per work-day in the visible period).
-  dayRows?: Array<SecullumAggregatedAbsence & { dayDate: Date }>;
   isLoading?: boolean;
   onEdit?: (record: SecullumAggregatedAbsence) => void;
   emptyText?: string;
@@ -59,24 +52,23 @@ interface AbsenceTableProps {
 
 const fmt = (iso: string) => format(new Date(iso), "dd/MM/yyyy", { locale: ptBR });
 
-// Brazilian short weekday labels with period suffix (matches "Seg.", "Ter.", etc.)
-const WEEKDAY_SHORT_PT = ["Dom.", "Seg.", "Ter.", "Qua.", "Qui.", "Sex.", "Sáb."];
-
 const daysBetween = (a: string, b: string) => {
   const ms = new Date(b).getTime() - new Date(a).getTime();
   return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)) + 1);
 };
 
+type ContextTarget =
+  | { kind: "single"; record: SecullumAggregatedAbsence }
+  | { kind: "group"; records: SecullumAggregatedAbsence[]; label: string };
+
 export function AbsenceTable({
   absences,
-  dayRows,
   isLoading,
   onEdit,
   emptyText = "Nenhum registro encontrado",
 }: AbsenceTableProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const deleteMut = useSecullumDeleteAbsence();
-  const isPerDayMode = Array.isArray(dayRows);
 
   const groups = useMemo(() => groupAbsences(absences), [absences]);
 
@@ -92,7 +84,7 @@ export function AbsenceTable({
   const handleDeleteOne = async (rec: SecullumAggregatedAbsence) => {
     try {
       await deleteMut.mutateAsync(rec.Id);
-      toast.success("Afastamento removido");
+      toast.success("Férias removidas");
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "Falha ao remover");
     }
@@ -113,14 +105,13 @@ export function AbsenceTable({
     else toast.warning(`${ok} removidos, ${fail} falharam`);
   };
 
-  // Right-click context menu state for the per-day Faltas table — matches the
-  // app's standard pattern (see position-table.tsx).
+  // Right-click context menu — app standard (see position-table.tsx).
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-    record: SecullumAggregatedAbsence;
+    target: ContextTarget;
   } | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<SecullumAggregatedAbsence | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ContextTarget | null>(null);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -133,154 +124,14 @@ export function AbsenceTable({
     };
   }, [contextMenu]);
 
-  const handleRowContextMenu = useCallback(
-    (e: React.MouseEvent, record: SecullumAggregatedAbsence) => {
+  const openContextMenu = useCallback(
+    (e: React.MouseEvent, target: ContextTarget) => {
       e.preventDefault();
       e.stopPropagation();
-      setContextMenu({ x: e.clientX, y: e.clientY, record });
+      setContextMenu({ x: e.clientX, y: e.clientY, target });
     },
     [],
   );
-
-  if (isPerDayMode) {
-    return (
-      <div className="rounded-lg flex flex-col overflow-hidden h-full">
-        <div className="flex-1 min-h-0 overflow-auto border border-border rounded-lg">
-          <Table className="text-sm">
-            <TableHeader className="sticky top-0 z-10 [&_tr]:border-b-0 [&_tr]:hover:bg-muted">
-              <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-                <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Data</TableHead>
-                <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Colaborador</TableHead>
-                <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Justificativa</TableHead>
-                <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Setor</TableHead>
-                <TableHead className="text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Motivo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <PerDaySkeletonRows />
-              ) : (dayRows?.length ?? 0) === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={5} className="p-0">
-                    <EmptyState text={emptyText} />
-                  </TableCell>
-                </TableRow>
-              ) : (
-                dayRows!.map((row, index) => {
-                  const meta = getJustificativaMeta(row.JustificativaId);
-                  return (
-                    <TableRow
-                      key={`${row.Id}-${row.dayDate.toISOString()}`}
-                      onContextMenu={(e) => handleRowContextMenu(e, row)}
-                      className={cn(
-                        "cursor-context-menu transition-colors border-b border-border [&>td]:py-2",
-                        index % 2 === 1 && "bg-muted/10",
-                        "hover:bg-muted/20",
-                      )}
-                    >
-                      <TableCell className="tabular-nums font-medium whitespace-nowrap px-4">
-                        {format(row.dayDate, "dd/MM/yy", { locale: ptBR })} -{" "}
-                        {WEEKDAY_SHORT_PT[row.dayDate.getDay()]}
-                      </TableCell>
-                      <TableCell className="font-medium px-4">{row.userName}</TableCell>
-                      <TableCell className="px-4">
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            "font-normal border-0",
-                            meta && TONE_CLASSES[meta.tone].bg,
-                            meta && TONE_CLASSES[meta.tone].text,
-                          )}
-                        >
-                          {meta?.label ?? row.JustificativaDescricao}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground px-4">
-                        {row.sectorName ?? "-"}
-                      </TableCell>
-                      <TableCell
-                        className="text-muted-foreground truncate max-w-[260px] px-4"
-                        title={row.Motivo ?? ""}
-                      >
-                        {row.Motivo || "-"}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        {contextMenu && (
-          <div className="fixed z-50" style={{ left: contextMenu.x, top: contextMenu.y }}>
-            <DropdownMenu open={true} onOpenChange={(o) => !o && setContextMenu(null)}>
-              <DropdownMenuTrigger asChild>
-                <div className="w-0 h-0" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                {onEdit && (
-                  <DropdownMenuItem
-                    onClick={() => {
-                      onEdit(contextMenu.record);
-                      setContextMenu(null);
-                    }}
-                  >
-                    <IconEdit className="mr-2 h-4 w-4" />
-                    Editar registro
-                  </DropdownMenuItem>
-                )}
-                {onEdit && <DropdownMenuSeparator />}
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={() => {
-                    setPendingDelete(contextMenu.record);
-                    setContextMenu(null);
-                  }}
-                >
-                  <IconTrash className="mr-2 h-4 w-4" />
-                  Remover registro completo
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
-
-        <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Remover registro de afastamento?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {pendingDelete && (
-                  <>
-                    Esta ação remove o registro completo de{" "}
-                    <strong>{pendingDelete.userName}</strong> de{" "}
-                    {format(new Date(pendingDelete.Inicio), "dd/MM/yyyy", { locale: ptBR })} a{" "}
-                    {format(new Date(pendingDelete.Fim), "dd/MM/yyyy", { locale: ptBR })}, não apenas
-                    este dia. Esta ação não pode ser desfeita.
-                  </>
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={async () => {
-                  if (pendingDelete) {
-                    await handleDeleteOne(pendingDelete);
-                    setPendingDelete(null);
-                  }
-                }}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Remover
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    );
-  }
 
   return (
     <div className="rounded-lg flex flex-col h-full overflow-hidden">
@@ -289,14 +140,11 @@ export function AbsenceTable({
           <TableHeader className="sticky top-0 z-10 [&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               <TableHead className="w-10 p-0 bg-muted border-b border-border" />
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Colaborador</TableHead>
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-28">Início</TableHead>
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-28">Fim</TableHead>
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-16 text-center">Dias</TableHead>
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Justificativa</TableHead>
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Setor</TableHead>
-              <TableHead className="text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border">Motivo</TableHead>
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-24 text-right pr-3">Ações</TableHead>
+              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-[28%]">Colaborador</TableHead>
+              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-[14%]">Início</TableHead>
+              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-[14%]">Fim</TableHead>
+              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-[8%] text-center">Dias</TableHead>
+              <TableHead className="text-foreground font-bold uppercase text-xs bg-muted px-4 py-2 border-b border-border w-[36%]">Setor</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -304,13 +152,12 @@ export function AbsenceTable({
               <SkeletonRows />
             ) : groups.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={9} className="p-0">
+                <TableCell colSpan={6} className="p-0">
                   <EmptyState text={emptyText} />
                 </TableCell>
               </TableRow>
             ) : (
               groups.map((g, index) => {
-                const meta = getJustificativaMeta(g.justificativaId);
                 const isOpen = expanded.has(g.groupId);
                 const head = g.records[0];
 
@@ -318,8 +165,11 @@ export function AbsenceTable({
                   return (
                     <TableRow
                       key={g.groupId}
+                      onContextMenu={(e) =>
+                        openContextMenu(e, { kind: "single", record: head })
+                      }
                       className={cn(
-                        "transition-colors border-b border-border [&>td]:py-2",
+                        "cursor-context-menu transition-colors border-b border-border [&>td]:py-2",
                         index % 2 === 1 && "bg-muted/10",
                         "hover:bg-muted/20",
                       )}
@@ -331,34 +181,8 @@ export function AbsenceTable({
                       <TableCell className="text-center tabular-nums text-muted-foreground px-4">
                         {daysBetween(head.Inicio, head.Fim)}
                       </TableCell>
-                      <TableCell className="px-4">
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            "font-normal border-0",
-                            meta && TONE_CLASSES[meta.tone].bg,
-                            meta && TONE_CLASSES[meta.tone].text,
-                          )}
-                        >
-                          {meta?.label ?? head.JustificativaDescricao}
-                        </Badge>
-                      </TableCell>
                       <TableCell className="text-muted-foreground px-4">
                         {head.sectorName ?? "-"}
-                      </TableCell>
-                      <TableCell
-                        className="text-muted-foreground truncate max-w-[260px] px-4"
-                        title={g.motivo}
-                      >
-                        {g.motivo || "-"}
-                      </TableCell>
-                      <TableCell className="text-right pr-3">
-                        <RowActions
-                          onEdit={onEdit ? () => onEdit(head) : undefined}
-                          onDelete={() => handleDeleteOne(head)}
-                          deleteTitle="Remover afastamento?"
-                          deleteDescription={`Esta ação não pode ser desfeita. O registro de ${head.userName} de ${fmt(head.Inicio)} a ${fmt(head.Fim)} será removido do Secullum.`}
-                        />
                       </TableCell>
                     </TableRow>
                   );
@@ -368,8 +192,15 @@ export function AbsenceTable({
                   <>
                     <TableRow
                       key={g.groupId}
+                      onContextMenu={(e) =>
+                        openContextMenu(e, {
+                          kind: "group",
+                          records: g.records,
+                          label: `${g.records.length} colaboradores`,
+                        })
+                      }
                       className={cn(
-                        "transition-colors border-b border-border [&>td]:py-2",
+                        "cursor-context-menu transition-colors border-b border-border [&>td]:py-2",
                         "bg-muted/30 hover:bg-muted/40",
                       )}
                     >
@@ -378,7 +209,10 @@ export function AbsenceTable({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 mx-auto"
-                          onClick={() => toggleExpand(g.groupId)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(g.groupId);
+                          }}
                           aria-label={isOpen ? "Recolher grupo" : "Expandir grupo"}
                         >
                           {isOpen ? (
@@ -402,38 +236,16 @@ export function AbsenceTable({
                       <TableCell className="text-center tabular-nums text-muted-foreground px-4">
                         {daysBetween(head.Inicio, head.Fim)}
                       </TableCell>
-                      <TableCell className="px-4">
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            "font-normal border-0",
-                            meta && TONE_CLASSES[meta.tone].bg,
-                            meta && TONE_CLASSES[meta.tone].text,
-                          )}
-                        >
-                          {meta?.label}
-                        </Badge>
-                      </TableCell>
                       <TableCell className="text-muted-foreground px-4">-</TableCell>
-                      <TableCell
-                        className="text-muted-foreground truncate max-w-[260px] px-4"
-                        title={g.motivo}
-                      >
-                        {g.motivo || "-"}
-                      </TableCell>
-                      <TableCell className="text-right pr-3">
-                        <RowActions
-                          onDelete={() => handleDeleteGroup(g.records)}
-                          deleteTitle="Remover afastamento coletivo?"
-                          deleteDescription={`Todos os ${g.records.length} registros do grupo serão removidos do Secullum. Esta ação não pode ser desfeita.`}
-                        />
-                      </TableCell>
                     </TableRow>
                     {isOpen &&
                       g.records.map((rec) => (
                         <TableRow
                           key={rec.Id}
-                          className="transition-colors border-b border-border [&>td]:py-2 hover:bg-muted/20"
+                          onContextMenu={(e) =>
+                            openContextMenu(e, { kind: "single", record: rec })
+                          }
+                          className="cursor-context-menu transition-colors border-b border-border [&>td]:py-2 hover:bg-muted/20"
                         >
                           <TableCell />
                           <TableCell className="pl-10 text-muted-foreground">
@@ -448,18 +260,8 @@ export function AbsenceTable({
                           <TableCell className="text-center tabular-nums text-muted-foreground px-4">
                             {daysBetween(rec.Inicio, rec.Fim)}
                           </TableCell>
-                          <TableCell />
                           <TableCell className="text-muted-foreground text-xs px-4">
                             {rec.sectorName ?? "-"}
-                          </TableCell>
-                          <TableCell />
-                          <TableCell className="text-right pr-3">
-                            <RowActions
-                              onEdit={onEdit ? () => onEdit(rec) : undefined}
-                              onDelete={() => handleDeleteOne(rec)}
-                              deleteTitle={`Remover registro de ${rec.userName}?`}
-                              deleteDescription="Apenas este colaborador será removido do grupo."
-                            />
                           </TableCell>
                         </TableRow>
                       ))}
@@ -470,54 +272,86 @@ export function AbsenceTable({
           </TableBody>
         </Table>
       </div>
-    </div>
-  );
-}
 
-function RowActions({
-  onEdit,
-  onDelete,
-  deleteTitle,
-  deleteDescription,
-}: {
-  onEdit?: () => void;
-  onDelete: () => void;
-  deleteTitle: string;
-  deleteDescription: string;
-}) {
-  return (
-    <div className="flex justify-end items-center gap-0.5">
-      {onEdit && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-          onClick={onEdit}
-          aria-label="Editar"
+      {contextMenu && (
+        <div
+          className="fixed z-50"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
         >
-          <IconEdit className="h-4 w-4" />
-        </Button>
-      )}
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-            aria-label="Remover"
+          <DropdownMenu
+            open={true}
+            onOpenChange={(o) => !o && setContextMenu(null)}
           >
-            <IconTrash className="h-4 w-4" />
-          </Button>
-        </AlertDialogTrigger>
+            <DropdownMenuTrigger asChild>
+              <div className="w-0 h-0" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              {contextMenu.target.kind === "single" && onEdit && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      onEdit((contextMenu.target as { kind: "single"; record: SecullumAggregatedAbsence }).record);
+                      setContextMenu(null);
+                    }}
+                  >
+                    <IconEdit className="mr-2 h-4 w-4" />
+                    Editar férias
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => {
+                  setPendingDelete(contextMenu.target);
+                  setContextMenu(null);
+                }}
+              >
+                <IconTrash className="mr-2 h-4 w-4" />
+                {contextMenu.target.kind === "group"
+                  ? "Remover férias coletivas"
+                  : "Remover férias"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+
+      <AlertDialog
+        open={!!pendingDelete}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{deleteTitle}</AlertDialogTitle>
-            <AlertDialogDescription>{deleteDescription}</AlertDialogDescription>
+            <AlertDialogTitle>
+              {pendingDelete?.kind === "group"
+                ? "Remover férias coletivas?"
+                : "Remover férias?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.kind === "group"
+                ? `Todos os ${pendingDelete.records.length} registros do grupo serão removidos do Secullum. Esta ação não pode ser desfeita.`
+                : pendingDelete && (
+                    <>
+                      O registro de <strong>{pendingDelete.record.userName}</strong> de{" "}
+                      {fmt(pendingDelete.record.Inicio)} a {fmt(pendingDelete.record.Fim)} será
+                      removido do Secullum. Esta ação não pode ser desfeita.
+                    </>
+                  )}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={onDelete}
+              onClick={async () => {
+                if (!pendingDelete) return;
+                if (pendingDelete.kind === "group") {
+                  await handleDeleteGroup(pendingDelete.records);
+                } else {
+                  await handleDeleteOne(pendingDelete.record);
+                }
+                setPendingDelete(null);
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Remover
@@ -526,34 +360,6 @@ function RowActions({
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function PerDaySkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 8 }).map((_, i) => (
-        <TableRow key={i} className="[&>td]:py-2 border-b border-border hover:bg-transparent">
-          <TableCell>
-            <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-            <div className="h-3 w-16 bg-muted animate-pulse rounded mt-1" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-40 bg-muted animate-pulse rounded" />
-          </TableCell>
-          <TableCell>
-            <div className="h-5 w-32 bg-muted animate-pulse rounded" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-          </TableCell>
-          <TableCell>
-            <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-          </TableCell>
-          <TableCell />
-        </TableRow>
-      ))}
-    </>
   );
 }
 
@@ -576,15 +382,8 @@ function SkeletonRows() {
             <div className="h-4 w-8 bg-muted animate-pulse rounded mx-auto" />
           </TableCell>
           <TableCell>
-            <div className="h-5 w-24 bg-muted animate-pulse rounded" />
-          </TableCell>
-          <TableCell>
             <div className="h-4 w-24 bg-muted animate-pulse rounded" />
           </TableCell>
-          <TableCell>
-            <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-          </TableCell>
-          <TableCell />
         </TableRow>
       ))}
     </>

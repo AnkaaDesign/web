@@ -4,14 +4,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Combobox } from '@/components/ui/combobox';
-import { routes, FAVORITE_PAGES } from '@/constants';
+import { cn } from '@/lib/utils';
+import { GOAL_METRIC, GOAL_METRIC_UNIT, routes, FAVORITE_PAGES } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
+import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
+import { GoalMetaPopover } from '@/components/statistics/goal-meta-popover';
 import { useQuoteFunnelAnalytics } from '@/hooks/financial/use-financial-analytics';
 import type { QuoteFunnelAnalyticsFilters } from '@/types/financial-analytics';
 import { StatisticsChart } from '@/components/statistics/statistics-chart';
@@ -397,6 +402,11 @@ const RevenueQuotesStatisticsPage = () => {
   const [yMode, setYMode] = useState<YMode>('value');
   const [chartType, setChartType] = useState<ChartTypeKey>('bar-stacked');
   const [trendLine, setTrendLine] = useState<TrendLineType | null>(null);
+  // Drill-down modal: opens when a clickable summary card is selected. The
+  // analytics endpoint doesn't return per-quote listings, so this is a
+  // placeholder UI with search + empty state for visual consistency.
+  const [drillDown, setDrillDown] = useState<{ title: string; subtitle?: string } | null>(null);
+  const [drillDownSearch, setDrillDownSearch] = useState('');
 
   const { data, isLoading, isError, error, refetch } = useQuoteFunnelAnalytics(filters);
   const summary = data?.data?.summary;
@@ -404,6 +414,31 @@ const RevenueQuotesStatisticsPage = () => {
   const items = data?.data?.items || [];
   const topCustomers = data?.data?.topCustomers || [];
   const topSectors = data?.data?.topSectors || [];
+
+  // 'value' mode shows currency totals → INVOICES_PAID (proxy for revenue
+  // booked in the period). 'count' mode shows new-quote counts → FINANCE_QUOTES_PER_PERIOD.
+  const goalMetric =
+    yMode === 'value' ? GOAL_METRIC.INVOICES_PAID : GOAL_METRIC.FINANCE_QUOTES_PER_PERIOD;
+
+  const [goalOverride, setGoalOverride] = useState<number | null>(null);
+
+  useEffect(() => {
+    setGoalOverride(null);
+  }, [yMode]);
+
+  const defaultGoal = useDefaultGoal({
+    metric: goalMetric,
+    period:
+      filters.startDate && filters.endDate
+        ? { from: filters.startDate, to: filters.endDate }
+        : null,
+    aggregation: 'AVERAGE_PER_PERIOD',
+    periodMode: 'calendar',
+  });
+
+  const goalValue = goalOverride ?? defaultGoal.value;
+  const goalSource: 'override' | 'default' | 'none' =
+    goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
@@ -590,9 +625,10 @@ const RevenueQuotesStatisticsPage = () => {
   }, [items]);
 
   const renderMainChart = () => {
+    const chartHeightStyle = { height: 'max(380px, calc(100vh - 460px))' };
     if (isLoading) {
       return (
-        <div style={{ height: 'calc(100vh - 460px)', minHeight: 460, maxHeight: 560 }} className="flex items-center justify-center">
+        <div style={chartHeightStyle} className="flex items-center justify-center">
           <div className="space-y-3">
             <Skeleton className="h-4 w-[250px]" />
             <Skeleton className="h-[380px] w-[600px]" />
@@ -602,7 +638,7 @@ const RevenueQuotesStatisticsPage = () => {
     }
     if (isError) {
       return (
-        <div style={{ height: 'calc(100vh - 460px)', minHeight: 460, maxHeight: 560 }} className="flex flex-col items-center justify-center gap-4">
+        <div style={chartHeightStyle} className="flex flex-col items-center justify-center gap-4">
           <IconAlertCircle className="h-12 w-12 text-destructive" />
           <div className="text-center">
             <p className="font-semibold">Erro ao carregar dados</p>
@@ -616,29 +652,28 @@ const RevenueQuotesStatisticsPage = () => {
     }
     if (!chartData.length) {
       return (
-        <div style={{ height: 'calc(100vh - 460px)', minHeight: 460, maxHeight: 560 }} className="flex flex-col items-center justify-center gap-4">
+        <div style={chartHeightStyle} className="flex flex-col items-center justify-center gap-4">
           <IconCalendarStats className="h-12 w-12 text-foreground/50" />
           <div className="text-center">
             <p className="font-semibold">Nenhum dado encontrado</p>
-            <p className="text-sm text-foreground/70">Ajuste os filtros para visualizar.</p>
+            <p className="text-sm text-foreground/70">Ajuste os filtros para visualizar os dados.</p>
           </div>
         </div>
       );
     }
     return (
-      <div style={{ height: 'calc(100vh - 460px)', minHeight: 460, maxHeight: 560 }}>
-        <StatisticsChart
-          data={chartData}
-          chartType={chartType as StatisticsChartType}
-          yAxisMode={yMode as YAxisMode}
-          isComparisonMode={isComparisonMode}
-          height="100%"
-          yAxisLabel={yMode === 'value' ? 'Valor (R$)' : 'Orçamentos'}
-          valueFormatter={valueFormatter}
-          trendLine={trendLine}
-          tooltipLabels={{ primary: yMode === 'value' ? 'Valor' : 'Orçamentos' }}
-        />
-      </div>
+      <StatisticsChart
+        data={chartData}
+        chartType={chartType as StatisticsChartType}
+        yAxisMode={yMode as YAxisMode}
+        isComparisonMode={isComparisonMode}
+        height="max(380px, calc(100vh - 460px))"
+        yAxisLabel={yMode === 'value' ? 'Valor (R$)' : 'Orçamentos'}
+        valueFormatter={valueFormatter}
+        trendLine={trendLine}
+        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
+        tooltipLabels={{ primary: yMode === 'value' ? 'Valor' : 'Orçamentos' }}
+      />
     );
   };
 
@@ -670,7 +705,7 @@ const RevenueQuotesStatisticsPage = () => {
                   Funil de Vendas & Receita
                 </CardTitle>
                 <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                  Evolução de orçamentos por estágio e receita liquidada.
+                  <span>Evolução de orçamentos por estágio e receita liquidada.</span>
                   <Badge variant="outline" className="text-xs">{yMode === 'value' ? 'R$' : 'Quantidade'}</Badge>
                   {trendLine && <Badge variant="outline" className="text-xs">Tendência: {TREND_LABELS[trendLine]}</Badge>}
                   {filters.startDate && (
@@ -726,6 +761,14 @@ const RevenueQuotesStatisticsPage = () => {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
+                <GoalMetaPopover
+                  value={goalValue}
+                  defaultValue={defaultGoal.value}
+                  source={goalSource}
+                  onOverride={setGoalOverride}
+                  unit={GOAL_METRIC_UNIT[goalMetric]}
+                />
+
                 <Button
                   variant={activeFilterCount > 0 ? 'default' : 'outline'}
                   size="sm"
@@ -760,17 +803,62 @@ const RevenueQuotesStatisticsPage = () => {
           </CardHeader>
 
           <CardContent className="space-y-5">
-            {/* KPI cards */}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Card>
+            {/* KPI cards — funnel stages + ticket + cycle. Clickable when there's drill-down data. */}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <Card
+                className={cn(
+                  'transition-colors',
+                  !isLoading && (summary?.totalQuotes ?? 0) > 0 && 'cursor-pointer hover:bg-muted/50',
+                )}
+                onClick={!isLoading && (summary?.totalQuotes ?? 0) > 0
+                  ? () => setDrillDown({ title: 'Orçamentos Criados', subtitle: `${formatNumber(summary?.totalQuotes ?? 0, 0)} no período` })
+                  : undefined}
+                role={!isLoading && (summary?.totalQuotes ?? 0) > 0 ? 'button' : undefined}
+                tabIndex={!isLoading && (summary?.totalQuotes ?? 0) > 0 ? 0 : undefined}
+                onKeyDown={e => {
+                  if (!isLoading && (summary?.totalQuotes ?? 0) > 0 && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    setDrillDown({ title: 'Orçamentos Criados', subtitle: `${formatNumber(summary?.totalQuotes ?? 0, 0)} no período` });
+                  }
+                }}
+              >
                 <CardContent className="py-3 px-4">
                   <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                    <IconCash className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> Receita Liquidada
+                    <IconReceipt className="h-3.5 w-3.5" /> Orçamentos
+                  </div>
+                  {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
+                    <div className="text-xl font-bold text-foreground mt-0.5">{formatNumber(summary?.totalQuotes ?? 0, 0)}</div>}
+                  <div className="text-[11px] text-foreground/70 mt-0.5">
+                    {formatCurrency(summary?.totalQuotedValue ?? 0)} orçados
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={cn(
+                  'transition-colors',
+                  !isLoading && (summary?.totalSettledValue ?? 0) > 0 && 'cursor-pointer hover:bg-muted/50',
+                )}
+                onClick={!isLoading && (summary?.totalSettledValue ?? 0) > 0
+                  ? () => setDrillDown({ title: 'Orçamentos Liquidados', subtitle: formatCurrency(summary?.totalSettledValue ?? 0) })
+                  : undefined}
+                role={!isLoading && (summary?.totalSettledValue ?? 0) > 0 ? 'button' : undefined}
+                tabIndex={!isLoading && (summary?.totalSettledValue ?? 0) > 0 ? 0 : undefined}
+                onKeyDown={e => {
+                  if (!isLoading && (summary?.totalSettledValue ?? 0) > 0 && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    setDrillDown({ title: 'Orçamentos Liquidados', subtitle: formatCurrency(summary?.totalSettledValue ?? 0) });
+                  }
+                }}
+              >
+                <CardContent className="py-3 px-4">
+                  <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
+                    <IconCash className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> Liquidados
                   </div>
                   {isLoading ? <Skeleton className="h-7 w-28 mt-1" /> :
-                    <div className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(summary?.totalSettledValue ?? 0)}</div>}
+                    <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">{formatCurrency(summary?.totalSettledValue ?? 0)}</div>}
                   <div className="text-[11px] text-foreground/70 mt-0.5">
-                    de <span className="font-medium text-foreground/85">{formatCurrency(summary?.totalQuotedValue ?? 0)}</span> orçados
+                    Receita efetiva no período
                   </div>
                 </CardContent>
               </Card>
@@ -783,7 +871,7 @@ const RevenueQuotesStatisticsPage = () => {
                   {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
                     <div className="text-xl font-bold text-foreground mt-0.5">{formatPercentage(summary?.conversionRate ?? 0)}</div>}
                   <div className="text-[11px] text-foreground/70 mt-0.5">
-                    Orçamentos liquidados ÷ criados
+                    Liquidados ÷ criados
                   </div>
                 </CardContent>
               </Card>
@@ -796,7 +884,7 @@ const RevenueQuotesStatisticsPage = () => {
                   {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> :
                     <div className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(summary?.avgTicket ?? 0)}</div>}
                   <div className="text-[11px] text-foreground/70 mt-0.5">
-                    Valor médio por orçamento liquidado
+                    Valor médio por liquidado
                   </div>
                 </CardContent>
               </Card>
@@ -804,30 +892,45 @@ const RevenueQuotesStatisticsPage = () => {
               <Card>
                 <CardContent className="py-3 px-4">
                   <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                    <IconClock className="h-3.5 w-3.5" /> Ciclo de Venda
+                    <IconClock className="h-3.5 w-3.5" /> Ciclo de Fechamento
                   </div>
                   {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
                     <div className="text-xl font-bold text-foreground mt-0.5">{formatNumber(summary?.avgSalesCycleDays ?? 0, 1)} dias</div>}
                   <div className="text-[11px] text-foreground/70 mt-0.5">
-                    Da criação até a aprovação de faturamento
+                    Criação até faturamento
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={cn(
+                  'transition-colors',
+                  !isLoading && (summary?.activeBacklogValue ?? 0) > 0 && 'cursor-pointer hover:bg-muted/50',
+                )}
+                onClick={!isLoading && (summary?.activeBacklogValue ?? 0) > 0
+                  ? () => setDrillDown({ title: 'Backlog Ativo', subtitle: `${formatCurrency(summary?.activeBacklogValue ?? 0)} em andamento` })
+                  : undefined}
+                role={!isLoading && (summary?.activeBacklogValue ?? 0) > 0 ? 'button' : undefined}
+                tabIndex={!isLoading && (summary?.activeBacklogValue ?? 0) > 0 ? 0 : undefined}
+                onKeyDown={e => {
+                  if (!isLoading && (summary?.activeBacklogValue ?? 0) > 0 && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    setDrillDown({ title: 'Backlog Ativo', subtitle: `${formatCurrency(summary?.activeBacklogValue ?? 0)} em andamento` });
+                  }
+                }}
+              >
+                <CardContent className="py-3 px-4">
+                  <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
+                    <IconLayoutGrid className="h-3.5 w-3.5 text-primary" /> Backlog Ativo
+                  </div>
+                  {isLoading ? <Skeleton className="h-7 w-28 mt-1" /> :
+                    <div className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(summary?.activeBacklogValue ?? 0)}</div>}
+                  <div className="text-[11px] text-foreground/70 mt-0.5">
+                    Receita prevista no pipeline
                   </div>
                 </CardContent>
               </Card>
             </div>
-
-            {/* Backlog snapshot */}
-            <Card className="border-primary/30 bg-primary/[0.04]">
-              <CardContent className="py-3 px-4 flex flex-wrap items-center gap-x-6 gap-y-2">
-                <div className="flex items-center gap-2">
-                  <IconLayoutGrid className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium text-foreground">Backlog ativo:</span>
-                  <span className="text-sm font-bold text-foreground">{formatCurrency(summary?.activeBacklogValue ?? 0)}</span>
-                </div>
-                <div className="text-xs text-foreground/75">
-                  Soma de orçamentos não liquidados em andamento — receita prevista no pipeline.
-                </div>
-              </CardContent>
-            </Card>
 
             {/* Main chart */}
             <Card>
@@ -960,6 +1063,53 @@ const RevenueQuotesStatisticsPage = () => {
         yMode={yMode}
         onApply={(f, m) => { setFilters(f); setYMode(m); }}
       />
+
+      {/* Drill-down placeholder modal — per-quote listings aren't returned by
+          the analytics endpoint yet, so this renders a search bar and an empty
+          state for UI consistency with other statistics pages. */}
+      <Dialog
+        open={!!drillDown}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDrillDown(null);
+            setDrillDownSearch('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconReceipt className="h-5 w-5 text-primary" />
+              {drillDown?.title}
+              {drillDown?.subtitle && (
+                <Badge variant="secondary" className="ml-2">{drillDown.subtitle}</Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Lista dos orçamentos correspondentes a esta etapa do funil no período filtrado.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 pt-2">
+            <Input
+              placeholder="Buscar por número, cliente ou setor..."
+              value={drillDownSearch}
+              onChange={(v) => setDrillDownSearch(v == null ? '' : String(v))}
+              className="w-full"
+            />
+            <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+              <IconCalendarStats className="h-12 w-12 text-foreground/40" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Detalhamento por orçamento em breve</p>
+                <p className="text-xs text-foreground/65 mt-1 max-w-sm">
+                  A listagem individual de cada orçamento ainda não é exposta por esta tela.
+                  Por enquanto, consulte a página de Orçamentos para o registro completo.
+                </p>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -30,7 +30,6 @@ const H = 595.28;
 const ML = 40;
 const MR = 40;
 const MT = 28;
-const MB = 50;
 const CW = W - ML - MR;
 
 function hexToRgb(hex: string) {
@@ -342,7 +341,9 @@ export async function exportProductivityPdf(opts: ProductivityPdfOptions): Promi
 
   // 3. Save and trigger download.
   const pdfBytes = await doc.save();
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  // Cast to BlobPart to satisfy TS lib.dom that may otherwise widen the
+  // backing buffer to `ArrayBufferLike` (which can include SharedArrayBuffer).
+  const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   const ts = new Date();

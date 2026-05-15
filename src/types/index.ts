@@ -16,6 +16,7 @@ export * from "./economic-activity";
 export * from "./ppe";
 export * from "./externalWithdrawal";
 export * from "./file";
+export * from "./goal";
 export * from "./holiday";
 export * from "./invoice";
 export * from "./item";

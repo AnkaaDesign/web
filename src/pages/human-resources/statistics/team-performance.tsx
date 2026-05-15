@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,45 +10,65 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Combobox } from '@/components/ui/combobox';
-import { routes } from '@/constants';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import { GOAL_METRIC, routes } from '@/constants';
+import { USER_STATUS, ACTIVE_USER_STATUSES } from '@/constants/enums';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
-import { useTeamPerformance, getHrComparisonType } from '@/hooks/human-resources/use-hr-analytics';
-import type { HrAnalyticsFilters, HrChartType } from '@/types/hr-analytics';
-import { StatisticsChart } from '@/components/statistics/statistics-chart';
-import { formatNumber, formatPercentage } from '@/types/statistics-common';
-import type { YAxisMode } from '@/types/statistics-common';
+import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
+import { useHeadcountAnalytics, useTurnoverAnalytics, hrAnalyticsKeys } from '@/hooks/human-resources/use-hr-analytics';
+import { useUsers } from '@/hooks/human-resources/use-user';
+import { useSectors } from '@/hooks/administration/use-sector';
+import { usePositions } from '@/hooks/human-resources/use-position';
+import type { HeadcountFilters, HrChartType, HeadcountTimeseriesItem, HeadcountResponse, TurnoverFilters } from '@/types/hr-analytics';
+import { getHeadcount } from '@/api-client/hr-analytics';
+import { useQueries } from '@tanstack/react-query';
+import { StatisticsChart, type StatisticsChartHandle } from '@/components/statistics/statistics-chart';
+import { formatNumber } from '@/types/statistics-common';
+import type { YAxisMode, TrendLineType } from '@/types/statistics-common';
 import { getSectors } from '@/api-client/sector';
-import { sectorKeys } from '@/hooks/common/query-keys';
+import { getPositions } from '@/api-client/position';
+import { sectorKeys, positionKeys } from '@/hooks/common/query-keys';
 import {
   IconChartBar,
-  IconChartPie,
   IconChartLine,
+  IconChartArea,
+  IconStack2,
   IconFilter,
   IconDownload,
   IconRefresh,
   IconAlertCircle,
   IconUsers,
-  IconStar,
-  IconAlertTriangle,
-  IconChartArea,
-  IconStack2,
   IconBuilding,
   IconCalendar,
-  IconNumbers,
-  IconRuler,
   IconX,
   IconCalendarStats,
+  IconUserPlus,
+  IconUserMinus,
+  IconInfoCircle,
+  IconBriefcase,
+  IconTrendingUp,
+  IconArrowsExchange,
+  IconPercentage,
+  IconTarget,
+  IconFileTypeCsv,
+  IconFileTypeXls,
 } from '@tabler/icons-react';
-import { format, startOfDay, endOfDay, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format, startOfDay, endOfDay } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { toast } from '@/components/ui/sonner';
+import * as XLSX from 'xlsx';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
 // =====================
@@ -58,191 +78,221 @@ import {
 const COMBOBOX_PAGE_SIZE = 20;
 
 const MONTH_OPTIONS = [
-  { value: '01', label: 'Janeiro' },
-  { value: '02', label: 'Fevereiro' },
-  { value: '03', label: 'Março' },
-  { value: '04', label: 'Abril' },
-  { value: '05', label: 'Maio' },
-  { value: '06', label: 'Junho' },
-  { value: '07', label: 'Julho' },
-  { value: '08', label: 'Agosto' },
-  { value: '09', label: 'Setembro' },
-  { value: '10', label: 'Outubro' },
-  { value: '11', label: 'Novembro' },
-  { value: '12', label: 'Dezembro' },
+  { value: '01', label: 'Janeiro' }, { value: '02', label: 'Fevereiro' },
+  { value: '03', label: 'Março' }, { value: '04', label: 'Abril' },
+  { value: '05', label: 'Maio' }, { value: '06', label: 'Junho' },
+  { value: '07', label: 'Julho' }, { value: '08', label: 'Agosto' },
+  { value: '09', label: 'Setembro' }, { value: '10', label: 'Outubro' },
+  { value: '11', label: 'Novembro' }, { value: '12', label: 'Dezembro' },
 ];
 
 const generateYearOptions = () => {
   const currentYear = new Date().getFullYear();
-  const years = [];
-  for (let i = 0; i <= 3; i++) {
-    const year = currentYear - i;
-    years.push({ value: year.toString(), label: year.toString() });
-  }
-  return years;
+  return Array.from({ length: 4 }, (_, i) => {
+    const y = currentYear - i;
+    return { value: y.toString(), label: y.toString() };
+  });
 };
 
 const YEAR_OPTIONS = generateYearOptions();
 
-const WARNING_CATEGORY_LABELS: Record<string, string> = {
-  SAFETY: 'Segurança',
-  MISCONDUCT: 'Má Conduta',
-  INSUBORDINATION: 'Insubordinação',
-  POLICY_VIOLATION: 'Violação de Política',
-  ATTENDANCE: 'Frequência',
-  PERFORMANCE: 'Desempenho',
-  BEHAVIOR: 'Comportamento',
-  OTHER: 'Outros',
-};
+type EquipeYAxisMode = 'headcount' | 'newHires' | 'dismissals' | 'netChange';
 
-type TeamYAxisMode = 'headcount' | 'warnings' | 'turnover';
-
-const Y_AXIS_OPTIONS: Array<{ value: TeamYAxisMode; label: string }> = [
-  { value: 'headcount', label: 'Efetivo (pessoas)' },
-  { value: 'warnings', label: 'Advertências' },
-  { value: 'turnover', label: 'Turnover (%)' },
+const Y_AXIS_OPTIONS: Array<{ value: EquipeYAxisMode; label: string }> = [
+  { value: 'headcount', label: 'Efetivo total' },
+  { value: 'newHires', label: 'Admissões' },
+  { value: 'dismissals', label: 'Desligamentos' },
+  { value: 'netChange', label: 'Variação líquida' },
 ];
 
-const getAvailableChartTypes = (isComparisonMode: boolean): Array<{
-  value: HrChartType;
-  label: string;
-  icon: typeof IconChartBar;
-  description: string;
-}> => {
-  const baseTypes: Array<{
-    value: HrChartType;
-    label: string;
-    icon: typeof IconChartBar;
-    description: string;
-  }> = [
-    { value: 'bar', label: 'Barras', icon: IconChartBar, description: 'Gráfico de barras vertical' },
-    { value: 'line', label: 'Linhas', icon: IconChartLine, description: 'Gráfico de linhas' },
-    { value: 'area', label: 'Área', icon: IconChartArea, description: 'Gráfico de área' },
-  ];
+const Y_AXIS_LABEL_BY_MODE: Record<EquipeYAxisMode, string> = {
+  headcount: 'Efetivo total',
+  newHires: 'Admissões',
+  dismissals: 'Desligamentos',
+  netChange: 'Variação líquida',
+};
 
-  if (isComparisonMode) {
-    baseTypes.push({ value: 'bar-stacked', label: 'Barras Empilhadas', icon: IconStack2, description: 'Barras empilhadas para comparação' });
-  } else {
-    baseTypes.push({ value: 'pie', label: 'Pizza', icon: IconChartPie, description: 'Gráfico de pizza' });
-  }
+type EquipeCompareMode = 'combined' | 'separated' | 'separatedWithTotal';
 
-  return baseTypes;
+const COMPARE_MODE_OPTIONS: Array<{ value: EquipeCompareMode; label: string }> = [
+  { value: 'combined',           label: 'Combinado (uma série)' },
+  { value: 'separated',          label: 'Separado (por entidade)' },
+  { value: 'separatedWithTotal', label: 'Separado + Total' },
+];
+
+const CHART_TYPE_OPTIONS: Array<{ value: HrChartType; label: string; icon: typeof IconChartBar; description: string }> = [
+  { value: 'area', label: 'Área', icon: IconChartArea, description: 'Área preenchida' },
+  { value: 'bar', label: 'Barras', icon: IconChartBar, description: 'Barras verticais' },
+  { value: 'line', label: 'Linhas', icon: IconChartLine, description: 'Linha simples' },
+  { value: 'bar-stacked', label: 'Empilhadas', icon: IconStack2, description: 'Empilhamento de séries' },
+];
+
+const TREND_LABELS: Record<TrendLineType, string> = {
+  linear: 'Linear', sma3: 'Média 3m', sma6: 'Média 6m', sma12: 'Média 12m',
 };
 
 // =====================
-// Filter Sheet Component
+// Business period helpers (26→25)
 // =====================
-
-interface TeamFiltersProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  filters: HrAnalyticsFilters;
-  onApply: (filters: HrAnalyticsFilters) => void;
-  onReset: () => void;
-  yAxisMode: TeamYAxisMode;
-  onYAxisModeChange: (mode: TeamYAxisMode) => void;
+//
+// Mirrors the helpers used by `productivity.tsx` and `bonus-value.tsx`. The
+// "business month M of year Y" refers to the cycle ending on 25/M/Y — so
+// today=2026-05-14 belongs to period (2026, 5) which runs 26/04 → 25/05.
+function businessPeriodStartDate(year: number, month: number): Date {
+  if (month === 1) return startOfDay(new Date(year - 1, 11, 26));
+  return startOfDay(new Date(year, month - 2, 26));
+}
+function businessPeriodEndDate(year: number, month: number): Date {
+  return endOfDay(new Date(year, month - 1, 25));
+}
+function getCurrentBusinessPeriod(): { year: number; month: number } {
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth() + 1;
+  if (now.getDate() > 25) {
+    month += 1;
+    if (month > 12) { month = 1; year += 1; }
+  }
+  return { year, month };
 }
 
-function TeamFilters({
-  open,
-  onOpenChange,
-  filters,
-  onApply,
-  onReset: _onReset,
-  yAxisMode,
-  onYAxisModeChange,
-}: TeamFiltersProps) {
-  const [localFilters, setLocalFilters] = useState<HrAnalyticsFilters>(filters);
-  const [localYAxisMode, setLocalYAxisMode] = useState<TeamYAxisMode>(yAxisMode);
-  const [selectedYear, setSelectedYear] = useState<number | undefined>(undefined);
-  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+function defaultBusinessPeriodRange(): { startDate: Date; endDate: Date; year: number; month: number } {
+  const bp = getCurrentBusinessPeriod();
+  return {
+    startDate: businessPeriodStartDate(bp.year, bp.month),
+    endDate: businessPeriodEndDate(bp.year, bp.month),
+    year: bp.year,
+    month: bp.month,
+  };
+}
+
+const DEFAULT_FILTERS_BASE = {
+  includeInactive: false,
+  includeUnassigned: true,
+  useBusinessPeriod: true,
+} as const;
+
+// =====================
+// Filter Sheet
+// =====================
+
+interface EquipeFiltersProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  filters: HeadcountFilters;
+  selectedYear: number | undefined;
+  selectedMonths: string[];
+  yAxisMode: EquipeYAxisMode;
+  compareMode: EquipeCompareMode;
+  includeExperienceFailures: boolean;
+  onApply: (next: {
+    filters: HeadcountFilters;
+    selectedYear: number | undefined;
+    selectedMonths: string[];
+    yAxisMode: EquipeYAxisMode;
+    compareMode: EquipeCompareMode;
+    includeExperienceFailures: boolean;
+  }) => void;
+}
+
+function EquipeFilters({
+  open, onOpenChange, filters, selectedYear, selectedMonths, yAxisMode, compareMode,
+  includeExperienceFailures, onApply,
+}: EquipeFiltersProps) {
+  const [local, setLocal] = useState<HeadcountFilters>(filters);
+  const [localYMode, setLocalYMode] = useState<EquipeYAxisMode>(yAxisMode);
+  const [localYear, setLocalYear] = useState<number | undefined>(selectedYear);
+  const [localMonths, setLocalMonths] = useState<string[]>(selectedMonths);
+  const [localCmp, setLocalCmp] = useState<EquipeCompareMode>(compareMode);
+  const [localIncExpFail, setLocalIncExpFail] = useState<boolean>(includeExperienceFailures);
 
   useEffect(() => {
     if (open) {
-      setLocalFilters(filters);
-      setLocalYAxisMode(yAxisMode);
-      setSelectedYear(undefined);
-      setSelectedMonths([]);
+      setLocal(filters);
+      setLocalYMode(yAxisMode);
+      setLocalYear(selectedYear);
+      setLocalMonths(selectedMonths);
+      setLocalCmp(compareMode);
+      setLocalIncExpFail(includeExperienceFailures);
     }
-  }, [open, filters, yAxisMode]);
+  }, [open, filters, yAxisMode, selectedYear, selectedMonths, compareMode, includeExperienceFailures]);
 
-  const fetchSectors = useCallback(async (search: string, page: number = 1) => {
-    const response = await getSectors({
-      searchingFor: search || undefined,
-      page,
-      limit: COMBOBOX_PAGE_SIZE,
-    });
+  const localSectors = local.sectorIds ?? [];
+  const localPositions = local.positionIds ?? [];
+  const canCompare = localSectors.length >= 2 || localPositions.length >= 2;
+
+  const fetchSectors = useCallback(async (search: string, page = 1) => {
+    const response = await getSectors({ searchingFor: search || undefined, page, limit: COMBOBOX_PAGE_SIZE });
     return {
-      data: (response.data || []).map((sector) => ({
-        value: sector.id,
-        label: sector.name,
-      })),
+      data: (response.data || []).map(s => ({ value: s.id, label: s.name })),
+      hasMore: response.meta?.hasNextPage || false,
+    };
+  }, []);
+
+  const fetchPositions = useCallback(async (search: string, page = 1) => {
+    const response = await getPositions({ searchingFor: search || undefined, page, limit: COMBOBOX_PAGE_SIZE });
+    return {
+      data: (response.data || []).map(p => ({ value: p.id, label: p.name })),
       hasMore: response.meta?.hasNextPage || false,
     };
   }, []);
 
   const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (localFilters.sectorIds && localFilters.sectorIds.length > 0) count++;
-    if (selectedMonths.length > 0) count++;
-    return count;
-  }, [localFilters, selectedMonths]);
-
-  const buildPeriods = useCallback(() => {
-    if (!selectedYear || selectedMonths.length < 2) return undefined;
-    return selectedMonths
-      .sort((a, b) => parseInt(a) - parseInt(b))
-      .map((monthStr) => {
-        const monthNum = parseInt(monthStr);
-        const monthStart = startOfMonth(new Date(selectedYear, monthNum - 1));
-        const monthEnd = endOfMonth(new Date(selectedYear, monthNum - 1));
-        const label = MONTH_OPTIONS.find((m) => m.value === monthStr)?.label || monthStr;
-        return {
-          id: `${selectedYear}-${monthStr}`,
-          label: `${label} ${selectedYear}`,
-          startDate: startOfDay(monthStart),
-          endDate: endOfDay(monthEnd),
-        };
-      });
-  }, [selectedYear, selectedMonths]);
+    let n = 0;
+    if (local.sectorIds?.length) n++;
+    if (local.positionIds?.length) n++;
+    if (localYear || localMonths.length > 0) n++;
+    if (canCompare && localCmp !== 'combined') n++;
+    if (localIncExpFail) n++;
+    return n;
+  }, [local, localMonths, localYear, canCompare, localCmp, localIncExpFail]);
 
   const handleApply = useCallback(() => {
-    let finalFilters = { ...localFilters };
-
-    if (selectedYear && selectedMonths.length > 0) {
-      if (selectedMonths.length === 1) {
-        const monthNum = parseInt(selectedMonths[0]);
-        finalFilters.startDate = startOfDay(startOfMonth(new Date(selectedYear, monthNum - 1)));
-        finalFilters.endDate = endOfDay(endOfMonth(new Date(selectedYear, monthNum - 1)));
-        finalFilters.periods = undefined;
-      } else {
-        const periods = buildPeriods();
-        finalFilters.periods = periods;
-        const monthNums = selectedMonths.map((m) => parseInt(m));
-        finalFilters.startDate = startOfDay(startOfMonth(new Date(selectedYear, Math.min(...monthNums) - 1)));
-        finalFilters.endDate = endOfDay(endOfMonth(new Date(selectedYear, Math.max(...monthNums) - 1)));
-      }
+    const next: HeadcountFilters = { ...local };
+    if (localYear && localMonths.length > 0) {
+      // Use business-period semantics (26→25) so the dataset stays consistent
+      // with productivity.tsx and bonus-value.tsx.
+      const monthNums = localMonths.map(m => parseInt(m, 10));
+      const minM = Math.min(...monthNums);
+      const maxM = Math.max(...monthNums);
+      next.startDate = businessPeriodStartDate(localYear, minM);
+      next.endDate = businessPeriodEndDate(localYear, maxM);
+    } else if (localYear) {
+      next.startDate = businessPeriodStartDate(localYear, 1);
+      next.endDate = businessPeriodEndDate(localYear, 12);
     } else {
-      finalFilters.periods = undefined;
+      // No year selected → fall back to the current business period so the
+      // chart never goes empty after clearing the dropdowns.
+      const def = defaultBusinessPeriodRange();
+      next.startDate = def.startDate;
+      next.endDate = def.endDate;
     }
-
-    onApply(finalFilters);
-    onYAxisModeChange(localYAxisMode);
+    onApply({
+      filters: next,
+      selectedYear: localYear,
+      selectedMonths: localMonths,
+      yAxisMode: localYMode,
+      compareMode: canCompare ? localCmp : 'combined',
+      includeExperienceFailures: localIncExpFail,
+    });
     onOpenChange(false);
-  }, [localFilters, selectedYear, selectedMonths, buildPeriods, onApply, onOpenChange, localYAxisMode, onYAxisModeChange]);
+  }, [local, localYear, localMonths, localYMode, localCmp, canCompare, localIncExpFail, onApply, onOpenChange]);
 
   const handleClear = useCallback(() => {
-    const defaultFilters: HrAnalyticsFilters = {
-      startDate: startOfDay(subMonths(new Date(), 6)),
-      endDate: endOfDay(new Date()),
-      sortBy: 'headcount',
-      sortOrder: 'desc',
-      limit: 50,
-    };
-    setLocalFilters(defaultFilters);
-    setLocalYAxisMode('headcount');
-    setSelectedYear(undefined);
-    setSelectedMonths([]);
+    // Clearing snaps back to the full current year (Jan→Dec, business-period
+    // aware) so the chart shows 12 months of trend by default — matching
+    // productivity.tsx. A single-month default makes the chart look empty.
+    const y = new Date().getFullYear();
+    setLocal({
+      startDate: businessPeriodStartDate(y, 1),
+      endDate: businessPeriodEndDate(y, 12),
+      ...DEFAULT_FILTERS_BASE,
+    });
+    setLocalYMode('headcount');
+    setLocalYear(y);
+    setLocalMonths([]);
+    setLocalCmp('combined');
+    setLocalIncExpFail(false);
   }, []);
 
   return (
@@ -251,141 +301,168 @@ function TeamFilters({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
-            Equipe - Filtros
-            {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {activeFilterCount}
-              </Badge>
-            )}
+            Filtros
+            {activeFilterCount > 0 && <Badge variant="secondary">{activeFilterCount}</Badge>}
           </SheetTitle>
-          <SheetDescription>
-            Configure os filtros para refinar a análise da equipe
-          </SheetDescription>
+          <SheetDescription>Configure período, métrica, setores e cargos</SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="space-y-6 py-4">
-            {/* Limit */}
+          <div className="space-y-5 py-4">
+            {/* Y-axis */}
             <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <IconNumbers className="h-4 w-4" />
-                Número de Resultados
-              </Label>
-              <Input
-                type="number"
-                min={1}
-                max={200}
-                value={localFilters.limit || 50}
-                onChange={(value: string | number | null) => {
-                  const numValue = typeof value === 'number' ? value : (typeof value === 'string' ? parseInt(value) || 50 : 50);
-                  setLocalFilters({ ...localFilters, limit: numValue });
-                }}
-                placeholder="50"
-                className="bg-transparent"
-              />
-            </div>
-
-            {/* Y-Axis Mode */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <IconRuler className="h-4 w-4" />
-                Eixo Y (Gráfico)
-              </Label>
+              <Label className="text-sm font-medium">Métrica do gráfico</Label>
               <Combobox
-                value={localYAxisMode}
-                onValueChange={(value) => setLocalYAxisMode(value as TeamYAxisMode)}
+                value={localYMode}
+                onValueChange={v => setLocalYMode(v as EquipeYAxisMode)}
                 options={Y_AXIS_OPTIONS}
                 placeholder="Selecione..."
                 searchable={false}
                 clearable={false}
               />
-              <p className="text-xs text-muted-foreground">
-                Define o valor exibido no eixo Y do gráfico
-              </p>
             </div>
 
-            {/* Period Selection */}
+            {/* Year */}
             <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <IconCalendar className="h-4 w-4" />
-                Período
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <IconCalendar className="h-4 w-4" />Ano
               </Label>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-1">
-                  <Combobox
-                    value={selectedYear?.toString() || ''}
-                    onValueChange={(year) => {
-                      const yearStr = Array.isArray(year) ? year[0] : year;
-                      const newYear = yearStr ? parseInt(yearStr) : undefined;
-                      setSelectedYear(newYear);
-                      if (!newYear) setSelectedMonths([]);
-                    }}
-                    options={YEAR_OPTIONS}
-                    placeholder="Ano..."
-                    searchable={false}
-                    clearable={true}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Combobox
-                    mode="multiple"
-                    value={selectedMonths}
-                    onValueChange={(months) => {
-                      if (Array.isArray(months)) setSelectedMonths(months);
-                      else if (months) setSelectedMonths([months]);
-                      else setSelectedMonths([]);
-                    }}
-                    options={MONTH_OPTIONS}
-                    placeholder={selectedYear ? 'Selecione os meses...' : 'Selecione um ano primeiro'}
-                    searchPlaceholder="Buscar meses..."
-                    emptyText="Nenhum mês encontrado"
-                    disabled={!selectedYear}
-                    searchable={true}
-                    clearable={true}
-                  />
-                </div>
-              </div>
+              <Combobox
+                value={localYear?.toString() || ''}
+                onValueChange={v => {
+                  const s = Array.isArray(v) ? v[0] : v;
+                  const n = s ? parseInt(s, 10) : undefined;
+                  setLocalYear(n);
+                  if (!n) setLocalMonths([]);
+                }}
+                options={YEAR_OPTIONS}
+                placeholder="Selecione um ano..."
+                searchable={false}
+                clearable={true}
+              />
             </div>
 
-            {/* Sectors Filter */}
+            {/* Months */}
             <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <IconBuilding className="h-4 w-4" />
-                Setores
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <IconCalendarStats className="h-4 w-4" />Meses
+              </Label>
+              <Combobox
+                mode="multiple"
+                value={localMonths}
+                onValueChange={v => {
+                  if (Array.isArray(v)) setLocalMonths(v);
+                  else if (v) setLocalMonths([v]);
+                  else setLocalMonths([]);
+                }}
+                options={MONTH_OPTIONS}
+                placeholder={localYear ? 'Todos os meses...' : 'Selecione um ano primeiro'}
+                disabled={!localYear}
+                searchable={true}
+                clearable={true}
+              />
+            </div>
+
+            {/* Sectors */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <IconBuilding className="h-4 w-4" />Setores
               </Label>
               <Combobox
                 mode="multiple"
                 async
-                value={localFilters.sectorIds || []}
-                onValueChange={(value) => setLocalFilters({
-                  ...localFilters,
-                  sectorIds: Array.isArray(value) && value.length > 0 ? value : undefined,
+                value={local.sectorIds || []}
+                onValueChange={v => setLocal({
+                  ...local,
+                  sectorIds: Array.isArray(v) && v.length > 0 ? v : undefined,
                 })}
                 queryKey={[...sectorKeys.lists()]}
                 queryFn={fetchSectors}
                 minSearchLength={0}
-                placeholder="Selecione setores..."
+                placeholder="Todos os setores..."
                 searchPlaceholder="Buscar setor..."
                 emptyText="Nenhum setor encontrado"
-                loadingText="Carregando setores..."
                 searchable={true}
                 clearable={true}
               />
-              <p className="text-xs text-muted-foreground">
-                Selecione 2+ setores para modo de comparação
-              </p>
             </div>
+
+            {/* Positions */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <IconBriefcase className="h-4 w-4" />Cargos
+              </Label>
+              <Combobox
+                mode="multiple"
+                async
+                value={local.positionIds || []}
+                onValueChange={v => setLocal({
+                  ...local,
+                  positionIds: Array.isArray(v) && v.length > 0 ? v : undefined,
+                })}
+                queryKey={[...positionKeys.lists()]}
+                queryFn={fetchPositions}
+                minSearchLength={0}
+                placeholder="Todos os cargos..."
+                searchPlaceholder="Buscar cargo..."
+                emptyText="Nenhum cargo encontrado"
+                searchable={true}
+                clearable={true}
+              />
+            </div>
+
+            {/* Compare mode — only when 2+ sectors OR 2+ positions */}
+            {canCompare && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <IconUsers className="h-4 w-4" />
+                  Modo de Comparação
+                </Label>
+                <Combobox
+                  value={localCmp}
+                  onValueChange={v => setLocalCmp(v as EquipeCompareMode)}
+                  options={COMPARE_MODE_OPTIONS}
+                  placeholder="Selecione..."
+                  searchable={false}
+                  clearable={false}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {localSectors.length >= 2 && localPositions.length >= 2
+                    ? 'Comparação por setor (prioridade) — cargos selecionados são usados como filtro adicional.'
+                    : localSectors.length >= 2
+                      ? 'Comparação por setor.'
+                      : 'Comparação por cargo.'}
+                </p>
+              </div>
+            )}
+
+            {/* Toggle: include experience-period dismissals in the turnover
+                rate. Folded in from the (now removed) Rotatividade page. */}
+            <div className="space-y-2 pt-2 border-t">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-input"
+                  checked={localIncExpFail}
+                  onChange={e => setLocalIncExpFail(e.target.checked)}
+                />
+                <span className="flex-1 text-sm">
+                  <span className="font-medium">Reprovações em experiência</span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    Inclui desligamentos ocorridos durante o período de experiência (até 90 dias) no cálculo da rotatividade.
+                  </span>
+                </span>
+              </label>
+            </div>
+
           </div>
         </ScrollArea>
 
         <div className="flex gap-2 pt-4 border-t">
           <Button variant="outline" onClick={handleClear} className="flex-1">
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar Tudo
+            <IconX className="h-4 w-4 mr-2" />Limpar
           </Button>
-          <Button onClick={handleApply} className="flex-1">
-            Aplicar
-          </Button>
+          <Button onClick={handleApply} className="flex-1">Aplicar</Button>
         </div>
       </SheetContent>
     </Sheet>
@@ -393,346 +470,845 @@ function TeamFilters({
 }
 
 // =====================
-// Main Page Component
+// KPI Drill-down Modal — shows ACTUAL user records, not period summaries
+// =====================
+//
+// Clicking a KPI card opens this modal scoped to the page's current date range
+// and sector/position filters:
+//   • headcount   → all colaboradores active right now (status in ACTIVE set,
+//                   no dismissedAt) — admissão date shown
+//   • newHires    → colaboradores whose createdAt falls inside [start, end]
+//   • dismissals  → colaboradores whose dismissedAt falls inside [start, end]
+//   • netChange   → derivative, not clickable (the underlying records live in
+//                   newHires / dismissals KPIs)
+
+type TeamDrillDownMode = 'headcount' | 'newHires' | 'dismissals' | 'netChange';
+
+const DRILL_DOWN_CONFIG: Record<TeamDrillDownMode, {
+  title: string;
+  icon: typeof IconUsers;
+  dateColumn: 'admission' | 'dismissal';
+}> = {
+  headcount: { title: 'Efetivo Atual', icon: IconUsers, dateColumn: 'admission' },
+  newHires: { title: 'Admissões no período', icon: IconUserPlus, dateColumn: 'admission' },
+  dismissals: { title: 'Desligamentos no período', icon: IconUserMinus, dateColumn: 'dismissal' },
+  netChange: { title: 'Variação Líquida', icon: IconArrowsExchange, dateColumn: 'admission' },
+};
+
+interface TeamDrillDownModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  mode: TeamDrillDownMode | null;
+  startDate?: Date;
+  endDate?: Date;
+  sectorIds?: string[];
+  positionIds?: string[];
+}
+
+function TeamDrillDownModal({
+  open, onOpenChange, mode,
+  startDate, endDate, sectorIds, positionIds,
+}: TeamDrillDownModalProps) {
+  const [search, setSearch] = useState('');
+  useEffect(() => { if (open) setSearch(''); }, [open]);
+
+  const config = mode ? DRILL_DOWN_CONFIG[mode] : null;
+  const Icon = config?.icon ?? IconUsers;
+
+  // Build the useUsers query args from the mode. We rely on the same Prisma-
+  // like `where` shape that other pages use (UserGetManyFormData supports
+  // gte/lte on createdAt + dismissedAt, see schemas/user.ts).
+  const queryArgs = useMemo(() => {
+    if (!mode || mode === 'netChange') return null;
+
+    const where: Record<string, any> = {};
+
+    if (mode === 'headcount') {
+      // Active right now = currently-active status AND not dismissed.
+      where.status = { in: [...ACTIVE_USER_STATUSES] };
+      where.dismissedAt = null;
+    } else if (mode === 'newHires') {
+      if (startDate) {
+        where.createdAt = {
+          gte: startDate,
+          ...(endDate ? { lte: endDate } : {}),
+        };
+      }
+    } else if (mode === 'dismissals') {
+      where.status = USER_STATUS.DISMISSED;
+      if (startDate) {
+        where.dismissedAt = {
+          gte: startDate,
+          ...(endDate ? { lte: endDate } : {}),
+        };
+      } else {
+        where.dismissedAt = { not: null };
+      }
+    }
+
+    if (sectorIds?.length) {
+      where.sectorId = { in: sectorIds };
+    }
+    if (positionIds?.length) where.positionId = { in: positionIds };
+
+    return {
+      where,
+      orderBy: mode === 'dismissals'
+        ? { dismissedAt: 'desc' as const }
+        : { name: 'asc' as const },
+      include: { position: true, sector: true },
+      limit: 100,
+    };
+  }, [mode, startDate, endDate, sectorIds, positionIds]);
+
+  const { data: response, isLoading, isError } = useUsers(queryArgs ?? {}, {
+    enabled: open && !!queryArgs,
+  } as any);
+
+  const rawUsers: any[] = (response as any)?.data ?? [];
+
+  // For the "Efetivo Atual" mode we mirror the backend's `isActiveAt(now)`
+  // predicate (hr-statistics.service.ts → joinDate = effectedAt ?? createdAt).
+  // Without this the modal counts users whose effectedAt/createdAt is in the
+  // future (e.g. signed contracts not yet started) and ends up higher than
+  // the summary card by exactly those users.
+  const scopedUsers = useMemo(() => {
+    if (mode !== 'headcount') return rawUsers;
+    const now = Date.now();
+    return rawUsers.filter(u => {
+      const join = u.effectedAt ?? u.createdAt;
+      if (!join) return true;
+      return new Date(join).getTime() <= now;
+    });
+  }, [rawUsers, mode]);
+
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return scopedUsers;
+    return scopedUsers.filter(u =>
+      (u.name || '').toLowerCase().includes(q) ||
+      (u.position?.name || '').toLowerCase().includes(q) ||
+      (u.sector?.name || '').toLowerCase().includes(q),
+    );
+  }, [scopedUsers, search]);
+
+  const dateColumnLabel = config?.dateColumn === 'dismissal' ? 'Desligamento' : 'Admissão';
+  const subtitle = isLoading
+    ? 'Carregando...'
+    : `${formatNumber(filteredUsers.length)} colaborador${filteredUsers.length !== 1 ? 'es' : ''}`;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+          <DialogTitle className="flex items-center gap-2">
+            <Icon className="h-5 w-5 text-primary" />
+            {config?.title ?? 'Detalhamento'}
+          </DialogTitle>
+          <DialogDescription className="text-sm text-foreground/75">
+            {subtitle}
+            <span className="block text-xs text-foreground/60 mt-1">Exibindo até 100 registros</span>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="px-6 py-3 border-b shrink-0">
+            <Input
+              value={search}
+              onChange={(v) => setSearch(v == null ? '' : String(v))}
+              placeholder="Buscar por nome, cargo ou setor..."
+              className="w-full"
+            />
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-auto">
+            <Table className="[&_th]:px-6 [&_td]:px-6 [&>div]:border-0">
+              <TableHeader className="sticky top-0 z-10 bg-muted shadow-[inset_0_-1px_0_hsl(var(--border))]">
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Cargo</TableHead>
+                  <TableHead>Setor</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">{dateColumnLabel}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 4 }).map((_, j) => (
+                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-destructive py-10">
+                      Erro ao carregar colaboradores.
+                    </TableCell>
+                  </TableRow>
+                ) : filteredUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="px-6 py-12 text-center text-sm text-foreground/60">
+                      {search ? 'Nenhum resultado.' : 'Nenhum colaborador encontrado'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredUsers.map((u) => {
+                    const dateValue = config?.dateColumn === 'dismissal'
+                      ? u.dismissedAt
+                      // Admission = exp1 start (when the user actually started
+                      // the experience period). `createdAt` is when the record
+                      // was inserted, which can be much later.
+                      : (u.exp1StartAt ?? u.createdAt);
+                    const formattedDate = dateValue
+                      ? format(new Date(dateValue), 'dd/MM/yyyy', { locale: ptBR })
+                      : '—';
+                    return (
+                      <TableRow key={u.id} className="text-sm">
+                        <TableCell className="font-medium whitespace-nowrap">{u.name}</TableCell>
+                        <TableCell className="text-foreground/85 whitespace-nowrap">{u.position?.name ?? '—'}</TableCell>
+                        <TableCell className="text-foreground/85 whitespace-nowrap">{u.sector?.name ?? '—'}</TableCell>
+                        <TableCell className="text-right text-xs text-foreground/80 whitespace-nowrap">{formattedDate}</TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// =====================
+// Period drill-down (chart-click) — colaboradores active during a period
+// =====================
+//
+// Triggered when the user clicks an x-axis value on the chart. Lists every
+// colaborador active at any point during the period's [from, to] window —
+// i.e. hired on/before `to` AND (still active OR dismissed after `from`).
+// Mirrors `ProductionPeriodTasksModal` in shape (header + search + sticky
+// table) so the modal feels native across statistics pages.
+
+interface TeamPeriodModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  item: HeadcountTimeseriesItem | null;
+  sectorIds?: string[];
+  positionIds?: string[];
+}
+
+function getPeriodRange(period: string): { from: Date; to: Date } | null {
+  if (/^\d{4}$/.test(period)) {
+    const y = parseInt(period, 10);
+    return { from: businessPeriodStartDate(y, 1), to: businessPeriodEndDate(y, 12) };
+  }
+  const m = /^(\d{4})-(\d{2})$/.exec(period);
+  if (!m) return null;
+  const y = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  return { from: businessPeriodStartDate(y, mo), to: businessPeriodEndDate(y, mo) };
+}
+
+function TeamPeriodModal({
+  open, onOpenChange, item, sectorIds, positionIds,
+}: TeamPeriodModalProps) {
+  const [search, setSearch] = useState('');
+
+  useEffect(() => { if (open) setSearch(''); }, [open]);
+
+  const range = item ? getPeriodRange(item.period) : null;
+
+  // Hired ON or BEFORE `to` (created during/before period) AND
+  // (dismissedAt is null OR dismissedAt >= from). Server-side filters on the
+  // common shape we already use elsewhere — see useUsers / use-user.ts.
+  const queryArgs = useMemo(() => {
+    if (!range) return null;
+    const args: any = {
+      where: {
+        createdAt: { lte: range.to },
+        OR: [
+          { dismissedAt: null },
+          { dismissedAt: { gte: range.from } },
+        ],
+      },
+      orderBy: { name: 'asc' as const },
+      include: { position: true, sector: true },
+      limit: 100,
+    };
+    if (sectorIds?.length) args.sectorIds = sectorIds;
+    if (positionIds?.length) args.positionIds = positionIds;
+    return args;
+  }, [range, sectorIds, positionIds]);
+
+  const { data: response, isLoading, isError } = useUsers(queryArgs ?? {}, {
+    enabled: open && !!queryArgs,
+  } as any);
+
+  const rawUsers: any[] = (response as any)?.data ?? [];
+
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rawUsers;
+    return rawUsers.filter(u =>
+      (u.name || '').toLowerCase().includes(q) ||
+      (u.position?.name || '').toLowerCase().includes(q) ||
+      (u.sector?.name || '').toLowerCase().includes(q),
+    );
+  }, [rawUsers, search]);
+
+  const statusLabel = (u: any): { label: string; tone: string } => {
+    switch (u.status) {
+      case USER_STATUS.EFFECTED: return { label: 'Efetivado', tone: 'text-emerald-700 dark:text-emerald-400' };
+      case USER_STATUS.EXPERIENCE_PERIOD_1: return { label: 'Experiência (30d)', tone: 'text-blue-700 dark:text-blue-400' };
+      case USER_STATUS.EXPERIENCE_PERIOD_2: return { label: 'Experiência (90d)', tone: 'text-blue-700 dark:text-blue-400' };
+      case USER_STATUS.DISMISSED: return { label: 'Desligado', tone: 'text-red-700 dark:text-red-400' };
+      default: return { label: u.status ?? '—', tone: 'text-foreground/70' };
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+          <DialogTitle className="flex items-center gap-2">
+            <IconUsers className="h-5 w-5 text-primary" />
+            Equipe — {item?.label ?? '—'}
+          </DialogTitle>
+          <DialogDescription className="text-sm text-foreground/75">
+            {item ? (
+              <>
+                <span className="font-medium">{formatNumber(item.headcount)}</span>{' '}
+                colaborador{item.headcount !== 1 ? 'es' : ''} ativo{item.headcount !== 1 ? 's' : ''}
+                {' · '}
+                <span className="font-medium">{formatNumber(item.newHires)}</span> admiss{item.newHires !== 1 ? 'ões' : 'ão'}
+                {' · '}
+                <span className="font-medium">{formatNumber(item.dismissals)}</span> desligamento{item.dismissals !== 1 ? 's' : ''}
+              </>
+            ) : '—'}
+            <span className="block text-xs text-foreground/60 mt-1">Exibindo até 100 registros</span>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="px-6 py-3 border-b shrink-0">
+            <Input
+              value={search}
+              onChange={(v) => setSearch(v == null ? '' : String(v))}
+              placeholder="Buscar por nome, cargo ou setor..."
+              className="w-full"
+            />
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-auto">
+            <Table className="[&>div]:border-0">
+              <TableHeader className="sticky top-0 z-10 bg-muted shadow-[inset_0_-1px_0_hsl(var(--border))]">
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Cargo</TableHead>
+                  <TableHead>Setor</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Admissão</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 5 }).map((_, j) => (
+                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-destructive py-10">
+                      Erro ao carregar colaboradores.
+                    </TableCell>
+                  </TableRow>
+                ) : filteredUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="px-6 py-12 text-center text-sm text-foreground/60">
+                      {search ? 'Nenhum resultado.' : 'Nenhum colaborador no período'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredUsers.map((u) => {
+                    const { label, tone } = statusLabel(u);
+                    const admissionDate = u.exp1StartAt ?? u.createdAt;
+                    const admittedAt = admissionDate
+                      ? format(new Date(admissionDate), 'dd/MM/yyyy', { locale: ptBR })
+                      : '—';
+                    return (
+                      <TableRow key={u.id} className="text-sm">
+                        <TableCell className="font-medium whitespace-nowrap">{u.name}</TableCell>
+                        <TableCell className="text-foreground/85 whitespace-nowrap">{u.position?.name ?? '—'}</TableCell>
+                        <TableCell className="text-foreground/85 whitespace-nowrap">{u.sector?.name ?? '—'}</TableCell>
+                        <TableCell className="text-right text-xs text-foreground/80 whitespace-nowrap">{admittedAt}</TableCell>
+                        <TableCell className={`text-right text-xs font-medium whitespace-nowrap ${tone}`}>{label}</TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// =====================
+// Page Component
 // =====================
 
-const TeamPerformancePage = () => {
+const EquipePage = () => {
   usePageTracker({
-    page: 'hr-team-performance-analytics',
-    title: 'Performance da Equipe - Estatísticas',
+    page: 'hr-equipe-statistics',
+    title: 'Equipe - Estatísticas',
   });
 
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+  const chartHandleRef = useRef<StatisticsChartHandle>(null);
 
-  const [filters, setFilters] = useState<HrAnalyticsFilters>({
-    startDate: startOfDay(subMonths(new Date(), 6)),
-    endDate: endOfDay(new Date()),
-    sortBy: 'headcount',
-    sortOrder: 'desc',
-    limit: 50,
+  // Default: the entire current year (Jan→Dec, business-period 26→25 aware).
+  // We want the chart to show a full 12-month headcount trend on page load —
+  // a single-month default produces a 1-datapoint chart that looks empty.
+  // Matches productivity.tsx, which also defaults to the current year.
+  const initialDefaults = useMemo(() => {
+    const y = new Date().getFullYear();
+    return {
+      year: y,
+      startDate: businessPeriodStartDate(y, 1),
+      endDate: businessPeriodEndDate(y, 12),
+    };
+  }, []);
+
+  const [filters, setFilters] = useState<HeadcountFilters>({
+    startDate: initialDefaults.startDate,
+    endDate: initialDefaults.endDate,
+    ...DEFAULT_FILTERS_BASE,
+  });
+  const [selectedYear, setSelectedYear] = useState<number | undefined>(initialDefaults.year);
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [chartType, setChartType] = useState<HrChartType>('area');
+  const [trendLine, setTrendLine] = useState<TrendLineType | null>(null);
+  const [yAxisMode, setYAxisMode] = useState<EquipeYAxisMode>('headcount');
+  const [compareMode, setCompareMode] = useState<EquipeCompareMode>('combined');
+  const [drillDown, setDrillDown] = useState<TeamDrillDownMode | null>(null);
+  const [periodModal, setPeriodModal] = useState<HeadcountTimeseriesItem | null>(null);
+  // User override on top of the admin-configured default from the goals feature.
+  const [goalOverride, setGoalOverride] = useState<number | null>(null);
+  // Whether the turnover-rate card counts dismissals that happened during the
+  // experience period. Mirrors the toggle that used to live on the standalone
+  // Rotatividade page.
+  const [includeExperienceFailures, setIncludeExperienceFailures] = useState(false);
+  const [goalInput, setGoalInput] = useState('');
+  const [goalPopoverOpen, setGoalPopoverOpen] = useState(false);
+
+  // Reset override when switching to a metric with a different scale.
+  useEffect(() => {
+    setGoalOverride(null);
+    setGoalInput('');
+  }, [yAxisMode]);
+
+  // Derive the dimension actually used for comparison. When both setores and
+  // cargos have 2+ selected, sectors take priority (matches the Combobox
+  // helper text). `null` means combined mode (no per-entity comparison).
+  const selectedSectorIds = filters.sectorIds ?? [];
+  const selectedPositionIds = filters.positionIds ?? [];
+  const compareDimension: 'sector' | 'position' | null = useMemo(() => {
+    if (compareMode === 'combined') return null;
+    if (selectedSectorIds.length >= 2) return 'sector';
+    if (selectedPositionIds.length >= 2) return 'position';
+    return null;
+  }, [compareMode, selectedSectorIds.length, selectedPositionIds.length]);
+
+  const isComparisonMode = compareDimension !== null;
+
+  const { data, isLoading, isError, error, refetch } = useHeadcountAnalytics(filters);
+  const summary = data?.data?.summary;
+  const timeseries = data?.data?.timeseries ?? [];
+
+  // Turnover-rate KPI — folds in the unique metric from the (now removed)
+  // standalone Rotatividade page. Uses the same date / sector / position
+  // scope as the headcount query so the rate matches what the user is seeing.
+  const turnoverFilters = useMemo<TurnoverFilters>(() => ({
+    startDate: filters.startDate,
+    endDate: filters.endDate,
+    sectorIds: filters.sectorIds,
+    positionIds: filters.positionIds,
+    useBusinessPeriod: filters.useBusinessPeriod,
+    includeExperienceFailures,
+  }), [filters.startDate, filters.endDate, filters.sectorIds, filters.positionIds, filters.useBusinessPeriod, includeExperienceFailures]);
+  const { data: turnoverData, isLoading: isTurnoverLoading } = useTurnoverAnalytics(turnoverFilters);
+  const turnoverSummary = turnoverData?.data?.summary;
+
+  // Default goal from the admin-configured monthly targets. Each yAxisMode
+  // maps to a different metric: COLLABORATORS_PER_SECTOR (sector-scoped) for
+  // headcount, HR_HIRES_PER_MONTH / HR_DISMISSALS_PER_MONTH for the flow
+  // metrics. netChange is a derivative and has no first-class goal.
+  const goalMetric =
+    yAxisMode === 'headcount' ? GOAL_METRIC.COLLABORATORS_PER_SECTOR
+    : yAxisMode === 'newHires' ? GOAL_METRIC.HR_HIRES_PER_MONTH
+    : yAxisMode === 'dismissals' ? GOAL_METRIC.HR_DISMISSALS_PER_MONTH
+    : null;
+
+  const defaultGoal = useDefaultGoal({
+    metric: goalMetric ?? GOAL_METRIC.COLLABORATORS_PER_SECTOR,
+    period:
+      filters.startDate && filters.endDate
+        ? { from: filters.startDate, to: filters.endDate }
+        : null,
+    sectorIds: filters.sectorIds,
+    // Each chart datapoint is a single month's value, so the goal-line is the
+    // average of per-month targets across the range — not the sum.
+    aggregation: 'AVERAGE_PER_PERIOD',
+    enabled: goalMetric !== null,
   });
 
-  const [selectedChartType, setSelectedChartType] = useState<HrChartType>('area');
-  const [yAxisMode, setYAxisMode] = useState<TeamYAxisMode>('headcount');
+  const goalValue = goalOverride ?? defaultGoal.value;
+  const goalSource: 'override' | 'default' | 'none' =
+    goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 
-  const comparisonType = useMemo(() => getHrComparisonType(filters), [filters]);
-  const isComparisonMode = comparisonType !== 'simple';
+  // Comparison mode: fan-out one query per selected entity so the timeseries
+  // for each sector/cargo arrives independently, then stitch them by period.
+  // Mirrors the productivity.tsx pattern. We keep the existing root query
+  // around for KPI cards + summary so headcount totals stay accurate.
+  const comparisonEntityIds = useMemo(
+    () => (compareDimension === 'sector' ? selectedSectorIds : compareDimension === 'position' ? selectedPositionIds : []),
+    [compareDimension, selectedSectorIds, selectedPositionIds],
+  );
 
-  const availableChartTypes = useMemo(() => getAvailableChartTypes(isComparisonMode), [isComparisonMode]);
+  const comparisonQueries = useQueries({
+    queries: isComparisonMode
+      ? comparisonEntityIds.map(id => {
+          const subFilters: HeadcountFilters = {
+            ...filters,
+            // Replace the multi-select with a single-entity scope so the API
+            // returns the timeseries for THIS one entity only.
+            ...(compareDimension === 'sector'
+              ? { sectorIds: [id], positionIds: filters.positionIds }
+              : { positionIds: [id], sectorIds: filters.sectorIds }),
+          };
+          return {
+            queryKey: hrAnalyticsKeys.headcount(subFilters),
+            queryFn: () => getHeadcount(subFilters),
+            staleTime: 3 * 60 * 1000,
+            gcTime: 10 * 60 * 1000,
+            retry: 2,
+          };
+        })
+      : [],
+  });
 
-  useMemo(() => {
-    const isCurrentTypeAvailable = availableChartTypes.some((type) => type.value === selectedChartType);
-    if (!isCurrentTypeAvailable) setSelectedChartType('area');
-  }, [availableChartTypes, selectedChartType]);
+  // Resolve entity ids → human-readable names for chart legends.
+  const { data: sectorsData } = useSectors(
+    { where: { id: { in: selectedSectorIds } }, limit: 100 },
+    { enabled: compareDimension === 'sector' && selectedSectorIds.length > 0 } as any,
+  );
+  const { data: positionsData } = usePositions(
+    { where: { id: { in: selectedPositionIds } }, limit: 100 },
+    { enabled: compareDimension === 'position' && selectedPositionIds.length > 0 } as any,
+  );
+
+  const entityNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    if (compareDimension === 'sector') {
+      ((sectorsData as any)?.data ?? []).forEach((s: { id: string; name: string }) => map.set(s.id, s.name));
+    } else if (compareDimension === 'position') {
+      ((positionsData as any)?.data ?? []).forEach((p: { id: string; name: string }) => map.set(p.id, p.name));
+    }
+    return map;
+  }, [compareDimension, sectorsData, positionsData]);
 
   const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (filters.sectorIds && filters.sectorIds.length > 0) count++;
-    if (filters.periods && filters.periods.length >= 2) count++;
-    return count;
-  }, [filters]);
+    let n = 0;
+    if (filters.sectorIds?.length) n++;
+    if (filters.positionIds?.length) n++;
+    if (selectedYear || selectedMonths.length > 0) n++;
+    if (isComparisonMode) n++;
+    return n;
+  }, [filters, selectedYear, selectedMonths, isComparisonMode]);
 
-  const { data, isLoading, isError, error, refetch } = useTeamPerformance(filters);
+  // Pick the right field on a HeadcountTimeseriesItem for the current Y mode.
+  const pickValue = useCallback((item: HeadcountTimeseriesItem): number => {
+    switch (yAxisMode) {
+      case 'newHires':   return item.newHires;
+      case 'dismissals': return item.dismissals;
+      case 'netChange':  return item.netChange;
+      default:           return item.headcount;
+    }
+  }, [yAxisMode]);
 
-  const items = data?.data?.items || [];
-  const summary = data?.data?.summary;
+  const pickSecondary = useCallback((item: HeadcountTimeseriesItem): number => {
+    switch (yAxisMode) {
+      case 'newHires':   return item.dismissals;
+      case 'dismissals': return item.newHires;
+      case 'netChange':  return item.headcount;
+      default:           return item.inExperience;
+    }
+  }, [yAxisMode]);
 
-  const handleFilterApply = useCallback((newFilters: HrAnalyticsFilters) => {
-    setFilters({ ...newFilters, limit: newFilters.limit || 50 });
-  }, []);
-
-  const handleFilterReset = useCallback(() => {
-    setFilters({
-      startDate: startOfDay(subMonths(new Date(), 6)),
-      endDate: endOfDay(new Date()),
-      sortBy: 'headcount',
-      sortOrder: 'desc',
-      limit: 50,
+  // Per-entity timeseries indexed by period → entity id → item. Used to look
+  // up each comparison row when assembling the chartData below.
+  const comparisonByPeriod = useMemo(() => {
+    if (!isComparisonMode) return null;
+    const map = new Map<string, Map<string, HeadcountTimeseriesItem>>();
+    comparisonQueries.forEach((q, idx) => {
+      const id = comparisonEntityIds[idx];
+      const items = ((q.data as HeadcountResponse | undefined)?.data?.timeseries) ?? [];
+      items.forEach(item => {
+        if (!map.has(item.period)) map.set(item.period, new Map());
+        map.get(item.period)!.set(id, item);
+      });
     });
-  }, []);
-
-  const handleExportCSV = useCallback(() => {
-    if (!items || items.length === 0) {
-      toast.error('Nenhum dado para exportar');
-      return;
-    }
-
-    try {
-      const headers = ['Período', 'Efetivo', 'Admissões', 'Demissões', 'Turnover %', 'Advertências'];
-      const rows = items.map((item) => [
-        item.label,
-        item.headcount.toString(),
-        item.newHires.toString(),
-        item.dismissals.toString(),
-        item.turnoverRate.toFixed(1),
-        item.totalWarnings.toString(),
-      ]);
-
-      const csv = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `equipe-performance-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`;
-      link.click();
-      toast.success('Dados exportados com sucesso!');
-    } catch (err) {
-      console.error('Erro ao exportar CSV:', err);
-      toast.error('Erro ao exportar dados');
-    }
-  }, [items]);
-
-  const chartYAxisMode: YAxisMode = yAxisMode === 'turnover' ? 'percentage' : 'count';
+    return map;
+  }, [isComparisonMode, comparisonQueries, comparisonEntityIds]);
 
   const chartData = useMemo(() => {
-    if (!items || items.length === 0) return [];
+    if (!timeseries.length) return [];
+    return timeseries.map(item => {
+      const value = pickValue(item);
+      const secondaryValue = pickSecondary(item);
 
-    return items.map((item) => {
-      let value: number;
-      let secondaryValue: number;
-
-      switch (yAxisMode) {
-        case 'warnings':
-          value = item.totalWarnings;
-          secondaryValue = item.headcount;
-          break;
-        case 'turnover':
-          value = item.turnoverRate;
-          secondaryValue = item.dismissals;
-          break;
-        default:
-          value = item.headcount;
-          secondaryValue = item.newHires;
-          break;
+      let comparisons: Array<{ entityName: string; value: number; secondaryValue?: number }> | undefined;
+      if (isComparisonMode && comparisonByPeriod) {
+        const perEntity = comparisonByPeriod.get(item.period);
+        comparisons = comparisonEntityIds.map(id => {
+          const sub = perEntity?.get(id);
+          const name = entityNameById.get(id) ?? id;
+          return {
+            entityName: name,
+            value: sub ? pickValue(sub) : 0,
+            secondaryValue: sub ? pickSecondary(sub) : 0,
+          };
+        });
+        if (compareMode === 'separatedWithTotal') {
+          comparisons.push({
+            entityName: 'Total',
+            value,
+            secondaryValue,
+          });
+        }
       }
 
-      return {
-        name: item.label,
-        value,
-        secondaryValue,
-      };
+      return { name: item.label, value, secondaryValue, comparisons };
     });
-  }, [items, yAxisMode]);
+  }, [timeseries, isComparisonMode, comparisonByPeriod, comparisonEntityIds, entityNameById, compareMode, pickValue, pickSecondary]);
 
-  const valueFormatter = useCallback((value: number, mode: YAxisMode): string => {
-    if (mode === 'percentage') return formatPercentage(value);
+  const valueFormatter = useCallback((value: number, _mode: YAxisMode): string => {
     return Math.round(value).toString();
   }, []);
 
+  const tooltipLabels = useMemo(() => {
+    switch (yAxisMode) {
+      case 'newHires': return { primary: 'Admissões', secondary: 'Desligamentos' };
+      case 'dismissals': return { primary: 'Desligamentos', secondary: 'Admissões' };
+      case 'netChange': return { primary: 'Variação líquida', secondary: 'Efetivo' };
+      default: return { primary: 'Efetivo', secondary: 'Em experiência' };
+    }
+  }, [yAxisMode]);
+
   const yAxisLabel = useMemo(() => {
     switch (yAxisMode) {
-      case 'warnings': return 'Advertências';
-      case 'turnover': return 'Turnover (%)';
+      case 'newHires': return 'Admissões';
+      case 'dismissals': return 'Desligamentos';
+      case 'netChange': return 'Variação';
       default: return 'Efetivo';
     }
   }, [yAxisMode]);
 
-  const tooltipLabels = useMemo(() => {
-    switch (yAxisMode) {
-      case 'warnings': return { primary: 'Advertências', secondary: 'Efetivo' };
-      case 'turnover': return { primary: 'Turnover', secondary: 'Demissões' };
-      default: return { primary: 'Efetivo', secondary: 'Admissões' };
+  const periodSummaryLabel = useMemo(() => {
+    if (selectedYear && selectedMonths.length > 0) {
+      const monthLabels = [...selectedMonths].sort().map(m => MONTH_OPTIONS.find(o => o.value === m)?.label).join(', ');
+      return `${monthLabels} ${selectedYear}`;
     }
-  }, [yAxisMode]);
+    if (selectedYear) return `Ano ${selectedYear}`;
+    return 'Equipe';
+  }, [selectedYear, selectedMonths]);
+
+  const handleFilterApply = useCallback((next: {
+    filters: HeadcountFilters;
+    selectedYear: number | undefined;
+    selectedMonths: string[];
+    yAxisMode: EquipeYAxisMode;
+    compareMode: EquipeCompareMode;
+    includeExperienceFailures: boolean;
+  }) => {
+    setFilters(next.filters);
+    setSelectedYear(next.selectedYear);
+    setSelectedMonths(next.selectedMonths);
+    setYAxisMode(next.yAxisMode);
+    setCompareMode(next.compareMode);
+    setIncludeExperienceFailures(next.includeExperienceFailures);
+  }, []);
+
+  const handleExportCSV = useCallback(() => {
+    if (!timeseries.length) { toast.error('Nenhum dado para exportar'); return; }
+    try {
+      const headers = ['Período', 'Efetivo', 'Em Experiência', 'Admissões', 'Desligamentos', 'Variação'];
+      const rows = timeseries.map(i => [i.label, i.headcount, i.inExperience, i.newHires, i.dismissals, i.netChange]);
+      const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `equipe-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`;
+      link.click();
+      toast.success('CSV exportado!');
+    } catch { toast.error('Erro ao exportar CSV'); }
+  }, [timeseries]);
+
+  const handleExportXLSX = useCallback(() => {
+    if (!timeseries.length) { toast.error('Nenhum dado para exportar'); return; }
+    try {
+      const headers = ['Período', 'Efetivo', 'Em Experiência', 'Admissões', 'Desligamentos', 'Variação'];
+      const rows = timeseries.map(i => [i.label, i.headcount, i.inExperience, i.newHires, i.dismissals, i.netChange]);
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      ws['!cols'] = headers.map((_, idx) => ({ wch: idx === 0 ? 20 : 16 }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Equipe');
+      XLSX.writeFile(wb, `equipe-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.xlsx`);
+      toast.success('XLSX exportado!');
+    } catch { toast.error('Erro ao exportar planilha'); }
+  }, [timeseries]);
+
+  // Surface loading from both the root query and any in-flight comparison
+  // queries so the chart stays in the skeleton state until per-entity data
+  // arrives — otherwise comparison series would render zero-filled.
+  const comparisonLoading = isComparisonMode && comparisonQueries.some(q => q.isLoading);
+  const effectiveIsLoading = isLoading || comparisonLoading;
 
   const renderChart = () => {
-    if (isLoading) {
+    if (effectiveIsLoading) {
       return (
-        <div className="h-[600px] flex items-center justify-center">
-          <div className="space-y-3">
-            <Skeleton className="h-4 w-[250px]" />
-            <Skeleton className="h-[400px] w-[600px]" />
+        <div style={{ height: 'max(380px, calc(100vh - 460px))' }} className="flex items-center justify-center">
+          <div className="space-y-3 w-full px-8">
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-[380px] w-full" />
           </div>
         </div>
       );
     }
-
     if (isError) {
       return (
-        <div className="h-[600px] flex flex-col items-center justify-center gap-4">
+        <div style={{ height: 'max(380px, calc(100vh - 460px))' }} className="flex flex-col items-center justify-center gap-4">
           <IconAlertCircle className="h-12 w-12 text-destructive" />
           <div className="text-center">
             <p className="font-semibold">Erro ao carregar dados</p>
-            <p className="text-sm text-muted-foreground">
-              {error?.message || 'Ocorreu um erro ao buscar os dados'}
-            </p>
+            <p className="text-sm text-muted-foreground">{error?.message || 'Erro inesperado'}</p>
           </div>
           <Button onClick={() => refetch()} variant="outline">
-            <IconRefresh className="mr-2 h-4 w-4" />
-            Tentar Novamente
+            <IconRefresh className="h-4 w-4 mr-2" />Tentar novamente
           </Button>
         </div>
       );
     }
-
-    if (!chartData || chartData.length === 0) {
+    if (!chartData.length) {
       return (
-        <div className="h-[600px] flex flex-col items-center justify-center gap-4">
+        <div style={{ height: 'max(380px, calc(100vh - 460px))' }} className="flex flex-col items-center justify-center gap-4">
           <IconCalendarStats className="h-12 w-12 text-muted-foreground" />
-          <div className="text-center">
-            <p className="font-semibold">Nenhum dado encontrado</p>
-            <p className="text-sm text-muted-foreground">
-              Tente ajustar os filtros para visualizar os dados
-            </p>
-          </div>
+          <p className="font-semibold">Nenhum dado encontrado</p>
+          <p className="text-sm text-muted-foreground">Ajuste os filtros para visualizar</p>
         </div>
       );
     }
-
     return (
       <StatisticsChart
+        ref={chartHandleRef}
+        key={`${isComparisonMode}-${compareDimension}-${compareMode}-${yAxisMode}`}
         data={chartData}
-        chartType={selectedChartType}
-        yAxisMode={chartYAxisMode}
+        chartType={chartType}
+        yAxisMode="count"
         isComparisonMode={isComparisonMode}
-        height="600px"
+        height="max(380px, calc(100vh - 460px))"
         yAxisLabel={yAxisLabel}
         valueFormatter={valueFormatter}
         tooltipLabels={tooltipLabels}
+        trendLine={trendLine}
+        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
+        onDataPointClick={(dataIndex) => {
+          const item = timeseries[dataIndex];
+          if (item) setPeriodModal(item);
+        }}
       />
     );
   };
 
-  // Compute warning breakdown from all items
-  const warningBreakdown = useMemo(() => {
-    const totals: Record<string, number> = {};
-    for (const item of items) {
-      for (const [cat, count] of Object.entries(item.warningsByCategory)) {
-        totals[cat] = (totals[cat] || 0) + count;
-      }
-    }
-    return Object.entries(totals)
-      .map(([category, count]) => ({
-        category,
-        label: WARNING_CATEGORY_LABELS[category] || category,
-        count,
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [items]);
+  const currentChartType = CHART_TYPE_OPTIONS.find(c => c.value === chartType) ?? CHART_TYPE_OPTIONS[0];
+  const ChartIcon = currentChartType.icon;
+
+  const hasData = !isLoading && timeseries.length > 0;
+  // Variação líquida is a derivative (newHires − dismissals), so it's read-only.
+  const isClickableMode = (mode: TeamDrillDownMode): boolean => mode !== 'netChange';
+  const openDrillDown = (mode: TeamDrillDownMode) => {
+    if (hasData && isClickableMode(mode)) setDrillDown(mode);
+  };
 
   return (
-    <div className="h-full flex flex-col px-4 pt-4">
-      <div className="flex-shrink-0">
-        <PageHeader
-          title="Performance da Equipe"
-          icon={IconUsers}
-          breadcrumbs={[
-            { label: 'Início', href: routes.home },
-            { label: 'Estatísticas', href: routes.statistics.root },
-            { label: 'Recursos Humanos', href: routes.statistics.humanResources.root },
-            { label: 'Equipe' },
-          ]}
-        />
-      </div>
-
-      <div className="flex-1 overflow-y-auto pb-6">
-        {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Efetivo</CardTitle>
-              <IconUsers className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-7 w-[80px]" />
-              ) : (
-                <>
-                  <div className="text-2xl font-bold">
-                    {summary ? formatNumber(summary.currentHeadcount) : '0'}
-                  </div>
-                  {summary && summary.turnoverRate > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Turnover: {formatPercentage(summary.turnoverRate)}
-                    </p>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Performance Média</CardTitle>
-              <IconStar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-7 w-[60px]" />
-              ) : (
-                <div className="text-2xl font-bold">
-                  {summary ? summary.avgPerformanceLevel.toFixed(1) : '0'}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Advertências</CardTitle>
-              <IconAlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-7 w-[60px]" />
-              ) : (
-                <div className="text-2xl font-bold">
-                  {summary ? formatNumber(summary.totalWarnings) : '0'}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
+    <TooltipProvider>
+      <div className="h-full flex flex-col px-4 pt-4">
+        <div className="flex-shrink-0">
+          <PageHeader
+            title="Equipe"
+            icon={IconUsers}
+            breadcrumbs={[
+              { label: 'Início', href: routes.home },
+              { label: 'Estatísticas', href: routes.statistics.root },
+              { label: 'Recursos Humanos', href: routes.statistics.humanResources.root },
+              { label: 'Equipe' },
+            ]}
+          />
         </div>
 
-        {/* Chart */}
-        <div className="mt-4">
-          <Card className="flex-1 flex flex-col">
+        <div className="flex-1 overflow-y-auto pb-6">
+          <Card className="mt-4">
             <CardHeader>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <CardTitle>Evolução da Equipe</CardTitle>
-                  <CardDescription>
-                    Visualize a evolução do efetivo, advertências e turnover por período
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <CardTitle className="flex items-center gap-2">
+                    <IconUsers className="h-5 w-5 text-primary" />
+                    {periodSummaryLabel}
+                  </CardTitle>
+                  <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span>Evolução do efetivo por período.</span>
+                    <Badge variant="outline" className="text-xs">{Y_AXIS_LABEL_BY_MODE[yAxisMode]}</Badge>
                     {isComparisonMode && (
-                      <Badge variant="secondary" className="ml-2">
-                        Modo Comparação: {comparisonType === 'sectors' ? 'Setores' : 'Períodos'}
+                      <Badge variant="secondary" className="text-xs">
+                        {compareDimension === 'sector' ? 'Comparação: Setores' : 'Comparação: Cargos'}
+                        {compareMode === 'separatedWithTotal' ? ' + Total' : ''}
                       </Badge>
+                    )}
+                    {trendLine && (
+                      <Badge variant="outline" className="text-xs">{TREND_LABELS[trendLine]}</Badge>
                     )}
                   </CardDescription>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {/* Chart Type Selector */}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {/* Chart type */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm">
-                        {(() => {
-                          const currentType = availableChartTypes.find((t) => t.value === selectedChartType);
-                          const Icon = currentType?.icon;
-                          return (
-                            <>
-                              {Icon && <Icon className="h-4 w-4 mr-2" />}
-                              {currentType?.label}
-                            </>
-                          );
-                        })()}
+                        <ChartIcon className="h-4 w-4 mr-2" />
+                        {currentChartType.label}
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Tipo de Gráfico</DropdownMenuLabel>
+                    <DropdownMenuContent align="end" className="w-60">
+                      <DropdownMenuLabel>Tipo de gráfico</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuRadioGroup
-                        value={selectedChartType}
-                        onValueChange={(value) => setSelectedChartType(value as HrChartType)}
-                      >
-                        {availableChartTypes.map((chartType) => {
-                          const ChartIcon = chartType.icon;
+                      <DropdownMenuRadioGroup value={chartType} onValueChange={v => setChartType(v as HrChartType)}>
+                        {CHART_TYPE_OPTIONS.map(c => {
+                          const Icon = c.icon;
                           return (
-                            <DropdownMenuRadioItem key={chartType.value} value={chartType.value} className="group">
-                              <ChartIcon className="h-4 w-4 mr-2" />
-                              <div>
-                                <div className="font-medium">{chartType.label}</div>
-                                <div className="text-xs text-muted-foreground">{chartType.description}</div>
+                            <DropdownMenuRadioItem key={c.value} value={c.value} className="group">
+                              <Icon className="h-4 w-4 mr-2" />
+                              <div className="flex flex-col">
+                                <span>{c.label}</span>
+                                <span className="text-xs text-muted-foreground group-data-[highlighted]:text-white/80">{c.description}</span>
                               </div>
                             </DropdownMenuRadioItem>
                           );
@@ -741,109 +1317,334 @@ const TeamPerformancePage = () => {
                     </DropdownMenuContent>
                   </DropdownMenu>
 
-                  {/* Filter Button */}
-                  <Button variant="outline" size="sm" onClick={() => setShowFilterDrawer(true)}>
-                    <IconFilter className="h-4 w-4 mr-2" />
-                    Filtros
-                    {activeFilterCount > 0 && (
-                      <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px]">
-                        {activeFilterCount}
-                      </Badge>
-                    )}
+                  {/* Trend */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant={trendLine ? 'default' : 'outline'} size="sm">
+                        <IconTrendingUp className="h-4 w-4 mr-2" />
+                        {trendLine ? TREND_LABELS[trendLine] : 'Tendência'}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuLabel>Linha de Tendência</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuRadioGroup value={trendLine ?? ''} onValueChange={v => setTrendLine(v ? (v as TrendLineType) : null)}>
+                        <DropdownMenuRadioItem value="">Desativada</DropdownMenuRadioItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuRadioItem value="linear">Linear</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="sma3">Média 3 meses</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="sma6">Média 6 meses</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="sma12">Média 12 meses</DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Goal line */}
+                  {goalMetric && (
+                    <Popover open={goalPopoverOpen} onOpenChange={setGoalPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant={goalValue != null ? 'default' : 'outline'} size="sm">
+                          <IconTarget className="h-4 w-4 mr-2" />
+                          {goalValue != null ? `Meta: ${formatNumber(goalValue, 0)}` : 'Meta'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-64">
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Definir Meta</p>
+                            {goalSource === 'default' && (
+                              <p className="text-xs text-muted-foreground">Padrão de Administração › Metas</p>
+                            )}
+                            {goalSource === 'override' && defaultGoal.value != null && (
+                              <p className="text-xs text-muted-foreground">
+                                Sobrescrevendo padrão ({formatNumber(defaultGoal.value, 0)})
+                              </p>
+                            )}
+                            {goalSource === 'none' && (
+                              <p className="text-xs text-muted-foreground">Sem meta padrão configurada</p>
+                            )}
+                          </div>
+                          <Input
+                            type="number"
+                            min={0}
+                            placeholder={defaultGoal.value != null ? `Padrão: ${defaultGoal.value}` : 'Ex: 50'}
+                            value={goalInput}
+                            onChange={v => setGoalInput(v == null ? '' : String(v))}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                const v = parseFloat(goalInput);
+                                setGoalOverride(isNaN(v) ? null : v);
+                                setGoalPopoverOpen(false);
+                              }
+                            }}
+                            className="bg-transparent"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => {
+                                const v = parseFloat(goalInput);
+                                setGoalOverride(isNaN(v) ? null : v);
+                                setGoalPopoverOpen(false);
+                              }}
+                            >
+                              Aplicar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setGoalOverride(null);
+                                setGoalInput('');
+                                setGoalPopoverOpen(false);
+                              }}
+                            >
+                              {goalSource === 'override' ? 'Usar padrão' : 'Limpar'}
+                            </Button>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+
+                  {/* Filters */}
+                  <Button
+                    variant={activeFilterCount > 0 ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setShowFilterDrawer(true)}
+                  >
+                    <IconFilter className="h-4 w-4 mr-2" />Filtros
+                    {activeFilterCount > 0 && <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>}
                   </Button>
 
                   {/* Export */}
-                  <Button variant="outline" size="sm" onClick={handleExportCSV}>
-                    <IconDownload className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-
-                  {/* Refresh */}
-                  <Button variant="outline" size="sm" onClick={() => refetch()}>
-                    <IconRefresh className="h-4 w-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" disabled={isLoading || !timeseries.length}>
+                        <IconDownload className="h-4 w-4 mr-2" />Exportar
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleExportCSV}>
+                        <IconFileTypeCsv className="h-4 w-4 mr-2" /> CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleExportXLSX}>
+                        <IconFileTypeXls className="h-4 w-4 mr-2" /> Excel (XLSX)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="flex-1">
-              {renderChart()}
+
+            <CardContent className="space-y-5">
+              {/* KPI cards */}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <Card
+                  className={cn('py-2', hasData && 'cursor-pointer hover:bg-muted/50 transition-colors')}
+                  onClick={hasData ? () => openDrillDown('headcount') : undefined}
+                  role={hasData ? 'button' : undefined}
+                  tabIndex={hasData ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if (hasData && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      openDrillDown('headcount');
+                    }
+                  }}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                    <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                      <IconUsers className="h-3.5 w-3.5" /> Efetivo Atual
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex">
+                            <IconInfoCircle className="h-3 w-3 text-muted-foreground" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>Funcionários ativos hoje (efetivados e em experiência).</TooltipContent>
+                      </Tooltip>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pb-0 px-4">
+                    {isLoading ? <Skeleton className="h-7 w-20" /> : (
+                      <>
+                        <div className="text-xl font-bold">{summary ? formatNumber(summary.totalActive) : '0'}</div>
+                        <div className="text-[11px] text-foreground/70 mt-0.5">
+                          {summary
+                            ? `${summary.effected} efetivados · ${summary.inExperiencePeriod} em experiência`
+                            : 'Sem dados'}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card
+                  className={cn('py-2', hasData && 'cursor-pointer hover:bg-muted/50 transition-colors')}
+                  onClick={hasData ? () => openDrillDown('newHires') : undefined}
+                  role={hasData ? 'button' : undefined}
+                  tabIndex={hasData ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if (hasData && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      openDrillDown('newHires');
+                    }
+                  }}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                    <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                      <IconUserPlus className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      Admissões
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pb-0 px-4">
+                    {isLoading ? <Skeleton className="h-7 w-20" /> : (
+                      <>
+                        <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
+                          {summary ? formatNumber(summary.newHiresInPeriod) : '0'}
+                        </div>
+                        <div className="text-[11px] text-foreground/70 mt-0.5">No período</div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card
+                  className={cn('py-2', hasData && 'cursor-pointer hover:bg-muted/50 transition-colors')}
+                  onClick={hasData ? () => openDrillDown('dismissals') : undefined}
+                  role={hasData ? 'button' : undefined}
+                  tabIndex={hasData ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if (hasData && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault();
+                      openDrillDown('dismissals');
+                    }
+                  }}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                    <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                      <IconUserMinus className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                      Desligamentos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pb-0 px-4">
+                    {isLoading ? <Skeleton className="h-7 w-20" /> : (
+                      <>
+                        <div className="text-xl font-bold text-red-700 dark:text-red-400">
+                          {summary ? formatNumber(summary.dismissalsInPeriod) : '0'}
+                        </div>
+                        <div className="text-[11px] text-foreground/70 mt-0.5">No período</div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Variação líquida is a derivative (admissões − desligamentos) —
+                    not clickable, the underlying records live in those two KPIs. */}
+                <Card className="py-2">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                    <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                      <IconArrowsExchange className="h-3.5 w-3.5" />
+                      Variação Líquida
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pb-0 px-4">
+                    {isLoading ? <Skeleton className="h-7 w-20" /> : (
+                      <>
+                        <div className={`text-xl font-bold ${summary && summary.netChange >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                          {summary ? `${summary.netChange >= 0 ? '+' : ''}${summary.netChange}` : '0'}
+                        </div>
+                        <div className="text-[11px] text-foreground/70 mt-0.5">
+                          {summary
+                            ? `${summary.newHiresInPeriod} admiss${summary.newHiresInPeriod !== 1 ? 'ões' : 'ão'} · ${summary.dismissalsInPeriod} desligamento${summary.dismissalsInPeriod !== 1 ? 's' : ''}`
+                            : 'Sem dados'}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Taxa de rotatividade — folded in from the deleted standalone
+                    Rotatividade page. Derived metric (dismissals ÷ efetivo
+                    médio), so not clickable. */}
+                <Card className="py-2">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                    <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                      <IconPercentage className="h-3.5 w-3.5" />
+                      Taxa de Rotatividade
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex">
+                            <IconInfoCircle className="h-3 w-3 text-muted-foreground" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>Desligamentos no período ÷ efetivo médio.</TooltipContent>
+                      </Tooltip>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pb-0 px-4">
+                    {isTurnoverLoading ? <Skeleton className="h-7 w-20" /> : (
+                      <>
+                        <div className="text-xl font-bold">
+                          {turnoverSummary ? `${turnoverSummary.turnoverRate.toFixed(1)}%` : '—'}
+                        </div>
+                        <div className="text-[11px] text-foreground/70 mt-0.5">
+                          {turnoverSummary
+                            ? `Efetivo médio: ${formatNumber(turnoverSummary.averageHeadcount)}`
+                            : 'Sem dados'}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Chart */}
+              <Card>
+                <CardContent className="p-4">
+                  {renderChart()}
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
         </div>
 
-        {/* Warning Breakdown */}
-        {warningBreakdown.length > 0 && (
-          <div className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Advertências por Categoria</CardTitle>
-                <CardDescription>Distribuição das advertências no período selecionado</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                  {warningBreakdown.map((item) => (
-                    <div key={item.category} className="flex items-center justify-between rounded-lg border p-3">
-                      <span className="text-sm font-medium">{item.label}</span>
-                      <Badge variant="secondary">{item.count}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        <EquipeFilters
+          open={showFilterDrawer}
+          onOpenChange={setShowFilterDrawer}
+          filters={filters}
+          selectedYear={selectedYear}
+          selectedMonths={selectedMonths}
+          yAxisMode={yAxisMode}
+          compareMode={compareMode}
+          includeExperienceFailures={includeExperienceFailures}
+          onApply={handleFilterApply}
+        />
 
-        {/* Data Table */}
-        {items.length > 0 && (
-          <div className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Detalhamento por Período</CardTitle>
-                <CardDescription>Dados mensais da equipe</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Período</TableHead>
-                      <TableHead className="text-right">Efetivo</TableHead>
-                      <TableHead className="text-right">Admissões</TableHead>
-                      <TableHead className="text-right">Demissões</TableHead>
-                      <TableHead className="text-right">Turnover</TableHead>
-                      <TableHead className="text-right">Advertências</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((item) => (
-                      <TableRow key={item.period}>
-                        <TableCell className="font-medium">{item.label}</TableCell>
-                        <TableCell className="text-right">{formatNumber(item.headcount)}</TableCell>
-                        <TableCell className="text-right">{formatNumber(item.newHires)}</TableCell>
-                        <TableCell className="text-right">{formatNumber(item.dismissals)}</TableCell>
-                        <TableCell className="text-right">{formatPercentage(item.turnoverRate)}</TableCell>
-                        <TableCell className="text-right">{formatNumber(item.totalWarnings)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        {/* KPI drill-down — opens when the user clicks Efetivo / Admissões /
+            Desligamentos. Variação líquida is not clickable. */}
+        <TeamDrillDownModal
+          open={drillDown !== null}
+          onOpenChange={(o) => { if (!o) setDrillDown(null); }}
+          mode={drillDown}
+          startDate={filters.startDate}
+          endDate={filters.endDate}
+          sectorIds={filters.sectorIds}
+          positionIds={filters.positionIds}
+        />
+
+        {/* Period drill-down — opens when the user clicks an x-axis value */}
+        <TeamPeriodModal
+          open={periodModal !== null}
+          onOpenChange={(o) => { if (!o) setPeriodModal(null); }}
+          item={periodModal}
+          sectorIds={filters.sectorIds}
+          positionIds={filters.positionIds}
+        />
       </div>
-
-      {/* Filter Drawer */}
-      <TeamFilters
-        open={showFilterDrawer}
-        onOpenChange={setShowFilterDrawer}
-        filters={filters}
-        onApply={handleFilterApply}
-        onReset={handleFilterReset}
-        yAxisMode={yAxisMode}
-        onYAxisModeChange={setYAxisMode}
-      />
-    </div>
+    </TooltipProvider>
   );
 };
 
-export default TeamPerformancePage;
+export default EquipePage;

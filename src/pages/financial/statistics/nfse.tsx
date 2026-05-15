@@ -4,12 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Combobox } from '@/components/ui/combobox';
+import { cn } from '@/lib/utils';
 import { routes, FAVORITE_PAGES } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useChartTheme } from '@/hooks/common/use-chart-theme';
@@ -46,7 +49,6 @@ import {
   IconCash,
   IconPercentage,
   IconCoin,
-  IconHourglass,
 } from '@tabler/icons-react';
 import {
   DropdownMenu,
@@ -198,6 +200,11 @@ const NfseStatisticsPage = () => {
   });
   const [chartType, setChartType] = useState<ChartTypeKey>('bar-stacked');
   const [trendLine, setTrendLine] = useState<TrendLineType | null>(null);
+  // Drill-down modal: opens when a summary card is clicked. Per-status NFS-e
+  // record listings aren't returned by the analytics endpoint yet, so this is
+  // a placeholder UI with search + empty state for visual consistency.
+  const [drillDown, setDrillDown] = useState<{ title: string; count: number } | null>(null);
+  const [drillDownSearch, setDrillDownSearch] = useState('');
 
   const { data, isLoading, isError, error, refetch } = useNfseAnalytics(filters);
   const summary = data?.data?.summary;
@@ -299,16 +306,17 @@ const NfseStatisticsPage = () => {
   const handleExportPDF = useCallback(async () => { toast.info('Geração de PDF em breve.'); }, []);
 
   const renderMainChart = () => {
+    const chartHeightStyle = { height: '100%' };
     if (isLoading) {
       return (
-        <div style={{ height: 'calc(100vh - 460px)', minHeight: 460, maxHeight: 560 }} className="flex items-center justify-center">
+        <div style={chartHeightStyle} className="flex items-center justify-center">
           <div className="space-y-3"><Skeleton className="h-4 w-[250px]" /><Skeleton className="h-[380px] w-[600px]" /></div>
         </div>
       );
     }
     if (isError) {
       return (
-        <div style={{ height: 'calc(100vh - 460px)', minHeight: 460, maxHeight: 560 }} className="flex flex-col items-center justify-center gap-4">
+        <div style={chartHeightStyle} className="flex flex-col items-center justify-center gap-4">
           <IconAlertCircle className="h-12 w-12 text-destructive" />
           <div className="text-center"><p className="font-semibold">Erro ao carregar dados</p><p className="text-sm text-foreground/70">{error?.message || 'Erro'}</p></div>
           <Button onClick={() => refetch()} variant="outline"><IconRefresh className="mr-2 h-4 w-4" /> Tentar novamente</Button>
@@ -317,29 +325,27 @@ const NfseStatisticsPage = () => {
     }
     if (!chartData.length) {
       return (
-        <div style={{ height: 'calc(100vh - 460px)', minHeight: 460, maxHeight: 560 }} className="flex flex-col items-center justify-center gap-4">
+        <div style={chartHeightStyle} className="flex flex-col items-center justify-center gap-4">
           <IconCalendarStats className="h-12 w-12 text-foreground/50" />
           <div className="text-center">
-            <p className="font-semibold">Nenhuma NFS-e no período</p>
-            <p className="text-sm text-foreground/70">A emissão municipal (Ibiporã) atualmente não passa por este pipeline.</p>
+            <p className="font-semibold">Nenhum dado encontrado</p>
+            <p className="text-sm text-foreground/70">Ajuste os filtros para visualizar os dados.</p>
           </div>
         </div>
       );
     }
     return (
-      <div style={{ height: 'calc(100vh - 460px)', minHeight: 460, maxHeight: 560 }}>
-        <StatisticsChart
-          data={chartData}
-          chartType={chartType as StatisticsChartType}
-          yAxisMode={'count' as YAxisMode}
-          isComparisonMode={isComparisonMode}
-          height="100%"
-          yAxisLabel="Documentos"
-          valueFormatter={valueFormatter}
-          trendLine={trendLine}
-          tooltipLabels={{ primary: 'Documentos' }}
-        />
-      </div>
+      <StatisticsChart
+        data={chartData}
+        chartType={chartType as StatisticsChartType}
+        yAxisMode={'count' as YAxisMode}
+        isComparisonMode={isComparisonMode}
+        height="100%"
+        yAxisLabel="Documentos"
+        valueFormatter={valueFormatter}
+        trendLine={trendLine}
+        tooltipLabels={{ primary: 'Documentos' }}
+      />
     );
   };
 
@@ -370,7 +376,7 @@ const NfseStatisticsPage = () => {
                   <IconReceipt2 className="h-5 w-5 text-primary" /> Emissão de Notas Fiscais
                 </CardTitle>
                 <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
-                  Status de emissão das NFS-e, falhas e taxa de autorização.
+                  <span>Status de emissão das NFS-e e taxa de autorização.</span>
                   <Badge variant="outline" className="text-xs">Quantidade</Badge>
                   {trendLine && <Badge variant="outline" className="text-xs">Tendência: {TREND_LABELS[trendLine]}</Badge>}
                   {filters.startDate && (
@@ -451,123 +457,179 @@ const NfseStatisticsPage = () => {
 
           <CardContent className="space-y-5">
             {/* All KPIs in one row — emissão status (4) + receita & impostos (4). */}
-            <div>
-              <div className="mb-2 flex items-center gap-2">
-                <IconCoin className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-semibold text-foreground">Resumo da Emissão & Imposto Estimado</h3>
-                <span className="text-xs text-foreground/65">
-                  — receita e ISS calculados sobre NFS-e <strong>autorizadas</strong> à alíquota de{' '}
-                  <strong>{formatNumber(summary?.issRatePercent ?? 2, 1)}%</strong>
-                </span>
-              </div>
-              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-4 2xl:grid-cols-8">
-                <Card>
-                  <CardContent className="py-3 px-4">
-                    <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                      <IconCircleCheck className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> Taxa de Autorização
-                    </div>
-                    {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
-                      <div className="text-xl font-bold text-foreground mt-0.5">{formatPercentage(summary?.authorizationRate ?? 0)}</div>}
-                    <div className="text-[11px] text-foreground/70 mt-0.5">
-                      <span className="font-medium text-emerald-700 dark:text-emerald-400">{summary?.totalAuthorized ?? 0}</span> de {summary?.totalDocuments ?? 0} autorizadas
-                    </div>
-                  </CardContent>
-                </Card>
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-4 2xl:grid-cols-8 flex-shrink-0">
+              <Card
+                className={cn(
+                  'transition-colors',
+                  !isLoading && (summary?.totalDocuments ?? 0) > 0 && 'cursor-pointer hover:bg-muted/50',
+                )}
+                onClick={!isLoading && (summary?.totalDocuments ?? 0) > 0
+                  ? () => setDrillDown({ title: 'Total de NFS-e', count: summary?.totalDocuments ?? 0 })
+                  : undefined}
+                role={!isLoading && (summary?.totalDocuments ?? 0) > 0 ? 'button' : undefined}
+                tabIndex={!isLoading && (summary?.totalDocuments ?? 0) > 0 ? 0 : undefined}
+                onKeyDown={e => {
+                  if (!isLoading && (summary?.totalDocuments ?? 0) > 0 && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    setDrillDown({ title: 'Total de NFS-e', count: summary?.totalDocuments ?? 0 });
+                  }
+                }}
+              >
+                <CardContent className="py-3 px-4">
+                  <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
+                    <IconReceipt2 className="h-3.5 w-3.5" /> Total de NFS-e
+                  </div>
+                  {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
+                    <div className="text-xl font-bold text-foreground mt-0.5">{formatNumber(summary?.totalDocuments ?? 0, 0)}</div>}
+                  <div className="text-[11px] text-foreground/70 mt-0.5">
+                    {(summary?.totalDocuments ?? 0) > 0
+                      ? 'Documentos no período'
+                      : 'Sem documentos no período'}
+                  </div>
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardContent className="py-3 px-4">
-                    <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                      <IconAlertTriangle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" /> Taxa de Erro
-                    </div>
-                    {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
-                      <div className="text-xl font-bold text-red-700 dark:text-red-400 mt-0.5">{formatPercentage(summary?.errorRate ?? 0)}</div>}
-                    <div className="text-[11px] text-foreground/70 mt-0.5">
-                      {summary?.totalError ?? 0} documentos com erro
-                    </div>
-                  </CardContent>
-                </Card>
+              <Card
+                className={cn(
+                  'transition-colors',
+                  !isLoading && (summary?.totalAuthorized ?? 0) > 0 && 'cursor-pointer hover:bg-muted/50',
+                )}
+                onClick={!isLoading && (summary?.totalAuthorized ?? 0) > 0
+                  ? () => setDrillDown({ title: 'NFS-e Autorizadas', count: summary?.totalAuthorized ?? 0 })
+                  : undefined}
+                role={!isLoading && (summary?.totalAuthorized ?? 0) > 0 ? 'button' : undefined}
+                tabIndex={!isLoading && (summary?.totalAuthorized ?? 0) > 0 ? 0 : undefined}
+                onKeyDown={e => {
+                  if (!isLoading && (summary?.totalAuthorized ?? 0) > 0 && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    setDrillDown({ title: 'NFS-e Autorizadas', count: summary?.totalAuthorized ?? 0 });
+                  }
+                }}
+              >
+                <CardContent className="py-3 px-4">
+                  <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
+                    <IconCircleCheck className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> Autorizadas
+                  </div>
+                  {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
+                    <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">{formatNumber(summary?.totalAuthorized ?? 0, 0)}</div>}
+                  <div className="text-[11px] text-foreground/70 mt-0.5">
+                    {formatPercentage(summary?.authorizationRate ?? 0)} do total
+                  </div>
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardContent className="py-3 px-4">
-                    <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                      <IconClock className="h-3.5 w-3.5" /> Pendentes
-                    </div>
-                    {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
-                      <div className="text-xl font-bold text-foreground mt-0.5">{formatNumber((summary?.totalPending ?? 0) + (summary?.totalProcessing ?? 0), 0)}</div>}
-                    <div className="text-[11px] text-foreground/70 mt-0.5">
-                      Aguardando envio ou processamento
-                    </div>
-                  </CardContent>
-                </Card>
+              <Card
+                className={cn(
+                  'transition-colors',
+                  !isLoading && ((summary?.totalPending ?? 0) + (summary?.totalProcessing ?? 0)) > 0 && 'cursor-pointer hover:bg-muted/50',
+                )}
+                onClick={!isLoading && ((summary?.totalPending ?? 0) + (summary?.totalProcessing ?? 0)) > 0
+                  ? () => setDrillDown({ title: 'NFS-e Pendentes', count: (summary?.totalPending ?? 0) + (summary?.totalProcessing ?? 0) })
+                  : undefined}
+                role={!isLoading && ((summary?.totalPending ?? 0) + (summary?.totalProcessing ?? 0)) > 0 ? 'button' : undefined}
+                tabIndex={!isLoading && ((summary?.totalPending ?? 0) + (summary?.totalProcessing ?? 0)) > 0 ? 0 : undefined}
+                onKeyDown={e => {
+                  if (!isLoading && ((summary?.totalPending ?? 0) + (summary?.totalProcessing ?? 0)) > 0 && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    setDrillDown({ title: 'NFS-e Pendentes', count: (summary?.totalPending ?? 0) + (summary?.totalProcessing ?? 0) });
+                  }
+                }}
+              >
+                <CardContent className="py-3 px-4">
+                  <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
+                    <IconClock className="h-3.5 w-3.5" /> Pendentes
+                  </div>
+                  {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
+                    <div className="text-xl font-bold text-foreground mt-0.5">{formatNumber((summary?.totalPending ?? 0) + (summary?.totalProcessing ?? 0), 0)}</div>}
+                  <div className="text-[11px] text-foreground/70 mt-0.5">
+                    Aguardando envio ou processamento
+                  </div>
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardContent className="py-3 px-4">
-                    <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                      <IconReload className="h-3.5 w-3.5" /> Retentativas Médias
-                    </div>
-                    {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
-                      <div className="text-xl font-bold text-foreground mt-0.5">{formatNumber(summary?.avgRetryCount ?? 0, 2)}</div>}
-                    <div className="text-[11px] text-foreground/70 mt-0.5">
-                      <span className="font-medium">{summary?.documentsAtRetryLimit ?? 0}</span> no limite (≥3 tentativas)
-                    </div>
-                  </CardContent>
-                </Card>
+              <Card
+                className={cn(
+                  'transition-colors',
+                  !isLoading && (summary?.totalError ?? 0) > 0 && 'cursor-pointer hover:bg-muted/50',
+                )}
+                onClick={!isLoading && (summary?.totalError ?? 0) > 0
+                  ? () => setDrillDown({ title: 'NFS-e em Erro', count: summary?.totalError ?? 0 })
+                  : undefined}
+                role={!isLoading && (summary?.totalError ?? 0) > 0 ? 'button' : undefined}
+                tabIndex={!isLoading && (summary?.totalError ?? 0) > 0 ? 0 : undefined}
+                onKeyDown={e => {
+                  if (!isLoading && (summary?.totalError ?? 0) > 0 && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    setDrillDown({ title: 'NFS-e em Erro', count: summary?.totalError ?? 0 });
+                  }
+                }}
+              >
+                <CardContent className="py-3 px-4">
+                  <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
+                    <IconAlertTriangle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" /> Em Erro
+                  </div>
+                  {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
+                    <div className="text-xl font-bold text-red-700 dark:text-red-400 mt-0.5">{formatNumber(summary?.totalError ?? 0, 0)}</div>}
+                  <div className="text-[11px] text-foreground/70 mt-0.5">
+                    {formatPercentage(summary?.errorRate ?? 0)} · {summary?.documentsAtRetryLimit ?? 0} no limite
+                  </div>
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardContent className="py-3 px-4">
-                    <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                      <IconCash className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> Receita Bruta
-                    </div>
-                    {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> :
-                      <div className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(summary?.grossServiceRevenue ?? 0)}</div>}
-                    <div className="text-[11px] text-foreground/70 mt-0.5">
-                      Total faturado em NFS-e
-                    </div>
-                  </CardContent>
-                </Card>
+              <Card>
+                <CardContent className="py-3 px-4">
+                  <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
+                    <IconReload className="h-3.5 w-3.5" /> Retentativas Médias
+                  </div>
+                  {isLoading ? <Skeleton className="h-7 w-20 mt-1" /> :
+                    <div className="text-xl font-bold text-foreground mt-0.5">{formatNumber(summary?.avgRetryCount ?? 0, 2)}</div>}
+                  <div className="text-[11px] text-foreground/70 mt-0.5">
+                    Tentativas por documento
+                  </div>
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardContent className="py-3 px-4">
-                    <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                      <IconPercentage className="h-3.5 w-3.5 text-red-600 dark:text-red-400" /> ISS Estimado
-                    </div>
-                    {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> :
-                      <div className="text-xl font-bold text-red-700 dark:text-red-400 mt-0.5">{formatCurrency(summary?.estimatedIssAmount ?? 0)}</div>}
-                    <div className="text-[11px] text-foreground/70 mt-0.5">
-                      Bruto × {formatNumber(summary?.issRatePercent ?? 2, 1)}%
-                    </div>
-                  </CardContent>
-                </Card>
+              <Card>
+                <CardContent className="py-3 px-4">
+                  <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
+                    <IconCash className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> Receita Bruta
+                  </div>
+                  {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> :
+                    <div className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(summary?.grossServiceRevenue ?? 0)}</div>}
+                  <div className="text-[11px] text-foreground/70 mt-0.5">
+                    Total faturado em NFS-e
+                  </div>
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardContent className="py-3 px-4">
-                    <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                      <IconCoin className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> Receita Líquida
-                    </div>
-                    {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> :
-                      <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">{formatCurrency(summary?.netServiceRevenue ?? 0)}</div>}
-                    <div className="text-[11px] text-foreground/70 mt-0.5">
-                      Bruto − ISS estimado
-                    </div>
-                  </CardContent>
-                </Card>
+              <Card>
+                <CardContent className="py-3 px-4">
+                  <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
+                    <IconPercentage className="h-3.5 w-3.5 text-red-600 dark:text-red-400" /> ISS Estimado
+                  </div>
+                  {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> :
+                    <div className="text-xl font-bold text-red-700 dark:text-red-400 mt-0.5">{formatCurrency(summary?.estimatedIssAmount ?? 0)}</div>}
+                  <div className="text-[11px] text-foreground/70 mt-0.5">
+                    Bruto × {formatNumber(summary?.issRatePercent ?? 2, 1)}%
+                  </div>
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardContent className="py-3 px-4">
-                    <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
-                      <IconHourglass className="h-3.5 w-3.5" /> Pendente
-                    </div>
-                    {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> :
-                      <div className="text-xl font-bold text-foreground mt-0.5">{formatCurrency(summary?.pendingGrossRevenue ?? 0)}</div>}
-                    <div className="text-[11px] text-foreground/70 mt-0.5">
-                      Aguarda emissão da NFS-e
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <Card>
+                <CardContent className="py-3 px-4">
+                  <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
+                    <IconCoin className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" /> Receita Líquida
+                  </div>
+                  {isLoading ? <Skeleton className="h-7 w-24 mt-1" /> :
+                    <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">{formatCurrency(summary?.netServiceRevenue ?? 0)}</div>}
+                  <div className="text-[11px] text-foreground/70 mt-0.5">
+                    Bruto − ISS estimado
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
-            <Card><CardContent className="p-4">{renderMainChart()}</CardContent></Card>
+            <Card><CardContent className="p-4" style={{ height: 'max(420px, calc(100vh - 540px))' }}>{renderMainChart()}</CardContent></Card>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
@@ -631,6 +693,53 @@ const NfseStatisticsPage = () => {
         filters={filters}
         onApply={setFilters}
       />
+
+      {/* Drill-down placeholder modal — the analytics endpoint doesn't return
+          per-record listings yet, so this renders a search bar and an empty
+          state for UI consistency with other statistics pages. */}
+      <Dialog
+        open={!!drillDown}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDrillDown(null);
+            setDrillDownSearch('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconReceipt2 className="h-5 w-5 text-primary" />
+              {drillDown?.title}
+              {drillDown && (
+                <Badge variant="secondary" className="ml-2">{formatNumber(drillDown.count, 0)}</Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Lista de NFS-e correspondentes ao status selecionado no período filtrado.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 pt-2">
+            <Input
+              placeholder="Buscar por número, cliente ou mensagem..."
+              value={drillDownSearch}
+              onChange={(v) => setDrillDownSearch(v == null ? '' : String(v))}
+              className="w-full"
+            />
+            <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+              <IconCalendarStats className="h-12 w-12 text-foreground/40" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Detalhamento por documento em breve</p>
+                <p className="text-xs text-foreground/65 mt-1 max-w-sm">
+                  A listagem individual de cada NFS-e ainda não é exposta por esta tela.
+                  Por enquanto, consulte a página de NFS-e para o registro completo.
+                </p>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

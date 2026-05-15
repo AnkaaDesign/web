@@ -23,6 +23,7 @@ import {
 
 import {
   USER_STATUS,
+  VACATION_JUSTIFICATIVA_ID,
   getJustificativaCategory,
   getJustificativaMeta,
 } from "../../../../constants";
@@ -547,7 +548,7 @@ function StatsRow({
       />
       <StatTile
         icon={IconBeach}
-        label="Ausências"
+        label="Férias"
         value={stats.vacationDays}
         suffix={`dias · ${colabSuffix(stats.usersOnVacation)}`}
         tone="purple"
@@ -761,7 +762,13 @@ function MonthView({
                     </span>
                   </div>
 
-                  <div className="mt-1.5 space-y-1">
+                  {/* Events list fills remaining cell height and scrolls when
+                      it overflows. `overscroll-contain` keeps wheel scrolls
+                      inside the cell so they don't bubble out to the page. */}
+                  <div
+                    className="mt-1.5 space-y-1 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full"
+                    onWheel={(e) => e.stopPropagation()}
+                  >
                     {/* Holidays — amber. Matches "Feriados úteis" tile. */}
                     {dayHolidays.slice(0, 1).map((h, i) => (
                       <div
@@ -792,11 +799,9 @@ function MonthView({
                         ...collectives.map((b) => ({ kind: "collective" as const, bucket: b })),
                         ...individuals.map((a) => ({ kind: "individual" as const, absence: a })),
                       ];
-                      const visible = items.slice(0, 3);
-                      const hidden = items.length - visible.length;
                       return (
                         <>
-                          {visible.map((it, i) => {
+                          {items.map((it, i) => {
                             if (it.kind === "collective") {
                               const b = it.bucket;
                               const cls = CATEGORY_BAR_CLASSES[b.category];
@@ -836,11 +841,6 @@ function MonthView({
                               </div>
                             );
                           })}
-                          {hidden > 0 && (
-                            <div className="text-[10px] text-muted-foreground font-medium">
-                              +{hidden} mais
-                            </div>
-                          )}
                         </>
                       );
                     })()}
@@ -1009,7 +1009,7 @@ function AbsenceCard({ absence }: { absence: SecullumAggregatedAbsence }) {
 function CollectiveCard({ bucket }: { bucket: CollectiveBucket }) {
   const catLabel =
     bucket.category === "AUSENCIA"
-      ? "Ausência Coletiva"
+      ? "Férias Coletiva"
       : bucket.category === "FALTA_JUSTIFIED"
         ? "Justificada Coletiva"
         : "Não Justificada Coletiva";
@@ -1426,7 +1426,6 @@ function getExplicitCollectiveKey(rec: SecullumAggregatedAbsence): string | null
 // dispensas, treinamentos, etc.) renders as individual rows even when many
 // employees share the same date range. Group key is either the explicit
 // [GRP:uuid] prefix or the implicit (JustificativaId + Inicio + Fim) tuple.
-const VACATION_JUSTIFICATIVA_ID = 2;
 function bucketDayAbsences(
   dayAbsences: SecullumAggregatedAbsence[],
 ): { collectives: CollectiveBucket[]; individuals: SecullumAggregatedAbsence[] } {

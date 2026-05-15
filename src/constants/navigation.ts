@@ -43,6 +43,8 @@ export const TABLER_ICONS = {
   // Administration
   cog: "IconSettings",
   admin: "IconShield", // More universal administrative icon
+  target: "IconTarget",
+  goal: "IconTarget",
 
   // Personal
   userCircle: "IconUserCircle",
@@ -110,6 +112,8 @@ export const TABLER_ICONS = {
   calendarStats: "IconCalendarStats",
   calendarWeek: "IconCalendarWeek",
   calendarDollar: "IconCalendarDollar",
+  calendarOff: "IconCalendarOff",
+  arrowsExchange: "IconArrowsExchange",
   schedule: "IconCalendarPlus",
   automation: "IconBolt",
 
@@ -548,6 +552,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "setores-editar", title: "Editar", icon: "edit", path: "/administracao/setores/editar/:id", isDynamic: true },
         ],
       },
+      {
+        id: "metas",
+        title: "Metas",
+        icon: "target",
+        path: "/administracao/metas",
+        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
+      },
     ],
   },
 
@@ -611,15 +622,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
     children: [
       {
-        id: "stats-administracao",
-        title: "Administração",
-        icon: "cog",
-        path: "/estatisticas/administracao",
-        children: [
-          { id: "stats-admin-visao-geral", title: "Visão Geral", icon: "chartBar", path: "/estatisticas/administracao/visao-geral" },
-        ],
-      },
-      {
         id: "stats-estoque",
         title: "Estoque",
         icon: "box",
@@ -627,8 +629,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [
           { id: "stats-estoque-consumo", title: "Análise de Consumo", icon: "chartBar", path: "/estatisticas/estoque/consumo" },
           { id: "stats-estoque-pedidos", title: "Análise de Pedidos", icon: "clipboardList", path: "/estatisticas/estoque/pedidos" },
-          { id: "stats-estoque-tendencias", title: "Tendências", icon: "trendingUp", path: "/estatisticas/estoque/tendencias" },
-          { id: "stats-estoque-top-itens", title: "Top Itens", icon: "trophy", path: "/estatisticas/estoque/top-itens" },
         ],
       },
       {
@@ -638,6 +638,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         path: "/estatisticas/producao",
         children: [
           { id: "stats-producao-produtividade", title: "Produtividade", icon: "chartBar", path: "/estatisticas/producao/produtividade" },
+          { id: "stats-producao-desempenho", title: "Desempenho", icon: "activity", path: "/estatisticas/producao/desempenho" },
           { id: "stats-producao-gargalos", title: "Gargalos", icon: "alertTriangle", path: "/estatisticas/producao/gargalos" },
           { id: "stats-producao-valor-bonus", title: "Relação Bônus / Produção", icon: "coins", path: "/estatisticas/producao/valor-bonus" },
         ],
@@ -650,7 +651,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [
           { id: "stats-financeiro-receita-orcamentos", title: "Receita & Orçamentos", icon: "coins", path: "/estatisticas/financeiro/receita-orcamentos" },
           { id: "stats-financeiro-cobrancas", title: "Cobranças & Fluxo de Caixa", icon: "chartBar", path: "/estatisticas/financeiro/cobrancas" },
-          { id: "stats-financeiro-recebiveis", title: "Recebíveis & Clientes", icon: "users", path: "/estatisticas/financeiro/recebiveis" },
           { id: "stats-financeiro-nfse", title: "NFS-e", icon: "receipt", path: "/estatisticas/financeiro/nfse" },
         ],
       },
@@ -662,15 +662,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [
           { id: "stats-rh-folha", title: "Folha de Pagamento", icon: "chartBar", path: "/estatisticas/recursos-humanos/folha" },
           { id: "stats-rh-equipe", title: "Equipe", icon: "users", path: "/estatisticas/recursos-humanos/equipe" },
-        ],
-      },
-      {
-        id: "stats-pintura",
-        title: "Pintura",
-        icon: "brush",
-        path: "/estatisticas/pintura",
-        children: [
-          { id: "stats-pintura-producao", title: "Produção de Tintas", icon: "chartBar", path: "/estatisticas/pintura/producao" },
+          { id: "stats-rh-faltas", title: "Faltas", icon: "calendarOff", path: "/estatisticas/recursos-humanos/faltas" },
         ],
       },
     ],
@@ -1585,27 +1577,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       {
-        id: "ausencias",
-        title: "Ausências",
+        id: "ferias",
+        title: "Férias",
         icon: "vacation",
-        path: "/recursos-humanos/ausencias",
+        path: "/recursos-humanos/ferias",
         requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
         children: [
-          { id: "ausencias-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/ausencias/cadastrar" },
-          { id: "ausencias-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/ausencias/editar/:id", isDynamic: true },
-          { id: "ausencias-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/ausencias/detalhes/:id", isDynamic: true },
-        ],
-      },
-      {
-        id: "faltas",
-        title: "Faltas",
-        icon: "alertTriangle",
-        path: "/recursos-humanos/faltas",
-        requiredPrivilege: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-        children: [
-          { id: "faltas-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/faltas/cadastrar" },
-          { id: "faltas-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/faltas/editar/:id", isDynamic: true },
-          { id: "faltas-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/faltas/detalhes/:id", isDynamic: true },
+          { id: "ferias-cadastrar", title: "Cadastrar", icon: "plus", path: "/recursos-humanos/ferias/cadastrar" },
+          { id: "ferias-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/ferias/editar/:id", isDynamic: true },
+          { id: "ferias-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/ferias/detalhes/:id", isDynamic: true },
         ],
       },
       {

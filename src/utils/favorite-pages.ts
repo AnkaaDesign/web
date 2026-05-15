@@ -93,8 +93,7 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
 
   // Human Resources - List Pages
   "/recursos-humanos/cargos": FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR,
-  "/recursos-humanos/ausencias": FAVORITE_PAGES.RECURSOS_HUMANOS_AUSENCIAS_LISTAR,
-  "/recursos-humanos/faltas": FAVORITE_PAGES.RECURSOS_HUMANOS_FALTAS_LISTAR,
+  "/recursos-humanos/ferias": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_LISTAR,
   "/recursos-humanos/calendario": FAVORITE_PAGES.RECURSOS_HUMANOS_CALENDARIO,
   "/recursos-humanos/feriados": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_LISTAR,
   "/recursos-humanos/avisos": FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_LISTAR,
@@ -105,8 +104,7 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
 
   // Human Resources - Create Pages
   "/recursos-humanos/cargos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_CADASTRAR,
-  "/recursos-humanos/ausencias/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_AUSENCIAS_CADASTRAR,
-  "/recursos-humanos/faltas/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_FALTAS_CADASTRAR,
+  "/recursos-humanos/ferias/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_CADASTRAR,
   "/recursos-humanos/feriados/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_CADASTRAR,
   "/recursos-humanos/avisos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_AVISOS_CADASTRAR,
   "/recursos-humanos/epi/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_CADASTRAR,

@@ -4,6 +4,7 @@ import {
   getProductionBottlenecks,
   getProductionRevenue,
   getTaskProductionStats,
+  getTaskPerformanceStats,
   getBonusValueTimeline,
 } from '@/api-client/production-analytics';
 import type {
@@ -13,6 +14,8 @@ import type {
   RevenueAnalyticsResponse,
   TaskProductionFilters,
   TaskProductionResponse,
+  TaskPerformanceFilters,
+  TaskPerformanceResponse,
   BonusValueTimelineFilters,
   BonusValueTimelineResponse,
 } from '@/types/production-analytics';
@@ -23,6 +26,7 @@ export const productionAnalyticsKeys = {
   bottlenecks: (filters: any) => [...productionAnalyticsKeys.all, 'bottlenecks', filters] as const,
   revenue: (filters: ProductionAnalyticsFilters) => [...productionAnalyticsKeys.all, 'revenue', filters] as const,
   taskProduction: (filters: TaskProductionFilters) => [...productionAnalyticsKeys.all, 'task-production', filters] as const,
+  taskPerformance: (filters: TaskPerformanceFilters) => [...productionAnalyticsKeys.all, 'task-performance', filters] as const,
   bonusValueTimeline: (filters: BonusValueTimelineFilters) => [...productionAnalyticsKeys.all, 'bonus-value-timeline', filters] as const,
 };
 
@@ -60,6 +64,16 @@ export function useTaskProductionStats(filters: TaskProductionFilters) {
   return useQuery<TaskProductionResponse, Error>({
     queryKey: productionAnalyticsKeys.taskProduction(filters),
     queryFn: () => getTaskProductionStats(filters),
+    staleTime: 3 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 2,
+  });
+}
+
+export function useTaskPerformanceStats(filters: TaskPerformanceFilters) {
+  return useQuery<TaskPerformanceResponse, Error>({
+    queryKey: productionAnalyticsKeys.taskPerformance(filters),
+    queryFn: () => getTaskPerformanceStats(filters),
     staleTime: 3 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     retry: 2,

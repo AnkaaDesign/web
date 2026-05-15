@@ -94,6 +94,7 @@ const AdministrationSectorsCreate = lazy(() => import("@/pages/administration/se
 const AdministrationSectorsEdit = lazy(() => import("@/pages/administration/sectors/edit/[id]").then((module) => ({ default: module.SectorEditPage })));
 const AdministrationSectorsDetails = lazy(() => import("@/pages/administration/sectors/details/[id]").then((module) => ({ default: module.SectorDetailPage })));
 const AdministrationSectorsBatchEdit = lazy(() => import("@/pages/administration/sectors/batch-edit").then((module) => ({ default: module.SectorBatchEditPage })));
+const AdministrationGoalsList = lazy(() => import("@/pages/administration/goals").then((module) => ({ default: module.GoalListPage })));
 
 const AdministrationNotifications = lazy(() => import("@/pages/administration/notifications/list").then((module) => ({ default: module.NotificationListPage })));
 const AdministrationNotificationsEdit = lazy(() => import("@/pages/administration/notifications/edit/[id]").then((module) => ({ default: module.EditNotificationPage })));
@@ -205,39 +206,31 @@ const InventoryProductsBrandsBatchEdit = lazy(() => import("@/pages/inventory/pr
 // Inventory Statistics
 const InventoryStatistics = lazy(() => import("@/pages/inventory/statistics/index").then((module) => ({ default: module.InventoryStatisticsPage })));
 const InventoryStatisticsConsumption = lazy(() => import("@/pages/inventory/statistics/consumption").then((module) => ({ default: module.InventoryConsumptionStatisticsPage })));
-const InventoryStatisticsTopItems = lazy(() => import("@/pages/inventory/statistics/top-items").then((module) => ({ default: module.default })));
-const InventoryStatisticsTrends = lazy(() => import("@/pages/inventory/statistics/trends").then((module) => ({ default: module.default })));
 
 // Order Statistics
 const OrderStatistics = lazy(() => import("@/pages/order/statistics/orders").then((module) => ({ default: module.OrderStatisticsPage })));
 
 // Production Statistics
 const ProductionProductivityStatistics = lazy(() => import("@/pages/production/statistics/productivity").then((module) => ({ default: module.default })));
+const ProductionPerformanceStatistics = lazy(() => import("@/pages/production/statistics/performance").then((module) => ({ default: module.default })));
 const ProductionBottlenecksStatistics = lazy(() => import("@/pages/production/statistics/bottlenecks").then((module) => ({ default: module.default })));
 const ProductionBonusValueStatistics = lazy(() => import("@/pages/production/statistics/bonus-value").then((module) => ({ default: module.default })));
 
 // Financial Statistics
 const FinancialCollectionStatistics = lazy(() => import("@/pages/financial/statistics/collection").then((module) => ({ default: module.default })));
 const FinancialRevenueQuotesStatistics = lazy(() => import("@/pages/financial/statistics/revenue-quotes").then((module) => ({ default: module.default })));
-const FinancialReceivablesStatistics = lazy(() => import("@/pages/financial/statistics/receivables").then((module) => ({ default: module.default })));
 const FinancialNfseStatistics = lazy(() => import("@/pages/financial/statistics/nfse").then((module) => ({ default: module.default })));
 
 // HR Statistics
 const HRPayrollStatistics = lazy(() => import("@/pages/human-resources/statistics/payroll").then((module) => ({ default: module.default })));
 const HRTeamPerformanceStatistics = lazy(() => import("@/pages/human-resources/statistics/team-performance").then((module) => ({ default: module.default })));
-
-// Paint Statistics
-const PaintProductionStatistics = lazy(() => import("@/pages/painting/statistics/production").then((module) => ({ default: module.default })));
-
-// Administration Statistics
-const AdministrationOverviewStatistics = lazy(() => import("@/pages/administration/statistics/overview").then((module) => ({ default: module.default })));
+const HRFaltasStatistics = lazy(() => import("@/pages/human-resources/statistics/faltas").then((module) => ({ default: module.default })));
 
 // Statistics Hub Pages
 const StatisticsHub = lazy(() => import("@/pages/statistics/index").then((module) => ({ default: module.default })));
 const ProductionStatisticsHub = lazy(() => import("@/pages/production/statistics/index").then((module) => ({ default: module.default })));
 const FinancialStatisticsHub = lazy(() => import("@/pages/financial/statistics/index").then((module) => ({ default: module.default })));
 const HRStatisticsHub = lazy(() => import("@/pages/human-resources/statistics/index").then((module) => ({ default: module.default })));
-const PaintStatisticsHub = lazy(() => import("@/pages/painting/statistics/index").then((module) => ({ default: module.default })));
 
 // Personal
 const Personal = lazy(() => import("@/pages/personal/root").then((module) => ({ default: module.Personal })));
@@ -338,8 +331,7 @@ const HumanResourcesHolidays = lazy(() => import("@/pages/human-resources/holida
 const HumanResourcesHolidaysCalendar = lazy(() => import("@/pages/human-resources/holidays/calendar").then((module) => ({ default: module.HolidayCalendarPage })));
 const HumanResourcesHolidaysCreate = lazy(() => import("@/pages/human-resources/holidays/cadastrar").then((module) => ({ default: module.HolidayCreatePage })));
 const HumanResourcesSchedules = lazy(() => import("@/pages/human-resources/schedules/list").then((module) => ({ default: module.SchedulesListPage })));
-const HumanResourcesAbsences = lazy(() => import("@/pages/human-resources/absences/list").then((module) => ({ default: module.AbsencesListPage })));
-const HumanResourcesFaltas = lazy(() => import("@/pages/human-resources/faltas/list").then((module) => ({ default: module.FaltasListPage })));
+const HumanResourcesVacations = lazy(() => import("@/pages/human-resources/vacations/list").then((module) => ({ default: module.VacationsListPage })));
 const HumanResourcesHRCalendar = lazy(() => import("@/pages/human-resources/calendar").then((module) => ({ default: module.HRCalendarPage })));
 const HumanResourcesTimeClock = lazy(() => import("@/pages/human-resources/time-clock/list"));
 const HumanResourcesAssinaturaDigitalList = lazy(
@@ -894,6 +886,14 @@ function App() {
                     </Suspense>
                   }
                 />
+                <Route
+                  path={routes.administration.goals.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdministrationGoalsList />
+                    </Suspense>
+                  }
+                />
 
                 <Route
                   path={routes.administration.notifications.root}
@@ -1141,19 +1141,14 @@ function App() {
                   path={routes.statistics.humanResources.root}
                   element={<Suspense fallback={<PageLoader />}><HRStatisticsHub /></Suspense>}
                 />
-                <Route
-                  path={routes.statistics.painting.root}
-                  element={<Suspense fallback={<PageLoader />}><PaintStatisticsHub /></Suspense>}
-                />
-                <Route
-                  path={routes.statistics.administration.root}
-                  element={<Suspense fallback={<PageLoader />}><AdministrationOverviewStatistics /></Suspense>}
-                />
-
                 {/* Production Statistics routes */}
                 <Route
                   path={routes.statistics.production.productivity}
                   element={<Suspense fallback={<PageLoader />}><ProductionProductivityStatistics /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.production.performance}
+                  element={<Suspense fallback={<PageLoader />}><ProductionPerformanceStatistics /></Suspense>}
                 />
                 <Route
                   path={routes.statistics.production.bottlenecks}
@@ -1173,10 +1168,6 @@ function App() {
                   element={<Suspense fallback={<PageLoader />}><FinancialRevenueQuotesStatistics /></Suspense>}
                 />
                 <Route
-                  path={routes.statistics.financial.receivables}
-                  element={<Suspense fallback={<PageLoader />}><FinancialReceivablesStatistics /></Suspense>}
-                />
-                <Route
                   path={routes.statistics.financial.nfse}
                   element={<Suspense fallback={<PageLoader />}><FinancialNfseStatistics /></Suspense>}
                 />
@@ -1190,17 +1181,9 @@ function App() {
                   path={routes.statistics.humanResources.teamPerformance}
                   element={<Suspense fallback={<PageLoader />}><HRTeamPerformanceStatistics /></Suspense>}
                 />
-
-                {/* Paint Statistics routes */}
                 <Route
-                  path={routes.statistics.painting.production}
-                  element={<Suspense fallback={<PageLoader />}><PaintProductionStatistics /></Suspense>}
-                />
-
-                {/* Administration Statistics routes */}
-                <Route
-                  path={routes.statistics.administration.overview}
-                  element={<Suspense fallback={<PageLoader />}><AdministrationOverviewStatistics /></Suspense>}
+                  path={routes.statistics.humanResources.absenteeism}
+                  element={<Suspense fallback={<PageLoader />}><HRFaltasStatistics /></Suspense>}
                 />
 
                 {/* Statistics routes - Under Construction (catch-all for unimplemented) */}
@@ -1227,22 +1210,6 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <InventoryStatisticsConsumption />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.inventory.topItems}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <InventoryStatisticsTopItems />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.inventory.trends}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <InventoryStatisticsTrends />
                     </Suspense>
                   }
                 />
@@ -2340,18 +2307,10 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.absences.root}
+                  path={routes.humanResources.vacations.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesAbsences />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.humanResources.faltas.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesFaltas />
+                      <HumanResourcesVacations />
                     </Suspense>
                   }
                 />

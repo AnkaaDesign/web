@@ -13,12 +13,19 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Combobox } from '@/components/ui/combobox';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
+import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
   DropdownMenuRadioGroup, DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
-import { routes, FAVORITE_PAGES, ACTIVITY_OPERATION } from '@/constants';
+import { GOAL_METRIC, GOAL_METRIC_UNIT, routes, FAVORITE_PAGES, ACTIVITY_OPERATION } from '@/constants';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
+import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
+import { GoalMetaPopover } from '@/components/statistics/goal-meta-popover';
 import { useConsumptionAnalytics, consumptionAnalyticsKeys } from '@/hooks/inventory/use-consumption-analytics';
 import { useSectors } from '@/hooks/administration/use-sector';
 import { useUsers } from '@/hooks/human-resources/use-user';
@@ -707,6 +714,12 @@ const ConsumptionPage = () => {
   const [chartType, setChartType]       = useState<ConsumptionChartType>('bar');
   const [trendLine, setTrendLine]       = useState<TrendLineType | null>(null);
 
+  // Drill-down modals. `topItemsOpen` lists the items behind the "Total"
+  // summary card (the biggest contributors). `peakDetailOpen` shows the
+  // breakdown for the peak x-axis row (period or item).
+  const [topItemsOpen, setTopItemsOpen] = useState(false);
+  const [peakDetailOpen, setPeakDetailOpen] = useState(false);
+
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   const [filters, setFilters] = useState<ConsumptionAnalyticsFilters>({
@@ -900,6 +913,32 @@ const ConsumptionPage = () => {
     };
   }, [isMultiEntityTemporal, data, multiQueries]);
 
+  // Goal default — only meaningful in temporal mode (one bar per period).
+  // INVENTORY_CONSUMPTION_VALUE is a budget ceiling (MINIMIZE).
+  const goalMetric =
+    isTemporalMode && yAxisMode === 'value' ? GOAL_METRIC.INVENTORY_CONSUMPTION_VALUE : null;
+
+  const [goalOverride, setGoalOverride] = useState<number | null>(null);
+
+  useEffect(() => {
+    setGoalOverride(null);
+  }, [yAxisMode, xAxisMode]);
+
+  const defaultGoal = useDefaultGoal({
+    metric: goalMetric ?? GOAL_METRIC.INVENTORY_CONSUMPTION_VALUE,
+    period:
+      filters.startDate && filters.endDate
+        ? { from: filters.startDate, to: filters.endDate }
+        : null,
+    aggregation: xAxisMode === 'year' ? 'TOTAL' : 'AVERAGE_PER_PERIOD',
+    periodMode: 'calendar',
+    enabled: goalMetric !== null,
+  });
+
+  const goalValue = goalOverride ?? defaultGoal.value;
+  const goalSource: 'override' | 'default' | 'none' =
+    goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
+
   // ── Y value accessors ──
   const getValue = useCallback((qty: number, val: number) =>
     yAxisMode === 'value' ? val : qty, [yAxisMode]);
@@ -1045,6 +1084,11 @@ const ConsumptionPage = () => {
     if (!chartData.length) return null;
     return chartData.reduce((max, d) => d.value > max.value ? d : max, chartData[0]);
   }, [chartData]);
+
+  // Peak card only opens a modal when there's a series breakdown to show
+  // (compare mode). In single-series mode the modal would render only a
+  // "sem detalhes" placeholder, so we keep the card non-interactive there.
+  const peakIsActionable = !!peakRow && (peakRow.comparisons?.length ?? 0) > 0;
 
   const averagePerXAxis = useMemo(() => {
     if (!chartData.length) return 0;
@@ -1221,7 +1265,7 @@ const ConsumptionPage = () => {
   const renderChart = () => {
     if (isLoading) {
       return (
-        <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 460px)', minHeight: '320px' }}>
+        <div style={{ height: '100%' }} className="flex items-center justify-center">
           <div className="space-y-3 w-full px-8">
             <Skeleton className="h-4 w-1/3" />
             <Skeleton className="h-[380px] w-full" />
@@ -1231,7 +1275,7 @@ const ConsumptionPage = () => {
     }
     if (isError) {
       return (
-        <div className="flex flex-col items-center justify-center gap-4" style={{ height: 'calc(100vh - 460px)', minHeight: '320px' }}>
+        <div style={{ height: '100%' }} className="flex flex-col items-center justify-center gap-4">
           <IconAlertCircle className="h-12 w-12 text-destructive" />
           <div className="text-center">
             <p className="font-semibold">Erro ao carregar dados</p>
@@ -1246,8 +1290,8 @@ const ConsumptionPage = () => {
     }
     if (!chartData.length) {
       return (
-        <div className="flex flex-col items-center justify-center gap-4" style={{ height: 'calc(100vh - 460px)', minHeight: '320px' }}>
-          <IconPackage className="h-12 w-12 text-muted-foreground" />
+        <div style={{ height: '100%' }} className="flex flex-col items-center justify-center gap-4">
+          <IconCalendarStats className="h-12 w-12 text-muted-foreground" />
           <div className="text-center">
             <p className="font-semibold">Nenhum dado encontrado</p>
             <p className="text-sm text-muted-foreground">Ajuste os filtros para visualizar os dados</p>
@@ -1262,7 +1306,7 @@ const ConsumptionPage = () => {
         chartType={chartType as StatisticsChartType}
         yAxisMode={chartYAxisMode}
         isComparisonMode={isChartComparisonMode}
-        height="calc(100vh - 460px)"
+        height="100%"
         yAxisLabel={yAxisLabel}
         valueFormatter={valueFormatter}
         secondaryValueFormatter={secondaryValueFormatter}
@@ -1271,6 +1315,7 @@ const ConsumptionPage = () => {
           secondary: isBothMode ? 'Valor (R$)' : undefined,
         }}
         trendLine={trendLine}
+        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
       />
     );
   };
@@ -1310,16 +1355,15 @@ const ConsumptionPage = () => {
           favoritePage={FAVORITE_PAGES.ESTOQUE_ESTATISTICAS}
           breadcrumbs={[
             { label: 'Início',       href: routes.home },
-            { label: 'Estoque',      href: routes.inventory.root },
-            { label: 'Estatísticas', href: routes.statistics.inventory.root },
+            { label: 'Estatísticas', href: routes.statistics.root },
+            { label: 'Estoque',      href: routes.statistics.inventory.root },
             { label: 'Consumo' },
           ]}
         />
       </div>
 
-      <div className="flex-1 min-h-0 mt-4 overflow-hidden">
-        <Card className="h-full flex flex-col">
-            <CardHeader>
+        <Card className="mt-4 flex-1 min-h-0 flex flex-col">
+            <CardHeader className="flex-shrink-0">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <CardTitle>{cardTitle[xAxisMode]}</CardTitle>
@@ -1411,6 +1455,16 @@ const ConsumptionPage = () => {
                     </DropdownMenuContent>
                   </DropdownMenu>
 
+                  {/* Goal line */}
+                  <GoalMetaPopover
+                    enabled={goalMetric !== null}
+                    value={goalValue}
+                    defaultValue={defaultGoal.value}
+                    source={goalSource}
+                    onOverride={setGoalOverride}
+                    unit={GOAL_METRIC_UNIT[goalMetric ?? GOAL_METRIC.INVENTORY_CONSUMPTION_VALUE]}
+                  />
+
                   {/* Filters */}
                   <Button
                     variant={activeFilterCount > 0 ? 'default' : 'outline'}
@@ -1453,20 +1507,34 @@ const ConsumptionPage = () => {
               </div>
             </CardHeader>
 
-            <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-4 pb-4">
+            <CardContent className="flex-1 min-h-0 flex flex-col gap-5 overflow-hidden">
 
               {/* Summary Cards — order mirrors productivity: Total → Média → Pico → Períodos */}
               {summary && (
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                  {/* 1. Total (quantity or value depending on y-mode) */}
-                  <Card className="py-2">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 flex-shrink-0">
+                  {/* 1. Total (quantity or value depending on y-mode) — click opens top items modal */}
+                  <Card
+                    className={cn(
+                      'py-2',
+                      rawItems.length > 0 && 'cursor-pointer hover:bg-muted/50 transition-colors',
+                    )}
+                    onClick={rawItems.length > 0 ? () => setTopItemsOpen(true) : undefined}
+                    role={rawItems.length > 0 ? 'button' : undefined}
+                    tabIndex={rawItems.length > 0 ? 0 : undefined}
+                    onKeyDown={e => {
+                      if (rawItems.length > 0 && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        setTopItemsOpen(true);
+                      }
+                    }}
+                  >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                      <CardTitle className="text-xs font-medium">
+                      <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                        {yAxisMode === 'value'
+                          ? <IconCash className="h-3.5 w-3.5" />
+                          : <IconBox  className="h-3.5 w-3.5" />}
                         {yAxisMode === 'value' ? 'Valor Total' : 'Quantidade Total'}
                       </CardTitle>
-                      {yAxisMode === 'value'
-                        ? <IconCash className="h-3.5 w-3.5 text-muted-foreground" />
-                        : <IconBox  className="h-3.5 w-3.5 text-muted-foreground" />}
                     </CardHeader>
                     <CardContent className="pb-0 px-4">
                       <div className="text-xl font-bold">
@@ -1474,16 +1542,21 @@ const ConsumptionPage = () => {
                           ? formatCurrency(summary.totalValue)
                           : formatNumber(summary.totalQuantity, 0)}
                       </div>
+                      {rawItems.length > 0 && (
+                        <div className="text-[11px] text-foreground/70 mt-0.5">
+                          {formatNumber(rawItems.length, 0)} itens
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
                   {/* 2. Média per X-axis category */}
                   <Card className="py-2">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                      <CardTitle className="text-xs font-medium">
+                      <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                        <IconCalendarStats className="h-3.5 w-3.5" />
                         Média por {xAxisSingularLabel[xAxisMode]}
                       </CardTitle>
-                      <IconCalendarStats className="h-3.5 w-3.5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent className="pb-0 px-4">
                       <div className="text-xl font-bold">
@@ -1498,20 +1571,40 @@ const ConsumptionPage = () => {
                   {yAxisMode === 'both' ? (
                     <Card className="py-2">
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                        <CardTitle className="text-xs font-medium">Valor Total</CardTitle>
-                        <IconCash className="h-3.5 w-3.5 text-muted-foreground" />
+                        <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                          <IconCash className="h-3.5 w-3.5" />
+                          Valor Total
+                        </CardTitle>
                       </CardHeader>
                       <CardContent className="pb-0 px-4">
                         <div className="text-xl font-bold">{formatCurrency(summary.totalValue)}</div>
                       </CardContent>
                     </Card>
                   ) : (
-                    <Card className="py-2">
+                    // Only make the card clickable when the modal has actual
+                    // breakdown to show — single-series mode renders a useless
+                    // "sem detalhes" placeholder, which is worse than not
+                    // opening anything.
+                    <Card
+                      className={cn(
+                        'py-2',
+                        peakIsActionable && 'cursor-pointer hover:bg-muted/50 transition-colors',
+                      )}
+                      onClick={peakIsActionable ? () => setPeakDetailOpen(true) : undefined}
+                      role={peakIsActionable ? 'button' : undefined}
+                      tabIndex={peakIsActionable ? 0 : undefined}
+                      onKeyDown={e => {
+                        if (peakIsActionable && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          setPeakDetailOpen(true);
+                        }
+                      }}
+                    >
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                        <CardTitle className="text-xs font-medium">
+                        <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                          <IconTrendingUp className="h-3.5 w-3.5" />
                           Pico de Uso{peakRow ? ` (${peakRow.name})` : ''}
                         </CardTitle>
-                        <IconTrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
                       </CardHeader>
                       <CardContent className="pb-0 px-4">
                         <div className="text-xl font-bold">
@@ -1526,10 +1619,10 @@ const ConsumptionPage = () => {
                   {/* 4. Períodos / Itens analisados */}
                   <Card className="py-2">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
-                      <CardTitle className="text-xs font-medium">
+                      <CardTitle className="text-xs font-medium flex items-center gap-1.5">
+                        <IconPackage className="h-3.5 w-3.5" />
                         {isTemporalMode ? 'Períodos Analisados' : `${xAxisPluralLabel[xAxisMode]} Analisados`}
                       </CardTitle>
-                      <IconPackage className="h-3.5 w-3.5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent className="pb-0 px-4">
                       <div className="text-xl font-bold">
@@ -1541,9 +1634,9 @@ const ConsumptionPage = () => {
               )}
 
               {/* Chart */}
-              <Card>
-                <CardContent className="p-4">
-                  <div ref={chartContainerRef}>
+              <Card className="flex-1 min-h-0 flex flex-col">
+                <CardContent className="flex-1 min-h-0 p-4">
+                  <div ref={chartContainerRef} className="h-full">
                     {renderChart()}
                   </div>
                 </CardContent>
@@ -1551,7 +1644,6 @@ const ConsumptionPage = () => {
 
             </CardContent>
           </Card>
-      </div>
 
       <ConsumptionFiltersSheet
         open={showFilters}
@@ -1564,6 +1656,102 @@ const ConsumptionPage = () => {
         selectedMonths={selectedMonths}
         onApply={handleFilterApply}
       />
+
+      {/* Top items drill-down — surfaces the items behind the "Total" KPI */}
+      <Dialog open={topItemsOpen} onOpenChange={setTopItemsOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconPackage className="h-5 w-5" />
+              Itens do período
+            </DialogTitle>
+            <DialogDescription>
+              Top {Math.min(rawItems.length, 50)} itens ordenados por {yAxisMode === 'value' ? 'valor' : 'quantidade'}.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead className="text-right">Quantidade</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rawItems.slice(0, 50).map(item => (
+                  <TableRow key={item.itemId}>
+                    <TableCell className="font-medium">
+                      {item.itemName}
+                      {item.itemUniCode && (
+                        <span className="ml-2 text-xs text-muted-foreground">({item.itemUniCode})</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatNumber(item.totalQuantity, 0)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(item.totalValue)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {rawItems.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
+                      Nenhum item no período.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Peak detail — shows the breakdown for the highest x-axis row */}
+      <Dialog open={peakDetailOpen} onOpenChange={setPeakDetailOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconTrendingUp className="h-5 w-5" />
+              Pico: {peakRow?.name ?? '—'}
+            </DialogTitle>
+            <DialogDescription>
+              {yAxisMode === 'value'
+                ? formatCurrency(peakRow?.value ?? 0)
+                : formatNumber(peakRow?.value ?? 0, 0)}
+              {' '}
+              ({yAxisMode === 'value' ? 'valor' : 'quantidade'})
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            {peakRow?.comparisons?.length ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{isTemporalMode ? 'Item' : 'Série'}</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {peakRow.comparisons.map((c, i) => (
+                    <TableRow key={`${c.entityName}-${i}`}>
+                      <TableCell className="font-medium">{c.entityName}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {yAxisMode === 'value' ? formatCurrency(c.value) : formatNumber(c.value, 0)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground py-4">
+                Sem detalhes adicionais para este pico.
+              </p>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

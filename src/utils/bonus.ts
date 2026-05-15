@@ -178,6 +178,84 @@ export function getBonusPeriod(year: number, month: number): { startDate: Date; 
   };
 }
 
+// Returns the business period (Y, M) that contains today. Convention: month is
+// the month that *closes* the period (the one with day 25). Distinct from
+// getCurrentPeriod() above, which has a 5th-day rule for payroll.
+export function getCurrentBusinessPeriod(referenceDate?: Date): { year: number; month: number } {
+  const now = referenceDate || new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth() + 1;
+  if (now.getDate() > 25) {
+    month += 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+  }
+  return { year, month };
+}
+
+/**
+ * Convert a calendar date into the (year, month) of the bonus period that
+ * contains it. Period N covers day 26 of month (N-1) → day 25 of month N.
+ */
+export function getBusinessPeriodForDate(date: Date): { year: number; month: number } {
+  return getCurrentBusinessPeriod(date);
+}
+
+/**
+ * Enumerate every bonus period (Y, M) whose 26→25 window intersects the
+ * inclusive [from, to] range. Used by lookups that need to sum monthly goal
+ * targets across an arbitrary date range (e.g. when a stats page is filtered
+ * to "Jan–Mar 2026").
+ */
+export function getBusinessPeriodsInRange(
+  from: Date,
+  to: Date,
+): Array<{ year: number; month: number }> {
+  const start = getBusinessPeriodForDate(from);
+  const end = getBusinessPeriodForDate(to);
+  const periods: Array<{ year: number; month: number }> = [];
+  let y = start.year;
+  let m = start.month;
+  while (y < end.year || (y === end.year && m <= end.month)) {
+    periods.push({ year: y, month: m });
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return periods;
+}
+
+/**
+ * Enumerate every calendar (year, month) tuple that intersects the inclusive
+ * [from, to] range. Use this instead of `getBusinessPeriodsInRange` when the
+ * range is composed of natural calendar months (e.g. inventory/order pages),
+ * not bonus periods. Avoids the off-by-one where Dec 31 of year Y maps to a
+ * business period in January of Y+1.
+ */
+export function getCalendarMonthsInRange(
+  from: Date,
+  to: Date,
+): Array<{ year: number; month: number }> {
+  const periods: Array<{ year: number; month: number }> = [];
+  let y = from.getFullYear();
+  let m = from.getMonth() + 1;
+  const endY = to.getFullYear();
+  const endM = to.getMonth() + 1;
+  while (y < endY || (y === endY && m <= endM)) {
+    periods.push({ year: y, month: m });
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return periods;
+}
+
 /**
  * Check if a position is eligible for bonus based on its bonifiable flag
  * @param position Position object with bonifiable property

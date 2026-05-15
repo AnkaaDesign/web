@@ -17,7 +17,7 @@ import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useProductionBottlenecks } from '@/hooks/production/use-production-analytics';
 import type { ProductionAnalyticsFilters } from '@/types/production-analytics';
 import { StatisticsChart } from '@/components/statistics/statistics-chart';
-import { formatNumber, formatPercentage } from '@/types/statistics-common';
+import { formatPercentage } from '@/types/statistics-common';
 import type { YAxisMode } from '@/types/statistics-common';
 import { getSectors } from '@/api-client/sector';
 import { sectorKeys } from '@/hooks/common/query-keys';
@@ -446,15 +446,15 @@ const BottlenecksPage = () => {
         <div className="mt-4">
           <Card className="flex-1 flex flex-col">
             <CardHeader>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                   <CardTitle>Análise de Gargalos</CardTitle>
-                  <CardDescription>
-                    Identifique gargalos na produção, utilização de barracões e tendências de recorte
+                  <CardDescription className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span>Gargalos de produção, utilização de barracões e recortes</span>
                   </CardDescription>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
                   {/* Sort Dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -500,11 +500,22 @@ const BottlenecksPage = () => {
                     )}
                   </Button>
 
-                  {/* Export Button */}
-                  <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isLoading || !stageDistribution.length}>
-                    <IconDownload className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
+                  {/* Export */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" disabled={isLoading || !stageDistribution.length}>
+                        <IconDownload className="h-4 w-4 mr-2" />
+                        Exportar
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Formato de Exportação</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleExportCSV}>
+                        <IconDownload className="h-4 w-4 mr-2" /> CSV dos Dados
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </CardHeader>

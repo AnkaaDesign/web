@@ -37,6 +37,9 @@ export const routes = {
       edit: (id: string) => `/administracao/setores/editar/${id}`,
       root: "/administracao/setores",
     },
+    goals: {
+      root: "/administracao/metas",
+    },
     users: {
       batchEdit: "/administracao/colaboradores/editar-em-lote",
       create: "/administracao/colaboradores/cadastrar",
@@ -205,17 +208,11 @@ export const routes = {
           `/recursos-humanos/controle-ponto/assinatura-digital/${id}`,
       },
     },
-    absences: {
-      root: "/recursos-humanos/ausencias",
-      create: "/recursos-humanos/ausencias/cadastrar",
-      edit: (id: string) => `/recursos-humanos/ausencias/editar/${id}`,
-      details: (id: string) => `/recursos-humanos/ausencias/detalhes/${id}`,
-    },
-    faltas: {
-      root: "/recursos-humanos/faltas",
-      create: "/recursos-humanos/faltas/cadastrar",
-      edit: (id: string) => `/recursos-humanos/faltas/editar/${id}`,
-      details: (id: string) => `/recursos-humanos/faltas/detalhes/${id}`,
+    vacations: {
+      root: "/recursos-humanos/ferias",
+      create: "/recursos-humanos/ferias/cadastrar",
+      edit: (id: string) => `/recursos-humanos/ferias/editar/${id}`,
+      details: (id: string) => `/recursos-humanos/ferias/detalhes/${id}`,
     },
     calendar: {
       root: "/recursos-humanos/calendario",
@@ -571,12 +568,11 @@ export const routes = {
       root: "/estatisticas/estoque",
       consumption: "/estatisticas/estoque/consumo",
       orders: "/estatisticas/estoque/pedidos",
-      topItems: "/estatisticas/estoque/principais-itens",
-      trends: "/estatisticas/estoque/tendencias",
     },
     production: {
       root: "/estatisticas/producao",
       productivity: "/estatisticas/producao/produtividade",
+      performance: "/estatisticas/producao/desempenho",
       bottlenecks: "/estatisticas/producao/gargalos",
       bonusValue: "/estatisticas/producao/valor-bonus",
     },
@@ -584,21 +580,13 @@ export const routes = {
       root: "/estatisticas/financeiro",
       collection: "/estatisticas/financeiro/cobrancas",
       revenueQuotes: "/estatisticas/financeiro/receita-orcamentos",
-      receivables: "/estatisticas/financeiro/recebiveis",
       nfse: "/estatisticas/financeiro/nfse",
     },
     humanResources: {
       root: "/estatisticas/recursos-humanos",
       payroll: "/estatisticas/recursos-humanos/folha",
       teamPerformance: "/estatisticas/recursos-humanos/equipe",
-    },
-    painting: {
-      root: "/estatisticas/pintura",
-      production: "/estatisticas/pintura/producao",
-    },
-    administration: {
-      root: "/estatisticas/administracao",
-      overview: "/estatisticas/administracao/visao-geral",
+      absenteeism: "/estatisticas/recursos-humanos/faltas",
     },
     // Advanced Analytics
     analytics: {

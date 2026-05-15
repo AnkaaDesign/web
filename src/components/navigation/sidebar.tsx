@@ -44,6 +44,7 @@ import {
   IconCalendarStats,
   IconCalendarWeek,
   IconCalendarDollar,
+  IconCalendarOff,
   IconPlus,
   IconEye,
   IconEdit,
@@ -111,6 +112,7 @@ import {
   IconMessageCircle,
   IconServer,
   IconQrcode,
+  IconTarget,
 } from "@tabler/icons-react";
 
 // Types for better type safety
@@ -145,6 +147,7 @@ const iconComponents: Record<string, any> = {
   IconCalendarStats,
   IconCalendarWeek,
   IconCalendarDollar,
+  IconCalendarOff,
   IconPlus,
   IconEye,
   IconEdit,
@@ -214,6 +217,7 @@ const iconComponents: Record<string, any> = {
   IconMessageCircle,
   IconServer,
   IconQrcode,
+  IconTarget,
 };
 
 // Get icon component helper

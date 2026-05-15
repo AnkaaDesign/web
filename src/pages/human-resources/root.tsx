@@ -298,9 +298,9 @@ export const HumanResourcesRootPage = () => {
                   color="blue"
                 />
                 <QuickAccessCard
-                  title="Ausências"
+                  title="Férias"
                   icon={IconBeach}
-                  onClick={() => navigate(routes.humanResources.absences.root)}
+                  onClick={() => navigate(routes.humanResources.vacations.root)}
                   color="green"
                 />
                 <QuickAccessCard
