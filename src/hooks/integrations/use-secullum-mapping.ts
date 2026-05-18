@@ -59,6 +59,17 @@ export const useLinkPositionFuncao = () => {
   });
 };
 
+export const useLinkUserFuncionario = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { userId: string; funcionarioId: number | null }) =>
+      secullumMappingService.linkUserFuncionario(vars.userId, vars.funcionarioId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] as const });
+    },
+  });
+};
+
 // =================== Departamentos ===================
 
 export const useSecullumDepartamentos = () =>

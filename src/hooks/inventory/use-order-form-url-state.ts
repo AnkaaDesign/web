@@ -7,11 +7,46 @@ import { useUrlFilters } from "../common/use-url-filters";
  *
  * Important behaviors:
  * - Manages selected items, their quantities, prices, ICMS, and IPI in URL state
- * - Manages form data (description, supplierId, forecast, notes) in URL state
- * - Handles form validation state
+ * - Manages form data (description, supplierId, forecast, notes, freight) in URL state
+ * - Manages a unified temporary-items list (items not in inventory) in URL state
  * - Persists all state in URL for page refresh recovery
  * - Use preserveQuantitiesOnDeselect option to keep values when deselecting items
  */
+
+export interface OrderTemporaryItem {
+  // client-side stable id used as React key and as handle for updates/removals
+  key: string;
+  temporaryItemDescription: string;
+  orderedQuantity: number;
+  price: number;
+  icms: number;
+  ipi: number;
+  // Optional metadata that, when filled, get composed into the final description
+  // sent to the API. Fields stay client-side only — the API only receives the
+  // composed `temporaryItemDescription` string.
+  uniCode?: string;
+  brand?: string;
+  category?: string;
+  measures?: string;
+}
+
+/**
+ * Compose the final temporaryItemDescription string from the visible metadata
+ * fields. Used at submit time — keeps the API contract single-string while
+ * letting the form capture richer info.
+ *
+ * Example: code="ABC", description="Parafuso", brand="Tramontina", category="Ferragens"
+ *  → "[ABC] Parafuso — Tramontina / Ferragens"
+ */
+export function composeTempItemDescription(t: OrderTemporaryItem): string {
+  const description = (t.temporaryItemDescription || "").trim();
+  const code = (t.uniCode || "").trim();
+  const tail = [t.brand, t.category, t.measures]
+    .map(v => (v || "").trim())
+    .filter(v => v.length > 0);
+  const head = code ? `[${code}] ${description}` : description;
+  return tail.length > 0 ? `${head} — ${tail.join(" / ")}` : head;
+}
 
 export interface OrderFormValidationState {
   isValid: boolean;
@@ -36,19 +71,13 @@ interface UseOrderFormUrlStateOptions {
     supplierId?: string;
     forecast?: Date | null;
     notes?: string;
-    orderItemMode?: "inventory" | "temporary";
+    freight?: number;
     selectedItems?: Set<string>;
     quantities?: Record<string, number>;
     prices?: Record<string, number>;
     icmses?: Record<string, number>;
     ipis?: Record<string, number>;
-    temporaryItems?: Array<{
-      temporaryItemDescription: string;
-      orderedQuantity: number;
-      price: number;
-      icms: number;
-      ipi: number;
-    }>;
+    temporaryItems?: OrderTemporaryItem[];
   };
 }
 
@@ -88,31 +117,24 @@ const orderFormFilterConfig = {
     debounceMs: 0, // Immediate update for IPI
   },
 
-  // Order item mode (inventory vs temporary items)
-  orderItemMode: {
-    schema: z.enum(["inventory", "temporary"]).default("inventory"),
-    defaultValue: "inventory" as "inventory" | "temporary",
-    debounceMs: 0, // Immediate update
-  },
-
-  // Temporary items state
+  // Temporary items state — items not in the inventory but added to the order.
+  // Lives alongside selectedItems; the form merges both into a single items array.
   temporaryItems: {
     schema: z.array(
       z.object({
-        temporaryItemDescription: z.string(),
-        orderedQuantity: z.number().positive(),
-        price: z.number().min(0),
+        key: z.string(),
+        temporaryItemDescription: z.string().default(""),
+        orderedQuantity: z.number().min(0).default(1),
+        price: z.number().min(0).default(0),
         icms: z.number().min(0).max(100).default(0),
         ipi: z.number().min(0).max(100).default(0),
+        uniCode: z.string().optional(),
+        brand: z.string().optional(),
+        category: z.string().optional(),
+        measures: z.string().optional(),
       })
     ).default([]),
-    defaultValue: [] as Array<{
-      temporaryItemDescription: string;
-      orderedQuantity: number;
-      price: number;
-      icms: number;
-      ipi: number;
-    }>,
+    defaultValue: [] as OrderTemporaryItem[],
     debounceMs: 0, // Immediate update
   },
 
@@ -136,6 +158,11 @@ const orderFormFilterConfig = {
     schema: z.string().default(""),
     defaultValue: "",
     debounceMs: 300,
+  },
+  freight: {
+    schema: z.coerce.number().min(0).default(0),
+    defaultValue: 0,
+    debounceMs: 0,
   },
 
   // Filter state
@@ -273,16 +300,16 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
           defaultValue: initialData.ipis,
         };
       }
-      if (initialData.orderItemMode !== undefined) {
-        config.orderItemMode = {
-          ...config.orderItemMode,
-          defaultValue: initialData.orderItemMode,
-        };
-      }
       if (initialData.temporaryItems !== undefined) {
         config.temporaryItems = {
           ...config.temporaryItems,
           defaultValue: initialData.temporaryItems,
+        };
+      }
+      if (initialData.freight !== undefined) {
+        config.freight = {
+          ...config.freight,
+          defaultValue: initialData.freight as any,
         };
       }
     }
@@ -334,8 +361,8 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
   const supplierId = filters.supplierId;
   const forecast = filters.forecast;
   const notes = filters.notes || "";
-  const orderItemMode = filters.orderItemMode || "inventory";
-  const temporaryItems = filters.temporaryItems || [];
+  const freight = (filters as any).freight ?? 0;
+  const temporaryItems: OrderTemporaryItem[] = (filters.temporaryItems as OrderTemporaryItem[]) || [];
   const showSelectedOnly = filters.showSelectedOnly !== undefined ? filters.showSelectedOnly : false;
   const searchTerm = filters.searchTerm || "";
   const showInactive = filters.showInactive !== undefined ? filters.showInactive : false;
@@ -391,6 +418,14 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
   const updateNotes = useCallback(
     (text: string) => {
       setFilter("notes", text === "" ? undefined : text);
+    },
+    [setFilter],
+  );
+
+  const updateFreight = useCallback(
+    (value: number) => {
+      const sanitized = Number.isFinite(value) && value >= 0 ? value : 0;
+      setFilter("freight", sanitized === 0 ? undefined : sanitized);
     },
     [setFilter],
   );
@@ -859,22 +894,37 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     }));
   }, [selectedItems, quantities, prices, icmses, ipis, defaultQuantity, defaultPrice, defaultIcms, defaultIpi]);
 
-  // Form data helpers
+  // Build the unified items payload sent to the API.
+  // Inventory selections become items with itemId; temporary items become items
+  // with temporaryItemDescription. Empty/incomplete temporary rows are dropped.
   const getFormData = useCallback(() => {
+    const inventoryItems = getSelectedItemsWithData().map((item) => ({
+      itemId: item.id,
+      orderedQuantity: item.quantity,
+      price: item.price,
+      icms: item.icms,
+      ipi: item.ipi,
+    }));
+
+    const tempItems = temporaryItems
+      .filter(t => t.temporaryItemDescription.trim() !== "" && t.orderedQuantity > 0)
+      .map(t => ({
+        temporaryItemDescription: composeTempItemDescription(t),
+        orderedQuantity: t.orderedQuantity,
+        price: t.price,
+        icms: t.icms,
+        ipi: t.ipi,
+      }));
+
     return {
       description: description.trim(),
       supplierId: supplierId || undefined,
       forecast: forecast || undefined,
       notes: notes.trim() || undefined,
-      items: getSelectedItemsWithData().map((item) => ({
-        itemId: item.id,
-        orderedQuantity: item.quantity,
-        price: item.price,
-        icms: item.icms,
-        ipi: item.ipi,
-      })),
+      freight: freight || 0,
+      items: [...inventoryItems, ...tempItems],
     };
-  }, [description, supplierId, forecast, notes, getSelectedItemsWithData]);
+  }, [description, supplierId, forecast, notes, freight, temporaryItems, getSelectedItemsWithData]);
 
   const resetForm = useCallback(() => {
     setFilters({
@@ -892,94 +942,77 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
       supplierId: undefined,
       forecast: undefined,
       notes: undefined,
+      freight: undefined,
+      temporaryItems: undefined,
     });
   }, [setFilters]);
 
   // Check if form has any data
   const hasFormData = useMemo(() => {
-    return description.trim() !== "" || supplierId !== undefined || forecast !== undefined || notes.trim() !== "" || selectedItems.size > 0;
-  }, [description, supplierId, forecast, notes, selectedItems.size]);
+    return (
+      description.trim() !== "" ||
+      supplierId !== undefined ||
+      forecast !== undefined ||
+      notes.trim() !== "" ||
+      freight > 0 ||
+      selectedItems.size > 0 ||
+      temporaryItems.length > 0
+    );
+  }, [description, supplierId, forecast, notes, freight, selectedItems.size, temporaryItems.length]);
 
-  // Helper to set order item mode
-  const setOrderItemMode = useCallback(
-    (mode: "inventory" | "temporary") => {
-      setFilters({ orderItemMode: mode });
-    },
-    [setFilters]
-  );
+  // Generate a stable client-side key for a new temporary item.
+  // crypto.randomUUID is available in modern browsers; fall back for older runtimes/tests.
+  const generateTempItemKey = (): string => {
+    if (typeof crypto !== "undefined" && typeof (crypto as any).randomUUID === "function") {
+      return (crypto as any).randomUUID();
+    }
+    return `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  };
 
-  // Helper to add temporary item
+  // Add a temporary item (returns the generated key so callers can focus the new row).
   const addTemporaryItem = useCallback(
-    (item: {
-      temporaryItemDescription: string;
-      orderedQuantity: number;
-      price: number;
-      icms?: number;
-      ipi?: number;
-    }) => {
-      const newTemporaryItems = [
-        ...temporaryItems,
-        {
-          temporaryItemDescription: item.temporaryItemDescription,
-          orderedQuantity: item.orderedQuantity,
-          price: item.price,
-          icms: item.icms ?? 0,
-          ipi: item.ipi ?? 0,
-        },
-      ];
-      setFilters({ temporaryItems: newTemporaryItems });
+    (item: Partial<Omit<OrderTemporaryItem, "key">> = {}): string => {
+      const key = generateTempItemKey();
+      const newItem: OrderTemporaryItem = {
+        key,
+        temporaryItemDescription: item.temporaryItemDescription ?? "",
+        orderedQuantity: item.orderedQuantity ?? 1,
+        price: item.price ?? 0,
+        icms: item.icms ?? 0,
+        ipi: item.ipi ?? 0,
+      };
+      setFilters({ temporaryItems: [...temporaryItems, newItem] });
+      return key;
     },
     [temporaryItems, setFilters]
   );
 
-  // Helper to update temporary item
+  // Update a temporary item by key (stable across reorders/inserts).
   const updateTemporaryItem = useCallback(
-    (
-      index: number,
-      updates: Partial<{
-        temporaryItemDescription: string;
-        orderedQuantity: number;
-        price: number;
-        icms: number;
-        ipi: number;
-      }>
-    ) => {
-      const newTemporaryItems = [...temporaryItems];
-      if (index >= 0 && index < newTemporaryItems.length) {
-        newTemporaryItems[index] = {
-          ...newTemporaryItems[index],
-          ...updates,
-        };
-        setFilters({ temporaryItems: newTemporaryItems });
-      }
+    (key: string, updates: Partial<Omit<OrderTemporaryItem, "key">>) => {
+      const next = temporaryItems.map(item =>
+        item.key === key ? { ...item, ...updates } : item,
+      );
+      setFilters({ temporaryItems: next });
     },
     [temporaryItems, setFilters]
   );
 
-  // Helper to remove temporary item
   const removeTemporaryItem = useCallback(
-    (index: number) => {
-      const newTemporaryItems = temporaryItems.filter((_, i) => i !== index);
-      setFilters({ temporaryItems: newTemporaryItems });
+    (key: string) => {
+      const next = temporaryItems.filter(item => item.key !== key);
+      setFilters({ temporaryItems: next.length > 0 ? next : undefined });
     },
     [temporaryItems, setFilters]
   );
 
-  // Helper to clear all temporary items
   const clearTemporaryItems = useCallback(() => {
-    setFilters({ temporaryItems: [] });
+    setFilters({ temporaryItems: undefined });
   }, [setFilters]);
 
-  // Helper to set temporary items array
   const setTemporaryItems = useCallback(
-    (items: Array<{
-      temporaryItemDescription: string;
-      orderedQuantity: number;
-      price: number;
-      icms: number;
-      ipi: number;
-    }>) => {
-      setFilters({ temporaryItems: items });
+    (items: OrderTemporaryItem[]) => {
+      setFilters({ temporaryItems: items.length > 0 ? items : undefined });
     },
     [setFilters]
   );
@@ -999,12 +1032,12 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     prices: effectivePrices,
     icmses: effectiveIcmses,
     ipis: effectiveIpis,
-    orderItemMode,
     temporaryItems,
     description,
     supplierId,
     forecast,
     notes,
+    freight,
     validation,
 
     // Filter and Pagination State
@@ -1027,6 +1060,7 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     updateSupplierId,
     updateForecast,
     updateNotes,
+    updateFreight,
 
     // Filter Update Functions
     setShowSelectedOnly,
@@ -1055,9 +1089,6 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     setItemIcms,
     setItemIpi,
     getSelectedItemsWithData,
-
-    // Order Item Mode Management
-    setOrderItemMode,
 
     // Temporary Items Management
     addTemporaryItem,

@@ -17,6 +17,10 @@ interface ProductionPeriodTasksModalProps {
   label: string;      // "14 Mai 2025", "Maio 2025"
   sectorIds?: string[];
   activeUsers?: number;
+  // sectorId → hex color, mirroring the chart's bar colors. When provided
+  // and >1 sector is actually present in the result set, task names are
+  // tinted by sector and rows are grouped by sector.
+  sectorColorMap?: Record<string, string>;
 }
 
 // Business period: month M of year Y covers 26th of M-1 through 25th of M.
@@ -56,6 +60,7 @@ export function ProductionPeriodTasksModal({
   label,
   sectorIds,
   activeUsers,
+  sectorColorMap,
 }: ProductionPeriodTasksModalProps) {
   const { from, to } = getBusinessPeriodRange(period);
   const [search, setSearch] = useState('');
@@ -71,6 +76,7 @@ export function ProductionPeriodTasksModal({
         include: {
           truck: true,
           customer: true,
+          sector: true,
         },
       } as any),
     enabled: open,
@@ -78,14 +84,30 @@ export function ProductionPeriodTasksModal({
 
   const rawTasks: any[] = (response as any)?.data ?? [];
   const total = (response as any)?.meta?.total ?? rawTasks.length;
-  // Most recent first — completed-at desc, falling back to 0 for missing dates
+
+  // Tint by sector only when >1 sector actually shows up — otherwise every
+  // row would share the same color and the tint would be noise.
+  const multiSector = useMemo(() => {
+    if (!sectorColorMap) return false;
+    const seen = new Set<string>();
+    for (const t of rawTasks) if (t.sectorId) seen.add(t.sectorId);
+    return seen.size > 1;
+  }, [sectorColorMap, rawTasks]);
+
+  // When sector-tinted, sort sector asc → finishedAt desc within the sector
+  // (matches the colaboradores modal's "sector first, then performance" rule).
+  // Otherwise keep the legacy "most recent first" order.
   const tasks = useMemo(
     () => [...rawTasks].sort((a, b) => {
+      if (multiSector) {
+        const s = (a.sector?.name ?? '').localeCompare(b.sector?.name ?? '');
+        if (s !== 0) return s;
+      }
       const da = a.finishedAt ? new Date(a.finishedAt).getTime() : 0;
       const db = b.finishedAt ? new Date(b.finishedAt).getTime() : 0;
       return db - da;
     }),
-    [rawTasks],
+    [rawTasks, multiSector],
   );
 
   const taskLabel = (task: any) => task.name || '—';
@@ -138,25 +160,19 @@ export function ProductionPeriodTasksModal({
         </DialogHeader>
 
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <div className="px-6 py-3 border-b flex items-center justify-between gap-3 shrink-0">
-            <div className="flex items-center gap-2 shrink-0">
-              <IconChecks className="h-4 w-4 text-blue-400" />
-              <span className="text-sm font-semibold">Tarefas concluídas</span>
-            </div>
-            {search.trim() && (
-              <span className="text-xs text-foreground/65">
-                mostrando {filteredTasks.length} de {tasks.length}
-              </span>
-            )}
-          </div>
-          <div className="px-6 py-3 border-b shrink-0">
+          <div className="px-6 py-3 border-b shrink-0 flex items-center justify-between gap-3">
             <Input
               type="text"
               placeholder="Buscar por nome, cliente ou identificador..."
               value={search}
               onChange={v => setSearch(v == null ? '' : String(v))}
-              className="w-full"
+              className="flex-1"
             />
+            {search.trim() && (
+              <span className="text-xs text-foreground/65 shrink-0">
+                {filteredTasks.length} de {tasks.length}
+              </span>
+            )}
           </div>
 
           {/* Plain overflow-y-auto (not Radix ScrollArea) — Radix wraps content
@@ -201,10 +217,17 @@ export function ProductionPeriodTasksModal({
                     const finishedDate = task.finishedAt
                       ? format(new Date(task.finishedAt), 'dd/MM/yyyy', { locale: ptBR })
                       : '—';
+                    const sectorColor = multiSector && task.sectorId
+                      ? sectorColorMap?.[task.sectorId]
+                      : undefined;
 
                     return (
                       <TableRow key={task.id} className="text-sm">
-                        <TableCell className="font-medium max-w-[200px] truncate">
+                        <TableCell
+                          className="font-medium max-w-[200px] truncate"
+                          style={sectorColor ? { color: sectorColor } : undefined}
+                          title={sectorColor ? (task.sector?.name ?? undefined) : undefined}
+                        >
                           {taskLabel(task)}
                         </TableCell>
                         <TableCell className="text-foreground/85 max-w-[180px] truncate">

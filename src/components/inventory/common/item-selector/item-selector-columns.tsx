@@ -169,6 +169,26 @@ export const createItemSelectorColumns = (
       className: "w-28",
       align: "left",
     },
+    // Per-row order subtotal — qty (this order) × unit price + ICMS + IPI.
+    // Distinct from `totalPrice` above (which is current stock × catalog price).
+    {
+      key: "orderSubtotal",
+      header: "SUBTOTAL",
+      accessor: (item: Item, ctx?: ItemSelectorContext) => {
+        const isSelected = ctx?.isSelected?.(item.id) ?? ctx?.selectedItems.has(item.id) ?? false;
+        if (!isSelected) return <div className="text-muted-foreground">—</div>;
+        const qty = Number(ctx?.quantities?.[item.id]) || 0;
+        const price = Number(ctx?.prices?.[item.id]) || 0;
+        const icms = Number(ctx?.icmses?.[item.id]) || 0;
+        const ipi = Number(ctx?.ipis?.[item.id]) || 0;
+        const subtotal = qty * price;
+        const total = subtotal + (subtotal * (icms / 100)) + (subtotal * (ipi / 100));
+        return <div className="font-semibold truncate">{formatCurrency(total)}</div>;
+      },
+      sortable: false,
+      className: "w-32",
+      align: "left",
+    },
     // Secondary columns
     {
       key: "CA",
@@ -392,6 +412,7 @@ export const createItemSelectorColumns = (
         return (
           <Input
             type="currency"
+            decimals={3}
             value={price || undefined}
             onChange={(value) => {
               const numValue = typeof value === "number" ? value : 0;

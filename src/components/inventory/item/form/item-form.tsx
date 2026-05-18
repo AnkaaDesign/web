@@ -2,11 +2,11 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useForm, useFieldArray, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router-dom";
-import { IconInfoCircle, IconClipboardList, IconCurrencyDollar, IconBarcode, IconSettings } from "@tabler/icons-react";
+import { IconInfoCircle, IconClipboardList, IconCurrencyDollar, IconBarcode, IconSettings, IconCalculator } from "@tabler/icons-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemUpdateFormData } from "../../../../schemas";
 import { useItemCategories } from "../../../../hooks";
-import { ITEM_CATEGORY_TYPE } from "../../../../constants";
+import { ITEM_CATEGORY_TYPE, ABC_CATEGORY_LABELS, XYZ_CATEGORY_LABELS } from "../../../../constants";
 import { serializeItemFormToUrlParams, debounce } from "@/utils/url-form-state";
 import type { Supplier, ItemBrand, ItemCategory } from "../../../../types";
 // import { FormValidationDebugger } from "@/components/debug/form-validation-debugger"; // Debug component removed
@@ -19,7 +19,6 @@ import { ItemBrandSelector } from "./brand-selector";
 import { CategorySelector } from "./category-selector";
 import { ItemSupplierSelector } from "./supplier-selector";
 import { QuantityInput } from "./quantity-input";
-import { MaxQuantityInput } from "./max-quantity-input";
 import { BoxQuantityInput } from "./box-quantity-input";
 import { LeadTimeInput } from "./lead-time-input";
 import { PriceInput } from "./price-input";
@@ -65,12 +64,10 @@ export function ItemForm(props: ItemFormProps) {
     name: defaultValues?.name || "",
     uniCode: defaultValues?.uniCode ?? null,
     quantity: defaultValues?.quantity ?? 0,
-    reorderPoint: defaultValues?.reorderPoint ?? null,  // Auto-calculated by default
-    reorderQuantity: defaultValues?.reorderQuantity ?? null,  // Optional manual override
-    maxQuantity: defaultValues?.maxQuantity ?? null,  // Auto-calculated by default
+    reorderPoint: defaultValues?.reorderPoint ?? null,  // Auto-calculated by the API
+    reorderQuantity: defaultValues?.reorderQuantity ?? null,  // Auto-calculated by the API
+    maxQuantity: defaultValues?.maxQuantity ?? null,  // Auto-calculated by the API
     boxQuantity: defaultValues?.boxQuantity ?? null,
-    isManualMaxQuantity: defaultValues?.isManualMaxQuantity ?? false,  // Start in automatic mode
-    isManualReorderPoint: defaultValues?.isManualReorderPoint ?? false,  // Start in automatic mode
     icms: defaultValues?.icms ?? undefined,
     ipi: defaultValues?.ipi ?? undefined,
     measures: defaultValues?.measures ?? [], // Initialize with empty measures array
@@ -317,13 +314,69 @@ export function ItemForm(props: ItemFormProps) {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <QuantityInput disabled={isSubmitting} required={isRequired} />
-                <MaxQuantityInput
-                  disabled={isSubmitting}
-                  currentValue={defaultValues?.maxQuantity}
-                  isManual={defaultValues?.isManualMaxQuantity || false}
-                />
                 <BoxQuantityInput disabled={isSubmitting} />
                 <LeadTimeInput disabled={isSubmitting} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Stock Calculation (read-only, computed by the API) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconCalculator className="h-5 w-5 text-muted-foreground" />
+                Cálculo de Estoque
+              </CardTitle>
+              <CardDescription>
+                Valores calculados automaticamente a partir do consumo e tempo de entrega
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground">Consumo mensal</span>
+                  <span className="font-semibold text-base text-foreground">
+                    {defaultValues?.monthlyConsumption != null
+                      ? `${defaultValues.monthlyConsumption.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} / mês`
+                      : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground">Tempo de entrega</span>
+                  <span className="font-semibold text-base text-foreground">
+                    {defaultValues?.estimatedLeadTime != null
+                      ? `${defaultValues.estimatedLeadTime} dias`
+                      : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground">Ponto de reposição</span>
+                  <span className="font-semibold text-base text-foreground">
+                    {defaultValues?.reorderPoint != null
+                      ? defaultValues.reorderPoint.toLocaleString("pt-BR", { maximumFractionDigits: 2 })
+                      : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground">Quantidade máxima</span>
+                  <span className="font-semibold text-base text-foreground">
+                    {defaultValues?.maxQuantity != null
+                      ? defaultValues.maxQuantity.toLocaleString("pt-BR", { maximumFractionDigits: 2 })
+                      : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground">Categoria ABC</span>
+                  <span className="font-semibold text-base text-foreground">
+                    {defaultValues?.abcCategory ? ABC_CATEGORY_LABELS[defaultValues.abcCategory] : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground">Categoria XYZ</span>
+                  <span className="font-semibold text-base text-foreground">
+                    {defaultValues?.xyzCategory ? XYZ_CATEGORY_LABELS[defaultValues.xyzCategory] : "—"}
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>

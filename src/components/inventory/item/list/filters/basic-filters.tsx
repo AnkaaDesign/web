@@ -5,6 +5,17 @@ import { STOCK_LEVEL, STOCK_LEVEL_LABELS } from "../../../../../constants";
 import { getStockLevelTextColor } from "../../../../../utils";
 import { IconTriangleInverted, IconUser, IconPackages, IconAlertTriangle, IconXboxX } from "@tabler/icons-react";
 
+// Plain-Portuguese helpers for each stock band — explain inline (no jargon).
+// Mirrors algorithm-spec §15 bands.
+const STOCK_LEVEL_FILTER_HELPERS: Record<STOCK_LEVEL, string> = {
+  [STOCK_LEVEL.NEGATIVE_STOCK]: "Quantidade abaixo de zero — provável erro de lançamento",
+  [STOCK_LEVEL.OUT_OF_STOCK]: "Sem nenhuma unidade em estoque",
+  [STOCK_LEVEL.CRITICAL]: "Estoque atingiu o ponto de reposição — precisa de pedido",
+  [STOCK_LEVEL.LOW]: "Estoque um pouco acima do ponto de reposição",
+  [STOCK_LEVEL.OPTIMAL]: "Estoque dentro do nível esperado",
+  [STOCK_LEVEL.OVERSTOCKED]: "Estoque acima da quantidade máxima",
+};
+
 interface BasicFiltersProps {
   showInactive?: boolean;
   onShowInactiveChange: (value: boolean | undefined) => void;
@@ -76,13 +87,17 @@ export function BasicFilters({
           {Object.values(STOCK_LEVEL).map((level) => {
             const colorClass = getStockLevelTextColor(level);
             const isChecked = stockLevels?.includes(level) || false;
+            const helper = STOCK_LEVEL_FILTER_HELPERS[level];
 
             return (
-              <div key={level} className="flex items-center justify-between">
-                <Label htmlFor={`stock-level-${level}`} className={`text-sm font-normal ${colorClass} flex items-center gap-2`}>
-                  <IconPackages className="h-3 w-3" />
-                  {STOCK_LEVEL_LABELS[level]}
-                </Label>
+              <div key={level} className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <Label htmlFor={`stock-level-${level}`} className={`text-sm font-normal ${colorClass} flex items-center gap-2`}>
+                    <IconPackages className="h-3 w-3" />
+                    {STOCK_LEVEL_LABELS[level]}
+                  </Label>
+                  {helper && <p className="text-xs text-muted-foreground mt-1 ml-5">{helper}</p>}
+                </div>
                 <Switch id={`stock-level-${level}`} checked={isChecked} onCheckedChange={() => handleStockLevelToggle(level)} />
               </div>
             );

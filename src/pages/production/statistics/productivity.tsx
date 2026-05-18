@@ -28,7 +28,7 @@ import type {
 import { StatisticsChart, type StatisticsChartHandle } from '@/components/statistics/statistics-chart';
 import { exportProductivityPdf } from '@/utils/productivity-pdf-generator';
 import { ProductionPeriodTasksModal } from '@/components/production/production-period-tasks-modal';
-import { formatNumber } from '@/types/statistics-common';
+import { formatNumber, CHART_COLORS } from '@/types/statistics-common';
 import type { YAxisMode, StatisticsChartType, TrendLineType } from '@/types/statistics-common';
 import { getSectors } from '@/api-client/sector';
 import { sectorKeys } from '@/hooks/common/query-keys';
@@ -915,6 +915,19 @@ const TaskProductionPage = () => {
     return cols;
   }, [isComparisonMode, items, includeAmbos, activeSectorIds]);
 
+  // sectorId → bar color. Mirrors statistics-chart.tsx's per-comparison color
+  // assignment so the task name tints in the drill-down modal match the bars
+  // the user just clicked.
+  const sectorColorMap = useMemo<Record<string, string> | undefined>(() => {
+    if (!isComparisonMode || !items.length || !items[0].comparisons) return undefined;
+    const map: Record<string, string> = {};
+    const active = items[0].comparisons.filter(c => activeSectorIds.has(c.sectorId));
+    active.forEach((c, i) => {
+      map[c.sectorId] = CHART_COLORS[i % CHART_COLORS.length];
+    });
+    return map;
+  }, [isComparisonMode, items, activeSectorIds]);
+
   // Build chart data — exclude sectors with no activity in the selected period.
   // When all displayed months share a single year, drop the year suffix from
   // the chart's x-axis labels ("Janeiro 2026" → "Janeiro"); the modal and
@@ -1706,6 +1719,7 @@ const TaskProductionPage = () => {
           label={clickedPeriod.label}
           sectorIds={filters.sectorIds}
           activeUsers={clickedPeriod.activeUsers}
+          sectorColorMap={sectorColorMap}
         />
       )}
     </div>

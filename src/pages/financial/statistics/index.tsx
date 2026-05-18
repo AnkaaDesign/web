@@ -6,11 +6,11 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
   IconChartBar,
-  IconReportMoney,
   IconArrowRight,
   IconReceipt2,
   IconCash,
   IconCheck,
+  IconArrowsExchange2,
 } from "@tabler/icons-react";
 
 type ToneKey = "blue" | "emerald" | "violet" | "amber" | "rose" | "cyan" | "fuchsia" | "sky";
@@ -45,29 +45,16 @@ interface StatPage {
 
 const pages: StatPage[] = [
   {
-    title: "Receita & Orçamentos",
-    description: "Funil de vendas, ticket médio e ciclo de fechamento",
-    route: routes.statistics.financial.revenueQuotes,
-    icon: IconReportMoney,
-    tone: "emerald",
-    bullets: [
-      "Funil de vendas e ticket médio",
-      "Ciclo de fechamento de orçamento",
-      "Backlog ativo por status",
-      "Ranking por cliente",
-    ],
-  },
-  {
-    title: "Cobranças & Fluxo de Caixa",
-    description: "Faturado vs recebido, atrasos e previsão de caixa",
+    title: "Visão Financeira",
+    description: "Receita, cobranças, funil de vendas e previsão de caixa em uma única tela",
     route: routes.statistics.financial.collection,
     icon: IconCash,
     tone: "blue",
     bullets: [
-      "Faturado vs recebido por período",
-      "Em atraso e previsão de caixa",
-      "Prazo médio de pagamento (DSO)",
-      "Drill-down por parcela",
+      "Faturado, recebido e receita liquidada",
+      "Funil de vendas e ticket médio",
+      "Em atraso, previsão de caixa e prazo médio",
+      "Ranking por cliente e por setor",
     ],
   },
   {
@@ -81,6 +68,20 @@ const pages: StatPage[] = [
       "Impostos estimados por serviço",
       "Emissões pendentes / em erro",
       "Histórico de retentativas",
+    ],
+  },
+  {
+    title: "Conciliação Bancária",
+    description:
+      "Pareamento entre extrato Sicredi (OFX) e notas fiscais coletadas via SIEG e upload manual",
+    route: routes.statistics.financial.reconciliation,
+    icon: IconArrowsExchange2,
+    tone: "emerald",
+    bullets: [
+      "Conciliado vs pendente ao longo do tempo",
+      "Maiores pendências por contraparte",
+      "Distribuição por tipo (exato, valor+data, manual, boleto)",
+      "Notas recebidas e última importação",
     ],
   },
 ];

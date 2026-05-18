@@ -41,7 +41,7 @@ import type {
 import { StatisticsChart, type StatisticsChartHandle } from '@/components/statistics/statistics-chart';
 import { exportProductivityPdf } from '@/utils/productivity-pdf-generator';
 import { PerformancePeriodModal } from '@/components/production/performance-period-modal';
-import { formatNumber } from '@/types/statistics-common';
+import { formatNumber, CHART_COLORS } from '@/types/statistics-common';
 import type { YAxisMode, StatisticsChartType, TrendLineType } from '@/types/statistics-common';
 import { getSectors } from '@/api-client/sector';
 import { sectorKeys } from '@/hooks/common/query-keys';
@@ -656,7 +656,19 @@ const TaskPerformancePage = () => {
     enabled: !yearCompareMode,
   });
 
-  const goalValue = goalOverride ?? defaultGoal.value;
+  // In separated-comparison mode each line represents ONE sector, so the
+  // count goal must be split across them. Performance mode is already a
+  // per-user rate (PRODUCTION_AVG_PERFORMANCE), so it stays unsplit —
+  // splitting would push each sector's expected rate down artificially.
+  const goalSectorSplit =
+    !isComparisonMode || usePerf ? 1 : Math.max(1, filters.sectorIds?.length ?? 1);
+
+  const goalValue = useMemo(() => {
+    const raw = goalOverride ?? defaultGoal.value;
+    if (raw == null) return null;
+    return goalSectorSplit > 1 ? raw / goalSectorSplit : raw;
+  }, [goalOverride, defaultGoal.value, goalSectorSplit]);
+
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
   const summary = data?.data?.summary;
@@ -751,6 +763,20 @@ const TaskPerformancePage = () => {
     if (includeAmbos) cols.push('Ambos');
     return cols;
   }, [isComparisonMode, items, includeAmbos, activeSectorIds]);
+
+  // sectorId → bar color. Mirrors statistics-chart.tsx's per-comparison color
+  // assignment (CHART_COLORS indexed by the order of items[0].comparisons,
+  // filtered to active sectors). Passed to the period modal so the name
+  // tinting matches what the user just clicked on the chart.
+  const sectorColorMap = useMemo<Record<string, string> | undefined>(() => {
+    if (!isComparisonMode || !items.length || !items[0].comparisons) return undefined;
+    const map: Record<string, string> = {};
+    const active = items[0].comparisons.filter(c => activeSectorIds.has(c.sectorId));
+    active.forEach((c, i) => {
+      map[c.sectorId] = CHART_COLORS[i % CHART_COLORS.length];
+    });
+    return map;
+  }, [isComparisonMode, items, activeSectorIds]);
 
   const stripYearOnAxis = filters.xAxisMode !== 'year' && selectedYears.length === 1;
   const chartData = useMemo(() => {
@@ -1464,6 +1490,7 @@ const TaskPerformancePage = () => {
           avgPerformance={clickedPeriod.avgPerformance}
           users={clickedPeriod.users}
           mode={clickedPeriod.mode}
+          sectorColorMap={sectorColorMap}
         />
       )}
     </div>

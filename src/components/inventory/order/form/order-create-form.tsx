@@ -25,10 +25,8 @@ import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import type { ItemGetManyFormData } from "../../../../schemas";
-import { TemporaryItemsInput } from "./temporary-items-input";
-import { useOrderFormUrlState } from "@/hooks/inventory/use-order-form-url-state";
+import { useOrderFormUrlState, composeTempItemDescription } from "@/hooks/inventory/use-order-form-url-state";
 import { formatCurrency, formatDate, measureUtils, formatPixKey } from "../../../../utils";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 export const OrderCreateForm = () => {
@@ -48,22 +46,21 @@ export const OrderCreateForm = () => {
     prices,
     icmses,
     ipis,
-    orderItemMode,
-    temporaryItems: _temporaryItems,
+    temporaryItems,
     description,
     supplierId,
     forecast,
     notes,
+    freight,
     updateDescription,
     updateSupplierId,
     updateForecast,
     updateNotes,
-    setOrderItemMode: _setOrderItemMode,
-    addTemporaryItem: _addTemporaryItem,
-    updateTemporaryItem: _updateTemporaryItem,
-    removeTemporaryItem: _removeTemporaryItem,
-    clearTemporaryItems: _clearTemporaryItems,
-    setTemporaryItems: _setTemporaryItems,
+    updateFreight,
+    addTemporaryItem,
+    updateTemporaryItem,
+    removeTemporaryItem,
+    clearTemporaryItems,
     showSelectedOnly,
     searchTerm,
     showInactive,
@@ -72,17 +69,14 @@ export const OrderCreateForm = () => {
     supplierIds,
     page,
     pageSize,
-    totalRecords: _totalRecords,
     setPage,
     setPageSize,
-    setTotalRecords: _setTotalRecords,
     setShowSelectedOnly,
     setSearchTerm,
     setShowInactive,
     setCategoryIds,
     setBrandIds,
     setSupplierIds,
-    setBatchFilters: _setBatchFilters,
     toggleItemSelection,
     batchUpdateSelection,
     setItemQuantity,
@@ -100,7 +94,7 @@ export const OrderCreateForm = () => {
     defaultPageSize: 40,
   });
 
-  // Steps - always show all 3 steps regardless of mode
+  // Steps — items step now mixes inventory selections + free-text temporary items in a single screen.
   const steps = [
     {
       id: 1,
@@ -109,8 +103,8 @@ export const OrderCreateForm = () => {
     },
     {
       id: 2,
-      name: orderItemMode === "temporary" ? "Itens Temporários" : "Seleção de Itens",
-      description: orderItemMode === "temporary" ? "Adicione os itens temporários" : "Escolha os itens e quantidades",
+      name: "Itens",
+      description: "Selecione itens do estoque ou adicione itens temporários",
     },
     {
       id: 3,
@@ -127,6 +121,7 @@ export const OrderCreateForm = () => {
       supplierId: supplierId && supplierId.trim() !== "" ? supplierId : undefined,
       forecast: forecast || undefined,
       notes: notes || "",
+      freight: freight ?? 0,
       items: [],
       paymentMethod: null,
       paymentPix: null,
@@ -184,43 +179,43 @@ export const OrderCreateForm = () => {
   }, [notes]);
 
 
-  // Sync selected items to form (validate only if items field was already touched)
+  // Sync inventory selections + temporary items into the form's unified items array.
+  // Validates only when the items field has already been touched to avoid spurious red errors on first paint.
   useEffect(() => {
-    const items = Array.from(selectedItems).map((itemId) => ({
+    const inventoryItems = Array.from(selectedItems).map((itemId) => ({
       itemId,
       orderedQuantity: quantities[itemId] || 1,
       price: prices[itemId] || 0,
       icms: icmses[itemId] || 0,
       ipi: ipis[itemId] || 0,
     }));
+    const tempItemsForForm = (temporaryItems || [])
+      .filter(t => t.temporaryItemDescription.trim() !== "" && t.orderedQuantity > 0)
+      .map(t => ({
+        temporaryItemDescription: composeTempItemDescription(t),
+        orderedQuantity: t.orderedQuantity,
+        price: t.price,
+        icms: t.icms,
+        ipi: t.ipi,
+      }));
+    const items = [...inventoryItems, ...tempItemsForForm];
     const isTouched = !!form.formState.touchedFields.items;
     form.setValue("items", items, {
       shouldValidate: isTouched,
-      shouldDirty: true
+      shouldDirty: true,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedItems, quantities, prices, icmses, ipis]);
+  }, [selectedItems, quantities, prices, icmses, ipis, temporaryItems]);
 
-  // Auto-add first temporary item when switching to temporary mode
+  // Sync URL freight back to form
   useEffect(() => {
-    if (orderItemMode === "temporary") {
-      const currentItems = form.getValues("temporaryItems") || [];
-      // Only add if there are no items yet
-      if (currentItems.length === 0) {
-        form.setValue("temporaryItems", [{
-          temporaryItemDescription: "",
-          orderedQuantity: 1,
-          price: 0,
-          icms: 0,
-          ipi: 0,
-        }] as any, {
-          shouldDirty: true,
-          shouldTouch: true,
-        });
-      }
-    }
+    const isTouched = form.formState.touchedFields.freight;
+    form.setValue("freight", freight ?? 0, {
+      shouldValidate: isTouched,
+      shouldDirty: true,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderItemMode]);
+  }, [freight]);
 
   // Mutations
   const { createAsync, isLoading: isSubmitting } = useOrderMutations();
@@ -232,20 +227,28 @@ export const OrderCreateForm = () => {
     include: { logo: true },
   });
 
-  const suppliers = suppliersResponse?.data || []; // Fetch selected items data for display
-  const { data: selectedItemsResponse } = useItems({
-    where: selectedItems.size > 0 ? { id: { in: Array.from(selectedItems) } } : undefined,
-    include: {
-      brand: true,
-      category: true,
-      measures: true,
-      prices: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
+  const suppliers = suppliersResponse?.data || [];
+  // Fetch selected items data for display.
+  // CRITICAL: `enabled` must live in the SECOND arg (react-query options),
+  // not in params — `useItems` passes the first arg straight to the API as
+  // query string, where unknown keys like `enabled` are ignored. With `where`
+  // also missing (size 0), the API returns *all* items → review step floods
+  // with the full inventory.
+  const { data: selectedItemsResponse } = useItems(
+    {
+      where: { id: { in: Array.from(selectedItems) } },
+      include: {
+        brand: true,
+        category: true,
+        measures: true,
+        prices: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
       },
     },
-    enabled: selectedItems.size > 0,
-  });
+    { enabled: selectedItems.size > 0 },
+  );
 
   const selectedItemsData = selectedItemsResponse?.data || [];
 
@@ -304,76 +307,47 @@ export const OrderCreateForm = () => {
 
         return true;
 
-      case 2:
-        // Validate item selection based on mode
-        if (orderItemMode === "inventory") {
-          // Inventory mode - validate selected items
-          if (selectedItems.size === 0) {
-            toast.error("Pelo menos um item deve ser selecionado");
-            return false;
-          }
-
-          // Validate that all selected items have prices set
-          const itemsWithoutPrice = Array.from(selectedItems).filter((itemId) => !prices[itemId] || Number(prices[itemId]) <= 0);
-          if (itemsWithoutPrice.length > 0) {
-            toast.error("Todos os itens selecionados devem ter preço definido");
-            return false;
-          }
-        } else {
-          // Temporary mode - validate temporary items
-          const tempItems = form.getValues("temporaryItems") || [];
-          if (tempItems.length === 0) {
-            toast.error("Pelo menos um item temporário deve ser adicionado");
-            return false;
-          }
-
-          // Validate each temporary item
-          const hasIncomplete = tempItems.some((item: any) =>
-            !item.temporaryItemDescription || item.temporaryItemDescription.trim() === "" ||
-            !item.orderedQuantity || item.orderedQuantity <= 0 ||
-            item.price === undefined || item.price === null || item.price < 0
-          );
-
-          if (hasIncomplete) {
-            toast.error("Todos os itens temporários devem ter descrição, quantidade e preço");
-            return false;
-          }
+      case 2: {
+        // Items step — must have at least one item (inventory or temporary).
+        const validTemp = (temporaryItems || []).filter(
+          t => t.temporaryItemDescription.trim() !== "" && t.orderedQuantity > 0,
+        );
+        const totalItems = selectedItems.size + validTemp.length;
+        if (totalItems === 0) {
+          toast.error("Pelo menos um item deve ser adicionado ao pedido");
+          return false;
+        }
+        const inventoryWithoutPrice = Array.from(selectedItems).filter(
+          (itemId) => prices[itemId] === undefined || Number(prices[itemId]) < 0,
+        );
+        if (inventoryWithoutPrice.length > 0) {
+          toast.error("Todos os itens selecionados devem ter preço definido");
+          return false;
+        }
+        const tempWithoutPrice = validTemp.filter(t => t.price < 0);
+        if (tempWithoutPrice.length > 0) {
+          toast.error("Itens temporários devem ter preço maior ou igual a zero");
+          return false;
         }
         return true;
+      }
 
-      case 3:
-        // Additional checks based on mode
-        if (orderItemMode === "inventory") {
-          if (selectedItems.size === 0) {
-            toast.error("Pelo menos um item deve ser selecionado");
-            return false;
-          }
-
-          // Validate prices
-          const itemsWithoutPriceFinal = Array.from(selectedItems).filter((itemId) => !prices[itemId] || Number(prices[itemId]) <= 0);
-          if (itemsWithoutPriceFinal.length > 0) {
-            toast.error("Todos os itens selecionados devem ter preço definido");
-            return false;
-          }
-        } else {
-          // Temporary mode - validate temporary items
-          const tempItems = form.getValues("temporaryItems") || [];
-          if (tempItems.length === 0) {
-            toast.error("Pelo menos um item temporário deve ser adicionado");
-            return false;
-          }
-
-          // Validate each temporary item
-          const hasIncomplete = tempItems.some((item: any) =>
-            !item.temporaryItemDescription || item.temporaryItemDescription.trim() === "" ||
-            !item.orderedQuantity || item.orderedQuantity <= 0 ||
-            item.price === undefined || item.price === null || item.price < 0
-          );
-
-          if (hasIncomplete) {
-            toast.error("Todos os itens temporários devem ter descrição, quantidade e preço");
-            return false;
-          }
+      case 3: {
+        // Review step — re-run the same item check before submission.
+        const validTemp = (temporaryItems || []).filter(
+          t => t.temporaryItemDescription.trim() !== "" && t.orderedQuantity > 0,
+        );
+        const totalItems = selectedItems.size + validTemp.length;
+        if (totalItems === 0) {
+          toast.error("Pelo menos um item deve ser adicionado ao pedido");
+          return false;
+        }
+        const inventoryWithoutPrice = Array.from(selectedItems).filter(
+          (itemId) => prices[itemId] === undefined || Number(prices[itemId]) < 0,
+        );
+        if (inventoryWithoutPrice.length > 0) {
+          toast.error("Todos os itens selecionados devem ter preço definido");
+          return false;
         }
 
         // Trigger full form validation
@@ -394,11 +368,12 @@ export const OrderCreateForm = () => {
         }
 
         return true;
+      }
 
       default:
         return true;
     }
-  }, [currentStep, form, selectedItems, prices, orderItemMode]);
+  }, [currentStep, form, selectedItems, prices, temporaryItems]);
 
   // Consolidate filters for ItemSelectorTable
   const filters = useMemo<Partial<ItemGetManyFormData>>(() => ({
@@ -502,35 +477,31 @@ export const OrderCreateForm = () => {
   // Handle form submission
   const handleSubmit = useCallback(async () => {
     try {
-      // Prepare items based on mode
-      let itemsData: any[] = [];
-
-      if (orderItemMode === "inventory") {
-        // Inventory items
-        itemsData = Array.from(selectedItems).map((itemId) => ({
-          itemId: String(itemId),
-          orderedQuantity: Number(quantities[itemId]) || 1,
-          price: Number(prices[itemId]) || 0,
-          icms: Number(icmses[itemId]) || 0,
-          ipi: Number(ipis[itemId]) || 0,
+      // Build the unified items array — inventory selections + valid temporary items.
+      const inventoryItemsData = Array.from(selectedItems).map((itemId) => ({
+        itemId: String(itemId),
+        orderedQuantity: Number(quantities[itemId]) || 1,
+        price: Number(prices[itemId]) || 0,
+        icms: Number(icmses[itemId]) || 0,
+        ipi: Number(ipis[itemId]) || 0,
+      }));
+      const tempItemsData = (temporaryItems || [])
+        .filter(t => t.temporaryItemDescription.trim() !== "" && t.orderedQuantity > 0)
+        .map(t => ({
+          temporaryItemDescription: composeTempItemDescription(t),
+          orderedQuantity: Number(t.orderedQuantity) || 1,
+          price: Number(t.price) || 0,
+          icms: Number(t.icms) || 0,
+          ipi: Number(t.ipi) || 0,
         }));
-      } else {
-        // Temporary items (stored under "temporaryItems" by useFieldArray)
-        const tempItems = form.getValues("temporaryItems") || [];
-        itemsData = tempItems.map((item: any) => ({
-          temporaryItemDescription: item.temporaryItemDescription,
-          orderedQuantity: Number(item.orderedQuantity) || 1,
-          price: Number(item.price) || 0,
-          icms: Number(item.icms) || 0,
-          ipi: Number(item.ipi) || 0,
-        }));
-      }
+      const itemsData = [...inventoryItemsData, ...tempItemsData];
 
       // Get form values to ensure we have the latest data
       const currentDescription = form.getValues("description");
       const currentSupplierId = form.getValues("supplierId");
       const currentForecast = form.getValues("forecast");
       const currentNotes = form.getValues("notes");
+      const currentFreight = form.getValues("freight");
       const currentPaymentMethod = form.getValues("paymentMethod");
       const currentPaymentPix = form.getValues("paymentPix");
       const currentPaymentDueDays = form.getValues("paymentDueDays");
@@ -543,6 +514,7 @@ export const OrderCreateForm = () => {
         supplierId: currentSupplierId || undefined,
         forecast: currentForecast || undefined,
         notes: currentNotes?.trim() || undefined,
+        freight: Number(currentFreight) || 0,
         items: itemsData,
         paymentMethod: currentPaymentMethod || undefined,
         paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
@@ -566,8 +538,6 @@ export const OrderCreateForm = () => {
           toast.error(errors.description.message || "Erro na descrição");
         } else if (errors.items) {
           toast.error("Erro nos itens do pedido");
-        } else if (errors.temporaryItems) {
-          toast.error("Erro nos itens temporários");
         } else if (errors.paymentPix) {
           toast.error(errors.paymentPix.message || "Erro na chave Pix");
         } else if (errors.budgetIds) {
@@ -630,6 +600,7 @@ export const OrderCreateForm = () => {
         // Clear form and selections
         form.reset();
         clearAllSelections();
+        clearTemporaryItems();
 
         // Navigate to the details page of the newly created order
         setTimeout(() => {
@@ -647,7 +618,7 @@ export const OrderCreateForm = () => {
       }
       // Error is handled by the mutation hook, but let's log it
     }
-  }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, icmses, ipis, orderItemMode, budgetFiles, receiptFiles, invoiceFiles, suppliers, createAsync, form, clearAllSelections, navigate]);
+  }, [validateCurrentStep, description, supplierId, forecast, notes, freight, selectedItems, quantities, prices, icmses, ipis, temporaryItems, budgetFiles, receiptFiles, invoiceFiles, suppliers, createAsync, form, clearAllSelections, clearTemporaryItems, navigate]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.orders.root);
@@ -666,37 +637,26 @@ export const OrderCreateForm = () => {
 
   // Watch form state to trigger validation when it changes
   const watchedDescription = form.watch("description");
-  const watchedTemporaryItems = form.watch("temporaryItems");
 
-  // Compute if form is ready to submit (no useMemo - compute on every render)
+  // Compute if form is ready to submit. Either inventory selections or
+  // temporary items count toward "has items"; both can also coexist.
   const computeFormReadiness = () => {
-    // Use watched values (they're live and trigger re-renders)
-    const hasDescription = watchedDescription?.trim().length > 0;
+    const hasDescription = (watchedDescription?.trim().length || 0) > 0;
 
-    // Check based on order mode
-    if (orderItemMode === "temporary") {
-      // Temporary mode: check for valid temporary items (stored under "temporaryItems" by useFieldArray)
-      const tempItems = watchedTemporaryItems || [];
-      const hasTemporaryItems = tempItems.length > 0;
+    const hasInventorySelection = selectedItems.size > 0;
+    const inventoryPricesValid = Array.from(selectedItems).every(
+      (itemId) => prices[itemId] !== undefined && Number(prices[itemId]) >= 0,
+    );
 
-      const allTemporaryItemsValid = tempItems.every((item: any, _index: number) => {
-        const hasDescription = item.temporaryItemDescription && item.temporaryItemDescription.trim() !== "";
-        const hasValidQuantity = item.orderedQuantity && item.orderedQuantity > 0;
-        const hasValidPrice = item.price !== undefined && item.price !== null && Number(item.price) > 0;
+    const validTemp = (temporaryItems || []).filter(
+      t => t.temporaryItemDescription.trim() !== "" && t.orderedQuantity > 0,
+    );
+    const hasValidTemp = validTemp.length > 0;
+    const tempPricesValid = validTemp.every(t => Number(t.price) >= 0);
 
-        return hasDescription && hasValidQuantity && hasValidPrice;
-      });
-
-      const finalResult = hasDescription && hasTemporaryItems && allTemporaryItemsValid;
-
-      return finalResult;
-    } else {
-      // Inventory mode: check for selected items with prices
-      const hasSelectedItems = selectedItems.size > 0;
-      const allItemsHavePrices = Array.from(selectedItems).every((itemId) => prices[itemId] !== undefined && Number(prices[itemId]) >= 0);
-
-      return hasDescription && hasSelectedItems && allItemsHavePrices;
-    }
+    const hasAnyItem = hasInventorySelection || hasValidTemp;
+    const allPricesValid = inventoryPricesValid && tempPricesValid;
+    return hasDescription && hasAnyItem && allPricesValid;
   };
 
   const isFormReadyToSubmit = computeFormReadiness();
@@ -908,7 +868,7 @@ export const OrderCreateForm = () => {
           <div class="header-info">
             <h1 class="title">${orderDescription}</h1>
             <div class="info">
-              <p><strong>Data do Pedido:</strong> ${formatDate(new Date())}${form.watch("forecast") ? ` | <strong>Data de Entrega:</strong> ${formatDate(form.watch("forecast") as Date)}` : ""} | <strong>Fornecedor:</strong> ${selectedSupplier ? selectedSupplier.fantasyName : "-"} | <strong>Total de itens:</strong> ${orderItemMode === "inventory" ? selectedItemsData.length : (form.watch("temporaryItems") || []).length}</p>
+              <p><strong>Data do Pedido:</strong> ${formatDate(new Date())}${form.watch("forecast") ? ` | <strong>Data de Entrega:</strong> ${formatDate(form.watch("forecast") as Date)}` : ""} | <strong>Fornecedor:</strong> ${selectedSupplier ? selectedSupplier.fantasyName : "-"} | <strong>Total de itens:</strong> ${selectedItemsData.length + (temporaryItems || []).filter(t => t.temporaryItemDescription.trim() !== "").length}</p>
             </div>
           </div>
         </div>
@@ -925,14 +885,11 @@ export const OrderCreateForm = () => {
               </tr>
             </thead>
             <tbody>
-              ${
-                orderItemMode === "inventory"
-                  ? selectedItemsData
-                      .map((item) => {
-                        const quantity = Number(quantities[item.id]) || 1;
-                        const measuresDisplay = formatMeasuresCompact(item.measures || []);
-
-                        return `
+              ${[
+                ...selectedItemsData.map((item) => {
+                  const quantity = Number(quantities[item.id]) || 1;
+                  const measuresDisplay = formatMeasuresCompact(item.measures || []);
+                  return `
                         <tr>
                           <td class="font-mono text-left">${item.uniCode || "-"}</td>
                           <td class="font-medium text-left">${item.name}</td>
@@ -941,23 +898,22 @@ export const OrderCreateForm = () => {
                           <td class="text-center font-medium">${quantity.toLocaleString("pt-BR")}</td>
                         </tr>
                       `;
-                      })
-                      .join("")
-                  : (form.watch("temporaryItems") || [])
-                      .map((item: any) => {
-                        const quantity = Number(item.orderedQuantity) || 0;
-                        return `
+                }),
+                ...(temporaryItems || [])
+                  .filter(t => t.temporaryItemDescription.trim() !== "")
+                  .map((t) => {
+                    const quantity = Number(t.orderedQuantity) || 0;
+                    return `
                         <tr>
-                          <td class="font-mono text-left">-</td>
-                          <td class="font-medium text-left">${item.temporaryItemDescription || "-"}</td>
-                          <td class="text-left">-</td>
-                          <td class="text-left">-</td>
+                          <td class="font-mono text-left">${t.uniCode || "-"}</td>
+                          <td class="font-medium text-left">${composeTempItemDescription(t)} <span style="background:#e0e7ff;color:#3730a3;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:600;margin-left:4px;">TEMP</span></td>
+                          <td class="text-left">${t.brand || "-"}</td>
+                          <td class="text-left">${t.measures || "-"}</td>
                           <td class="text-center font-medium">${quantity.toLocaleString("pt-BR")}</td>
                         </tr>
                       `;
-                      })
-                      .join("")
-              }
+                  }),
+              ].join("")}
             </tbody>
           </table>
 
@@ -999,7 +955,7 @@ export const OrderCreateForm = () => {
         };
       }
     },
-    [form, suppliers, selectionCount, selectedItemsData, quantities, prices, orderItemMode],
+    [form, suppliers, selectionCount, selectedItemsData, quantities, prices, temporaryItems],
   );
 
   // Generate navigation actions based on current step
@@ -1192,49 +1148,9 @@ export const OrderCreateForm = () => {
                             </div>
                           </div>
 
-                          {/* Second Row: Type and Observations */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Left: Type selector */}
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium flex items-center gap-2">
-                                <IconClipboardList className="h-4 w-4" />
-                                Tipo de Itens
-                              </Label>
-                              <RadioGroup
-                                value={orderItemMode}
-                                onValueChange={(value) => _setOrderItemMode(value as "inventory" | "temporary")}
-                                className="flex flex-col gap-2"
-                              >
-                                <label
-                                  htmlFor="mode-inventory"
-                                  className="flex flex-col space-y-0.5 rounded-md border border-border p-3 hover:bg-accent cursor-pointer transition-colors group"
-                                >
-                                  <div className="flex items-center gap-2 font-medium group-hover:text-white">
-                                    <RadioGroupItem value="inventory" id="mode-inventory" />
-                                    <IconShoppingCart className="h-4 w-4" />
-                                    Itens do Estoque
-                                  </div>
-                                  <p className="text-sm text-muted-foreground group-hover:text-white/90 pl-6">
-                                    Selecione itens do inventário
-                                  </p>
-                                </label>
-                                <label
-                                  htmlFor="mode-temporary"
-                                  className="flex flex-col space-y-0.5 rounded-md border border-border p-3 hover:bg-accent cursor-pointer transition-colors group"
-                                >
-                                  <div className="flex items-center gap-2 font-medium group-hover:text-white">
-                                    <RadioGroupItem value="temporary" id="mode-temporary" />
-                                    <IconFileInvoice className="h-4 w-4" />
-                                    Itens Temporários
-                                  </div>
-                                  <p className="text-sm text-muted-foreground group-hover:text-white/90 pl-6">
-                                    Compras únicas sem inventário
-                                  </p>
-                                </label>
-                              </RadioGroup>
-                            </div>
-
-                            {/* Right: Observations */}
+                          {/* Second Row: Observations only — item-type toggle was removed
+                              (inventory + temporary items are now mixed in a single list) */}
+                          <div className="grid grid-cols-1 gap-4">
                             <div className="space-y-2 flex flex-col">
                               <Label className="text-sm font-medium flex items-center gap-2">
                                 <IconNotes className="h-4 w-4" />
@@ -1337,7 +1253,7 @@ export const OrderCreateForm = () => {
                   </div>
                 )}
 
-                {currentStep === 2 && orderItemMode === "inventory" && (
+                {currentStep === 2 && (
                   <ItemSelectorTable
                     selectedItems={selectedItems}
                     onSelectItem={handleSelectItem}
@@ -1363,7 +1279,7 @@ export const OrderCreateForm = () => {
                         name: 'Essencial para identificar o item sendo pedido',
                       },
                     }}
-                    defaultColumns={['uniCode', 'name', 'quantity', 'price', 'monthlyConsumption']}
+                    defaultColumns={['uniCode', 'name', 'quantity', 'price', 'monthlyConsumption', 'orderSubtotal']}
                     storageKey="order-item-selector"
                     // URL state management
                     page={page}
@@ -1376,27 +1292,14 @@ export const OrderCreateForm = () => {
                     onShowSelectedOnlyChange={setShowSelectedOnly}
                     onSearchTermChange={setSearchTerm}
                     onFiltersChange={handleFiltersChange}
+                    // Inline temporary item entry — sticky first row + pinned existing temps
+                    enableTemporaryItems
+                    temporaryItems={temporaryItems}
+                    onTemporaryItemAdd={addTemporaryItem}
+                    onTemporaryItemUpdate={updateTemporaryItem}
+                    onTemporaryItemRemove={removeTemporaryItem}
                     className="flex-1 min-h-0"
                   />
-                )}
-
-                {currentStep === 2 && orderItemMode === "temporary" && (
-                  <div className="space-y-6">
-                    <Card className="w-full">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <IconFileInvoice className="h-5 w-5" />
-                          Itens Temporários
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <TemporaryItemsInput
-                          control={form.control}
-                          disabled={isSubmitting}
-                        />
-                      </CardContent>
-                    </Card>
-                  </div>
                 )}
 
                 {currentStep === 3 && (
@@ -1441,37 +1344,40 @@ export const OrderCreateForm = () => {
                             <span className="text-sm font-semibold text-foreground">{form.watch("forecast") ? formatDate(form.watch("forecast") as Date) : "-"}</span>
                           </div>
 
-                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                            <span className="text-sm text-muted-foreground">Itens</span>
-                            <span className="text-sm font-semibold text-foreground">
-                              {orderItemMode === "inventory" ? selectionCount : (form.watch("temporaryItems") || []).filter((item: any) => item.temporaryItemDescription).length} itens
-                              {" / "}
-                              {orderItemMode === "inventory"
-                                ? Array.from(selectedItems).reduce((total: number, itemId: string) => total + (Number(quantities[itemId]) || 1), 0)
-                                : (form.watch("temporaryItems") || []).reduce((total: number, item: any) => total + (Number(item.orderedQuantity) || 0), 0)} unidades
-                            </span>
-                          </div>
+                          {(() => {
+                            const validTemp = (temporaryItems || []).filter(t => t.temporaryItemDescription.trim() !== "");
+                            const totalItemCount = selectionCount + validTemp.length;
+                            const totalUnits =
+                              Array.from(selectedItems).reduce((total: number, itemId: string) => total + (Number(quantities[itemId]) || 1), 0) +
+                              validTemp.reduce((total: number, t) => total + (Number(t.orderedQuantity) || 0), 0);
+                            const tempTotal = validTemp.reduce((total: number, t) => {
+                              const quantity = Number(t.orderedQuantity) || 0;
+                              const price = Number(t.price) || 0;
+                              const icms = Number(t.icms) || 0;
+                              const ipi = Number(t.ipi) || 0;
+                              const subtotal = quantity * price;
+                              return total + subtotal + (subtotal * (icms / 100)) + (subtotal * (ipi / 100));
+                            }, 0);
+                            const watchedFreight = Number(form.watch("freight")) || 0;
+                            const grandTotal = totalPrice + tempTotal + watchedFreight;
+                            return (
+                              <>
+                                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                                  <span className="text-sm text-muted-foreground">Itens</span>
+                                  <span className="text-sm font-semibold text-foreground">
+                                    {totalItemCount} itens / {totalUnits} unidades
+                                  </span>
+                                </div>
 
-                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                            <span className="text-sm text-muted-foreground">Valor Total</span>
-                            <span className="text-sm font-semibold text-primary">
-                              {formatCurrency(
-                                orderItemMode === "inventory"
-                                  ? totalPrice
-                                  : (form.watch("temporaryItems") || []).reduce((total: number, item: any) => {
-                                      const quantity = Number(item.orderedQuantity) || 0;
-                                      const price = Number(item.price) || 0;
-                                      const icms = Number(item.icms) || 0;
-                                      const ipi = Number(item.ipi) || 0;
-                                      const subtotal = quantity * price;
-                                      const icmsAmount = subtotal * (icms / 100);
-                                      const ipiAmount = subtotal * (ipi / 100);
-                                      const taxAmount = icmsAmount + ipiAmount;
-                                      return total + subtotal + taxAmount;
-                                    }, 0)
-                              )}
-                            </span>
-                          </div>
+                                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                                  <span className="text-sm text-muted-foreground">Valor Total</span>
+                                  <span className="text-sm font-semibold text-primary">
+                                    {formatCurrency(grandTotal)}
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          })()}
 
                           {form.watch("notes") && (
                             <div className="bg-muted/50 rounded-lg px-4 py-3">
@@ -1616,6 +1522,28 @@ export const OrderCreateForm = () => {
                               </div>
                             </div>
                           )}
+
+                          {/* Freight (frete) — supplier shipping cost added to the order total. */}
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-[6px]">
+                            <span className="text-sm text-muted-foreground whitespace-nowrap mr-4 flex items-center gap-2">
+                              <IconTruck className="h-4 w-4" />
+                              Frete
+                            </span>
+                            <div className="flex-1 max-w-[55%]">
+                              <Input
+                                type="currency"
+                                value={form.watch("freight") ?? 0}
+                                onChange={(value) => {
+                                  const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+                                  const sanitized = Number.isFinite(n) && n >= 0 ? n : 0;
+                                  form.setValue("freight", sanitized, { shouldDirty: true, shouldTouch: true });
+                                  updateFreight(sanitized);
+                                }}
+                                placeholder="R$ 0,00"
+                                className="h-8 w-full border-neutral-500"
+                              />
+                            </div>
+                          </div>
                         </CardContent>
                       </Card>
                     </div>
@@ -1624,138 +1552,130 @@ export const OrderCreateForm = () => {
                     <Card className="w-full">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                          {orderItemMode === "inventory" ? <IconShoppingCart className="h-5 w-5" /> : <IconFileInvoice className="h-5 w-5" />}
-                          {orderItemMode === "inventory" ? "Itens Selecionados" : "Itens Temporários"}
+                          <IconShoppingCart className="h-5 w-5" />
+                          Itens do Pedido
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {orderItemMode === "inventory" ? (
-                          <div className="rounded-md border border-border overflow-hidden w-full">
-                            <Table>
-                              <TableHeader>
-                                <TableRow className="bg-muted/50">
-                                  <TableHead className="font-semibold">Código</TableHead>
-                                  <TableHead className="font-semibold">Nome</TableHead>
-                                  <TableHead className="font-semibold">Marca</TableHead>
-                                  <TableHead className="font-semibold">Medida</TableHead>
-                                  <TableHead className="text-right font-semibold">Quantidade</TableHead>
-                                  <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
-                                  <TableHead className="text-right font-semibold">Total</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {selectedItemsData.map((item, index) => {
-                                const quantity = Number(quantities[item.id]) || 1;
-                                const price = Number(prices[item.id]) || 0;
-                                const total = quantity * price;
+                        {(() => {
+                          // Get measure display — prioritize volume if both weight and volume exist
+                          const getMeasureDisplay = (item: any) => {
+                            if (!item.measures || item.measures.length === 0) return "-";
+                            const volumeUnits = [MEASURE_UNIT.MILLILITER, MEASURE_UNIT.LITER, MEASURE_UNIT.CUBIC_METER, MEASURE_UNIT.CUBIC_CENTIMETER];
+                            const weightUnits = [MEASURE_UNIT.KILOGRAM, MEASURE_UNIT.GRAM];
+                            const hasVolume = item.measures.some((m: any) => m.unit !== null && volumeUnits.includes(m.unit as MEASURE_UNIT));
+                            const hasWeight = item.measures.some((m: any) => m.unit !== null && weightUnits.includes(m.unit as MEASURE_UNIT));
+                            if (hasVolume && hasWeight) {
+                              const volumeMeasure = item.measures.find((m: any) => m.unit !== null && volumeUnits.includes(m.unit as MEASURE_UNIT));
+                              return volumeMeasure && volumeMeasure.unit ? `${volumeMeasure.value} ${MEASURE_UNIT_LABELS[volumeMeasure.unit as keyof typeof MEASURE_UNIT_LABELS] || volumeMeasure.unit}` : "-";
+                            }
+                            const firstMeasure = item.measures[0];
+                            if (!firstMeasure) return "-";
+                            return `${firstMeasure.value} ${MEASURE_UNIT_LABELS[firstMeasure.unit as keyof typeof MEASURE_UNIT_LABELS] || firstMeasure.unit}`;
+                          };
 
-                                // Get measure display - prioritize volume if both weight and volume exist
-                                const getMeasureDisplay = () => {
-                                  if (!item.measures || item.measures.length === 0) return "-";
+                          // Build a unified row list for inventory + temporary items.
+                          const inventoryRows = selectedItemsData.map((item) => {
+                            const quantity = Number(quantities[item.id]) || 1;
+                            const price = Number(prices[item.id]) || 0;
+                            const icms = Number(icmses[item.id]) || 0;
+                            const ipi = Number(ipis[item.id]) || 0;
+                            const subtotal = quantity * price;
+                            const taxAmount = subtotal * (icms / 100) + subtotal * (ipi / 100);
+                            return {
+                              key: `inv-${item.id}`,
+                              kind: "inventory" as const,
+                              code: item.uniCode || "-",
+                              name: item.name,
+                              brand: item.brand?.name || "-",
+                              measures: getMeasureDisplay(item),
+                              quantity, price, icms, ipi, subtotal, taxAmount,
+                              total: subtotal + taxAmount,
+                            };
+                          });
+                          const tempRows = (temporaryItems || [])
+                            .filter(t => t.temporaryItemDescription.trim() !== "")
+                            .map((t) => {
+                              const quantity = Number(t.orderedQuantity) || 0;
+                              const price = Number(t.price) || 0;
+                              const icms = Number(t.icms) || 0;
+                              const ipi = Number(t.ipi) || 0;
+                              const subtotal = quantity * price;
+                              const taxAmount = subtotal * (icms / 100) + subtotal * (ipi / 100);
+                              return {
+                                key: `tmp-${t.key}`,
+                                kind: "temporary" as const,
+                                code: t.uniCode || "—",
+                                // Show the raw description in the review (the metadata is split into other columns).
+                                // The COMPOSED string is what we send to the API at submit.
+                                name: t.temporaryItemDescription,
+                                brand: t.brand || "—",
+                                measures: t.measures || "—",
+                                quantity, price, icms, ipi, subtotal, taxAmount,
+                                total: subtotal + taxAmount,
+                              };
+                            });
+                          const rows = [...inventoryRows, ...tempRows];
+                          const itemsTotal = rows.reduce((sum, r) => sum + r.total, 0);
+                          const watchedFreight = Number(form.watch("freight")) || 0;
+                          const grandTotal = itemsTotal + watchedFreight;
 
-                                  const volumeUnits = [MEASURE_UNIT.MILLILITER, MEASURE_UNIT.LITER, MEASURE_UNIT.CUBIC_METER, MEASURE_UNIT.CUBIC_CENTIMETER];
-                                  const weightUnits = [MEASURE_UNIT.KILOGRAM, MEASURE_UNIT.GRAM];
-
-                                  const hasVolume = item.measures.some((m) => m.unit !== null && volumeUnits.includes(m.unit as MEASURE_UNIT));
-                                  const hasWeight = item.measures.some((m) => m.unit !== null && weightUnits.includes(m.unit as MEASURE_UNIT));
-
-                                  if (hasVolume && hasWeight) {
-                                    // If both exist, show only volume
-                                    const volumeMeasure = item.measures.find((m) => m.unit !== null && volumeUnits.includes(m.unit as MEASURE_UNIT));
-                                    return volumeMeasure && volumeMeasure.unit ? `${volumeMeasure.value} ${MEASURE_UNIT_LABELS[volumeMeasure.unit] || volumeMeasure.unit}` : "-";
-                                  }
-
-                                  // Otherwise show the first measure
-                                  const firstMeasure = item.measures[0];
-                                  if (!firstMeasure) return "-";
-                                  return `${firstMeasure.value} ${MEASURE_UNIT_LABELS[firstMeasure.unit as keyof typeof MEASURE_UNIT_LABELS] || firstMeasure.unit}`;
-                                };
-
-                                return (
-                                  <TableRow key={item.id} className={cn("transition-colors", index % 2 === 1 && "bg-muted/10")}>
-                                    <TableCell className="font-mono">{item.uniCode || "-"}</TableCell>
-                                    <TableCell className="font-medium">{item.name}</TableCell>
-                                    <TableCell>{item.brand?.name || "-"}</TableCell>
-                                    <TableCell>{getMeasureDisplay()}</TableCell>
-                                    <TableCell className="text-right font-medium">{quantity.toLocaleString("pt-BR")}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(Number(price))}</TableCell>
-                                    <TableCell className="text-right font-semibold">{formatCurrency(Number(total))}</TableCell>
+                          return (
+                            <div className="rounded-md border border-border overflow-hidden w-full">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="bg-muted/50">
+                                    <TableHead className="font-semibold">Código</TableHead>
+                                    <TableHead className="font-semibold">Nome</TableHead>
+                                    <TableHead className="font-semibold">Marca</TableHead>
+                                    <TableHead className="font-semibold">Medida</TableHead>
+                                    <TableHead className="text-right font-semibold">Quantidade</TableHead>
+                                    <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
+                                    <TableHead className="text-right font-semibold">Impostos</TableHead>
+                                    <TableHead className="text-right font-semibold">Total</TableHead>
                                   </TableRow>
-                                );
-                              })}
-                              <TableRow className="bg-muted/30 font-semibold">
-                                <TableCell colSpan={6} className="text-right">
-                                  Total Geral:
-                                </TableCell>
-                                <TableCell className="text-right">{formatCurrency(Number(totalPrice))}</TableCell>
-                              </TableRow>
-                            </TableBody>
-                          </Table>
-                        </div>
-                        ) : (
-                          <div className="rounded-md border border-border overflow-hidden w-full">
-                            <Table>
-                              <TableHeader>
-                                <TableRow className="bg-muted/50">
-                                  <TableHead className="font-semibold">Descrição</TableHead>
-                                  <TableHead className="text-right font-semibold">Quantidade</TableHead>
-                                  <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
-                                  <TableHead className="text-right font-semibold">ICMS (%)</TableHead>
-                                  <TableHead className="text-right font-semibold">IPI (%)</TableHead>
-                                  <TableHead className="text-right font-semibold">Subtotal</TableHead>
-                                  <TableHead className="text-right font-semibold">Impostos</TableHead>
-                                  <TableHead className="text-right font-semibold">Total</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {((form.watch("temporaryItems") || []).filter((item: any) => item.temporaryItemDescription)).map((item: any, index: number) => {
-                                  const quantity = Number(item.orderedQuantity) || 0;
-                                  const price = Number(item.price) || 0;
-                                  const icms = Number(item.icms) || 0;
-                                  const ipi = Number(item.ipi) || 0;
-                                  const subtotal = quantity * price;
-                                  const icmsAmount = subtotal * (icms / 100);
-                                  const ipiAmount = subtotal * (ipi / 100);
-                                  const taxAmount = icmsAmount + ipiAmount;
-                                  const total = subtotal + taxAmount;
-
-                                  return (
-                                    <TableRow key={index} className={cn("transition-colors", index % 2 === 1 && "bg-muted/10")}>
-                                      <TableCell className="font-medium">{item.temporaryItemDescription || "-"}</TableCell>
-                                      <TableCell className="text-right font-medium">{quantity.toLocaleString("pt-BR")}</TableCell>
-                                      <TableCell className="text-right">{formatCurrency(price)}</TableCell>
-                                      <TableCell className="text-right">{icms.toFixed(2)}%</TableCell>
-                                      <TableCell className="text-right">{ipi.toFixed(2)}%</TableCell>
-                                      <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
-                                      <TableCell className="text-right">{formatCurrency(taxAmount)}</TableCell>
-                                      <TableCell className="text-right font-semibold">{formatCurrency(total)}</TableCell>
+                                </TableHeader>
+                                <TableBody>
+                                  {rows.map((row, index) => (
+                                    <TableRow key={row.key} className={cn("transition-colors", index % 2 === 1 && "bg-muted/10")}>
+                                      <TableCell className="font-mono">{row.code}</TableCell>
+                                      <TableCell className="font-medium">
+                                        <div className="flex items-center gap-2">
+                                          <span>{row.name}</span>
+                                          {row.kind === "temporary" && (
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-primary/10 text-primary">
+                                              Temp
+                                            </span>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>{row.brand}</TableCell>
+                                      <TableCell>{row.measures}</TableCell>
+                                      <TableCell className="text-right font-medium">{row.quantity.toLocaleString("pt-BR")}</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(row.price, "pt-BR", "BRL", 3)}</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(row.taxAmount)}</TableCell>
+                                      <TableCell className="text-right font-semibold">{formatCurrency(row.total)}</TableCell>
                                     </TableRow>
-                                  );
-                                })}
-                                <TableRow className="bg-muted/30 font-semibold">
-                                  <TableCell colSpan={7} className="text-right">
-                                    Total Geral:
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    {formatCurrency(
-                                      ((form.watch("temporaryItems") || []).filter((item: any) => item.temporaryItemDescription)).reduce((total: number, item: any) => {
-                                        const quantity = Number(item.orderedQuantity) || 0;
-                                        const price = Number(item.price) || 0;
-                                        const icms = Number(item.icms) || 0;
-                                        const ipi = Number(item.ipi) || 0;
-                                        const subtotal = quantity * price;
-                                        const icmsAmount = subtotal * (icms / 100);
-                                        const ipiAmount = subtotal * (ipi / 100);
-                                        const taxAmount = icmsAmount + ipiAmount;
-                                        return total + subtotal + taxAmount;
-                                      }, 0)
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              </TableBody>
-                            </Table>
-                          </div>
-                        )}
+                                  ))}
+                                  {watchedFreight > 0 && (
+                                    <TableRow className="bg-muted/20">
+                                      <TableCell colSpan={7} className="text-right text-sm text-muted-foreground">
+                                        Frete:
+                                      </TableCell>
+                                      <TableCell className="text-right font-medium">{formatCurrency(watchedFreight)}</TableCell>
+                                    </TableRow>
+                                  )}
+                                  <TableRow className="bg-muted/30 font-semibold">
+                                    <TableCell colSpan={7} className="text-right">
+                                      Total Geral:
+                                    </TableCell>
+                                    <TableCell className="text-right">{formatCurrency(grandTotal)}</TableCell>
+                                  </TableRow>
+                                </TableBody>
+                              </Table>
+                            </div>
+                          );
+                        })()}
                       </CardContent>
                     </Card>
 

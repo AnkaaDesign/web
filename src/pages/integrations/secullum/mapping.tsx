@@ -35,6 +35,7 @@ import {
   useLinkSectorDepartamento,
   useSetSectorHorario,
   useLinkPositionFuncao,
+  useLinkUserFuncionario,
 } from "@/hooks/integrations/use-secullum-mapping";
 import { useSectors } from "@/hooks/administration/use-sector";
 import { usePositions } from "@/hooks/human-resources/use-position";
@@ -727,13 +728,19 @@ function FuncionariosCard() {
     return m;
   }, [users]);
 
-  const matchUser = (f: FuncionarioRow): UserRow | null => {
+  // Resolve a Funcionario row to its Ankaa user.
+  // `via: 'fk'` means User.secullumEmployeeId is set — actually linked.
+  // `via: 'payroll'` is a fuzzy candidate (payroll number match) that the
+  // operator can promote to a real link via the "Vincular" button.
+  const matchUser = (
+    f: FuncionarioRow,
+  ): { user: UserRow; via: "fk" | "payroll" } | null => {
     const byId = userByEmployeeId.get(f.Id);
-    if (byId) return byId;
+    if (byId) return { user: byId, via: "fk" };
     const folha = Number(f.NumeroFolha);
     if (!Number.isNaN(folha) && folha > 0) {
       const byFolha = userByPayroll.get(folha);
-      if (byFolha) return byFolha;
+      if (byFolha) return { user: byFolha, via: "payroll" };
     }
     return null;
   };
@@ -744,8 +751,8 @@ function FuncionariosCard() {
     return rows.filter((r) => {
       if (norm(r.Nome).includes(q)) return true;
       if ((r.NumeroFolha ?? "").includes(q)) return true;
-      const u = matchUser(r);
-      if (u && norm(u.name).includes(q)) return true;
+      const m = matchUser(r);
+      if (m && norm(m.user.name).includes(q)) return true;
       return false;
     });
   };
@@ -753,7 +760,8 @@ function FuncionariosCard() {
   const ativosFiltered = filterRows(ativos);
   const demitidosFiltered = filterRows(demitidos);
 
-  const ativosLinked = ativos.filter((f) => matchUser(f) != null).length;
+  const ativosLinked = ativos.filter((f) => matchUser(f)?.via === "fk").length;
+  const ativosPending = ativos.filter((f) => matchUser(f)?.via === "payroll").length;
 
   const isLoading = ativosQ.isLoading || demitidosQ.isLoading || usersQ.isLoading;
 
@@ -769,7 +777,10 @@ function FuncionariosCard() {
             <p className="text-sm text-muted-foreground">
               {isLoading
                 ? "Carregando…"
-                : `${ativos.length} ativo(s) no Secullum • ${ativosLinked} vinculado(s) a usuários Ankaa`}
+                : `${ativos.length} ativo(s) no Secullum • ${ativosLinked} vinculado(s)` +
+                  (ativosPending > 0
+                    ? ` • ${ativosPending} aguardando vínculo`
+                    : "")}
             </p>
           </div>
           <Button
@@ -838,9 +849,55 @@ function FuncionariosTable({
   variant,
 }: {
   rows: FuncionarioRow[];
-  matchUser: (f: FuncionarioRow) => UserRow | null;
+  matchUser: (
+    f: FuncionarioRow,
+  ) => { user: UserRow; via: "fk" | "payroll" } | null;
   variant: "ativo" | "demitido";
 }) {
+  const linkMutation = useLinkUserFuncionario();
+  const [pendingId, setPendingId] = useState<number | null>(null);
+
+  const handleLink = async (
+    funcionarioId: number,
+    userId: string,
+    funcionarioNome: string,
+    userName: string,
+  ) => {
+    setPendingId(funcionarioId);
+    try {
+      await linkMutation.mutateAsync({ userId, funcionarioId });
+      toast.success(`${userName} vinculado a ${funcionarioNome}`);
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Falha ao vincular usuário",
+      );
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  const handleUnlink = async (
+    funcionarioId: number,
+    userId: string,
+    userName: string,
+  ) => {
+    setPendingId(funcionarioId);
+    try {
+      await linkMutation.mutateAsync({ userId, funcionarioId: null });
+      toast.success(`${userName} desvinculado`);
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Falha ao desvincular usuário",
+      );
+    } finally {
+      setPendingId(null);
+    }
+  };
+
   if (rows.length === 0) {
     return (
       <div className="rounded-md border border-dashed bg-muted/20 px-3 py-6 text-center text-sm text-muted-foreground">
@@ -874,7 +931,9 @@ function FuncionariosTable({
         </thead>
         <tbody>
           {rows.map((f) => {
-            const u = matchUser(f);
+            const m = matchUser(f);
+            const u = m?.user ?? null;
+            const isBusy = pendingId === f.Id;
             return (
               <tr
                 key={f.Id}
@@ -899,10 +958,32 @@ function FuncionariosTable({
                     <Badge variant="outline" className="text-muted-foreground">
                       Desligado
                     </Badge>
-                  ) : u ? (
-                    <Badge className="gap-1 bg-emerald-100 text-emerald-900 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300">
-                      <IconCheck className="h-3 w-3" /> Vinculado
-                    </Badge>
+                  ) : m?.via === "fk" ? (
+                    <div className="flex items-center gap-2">
+                      <Badge className="gap-1 bg-emerald-100 text-emerald-900 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        <IconCheck className="h-3 w-3" /> Vinculado
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs text-muted-foreground"
+                        disabled={isBusy}
+                        onClick={() => handleUnlink(f.Id, u!.id, u!.name)}
+                      >
+                        <IconX className="h-3.5 w-3.5" /> Desvincular
+                      </Button>
+                    </div>
+                  ) : m?.via === "payroll" ? (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-7 gap-1 px-2 text-xs"
+                      disabled={isBusy}
+                      onClick={() => handleLink(f.Id, u!.id, f.Nome, u!.name)}
+                    >
+                      <IconLink className="h-3.5 w-3.5" />
+                      {isBusy ? "Vinculando…" : "Vincular"}
+                    </Button>
                   ) : (
                     <Badge variant="outline" className="text-muted-foreground">
                       Sem usuário

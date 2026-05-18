@@ -130,3 +130,5 @@ export {
 export * from "./services/deployment";
 export * from "./platform-utils";
 export * from "./push-notifications";
+export { reconciliationService } from "./reconciliation";
+export { siegService } from "./sieg";

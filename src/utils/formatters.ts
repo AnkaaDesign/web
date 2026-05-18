@@ -37,6 +37,20 @@ export const formatCPF = (cpf: string): string => {
   return cleaned.substring(0, 11).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
 };
 
+export const formatCnpjCpf = (value: string | null | undefined): string => {
+  if (!value) return "";
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 14) return formatCNPJ(digits);
+  if (digits.length === 11) return formatCPF(digits);
+  return value;
+};
+
+export const formatAccountNumber = (raw: string | null | undefined): string => {
+  if (!raw) return "—";
+  const trimmed = raw.replace(/^0+/, "") || "0";
+  return trimmed.length > 1 ? `${trimmed.slice(0, -1)}-${trimmed.slice(-1)}` : trimmed;
+};
+
 export const formatCNPJ = (cnpj: string): string => {
   const cleaned = cnpj.replace(/\D/g, "");
 

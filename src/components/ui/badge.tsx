@@ -12,7 +12,8 @@ const badgeVariants = cva(
         // ===== NEUTRAL VARIANTS =====
         default: "border-transparent bg-neutral-500 text-white hover:bg-neutral-600",
         secondary: "border-transparent bg-neutral-200 text-neutral-900 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600",
-        muted: "border-transparent bg-neutral-400 text-white hover:bg-neutral-500",
+        muted:
+          "border-transparent bg-neutral-200 text-neutral-800 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600",
         outline: "bg-transparent text-neutral-900 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-border",
 
         // ===== CORE SEMANTIC VARIANTS =====
@@ -53,7 +54,7 @@ const badgeVariants = cva(
         teal: "border-transparent bg-teal-500 text-white hover:bg-teal-600",
         indigo: "border-transparent bg-indigo-600 text-white hover:bg-indigo-700",
         pink: "border-transparent bg-pink-600 text-white hover:bg-pink-700",
-        yellow: "border-transparent bg-yellow-500 text-white hover:bg-yellow-600",
+        yellow: "border-transparent bg-yellow-400 text-yellow-950 hover:bg-yellow-500",
         amber: "border-transparent bg-amber-500 text-white hover:bg-amber-600",
         blue: "border-transparent bg-blue-600 text-white hover:bg-blue-700",
         orange: "border-transparent bg-orange-500 text-white hover:bg-orange-600",

@@ -124,6 +124,13 @@ export const routes = {
       detail: (id: number) => `/financeiro/notas-fiscais/${id}`,
       root: "/financeiro/notas-fiscais",
     },
+    reconciliation: {
+      root: "/financeiro/conciliacao",
+      statements: "/financeiro/conciliacao/extratos",
+      statementDetail: (id: string) => `/financeiro/conciliacao/extratos/${id}`,
+      transactions: "/financeiro/conciliacao/transacoes",
+      fiscalDocuments: "/financeiro/conciliacao/notas",
+    },
     root: "/financeiro",
   },
 
@@ -581,6 +588,7 @@ export const routes = {
       collection: "/estatisticas/financeiro/cobrancas",
       revenueQuotes: "/estatisticas/financeiro/receita-orcamentos",
       nfse: "/estatisticas/financeiro/nfse",
+      reconciliation: "/estatisticas/financeiro/conciliacao",
     },
     humanResources: {
       root: "/estatisticas/recursos-humanos",

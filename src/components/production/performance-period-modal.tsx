@@ -47,6 +47,10 @@ interface PerformancePeriodModalProps {
   // 'collaborators' shows only the per-user attribution, 'both' shows
   // them side-by-side (the chart-click default).
   mode?: 'tasks' | 'collaborators' | 'both';
+  // sectorId → hex color, mirroring the chart's bar colors. When provided
+  // and >1 sector is present, names are tinted by sector and the default
+  // sort becomes sector-then-tasks.
+  sectorColorMap?: Record<string, string>;
 }
 
 // Business period: month M = 26th of M-1 through 25th of M; year Y = the
@@ -83,12 +87,23 @@ export function PerformancePeriodModal({
   avgPerformance,
   users,
   mode = 'both',
+  sectorColorMap,
 }: PerformancePeriodModalProps) {
   const showTasks = mode === 'tasks' || mode === 'both';
   const showCollaborators = mode === 'collaborators' || mode === 'both';
   const { from, to } = getBusinessPeriodRange(period);
-  const [sortKey, setSortKey] = useState<UserSortKey>('tasks');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  // Tint names by sector only when comparing >1 sector that's actually
+  // represented in the result set (otherwise everyone would share one color).
+  const multiSector = useMemo(() => {
+    if (!sectorColorMap) return false;
+    const seen = new Set<string>();
+    for (const u of users) if (u.sectorId) seen.add(u.sectorId);
+    return seen.size > 1;
+  }, [sectorColorMap, users]);
+
+  const [sortKey, setSortKey] = useState<UserSortKey>(multiSector ? 'sector' : 'tasks');
+  const [sortDir, setSortDir] = useState<SortDir>(multiSector ? 'asc' : 'desc');
   const [search, setSearch] = useState('');
   const [taskSearch, setTaskSearch] = useState('');
 
@@ -100,19 +115,32 @@ export function PerformancePeriodModal({
         status: [TASK_STATUS.COMPLETED],
         ...(sectorIds?.length ? { sectorIds } : {}),
         limit: 100,
-        include: { truck: true, customer: true },
+        include: { truck: true, customer: true, sector: true },
       } as any),
     enabled: open && showTasks,
   });
 
   const rawTasks: any[] = (tasksQuery.data as any)?.data ?? [];
+  // Group by sector then finishedAt desc when comparing >1 sector, so the
+  // task list reads the same way as the colaboradores column on the right.
+  const multiSectorTasks = useMemo(() => {
+    if (!sectorColorMap) return false;
+    const seen = new Set<string>();
+    for (const t of rawTasks) if (t.sectorId) seen.add(t.sectorId);
+    return seen.size > 1;
+  }, [sectorColorMap, rawTasks]);
+
   const tasks = useMemo(
     () => [...rawTasks].sort((a, b) => {
+      if (multiSectorTasks) {
+        const s = (a.sector?.name ?? '').localeCompare(b.sector?.name ?? '');
+        if (s !== 0) return s;
+      }
       const da = a.finishedAt ? new Date(a.finishedAt).getTime() : 0;
       const db = b.finishedAt ? new Date(b.finishedAt).getTime() : 0;
       return db - da;
     }),
-    [rawTasks],
+    [rawTasks, multiSectorTasks],
   );
 
   const toggleSort = (key: UserSortKey) => {
@@ -144,13 +172,20 @@ export function PerformancePeriodModal({
     const sign = sortDir === 'asc' ? 1 : -1;
     const arr = [...filteredUsers];
     arr.sort((a, b) => {
+      // Sector grouping: tasks desc within each sector (independent of sortDir
+      // so the rows always read "biggest first" inside the group, matching
+      // the way the chart is read).
+      if (sortKey === 'sector') {
+        const s = (a.sectorName ?? '').localeCompare(b.sectorName ?? '');
+        if (s !== 0) return s * sign;
+        return b.tasksAllocated - a.tasksAllocated;
+      }
       let cmp = 0;
       switch (sortKey) {
         case 'tasks':       cmp = a.tasksAllocated - b.tasksAllocated; break;
         case 'workingDays': cmp = a.workingDays - b.workingDays; break;
         case 'rank':        cmp = a.rank - b.rank; break;
         case 'name':        cmp = a.userName.localeCompare(b.userName); break;
-        case 'sector':      cmp = (a.sectorName ?? '').localeCompare(b.sectorName ?? ''); break;
       }
       if (cmp === 0) cmp = a.userName.localeCompare(b.userName);
       return cmp * sign;
@@ -219,27 +254,34 @@ export function PerformancePeriodModal({
           {/* LEFT: Tarefas concluídas */}
           {showTasks && (
           <div className={`flex flex-col min-h-0 ${showCollaborators ? 'border-r' : ''}`}>
-            <div className="flex-shrink-0 px-6 py-3 border-b bg-muted/30">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <IconChecks className="h-4 w-4 text-blue-400" />
-                  <span className="font-medium">Tarefas concluídas</span>
+            {mode === 'both' && (
+              <div className="flex-shrink-0 px-6 py-3 border-b bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <IconChecks className="h-4 w-4 text-blue-400" />
+                    <span className="font-medium">Tarefas concluídas</span>
+                  </div>
+                  {!tasksLoading && !tasksError && taskSearch.trim() && (
+                    <span className="text-xs text-foreground/65">
+                      mostrando {filteredTasks.length} de {tasks.length}
+                    </span>
+                  )}
                 </div>
-                {!tasksLoading && !tasksError && taskSearch.trim() && (
-                  <span className="text-xs text-foreground/65">
-                    mostrando {filteredTasks.length} de {tasks.length}
-                  </span>
-                )}
               </div>
-            </div>
-            <div className="flex-shrink-0 px-6 py-3 border-b">
+            )}
+            <div className="flex-shrink-0 px-6 py-3 border-b flex items-center justify-between gap-3">
               <Input
                 type="text"
                 value={taskSearch}
                 onChange={v => setTaskSearch(v == null ? '' : String(v))}
                 placeholder="Buscar tarefa ou cliente..."
-                className="w-full"
+                className="flex-1"
               />
+              {mode !== 'both' && !tasksLoading && !tasksError && taskSearch.trim() && (
+                <span className="text-xs text-foreground/65 shrink-0">
+                  {filteredTasks.length} de {tasks.length}
+                </span>
+              )}
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto">
@@ -278,9 +320,16 @@ export function PerformancePeriodModal({
                       const finished = task.finishedAt
                         ? format(new Date(task.finishedAt), 'dd/MM', { locale: ptBR })
                         : '—';
+                      const taskSectorColor = multiSectorTasks && task.sectorId
+                        ? sectorColorMap?.[task.sectorId]
+                        : undefined;
                       return (
                         <TableRow key={task.id} className="text-sm">
-                          <TableCell className="font-medium max-w-[220px] truncate">
+                          <TableCell
+                            className="font-medium max-w-[220px] truncate"
+                            style={taskSectorColor ? { color: taskSectorColor } : undefined}
+                            title={taskSectorColor ? (task.sector?.name ?? undefined) : undefined}
+                          >
                             {taskLabel(task)}
                           </TableCell>
                           <TableCell className="text-foreground/85 max-w-[180px] truncate">
@@ -302,27 +351,34 @@ export function PerformancePeriodModal({
           {/* RIGHT: Colaboradores */}
           {showCollaborators && (
           <div className="flex flex-col min-h-0">
-            <div className="flex-shrink-0 px-6 py-3 border-b bg-muted/30">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <IconUsers className="h-4 w-4 text-emerald-400" />
-                  <span className="font-medium">Colaboradores</span>
+            {mode === 'both' && (
+              <div className="flex-shrink-0 px-6 py-3 border-b bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <IconUsers className="h-4 w-4 text-emerald-400" />
+                    <span className="font-medium">Colaboradores</span>
+                  </div>
+                  {search.trim() && (
+                    <span className="text-xs text-foreground/65">
+                      mostrando {sortedUsers.length} de {users.length}
+                    </span>
+                  )}
                 </div>
-                {search.trim() && (
-                  <span className="text-xs text-foreground/65">
-                    mostrando {sortedUsers.length} de {users.length}
-                  </span>
-                )}
               </div>
-            </div>
-            <div className="flex-shrink-0 px-6 py-3 border-b">
+            )}
+            <div className="flex-shrink-0 px-6 py-3 border-b flex items-center justify-between gap-3">
               <Input
                 type="text"
                 value={search}
                 onChange={v => setSearch(v == null ? '' : String(v))}
                 placeholder="Buscar por nome, cargo ou setor..."
-                className="w-full"
+                className="flex-1"
               />
+              {mode !== 'both' && search.trim() && (
+                <span className="text-xs text-foreground/65 shrink-0">
+                  {sortedUsers.length} de {users.length}
+                </span>
+              )}
             </div>
 
             <div className="flex-1 min-h-0 overflow-auto">
@@ -351,9 +407,17 @@ export function PerformancePeriodModal({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    sortedUsers.map(u => (
+                    sortedUsers.map(u => {
+                      const sectorColor = multiSector && u.sectorId
+                        ? sectorColorMap?.[u.sectorId]
+                        : undefined;
+                      return (
                       <TableRow key={u.userId} className="text-sm">
-                        <TableCell className="font-medium whitespace-nowrap">
+                        <TableCell
+                          className="font-medium whitespace-nowrap"
+                          style={sectorColor ? { color: sectorColor } : undefined}
+                          title={sectorColor ? (u.sectorName ?? undefined) : undefined}
+                        >
                           {u.userName}
                         </TableCell>
                         <TableCell className="text-xs text-foreground/80 whitespace-nowrap">
@@ -366,7 +430,8 @@ export function PerformancePeriodModal({
                           {u.tasksAllocated.toFixed(2)}
                         </TableCell>
                       </TableRow>
-                    ))
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

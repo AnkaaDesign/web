@@ -6,7 +6,6 @@ export { ItemBrandSelector } from "./brand-selector";
 export { CategorySelector } from "./category-selector";
 export { ItemSupplierSelector } from "./supplier-selector";
 export { QuantityInput } from "./quantity-input";
-export { MaxQuantityInput } from "./max-quantity-input";
 export { BoxQuantityInput } from "./box-quantity-input";
 export { LeadTimeInput } from "./lead-time-input";
 export { PriceInput } from "./price-input";

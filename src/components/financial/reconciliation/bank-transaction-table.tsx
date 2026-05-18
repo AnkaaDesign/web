@@ -1,0 +1,286 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  IconArrowUpRight,
+  IconCash,
+  IconEye,
+  IconLink,
+  IconLinkOff,
+  IconBan,
+} from "@tabler/icons-react";
+import {
+  StandardizedTable,
+  type StandardizedColumn,
+} from "@/components/ui/standardized-table";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
+import { MatchStatusBadge } from "./match-status-badge";
+import { routes } from "@/constants";
+import { formatCNPJ, formatCnpjCpf, formatCurrency, formatDate } from "@/utils";
+import type { BankTransaction } from "@/types/reconciliation";
+
+interface Props {
+  data: BankTransaction[];
+  isLoading?: boolean;
+  totalPages?: number;
+  totalRecords?: number;
+  page?: number;
+  pageSize?: number;
+  onPageChange?: (p: number) => void;
+  onPageSizeChange?: (s: number) => void;
+  emptyMessage?: string;
+  emptyIcon?: React.ElementType;
+  /** Shows a column with the source statement period — useful in the global
+   *  Transações view, redundant on the per-statement detail page. */
+  showStatementColumn?: boolean;
+  selectable?: boolean;
+  isSelected?: (id: string) => boolean;
+  onSelectionChange?: (id: string) => void;
+  allSelected?: boolean;
+  partiallySelected?: boolean;
+  onSelectAll?: () => void;
+  onMatch?: (tx: BankTransaction) => void;
+  onUnmatch?: (tx: BankTransaction) => void;
+  onIgnore?: (tx: BankTransaction) => void;
+  onViewDetails?: (tx: BankTransaction) => void;
+}
+
+export function BankTransactionTable({
+  data,
+  isLoading,
+  totalPages,
+  totalRecords,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+  emptyMessage = "Nenhuma transação encontrada",
+  emptyIcon = IconCash,
+  showStatementColumn = false,
+  selectable,
+  isSelected,
+  onSelectionChange,
+  allSelected,
+  partiallySelected,
+  onSelectAll,
+  onMatch,
+  onUnmatch,
+  onIgnore,
+  onViewDetails,
+}: Props) {
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    tx: BankTransaction;
+  } | null>(null);
+
+  const closeContextMenu = () => setContextMenu(null);
+
+  const columns: StandardizedColumn<BankTransaction>[] = [
+    {
+      key: "postedAt",
+      header: "Data",
+      sortable: true,
+      render: t => <span className="whitespace-nowrap">{formatDate(t.postedAt)}</span>,
+    },
+    ...(showStatementColumn
+      ? ([
+          {
+            key: "statement",
+            header: "Extrato",
+            render: t =>
+              t.statement ? (
+                <span className="whitespace-nowrap text-xs text-muted-foreground">
+                  {formatDate(t.statement.periodStart)} – {formatDate(t.statement.periodEnd)}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              ),
+          },
+        ] as StandardizedColumn<BankTransaction>[])
+      : []),
+    {
+      key: "type",
+      header: "Tipo",
+      render: t => (
+        <Badge variant={t.type === "CREDIT" ? "completed" : "cancelled"} size="sm">
+          {t.type === "CREDIT" ? "Crédito" : "Débito"}
+        </Badge>
+      ),
+    },
+    {
+      key: "subtype",
+      header: "Forma",
+      render: t => <span className="text-xs text-muted-foreground">{t.subtype}</span>,
+    },
+    {
+      key: "amount",
+      header: "Valor",
+      align: "right",
+      sortable: true,
+      render: t => (
+        <span
+          className={`font-semibold tabular-nums ${
+            t.type === "CREDIT" ? "text-emerald-700" : "text-red-700"
+          }`}
+        >
+          {formatCurrency(t.amount)}
+        </span>
+      ),
+    },
+    {
+      key: "memo",
+      header: "Descrição",
+      render: t => (
+        <span className="block max-w-md truncate" title={t.memo || ""}>
+          {t.memo || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "counterparty",
+      header: "Contraparte",
+      render: t => (
+        <span className="block max-w-xs truncate">
+          {t.counterpartyName ||
+            (t.counterpartyCnpjCpf ? formatCnpjCpf(t.counterpartyCnpjCpf) : "—")}
+        </span>
+      ),
+    },
+    {
+      key: "linkedNf",
+      header: "NF vinculada",
+      render: t => {
+        const firstDoc = t.matches?.find(m => m.fiscalDocument)?.fiscalDocument;
+        const extraCount = (t.matches?.filter(m => m.fiscalDocument).length ?? 0) - 1;
+        if (!firstDoc?.id) {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        const emitDisplay = firstDoc.emitName
+          ? firstDoc.emitName
+          : firstDoc.emitCnpj
+            ? formatCNPJ(firstDoc.emitCnpj)
+            : "NF";
+        return (
+          <Link
+            to={`${routes.financial.reconciliation.fiscalDocuments}?nfId=${firstDoc.id}`}
+            onClick={e => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline max-w-[14rem] truncate"
+            title={emitDisplay}
+          >
+            <span className="truncate">{emitDisplay}</span>
+            {extraCount > 0 && (
+              <span className="text-muted-foreground">(+{extraCount})</span>
+            )}
+            <IconArrowUpRight className="h-3 w-3 flex-shrink-0" />
+          </Link>
+        );
+      },
+    },
+    {
+      key: "matchStatus",
+      header: "Status",
+      render: t => {
+        const conf = t.matches?.[0]?.confidenceScore;
+        return <MatchStatusBadge status={t.matchStatus} confidence={conf} />;
+      },
+    },
+  ];
+
+  const ctxTx = contextMenu?.tx;
+  const ctxHasMatches = (ctxTx?.matches?.length ?? 0) > 0;
+
+  return (
+    <>
+      <StandardizedTable
+        columns={columns}
+        data={data}
+        getItemKey={t => t.id}
+        isLoading={isLoading}
+        emptyMessage={emptyMessage}
+        emptyIcon={emptyIcon}
+        currentPage={page}
+        totalPages={totalPages}
+        totalRecords={totalRecords}
+        pageSize={pageSize}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        isSelected={selectable ? isSelected : undefined}
+        onSelectionChange={selectable ? onSelectionChange : undefined}
+        onSelectAll={selectable ? onSelectAll : undefined}
+        allSelected={allSelected}
+        partiallySelected={partiallySelected}
+        onRowClick={onViewDetails}
+        onContextMenu={(e, tx) => {
+          e.preventDefault();
+          setContextMenu({ x: e.clientX, y: e.clientY, tx });
+        }}
+      />
+
+      {contextMenu && ctxTx && (
+        <DropdownMenu open onOpenChange={open => !open && closeContextMenu()}>
+          <PositionedDropdownMenuContent
+            position={contextMenu}
+            isOpen
+            className="w-56"
+            onCloseAutoFocus={e => e.preventDefault()}
+          >
+            {onViewDetails && (
+              <DropdownMenuItem
+                onClick={() => {
+                  onViewDetails(ctxTx);
+                  closeContextMenu();
+                }}
+              >
+                <IconEye className="h-4 w-4 mr-2" />
+                Ver detalhes
+              </DropdownMenuItem>
+            )}
+            {onMatch && ctxTx.matchStatus !== "MANUAL_MATCHED" && (
+              <DropdownMenuItem
+                onClick={() => {
+                  onMatch(ctxTx);
+                  closeContextMenu();
+                }}
+              >
+                <IconLink className="h-4 w-4 mr-2" />
+                Conciliar manualmente
+              </DropdownMenuItem>
+            )}
+            {onUnmatch && ctxHasMatches && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    onUnmatch(ctxTx);
+                    closeContextMenu();
+                  }}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <IconLinkOff className="h-4 w-4 mr-2" />
+                  Desfazer conciliação
+                </DropdownMenuItem>
+              </>
+            )}
+            {onIgnore && ctxTx.matchStatus !== "IGNORED" && (
+              <DropdownMenuItem
+                onClick={() => {
+                  onIgnore(ctxTx);
+                  closeContextMenu();
+                }}
+              >
+                <IconBan className="h-4 w-4 mr-2" />
+                Ignorar
+              </DropdownMenuItem>
+            )}
+          </PositionedDropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </>
+  );
+}

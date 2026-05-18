@@ -16,7 +16,6 @@ import { StatusToggle } from "@/components/inventory/item/form/status-toggle";
 import { ItemBrandSelector } from "@/components/inventory/item/form/brand-selector";
 import { ItemSupplierSelector } from "@/components/inventory/item/form/supplier-selector";
 import { QuantityInput } from "@/components/inventory/item/form/quantity-input";
-import { MaxQuantityInput } from "@/components/inventory/item/form/max-quantity-input";
 import { BoxQuantityInput } from "@/components/inventory/item/form/box-quantity-input";
 import { LeadTimeInput } from "@/components/inventory/item/form/lead-time-input";
 import { PriceInput } from "@/components/inventory/item/form/price-input";
@@ -242,11 +241,6 @@ export function EpiForm(props: EpiFormProps) {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <QuantityInput disabled={isSubmitting} required={isRequired} />
-                  <MaxQuantityInput
-                    disabled={isSubmitting}
-                    currentValue={defaultValues?.maxQuantity}
-                    isManual={defaultValues?.isManualMaxQuantity || false}
-                  />
                   <BoxQuantityInput disabled={isSubmitting} />
                   <LeadTimeInput disabled={isSubmitting} />
                 </div>

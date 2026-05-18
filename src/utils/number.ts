@@ -4,10 +4,21 @@
 // Currency Formatting
 // =====================
 
-export const formatCurrency = (value: number, locale: string = "pt-BR", currency: string = "BRL"): string => {
+export const formatCurrency = (
+  value: number,
+  locale: string = "pt-BR",
+  currency: string = "BRL",
+  // Allow opting in to extra precision (e.g. order item unit prices that the
+  // supplier quotes per-cento/dúzia and resolve to 3 decimal places per unit).
+  fractionDigits?: number,
+): string => {
   return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: currency,
+    currency,
+    ...(fractionDigits !== undefined && {
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    }),
   }).format(value);
 };
 

@@ -1960,6 +1960,7 @@ export enum FAVORITE_PAGES {
   ESTATISTICAS_FINANCEIRO_BOLETOS = "/estatisticas/financeiro/boletos",
   ESTATISTICAS_FINANCEIRO_RECEITA = "/estatisticas/financeiro/receita-orcamentos",
   ESTATISTICAS_FINANCEIRO_NFSE = "/estatisticas/financeiro/nfse",
+  ESTATISTICAS_FINANCEIRO_CONCILIACAO = "/estatisticas/financeiro/conciliacao",
   // Advanced Analytics
   ESTATISTICAS_ANALYTICS_PREDITIVA = "/estatisticas/analytics/preditiva",
   ESTATISTICAS_ANALYTICS_COMPARATIVA = "/estatisticas/analytics/comparativa",
@@ -2045,6 +2046,9 @@ export enum FAVORITE_PAGES {
   FINANCEIRO_FATURAMENTO = "/financeiro/faturamento",
   FINANCEIRO_ORCAMENTO = "/financeiro/orcamento",
   FINANCEIRO_ORCAMENTO_CADASTRAR = "/financeiro/orcamento/cadastrar",
+  FINANCEIRO_CONCILIACAO_EXTRATOS = "/financeiro/conciliacao/extratos",
+  FINANCEIRO_CONCILIACAO_TRANSACOES = "/financeiro/conciliacao/transacoes",
+  FINANCEIRO_CONCILIACAO_NOTAS = "/financeiro/conciliacao/notas",
 
   // Human Resources - List Pages
   RECURSOS_HUMANOS_CARGOS_LISTAR = "/recursos-humanos/cargos",

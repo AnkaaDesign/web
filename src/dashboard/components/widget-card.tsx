@@ -103,7 +103,7 @@ export function WidgetCard({
           )}
         </div>
       )}
-      <div className="flex-1 min-h-0 overflow-auto">{children}</div>
+      <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
       {renderFooter && (
         <div className="relative flex items-center justify-center px-3 h-7 border-t border-border shrink-0 bg-muted/30">
           {viewAllHref && (

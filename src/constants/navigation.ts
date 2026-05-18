@@ -114,6 +114,8 @@ export const TABLER_ICONS = {
   calendarDollar: "IconCalendarDollar",
   calendarOff: "IconCalendarOff",
   arrowsExchange: "IconArrowsExchange",
+  arrowsExchange2: "IconArrowsExchange2",
+  fileSpreadsheet: "IconFileSpreadsheet",
   schedule: "IconCalendarPlus",
   automation: "IconBolt",
 
@@ -610,6 +612,18 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "orcamento-detalhes", title: "Detalhes", icon: "eye", path: "/financeiro/orcamento/detalhes/:id", isDynamic: true },
         ],
       },
+      {
+        id: "conciliacao-bancaria",
+        title: "Conciliação Bancária",
+        icon: "arrowsExchange2",
+        path: "/financeiro/conciliacao/extratos",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL],
+        children: [
+          { id: "conciliacao-extratos", title: "Extratos", icon: "fileSpreadsheet", path: "/financeiro/conciliacao/extratos" },
+          { id: "conciliacao-transacoes", title: "Transações", icon: "list", path: "/financeiro/conciliacao/transacoes" },
+          { id: "conciliacao-notas", title: "Notas Fiscais", icon: "receipt", path: "/financeiro/conciliacao/notas" },
+        ],
+      },
     ],
   },
 
@@ -649,8 +663,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         icon: "dollarSign",
         path: "/estatisticas/financeiro",
         children: [
-          { id: "stats-financeiro-receita-orcamentos", title: "Receita & Orçamentos", icon: "coins", path: "/estatisticas/financeiro/receita-orcamentos" },
-          { id: "stats-financeiro-cobrancas", title: "Cobranças & Fluxo de Caixa", icon: "chartBar", path: "/estatisticas/financeiro/cobrancas" },
+          { id: "stats-financeiro-cobrancas", title: "Visão Financeira", icon: "chartBar", path: "/estatisticas/financeiro/cobrancas" },
           { id: "stats-financeiro-nfse", title: "NFS-e", icon: "receipt", path: "/estatisticas/financeiro/nfse" },
         ],
       },

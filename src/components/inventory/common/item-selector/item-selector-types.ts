@@ -150,6 +150,39 @@ export interface ItemSelectorTableProps {
   onSearchTermChange?: (term: string) => void;
   /** Handler for filter changes */
   onFiltersChange?: (filters: Partial<ItemGetManyFormData>) => void;
+
+  // Temporary items support — when these props are passed in, the selector
+  // shows a sticky first-row form for adding free-text items to the order
+  // alongside inventory selections.
+  /** When true, render the sticky temporary-item entry row + pinned temp item rows */
+  enableTemporaryItems?: boolean;
+  /** Currently added temporary items (rendered as pinned rows above inventory) */
+  temporaryItems?: TemporaryItemRow[];
+  /** Add a new temporary item — return value is the new item's key (used for focus management) */
+  onTemporaryItemAdd?: (item: Omit<TemporaryItemRow, "key">) => string | void;
+  /** Patch a temporary item identified by its stable key */
+  onTemporaryItemUpdate?: (key: string, updates: Partial<Omit<TemporaryItemRow, "key">>) => void;
+  /** Remove a temporary item by key */
+  onTemporaryItemRemove?: (key: string) => void;
+}
+
+/**
+ * Temporary item carried directly inside the order form (no inventory itemId).
+ * Rendered as pinned rows above the paginated inventory items.
+ * Optional metadata fields, when filled, get composed into the final
+ * description sent to the API at submit time.
+ */
+export interface TemporaryItemRow {
+  key: string;
+  temporaryItemDescription: string;
+  orderedQuantity: number;
+  price: number;
+  icms: number;
+  ipi: number;
+  uniCode?: string;
+  brand?: string;
+  category?: string;
+  measures?: string;
 }
 
 /**

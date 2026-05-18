@@ -1,7 +1,7 @@
 // packages/interfaces/src/item.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, BaseMergeResponse } from "./common";
-import type { MEASURE_UNIT, ORDER_BY_DIRECTION, ABC_CATEGORY, XYZ_CATEGORY, PPE_TYPE, PPE_SIZE, PPE_DELIVERY_MODE, ITEM_CATEGORY_TYPE } from "../constants";
+import type { MEASURE_UNIT, ORDER_BY_DIRECTION, ABC_CATEGORY, XYZ_CATEGORY, PPE_TYPE, PPE_SIZE, PPE_DELIVERY_MODE, ITEM_CATEGORY_TYPE, STOCK_LEVEL } from "../constants";
 import type { Supplier, SupplierIncludes, SupplierOrderBy } from "./supplier";
 import type { Activity, ActivityIncludes } from "./activity";
 import type { Borrow, BorrowIncludes } from "./borrow";
@@ -50,8 +50,6 @@ export interface Item extends BaseEntity {
   maxQuantity: number | null;
   reorderPoint: number | null;
   reorderQuantity: number | null;
-  isManualMaxQuantity: boolean;
-  isManualReorderPoint: boolean;
   lastAutoOrderDate: Date | null;
   boxQuantity: number | null;
   icms: number;
@@ -70,6 +68,10 @@ export interface Item extends BaseEntity {
   abcCategoryOrder: number | null;
   xyzCategory: XYZ_CATEGORY | null;
   xyzCategoryOrder: number | null;
+
+  // Computed by the API (algorithm-spec §15 / §18)
+  stockLevel?: STOCK_LEVEL;
+  hasActiveOrder?: boolean;
 
   // PPE-specific fields (when item is a PPE)
   ppeType: PPE_TYPE | null;

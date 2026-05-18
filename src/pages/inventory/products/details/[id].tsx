@@ -7,6 +7,7 @@ import { SpecificationsCard } from "@/components/inventory/item/detail/specifica
 import { RelatedItemsCard } from "@/components/inventory/item/detail/related-items-card";
 import { ActivityHistoryCard } from "@/components/inventory/item/detail/activity-history-card";
 import { MetricsCard } from "@/components/inventory/item/detail/metrics-card";
+import { CalculationBreakdownCard } from "@/components/inventory/item/detail/calculation-breakdown-card";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { PageHeader } from "@/components/ui/page-header";
 import { PpeInfoCard } from "@/components/inventory/item/detail/ppe-info-card";
@@ -207,6 +208,9 @@ const ProductDetailsPage = () => {
             {/* Core Information Grid - Specifications and Metrics */}
             <SpecificationsCard item={item} />
             <MetricsCard item={item} />
+
+            {/* Stock calculation breakdown — read-only, computed by the API */}
+            <CalculationBreakdownCard item={item} />
 
             {/* PPE Information - Show only if item is a PPE */}
             {item.ppeType && (

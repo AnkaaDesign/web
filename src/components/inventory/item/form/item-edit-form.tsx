@@ -26,8 +26,6 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
       reorderPoint: item.reorderPoint,
       reorderQuantity: item.reorderQuantity,
       maxQuantity: item.maxQuantity,
-      isManualMaxQuantity: item.isManualMaxQuantity ?? false,
-      isManualReorderPoint: item.isManualReorderPoint ?? false,
       boxQuantity: item.boxQuantity,
       icms: item.icms,
       ipi: item.ipi,
@@ -71,10 +69,6 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
     // PPE fields that should be sent together when any of them changes
     const ppeFields = ['ppeType', 'ppeSize', 'ppeCA', 'ppeDeliveryMode', 'ppeStandardQuantity', 'measures'] as const;
 
-    // Stock control fields that should be sent together (manual flag + value)
-    const maxQuantityFields = ['maxQuantity', 'isManualMaxQuantity'] as const;
-    const reorderPointFields = ['reorderPoint', 'isManualReorderPoint'] as const;
-
     // Check each field for changes
     Object.keys(data).forEach((key) => {
       const typedKey = key as keyof ItemUpdateFormData;
@@ -99,26 +93,6 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
     const hasPpeFieldChanged = ppeFields.some(field => field in changedFields);
     if (hasPpeFieldChanged) {
       ppeFields.forEach(field => {
-        if (!(field in changedFields) && field in data) {
-          changedFields[field] = (data as any)[field];
-        }
-      });
-    }
-
-    // If maxQuantity or isManualMaxQuantity changed, include both fields
-    const hasMaxQuantityFieldChanged = maxQuantityFields.some(field => field in changedFields);
-    if (hasMaxQuantityFieldChanged) {
-      maxQuantityFields.forEach(field => {
-        if (!(field in changedFields) && field in data) {
-          changedFields[field] = (data as any)[field];
-        }
-      });
-    }
-
-    // If reorderPoint or isManualReorderPoint changed, include both fields
-    const hasReorderPointFieldChanged = reorderPointFields.some(field => field in changedFields);
-    if (hasReorderPointFieldChanged) {
-      reorderPointFields.forEach(field => {
         if (!(field in changedFields) && field in data) {
           changedFields[field] = (data as any)[field];
         }

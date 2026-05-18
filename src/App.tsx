@@ -73,6 +73,11 @@ const FinancialBudgetCreate = lazy(() => import("@/pages/financial/budget/create
 const FinancialBudgetDetail = lazy(() => import("@/pages/financial/budget/details/[taskId]").then((module) => ({ default: module.FinancialBudgetDetailPage })));
 const FinancialNfseList = lazy(() => import("@/pages/financial/nfse/list").then((module) => ({ default: module.NfseListPage })));
 const FinancialNfseDetail = lazy(() => import("@/pages/financial/nfse/detail").then((module) => ({ default: module.NfseDetailPage })));
+const ReconciliationStatementsList = lazy(() => import("@/pages/financial/reconciliation/statements-list").then((module) => ({ default: module.ReconciliationStatementsListPage })));
+const ReconciliationStatementDetail = lazy(() => import("@/pages/financial/reconciliation/statement-detail").then((module) => ({ default: module.ReconciliationStatementDetailPage })));
+const ReconciliationTransactionsList = lazy(() => import("@/pages/financial/reconciliation/transactions-list").then((module) => ({ default: module.ReconciliationTransactionsListPage })));
+const ReconciliationFiscalDocumentsList = lazy(() => import("@/pages/financial/reconciliation/fiscal-documents-list").then((module) => ({ default: module.ReconciliationFiscalDocumentsListPage })));
+const ReconciliationStatistics = lazy(() => import("@/pages/financial/statistics/reconciliation").then((module) => ({ default: module.ReconciliationStatisticsPage })));
 const FinancialCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
 const FinancialCustomersBatchEdit = lazy(() => import("@/pages/administration/customers/batch-edit").then((module) => ({ default: module.CustomerBatchEditPage })));
 
@@ -217,8 +222,10 @@ const ProductionBottlenecksStatistics = lazy(() => import("@/pages/production/st
 const ProductionBonusValueStatistics = lazy(() => import("@/pages/production/statistics/bonus-value").then((module) => ({ default: module.default })));
 
 // Financial Statistics
-const FinancialCollectionStatistics = lazy(() => import("@/pages/financial/statistics/collection").then((module) => ({ default: module.default })));
-const FinancialRevenueQuotesStatistics = lazy(() => import("@/pages/financial/statistics/revenue-quotes").then((module) => ({ default: module.default })));
+// Cobranças/Receita merged into a single unified "Visão Financeira" page (collection.tsx).
+// The legacy /receita-orcamentos URL remains live and resolves to the same component
+// so saved favorites and bookmarks keep working.
+const FinancialOverviewStatistics = lazy(() => import("@/pages/financial/statistics/collection").then((module) => ({ default: module.default })));
 const FinancialNfseStatistics = lazy(() => import("@/pages/financial/statistics/nfse").then((module) => ({ default: module.default })));
 
 // HR Statistics
@@ -1100,6 +1107,42 @@ function App() {
                   }
                 />
                 <Route
+                  path={routes.financial.reconciliation.root}
+                  element={<Navigate to={routes.financial.reconciliation.statements} replace />}
+                />
+                <Route
+                  path={routes.financial.reconciliation.statements}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationStatementsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="/financeiro/conciliacao/extratos/:id"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationStatementDetail />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.reconciliation.transactions}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationTransactionsList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.reconciliation.fiscalDocuments}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ReconciliationFiscalDocumentsList />
+                    </Suspense>
+                  }
+                />
+                <Route
                   path={routes.financial.budget.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -1159,17 +1202,22 @@ function App() {
                   element={<Suspense fallback={<PageLoader />}><ProductionBonusValueStatistics /></Suspense>}
                 />
                 {/* Financial Statistics routes */}
+                {/* /cobrancas + /receita-orcamentos both mount the unified Visão Financeira page */}
                 <Route
                   path={routes.statistics.financial.collection}
-                  element={<Suspense fallback={<PageLoader />}><FinancialCollectionStatistics /></Suspense>}
+                  element={<Suspense fallback={<PageLoader />}><FinancialOverviewStatistics /></Suspense>}
                 />
                 <Route
                   path={routes.statistics.financial.revenueQuotes}
-                  element={<Suspense fallback={<PageLoader />}><FinancialRevenueQuotesStatistics /></Suspense>}
+                  element={<Suspense fallback={<PageLoader />}><FinancialOverviewStatistics /></Suspense>}
                 />
                 <Route
                   path={routes.statistics.financial.nfse}
                   element={<Suspense fallback={<PageLoader />}><FinancialNfseStatistics /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.financial.reconciliation}
+                  element={<Suspense fallback={<PageLoader />}><ReconciliationStatistics /></Suspense>}
                 />
 
                 {/* HR Statistics routes */}

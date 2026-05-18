@@ -935,7 +935,19 @@ const ConsumptionPage = () => {
     enabled: goalMetric !== null,
   });
 
-  const goalValue = goalOverride ?? defaultGoal.value;
+  // Multi-entity temporal mode renders ONE chart line per selected sector (or
+  // user). The company-wide consumption budget must be averaged across them
+  // so each line is compared against a fair per-entity share.
+  const goalEntitySplit = isMultiEntityTemporal
+    ? Math.max(1, multiEntityIds.length)
+    : 1;
+
+  const goalValue = useMemo(() => {
+    const raw = goalOverride ?? defaultGoal.value;
+    if (raw == null) return null;
+    return goalEntitySplit > 1 ? raw / goalEntitySplit : raw;
+  }, [goalOverride, defaultGoal.value, goalEntitySplit]);
+
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 

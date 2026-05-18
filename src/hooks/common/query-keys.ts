@@ -900,3 +900,34 @@ export const teamStaffKeys = {
 };
 
 // =====================================================
+// Bank Reconciliation Query Keys
+// =====================================================
+export const reconciliationKeys = {
+  all: ["reconciliation"] as const,
+  statements: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["reconciliation", "statements", filters] as const)
+      : (["reconciliation", "statements"] as const),
+  statement: (id: string) => ["reconciliation", "statement", id] as const,
+  transactions: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["reconciliation", "transactions", filters] as const)
+      : (["reconciliation", "transactions"] as const),
+  transaction: (id: string) => ["reconciliation", "transaction", id] as const,
+  candidates: (transactionId: string) =>
+    ["reconciliation", "candidates", transactionId] as const,
+  fiscalDocs: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["reconciliation", "fiscalDocs", filters] as const)
+      : (["reconciliation", "fiscalDocs"] as const),
+  fiscalDoc: (id: string) => ["reconciliation", "fiscalDoc", id] as const,
+  fiscalDocXml: (accessKey: string) =>
+    ["reconciliation", "fiscalDocXml", accessKey] as const,
+  stats: (filters?: Record<string, unknown>) =>
+    filters
+      ? (["reconciliation", "stats", filters] as const)
+      : (["reconciliation", "stats"] as const),
+  siegStatus: () => ["reconciliation", "siegStatus"] as const,
+};
+
+// =====================================================

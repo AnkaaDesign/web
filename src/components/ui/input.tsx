@@ -144,19 +144,20 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           case "cep":
             return formatCEP(strValue);
           case "currency": {
-            // Handle currency with improved formatting
+            // Honor the `decimals` prop when formatting so callers can opt into
+            // 3-decimal unit prices (defaults to 2 when not supplied).
+            const fractionDigits = typeof decimals === "number" ? decimals : 2;
+            const denominator = Math.pow(10, fractionDigits);
             if (typeof val === "number") {
-              return formatCurrency(val);
+              return formatCurrency(val, "pt-BR", "BRL", fractionDigits);
             }
-            // Parse string that might already be formatted
             const cleanStr = strValue.replace(/[^\d,-]/g, "").replace(",", ".");
             const numVal = parseFloat(cleanStr);
             if (!isNaN(numVal)) {
-              return formatCurrency(numVal);
+              return formatCurrency(numVal, "pt-BR", "BRL", fractionDigits);
             }
-            // Try parsing as cents
             const cents = parseInt(strValue.replace(/\D/g, ""), 10) || 0;
-            return formatCurrency(cents / 100);
+            return formatCurrency(cents / denominator, "pt-BR", "BRL", fractionDigits);
           }
           case "percentage": {
             const pctVal = typeof val === "number" ? val : parseFloat(strValue.replace(/[^\d,.-]/g, "").replace(",", "."));
@@ -309,20 +310,22 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       // For currency, handle special formatting
       if (type === "currency") {
         if (!isFocused) {
-          const cents = value !== null ? Math.round(Number(value) * 100) : 0;
+          const fractionDigits = typeof decimals === "number" ? decimals : 2;
+          const denominator = Math.pow(10, fractionDigits);
+          const subUnits = value !== null ? Math.round(Number(value) * denominator) : 0;
 
-          if (cents === 0) {
+          if (subUnits === 0) {
             // Keep empty for placeholder
             setInternalValue("");
             if (!naturalTyping || disabled) {
               setDisplayValue("");
             }
           } else {
-            // Format the cents value
-            const whole = Math.floor(cents / 100);
-            const decimal = cents % 100;
+            // Format respecting fractionDigits (defaults to 2, supports 3 for unit prices).
+            const whole = Math.floor(subUnits / denominator);
+            const decimal = Math.abs(subUnits % denominator);
             const wholeStr = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-            const decimalStr = decimal.toString().padStart(2, "0");
+            const decimalStr = decimal.toString().padStart(fractionDigits, "0");
             const formatted = `R$ ${wholeStr},${decimalStr}`;
 
             setInternalValue(formatted);
@@ -644,9 +647,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
       if (type === "currency") {
         e.preventDefault();
+        const fractionDigits = typeof decimals === "number" ? decimals : 2;
+        const denominator = Math.pow(10, fractionDigits);
         const pastedText = e.clipboardData.getData("text");
 
-        // Extract digits only and treat as cents
+        // Extract digits only and treat as cents/sub-units
         const digitsOnly = pastedText.replace(/\D/g, "");
 
         if (digitsOnly) {
@@ -658,13 +663,13 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             centsValue = maxCents;
           }
 
-          const realValue = centsValue / 100;
+          const realValue = centsValue / denominator;
 
           // Format using the same logic as handleChange
-          const whole = Math.floor(centsValue / 100);
-          const decimal = centsValue % 100;
+          const whole = Math.floor(centsValue / denominator);
+          const decimal = centsValue % denominator;
           const wholeStr = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-          const decimalStr = decimal.toString().padStart(2, "0");
+          const decimalStr = decimal.toString().padStart(fractionDigits, "0");
           const formatted = `R$ ${wholeStr},${decimalStr}`;
 
           setInternalValue(formatted);
@@ -730,8 +735,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       // For formatted inputs (CPF, phone, etc.), don't process during IME composition
       if (isComposingRef.current) return;
 
-      // Special handling for currency - build from cents
+      // Special handling for currency - build from cents (or sub-units when decimals>2).
       if (type === "currency") {
+        const fractionDigits = typeof decimals === "number" ? decimals : 2;
+        const denominator = Math.pow(10, fractionDigits);
+
         // Check if user is typing at the end (most common case for currency)
         const isTypingAtEnd = oldCursorPos >= rawValue.length;
 
@@ -748,22 +756,22 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           return;
         }
 
-        // Convert digits to cents value - treat the whole number as cents
+        // Convert digits to sub-unit value — treat the whole number as the lowest unit (cents/mils).
         let centsValue = parseInt(digitsOnly, 10);
 
-        // Limit to max safe value (999.999.999,99)
+        // Limit to max safe value (~999.999.999 in whole units)
         const maxCents = 99999999999;
         if (centsValue > maxCents) {
           centsValue = maxCents;
         }
 
-        const realValue = centsValue / 100;
+        const realValue = centsValue / denominator;
 
         // Format for display using special currency formatting
-        const whole = Math.floor(centsValue / 100);
-        const decimal = centsValue % 100;
+        const whole = Math.floor(centsValue / denominator);
+        const decimal = centsValue % denominator;
         const wholeStr = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-        const decimalStr = decimal.toString().padStart(2, "0");
+        const decimalStr = decimal.toString().padStart(fractionDigits, "0");
         const formattedValue = `R$ ${wholeStr},${decimalStr}`;
 
         setInternalValue(formattedValue);
@@ -1154,13 +1162,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
       // Ensure proper formatting on blur for currency
       if (type === "currency" && internalValue) {
+        const fractionDigits = typeof decimals === "number" ? decimals : 2;
+        const denominator = Math.pow(10, fractionDigits);
         const digitsOnly = internalValue.replace(/\D/g, "");
         if (digitsOnly) {
           const cents = parseInt(digitsOnly, 10);
-          const whole = Math.floor(cents / 100);
-          const decimal = cents % 100;
+          const whole = Math.floor(cents / denominator);
+          const decimal = cents % denominator;
           const wholeStr = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-          const decimalStr = decimal.toString().padStart(2, "0");
+          const decimalStr = decimal.toString().padStart(fractionDigits, "0");
           const formatted = `R$ ${wholeStr},${decimalStr}`;
           setInternalValue(formatted);
           setDisplayValue(formatted);

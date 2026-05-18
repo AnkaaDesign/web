@@ -123,6 +123,12 @@ export const secullumMappingService = {
         funcaoId,
       })
       .then((r) => r.data),
+  linkUserFuncionario: (userId: string, funcionarioId: number | null) =>
+    apiClient
+      .post(`/integrations/secullum/mapping/user/${userId}/funcionario`, {
+        funcionarioId,
+      })
+      .then((r) => r.data),
 
   // Justificativas (batch delete!)
   upsertJustificativa: (body: {

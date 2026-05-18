@@ -19,7 +19,7 @@ import { usePayrollTrends, getHrComparisonType } from '@/hooks/human-resources/u
 import { useUsers } from '@/hooks/human-resources/use-user';
 import type { HrAnalyticsFilters, HrChartType } from '@/types/hr-analytics';
 import { StatisticsChart, type StatisticsChartHandle } from '@/components/statistics/statistics-chart';
-import { formatCurrency, formatPercentage, formatNumber } from '@/types/statistics-common';
+import { formatCurrency, formatPercentage, formatNumber, CHART_COLORS } from '@/types/statistics-common';
 import type { YAxisMode, TrendLineType } from '@/types/statistics-common';
 import { getSectors } from '@/api-client/sector';
 import { sectorKeys } from '@/hooks/common/query-keys';
@@ -398,6 +398,10 @@ interface PayrollEmployeesModalProps {
   periodLabel: string;
   totalAggregate: number;
   totalBonuses: number;
+  // sectorId → hex color, mirroring the chart's bar colors. When provided
+  // and >1 sector is present in the result, names are tinted by sector and
+  // rows are grouped by sector then remuneration desc.
+  sectorColorMap?: Record<string, string>;
 }
 
 function PayrollEmployeesModal({
@@ -410,6 +414,7 @@ function PayrollEmployeesModal({
   periodLabel,
   totalAggregate,
   totalBonuses,
+  sectorColorMap,
 }: PayrollEmployeesModalProps) {
   const [search, setSearch] = useState('');
 
@@ -431,7 +436,7 @@ function PayrollEmployeesModal({
     enabled: open,
   } as any);
 
-  const employees: EmployeeRow[] = useMemo(() => {
+  const employees: Array<EmployeeRow & { sectorId: string | null }> = useMemo(() => {
     const raw = (usersResp?.data ?? []) as any[];
     return raw
       .filter(u => {
@@ -442,21 +447,36 @@ function PayrollEmployeesModal({
       .map(u => ({
         id: u.id as string,
         name: (u.name as string) || '—',
+        sectorId: (u.sectorId as string | null) ?? null,
         sectorName: (u.sector?.name as string) || '—',
         positionName: (u.position?.name as string) || '—',
         remuneration: Number(u.position?.remuneration ?? 0),
       }));
   }, [usersResp, startDate]);
 
+  const multiSector = useMemo(() => {
+    if (!sectorColorMap) return false;
+    const seen = new Set<string>();
+    for (const e of employees) if (e.sectorId) seen.add(e.sectorId);
+    return seen.size > 1;
+  }, [sectorColorMap, employees]);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return employees;
-    return employees.filter(e =>
-      e.name.toLowerCase().includes(term) ||
-      e.sectorName.toLowerCase().includes(term) ||
-      e.positionName.toLowerCase().includes(term),
-    );
-  }, [employees, search]);
+    const base = term
+      ? employees.filter(e =>
+          e.name.toLowerCase().includes(term) ||
+          e.sectorName.toLowerCase().includes(term) ||
+          e.positionName.toLowerCase().includes(term),
+        )
+      : employees;
+    if (!multiSector) return base;
+    return [...base].sort((a, b) => {
+      const s = a.sectorName.localeCompare(b.sectorName);
+      if (s !== 0) return s;
+      return b.remuneration - a.remuneration;
+    });
+  }, [employees, search, multiSector]);
 
   const title = mode === 'bonuses' ? 'Bônus do período' : 'Folha do período';
   const totalForMode = mode === 'bonuses' ? totalBonuses : totalAggregate;
@@ -516,14 +536,23 @@ function PayrollEmployeesModal({
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map(e => (
+                filtered.map(e => {
+                  const sectorColor = multiSector && e.sectorId
+                    ? sectorColorMap?.[e.sectorId]
+                    : undefined;
+                  return (
                   <TableRow key={e.id} className="text-sm">
-                    <TableCell className="py-3 font-medium whitespace-nowrap">{e.name}</TableCell>
+                    <TableCell
+                      className="py-3 font-medium whitespace-nowrap"
+                      style={sectorColor ? { color: sectorColor } : undefined}
+                      title={sectorColor ? e.sectorName : undefined}
+                    >{e.name}</TableCell>
                     <TableCell className="text-foreground/85 whitespace-nowrap">{e.sectorName}</TableCell>
                     <TableCell className="text-foreground/85 whitespace-nowrap">{e.positionName}</TableCell>
                     <TableCell className="text-right tabular-nums whitespace-nowrap">{formatCurrency(e.remuneration)}</TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -592,6 +621,18 @@ const PayrollStatisticsPage = () => {
   const comparisonType = useMemo(() => getHrComparisonType(filters), [filters]);
   const isComparisonMode = comparisonType !== 'simple';
 
+  // sectorId → bar color. Mirrors statistics-chart.tsx's per-comparison color
+  // assignment so the period modal tints names with the same color the user
+  // just clicked on the chart.
+  const sectorColorMap = useMemo<Record<string, string> | undefined>(() => {
+    if (comparisonType !== 'sectors' || !filters.sectorIds?.length) return undefined;
+    const map: Record<string, string> = {};
+    filters.sectorIds.forEach((id, i) => {
+      map[id] = CHART_COLORS[i % CHART_COLORS.length];
+    });
+    return map;
+  }, [comparisonType, filters.sectorIds]);
+
   const availableChartTypes = useMemo(() => getAvailableChartTypes(isComparisonMode), [isComparisonMode]);
 
   useEffect(() => {
@@ -634,7 +675,19 @@ const PayrollStatisticsPage = () => {
     enabled: goalMetric !== null,
   });
 
-  const goalValue = goalOverride ?? defaultGoal.value;
+  // When comparing by sectors each line represents ONE sector, so the goal
+  // (a sum across the filtered sectors) must be averaged. Period comparison
+  // leaves the monthly target unchanged — each year-line still aims at the
+  // same per-month budget.
+  const goalSectorSplit =
+    comparisonType === 'sectors' ? Math.max(1, filters.sectorIds?.length ?? 1) : 1;
+
+  const goalValue = useMemo(() => {
+    const raw = goalOverride ?? defaultGoal.value;
+    if (raw == null) return null;
+    return goalSectorSplit > 1 ? raw / goalSectorSplit : raw;
+  }, [goalOverride, defaultGoal.value, goalSectorSplit]);
+
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 
@@ -1202,6 +1255,7 @@ const PayrollStatisticsPage = () => {
         periodLabel={periodSummaryLabel.replace(/^Folha\s·\s/, '')}
         totalAggregate={summary?.totalGrossSalary ?? 0}
         totalBonuses={summary?.totalBonuses ?? 0}
+        sectorColorMap={sectorColorMap}
       />
 
       {/* Period drill-down — opens when the user clicks an x-axis value */}
@@ -1215,6 +1269,7 @@ const PayrollStatisticsPage = () => {
         periodLabel={periodDrill?.label ?? ''}
         totalAggregate={rawItems.find(i => i.label === periodDrill?.label)?.grossSalary ?? 0}
         totalBonuses={rawItems.find(i => i.label === periodDrill?.label)?.bonusTotal ?? 0}
+        sectorColorMap={sectorColorMap}
       />
     </div>
   );

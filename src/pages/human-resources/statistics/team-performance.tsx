@@ -25,7 +25,7 @@ import type { HeadcountFilters, HrChartType, HeadcountTimeseriesItem, HeadcountR
 import { getHeadcount } from '@/api-client/hr-analytics';
 import { useQueries } from '@tanstack/react-query';
 import { StatisticsChart, type StatisticsChartHandle } from '@/components/statistics/statistics-chart';
-import { formatNumber } from '@/types/statistics-common';
+import { formatNumber, CHART_COLORS } from '@/types/statistics-common';
 import type { YAxisMode, TrendLineType } from '@/types/statistics-common';
 import { getSectors } from '@/api-client/sector';
 import { getPositions } from '@/api-client/position';
@@ -503,11 +503,12 @@ interface TeamDrillDownModalProps {
   endDate?: Date;
   sectorIds?: string[];
   positionIds?: string[];
+  sectorColorMap?: Record<string, string>;
 }
 
 function TeamDrillDownModal({
   open, onOpenChange, mode,
-  startDate, endDate, sectorIds, positionIds,
+  startDate, endDate, sectorIds, positionIds, sectorColorMap,
 }: TeamDrillDownModalProps) {
   const [search, setSearch] = useState('');
   useEffect(() => { if (open) setSearch(''); }, [open]);
@@ -528,11 +529,15 @@ function TeamDrillDownModal({
       where.status = { in: [...ACTIVE_USER_STATUSES] };
       where.dismissedAt = null;
     } else if (mode === 'newHires') {
+      // Mirror the backend's joinDate() = effectedAt ?? createdAt
+      // (hr-statistics.service.ts). Without the fallback the modal counts
+      // users by createdAt only and shows far more rows than the summary card.
       if (startDate) {
-        where.createdAt = {
-          gte: startDate,
-          ...(endDate ? { lte: endDate } : {}),
-        };
+        const range = { gte: startDate, ...(endDate ? { lte: endDate } : {}) };
+        where.OR = [
+          { effectedAt: range },
+          { effectedAt: null, createdAt: range },
+        ];
       }
     } else if (mode === 'dismissals') {
       where.status = USER_STATUS.DISMISSED;
@@ -582,15 +587,40 @@ function TeamDrillDownModal({
     });
   }, [rawUsers, mode]);
 
+  const multiSector = useMemo(() => {
+    if (!sectorColorMap) return false;
+    const seen = new Set<string>();
+    for (const u of scopedUsers) if (u.sectorId) seen.add(u.sectorId);
+    return seen.size > 1;
+  }, [sectorColorMap, scopedUsers]);
+
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return scopedUsers;
-    return scopedUsers.filter(u =>
-      (u.name || '').toLowerCase().includes(q) ||
-      (u.position?.name || '').toLowerCase().includes(q) ||
-      (u.sector?.name || '').toLowerCase().includes(q),
-    );
-  }, [scopedUsers, search]);
+    const base = q
+      ? scopedUsers.filter(u =>
+          (u.name || '').toLowerCase().includes(q) ||
+          (u.position?.name || '').toLowerCase().includes(q) ||
+          (u.sector?.name || '').toLowerCase().includes(q),
+        )
+      : scopedUsers;
+    if (!multiSector) return base;
+    return [...base].sort((a, b) => {
+      const s = (a.sector?.name ?? '').localeCompare(b.sector?.name ?? '');
+      if (s !== 0) return s;
+      // Within a sector, sort by the date column shown in the table
+      // (admission for newHires/headcount/netChange, dismissal otherwise) —
+      // newest first.
+      const dateA = mode === 'dismissals'
+        ? a.dismissedAt
+        : (a.effectedAt ?? a.createdAt);
+      const dateB = mode === 'dismissals'
+        ? b.dismissedAt
+        : (b.effectedAt ?? b.createdAt);
+      const ta = dateA ? new Date(dateA).getTime() : 0;
+      const tb = dateB ? new Date(dateB).getTime() : 0;
+      return tb - ta;
+    });
+  }, [scopedUsers, search, multiSector, mode]);
 
   const dateColumnLabel = config?.dateColumn === 'dismissal' ? 'Desligamento' : 'Admissão';
   const subtitle = isLoading
@@ -656,16 +686,23 @@ function TeamDrillDownModal({
                   filteredUsers.map((u) => {
                     const dateValue = config?.dateColumn === 'dismissal'
                       ? u.dismissedAt
-                      // Admission = exp1 start (when the user actually started
-                      // the experience period). `createdAt` is when the record
-                      // was inserted, which can be much later.
-                      : (u.exp1StartAt ?? u.createdAt);
+                      // Match backend joinDate() — effectedAt when present,
+                      // otherwise fall back to createdAt. Keeps the displayed
+                      // date consistent with the summary count.
+                      : (u.effectedAt ?? u.createdAt);
                     const formattedDate = dateValue
                       ? format(new Date(dateValue), 'dd/MM/yyyy', { locale: ptBR })
                       : '—';
+                    const sectorColor = multiSector && u.sectorId
+                      ? sectorColorMap?.[u.sectorId]
+                      : undefined;
                     return (
                       <TableRow key={u.id} className="text-sm">
-                        <TableCell className="font-medium whitespace-nowrap">{u.name}</TableCell>
+                        <TableCell
+                          className="font-medium whitespace-nowrap"
+                          style={sectorColor ? { color: sectorColor } : undefined}
+                          title={sectorColor ? (u.sector?.name ?? undefined) : undefined}
+                        >{u.name}</TableCell>
                         <TableCell className="text-foreground/85 whitespace-nowrap">{u.position?.name ?? '—'}</TableCell>
                         <TableCell className="text-foreground/85 whitespace-nowrap">{u.sector?.name ?? '—'}</TableCell>
                         <TableCell className="text-right text-xs text-foreground/80 whitespace-nowrap">{formattedDate}</TableCell>
@@ -698,6 +735,11 @@ interface TeamPeriodModalProps {
   item: HeadcountTimeseriesItem | null;
   sectorIds?: string[];
   positionIds?: string[];
+  // sectorId → hex color, mirroring the chart's bar colors. Provided only
+  // when the page is in "Comparação: Setores" mode. When given and >1 sector
+  // is present in the result set, names are tinted by sector and rows are
+  // grouped by sector (asc) then by admission date (newest first).
+  sectorColorMap?: Record<string, string>;
 }
 
 function getPeriodRange(period: string): { from: Date; to: Date } | null {
@@ -713,7 +755,7 @@ function getPeriodRange(period: string): { from: Date; to: Date } | null {
 }
 
 function TeamPeriodModal({
-  open, onOpenChange, item, sectorIds, positionIds,
+  open, onOpenChange, item, sectorIds, positionIds, sectorColorMap,
 }: TeamPeriodModalProps) {
   const [search, setSearch] = useState('');
 
@@ -749,15 +791,36 @@ function TeamPeriodModal({
 
   const rawUsers: any[] = (response as any)?.data ?? [];
 
+  const multiSector = useMemo(() => {
+    if (!sectorColorMap) return false;
+    const seen = new Set<string>();
+    for (const u of rawUsers) if (u.sectorId) seen.add(u.sectorId);
+    return seen.size > 1;
+  }, [sectorColorMap, rawUsers]);
+
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rawUsers;
-    return rawUsers.filter(u =>
-      (u.name || '').toLowerCase().includes(q) ||
-      (u.position?.name || '').toLowerCase().includes(q) ||
-      (u.sector?.name || '').toLowerCase().includes(q),
-    );
-  }, [rawUsers, search]);
+    const base = q
+      ? rawUsers.filter(u =>
+          (u.name || '').toLowerCase().includes(q) ||
+          (u.position?.name || '').toLowerCase().includes(q) ||
+          (u.sector?.name || '').toLowerCase().includes(q),
+        )
+      : rawUsers;
+    if (!multiSector) return base;
+    // Sector asc → admission desc within sector (most recent admissions
+    // float to the top of each group, matching the "performance first"
+    // intent used in the production modals).
+    return [...base].sort((a, b) => {
+      const s = (a.sector?.name ?? '').localeCompare(b.sector?.name ?? '');
+      if (s !== 0) return s;
+      const da = a.exp1StartAt ?? a.createdAt;
+      const db = b.exp1StartAt ?? b.createdAt;
+      const ta = da ? new Date(da).getTime() : 0;
+      const tb = db ? new Date(db).getTime() : 0;
+      return tb - ta;
+    });
+  }, [rawUsers, search, multiSector]);
 
   const statusLabel = (u: any): { label: string; tone: string } => {
     switch (u.status) {
@@ -841,9 +904,16 @@ function TeamPeriodModal({
                     const admittedAt = admissionDate
                       ? format(new Date(admissionDate), 'dd/MM/yyyy', { locale: ptBR })
                       : '—';
+                    const sectorColor = multiSector && u.sectorId
+                      ? sectorColorMap?.[u.sectorId]
+                      : undefined;
                     return (
                       <TableRow key={u.id} className="text-sm">
-                        <TableCell className="font-medium whitespace-nowrap">{u.name}</TableCell>
+                        <TableCell
+                          className="font-medium whitespace-nowrap"
+                          style={sectorColor ? { color: sectorColor } : undefined}
+                          title={sectorColor ? (u.sector?.name ?? undefined) : undefined}
+                        >{u.name}</TableCell>
                         <TableCell className="text-foreground/85 whitespace-nowrap">{u.position?.name ?? '—'}</TableCell>
                         <TableCell className="text-foreground/85 whitespace-nowrap">{u.sector?.name ?? '—'}</TableCell>
                         <TableCell className="text-right text-xs text-foreground/80 whitespace-nowrap">{admittedAt}</TableCell>
@@ -970,7 +1040,25 @@ const EquipePage = () => {
     enabled: goalMetric !== null,
   });
 
-  const goalValue = goalOverride ?? defaultGoal.value;
+  // In comparison mode each chart line represents ONE entity (sector or
+  // position), so the goal must reflect the per-entity average — not the sum
+  // across all filtered entities. Otherwise a Meta of 16 (= 8+8 across two
+  // sectors) hovers above two lines that each only need to hit 8.
+  const comparisonCount =
+    !isComparisonMode
+      ? 0
+      : compareDimension === 'sector'
+        ? selectedSectorIds.length
+        : compareDimension === 'position'
+          ? selectedPositionIds.length
+          : 0;
+
+  const goalValue = useMemo(() => {
+    const raw = goalOverride ?? defaultGoal.value;
+    if (raw == null) return null;
+    return comparisonCount > 1 ? raw / comparisonCount : raw;
+  }, [goalOverride, defaultGoal.value, comparisonCount]);
+
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 
@@ -982,6 +1070,20 @@ const EquipePage = () => {
     () => (compareDimension === 'sector' ? selectedSectorIds : compareDimension === 'position' ? selectedPositionIds : []),
     [compareDimension, selectedSectorIds, selectedPositionIds],
   );
+
+  // sectorId → bar color. Mirrors statistics-chart.tsx's per-comparison color
+  // assignment (CHART_COLORS indexed by selection order) so the period modal
+  // can tint names with the same color the user just clicked. Only built in
+  // sector-comparison mode; position-comparison gets no map (modal falls back
+  // to its default rendering).
+  const sectorColorMap = useMemo<Record<string, string> | undefined>(() => {
+    if (compareDimension !== 'sector' || !selectedSectorIds.length) return undefined;
+    const map: Record<string, string> = {};
+    selectedSectorIds.forEach((id, i) => {
+      map[id] = CHART_COLORS[i % CHART_COLORS.length];
+    });
+    return map;
+  }, [compareDimension, selectedSectorIds]);
 
   const comparisonQueries = useQueries({
     queries: isComparisonMode
@@ -1632,6 +1734,7 @@ const EquipePage = () => {
           endDate={filters.endDate}
           sectorIds={filters.sectorIds}
           positionIds={filters.positionIds}
+          sectorColorMap={sectorColorMap}
         />
 
         {/* Period drill-down — opens when the user clicks an x-axis value */}
@@ -1641,6 +1744,7 @@ const EquipePage = () => {
           item={periodModal}
           sectorIds={filters.sectorIds}
           positionIds={filters.positionIds}
+          sectorColorMap={sectorColorMap}
         />
       </div>
     </TooltipProvider>

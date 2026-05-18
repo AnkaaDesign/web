@@ -126,6 +126,7 @@ export const TABLER_ICONS = {
   // Borrowing/Lending
   borrowing: "IconArrowsExchange", // Borrowing cycle
   arrowsExchange: "IconArrowsExchange", // Alias for HR rotatividade nav
+  arrowsExchange2: "IconArrowsExchange2", // Bank reconciliation (alternative arrows)
   loan: "IconRepeat",
   repeat: "IconRepeat", // Repeat/cycle icon (for favorites)
   return: "IconArrowLeft", // Return items
@@ -208,6 +209,7 @@ export const TABLER_ICONS = {
   document: "IconFileText",
   fileInvoice: "IconFileInvoice", // Alias for favorites icon mapping
   fileDescription: "IconFileDescription",
+  fileSpreadsheet: "IconFileSpreadsheet", // Bank statements (Extratos)
   archive: "IconArchive",
 
   // System Management

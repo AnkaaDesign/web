@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import type { MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 import { IconFilter, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
+import { Input } from "@/components/ui/input";
 import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
+import { formatCurrency } from "../../../../utils";
+import type { OrderTemporaryItem } from "@/hooks/inventory/use-order-form-url-state";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
@@ -13,7 +15,6 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
-import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { useDebounce } from "@/hooks/common/use-debounce";
 import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 import type { Item } from "../../../../types";
@@ -70,6 +71,11 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   onShowSelectedOnlyChange,
   onSearchTermChange,
   onFiltersChange,
+  enableTemporaryItems = false,
+  temporaryItems = [],
+  onTemporaryItemAdd,
+  onTemporaryItemUpdate,
+  onTemporaryItemRemove,
 }) => {
   // Local state for immediate UI updates
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTermProp || "");
@@ -94,9 +100,6 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
 
   // Debounced search term for API calls
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
-
-  // Get scrollbar width info
-  const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
 
   // Table state
   const {
@@ -470,6 +473,318 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   const allSelected = items.length > 0 && items.every((item) => selectedItems.has(item.id));
   const partiallySelected = items.some((item) => selectedItems.has(item.id)) && !allSelected;
 
+  // ===== Sticky temporary-item entry row state =====
+  // Local form for the always-visible "add a temporary item" row at the top of the body.
+  // Once committed (Enter or +Add), the row is appended to the parent's temporaryItems list.
+  // Includes optional metadata (uniCode/brand/category/measures) — when filled,
+  // they get composed into the final description by the parent at submit time.
+  const initialTempDraft = {
+    description: "",
+    uniCode: "",
+    brand: "",
+    category: "",
+    measures: "",
+    quantity: 1,
+    price: 0,
+    icms: 0,
+    ipi: 0,
+  };
+  const [tempDraft, setTempDraft] = useState(initialTempDraft);
+  const tempDescriptionInputRef = useRef<HTMLInputElement>(null);
+
+  const resetTempDraft = useCallback(() => {
+    setTempDraft(initialTempDraft);
+  }, []);
+
+  const commitTempDraft = useCallback(() => {
+    const description = tempDraft.description.trim();
+    if (!description || tempDraft.quantity <= 0) {
+      return;
+    }
+    onTemporaryItemAdd?.({
+      temporaryItemDescription: description,
+      orderedQuantity: tempDraft.quantity,
+      price: tempDraft.price,
+      icms: tempDraft.icms,
+      ipi: tempDraft.ipi,
+      uniCode: tempDraft.uniCode.trim() || undefined,
+      brand: tempDraft.brand.trim() || undefined,
+      category: tempDraft.category.trim() || undefined,
+      measures: tempDraft.measures.trim() || undefined,
+    });
+    resetTempDraft();
+    // Re-focus the description input so the user can keep typing more items quickly.
+    setTimeout(() => tempDescriptionInputRef.current?.focus(), 0);
+  }, [tempDraft, onTemporaryItemAdd, resetTempDraft]);
+
+  const handleTempKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        commitTempDraft();
+      }
+    },
+    [commitTempDraft],
+  );
+
+  const tempInputBaseClass = "h-8 w-full bg-transparent border-border";
+
+  // Cell renderer for the sticky entry-row draft. Falls back to em-dash for
+  // inventory-only columns (stock, consumption, catalog price, etc.).
+  const renderEntryCell = (columnKey: string): ReactNode => {
+    switch (columnKey) {
+      case "uniCode":
+        return (
+          <Input
+            value={tempDraft.uniCode}
+            onChange={(value) => setTempDraft((prev) => ({ ...prev, uniCode: (value as string) ?? "" }))}
+            onKeyDown={handleTempKeyDown}
+            placeholder="Código"
+            className={tempInputBaseClass}
+            maxLength={50}
+          />
+        );
+      case "name":
+        return (
+          <Input
+            ref={tempDescriptionInputRef}
+            value={tempDraft.description}
+            onChange={(value) => setTempDraft((prev) => ({ ...prev, description: (value as string) ?? "" }))}
+            onKeyDown={handleTempKeyDown}
+            placeholder="Adicionar item temporário (descrição)…"
+            className={tempInputBaseClass}
+            maxLength={500}
+          />
+        );
+      case "brand.name":
+        return (
+          <Input
+            value={tempDraft.brand}
+            onChange={(value) => setTempDraft((prev) => ({ ...prev, brand: (value as string) ?? "" }))}
+            onKeyDown={handleTempKeyDown}
+            placeholder="Marca"
+            className={tempInputBaseClass}
+            maxLength={100}
+          />
+        );
+      case "category.name":
+        return (
+          <Input
+            value={tempDraft.category}
+            onChange={(value) => setTempDraft((prev) => ({ ...prev, category: (value as string) ?? "" }))}
+            onKeyDown={handleTempKeyDown}
+            placeholder="Categoria"
+            className={tempInputBaseClass}
+            maxLength={100}
+          />
+        );
+      case "measures":
+        return (
+          <Input
+            value={tempDraft.measures}
+            onChange={(value) => setTempDraft((prev) => ({ ...prev, measures: (value as string) ?? "" }))}
+            onKeyDown={handleTempKeyDown}
+            placeholder="Medidas"
+            className={tempInputBaseClass}
+            maxLength={100}
+          />
+        );
+      case "quantityInput":
+        return (
+          <Input
+            type="decimal"
+            min={0.01}
+            max={999999}
+            step={0.01}
+            value={tempDraft.quantity || ""}
+            onChange={(value) => {
+              const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+              setTempDraft((prev) => ({ ...prev, quantity: Number.isFinite(n) ? n : 0 }));
+            }}
+            onKeyDown={handleTempKeyDown}
+            className={tempInputBaseClass}
+          />
+        );
+      case "priceInput":
+        return (
+          <Input
+            type="currency"
+            decimals={3}
+            value={tempDraft.price || undefined}
+            onChange={(value) => {
+              const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+              setTempDraft((prev) => ({ ...prev, price: Number.isFinite(n) ? n : 0 }));
+            }}
+            onKeyDown={handleTempKeyDown}
+            placeholder="R$ 0,000"
+            className={tempInputBaseClass}
+          />
+        );
+      case "icmsInput":
+        return (
+          <Input
+            type="decimal"
+            min={0}
+            max={100}
+            step={0.01}
+            value={tempDraft.icms || ""}
+            onChange={(value) => {
+              const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+              setTempDraft((prev) => ({ ...prev, icms: Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0 }));
+            }}
+            onKeyDown={handleTempKeyDown}
+            className={tempInputBaseClass}
+          />
+        );
+      case "ipiInput":
+        return (
+          <Input
+            type="decimal"
+            min={0}
+            max={100}
+            step={0.01}
+            value={tempDraft.ipi || ""}
+            onChange={(value) => {
+              const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+              setTempDraft((prev) => ({ ...prev, ipi: Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0 }));
+            }}
+            onKeyDown={handleTempKeyDown}
+            className={tempInputBaseClass}
+          />
+        );
+      case "orderSubtotal": {
+        const subtotal = tempDraft.quantity * tempDraft.price;
+        const total = subtotal + (subtotal * (tempDraft.icms / 100)) + (subtotal * (tempDraft.ipi / 100));
+        if (total === 0) return <span className="text-muted-foreground">—</span>;
+        return <span className="font-semibold">{formatCurrency(total)}</span>;
+      }
+      default:
+        return <span className="text-muted-foreground">—</span>;
+    }
+  };
+
+  // Cell renderer for an already-added temp row.
+  const renderTempCell = (columnKey: string, temp: OrderTemporaryItem): ReactNode => {
+    switch (columnKey) {
+      case "uniCode":
+        return (
+          <Input
+            value={temp.uniCode || ""}
+            onChange={(value) => onTemporaryItemUpdate?.(temp.key, { uniCode: ((value as string) || "").trim() || undefined })}
+            placeholder="Código"
+            className={tempInputBaseClass}
+            maxLength={50}
+          />
+        );
+      case "name":
+        return (
+          <Input
+            value={temp.temporaryItemDescription}
+            onChange={(value) => onTemporaryItemUpdate?.(temp.key, { temporaryItemDescription: (value as string) ?? "" })}
+            placeholder="Descrição do item"
+            className={tempInputBaseClass}
+            maxLength={500}
+          />
+        );
+      case "brand.name":
+        return (
+          <Input
+            value={temp.brand || ""}
+            onChange={(value) => onTemporaryItemUpdate?.(temp.key, { brand: ((value as string) || "").trim() || undefined })}
+            placeholder="Marca"
+            className={tempInputBaseClass}
+            maxLength={100}
+          />
+        );
+      case "category.name":
+        return (
+          <Input
+            value={temp.category || ""}
+            onChange={(value) => onTemporaryItemUpdate?.(temp.key, { category: ((value as string) || "").trim() || undefined })}
+            placeholder="Categoria"
+            className={tempInputBaseClass}
+            maxLength={100}
+          />
+        );
+      case "measures":
+        return (
+          <Input
+            value={temp.measures || ""}
+            onChange={(value) => onTemporaryItemUpdate?.(temp.key, { measures: ((value as string) || "").trim() || undefined })}
+            placeholder="Medidas"
+            className={tempInputBaseClass}
+            maxLength={100}
+          />
+        );
+      case "quantityInput":
+        return (
+          <Input
+            type="decimal"
+            min={0.01}
+            max={999999}
+            step={0.01}
+            value={temp.orderedQuantity || ""}
+            onChange={(value) => {
+              const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+              onTemporaryItemUpdate?.(temp.key, { orderedQuantity: Number.isFinite(n) ? n : 0 });
+            }}
+            className={tempInputBaseClass}
+          />
+        );
+      case "priceInput":
+        return (
+          <Input
+            type="currency"
+            decimals={3}
+            value={temp.price || undefined}
+            onChange={(value) => {
+              const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+              onTemporaryItemUpdate?.(temp.key, { price: Number.isFinite(n) ? n : 0 });
+            }}
+            placeholder="R$ 0,000"
+            className={tempInputBaseClass}
+          />
+        );
+      case "icmsInput":
+        return (
+          <Input
+            type="decimal"
+            min={0}
+            max={100}
+            step={0.01}
+            value={temp.icms || ""}
+            onChange={(value) => {
+              const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+              onTemporaryItemUpdate?.(temp.key, { icms: Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0 });
+            }}
+            className={tempInputBaseClass}
+          />
+        );
+      case "ipiInput":
+        return (
+          <Input
+            type="decimal"
+            min={0}
+            max={100}
+            step={0.01}
+            value={temp.ipi || ""}
+            onChange={(value) => {
+              const n = typeof value === "number" ? value : parseFloat((value as string) ?? "0");
+              onTemporaryItemUpdate?.(temp.key, { ipi: Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0 });
+            }}
+            className={tempInputBaseClass}
+          />
+        );
+      case "orderSubtotal": {
+        const subtotal = (Number(temp.orderedQuantity) || 0) * (Number(temp.price) || 0);
+        const total = subtotal + (subtotal * (temp.icms / 100)) + (subtotal * (temp.ipi / 100));
+        return <span className="font-semibold">{formatCurrency(total)}</span>;
+      }
+      default:
+        return <span className="text-muted-foreground">—</span>;
+    }
+  };
+
   // Render sort indicator
   const renderSortIndicator = (columnKey: string) => {
     const direction = getSortDirection(columnKey);
@@ -529,24 +844,102 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
         )}
       </div>
 
-      {/* Table with fixed header, scrollable body, fixed footer */}
+      {/* Table with sticky header, scrollable body, fixed footer.
+          Single <table> with `position: sticky` thead — eliminates the dual-
+          table column-width drift that plagued the previous architecture. */}
       <div className="flex-1 min-h-0 mt-4">
         <div className={cn("rounded-lg flex flex-col overflow-hidden h-full", TABLE_LAYOUT.tableLayout)}>
-          {/* Fixed Header Table */}
-          <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
-            <Table className="w-full table-fixed [&>div]:border-0 [&>div]:rounded-none">
-              <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
+          {/* Single scroll container holding the whole table. The thead inside
+              is `position: sticky; top: 0;` so it stays pinned while the
+              tbody scrolls underneath. Because header and body share the same
+              <table>, every column has exactly one width — no cross-table
+              drift. */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden border border-border rounded-t-lg">
+            <Table className="w-full table-fixed border-separate border-spacing-0 [&>div]:border-0 [&>div]:rounded-none">
+              {/* Single source of truth for column widths — applies to every
+                  row in the table at once, so checkbox, header, sticky +/X,
+                  and body rows can never drift. Browsers ignore per-cell
+                  width hints when a <colgroup> exists. The trailing <col />
+                  has no explicit width so it absorbs leftover space (data
+                  columns stay at exactly their declared widths). */}
+              <colgroup>
+                <col style={{ width: 48 }} />
+                {displayColumns.filter(col => col.key !== 'checkbox').map(col => {
+                  // Extract width from Tailwind w-N class (e.g. "w-28" → 112px)
+                  const match = col.className?.match(/(?:^|\s)w-(\d+)(?:\s|$)/);
+                  const width = match ? parseInt(match[1], 10) * 4 : undefined;
+                  return <col key={col.key} style={width ? { width } : undefined} />;
+                })}
+              </colgroup>
+              <TableHeader className="sticky top-0 z-20 [&_tr]:border-b-0 [&_tr]:hover:bg-muted">
                 <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-                  {/* Checkbox column */}
-                  <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                    <div className="flex items-center justify-start h-full w-full px-4 py-2">
-                      <Checkbox
-                        checked={allSelected}
-                        indeterminate={partiallySelected}
-                        onCheckedChange={handleSelectAllOnPage}
+                  {/* Checkbox column — absolute-positioned 16×16 box at
+                      exactly left:16, vertically centered. Bypasses ALL
+                      flex/padding/border layout interactions; the box's
+                      X position is determined SOLELY by the inline `left`
+                      style. Identical positioning is hard-coded in all four
+                      checkbox cells (header / sticky / pinned / body). */}
+                  <TableHead
+                    style={{ width: 48, minWidth: 48, maxWidth: 48, padding: 0, position: "relative", height: 40 }}
+                    className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0"
+                  >
+                    <div
+                      className="absolute cursor-pointer"
+                      style={{ left: 0, top: 0, right: 0, bottom: 0 }}
+                      onClick={() => {
+                        if (!isLoading && items.length > 0) handleSelectAllOnPage();
+                      }}
+                    >
+                      <div
+                        role="checkbox"
+                        aria-checked={partiallySelected ? "mixed" : allSelected}
                         aria-label="Select all items"
-                        disabled={isLoading || items.length === 0}
-                      />
+                        aria-disabled={isLoading || items.length === 0}
+                        tabIndex={0}
+                        style={{
+                          position: "absolute",
+                          left: 16,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          width: 16,
+                          height: 16,
+                          boxSizing: "border-box",
+                        }}
+                        className={cn(
+                          "rounded-sm border transition-all",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                          allSelected || partiallySelected
+                            ? "bg-primary border-primary text-primary-foreground"
+                            : "border-border bg-transparent hover:border-primary/50",
+                          (isLoading || items.length === 0) && "opacity-50 cursor-not-allowed",
+                        )}
+                      >
+                        {(allSelected || partiallySelected) && (
+                          <svg
+                            className="h-full w-full"
+                            viewBox="0 0 15 15"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            {partiallySelected ? (
+                              <path
+                                d="M4 7.5 H11"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              />
+                            ) : (
+                              <path
+                                d="M11.4669 3.72684C11.7558 3.91574 11.8369 4.30308 11.648 4.59198L7.39799 11.092C7.29783 11.2452 7.13556 11.3467 6.95402 11.3699C6.77247 11.3931 6.58989 11.3355 6.45446 11.2124L3.70446 8.71241C3.44905 8.48022 3.43023 8.08494 3.66242 7.82953C3.89461 7.57412 4.28989 7.55529 4.5453 7.78749L6.75292 9.79441L10.6018 3.90792C10.7907 3.61902 11.178 3.53795 11.4669 3.72684Z"
+                                fill="currentColor"
+                                fillRule="evenodd"
+                                clipRule="evenodd"
+                                strokeWidth={3}
+                              />
+                            )}
+                          </svg>
+                        )}
+                      </div>
                     </div>
                   </TableHead>
 
@@ -576,25 +969,163 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
                     </TableHead>
                   ))}
 
-                  {/* Scrollbar spacer - only show if not overlay scrollbar */}
-                  {!isOverlay && (
-                    <TableHead
-                      style={{ width: `${scrollbarWidth}px`, minWidth: `${scrollbarWidth}px` }}
-                      className="bg-muted p-0 border-0 !border-r-0 shrink-0"
-                    ></TableHead>
-                  )}
                 </TableRow>
               </TableHeader>
-            </Table>
-          </div>
-
-          {/* Scrollable Body Table */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden border-l border-r border-border">
-            <Table className="w-full table-fixed [&>div]:border-0 [&>div]:rounded-none">
               <TableBody>
+                {enableTemporaryItems && (
+                  <>
+                    {/* Sticky temporary-item entry row — uses the same per-column
+                        cells as inventory rows so widths align perfectly.
+                        Action button (+) lives in the checkbox column position. */}
+                    <TableRow
+                      className="bg-primary/5 border-b-2 border-primary/20 hover:bg-primary/10"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* Checkbox column → commit (+) button. Same absolute-
+                          positioned 16×16 box as the header checkbox above. */}
+                      <TableCell
+                        style={{ width: 48, minWidth: 48, maxWidth: 48, padding: 0, position: "relative", height: 48 }}
+                        className="!border-r-0"
+                      >
+                        <div
+                          className="absolute cursor-pointer"
+                          style={{ left: 0, top: 0, right: 0, bottom: 0 }}
+                          onClick={(e) => { e.stopPropagation(); commitTempDraft(); }}
+                        >
+                          <div
+                            role="button"
+                            aria-label="Adicionar item temporário (Enter)"
+                            title="Adicionar item temporário (Enter)"
+                            tabIndex={0}
+                            style={{
+                              position: "absolute",
+                              left: 16,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              width: 16,
+                              height: 16,
+                              boxSizing: "border-box",
+                              backgroundColor: "rgb(34 139 79)",
+                              borderColor: "rgb(34 139 79)",
+                              color: "#fff",
+                            }}
+                            className={cn(
+                              "rounded-sm border transition-all",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                              "hover:brightness-110",
+                              !(tempDraft.description.trim() && tempDraft.quantity > 0) && "opacity-50",
+                            )}
+                          >
+                            <svg
+                              className="h-full w-full"
+                              viewBox="0 0 15 15"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M7.5 4.5 V10.5 M4.5 7.5 H10.5"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      {/* Data columns — render appropriate input or em-dash per column */}
+                      {displayColumns.filter((col) => col.key !== "checkbox").map((column) => (
+                        <TableCell
+                          key={column.key}
+                          className={cn(column.className, "px-4 py-2 !border-r-0 align-middle")}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {renderEntryCell(column.key)}
+                        </TableCell>
+                      ))}
+
+                    </TableRow>
+
+                    {/* Pinned temporary items already added — same per-column layout
+                        as the entry row + inventory rows, fully editable in place. */}
+                    {temporaryItems.map((temp) => (
+                      <TableRow
+                        key={temp.key}
+                        className="bg-primary/[0.02] border-b border-primary/10 hover:bg-primary/5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Checkbox column → X (delete) button. Same absolute-
+                            positioned 16×16 box as the other three. */}
+                        <TableCell
+                          style={{ width: 48, minWidth: 48, maxWidth: 48, padding: 0, position: "relative", height: 48 }}
+                          className="!border-r-0"
+                        >
+                          <div
+                            className="absolute cursor-pointer"
+                            style={{ left: 0, top: 0, right: 0, bottom: 0 }}
+                            onClick={(e) => { e.stopPropagation(); onTemporaryItemRemove?.(temp.key); }}
+                          >
+                            <div
+                              role="button"
+                              aria-label="Remover item temporário"
+                              title="Remover item temporário"
+                              tabIndex={0}
+                              style={{
+                                position: "absolute",
+                                left: 16,
+                                top: "50%",
+                                transform: "translateY(-50%)",
+                                width: 16,
+                                height: 16,
+                                boxSizing: "border-box",
+                                backgroundColor: "rgb(196 60 60)",
+                                borderColor: "rgb(196 60 60)",
+                                color: "#fff",
+                              }}
+                              className={cn(
+                                "rounded-sm border transition-all",
+                                "hover:brightness-110",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2",
+                              )}
+                            >
+                              <svg
+                                className="h-full w-full"
+                                viewBox="0 0 15 15"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                {/* X glyph kept inset (4.5–10.5) so its
+                                    visual footprint matches the + and checkbox
+                                    checkmark — no edge-bleed. */}
+                                <path
+                                  d="M4.5 4.5 L10.5 10.5 M10.5 4.5 L4.5 10.5"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        {/* Data columns */}
+                        {displayColumns.filter((col) => col.key !== "checkbox").map((column) => (
+                          <TableCell
+                            key={column.key}
+                            className={cn(column.className, "px-4 py-2 !border-r-0 align-middle")}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {renderTempCell(column.key, temp)}
+                          </TableCell>
+                        ))}
+
+                      </TableRow>
+                    ))}
+                  </>
+                )}
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={displayColumns.length + (!isOverlay ? 1 : 0)} className="p-0">
+                    <TableCell colSpan={displayColumns.length} className="p-0">
                       <div className="flex flex-col items-center justify-center p-8 text-center">
                         <LoadingSpinner />
                       </div>
@@ -602,7 +1133,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
                   </TableRow>
                 ) : items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={displayColumns.length + (!isOverlay ? 1 : 0)} className="p-0">
+                    <TableCell colSpan={displayColumns.length} className="p-0">
                       <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
                         <div className="text-lg font-medium mb-2">Nenhum item encontrado</div>
                         {hasActiveFilters && (
@@ -630,19 +1161,32 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
                         )}
                         onClick={(e) => handleRowClick(item, e)}
                       >
-                        {/* Checkbox cell */}
-                        <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        {/* Checkbox cell — same absolute-positioned 16×16 box
+                            as the header, sticky entry, and pinned temp cells. */}
+                        <TableCell
+                          style={{ width: 48, minWidth: 48, maxWidth: 48, padding: 0, position: "relative", height: 36 }}
+                          className="!border-r-0"
+                        >
                           <div
-                            className="flex items-center justify-start h-full w-full px-4 py-2 cursor-pointer"
+                            className="absolute cursor-pointer"
+                            style={{ left: 0, top: 0, right: 0, bottom: 0 }}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleRowClick(item, e);
                             }}
                           >
-                            {/* Simple visual checkbox to avoid Radix ref composition issues */}
                             <div
+                              style={{
+                                position: "absolute",
+                                left: 16,
+                                top: "50%",
+                                transform: "translateY(-50%)",
+                                width: 16,
+                                height: 16,
+                                boxSizing: "border-box",
+                              }}
                               className={cn(
-                                "h-4 w-4 shrink-0 rounded-sm border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                "rounded-sm border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                                 itemIsSelected
                                   ? "bg-primary border-primary text-primary-foreground"
                                   : "border-border bg-transparent hover:border-primary/50"
@@ -690,6 +1234,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
                             {column.accessor(item, contextRef.current)}
                           </TableCell>
                         ))}
+
                       </TableRow>
                     );
                   })
