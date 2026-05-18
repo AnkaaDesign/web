@@ -113,6 +113,30 @@ export class PositionService {
     });
     return response.data;
   }
+
+  async adjustPositionSalaries(
+    positionIds: string[],
+    percentage: number,
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      totalSuccess: number;
+      totalFailed: number;
+      results: any[];
+    };
+  }> {
+    const response = await apiClient.post<{
+      success: boolean;
+      message: string;
+      data: {
+        totalSuccess: number;
+        totalFailed: number;
+        results: any[];
+      };
+    }>(`${this.basePath}/batch-adjust-salaries`, { positionIds, percentage });
+    return response.data;
+  }
 }
 
 // =====================
@@ -244,6 +268,8 @@ export const deletePosition = (id: string) => positionService.deletePosition(id)
 export const batchCreatePositions = (data: PositionBatchCreateFormData, queryParams?: PositionQueryFormData) => positionService.batchCreatePositions(data, queryParams);
 export const batchUpdatePositions = (data: PositionBatchUpdateFormData, queryParams?: PositionQueryFormData) => positionService.batchUpdatePositions(data, queryParams);
 export const batchDeletePositions = (data: PositionBatchDeleteFormData) => positionService.batchDeletePositions(data);
+export const adjustPositionSalaries = (positionIds: string[], percentage: number) =>
+  positionService.adjustPositionSalaries(positionIds, percentage);
 
 // Position Remuneration query exports
 export const getPositionRemunerations = (params?: PositionRemunerationGetManyFormData) => positionRemunerationService.getPositionRemunerations(params);

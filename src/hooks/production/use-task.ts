@@ -106,7 +106,7 @@ export function useTasks(params?: UseTasksParams) {
     queryKey, // Include pagination in query key
     queryFn: () => getTasks(restParams), // Pass all params to the API
     enabled,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 0,
     retry: 2,
     refetchOnWindowFocus,
   });

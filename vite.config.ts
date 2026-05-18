@@ -2,9 +2,31 @@ import { defineConfig, type Plugin, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "url";
+import { execSync } from "child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+function getGitHash(): string {
+  try {
+    return execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
+  } catch {
+    return "dev";
+  }
+}
+
+function buildVersionPlugin(hash: string): Plugin {
+  return {
+    name: "build-version",
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "version.json",
+        source: JSON.stringify({ hash, buildTime: new Date().toISOString() }),
+      });
+    },
+  };
+}
 
 function htmlEnvReplace(apiUrl: string): Plugin {
   return {
@@ -23,9 +45,10 @@ export default defineConfig(({ mode }) => {
   // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
   const env = loadEnv(mode, process.cwd(), '');
   const apiUrl = env.VITE_API_URL || "http://localhost:3030";
+  const appHash = getGitHash();
 
   return {
-    plugins: [react(), htmlEnvReplace(apiUrl)],
+    plugins: [react(), htmlEnvReplace(apiUrl), buildVersionPlugin(appHash)],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
@@ -45,6 +68,7 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       global: "globalThis",
+      __APP_HASH__: JSON.stringify(appHash),
     },
     optimizeDeps: {
       exclude: ["react-native"],

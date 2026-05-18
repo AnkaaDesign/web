@@ -3,27 +3,28 @@ import { IconPlus } from "@tabler/icons-react";
 import { UserList } from "@/components/administration/user/list/user-list";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { FAVORITE_PAGES, routes, SECTOR_PRIVILEGES } from "../../../constants";
+import { useAuth } from "@/contexts/auth-context";
 import { useNavigate } from "react-router-dom";
 
 const CollaboratorListPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
 
-  const handleCreateNew = () => {
-    navigate(routes.administration.collaborators.create);
-  };
-
-  const actions = [
-    {
-      key: "create",
-      label: "Novo Colaborador",
-      icon: IconPlus,
-      onClick: handleCreateNew,
-      variant: "default" as const,
-    },
-  ];
+  const actions = isAdmin
+    ? [
+        {
+          key: "create",
+          label: "Novo Colaborador",
+          icon: IconPlus,
+          onClick: () => navigate(routes.administration.collaborators.create),
+          variant: "default" as const,
+        },
+      ]
+    : [];
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"

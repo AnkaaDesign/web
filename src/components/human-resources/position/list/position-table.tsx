@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconExternalLink, IconBriefcase, IconAlertTriangle, IconPlus } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconExternalLink, IconBriefcase, IconAlertTriangle, IconPlus, IconPercentage } from "@tabler/icons-react";
 
 import type { Position } from "../../../../types";
 import type { PositionGetManyFormData } from "../../../../schemas";
@@ -31,6 +31,7 @@ import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
 import { PositionListSkeleton } from "./position-list-skeleton";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/common/use-table-state";
+import { SalaryAdjustmentModal } from "../modals/salary-adjustment-modal";
 
 interface PositionTableProps {
   filters: Partial<PositionGetManyFormData>;
@@ -50,6 +51,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ items: Position[]; isBulk: boolean } | null>(null);
+  const [salaryAdjustmentModal, setSalaryAdjustmentModal] = useState<{ open: boolean; positions: Position[] }>({ open: false, positions: [] });
 
   // Permission checks
   const { user } = useAuth();
@@ -237,6 +239,14 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
         items: positions,
         isBulk: positions.length > 1,
       });
+      setContextMenu(null);
+    },
+    [],
+  );
+
+  const handleSalaryAdjustment = useCallback(
+    (positions: Position[]) => {
+      setSalaryAdjustmentModal({ open: true, positions });
       setContextMenu(null);
     },
     [],
@@ -546,6 +556,12 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
                       Editar
                     </DropdownMenuItem>
                   )}
+                  {canEdit && (
+                    <DropdownMenuItem onClick={() => handleSalaryAdjustment(contextMenu.positions)}>
+                      <IconPercentage className="mr-2 h-4 w-4" />
+                      Aplicar Reajuste
+                    </DropdownMenuItem>
+                  )}
                   {(canEdit || canDelete) && <DropdownMenuSeparator />}
                   {canDelete && (
                     <DropdownMenuItem onClick={() => handleDelete(contextMenu.positions)} className="text-destructive">
@@ -570,6 +586,10 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
                         <IconEdit className="mr-2 h-4 w-4" />
                         Editar em lote
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleSalaryAdjustment(contextMenu.positions)}>
+                        <IconPercentage className="mr-2 h-4 w-4" />
+                        Aplicar Reajuste
+                      </DropdownMenuItem>
                     </>
                   )}
                   {(canEdit || canDelete) && <DropdownMenuSeparator />}
@@ -585,6 +605,14 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
           </DropdownMenu>
         </div>
       )}
+
+      {/* Salary Adjustment Modal */}
+      <SalaryAdjustmentModal
+        open={salaryAdjustmentModal.open}
+        onOpenChange={(open) => setSalaryAdjustmentModal((prev) => ({ ...prev, open }))}
+        selectedPositions={salaryAdjustmentModal.positions}
+        onSuccess={() => refetch()}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>

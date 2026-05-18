@@ -17,6 +17,12 @@ import { setupWebNotifications } from "@/lib/setup-notifications";
 import { PushNotificationSetup } from "@/components/common/push-notification-setup";
 import { SocketNotificationsListener } from "@/components/common/socket-notifications-listener";
 import { SocketReconnectHandler } from "@/components/common/socket-reconnect-handler";
+import { useAppVersion } from "@/hooks/use-app-version";
+
+function AppVersionChecker() {
+  useAppVersion();
+  return null;
+}
 
 // Loading component for lazy loading
 const PageLoader = () => (
@@ -429,6 +435,7 @@ function App() {
                   <SidebarProvider>
                     <SocketNotificationsListener />
                     <SocketReconnectHandler />
+                    <AppVersionChecker />
                     <FavoritesProvider>
                       <FileViewerProvider>
                         <MessageModalProvider>

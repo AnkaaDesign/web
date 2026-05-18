@@ -15,6 +15,8 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/administracao/mensagens": ["ADMIN", "PRODUCTION_MANAGER"],
   "/administracao/mensagens/criar": ["ADMIN", "PRODUCTION_MANAGER"],
   "/administracao/mensagens/*": ["ADMIN", "PRODUCTION_MANAGER"],
+  "/administracao/colaboradores": ["ADMIN", "PRODUCTION_MANAGER"],
+  "/administracao/colaboradores/detalhes/:id": ["ADMIN", "PRODUCTION_MANAGER"],
 
   // Servidor - Server management routes (mostly admin, file manager also accessible to commercial and production manager)
   "/servidor/gerenciador-de-arquivos": ["ADMIN", "COMMERCIAL", "PRODUCTION_MANAGER"],

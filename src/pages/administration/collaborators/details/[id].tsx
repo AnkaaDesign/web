@@ -4,6 +4,7 @@ import { IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle } from
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { useUser, useUserMutations } from "../../../../hooks";
+import { useAuth } from "@/contexts/auth-context";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -18,6 +19,8 @@ const CollaboratorDetailsPage = () => {
   usePageTracker({ title: "Detalhes do Colaborador" });
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const {
@@ -60,7 +63,7 @@ const CollaboratorDetailsPage = () => {
 
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
         <UserDetailSkeleton />
       </PrivilegeRoute>
     );
@@ -83,7 +86,7 @@ const CollaboratorDetailsPage = () => {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
@@ -101,18 +104,20 @@ const CollaboratorDetailsPage = () => {
               icon: IconRefresh,
               onClick: () => refetch(),
             },
-            {
-              key: "edit",
-              label: "Editar",
-              icon: IconEdit,
-              onClick: () => navigate(routes.administration.collaborators.edit(id)),
-            },
-            {
-              key: "delete",
-              label: "Excluir",
-              icon: IconTrash,
-              onClick: () => setIsDeleteDialogOpen(true),
-            },
+            ...(isAdmin ? [
+              {
+                key: "edit",
+                label: "Editar",
+                icon: IconEdit,
+                onClick: () => navigate(routes.administration.collaborators.edit(id)),
+              },
+              {
+                key: "delete",
+                label: "Excluir",
+                icon: IconTrash,
+                onClick: () => setIsDeleteDialogOpen(true),
+              },
+            ] : []),
           ]}
           className="flex-shrink-0"
         />

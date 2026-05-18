@@ -1113,6 +1113,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     path: "/pessoal/mensagens",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   },
+  {
+    id: "colaboradores-production-manager",
+    title: "Colaboradores",
+    icon: "users",
+    path: "/administracao/colaboradores",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+  },
   // PRODUCTION_MANAGER - Ferramentas (flat items mirroring the full tools section)
   {
     id: "ferramentas-production-manager",
