@@ -123,9 +123,10 @@ export function BankTransactionTable({
       header: "Valor",
       align: "right",
       sortable: true,
+      width: "120px",
       render: t => (
         <span
-          className={`font-semibold tabular-nums ${
+          className={`font-semibold tabular-nums whitespace-nowrap ${
             t.type === "CREDIT" ? "text-emerald-700" : "text-red-700"
           }`}
         >
@@ -134,21 +135,12 @@ export function BankTransactionTable({
       ),
     },
     {
-      key: "memo",
-      header: "Descrição",
-      render: t => (
-        <span className="block max-w-md truncate" title={t.memo || ""}>
-          {t.memo || "—"}
-        </span>
-      ),
-    },
-    {
       key: "counterparty",
-      header: "Contraparte",
+      header: "Contraparte / Descrição",
       render: t => (
-        <span className="block max-w-xs truncate">
+        <span className="block max-w-md truncate">
           {t.counterpartyName ||
-            (t.counterpartyCnpjCpf ? formatCnpjCpf(t.counterpartyCnpjCpf) : "—")}
+            (t.counterpartyCnpjCpf ? formatCnpjCpf(t.counterpartyCnpjCpf) : t.memo || "—")}
         </span>
       ),
     },
@@ -185,6 +177,8 @@ export function BankTransactionTable({
     {
       key: "matchStatus",
       header: "Status",
+      width: "200px",
+      className: "whitespace-nowrap",
       render: t => {
         const conf = t.matches?.[0]?.confidenceScore;
         return <MatchStatusBadge status={t.matchStatus} confidence={conf} />;

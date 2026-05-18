@@ -120,8 +120,8 @@ export const ReconciliationStatementsListPage = () => {
       align: "right",
       render: s => {
         const pct =
-          s.transactionCount > 0
-            ? Math.round((s.matchedCount / s.transactionCount) * 100)
+          s.debitTransactionCount > 0
+            ? Math.round((s.matchedCount / s.debitTransactionCount) * 100)
             : 0;
         return (
           <Badge variant={getConfidenceBadgeVariant(pct)} className="font-medium">

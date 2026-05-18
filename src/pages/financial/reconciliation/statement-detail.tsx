@@ -61,7 +61,7 @@ export const ReconciliationStatementDetailPage = () => {
   const activeFilterCount =
     (filters.matchStatus ? 1 : 0) +
     (filters.matchType ? 1 : 0) +
-    (filters.type ? 1 : 0) +
+    (filters.type && filters.type !== "DEBIT" ? 1 : 0) +
     (filters.subtype ? 1 : 0) +
     (filters.dateFrom ? 1 : 0) +
     (filters.dateTo ? 1 : 0) +
@@ -119,8 +119,8 @@ export const ReconciliationStatementDetailPage = () => {
   const runMut = useRunAutoMatch();
 
   const matchedPct =
-    statement && statement.transactionCount > 0
-      ? Math.round((statement.matchedCount / statement.transactionCount) * 100)
+    statement && statement.debitTransactionCount > 0
+      ? Math.round((statement.matchedCount / statement.debitTransactionCount) * 100)
       : 0;
 
   const total = txData?.meta.total ?? 0;

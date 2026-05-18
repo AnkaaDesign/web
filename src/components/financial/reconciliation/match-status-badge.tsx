@@ -39,13 +39,10 @@ export function MatchStatusBadge({ status, confidence }: Props) {
   const cfg = STATUS_CONFIG[status];
   if (status === "AUTO_MATCHED" && typeof confidence === "number") {
     return (
-      <div className="inline-flex items-center gap-1.5">
-        <Badge variant={cfg.variant}>{cfg.label}</Badge>
-        <Badge variant={getConfidenceBadgeVariant(confidence)} size="sm">
-          {confidence}%
-        </Badge>
-      </div>
+      <Badge variant={cfg.variant} className="whitespace-nowrap">
+        {cfg.label} · {confidence}%
+      </Badge>
     );
   }
-  return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+  return <Badge variant={cfg.variant} className="whitespace-nowrap">{cfg.label}</Badge>;
 }

@@ -39,7 +39,7 @@ export interface ReconciliationFilters {
   statementId?: string;
 }
 
-export const defaultReconciliationFilters: ReconciliationFilters = {};
+export const defaultReconciliationFilters: ReconciliationFilters = { type: "DEBIT" };
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos" },

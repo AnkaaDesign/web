@@ -48,7 +48,7 @@ export const ReconciliationTransactionsListPage = () => {
     matchStatus:
       (searchParams.get("matchStatus") as ReconciliationFilters["matchStatus"]) || undefined,
     matchType: (searchParams.get("matchType") as MatchType | null) || undefined,
-    type: (searchParams.get("type") as ReconciliationFilters["type"]) || undefined,
+    type: (searchParams.get("type") as ReconciliationFilters["type"]) || "DEBIT",
     subtype: (searchParams.get("subtype") as BankTransactionSubtype | null) || undefined,
     dateFrom: searchParams.get("dateFrom") || undefined,
     dateTo: searchParams.get("dateTo") || undefined,
@@ -147,11 +147,19 @@ export const ReconciliationTransactionsListPage = () => {
     [searchParams, setPage, setSearchParams],
   );
 
-  const activeFilterCount = useMemo(
-    () =>
-      Object.values(filters).filter(v => v !== undefined && v !== null && v !== "").length,
-    [filters],
-  );
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.matchStatus) count++;
+    if (filters.matchType) count++;
+    if (filters.type !== "DEBIT") count++;
+    if (filters.subtype) count++;
+    if (filters.dateFrom) count++;
+    if (filters.dateTo) count++;
+    if (filters.amountMin !== undefined) count++;
+    if (filters.amountMax !== undefined) count++;
+    if (filters.counterparty) count++;
+    return count;
+  }, [filters]);
 
   const total = data?.meta.total ?? 0;
   const totalPages = data?.meta.totalPages ?? 1;

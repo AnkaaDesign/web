@@ -68,21 +68,26 @@ export function createFormDataWithContext(
           // This avoids sending [''] which would fail UUID validation for ID arrays
           formData.append(`${key}_empty`, 'true');
         } else {
-          value.forEach((item, index) => {
-            if (item !== null && item !== undefined) {
-              if (typeof item === 'object' && !(item instanceof File)) {
-                // For array of objects, append the whole object as JSON with indexed key
-                formData.append(`${key}[${index}]`, JSON.stringify(item));
-              } else if (item instanceof File) {
-                // Files should be in the files parameter, not data
-                console.warn(`File found in data.${key}[${index}], should be in files parameter`);
-                formData.append(`${key}[${index}]`, item);
-              } else {
-                // For primitive values
-                formData.append(`${key}[${index}]`, String(item));
+          const hasObjects = value.some(
+            item => item !== null && item !== undefined && typeof item === 'object' && !(item instanceof File)
+          );
+          if (hasObjects) {
+            // Serialize the entire array as a single JSON string so the backend's
+            // fixArrays() can parse it back. Bracket notation (items[0], items[1])
+            // creates literal field names the backend cannot reassemble into an array.
+            formData.append(key, JSON.stringify(value));
+          } else {
+            value.forEach((item, index) => {
+              if (item !== null && item !== undefined) {
+                if (item instanceof File) {
+                  console.warn(`File found in data.${key}[${index}], should be in files parameter`);
+                  formData.append(`${key}[${index}]`, item);
+                } else {
+                  formData.append(`${key}[${index}]`, String(item));
+                }
               }
-            }
-          });
+            });
+          }
         }
       } else if (typeof value === 'object') {
         formData.append(key, JSON.stringify(value));

@@ -52,6 +52,7 @@ export interface BankStatement {
   totalCredits: number;
   totalDebits: number;
   matchedCount: number;
+  debitTransactionCount: number;
   status: BankStatementImportStatus;
   errorMessage: string | null;
   uploadedById: string | null;
