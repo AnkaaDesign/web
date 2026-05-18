@@ -165,8 +165,13 @@ export function BonusValueDayModal({
     );
   }, [payrollUsers, sectorIds]);
 
-  // Fraction of the period's projected final bonus accrued by this day.
-  // Matches the chart's daily distribution: dayBonusValue / forecastedFinal.
+  // Fraction of the projected final bonus represented by this day's value.
+  // For real days: dayBonusValue = actual bonus at the day's real B1 (polynomial
+  // formula), so dayFraction = actual/projected — a meaningful "progress" ratio.
+  // For forecast days: dayBonusValue is a proportional projection, so dayFraction
+  // equals the weighted-task proportion. Algebraically, accruedBonus per user
+  // = u.baseBonus × rescaleFactor × dayFraction ≈ u.baseBonus for real days
+  // (since liveBonusTotal ≈ dayBonusValue when both use the same current B1).
   const dayFraction = forecastedFinalBonusValue > 0
     ? Math.min(1, dayBonusValue / forecastedFinalBonusValue)
     : 0;
@@ -202,11 +207,11 @@ export function BonusValueDayModal({
       .sort((a, b) => b.accruedBonus - a.accruedBonus);
   }, [filteredUsers, dayFraction, rescaleFactor, userSearch]);
 
-  // The chart's projected final weighted tasks is the right base for B1 here —
-  // it matches the same projection that produced the per-day bonus values.
-  const b1 = eligibleCount > 0
-    ? forecastedFinalWeightedTaskCount / eligibleCount
-    : 0;
+  // For past/today (non-forecast) days: use the actual accumulated weighted tasks
+  // for B1 so it reflects reality, not the projection. Forecast days use the
+  // projected end-of-period weighted task count (the same projection the chart uses).
+  const b1WeightedTasks = dayIsForecast ? forecastedFinalWeightedTaskCount : dayWeightedTaskCount;
+  const b1 = eligibleCount > 0 ? b1WeightedTasks / eligibleCount : 0;
 
   const tasksLoading = tasksQuery.isLoading;
   const tasksError = tasksQuery.isError;
@@ -422,14 +427,18 @@ export function BonusValueDayModal({
                 Resumo do cálculo
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <div className="text-muted-foreground">Bônus final do período</div>
+                <div className="text-muted-foreground">
+                  {dayIsForecast ? 'Bônus final do período' : 'Bônus final do período (projeção)'}
+                </div>
                 <div className="text-right font-medium text-foreground">
                   {formatCurrency(forecastedFinalBonusValue)}
                 </div>
 
-                <div className="text-muted-foreground">Tarefas ponderadas (projeção)</div>
+                <div className="text-muted-foreground">
+                  {dayIsForecast ? 'Tarefas ponderadas (projeção)' : 'Tarefas ponderadas (real)'}
+                </div>
                 <div className="text-right font-medium text-foreground">
-                  {forecastedFinalWeightedTaskCount.toFixed(2)}
+                  {b1WeightedTasks.toFixed(2)}
                 </div>
 
                 <div className="text-muted-foreground">B1 (média/colaborador elegível)</div>
@@ -443,9 +452,10 @@ export function BonusValueDayModal({
                 </div>
               </div>
               <p className="text-[10px] text-muted-foreground leading-relaxed pt-1">
-                O bônus do período é projetado pelo ritmo atual de tarefas e distribuído
-                dia a dia proporcionalmente ao peso acumulado. O valor de cada colaborador
-                acompanha a mesma proporção ({(dayFraction * 100).toFixed(1)}%) do bônus final.
+                {dayIsForecast
+                  ? `O bônus do período é projetado pelo ritmo atual de tarefas e distribuído dia a dia proporcionalmente ao peso acumulado. O valor de cada colaborador acompanha a mesma proporção (${(dayFraction * 100).toFixed(1)}%) do bônus final.`
+                  : `Tarefas e B1 refletem os valores reais acumulados até este dia. O bônus final do período é uma projeção baseada no ritmo atual. O acumulado (${(dayFraction * 100).toFixed(1)}%) representa a proporção do peso real sobre o peso projetado.`
+                }
               </p>
             </div>
           </div>

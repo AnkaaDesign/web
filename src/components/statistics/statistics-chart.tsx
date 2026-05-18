@@ -38,6 +38,34 @@ interface StatisticsChartProps {
   secondaryValueFormatter?: (value: number) => string;
   trendLine?: TrendLineType | null;
   goalLine?: { value: number; label?: string } | null;
+  /**
+   * Per-period goal values aligned positionally with `data`. When provided,
+   * renders a stepped line that follows the configured goal for each period
+   * instead of a single flat reference line. Takes precedence over goalLine.
+   */
+  perPeriodGoalLine?: { values: (number | null)[]; label?: string } | null;
+  /**
+   * Goal line rendered on the right Y-axis (yAxisIndex: 1). Only shown when
+   * yAxisMode === 'both'. Used to display a second metric's target alongside
+   * the primary goal without cluttering the primary axis.
+   */
+  secondaryGoalLine?: { value: number; label?: string } | null;
+  /**
+   * Per-period goal values for the secondary (right-axis) series. When provided,
+   * renders diamond markers with a dashed connecting line on yAxisIndex:1 instead
+   * of the flat secondaryGoalLine markLine. Takes precedence over secondaryGoalLine.
+   */
+  perPeriodSecondaryGoalLine?: { values: (number | null)[]; label?: string } | null;
+  /**
+   * Individual chart type for the primary series when yAxisMode === 'both'.
+   * Overrides the global chartType for the left-axis series only.
+   */
+  primaryChartType?: 'bar' | 'line' | 'line-smooth' | 'area' | 'area-smooth';
+  /**
+   * Individual chart type for the secondary series when yAxisMode === 'both'.
+   * Overrides the default 'line' for the right-axis series.
+   */
+  secondaryChartType?: 'bar' | 'line' | 'line-smooth' | 'area' | 'area-smooth';
   onDataPointClick?: (dataIndex: number, name: string, seriesName: string) => void;
 }
 
@@ -128,6 +156,11 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   secondaryValueFormatter,
   trendLine,
   goalLine,
+  perPeriodGoalLine,
+  secondaryGoalLine,
+  perPeriodSecondaryGoalLine,
+  primaryChartType,
+  secondaryChartType,
   onDataPointClick,
 }, externalRef) {
   const smooth = chartType === 'line-smooth' || chartType === 'area-smooth';
@@ -182,6 +215,10 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
     return () => observer.disconnect();
   }, []);
 
+  // Computed outside both useMemos so legendItems can reference them too.
+  const usePerPeriod = !!(perPeriodGoalLine?.values && perPeriodGoalLine.values.some(v => v != null));
+  const usePerPeriodSecondary = !!(perPeriodSecondaryGoalLine?.values?.some(v => v != null));
+
   const option = useMemo((): EChartsOption => {
     if (!data || data.length === 0) return {};
 
@@ -196,6 +233,12 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
     const needsScroll = chartLimit > 8;
 
     const xAxisData = data.map(item => item.name);
+
+    // Resolved upfront so goal-label colors and axis-rescaling both use the same name.
+    const primarySeriesName = yAxisLabel || tooltipLabels.primary;
+    const secondarySeriesName = tooltipLabels.secondary ?? 'Média/Usuário';
+    const primaryDataColor = colorOf(primarySeriesName, CHART_COLORS[0]);
+    const secondaryDataColor = colorOf(secondarySeriesName, CHART_COLORS[1]);
 
     const getItemValue = (item: ChartDataItem) => item.value ?? 0;
     const getComparisonValue = (comp: { value: number }) => comp.value ?? 0;
@@ -227,20 +270,40 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       axisTick: { lineStyle: { color: axisLineColor } },
     };
 
+    // All configured per-period values (including future months with goals).
+    // We show markers wherever a goal is configured, not just where bars exist.
+    const filteredPerPeriodVals = usePerPeriod
+      ? perPeriodGoalLine!.values
+      : null;
+
     // When a goal line is set above the visible data range, ECharts' auto
     // axis-scaling doesn't expand to include the markLine (it's attached to a
     // dummy null-data series), so the line gets clipped off-chart. Push the
     // axis max up to at least the goal value + ~10% headroom.
-    const dataMaxRaw = Math.max(
-      0,
-      ...data.flatMap(d => [
-        d.value ?? 0,
-        d.secondaryValue ?? 0,
-        ...(d.comparisons?.flatMap(c => [c.value ?? 0, c.secondaryValue ?? 0]) ?? []),
-      ]),
-    );
-    const axisFloor = goalLine?.value != null
-      ? Math.ceil(Math.max(dataMaxRaw, goalLine.value) * 1.08)
+    // Exclude hidden series from axis max so the chart rescales when a series is toggled off.
+    // Secondary values go on the right axis (handled in buildDualYAxis), so they don't
+    // contribute to the left-axis floor here regardless of visibility.
+    const dataMaxRaw = (() => {
+      if (isComparisonMode && data[0]?.comparisons) {
+        return Math.max(0, ...data.flatMap(d =>
+          (d.comparisons ?? []).flatMap(c =>
+            hiddenSeries.has(c.entityName) ? [] : [c.value ?? 0]
+          )
+        ));
+      }
+      if (hiddenSeries.has(primarySeriesName)) return 0;
+      return Math.max(0, ...data.map(d => d.value ?? 0));
+    })();
+    const goalSeriesName = usePerPeriod
+      ? (perPeriodGoalLine!.label || 'Meta')
+      : (goalLine?.label || 'Meta');
+    const goalIsHidden = hiddenSeries.has(goalSeriesName);
+    const perPeriodGoalMax = (filteredPerPeriodVals && !goalIsHidden)
+      ? Math.max(0, ...filteredPerPeriodVals.filter((v): v is number => v != null))
+      : 0;
+    const effectiveGoalMax = goalIsHidden ? 0 : Math.max(goalLine?.value ?? 0, perPeriodGoalMax);
+    const axisFloor = effectiveGoalMax > 0
+      ? Math.ceil(Math.max(dataMaxRaw, effectiveGoalMax) * 1.08)
       : undefined;
 
     const buildYAxis = () => {
@@ -279,10 +342,22 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       };
       const primary: any = { ...base, type: 'value' as const };
       if (axisFloor != null) { primary.min = 0; primary.max = axisFloor; }
-      return [
-        primary,
-        { ...base, type: 'value' as const, axisLabel: { ...base.axisLabel, formatter: (v: number) => secVF(v) }, splitLine: { show: false } },
-      ];
+
+      const secIsHidden = hiddenSeries.has(secondarySeriesName);
+      const secDataMax = secIsHidden ? 0 : Math.max(0, ...data.map(d => d.secondaryValue ?? 0));
+      const secGoalSeriesName = usePerPeriodSecondary
+        ? (perPeriodSecondaryGoalLine!.label || 'Meta Média')
+        : (secondaryGoalLine?.label || 'Meta Média');
+      const secGoalIsHidden = hiddenSeries.has(secGoalSeriesName);
+      const secFlatGoalMax = (!secGoalIsHidden && secondaryGoalLine?.value != null) ? secondaryGoalLine.value : 0;
+      const secPerPeriodMax = (!secGoalIsHidden && perPeriodSecondaryGoalLine?.values)
+        ? Math.max(0, ...perPeriodSecondaryGoalLine.values.filter((v): v is number => v != null))
+        : 0;
+      const secGoalMax = Math.max(secFlatGoalMax, secPerPeriodMax);
+      const secMax = Math.max(secDataMax, secGoalMax);
+      const secondary: any = { ...base, type: 'value' as const, axisLabel: { ...base.axisLabel, formatter: (v: number) => secVF(v) }, splitLine: { show: false } };
+      if (secMax > 0) { secondary.min = 0; secondary.max = Math.ceil(secMax * 1.12); }
+      return [primary, secondary];
     };
 
     const pointLabel = {
@@ -389,8 +464,37 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
     }
 
     // ── GOAL LINE ─────────────────────────────────────────────────────────────
+    // perPeriodGoalLine takes precedence: renders a stepped line that follows
+    // the configured goal for each period. Falls back to flat goalLine.
     const goalLineSeries: any[] = [];
-    if (goalLine?.value != null) {
+    if (usePerPeriod) {
+      const lbl = perPeriodGoalLine!.label || 'Meta';
+      const goalColor = colorOf(lbl, '#10b981');
+      // filteredPerPeriodVals was pre-computed above (only non-zero data positions).
+      const vals = filteredPerPeriodVals!;
+      goalLineSeries.push({
+        type: 'line' as const, name: lbl,
+        data: vals,
+        symbol: 'diamond',
+        symbolSize: 12,
+        showSymbol: true,
+        connectNulls: false,
+        animation: false,
+        silent: true,
+        legendHoverLink: false,
+        tooltip: { show: false },
+        // Dashed line connecting adjacent markers.
+        lineStyle: { color: goalColor, width: 2, type: 'dashed' as const },
+        itemStyle: { color: goalColor },
+        label: {
+          show: true,
+          position: 'top' as const,
+          formatter: (params: any) => params.value == null ? '' : valueFormatter(params.value, yAxisMode),
+          color: textColor, fontSize: 10,
+          backgroundColor: 'transparent', borderWidth: 0,
+        },
+      });
+    } else if (goalLine?.value != null) {
       const lbl = goalLine.label || 'Meta';
       const goalColor = colorOf(lbl, '#10b981');
       goalLineSeries.push({
@@ -406,6 +510,53 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           label: {
             formatter: `${lbl}: ${valueFormatter(goalLine.value, yAxisMode)}`,
             color: goalColor, fontSize: 11,
+            position: 'insideEndTop' as const,
+            backgroundColor: 'transparent', borderWidth: 0,
+          },
+        },
+      });
+    }
+
+    // ── SECONDARY PER-PERIOD GOAL LINE (right axis, both-mode only) ──────────
+    const perPeriodSecondaryGoalSeries: any[] = [];
+    if (yAxisMode === 'both' && usePerPeriodSecondary) {
+      const lbl3 = perPeriodSecondaryGoalLine!.label || 'Meta Média';
+      const goalColor3 = colorOf(lbl3, '#f59e0b');
+      const vals3 = perPeriodSecondaryGoalLine!.values;
+      perPeriodSecondaryGoalSeries.push({
+        type: 'line' as const, name: lbl3, data: vals3,
+        symbol: 'diamond', symbolSize: 12, showSymbol: true,
+        connectNulls: false, animation: false, silent: true,
+        lineStyle: { color: goalColor3, width: 2, type: 'dashed' as const },
+        itemStyle: { color: goalColor3 },
+        yAxisIndex: 1,
+        label: {
+          show: true, position: 'top' as const,
+          formatter: (params: any) => params.value == null ? '' : secVF(params.value),
+          color: textColor, fontSize: 10,
+        },
+      });
+    }
+
+    // ── SECONDARY GOAL LINE (right axis, both-mode only) ──────────────────────
+    const secondaryGoalSeries: any[] = [];
+    if (yAxisMode === 'both' && !usePerPeriodSecondary && secondaryGoalLine?.value != null) {
+      const lbl2 = secondaryGoalLine.label || 'Meta Média';
+      const goalColor2 = colorOf(lbl2, '#f59e0b');
+      secondaryGoalSeries.push({
+        type: 'line' as const, name: lbl2, data: xAxisData.map(() => null),
+        animation: false, silent: true, legendHoverLink: false,
+        showSymbol: false, lineStyle: { opacity: 0 }, tooltip: { show: false },
+        itemStyle: { color: goalColor2 },
+        yAxisIndex: 1,
+        markLine: {
+          silent: true,
+          symbol: ['none', 'none'],
+          data: [{ yAxis: secondaryGoalLine.value, name: lbl2 }],
+          lineStyle: { color: goalColor2, width: 2, type: 'dashed' as const },
+          label: {
+            formatter: `${lbl2}: ${secVF(secondaryGoalLine.value)}`,
+            color: goalColor2, fontSize: 11,
             position: 'insideEndTop' as const,
             backgroundColor: 'transparent', borderWidth: 0,
           },
@@ -494,7 +645,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           legend: { show: false },
           grid: baseGrid, xAxis: xAxisBase, yAxis: buildDualYAxis(),
           color: CHART_COLORS, dataZoom,
-          series: [...yearBandSeries, ...goalLineSeries, ...barSeries, ...lineSeries],
+          series: [...yearBandSeries, ...goalLineSeries, ...secondaryGoalSeries, ...perPeriodSecondaryGoalSeries, ...barSeries, ...lineSeries],
         };
       }
 
@@ -506,8 +657,9 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           const name = params[0].name;
           let html = `<strong style="color:${textColor}">${name}</strong><br/>`;
           params.forEach((p: any) => {
+            if (p.value == null) return;
             const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:4px;"></span>`;
-            const val = p.seriesIndex === 0 ? valueFormatter(p.value, 'count' as any) : secVF(p.value);
+            const val = (p.yAxisIndex ?? 0) === 1 ? secVF(p.value) : valueFormatter(p.value, 'count' as any);
             html += `${dot}${p.seriesName}: ${val}<br/>`;
           });
           return html;
@@ -515,11 +667,28 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       };
 
       const gridBothBottom = needsScroll ? 124 : 80;
-      const primaryIsLine = baseChartType === 'line-stacked';
+      // Determine primary/secondary rendering types. `primaryChartType` prop
+      // overrides the global chartType for the primary series; `secondaryChartType`
+      // overrides the default 'line' for the secondary series.
+      const effPrimary = primaryChartType ?? (baseChartType === 'line-stacked' ? 'line' : 'bar');
+      const effSecondary = secondaryChartType ?? 'line';
+      const primaryIsLine = effPrimary !== 'bar';
+      const primarySmooth = effPrimary === 'line-smooth' || effPrimary === 'area-smooth';
+      const primaryIsArea = effPrimary === 'area' || effPrimary === 'area-smooth';
+      const secondaryIsBar = effSecondary === 'bar';
+      const secondaryIsArea = effSecondary === 'area' || effSecondary === 'area-smooth';
+      const secondarySmooth = effSecondary === 'line-smooth' || effSecondary === 'area-smooth';
       const primaryName = tooltipLabels.primary;
       const secondaryName = tooltipLabels.secondary ?? 'Média/Usuário';
       const primaryColor = colorOf(primaryName, CHART_COLORS[0]);
       const secondaryColor = colorOf(secondaryName, CHART_COLORS[1]);
+      // Keep the secondary series consistent with the primary: if the primary
+      // plots a 0 for an empty / future period, the secondary plots 0 too —
+      // otherwise the blue line continues across the x-axis while the red one
+      // suddenly stops, which looks like a bug to the user (see the Jun-Dez
+      // gap in the both-mode chart). Use the raw secondary value with a 0
+      // fallback so both series cover the same x-range identically.
+      const secondaryData = data.map(item => item.secondaryValue ?? 0);
       return {
         tooltip: simpleBothTooltip,
         legend: { show: false },
@@ -536,17 +705,36 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
             data: data.map(item => ({ ...item, value: getItemValue(item) })),
             itemStyle: { color: primaryColor },
             ...(primaryIsLine
-              ? { smooth, lineStyle: { width: 2, color: primaryColor }, label: pointLabel }
+              ? {
+                  smooth: primarySmooth,
+                  lineStyle: { width: 2, color: primaryColor },
+                  ...(primaryIsArea ? { areaStyle: { opacity: 0.3, color: primaryColor } } : {}),
+                  label: pointLabel,
+                }
               : { label: barLabel }),
           },
           {
             name: secondaryName,
-            type: 'line' as const, yAxisIndex: 1,
-            data: data.map(item => item.secondaryValue ?? 0),
+            type: secondaryIsBar ? 'bar' as const : 'line' as const,
+            yAxisIndex: 1,
+            data: secondaryIsBar
+              ? data.map(item => item.secondaryValue ?? 0)
+              : secondaryData,
             itemStyle: { color: secondaryColor },
-            lineStyle: { width: 2, type: 'dashed' as const, color: secondaryColor },
-            smooth, label: secondaryPointLabel,
+            ...(secondaryIsBar
+              ? { label: barLabel }
+              : {
+                  lineStyle: { width: 2.5, type: 'solid' as const, color: secondaryColor },
+                  symbol: 'circle',
+                  symbolSize: 7,
+                  smooth: secondarySmooth,
+                  connectNulls: false,
+                  ...(secondaryIsArea ? { areaStyle: { opacity: 0.3, color: secondaryColor } } : {}),
+                  label: secondaryPointLabel,
+                }),
           },
+          ...secondaryGoalSeries,
+          ...perPeriodSecondaryGoalSeries,
         ],
       };
     }
@@ -681,7 +869,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
       color: CHART_COLORS, dataZoom,
       series: [...yearBandSeries, ...goalLineSeries, ...trendSeries, ...series],
     };
-  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, isDark, seriesColors, hasClickHandler, trendLabels, colorOf]);
+  }, [data, chartType, yAxisMode, isComparisonMode, yAxisLabel, valueFormatter, tooltipLabels, secondaryValueFormatter, trendLine, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, usePerPeriod, usePerPeriodSecondary, isDark, seriesColors, hiddenSeries, hasClickHandler, trendLabels, colorOf, primaryChartType, secondaryChartType]);
 
   const onEvents = useMemo((): Record<string, (params: any) => void> => {
     if (!hasClickHandler) return {};
@@ -729,34 +917,49 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
   // Build the list of legend items mirroring the series the option actually
   // adds, in the same order they appear.
   const legendItems = useMemo(() => {
-    if (!data?.length || baseChartType === 'pie') return [] as Array<{ name: string; color: string }>;
-    const items: Array<{ name: string; color: string }> = [];
-    const push = (name: string, fallback: string) => items.push({ name, color: colorOf(name, fallback) });
+    if (!data?.length || baseChartType === 'pie') return [] as Array<{ name: string; color: string; seriesType: 'bar' | 'line' | 'dashed' }>;
+    const items: Array<{ name: string; color: string; seriesType: 'bar' | 'line' | 'dashed' }> = [];
+    const push = (name: string, fallback: string, seriesType: 'bar' | 'line' | 'dashed' = 'bar') =>
+      items.push({ name, color: colorOf(name, fallback), seriesType });
+    // Primary series type based on current chart
+    const primaryType: 'bar' | 'line' = (baseChartType === 'bar' || baseChartType === 'bar-stacked') ? 'bar' : 'line';
 
     if (yAxisMode === 'both') {
       if (isComparisonMode && data[0]?.comparisons) {
-        data[0].comparisons.forEach((c, i) => push(c.entityName, CHART_COLORS[i % CHART_COLORS.length]));
-        data[0].comparisons.forEach((c, i) => push(`${c.entityName} (Média)`, CHART_COLORS[i % CHART_COLORS.length]));
+        data[0].comparisons.forEach((c, i) => push(c.entityName, CHART_COLORS[i % CHART_COLORS.length], 'bar'));
+        data[0].comparisons.forEach((c, i) => push(`${c.entityName} (Média)`, CHART_COLORS[i % CHART_COLORS.length], 'line'));
       } else {
-        push(tooltipLabels.primary, CHART_COLORS[0]);
-        push(tooltipLabels.secondary ?? 'Média/Usuário', CHART_COLORS[1]);
+        const effPrim = primaryChartType ?? primaryType;
+        const effSec = secondaryChartType ?? 'line';
+        const primLegendType: 'bar' | 'line' = (effPrim === 'bar') ? 'bar' : 'line';
+        const secLegendType: 'bar' | 'line' = (effSec === 'bar') ? 'bar' : 'line';
+        push(tooltipLabels.primary, CHART_COLORS[0], primLegendType);
+        push(tooltipLabels.secondary ?? 'Média/Usuário', CHART_COLORS[1], secLegendType);
+      }
+      if (usePerPeriodSecondary) {
+        push(perPeriodSecondaryGoalLine!.label || 'Meta Média', '#f59e0b', 'dashed');
+      } else if (secondaryGoalLine?.value != null) {
+        push(secondaryGoalLine.label || 'Meta Média', '#f59e0b', 'dashed');
       }
     } else if (isComparisonMode && data[0]?.comparisons) {
-      data[0].comparisons.forEach((c, i) => push(c.entityName, CHART_COLORS[i % CHART_COLORS.length]));
+      data[0].comparisons.forEach((c, i) => push(c.entityName, CHART_COLORS[i % CHART_COLORS.length], primaryType));
       if (trendLine && baseChartType !== 'bar-stacked' && baseChartType !== 'line-stacked') {
         data[0].comparisons.forEach((c, i) =>
-          push(`${c.entityName} · ${trendLabels[trendLine]}`, CHART_COLORS[i % CHART_COLORS.length])
+          push(`${c.entityName} · ${trendLabels[trendLine]}`, CHART_COLORS[i % CHART_COLORS.length], 'dashed')
         );
       }
     } else {
-      push(yAxisLabel || tooltipLabels.primary, CHART_COLORS[0]);
-      if (trendLine) push(trendLabels[trendLine], '#f59e0b');
+      push(yAxisLabel || tooltipLabels.primary, CHART_COLORS[0], primaryType);
+      if (trendLine) push(trendLabels[trendLine], '#f59e0b', 'dashed');
     }
-    if (goalLine?.value != null) {
-      push(goalLine.label || 'Meta', '#10b981');
+    const effectiveGoalLabel = usePerPeriod
+      ? (perPeriodGoalLine?.label || 'Meta')
+      : (goalLine?.label || 'Meta');
+    if (usePerPeriod || goalLine?.value != null) {
+      push(effectiveGoalLabel, '#10b981', 'dashed');
     }
     return items;
-  }, [data, baseChartType, yAxisMode, isComparisonMode, tooltipLabels, yAxisLabel, trendLine, trendLabels, goalLine, colorOf]);
+  }, [data, baseChartType, yAxisMode, isComparisonMode, tooltipLabels, yAxisLabel, trendLine, trendLabels, goalLine, perPeriodGoalLine, secondaryGoalLine, perPeriodSecondaryGoalLine, colorOf, usePerPeriod, usePerPeriodSecondary, primaryChartType, secondaryChartType]);
 
   // Drop hidden entries that no longer exist (e.g. after switching modes)
   useEffect(() => {
@@ -831,6 +1034,7 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
           >
             {legendItems.map(item => {
             const hidden = hiddenSeries.has(item.name);
+            const alpha = hidden ? 0.35 : 1;
             return (
               <div key={item.name} className="pointer-events-auto flex items-center gap-1.5 bg-card/60 backdrop-blur-sm px-1.5 py-0.5 rounded">
                 <Popover
@@ -840,13 +1044,28 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
                   <PopoverTrigger asChild>
                     <button
                       aria-label={`Cor da série ${item.name}`}
-                      className="w-4 h-4 rounded-sm transition-transform hover:scale-110 focus:outline-none"
-                      style={{ background: item.color, opacity: hidden ? 0.35 : 1 }}
-                    />
+                      className="flex items-center justify-center transition-transform hover:scale-110 focus:outline-none"
+                      style={{ opacity: alpha }}
+                    >
+                      {item.seriesType === 'bar' ? (
+                        <svg width="14" height="14" viewBox="0 0 14 14">
+                          <rect x="1" y="3" width="12" height="11" rx="1" fill={item.color} />
+                        </svg>
+                      ) : item.seriesType === 'line' ? (
+                        <svg width="22" height="12" viewBox="0 0 22 12">
+                          <line x1="0" y1="6" x2="22" y2="6" stroke={item.color} strokeWidth="2" />
+                          <circle cx="11" cy="6" r="3.5" fill={item.color} />
+                        </svg>
+                      ) : (
+                        <svg width="22" height="12" viewBox="0 0 22 12">
+                          <line x1="0" y1="6" x2="22" y2="6" stroke={item.color} strokeWidth="2" strokeDasharray="5 3" />
+                        </svg>
+                      )}
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent align="center" className="w-auto p-3">
                     <p className="text-xs font-medium mb-2 text-muted-foreground">Cor da série</p>
-                    <div className="grid grid-cols-5 gap-1.5">
+                    <div className="grid grid-cols-6 gap-1.5">
                       {CHART_COLORS.map(color => (
                         <button
                           key={color}

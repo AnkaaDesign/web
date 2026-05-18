@@ -63,6 +63,44 @@ export const routes = {
         root: "/administracao/monitoramento/logs",
       },
     },
+    // ---------------------------------------------------------------
+    // Skill-Assessment domain (Phase-4 rewrite)
+    // Skill = catálogo de habilidades (BEHAVIORAL/SAFETY/PRODUCTIVITY)
+    // Topic = item avaliável dentro de uma Skill
+    // Assessment = campanha de avaliação (período + setores + tópicos)
+    // ---------------------------------------------------------------
+    skill: {
+      root: "/administracao/competencias",
+      create: "/administracao/competencias/cadastrar",
+      details: (id: string) => `/administracao/competencias/detalhes/${id}`,
+      edit: (id: string) => `/administracao/competencias/editar/${id}`,
+      batchEdit: "/administracao/competencias/editar-lote",
+    },
+    topic: {
+      root: "/administracao/topicos",
+      create: "/administracao/topicos/cadastrar",
+      details: (id: string) => `/administracao/topicos/detalhes/${id}`,
+      edit: (id: string) => `/administracao/topicos/editar/${id}`,
+      batchEdit: "/administracao/topicos/editar-lote",
+    },
+    skillAssessment: {
+      root: "/administracao/avaliacao-competencias",
+      create: "/administracao/avaliacao-competencias/nova",
+      details: (id: string) => `/administracao/avaliacao-competencias/${id}`,
+      edit: (id: string) => `/administracao/avaliacao-competencias/${id}/editar`,
+      analytics: (id: string) => `/administracao/avaliacao-competencias/${id}/analytics`,
+      // Legacy — kept until Phase-6 page rewrite drops the old SkillModel UI.
+      model: "/administracao/avaliacao-competencias/modelo",
+      modelEdit: "/administracao/avaliacao-competencias/modelo/editar",
+    },
+  },
+
+  // Leader fill — Produção: leader fills the assessment entries assigned to them
+  skillAssessmentLeader: {
+    pending: "/meu-pessoal/avaliacoes-competencias",
+    campaign: (campaignId: string) =>
+      `/meu-pessoal/avaliacoes-competencias/${campaignId}`,
+    fill: (entryId: string) => `/meu-pessoal/avaliacoes-competencias/preencher/${entryId}`,
   },
 
   // Authentication - Rotas de autenticação
@@ -536,6 +574,12 @@ export const routes = {
     },
     garages: {
       root: "/producao/barracoes",
+    },
+    skillAssessment: {
+      root: "/producao/avaliacao-competencias",
+      period: (periodId: string) => `/producao/avaliacao-competencias/${periodId}`,
+      assess: (periodId: string, assesseeId: string) => `/producao/avaliacao-competencias/${periodId}/avaliar/${assesseeId}`,
+      assessment: (id: string) => `/producao/avaliacao-competencias/avaliacoes/${id}`,
     },
   },
 

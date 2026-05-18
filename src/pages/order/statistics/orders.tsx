@@ -688,6 +688,22 @@ const OrderPage = () => {
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 
+  const perPeriodGoalValues = useMemo(() => {
+    if (goalOverride != null || yearCompareMode || !defaultGoal.perPeriodValues) return null;
+    return displayBuckets.map(b => {
+      if (xMode === 'year') {
+        let total = 0; let hasAny = false;
+        for (let m = 1; m <= 12; m++) {
+          const key = `${b.period}-${String(m).padStart(2, '0')}`;
+          const v = defaultGoal.perPeriodValues!.get(key);
+          if (v != null) { total += v; hasAny = true; }
+        }
+        return hasAny ? total : null;
+      }
+      return defaultGoal.perPeriodValues!.get(b.period) ?? null;
+    });
+  }, [goalOverride, yearCompareMode, defaultGoal.perPeriodValues, displayBuckets, xMode]);
+
   // -------- Active filter count + period summary --------
 
   const activeFilterCount = useMemo(() => {
@@ -938,7 +954,8 @@ const OrderPage = () => {
         valueFormatter={valueFormatter}
         secondaryValueFormatter={secondaryValueFormatter}
         trendLine={trendLine}
-        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
+        goalLine={goalValue != null && !perPeriodGoalValues?.some(v => v != null) ? { value: goalValue, label: 'Meta Pedidos' } : null}
+        perPeriodGoalLine={perPeriodGoalValues?.some(v => v != null) ? { values: perPeriodGoalValues, label: 'Meta Pedidos' } : null}
         tooltipLabels={{
           primary: yMode === 'value' ? 'Valor' : 'Pedidos',
           secondary: yMode === 'value' ? 'Pedidos' : 'Valor (R$)',

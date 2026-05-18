@@ -628,6 +628,11 @@ const FaltasStatisticsPage = () => {
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 
+  const perPeriodGoalValues = useMemo(() => {
+    if (goalOverride != null || goalMetric === null || !defaultGoal.perPeriodValues) return null;
+    return items.map(item => defaultGoal.perPeriodValues!.get(item.period) ?? null);
+  }, [goalOverride, goalMetric, defaultGoal.perPeriodValues, items]);
+
   const activeFilterCount = useMemo(() => {
     let n = 0;
     if (filters.sectorIds?.length) n++;
@@ -782,7 +787,8 @@ const FaltasStatisticsPage = () => {
         valueFormatter={valueFormatter}
         tooltipLabels={tooltipLabels}
         trendLine={trendLine}
-        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
+        goalLine={goalValue != null && !perPeriodGoalValues?.some(v => v != null) ? { value: goalValue, label: 'Meta Limite Faltas' } : null}
+        perPeriodGoalLine={perPeriodGoalValues?.some(v => v != null) ? { values: perPeriodGoalValues, label: 'Meta Limite Faltas' } : null}
         onDataPointClick={(dataIndex) => {
           const it = items[dataIndex];
           if (!it || topAbsentees.length === 0) return;

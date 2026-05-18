@@ -2314,3 +2314,36 @@ export { DEPLOYMENT_ENVIRONMENT as DeploymentEnvironment };
 export { DEPLOYMENT_APPLICATION as DeploymentApplication };
 export { DEPLOYMENT_STATUS as DeploymentStatus };
 export { DEPLOYMENT_TRIGGER as DeploymentTrigger };
+
+// =====================
+// Skill Assessment Enums (mirror Prisma enums)
+// =====================
+//
+// Note: SKILL_AREA was removed. A Skill IS the area — the parallel enum was
+// redundant. Grouping/filtering now uses skillId / skill.name directly.
+
+export enum ASSESSMENT_STATUS {
+  DRAFT = "DRAFT",
+  OPEN = "OPEN",
+  CLOSED = "CLOSED",
+  CANCELLED = "CANCELLED",
+}
+
+export enum ASSESSMENT_ENTRY_STATUS {
+  PENDING = "PENDING",
+  IN_PROGRESS = "IN_PROGRESS",
+  SUBMITTED = "SUBMITTED",
+}
+
+export const ASSESSMENT_STATUS_LABELS: Record<ASSESSMENT_STATUS, string> = {
+  [ASSESSMENT_STATUS.DRAFT]: "Rascunho",
+  [ASSESSMENT_STATUS.OPEN]: "Aberta",
+  [ASSESSMENT_STATUS.CLOSED]: "Fechada",
+  [ASSESSMENT_STATUS.CANCELLED]: "Cancelada",
+};
+
+export const ASSESSMENT_ENTRY_STATUS_LABELS: Record<ASSESSMENT_ENTRY_STATUS, string> = {
+  [ASSESSMENT_ENTRY_STATUS.PENDING]: "Pendente",
+  [ASSESSMENT_ENTRY_STATUS.IN_PROGRESS]: "Em andamento",
+  [ASSESSMENT_ENTRY_STATUS.SUBMITTED]: "Enviada",
+};

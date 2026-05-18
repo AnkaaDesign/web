@@ -111,25 +111,33 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
 
   // Handle apply filters
   const handleApply = () => {
-    const updatedFilters = { ...localFilters };
+    const updatedFilters: Partial<TaskGetManyFormData> = { ...localFilters };
 
-    // Handle year and month period (26th to 25th cycle)
+    // Handle year and month period (26th to 25th cycle).
+    //
+    // Send the canonical {bonusPeriodYear, bonusPeriodMonths} pair. The
+    // backend computes the date range via businessPeriodStart/End — the
+    // SAME helpers `bonus.service.ts` uses — so task-history's count
+    // matches the bonus pages exactly. Eliminates browser-TZ vs server-TZ
+    // drift at the period boundaries.
+    //
+    // Also clear any stale finishedDateRange so the new period wins.
     if (selectedYear && selectedMonths.length > 0) {
-      // Convert year and months to date range using bonus period logic
       const monthNumbers = selectedMonths.map(m => parseInt(m));
+      updatedFilters.bonusPeriodYear = selectedYear;
+      updatedFilters.bonusPeriodMonths = monthNumbers;
+
+      // For UI display only (filter chips), keep finishedDateRange in sync.
+      // Backend ignores it because bonusPeriodYear is set.
       const minMonth = Math.min(...monthNumbers);
       const maxMonth = Math.max(...monthNumbers);
-
-      // Start date: 26th of the previous month of the earliest selected month
-      const fromDate = getBonusPeriodStart(selectedYear, minMonth);
-
-      // End date: 25th of the latest selected month
-      const toDate = getBonusPeriodEnd(selectedYear, maxMonth);
-
       updatedFilters.finishedDateRange = {
-        from: fromDate,
-        to: toDate,
+        from: getBonusPeriodStart(selectedYear, minMonth),
+        to: getBonusPeriodEnd(selectedYear, maxMonth),
       };
+    } else {
+      delete updatedFilters.bonusPeriodYear;
+      delete updatedFilters.bonusPeriodMonths;
     }
 
     onFilterChange(updatedFilters);

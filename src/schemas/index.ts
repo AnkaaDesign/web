@@ -112,3 +112,4 @@ export {
 export * from "./deployment";
 export * from "./economic-activity";
 export * from "./reconciliation";
+export * from "./skill";

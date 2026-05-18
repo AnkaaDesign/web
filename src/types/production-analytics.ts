@@ -132,12 +132,36 @@ export type TaskProductionCompareMode = 'combined' | 'separated' | 'separatedWit
 export type TaskProductionChartType = 'bar' | 'bar-stacked' | 'line' | 'line-smooth' | 'line-stacked' | 'area' | 'area-smooth';
 
 export interface TaskProductionFilters {
+  /**
+   * Legacy: explicit ISO dates from the browser. Susceptible to browser-TZ
+   * vs server-TZ drift at period boundaries. Prefer bonusPeriodYear +
+   * bonusPeriodMonths below — that lets the backend compute the window using
+   * the canonical helpers `bonus.service.ts` uses, eliminating the drift.
+   */
   startDate?: Date;
   endDate?: Date;
+  /**
+   * Canonical bonus-period inputs. When set, the backend ignores
+   * startDate/endDate and computes the date range via
+   * businessPeriodStart/businessPeriodEnd. Identical UTC moments to bonus.
+   */
+  bonusPeriodYear?: number;
+  bonusPeriodMonths?: number[];
   sectorIds?: string[];
   xAxisMode?: TaskProductionXAxisMode;
   yAxisMode?: TaskProductionYAxisMode;
   compareMode?: TaskProductionCompareMode;
+  /**
+   * Filter tasks by commission status. When provided, only tasks with one of
+   * the listed CommissionStatus values are counted in the statistics.
+   * e.g. ['FULL_COMMISSION', 'PARTIAL_COMMISSION']
+   */
+  commissionStatuses?: string[];
+  /**
+   * Filter tasks by the internal user who created them (createdById). When
+   * provided, only tasks registered by one of the listed user IDs are counted.
+   */
+  userIds?: string[];
 }
 
 export interface TaskProductionSectorComparison {
@@ -196,6 +220,9 @@ export type TaskPerformanceChartType = TaskProductionChartType;
 export interface TaskPerformanceFilters {
   startDate?: Date;
   endDate?: Date;
+  /** Canonical bonus-period inputs — see TaskProductionFilters for rationale. */
+  bonusPeriodYear?: number;
+  bonusPeriodMonths?: number[];
   sectorIds?: string[];
   xAxisMode?: TaskPerformanceXAxisMode;
   yAxisMode?: TaskPerformanceYAxisMode;
@@ -284,6 +311,8 @@ export interface BonusValueTimelineDay {
 
 export interface BonusValueTimelineSummary {
   currentBonusValue: number;
+  /** Gross bonus pool computed at today's actual B1 (no projection). Comparable to the HR bonus page's gross total before individual adjustments. */
+  actualCurrentBonusValue: number;
   forecastedFinalBonusValue: number;
   currentTaskCount: number;
   currentWeightedTaskCount: number;

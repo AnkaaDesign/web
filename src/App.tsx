@@ -245,6 +245,29 @@ const ProductionStatisticsHub = lazy(() => import("@/pages/production/statistics
 const FinancialStatisticsHub = lazy(() => import("@/pages/financial/statistics/index").then((module) => ({ default: module.default })));
 const HRStatisticsHub = lazy(() => import("@/pages/human-resources/statistics/index").then((module) => ({ default: module.default })));
 
+// Skill Assessment - Admin (Phase-4 rewrite)
+const SkillListAdminPage = lazy(() => import("@/pages/administration/skill/list").then((m) => ({ default: m.SkillListPage })));
+const SkillCreateAdminPage = lazy(() => import("@/pages/administration/skill/create").then((m) => ({ default: m.SkillCreatePage })));
+const SkillDetailsAdminPage = lazy(() => import("@/pages/administration/skill/details/[id]").then((m) => ({ default: m.SkillDetailsPage })));
+const SkillEditAdminPage = lazy(() => import("@/pages/administration/skill/edit/[id]").then((m) => ({ default: m.SkillEditPage })));
+const SkillBatchEditAdminPage = lazy(() => import("@/pages/administration/skill/batch-edit").then((m) => ({ default: m.SkillBatchEditPage })));
+
+const TopicListAdminPage = lazy(() => import("@/pages/administration/topic/list").then((m) => ({ default: m.TopicListPage })));
+const TopicCreateAdminPage = lazy(() => import("@/pages/administration/topic/create").then((m) => ({ default: m.TopicCreatePage })));
+const TopicDetailsAdminPage = lazy(() => import("@/pages/administration/topic/details/[id]").then((m) => ({ default: m.TopicDetailsPage })));
+const TopicEditAdminPage = lazy(() => import("@/pages/administration/topic/edit/[id]").then((m) => ({ default: m.TopicEditPage })));
+const TopicBatchEditAdminPage = lazy(() => import("@/pages/administration/topic/batch-edit").then((m) => ({ default: m.TopicBatchEditPage })));
+
+const SkillAssessmentAdminList = lazy(() => import("@/pages/administration/skill-assessment/list").then((m) => ({ default: m.SkillAssessmentListPage })));
+const SkillAssessmentAdminCreate = lazy(() => import("@/pages/administration/skill-assessment/create").then((m) => ({ default: m.SkillAssessmentCreatePage })));
+const SkillAssessmentAdminDetails = lazy(() => import("@/pages/administration/skill-assessment/details/[id]").then((m) => ({ default: m.SkillAssessmentDetailsPage })));
+const SkillAssessmentAdminEdit = lazy(() => import("@/pages/administration/skill-assessment/edit/[id]").then((m) => ({ default: m.SkillAssessmentEditPage })));
+
+// Skill Assessment - Leader (Phase-4 rewrite: queue + per-entry fill)
+const SkillAssessmentLeaderList = lazy(() => import("@/pages/production/skill-assessment/index").then((m) => ({ default: m.SkillAssessmentLeaderPage })));
+const SkillAssessmentLeaderCampaign = lazy(() => import("@/pages/production/skill-assessment/[campaignId]").then((m) => ({ default: m.SkillAssessmentCampaignPage })));
+const SkillAssessmentLeaderFill = lazy(() => import("@/pages/production/skill-assessment/fill/[entryId]").then((m) => ({ default: m.SkillAssessmentFillPage })));
+
 // Personal
 const Personal = lazy(() => import("@/pages/personal/root").then((module) => ({ default: module.Personal })));
 const PersonalMyMessages = lazy(() => import("@/pages/personal/my-messages").then((module) => ({ default: module.MyMessagesPage })));
@@ -715,6 +738,183 @@ function App() {
                     <Suspense fallback={<PageLoader />}>
                       <ProductionGarages />
                     </Suspense>
+                  }
+                />
+
+                {/* Admin Skill catalogue routes (Phase-4 rewrite) */}
+                <Route
+                  path={routes.administration.skill.root}
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillListAdminPage />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path={routes.administration.skill.create}
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillCreateAdminPage />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path={routes.administration.skill.batchEdit}
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillBatchEditAdminPage />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path="/administracao/competencias/detalhes/:id"
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillDetailsAdminPage />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path="/administracao/competencias/editar/:id"
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillEditAdminPage />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+
+                {/* Admin Topic catalogue routes */}
+                <Route
+                  path={routes.administration.topic.root}
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <TopicListAdminPage />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path={routes.administration.topic.create}
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <TopicCreateAdminPage />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path={routes.administration.topic.batchEdit}
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <TopicBatchEditAdminPage />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path="/administracao/topicos/detalhes/:id"
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <TopicDetailsAdminPage />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path="/administracao/topicos/editar/:id"
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <TopicEditAdminPage />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+
+                {/* Admin Skill-Assessment campaign routes */}
+                <Route
+                  path={routes.administration.skillAssessment.root}
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillAssessmentAdminList />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path={routes.administration.skillAssessment.create}
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillAssessmentAdminCreate />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path="/administracao/avaliacao-competencias/:id/editar"
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillAssessmentAdminEdit />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path="/administracao/avaliacao-competencias/:id"
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillAssessmentAdminDetails />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                {/* Leader skill assessment routes (Phase-4 rewrite) */}
+                <Route
+                  path={routes.skillAssessmentLeader.pending}
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillAssessmentLeaderList />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path="/meu-pessoal/avaliacoes-competencias/:campaignId"
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillAssessmentLeaderCampaign />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
+                  path="/meu-pessoal/avaliacoes-competencias/preencher/:entryId"
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillAssessmentLeaderFill />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
                   }
                 />
 

@@ -1331,7 +1331,7 @@ const EquipePage = () => {
         valueFormatter={valueFormatter}
         tooltipLabels={tooltipLabels}
         trendLine={trendLine}
-        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
+        goalLine={goalValue != null ? { value: goalValue, label: 'Meta Desempenho Equipe' } : null}
         onDataPointClick={(dataIndex) => {
           const item = timeseries[dataIndex];
           if (item) setPeriodModal(item);

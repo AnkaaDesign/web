@@ -391,18 +391,28 @@ export function PerformancePeriodModal({
                     <TableHead className="cursor-pointer select-none whitespace-nowrap" onClick={() => toggleSort('rank')}>
                       Cargo {sortIcon('rank')}
                     </TableHead>
+                    <TableHead
+                      className="text-right whitespace-nowrap"
+                      title="Peso da posição = 1 + passo × rank (rank=0 para a posição mais baixa). O passo é configurável no filtro."
+                    >
+                      Peso
+                    </TableHead>
                     <TableHead className="text-right cursor-pointer select-none whitespace-nowrap" onClick={() => toggleSort('workingDays')}>
                       Dias Úteis {sortIcon('workingDays')}
                     </TableHead>
-                    <TableHead className="text-right cursor-pointer select-none whitespace-nowrap" onClick={() => toggleSort('tasks')}>
-                      Tarefas {sortIcon('tasks')}
+                    <TableHead
+                      className="text-right cursor-pointer select-none whitespace-nowrap"
+                      onClick={() => toggleSort('tasks')}
+                      title="Tarefas Atribuídas = T × (peso × dias úteis) / Σ(peso × dias úteis). Soma exata = T."
+                    >
+                      Tarefas Atribuídas {sortIcon('tasks')}
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedUsers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="py-12 text-center text-sm text-foreground/60">
+                      <TableCell colSpan={5} className="py-12 text-center text-sm text-foreground/60">
                         {search ? 'Nenhum resultado.' : 'Nenhum colaborador ativo neste período.'}
                       </TableCell>
                     </TableRow>
@@ -422,6 +432,9 @@ export function PerformancePeriodModal({
                         </TableCell>
                         <TableCell className="text-xs text-foreground/80 whitespace-nowrap">
                           {u.positionName ?? '—'}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs text-foreground/80">
+                          {u.weight.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-xs">
                           {formatNumber(u.workingDays)}

@@ -132,3 +132,9 @@ export * from "./platform-utils";
 export * from "./push-notifications";
 export { reconciliationService } from "./reconciliation";
 export { siegService } from "./sieg";
+
+// Skill-Assessment domain
+export * from "./skill";
+export * from "./topic";
+export * from "./assessment";
+export * from "./assessment-entry";

@@ -14,11 +14,41 @@ import {
   IconSettings,
   IconTrash,
   IconAlertTriangle,
+  IconLock,
 } from "@tabler/icons-react";
 import { Button } from "../../components/ui/button";
+import { ErrorBoundary } from "../../components/ui/error-boundary";
 import { SizeSelector } from "./size-selector";
 import { widgetRegistry } from "../registry";
 import type { WidgetInstance, WidgetSize } from "../types";
+
+// A widget can throw when its data fetch hits a 403 (e.g. an ADMIN-only stats
+// endpoint hit by a user whose sector was changed since the layout was saved).
+// We don't want that to crash the dashboard or unmount sibling widgets — and
+// 403 in particular is a permission issue, not a real error, so we render a
+// quiet placeholder rather than an alarming red banner.
+function isForbiddenError(error: Error): boolean {
+  const anyErr = error as { statusCode?: number; response?: { status?: number }; _statusCode?: number };
+  if (anyErr.statusCode === 403 || anyErr._statusCode === 403 || anyErr.response?.status === 403) return true;
+  return /403|forbidden|privilégios|acesso negado/i.test(error.message || "");
+}
+
+function WidgetErrorFallback({ error }: { error: Error; reset: () => void }) {
+  if (isForbiddenError(error)) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 p-4 text-center gap-2">
+        <IconLock className="h-5 w-5 text-muted-foreground" />
+        <p className="text-xs text-muted-foreground">Sem permissão para este widget</p>
+      </div>
+    );
+  }
+  return (
+    <div className="h-full w-full flex flex-col items-center justify-center rounded-lg border border-dashed border-destructive/40 bg-destructive/5 p-4 text-center gap-2">
+      <IconAlertTriangle className="h-5 w-5 text-destructive" />
+      <p className="text-xs text-muted-foreground">Não foi possível carregar este widget</p>
+    </div>
+  );
+}
 
 interface WidgetTileProps {
   instance: WidgetInstance;
@@ -150,18 +180,20 @@ export function WidgetTile({
         </>
       )}
       <div className="h-full min-h-0">
-        <Suspense
-          fallback={
-            <div className="h-full w-full animate-pulse rounded-lg bg-muted/30" />
-          }
-        >
-          <Render
-            instanceId={instance.instanceId}
-            config={parsedConfig}
-            size={instance.size}
-            isEditing={isEditing}
-          />
-        </Suspense>
+        <ErrorBoundary fallback={WidgetErrorFallback}>
+          <Suspense
+            fallback={
+              <div className="h-full w-full animate-pulse rounded-lg bg-muted/30" />
+            }
+          >
+            <Render
+              instanceId={instance.instanceId}
+              config={parsedConfig}
+              size={instance.size}
+              isEditing={isEditing}
+            />
+          </Suspense>
+        </ErrorBoundary>
       </div>
     </div>
   );

@@ -175,8 +175,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Set up global authentication error handler
   useEffect(() => {
     const handleAuthError = (error: { statusCode: number; message: string; category?: string }) => {
-      // Check if it's a deleted user or token-related error
-      if (error.statusCode === 401 || error.statusCode === 403) {
+      // Only 401 (Unauthorized — invalid/expired token) triggers logout.
+      // 403 (Forbidden — authenticated but lacks role/sector permission) must not,
+      // or restricted widgets/endpoints would log valid users out.
+      if (error.statusCode === 401) {
         // Clear auth state immediately
         removeLocalStorage("token");
         removeUserData();

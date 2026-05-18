@@ -942,6 +942,22 @@ const FinancialOverviewPage = () => {
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 
+  const perPeriodGoalValues = useMemo(() => {
+    if (goalOverride != null || yearCompareMode || goalMetric == null || analysis.dimension !== 'periodo' || !defaultGoal.perPeriodValues) return null;
+    return displayBuckets.map(b => {
+      if (xMode === 'year') {
+        let total = 0; let hasAny = false;
+        for (let m = 1; m <= 12; m++) {
+          const key = `${b.period}-${String(m).padStart(2, '0')}`;
+          const v = defaultGoal.perPeriodValues!.get(key);
+          if (v != null) { total += v; hasAny = true; }
+        }
+        return hasAny ? total : null;
+      }
+      return defaultGoal.perPeriodValues!.get(b.period) ?? null;
+    });
+  }, [goalOverride, yearCompareMode, goalMetric, analysis.dimension, defaultGoal.perPeriodValues, displayBuckets, xMode]);
+
   // -------- Loading / error state aggregation --------
 
   const isLoading = collectionLoading || receivablesLoading || quoteFunnelLoading;
@@ -1488,7 +1504,8 @@ const FinancialOverviewPage = () => {
           yAxisLabel={unit === 'currency' ? 'Valor (R$)' : unit === 'percent' ? 'Taxa (%)' : unit === 'days' ? 'Dias' : 'Qtd'}
           valueFormatter={valueFmt}
           trendLine={trendLine}
-          goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
+          goalLine={goalValue != null && !perPeriodGoalValues?.some(v => v != null) ? { value: goalValue, label: 'Meta Cobrança' } : null}
+          perPeriodGoalLine={perPeriodGoalValues?.some(v => v != null) ? { values: perPeriodGoalValues, label: 'Meta Cobrança' } : null}
           tooltipLabels={{ primary: currentMetricDef.label }}
           onDataPointClick={handleChartPointClick}
         />

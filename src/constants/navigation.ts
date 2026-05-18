@@ -561,6 +561,36 @@ export const NAVIGATION_MENU: MenuItem[] = [
         path: "/administracao/metas",
         requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
       },
+      {
+        id: "avaliacao-competencias-admin",
+        title: "Aval. de Competências",
+        icon: "clipboardList",
+        path: "/administracao/avaliacao-competencias",
+        requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
+        children: [
+          {
+            id: "avaliacao-competencias-campanhas",
+            title: "Campanhas",
+            icon: "clipboardList",
+            path: "/administracao/avaliacao-competencias",
+            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER],
+          },
+          {
+            id: "avaliacao-competencias-skills",
+            title: "Competências",
+            icon: "clipboardList",
+            path: "/administracao/competencias",
+            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES],
+          },
+          {
+            id: "avaliacao-competencias-topics",
+            title: "Tópicos",
+            icon: "clipboardList",
+            path: "/administracao/topicos",
+            requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES],
+          },
+        ],
+      },
     ],
   },
 
@@ -1113,6 +1143,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
     path: "/pessoal/mensagens",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   },
+  // PRODUCTION_MANAGER access to "Aval. de Competências" is consolidated into the
+  // admin block above (requiredPrivilege includes PRODUCTION_MANAGER). Read-only
+  // for the campaign list/details; setup pages (skills/topics) remain ADMIN+HR only.
   {
     id: "colaboradores-production-manager",
     title: "Colaboradores",
@@ -1309,6 +1342,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
       { id: "epis-equipe", title: "Entregas de EPI", icon: "helmet", path: "/meu-pessoal/epis" },
       { id: "movimentacoes-equipe", title: "Movimentações", icon: "activity", path: "/meu-pessoal/movimentacoes" },
       { id: "calculos-equipe", title: "Controle de Ponto", icon: "fingerprint", path: "/meu-pessoal/calculos" },
+      { id: "avaliacao-competencias-lider", title: "Aval. de Competências", icon: "clipboardList", path: "/meu-pessoal/avaliacoes-competencias" },
     ],
   },
 
@@ -1633,12 +1667,18 @@ export const NAVIGATION_MENU: MenuItem[] = [
   // FERRAMENTAS
   // Shown only for hierarchical-nav roles; flat-nav roles (COMMERCIAL, FINANCIAL, DESIGNER,
   // LOGISTIC, PLOTTING, MAINTENANCE, PRODUCTION_MANAGER) have their own specific items or no tools access.
+  // PRODUCTION is excluded — production-sector workers don't need the calculators/QR tools.
+  // Production team leaders are also excluded (TEAM_LEADER virtual privilege removed) — they were
+  // still seeing the menu otherwise.
+  // BASIC is excluded because production sectors default to BASIC when `privileges` is unset
+  // (see api/src/schemas/sector.ts default + auth.service.ts fallback) — keeping BASIC here would
+  // leak the menu to those users.
   {
     id: "ferramentas",
     title: "Ferramentas",
     icon: "tools",
     path: "/ferramentas",
-    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.BASIC, SECTOR_PRIVILEGES.EXTERNAL, TEAM_LEADER],
+    requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.EXTERNAL],
     children: [
       {
         id: "ferramentas-qr-code",

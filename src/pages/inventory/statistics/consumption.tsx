@@ -951,6 +951,18 @@ const ConsumptionPage = () => {
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 
+  // Per-period goal for temporal mode (simple month x-axis only).
+  const perPeriodGoalValues = useMemo(() => {
+    if (goalOverride != null || !defaultGoal.perPeriodValues || !isTemporalMode || isMultiEntityTemporal) return null;
+    const periods = apiFilters.periods ?? [];
+    if (!periods.length) return null;
+    return periods.map(period => {
+      const rawSum = defaultGoal.perPeriodValues!.get(period.id) ?? null;
+      if (rawSum == null) return null;
+      return goalEntitySplit > 1 ? rawSum / goalEntitySplit : rawSum;
+    });
+  }, [goalOverride, defaultGoal.perPeriodValues, isTemporalMode, isMultiEntityTemporal, apiFilters.periods, goalEntitySplit]);
+
   // ── Y value accessors ──
   const getValue = useCallback((qty: number, val: number) =>
     yAxisMode === 'value' ? val : qty, [yAxisMode]);
@@ -1327,7 +1339,8 @@ const ConsumptionPage = () => {
           secondary: isBothMode ? 'Valor (R$)' : undefined,
         }}
         trendLine={trendLine}
-        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
+        goalLine={goalValue != null && !perPeriodGoalValues?.some(v => v != null) ? { value: goalValue, label: 'Meta Consumo' } : null}
+        perPeriodGoalLine={perPeriodGoalValues?.some(v => v != null) ? { values: perPeriodGoalValues, label: 'Meta Consumo' } : null}
       />
     );
   };

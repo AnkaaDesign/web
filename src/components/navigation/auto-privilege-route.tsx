@@ -2,43 +2,53 @@ import type { ReactNode } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { Navigate, useLocation } from "react-router-dom";
 import { IconLoader2, IconShield } from "@tabler/icons-react";
-import { SECTOR_PRIVILEGES, routes } from "../../constants";
+import { SECTOR_PRIVILEGES, TEAM_LEADER, routes } from "../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getRequiredPrivilegeForRoute } from "@/utils/route-privileges";
 import { hasAnyPrivilege, hasPrivilege, getSectorPrivilegesLabel } from "../../utils";
 
+type PrivilegeKey = keyof typeof SECTOR_PRIVILEGES | "TEAM_LEADER";
+
 interface AutoPrivilegeRouteProps {
   children: ReactNode;
+}
+
+// TEAM_LEADER is a virtual privilege (string constant, not in the SECTOR_PRIVILEGES
+// enum) — checked via `user.ledSector.id`. Resolving "TEAM_LEADER" through
+// `SECTOR_PRIVILEGES[key]` yields `undefined`, which silently strips the privilege
+// from both access checks and the unauthorized-page label.
+function resolvePrivilegeValue(key: PrivilegeKey): SECTOR_PRIVILEGES | typeof TEAM_LEADER {
+  return key === "TEAM_LEADER" ? TEAM_LEADER : SECTOR_PRIVILEGES[key];
 }
 
 /**
  * Check if user has required privilege(s) for route access
  * Supports both single privileges and arrays of privileges (OR logic)
  */
-function hasRequiredPrivilegeForRoute(user: any, requiredPrivilege: keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[]): boolean {
+function hasRequiredPrivilegeForRoute(user: any, requiredPrivilege: PrivilegeKey | PrivilegeKey[]): boolean {
   if (!user || !requiredPrivilege) return false;
 
   // Handle array of privileges (OR logic - user needs ANY of the privileges)
   if (Array.isArray(requiredPrivilege)) {
-    const privilegeValues = requiredPrivilege.map((key) => SECTOR_PRIVILEGES[key]);
+    const privilegeValues = requiredPrivilege.map(resolvePrivilegeValue);
     return hasAnyPrivilege(user, privilegeValues);
   }
 
   // Handle single privilege
-  return hasPrivilege(user, SECTOR_PRIVILEGES[requiredPrivilege]);
+  return hasPrivilege(user, resolvePrivilegeValue(requiredPrivilege));
 }
 
 /**
  * Helper function to get privilege labels for arrays
  * Uses existing getSectorPrivilegesLabel utility for single privileges
  */
-function getRequiredPrivilegeLabels(requiredPrivilege: keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[]): string {
+function getRequiredPrivilegeLabels(requiredPrivilege: PrivilegeKey | PrivilegeKey[]): string {
   if (Array.isArray(requiredPrivilege)) {
-    return requiredPrivilege.map((key) => getSectorPrivilegesLabel(SECTOR_PRIVILEGES[key])).join(", ");
+    return requiredPrivilege.map((key) => getSectorPrivilegesLabel(resolvePrivilegeValue(key) as SECTOR_PRIVILEGES)).join(", ");
   }
 
-  return getSectorPrivilegesLabel(SECTOR_PRIVILEGES[requiredPrivilege]);
+  return getSectorPrivilegesLabel(resolvePrivilegeValue(requiredPrivilege) as SECTOR_PRIVILEGES);
 }
 
 /**
@@ -64,7 +74,7 @@ function getUserPrivilegeLabels(user: any): string {
   return user.sector.privileges.toString();
 }
 
-function UnauthorizedAccess({ currentRoute, requiredPrivilege }: { currentRoute: string; requiredPrivilege: keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[] }) {
+function UnauthorizedAccess({ currentRoute, requiredPrivilege }: { currentRoute: string; requiredPrivilege: PrivilegeKey | PrivilegeKey[] }) {
   const { user, logout } = useAuth();
 
   const handleGoBack = () => {
@@ -164,10 +174,10 @@ export const AutoPrivilegeRoute: React.FC<AutoPrivilegeRouteProps> = ({ children
   // Only check privilege if it's defined (route requires specific privilege)
   if (requiredPrivilege) {
     // Check if user has required privilege(s)
-    const hasAccess = hasRequiredPrivilegeForRoute(user, requiredPrivilege as keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[]);
+    const hasAccess = hasRequiredPrivilegeForRoute(user, requiredPrivilege as PrivilegeKey | PrivilegeKey[]);
 
     if (!hasAccess) {
-      return <UnauthorizedAccess currentRoute={location.pathname} requiredPrivilege={requiredPrivilege as keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[]} />;
+      return <UnauthorizedAccess currentRoute={location.pathname} requiredPrivilege={requiredPrivilege as PrivilegeKey | PrivilegeKey[]} />;
     }
   }
 

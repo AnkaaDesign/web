@@ -10,7 +10,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Combobox } from '@/components/ui/combobox';
-import { GOAL_METRIC, routes, SECTOR_PRIVILEGES } from '@/constants';
+import { GOAL_METRIC, routes, SECTOR_PRIVILEGES, COMMISSION_STATUS } from '@/constants';
+import { COMMISSION_STATUS_LABELS } from '@/constants/enum-labels';
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import { useTaskProductionStats } from '@/hooks/production/use-production-analytics';
 import { useDefaultGoal } from '@/hooks/administration/use-default-goal';
@@ -31,7 +32,8 @@ import { ProductionPeriodTasksModal } from '@/components/production/production-p
 import { formatNumber, CHART_COLORS } from '@/types/statistics-common';
 import type { YAxisMode, StatisticsChartType, TrendLineType } from '@/types/statistics-common';
 import { getSectors } from '@/api-client/sector';
-import { sectorKeys } from '@/hooks/common/query-keys';
+import { getUsers } from '@/api-client/user';
+import { sectorKeys, userKeys } from '@/hooks/common/query-keys';
 import {
   IconChartBar,
   IconChartLine,
@@ -251,17 +253,24 @@ interface FilterSheetProps {
   onApply: (filters: TaskProductionFilters, years: string[], months: string[], days: string[], yearCompare: boolean) => void;
 }
 
+const COMMISSION_OPTIONS = Object.values(COMMISSION_STATUS).map(v => ({
+  value: v,
+  label: COMMISSION_STATUS_LABELS[v],
+}));
+
 function TaskProductionFiltersSheet({
   open, onOpenChange, filters, selectedYears, selectedMonths, selectedDays, yearCompareMode, onApply,
 }: FilterSheetProps) {
   const [localX, setLocalX]     = useState<TaskProductionXAxisMode>(filters.xAxisMode || 'month');
   const [localY, setLocalY]     = useState<TaskProductionYAxisMode>(filters.yAxisMode || 'count');
   const [localCmp, setLocalCmp] = useState<TaskProductionCompareMode>(filters.compareMode || 'combined');
-  const [localSectors, setLocalSectors] = useState<string[]>(filters.sectorIds || []);
-  const [localYears, setLocalYears]     = useState<string[]>(selectedYears);
-  const [localMonths, setLocalMonths]   = useState<string[]>(selectedMonths);
-  const [localDays, setLocalDays]       = useState<string[]>(selectedDays);
+  const [localSectors, setLocalSectors]         = useState<string[]>(filters.sectorIds || []);
+  const [localYears, setLocalYears]             = useState<string[]>(selectedYears);
+  const [localMonths, setLocalMonths]           = useState<string[]>(selectedMonths);
+  const [localDays, setLocalDays]               = useState<string[]>(selectedDays);
   const [localYearCompare, setLocalYearCompare] = useState(yearCompareMode);
+  const [localCommissions, setLocalCommissions] = useState<string[]>(filters.commissionStatuses || []);
+  const [localUserIds, setLocalUserIds]         = useState<string[]>(filters.userIds || []);
 
   useEffect(() => {
     if (open) {
@@ -273,6 +282,8 @@ function TaskProductionFiltersSheet({
       setLocalMonths(selectedMonths);
       setLocalDays(selectedDays);
       setLocalYearCompare(yearCompareMode);
+      setLocalCommissions(filters.commissionStatuses || []);
+      setLocalUserIds(filters.userIds || []);
     }
   }, [open, filters, selectedYears, selectedMonths, selectedDays, yearCompareMode]);
 
@@ -289,6 +300,14 @@ function TaskProductionFiltersSheet({
     };
   }, []);
 
+  const fetchUsers = useCallback(async (search: string, page = 1) => {
+    const res = await getUsers({ where: { isActive: true }, search: search || undefined, page, limit: COMBOBOX_PAGE_SIZE });
+    return {
+      data: (res.data || []).map((u: any) => ({ value: u.id, label: u.name })),
+      hasMore: res.meta?.hasNextPage || false,
+    };
+  }, []);
+
   // 'both' mode shows two metrics on one chart — sector comparison not applicable
   useEffect(() => {
     if (localY === 'both' && localSectors.length > 0) setLocalSectors([]);
@@ -298,22 +317,32 @@ function TaskProductionFiltersSheet({
 
   const handleApply = useCallback(() => {
     const { startDate, endDate } = computeDateRange(localYears, localMonths, localX);
+    // Canonical bonus-period inputs: when years are picked, ALSO send year +
+    // months so the backend can compute the exact window via the same helpers
+    // bonus uses. Eliminates browser-TZ vs server-TZ drift at the boundaries.
+    // For multi-year selections we fall back to startDate/endDate only —
+    // bonusPeriodYear is single-year by design (mirrors the bonus endpoint).
+    const singleYear = localYears.length === 1 ? Number(localYears[0]) : undefined;
+    const bonusPeriodMonths = singleYear !== undefined && localMonths.length > 0
+      ? localMonths.map(m => Number(m))
+      : undefined;
     const finalFilters: TaskProductionFilters = {
       startDate,
       endDate,
+      bonusPeriodYear: singleYear,
+      bonusPeriodMonths,
       xAxisMode: localX,
       yAxisMode: localY,
       compareMode: canCompare ? localCmp : 'combined',
       sectorIds: localSectors.length > 0 ? localSectors : undefined,
+      commissionStatuses: localCommissions.length > 0 ? localCommissions : undefined,
+      userIds: localUserIds.length > 0 ? localUserIds : undefined,
     };
-    // Day filter only applies when grouping by day — drop it otherwise so it
-    // doesn't silently restrict the months/years modes.
     const daysOut = localX === 'day' ? localDays : [];
-    // Year-over-year comparison is only meaningful in month mode.
     const yearCompare = localYears.length >= 2 && localX === 'month' ? localYearCompare : false;
     onApply(finalFilters, localYears, localMonths, daysOut, yearCompare);
     onOpenChange(false);
-  }, [localX, localY, localCmp, localSectors, localYears, localMonths, localDays, localYearCompare, canCompare, onApply, onOpenChange]);
+  }, [localX, localY, localCmp, localSectors, localYears, localMonths, localDays, localYearCompare, localCommissions, localUserIds, canCompare, onApply, onOpenChange]);
 
   const handleClear = useCallback(() => {
     setLocalX('month');
@@ -323,9 +352,11 @@ function TaskProductionFiltersSheet({
     setLocalYears([]);
     setLocalMonths([]);
     setLocalDays([]);
+    setLocalCommissions([]);
+    setLocalUserIds([]);
   }, []);
 
-  const activeCount = [localSectors.length > 0, localYears.length > 0].filter(Boolean).length;
+  const activeCount = [localSectors.length > 0, localYears.length > 0, localCommissions.length > 0, localUserIds.length > 0].filter(Boolean).length;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -552,6 +583,52 @@ function TaskProductionFiltersSheet({
                 )}
               </div>
             )}
+
+            {/* Commission status filter */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <IconCheckbox className="h-4 w-4" />
+                Status de Comissão
+              </Label>
+              <Combobox
+                mode="multiple"
+                value={localCommissions}
+                onValueChange={v => setLocalCommissions(Array.isArray(v) && v.length > 0 ? v : [])}
+                options={COMMISSION_OPTIONS}
+                placeholder="Todos os status..."
+                searchable={false}
+                clearable={true}
+              />
+              <p className="text-xs text-muted-foreground">
+                Filtra tarefas pelo status de comissão. Sem seleção = todos.
+              </p>
+            </div>
+
+            {/* Collaborator (user) filter */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <IconUsers className="h-4 w-4" />
+                Colaborador
+              </Label>
+              <Combobox
+                mode="multiple"
+                async
+                value={localUserIds}
+                onValueChange={v => setLocalUserIds(Array.isArray(v) && v.length > 0 ? v : [])}
+                queryKey={[...userKeys.lists()]}
+                queryFn={fetchUsers}
+                minSearchLength={0}
+                placeholder="Todos os colaboradores..."
+                searchPlaceholder="Buscar colaborador..."
+                emptyText="Nenhum colaborador encontrado"
+                loadingText="Carregando..."
+                searchable={true}
+                clearable={true}
+              />
+              <p className="text-xs text-muted-foreground">
+                Filtra por quem registrou a tarefa. Sem seleção = todos.
+              </p>
+            </div>
           </div>
         </ScrollArea>
 
@@ -579,6 +656,9 @@ const TaskProductionPage = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const [chartType, setChartType] = useState<TaskProductionChartType>('bar');
+  // Independent chart types for the primary and secondary series in both-mode.
+  const [primaryChartType, setPrimaryChartType] = useState<'bar' | 'line' | 'line-smooth' | 'area' | 'area-smooth'>('bar');
+  const [secondaryChartType, setSecondaryChartType] = useState<'bar' | 'line' | 'line-smooth' | 'area' | 'area-smooth'>('line');
   const [trendLine, setTrendLine] = useState<TrendLineType | null>(null);
   // `goalOverride` is the value the user typed in the popover. Null means
   // "use the admin-configured default from the goals feature". See useDefaultGoal below.
@@ -592,9 +672,18 @@ const TaskProductionPage = () => {
   const chartHandleRef = useRef<StatisticsChartHandle>(null);
 
   const [filters, setFilters] = useState<TaskProductionFilters>(() => {
-    const y = new Date().getFullYear().toString();
-    const { startDate, endDate } = computeDateRange([y], [], 'month');
-    return { xAxisMode: 'month', yAxisMode: 'count', compareMode: 'combined', startDate, endDate };
+    const y = new Date().getFullYear();
+    const { startDate, endDate } = computeDateRange([y.toString()], [], 'month');
+    return {
+      xAxisMode: 'month',
+      yAxisMode: 'count',
+      compareMode: 'combined',
+      startDate,
+      endDate,
+      // Canonical input: backend computes the exact window via the same
+      // helpers bonus uses. Browser-TZ drift no longer affects boundaries.
+      bonusPeriodYear: y,
+    };
   });
 
   const [selectedYears, setSelectedYears]   = useState<string[]>(() => [new Date().getFullYear().toString()]);
@@ -801,6 +890,19 @@ const TaskProductionPage = () => {
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 
+  // Second goal for "both" mode — tracks Tarefas por colaborador ativo on the
+  // right Y-axis. The TASKS_PER_ACTIVE_USER metric is already a per-user rate,
+  // so use AVERAGE_PER_PERIOD (not AVERAGE_PER_USER which would divide again).
+  const avgPerUserGoalRaw = useDefaultGoal({
+    metric: GOAL_METRIC.TASKS_PER_ACTIVE_USER,
+    period:
+      filters.startDate && filters.endDate
+        ? { from: filters.startDate, to: filters.endDate }
+        : null,
+    aggregation: 'AVERAGE_PER_PERIOD',
+    enabled: isBothMode && !yearCompareMode,
+  });
+
   // Client-side filter + optional year aggregation
   const items = useMemo(() => {
     if (!rawItems.length) return rawItems;
@@ -874,6 +976,67 @@ const TaskProductionPage = () => {
       .sort((a, b) => a.period.localeCompare(b.period));
   }, [rawItems, filters.xAxisMode, selectedYears, selectedMonths, selectedDays]);
 
+  // Per-period goal values for stepped goal line — must come AFTER `items` since
+  // it maps over the filtered+processed items array. Only applies when no
+  // override is set (override is a flat scalar, not a per-period schedule).
+  //
+  // In avgPerUser mode the chart bars are per-user rates (e.g. 2.76 tasks/user
+  // per month), so the goal line MUST be divided by each period's active user
+  // count too — otherwise the line plots raw monthly task targets (45, 65, …)
+  // on a per-user-rate axis and dwarfs the bars. Uses `item.activeUsers` which
+  // comes from the same API as the bar values, keeping numerator/denominator
+  // consistent per period.
+  const perPeriodGoalValues = useMemo(() => {
+    if (goalOverride != null || yearCompareMode || !defaultGoalRaw.perPeriodValues) return null;
+    return items.map(item => {
+      let rawSum: number | null;
+      if (filters.xAxisMode === 'year') {
+        // item.period = "2026"; aggregate all months for that year
+        let total = 0; let hasAny = false;
+        for (let m = 1; m <= 12; m++) {
+          const key = `${item.period}-${String(m).padStart(2, '0')}`;
+          const v = defaultGoalRaw.perPeriodValues!.get(key);
+          if (v != null) { total += v; hasAny = true; }
+        }
+        rawSum = hasAny ? total : null;
+      } else {
+        rawSum = defaultGoalRaw.perPeriodValues!.get(item.period) ?? null;
+      }
+      if (rawSum == null) return null;
+      let val = rawSum;
+      if (scaleBy?.numerator != null && scaleBy.denominator != null && scaleBy.denominator > 0) {
+        val = val * (scaleBy.numerator / scaleBy.denominator);
+      }
+      if (goalSectorSplit > 1) val = val / goalSectorSplit;
+      if (useAvg) {
+        const activeUsers = item.activeUsers ?? 0;
+        if (activeUsers <= 0) return null;
+        val = val / activeUsers;
+      }
+      if (filters.xAxisMode === 'day' && !useAvg) val = Math.round(val);
+      return val;
+    });
+  }, [goalOverride, yearCompareMode, defaultGoalRaw.perPeriodValues, items, scaleBy, goalSectorSplit, filters.xAxisMode, useAvg]);
+
+  // Per-period goal line for the secondary (avg/user) series on the right axis.
+  // TASKS_PER_ACTIVE_USER is already a per-user rate, so year-mode averages
+  // monthly values instead of summing them.
+  const perPeriodSecondaryGoalValues = useMemo(() => {
+    if (!isBothMode || yearCompareMode || !avgPerUserGoalRaw.perPeriodValues) return null;
+    return items.map(item => {
+      if (filters.xAxisMode === 'year') {
+        let total = 0; let count = 0;
+        for (let m = 1; m <= 12; m++) {
+          const key = `${item.period}-${String(m).padStart(2, '0')}`;
+          const v = avgPerUserGoalRaw.perPeriodValues!.get(key);
+          if (v != null) { total += v; count++; }
+        }
+        return count > 0 ? total / count : null;
+      }
+      return avgPerUserGoalRaw.perPeriodValues!.get(item.period) ?? null;
+    });
+  }, [isBothMode, yearCompareMode, avgPerUserGoalRaw.perPeriodValues, items, filters.xAxisMode]);
+
   const handleFilterApply = useCallback((f: TaskProductionFilters, years: string[], months: string[], days: string[], yearCompare: boolean) => {
     setFilters(f);
     setSelectedYears(years);
@@ -890,6 +1053,8 @@ const TaskProductionPage = () => {
     if (selectedDays.length) c++;
     if (filters.xAxisMode !== 'month') c++;
     if (filters.yAxisMode !== 'count') c++;
+    if (filters.commissionStatuses?.length) c++;
+    if (filters.userIds?.length) c++;
     return c;
   }, [filters, selectedYears, selectedMonths, selectedDays]);
 
@@ -1293,6 +1458,7 @@ const TaskProductionPage = () => {
         </div>
       );
     }
+    const hasPerPeriodGoal = perPeriodGoalValues && perPeriodGoalValues.some(v => v != null);
     return (
       <StatisticsChart
         ref={chartHandleRef}
@@ -1310,7 +1476,20 @@ const TaskProductionPage = () => {
           secondary: isBothMode ? 'Média/Colaborador' : undefined,
         }}
         trendLine={trendLine}
-        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
+        goalLine={!hasPerPeriodGoal && goalValue != null ? { value: goalValue, label: useAvg && !isBothMode ? 'Meta Média/Colaborador' : 'Meta Tarefas Concluídas' } : null}
+        perPeriodGoalLine={hasPerPeriodGoal ? { values: perPeriodGoalValues!, label: useAvg && !isBothMode ? 'Meta Média/Colaborador' : 'Meta Tarefas Concluídas' } : null}
+        perPeriodSecondaryGoalLine={
+          isBothMode && perPeriodSecondaryGoalValues?.some(v => v != null)
+            ? { values: perPeriodSecondaryGoalValues!, label: 'Meta Média/Colaborador' }
+            : null
+        }
+        secondaryGoalLine={
+          isBothMode && !perPeriodSecondaryGoalValues?.some(v => v != null) && avgPerUserGoalRaw.value != null
+            ? { value: avgPerUserGoalRaw.value, label: 'Meta Média/Colaborador' }
+            : null
+        }
+        primaryChartType={isBothMode ? primaryChartType : undefined}
+        secondaryChartType={isBothMode ? secondaryChartType : undefined}
         onDataPointClick={handleChartClick}
       />
     );
@@ -1380,38 +1559,89 @@ const TaskProductionPage = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  {/* Chart type selector */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <ChartIcon className="h-4 w-4 mr-2" />
-                        {currentChartType.label}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-60">
-                      <DropdownMenuLabel>Tipo de Gráfico</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuRadioGroup
-                        value={chartType}
-                        onValueChange={v => setChartType(v as TaskProductionChartType)}
-                      >
-                        {availableChartTypes.map(ct => {
-                          const Icon = ct.icon;
-                          return (
-                            <DropdownMenuRadioItem key={ct.value} value={ct.value} className="group">
-                              <Icon className="h-4 w-4 mr-2" />
-                              <div className="flex flex-col">
+                  {/* Chart type selector — dual pickers in both-mode */}
+                  {isBothMode ? (
+                    <>
+                      {/* Primary series (left axis) */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            {BASE_CHART_TYPE_OPTIONS.find(t => t.value === primaryChartType)?.icon
+                              ? (() => { const I = BASE_CHART_TYPE_OPTIONS.find(t => t.value === primaryChartType)!.icon; return <I className="h-4 w-4 mr-1" />; })()
+                              : <IconChartBar className="h-4 w-4 mr-1" />}
+                            Total
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>Total Tarefas</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuRadioGroup value={primaryChartType} onValueChange={v => setPrimaryChartType(v as typeof primaryChartType)}>
+                            {BASE_CHART_TYPE_OPTIONS.map(ct => { const I = ct.icon; return (
+                              <DropdownMenuRadioItem key={ct.value} value={ct.value} className="group">
+                                <I className="h-4 w-4 mr-2" />
                                 <span>{ct.label}</span>
-                                <span className="text-xs text-muted-foreground group-data-[highlighted]:text-white/80">
-                                  {ct.description}
-                                </span>
-                              </div>
-                            </DropdownMenuRadioItem>
-                          );
-                        })}
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                              </DropdownMenuRadioItem>
+                            ); })}
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      {/* Secondary series (right axis) */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            {BASE_CHART_TYPE_OPTIONS.find(t => t.value === secondaryChartType)?.icon
+                              ? (() => { const I = BASE_CHART_TYPE_OPTIONS.find(t => t.value === secondaryChartType)!.icon; return <I className="h-4 w-4 mr-1" />; })()
+                              : <IconChartLine className="h-4 w-4 mr-1" />}
+                            Média
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>Média/Colaborador</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuRadioGroup value={secondaryChartType} onValueChange={v => setSecondaryChartType(v as typeof secondaryChartType)}>
+                            {BASE_CHART_TYPE_OPTIONS.map(ct => { const I = ct.icon; return (
+                              <DropdownMenuRadioItem key={ct.value} value={ct.value} className="group">
+                                <I className="h-4 w-4 mr-2" />
+                                <span>{ct.label}</span>
+                              </DropdownMenuRadioItem>
+                            ); })}
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </>
+                  ) : (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <ChartIcon className="h-4 w-4 mr-2" />
+                          {currentChartType.label}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-60">
+                        <DropdownMenuLabel>Tipo de Gráfico</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuRadioGroup
+                          value={chartType}
+                          onValueChange={v => setChartType(v as TaskProductionChartType)}
+                        >
+                          {availableChartTypes.map(ct => {
+                            const Icon = ct.icon;
+                            return (
+                              <DropdownMenuRadioItem key={ct.value} value={ct.value} className="group">
+                                <Icon className="h-4 w-4 mr-2" />
+                                <div className="flex flex-col">
+                                  <span>{ct.label}</span>
+                                  <span className="text-xs text-muted-foreground group-data-[highlighted]:text-white/80">
+                                    {ct.description}
+                                  </span>
+                                </div>
+                              </DropdownMenuRadioItem>
+                            );
+                          })}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
 
                   {/* Trend line selector */}
                   <DropdownMenu>
@@ -1718,6 +1948,8 @@ const TaskProductionPage = () => {
           period={clickedPeriod.period}
           label={clickedPeriod.label}
           sectorIds={filters.sectorIds}
+          commissionStatuses={filters.commissionStatuses}
+          userIds={filters.userIds}
           activeUsers={clickedPeriod.activeUsers}
           sectorColorMap={sectorColorMap}
         />

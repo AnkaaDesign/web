@@ -944,6 +944,11 @@ export const taskGetManySchema = z
         },
       )
       .optional(),
+    // Canonical bonus-period inputs. When set, the backend recomputes the
+    // finishedAt range using businessPeriodStart/End (same helpers bonus
+    // uses), so task-history's count matches the bonus pages exactly.
+    bonusPeriodYear: z.coerce.number().int().optional(),
+    bonusPeriodMonths: z.array(z.coerce.number().int().min(1).max(12)).optional(),
     forecastDateRange: z
       .object({
         from: z.coerce.date().optional(),

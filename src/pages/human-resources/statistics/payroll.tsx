@@ -691,6 +691,15 @@ const PayrollStatisticsPage = () => {
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 
+  const perPeriodGoalValues = useMemo(() => {
+    if (goalOverride != null || goalMetric === null || !defaultGoal.perPeriodValues) return null;
+    return rawItems.map(item => {
+      const rawSum = defaultGoal.perPeriodValues!.get(item.period) ?? null;
+      if (rawSum == null) return null;
+      return goalSectorSplit > 1 ? rawSum / goalSectorSplit : rawSum;
+    });
+  }, [goalOverride, goalMetric, defaultGoal.perPeriodValues, rawItems, goalSectorSplit]);
+
   const handleFilterApply = useCallback((next: {
     filters: HrAnalyticsFilters;
     selectedYears: string[];
@@ -871,7 +880,8 @@ const PayrollStatisticsPage = () => {
         valueFormatter={valueFormatter}
         tooltipLabels={tooltipLabels}
         trendLine={trendLine}
-        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
+        goalLine={goalValue != null && !perPeriodGoalValues?.some(v => v != null) ? { value: goalValue, label: 'Meta Folha de Pagamento' } : null}
+        perPeriodGoalLine={perPeriodGoalValues?.some(v => v != null) ? { values: perPeriodGoalValues, label: 'Meta Folha de Pagamento' } : null}
         onDataPointClick={(dataIndex) => {
           const it = rawItems[dataIndex];
           if (!it) return;

@@ -7,3 +7,4 @@ export * from "./human-resources";
 export * from "./administration";
 export * from "./server";
 export * from "./integrations";
+export * from "./skill";

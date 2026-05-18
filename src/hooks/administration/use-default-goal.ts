@@ -73,6 +73,12 @@ export interface UseDefaultGoalParams {
 export interface UseDefaultGoalResult {
   /** The aggregated default value, or null if no goal is configured. */
   value: number | null;
+  /**
+   * Per-period goal sums keyed by "YYYY-MM" (zero-padded month, matching
+   * TaskProductionItem.period). Use this to render a per-period stepped goal
+   * line instead of the flat average. Null when enabled=false or no goals.
+   */
+  perPeriodValues: Map<string, number> | null;
   /** Where the value came from. */
   source: GoalSource;
   /** Unit of measure — useful for chart axes and input masks. */
@@ -155,7 +161,7 @@ export function useDefaultGoal(params: UseDefaultGoalParams): UseDefaultGoalResu
     };
 
     if (!enabledForQuery) {
-      return { ...baseResult, value: null, source: "none", goals: [], isLoading: false };
+      return { ...baseResult, value: null, perPeriodValues: null, source: "none", goals: [], isLoading: false };
     }
 
     const allGoals: Goal[] = [];
@@ -179,7 +185,7 @@ export function useDefaultGoal(params: UseDefaultGoalParams): UseDefaultGoalResu
     });
 
     if (matching.length === 0) {
-      return { ...baseResult, value: null, source: "none", goals: [], isLoading: anyLoading };
+      return { ...baseResult, value: null, perPeriodValues: null, source: "none", goals: [], isLoading: anyLoading };
     }
 
     // For sector-scoped metrics, multiple goal rows can share the same
@@ -227,9 +233,18 @@ export function useDefaultGoal(params: UseDefaultGoalParams): UseDefaultGoalResu
       value = value * (scaleBy.numerator / scaleBy.denominator);
     }
 
+    // Build per-period map keyed by "YYYY-MM" (zero-padded to match
+    // TaskProductionItem.period format from the API).
+    const perPeriodValues = new Map<string, number>();
+    for (const [k, v] of perPeriodSums.entries()) {
+      const [year, month] = k.split('-');
+      perPeriodValues.set(`${year}-${month.padStart(2, '0')}`, v);
+    }
+
     return {
       ...baseResult,
       value,
+      perPeriodValues: perPeriodValues.size > 0 ? perPeriodValues : null,
       source: value == null ? "none" : "goal",
       goals: matching,
       isLoading: anyLoading,

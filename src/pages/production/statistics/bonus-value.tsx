@@ -868,10 +868,22 @@ export default function ProductionBonusValuePage() {
         hoveredDayRef.current = null;
         return;
       }
-      hoveredDayRef.current = typeof val === 'number' ? val : null;
+      // On a category axis, ECharts emits the category label (string) not the
+      // numeric index. Resolve it back to the day array index by matching the
+      // day label against each day's UTC date number.
+      if (typeof val === 'number') {
+        hoveredDayRef.current = val;
+      } else if (result?.days) {
+        const idx = result.days.findIndex(
+          d => String(new Date(d.date).getUTCDate()) === String(val),
+        );
+        hoveredDayRef.current = idx >= 0 ? idx : null;
+      } else {
+        hoveredDayRef.current = null;
+      }
     },
     globalout: () => { hoveredDayRef.current = null; },
-  }), []);
+  }), [result?.days]);
 
   const handleChartContainerClick = useCallback(() => {
     if (!result) return;
@@ -1100,9 +1112,9 @@ export default function ProductionBonusValuePage() {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-shrink-0">
                 <SummaryCard
-                  title={result.period.isClosed ? 'Bônus final' : 'Bônus acumulado'}
-                  value={formatCurrency(result.summary.currentBonusValue)}
-                  hint={result.period.isClosed ? 'Fechamento do período' : 'Acumulado até hoje'}
+                  title={result.period.isClosed ? 'Bônus final' : 'Bônus atual'}
+                  value={formatCurrency(result.summary.actualCurrentBonusValue)}
+                  hint={result.period.isClosed ? 'Fechamento do período' : 'Bruto, se o período fechasse hoje'}
                   icon={IconCoins}
                   emphasis="primary"
                   onClick={lastRealDay ? () => openLastDay('collaborators') : undefined}
@@ -1110,7 +1122,7 @@ export default function ProductionBonusValuePage() {
                 <SummaryCard
                   title="Previsão de fechamento"
                   value={formatCurrency(result.summary.forecastedFinalBonusValue)}
-                  hint={result.period.isClosed ? 'Igual ao bônus final' : 'No ritmo atual de tarefas'}
+                  hint={result.period.isClosed ? 'Igual ao bônus final' : 'Projeção pela tendência atual'}
                   icon={IconTrendingUp}
                   emphasis="forecast"
                 />

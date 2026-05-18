@@ -931,3 +931,85 @@ export const reconciliationKeys = {
 };
 
 // =====================================================
+// Skill Assessment Query Keys (Phase-4 rewrite)
+// =====================================================
+//
+// Four entities, each with its own QueryKeys factory matching the
+// createEntityHooks contract (all / lists / list / details / detail / byIds).
+//
+// Legacy `skillKeys` (skillModel / skillAssessmentPeriod) preserved in
+// `legacySkillKeys` below so the old pages continue to compile until they are
+// rewritten in Phase-6.
+
+export const skillKeys = {
+  all: ["skill"] as const,
+  lists: () => ["skill", "list"] as const,
+  list: (filters?: any) =>
+    filters ? (["skill", "list", filters] as const) : (["skill", "list"] as const),
+  details: () => ["skill", "detail"] as const,
+  detail: (id: string, include?: any) =>
+    include ? (["skill", "detail", id, include] as const) : (["skill", "detail", id] as const),
+  byIds: (ids: string[]) => ["skill", "byIds", ids] as const,
+};
+
+export const topicKeys = {
+  all: ["topic"] as const,
+  lists: () => ["topic", "list"] as const,
+  list: (filters?: any) =>
+    filters ? (["topic", "list", filters] as const) : (["topic", "list"] as const),
+  details: () => ["topic", "detail"] as const,
+  detail: (id: string, include?: any) =>
+    include ? (["topic", "detail", id, include] as const) : (["topic", "detail", id] as const),
+  byIds: (ids: string[]) => ["topic", "byIds", ids] as const,
+  // Per-topic levels (PUT /topic/:id/levels)
+  levels: (id: string) => ["topic", id, "levels"] as const,
+};
+
+export const assessmentKeys = {
+  all: ["assessment"] as const,
+  lists: () => ["assessment", "list"] as const,
+  list: (filters?: any) =>
+    filters ? (["assessment", "list", filters] as const) : (["assessment", "list"] as const),
+  details: () => ["assessment", "detail"] as const,
+  detail: (id: string, include?: any) =>
+    include
+      ? (["assessment", "detail", id, include] as const)
+      : (["assessment", "detail", id] as const),
+  byIds: (ids: string[]) => ["assessment", "byIds", ids] as const,
+  // Specialized
+  analytics: (id: string) => ["assessment", id, "analytics"] as const,
+};
+
+export const assessmentEntryKeys = {
+  all: ["assessment-entry"] as const,
+  lists: () => ["assessment-entry", "list"] as const,
+  list: (filters?: any) =>
+    filters
+      ? (["assessment-entry", "list", filters] as const)
+      : (["assessment-entry", "list"] as const),
+  details: () => ["assessment-entry", "detail"] as const,
+  detail: (id: string, include?: any) =>
+    include
+      ? (["assessment-entry", "detail", id, include] as const)
+      : (["assessment-entry", "detail", id] as const),
+  byIds: (ids: string[]) => ["assessment-entry", "byIds", ids] as const,
+  // Specialized
+  myPending: () => ["assessment-entry", "me", "pending"] as const,
+};
+
+// Legacy keys retained until Phase-6 page rewrite. Do NOT use in new code.
+export const legacySkillKeys = {
+  all: ["skills"] as const,
+  model: () => ["skills", "model"] as const,
+  assessments: () => ["skills", "assessments"] as const,
+  assessmentList: (filters: Record<string, unknown>) =>
+    ["skills", "assessments", "list", filters] as const,
+  assessmentMyTeam: () => ["skills", "assessments", "my-team"] as const,
+  assessmentDetail: (id: string) => ["skills", "assessments", id] as const,
+  periods: () => [...(["skills"] as const), "periods"] as const,
+  periodList: (filters?: object) => [...(["skills", "periods"] as const), filters] as const,
+  periodDetail: (id: string) => [...(["skills", "periods"] as const), id] as const,
+  activePeriods: () => [...(["skills", "periods"] as const), "active"] as const,
+};
+
+// =====================================================

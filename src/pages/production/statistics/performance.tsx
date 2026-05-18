@@ -260,9 +260,18 @@ function TaskPerformanceFiltersSheet({
 
   const handleApply = useCallback(() => {
     const { startDate, endDate } = computeDateRange(localYears, localMonths);
+    // Send canonical bonus-period inputs alongside startDate/endDate so the
+    // backend can compute the exact window via the same helpers bonus uses.
+    // See productivity.tsx for the same pattern + rationale.
+    const singleYear = localYears.length === 1 ? Number(localYears[0]) : undefined;
+    const bonusPeriodMonths = singleYear !== undefined && localMonths.length > 0
+      ? localMonths.map(m => Number(m))
+      : undefined;
     const finalFilters: TaskPerformanceFilters = {
       startDate,
       endDate,
+      bonusPeriodYear: singleYear,
+      bonusPeriodMonths,
       xAxisMode: localX,
       yAxisMode: localY,
       compareMode: canCompare ? localCmp : 'combined',
@@ -281,6 +290,7 @@ function TaskPerformanceFiltersSheet({
     setLocalSectors([]);
     setLocalYears([]);
     setLocalMonths([]);
+    setLocalYearCompare(false);
     setLocalStep(0.6);
   }, []);
 
@@ -351,10 +361,11 @@ function TaskPerformanceFiltersSheet({
                 Quanto a produção esperada cresce a cada cargo na hierarquia. Com passo 0,6, um cargo logo acima produz cerca de 1,6× o cargo logo abaixo no mesmo intervalo (peso 1,0 → 1,6 → 2,2 → ...).
               </p>
               <Input
-                type="number"
+                type="decimal"
                 min={0}
                 step={0.1}
-                value={localStep.toString()}
+                decimals={2}
+                value={localStep}
                 onChange={v => setLocalStep(parseFloat(String(v ?? '0.6')) || 0)}
                 className="bg-transparent"
               />
@@ -522,6 +533,8 @@ const TaskPerformancePage = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const [chartType, setChartType] = useState<TaskPerformanceChartType>('bar');
+  const [primaryChartType, setPrimaryChartType] = useState<'bar' | 'line' | 'line-smooth' | 'area' | 'area-smooth'>('bar');
+  const [secondaryChartType, setSecondaryChartType] = useState<'bar' | 'line' | 'line-smooth' | 'area' | 'area-smooth'>('line');
   const [trendLine, setTrendLine] = useState<TrendLineType | null>(null);
   // User override on top of the admin-configured default from the goals feature.
   const [goalOverride, setGoalOverride] = useState<number | null>(null);
@@ -543,14 +556,17 @@ const TaskPerformancePage = () => {
   const chartHandleRef = useRef<StatisticsChartHandle>(null);
 
   const [filters, setFilters] = useState<TaskPerformanceFilters>(() => {
-    const y = new Date().getFullYear().toString();
-    const { startDate, endDate } = computeDateRange([y], []);
+    const y = new Date().getFullYear();
+    const { startDate, endDate } = computeDateRange([y.toString()], []);
     return {
       xAxisMode: 'month',
       yAxisMode: 'performance',
       compareMode: 'combined',
       startDate,
       endDate,
+      // Canonical input — backend resolves the exact window the same way
+      // bonus does, eliminating TZ drift.
+      bonusPeriodYear: y,
       positionStep: 0.6,
     };
   });
@@ -726,6 +742,35 @@ const TaskPerformancePage = () => {
       })
       .sort((a, b) => a.period.localeCompare(b.period));
   }, [rawItems, filters.xAxisMode, selectedYears, selectedMonths]);
+
+  // Per-period goal values for stepped goal line (performance page).
+  const perPeriodGoalValues = useMemo(() => {
+    if (goalOverride != null || yearCompareMode || !defaultGoal.perPeriodValues) return null;
+    return items.map(item => {
+      let rawVal: number | null;
+      if (filters.xAxisMode === 'year') {
+        let total = 0; let count = 0;
+        for (let m = 1; m <= 12; m++) {
+          const key = `${item.period}-${String(m).padStart(2, '0')}`;
+          const v = defaultGoal.perPeriodValues!.get(key);
+          if (v != null) { total += v; count++; }
+        }
+        if (count === 0) return null;
+        // Performance goals are per-user rates (AVERAGE_PER_PERIOD) — average
+        // across months. Count goals are totals — sum across months.
+        rawVal = usePerf ? total / count : total;
+      } else {
+        rawVal = defaultGoal.perPeriodValues!.get(item.period) ?? null;
+      }
+      if (rawVal == null) return null;
+      let val = rawVal;
+      if (scaleBy?.numerator != null && scaleBy.denominator != null && scaleBy.denominator > 0) {
+        val = val * (scaleBy.numerator / scaleBy.denominator);
+      }
+      if (goalSectorSplit > 1) val = val / goalSectorSplit;
+      return val;
+    });
+  }, [goalOverride, yearCompareMode, usePerf, defaultGoal.perPeriodValues, items, scaleBy, goalSectorSplit, filters.xAxisMode]);
 
   const handleFilterApply = useCallback((f: TaskPerformanceFilters, years: string[], months: string[], yearCompare: boolean) => {
     setFilters(f);
@@ -1134,7 +1179,10 @@ const TaskPerformancePage = () => {
           secondary: isBothMode ? 'Média ajustada' : undefined,
         }}
         trendLine={trendLine}
-        goalLine={goalValue != null ? { value: goalValue, label: 'Meta' } : null}
+        goalLine={goalValue != null && !perPeriodGoalValues?.some(v => v != null) ? { value: goalValue, label: 'Meta Desempenho' } : null}
+        perPeriodGoalLine={perPeriodGoalValues?.some(v => v != null) ? { values: perPeriodGoalValues, label: 'Meta Desempenho' } : null}
+        primaryChartType={isBothMode ? primaryChartType : undefined}
+        secondaryChartType={isBothMode ? secondaryChartType : undefined}
         onDataPointClick={handleChartClick}
       />
     );
@@ -1197,37 +1245,84 @@ const TaskPerformancePage = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <ChartIcon className="h-4 w-4 mr-2" />
-                        {currentChartType.label}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-60">
-                      <DropdownMenuLabel>Tipo de Gráfico</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuRadioGroup
-                        value={chartType}
-                        onValueChange={v => setChartType(v as TaskPerformanceChartType)}
-                      >
-                        {availableChartTypes.map(ct => {
-                          const Icon = ct.icon;
-                          return (
-                            <DropdownMenuRadioItem key={ct.value} value={ct.value} className="group">
-                              <Icon className="h-4 w-4 mr-2" />
-                              <div className="flex flex-col">
-                                <span>{ct.label}</span>
-                                <span className="text-xs text-muted-foreground group-data-[highlighted]:text-white/80">
-                                  {ct.description}
-                                </span>
-                              </div>
-                            </DropdownMenuRadioItem>
-                          );
-                        })}
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {isBothMode ? (
+                    <>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            {BASE_CHART_TYPE_OPTIONS.find(t => t.value === primaryChartType)?.icon
+                              ? (() => { const I = BASE_CHART_TYPE_OPTIONS.find(t => t.value === primaryChartType)!.icon; return <I className="h-4 w-4 mr-1" />; })()
+                              : <ChartIcon className="h-4 w-4 mr-1" />}
+                            Total
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>Total Tarefas</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuRadioGroup value={primaryChartType} onValueChange={v => setPrimaryChartType(v as typeof primaryChartType)}>
+                            {BASE_CHART_TYPE_OPTIONS.map(ct => { const I = ct.icon; return (
+                              <DropdownMenuRadioItem key={ct.value} value={ct.value}>
+                                <I className="h-4 w-4 mr-2" /><span>{ct.label}</span>
+                              </DropdownMenuRadioItem>
+                            ); })}
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            {BASE_CHART_TYPE_OPTIONS.find(t => t.value === secondaryChartType)?.icon
+                              ? (() => { const I = BASE_CHART_TYPE_OPTIONS.find(t => t.value === secondaryChartType)!.icon; return <I className="h-4 w-4 mr-1" />; })()
+                              : <ChartIcon className="h-4 w-4 mr-1" />}
+                            Desempenho
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>Média Ajustada</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuRadioGroup value={secondaryChartType} onValueChange={v => setSecondaryChartType(v as typeof secondaryChartType)}>
+                            {BASE_CHART_TYPE_OPTIONS.map(ct => { const I = ct.icon; return (
+                              <DropdownMenuRadioItem key={ct.value} value={ct.value}>
+                                <I className="h-4 w-4 mr-2" /><span>{ct.label}</span>
+                              </DropdownMenuRadioItem>
+                            ); })}
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </>
+                  ) : (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <ChartIcon className="h-4 w-4 mr-2" />
+                          {currentChartType.label}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-60">
+                        <DropdownMenuLabel>Tipo de Gráfico</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuRadioGroup
+                          value={chartType}
+                          onValueChange={v => setChartType(v as TaskPerformanceChartType)}
+                        >
+                          {availableChartTypes.map(ct => {
+                            const Icon = ct.icon;
+                            return (
+                              <DropdownMenuRadioItem key={ct.value} value={ct.value} className="group">
+                                <Icon className="h-4 w-4 mr-2" />
+                                <div className="flex flex-col">
+                                  <span>{ct.label}</span>
+                                  <span className="text-xs text-muted-foreground group-data-[highlighted]:text-white/80">
+                                    {ct.description}
+                                  </span>
+                                </div>
+                              </DropdownMenuRadioItem>
+                            );
+                          })}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

@@ -860,11 +860,14 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         }
       }
 
-      // Handle authentication errors (401/403) - trigger logout if refresh failed
+      // Handle authentication errors (401 only) - trigger logout if refresh failed.
+      // 403 (Forbidden) means the user is authenticated but lacks permission for the
+      // resource — it must NOT log the user out, otherwise role/sector-restricted
+      // widget fetches would kick valid users back to login.
       if (
-        (errorInfo.category === ErrorCategory.AUTHENTICATION || errorInfo.category === ErrorCategory.AUTHORIZATION) &&
+        errorInfo.category === ErrorCategory.AUTHENTICATION &&
         globalAuthErrorHandler &&
-        (errorInfo._statusCode === 401 || errorInfo._statusCode === 403)
+        errorInfo._statusCode === 401
       ) {
         if (process.env.NODE_ENV !== 'production') {
           console.log(`[API CLIENT DEBUG] Authentication error detected (${errorInfo._statusCode}), calling auth error handler`);
