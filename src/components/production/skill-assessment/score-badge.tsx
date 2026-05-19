@@ -31,13 +31,32 @@ export interface ScoreBadgeProps {
   className?: string;
 }
 
+// Score palette — diverging "bad → acceptable → good" with green at the top.
+// All stops are dark enough that the always-white text passes WCAG AA
+// (≥4.5:1 contrast). Aligned with the canonical app status colours so a
+// "5" badge reads the same green as `Badge variant="completed"` and a "1"
+// badge reads the same red as `variant="cancelled"`.
+//
+// Note on level 3: an earlier draft used amber-700 here, but amber sits in
+// the same hue family as the orange used for level 2 — the eye couldn't
+// distinguish 2 from 3 at a glance. Teal-700 breaks out of warm-orange
+// territory entirely and signals "crossed into acceptable" — visually
+// distinct from both orange-600 (below) and blue-700 (above), and reads
+// semantically neutral/calm, fitting "Adequado".
+//
+//   5 → green-700   (max — same as "completed")
+//   4 → blue-700    (same as "inProgress")
+//   3 → teal-700    (neutral / acceptable threshold)
+//   2 → orange-600
+//   1 → red-700     (same as "cancelled")
+//   0 → neutral-900 (black)
 const SCORE_CLASSES: Record<number, string> = {
   0: "border-transparent bg-neutral-900 text-white hover:bg-neutral-900",
-  1: "border-transparent bg-red-600 text-white hover:bg-red-600",
-  2: "border-transparent bg-orange-500 text-white hover:bg-orange-500",
-  3: "border-transparent bg-amber-500 text-white hover:bg-amber-500",
-  4: "border-transparent bg-blue-600 text-white hover:bg-blue-600",
-  5: "border-transparent bg-emerald-600 text-white hover:bg-emerald-600",
+  1: "border-transparent bg-red-700 text-white hover:bg-red-700",
+  2: "border-transparent bg-orange-600 text-white hover:bg-orange-600",
+  3: "border-transparent bg-teal-700 text-white hover:bg-teal-700",
+  4: "border-transparent bg-blue-700 text-white hover:bg-blue-700",
+  5: "border-transparent bg-green-700 text-white hover:bg-green-700",
 };
 
 const FALLBACK_CLASS =

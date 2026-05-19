@@ -10,7 +10,12 @@ type ToastOptions = Parameters<typeof sonnerToast>[1] & { allowDuplicate?: boole
 // Unique toast IDs for specific error types
 const NETWORK_ERROR_TOAST_ID = 'network-error-toast';
 
-// Z-index layers — API toasts render above notification toasts
+// Wrapper z-index — overrides Sonner's default 999999999 so the entire toast
+// layer sits below right-side drawers/sheets (z-[10010]).
+const TOAST_WRAPPER_Z = 9000;
+// Inner-toast z-index — orders API toasts above notification toasts within
+// Sonner's container. Stacking against the rest of the page is governed by
+// TOAST_WRAPPER_Z, not these values.
 const TOAST_Z_API = 10000;
 const TOAST_Z_NOTIFICATION = 9990;
 
@@ -127,6 +132,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       style={{
         '--width': '280px',
         right: `${sidebarWidth + 12}px`,
+        zIndex: TOAST_WRAPPER_Z,
       } as React.CSSProperties}
       toastOptions={{
         style: {

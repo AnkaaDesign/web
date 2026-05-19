@@ -22,11 +22,12 @@ import { useColumnVisibility } from "@/hooks/common/use-column-visibility";
 
 interface ActivityListProps {
   className?: string;
+  teamScope?: boolean;
 }
 
 const DEFAULT_PAGE_SIZE = 40;
 
-export function ActivityList({ className }: ActivityListProps) {
+export function ActivityList({ className, teamScope }: ActivityListProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // State to hold current page items and total count from the table
@@ -208,8 +209,9 @@ export function ActivityList({ className }: ActivityListProps) {
     return {
       ...baseQueryFilters,
       ...(searchingFor && { searchingFor }),
+      ...(teamScope && { _useTeamStaffEndpoint: true }),
     };
-  }, [baseQueryFilters, searchingFor]);
+  }, [baseQueryFilters, searchingFor, teamScope]);
 
   return (
     <Card className={cn("flex flex-col shadow-sm border border-border", className)}>

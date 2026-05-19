@@ -3,11 +3,11 @@ import { IconCheck, IconClipboardList } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import type { AssessmentCreateFormData } from "../../../types";
-import { useCreateAssessment } from "../../../hooks";
+import { useCreateAssessment, useOpenAssessment } from "../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { CampaignForm } from "@/components/administration/skill-assessment/campaign-form";
+import { CampaignForm, type CampaignSubmitOptions } from "@/components/administration/skill-assessment/campaign-form";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { toast } from "@/components/ui/sonner";
 
@@ -15,13 +15,27 @@ export const SkillAssessmentCreatePage = () => {
   usePageTracker({ title: "Nova Campanha", icon: "clipboard-list" });
   const navigate = useNavigate();
   const createMutation = useCreateAssessment();
+  const openMutation = useOpenAssessment();
 
-  const handleSubmit = async (data: AssessmentCreateFormData) => {
+  const handleSubmit = async (data: AssessmentCreateFormData, opts: CampaignSubmitOptions) => {
     try {
       const result = await createMutation.mutateAsync({ data });
-      toast.success("Campanha criada em rascunho. Você pode revisar e abrir quando quiser.");
-      if (result.data?.id) {
-        navigate(routes.administration.skillAssessment.details(result.data.id));
+      const newId = result.data?.id;
+
+      if (opts.openAfter && newId) {
+        try {
+          await openMutation.mutateAsync(newId);
+          toast.success("Campanha criada e aberta para coleta.");
+        } catch (openErr) {
+          toast.error("Campanha criada, mas falhou ao abrir. Abra manualmente na página de detalhes.");
+          if (process.env.NODE_ENV !== "production") console.error(openErr);
+        }
+      } else {
+        toast.success("Campanha criada em rascunho.");
+      }
+
+      if (newId) {
+        navigate(routes.administration.skillAssessment.details(newId));
       } else {
         navigate(routes.administration.skillAssessment.root);
       }

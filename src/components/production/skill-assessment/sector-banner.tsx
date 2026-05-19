@@ -4,7 +4,6 @@
 // assessment context so the leader always knows who they're scoring.
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   IconBuilding,
   IconCalendar,
@@ -12,7 +11,8 @@ import {
   IconUser,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { ASSESSMENT_ENTRY_STATUS, ASSESSMENT_ENTRY_STATUS_LABELS } from "../../../constants";
+import { ASSESSMENT_ENTRY_STATUS } from "../../../constants";
+import { AssessmentEntryStatusBadge } from "./assessment-entry-status-badge";
 
 interface SectorBannerProps {
   assessmentName: string;
@@ -23,18 +23,14 @@ interface SectorBannerProps {
   evaluateePosition?: string | null;
   evaluatorName: string;
   status: ASSESSMENT_ENTRY_STATUS;
+  /** All topics scored — display as "Concluída" even if not yet SUBMITTED. */
+  fullyScored?: boolean;
   className?: string;
 }
 
 const formatDate = (d: Date | string) => {
   const date = typeof d === "string" ? new Date(d) : d;
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-};
-
-const statusVariant: Record<ASSESSMENT_ENTRY_STATUS, "secondary" | "default" | "outline"> = {
-  [ASSESSMENT_ENTRY_STATUS.PENDING]: "secondary",
-  [ASSESSMENT_ENTRY_STATUS.IN_PROGRESS]: "default",
-  [ASSESSMENT_ENTRY_STATUS.SUBMITTED]: "outline",
 };
 
 export function SectorBanner({
@@ -46,6 +42,7 @@ export function SectorBanner({
   evaluateePosition,
   evaluatorName,
   status,
+  fullyScored,
   className,
 }: SectorBannerProps) {
   return (
@@ -55,9 +52,11 @@ export function SectorBanner({
           <div className="flex flex-wrap items-center gap-2">
             <IconClipboardCheck className="h-5 w-5 text-primary" />
             <span className="text-base font-semibold leading-none">{assessmentName}</span>
-            <Badge variant={statusVariant[status]} className="ml-1">
-              {ASSESSMENT_ENTRY_STATUS_LABELS[status]}
-            </Badge>
+            <AssessmentEntryStatusBadge
+              status={status}
+              fullyScored={fullyScored}
+              className="ml-1"
+            />
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">

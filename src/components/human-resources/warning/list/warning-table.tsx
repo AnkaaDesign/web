@@ -8,7 +8,7 @@ import { routes, WARNING_SEVERITY_LABELS, WARNING_CATEGORY_LABELS } from "../../
 import { useAuth } from "../../../../hooks/common/use-auth";
 import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate } from "../../../../utils";
-import { useWarningMutations, useWarnings, useMyWarnings } from "../../../../hooks";
+import { useWarningMutations, useWarnings, useMyWarnings, useTeamStaffWarnings } from "../../../../hooks";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -80,13 +80,14 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
     resetSelectionOnPageChange: false,
   });
 
-  // Check if we should use the my-warnings endpoint
+  // Check if we should use the my-warnings or team-staff endpoint
   const useMyWarningsEndpoint = (filters as any)?._useMyWarningsEndpoint;
+  const useTeamStaffEndpoint = (filters as any)?._useTeamStaffEndpoint;
 
   // Memoize query parameters to prevent unnecessary re-fetches
   const queryParams = React.useMemo(
     () => {
-      const { _useMyWarningsEndpoint, ...restFilters } = filters as any;
+      const { _useMyWarningsEndpoint, _useTeamStaffEndpoint, ...restFilters } = filters as any;
       return {
         // Always apply base filters to prevent showing unintended records
         ...(showSelectedOnly ? {} : restFilters),
@@ -112,10 +113,16 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
     [filters, page, pageSize, sortConfigs, showSelectedOnly, selectedIds],
   );
 
-  // Fetch data in the table component - use my-warnings endpoint if flag is set
-  const { data: response, isLoading, error, refetch } = useMyWarningsEndpoint
-    ? useMyWarnings(queryParams)
-    : useWarnings(queryParams);
+  // Fetch data — always call all three hooks (Rules of Hooks), gate via `enabled`
+  const allWarningsQuery = useWarnings(queryParams, { enabled: !useTeamStaffEndpoint && !useMyWarningsEndpoint });
+  const myWarningsQuery = useMyWarnings(queryParams, { enabled: !useTeamStaffEndpoint && !!useMyWarningsEndpoint });
+  const teamWarningsQuery = useTeamStaffWarnings(queryParams, { enabled: !!useTeamStaffEndpoint });
+  const activeQuery = useTeamStaffEndpoint
+    ? teamWarningsQuery
+    : useMyWarningsEndpoint
+      ? myWarningsQuery
+      : allWarningsQuery;
+  const { data: response, isLoading, error, refetch } = activeQuery;
 
   const warnings = response?.data || [];
   const totalRecords = response?.meta?.totalRecords || 0;

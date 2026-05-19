@@ -36,11 +36,12 @@ import {
 
 interface UserListProps {
   className?: string;
+  teamScope?: boolean;
 }
 
 const DEFAULT_PAGE_SIZE = 40;
 
-export function UserList({ className }: UserListProps) {
+export function UserList({ className, teamScope }: UserListProps) {
   const navigate = useNavigate();
   const { batchDelete, batchUpdateAsync } = useUserBatchMutations();
   const queryClient = useQueryClient();
@@ -343,8 +344,12 @@ export function UserList({ className }: UserListProps) {
       result.isActive = true;
     }
 
+    if (teamScope) {
+      (result as any)._useTeamStaffEndpoint = true;
+    }
+
     return result;
-  }, [baseQueryFilters]);
+  }, [baseQueryFilters, teamScope]);
 
   // Handle filter changes
   const handleFilterChange = useCallback(

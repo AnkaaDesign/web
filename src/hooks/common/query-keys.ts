@@ -894,9 +894,11 @@ export const teamStaffKeys = {
   epis: () => ["teamStaff", "epis"] as const,
   episList: (filters?: Partial<PpeDeliveryGetManyFormData>) => (filters ? (["teamStaff", "epis", "list", filters] as const) : (["teamStaff", "epis", "list"] as const)),
 
-  // Payroll calculations for team members
+  // Payroll calculations for team members (per-member: validated server-side
+  // against the leader's led sector before calling Secullum).
   calculations: () => ["teamStaff", "calculations"] as const,
-  calculationsByPeriod: (year: number, month: number) => ["teamStaff", "calculations", year, month] as const,
+  calculationsByUser: (params?: { userId?: string; startDate?: string; endDate?: string; page?: number; take?: number }) =>
+    ["teamStaff", "calculations", "by-user", params ?? null] as const,
 };
 
 // =====================================================
@@ -904,11 +906,6 @@ export const teamStaffKeys = {
 // =====================================================
 export const reconciliationKeys = {
   all: ["reconciliation"] as const,
-  statements: (filters?: Record<string, unknown>) =>
-    filters
-      ? (["reconciliation", "statements", filters] as const)
-      : (["reconciliation", "statements"] as const),
-  statement: (id: string) => ["reconciliation", "statement", id] as const,
   transactions: (filters?: Record<string, unknown>) =>
     filters
       ? (["reconciliation", "transactions", filters] as const)
@@ -931,15 +928,11 @@ export const reconciliationKeys = {
 };
 
 // =====================================================
-// Skill Assessment Query Keys (Phase-4 rewrite)
+// Skill Assessment Query Keys
 // =====================================================
 //
 // Four entities, each with its own QueryKeys factory matching the
 // createEntityHooks contract (all / lists / list / details / detail / byIds).
-//
-// Legacy `skillKeys` (skillModel / skillAssessmentPeriod) preserved in
-// `legacySkillKeys` below so the old pages continue to compile until they are
-// rewritten in Phase-6.
 
 export const skillKeys = {
   all: ["skill"] as const,
@@ -995,6 +988,25 @@ export const assessmentEntryKeys = {
   byIds: (ids: string[]) => ["assessment-entry", "byIds", ids] as const,
   // Specialized
   myPending: () => ["assessment-entry", "me", "pending"] as const,
+};
+
+// Cross-campaign skill statistics (Overview / Comparison / Evolution).
+// Each variant gets its own subtree so we can invalidate a single view
+// without nuking the others.
+export const skillAnalyticsKeys = {
+  all: ["skill-analytics"] as const,
+  overview: (filters?: any) =>
+    filters
+      ? (["skill-analytics", "overview", filters] as const)
+      : (["skill-analytics", "overview"] as const),
+  comparison: (filters?: any) =>
+    filters
+      ? (["skill-analytics", "comparison", filters] as const)
+      : (["skill-analytics", "comparison"] as const),
+  evolution: (filters?: any) =>
+    filters
+      ? (["skill-analytics", "evolution", filters] as const)
+      : (["skill-analytics", "evolution"] as const),
 };
 
 // Legacy keys retained until Phase-6 page rewrite. Do NOT use in new code.

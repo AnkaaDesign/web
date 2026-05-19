@@ -219,7 +219,7 @@ function SummaryGrid({
         }
         Icon={IconUpload}
         tone="sky"
-        href={routes.financial.reconciliation.statements}
+        href={routes.financial.reconciliation.transactions}
       />
     </div>
   );

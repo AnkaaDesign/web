@@ -6,3 +6,4 @@ export * from "./use-skill";
 export * from "./use-topic";
 export * from "./use-assessment";
 export * from "./use-assessment-entry";
+export * from "./use-skill-analytics";

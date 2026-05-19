@@ -9,16 +9,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Combobox } from "@/components/ui/combobox";
-import { DateTimeInput } from "@/components/ui/date-time-input";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import {
-  IconFilter,
-  IconX,
-  IconCalendar,
-  IconCash,
-  IconUser,
-} from "@tabler/icons-react";
+import { IconFilter, IconX, IconCalendar, IconCash } from "@tabler/icons-react";
 import type {
   BankTransactionSubtype,
   MatchStatus,
@@ -31,15 +24,30 @@ export interface ReconciliationFilters {
   matchType?: MatchType;
   type?: TransactionType;
   subtype?: BankTransactionSubtype;
-  dateFrom?: string;
-  dateTo?: string;
+  /** Period filter (year + selected months) — same workflow as Bônus. */
+  year?: number;
+  months?: string[];
   amountMin?: number;
   amountMax?: number;
+  /** Kept as a URL/query option for deep links but no longer surfaced in the
+   *  filter sheet — the page-level search input already covers it. */
   counterparty?: string;
-  statementId?: string;
 }
 
-export const defaultReconciliationFilters: ReconciliationFilters = { type: "DEBIT" };
+/**
+ * Default to the current period. The accordion view always needs a period to
+ * enumerate dates against — empty period defaults are meaningless here.
+ */
+export function getDefaultReconciliationFilters(): ReconciliationFilters {
+  const now = new Date();
+  return {
+    type: "DEBIT",
+    year: now.getFullYear(),
+    months: [String(now.getMonth() + 1).padStart(2, "0")],
+  };
+}
+
+export const defaultReconciliationFilters: ReconciliationFilters = getDefaultReconciliationFilters();
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos" },
@@ -81,6 +89,21 @@ const MATCH_TYPE_OPTIONS = [
   { value: "BANK_SLIP_BRIDGE", label: "Via boleto" },
 ];
 
+const MONTH_OPTIONS = [
+  { value: "01", label: "Janeiro" },
+  { value: "02", label: "Fevereiro" },
+  { value: "03", label: "Março" },
+  { value: "04", label: "Abril" },
+  { value: "05", label: "Maio" },
+  { value: "06", label: "Junho" },
+  { value: "07", label: "Julho" },
+  { value: "08", label: "Agosto" },
+  { value: "09", label: "Setembro" },
+  { value: "10", label: "Outubro" },
+  { value: "11", label: "Novembro" },
+  { value: "12", label: "Dezembro" },
+];
+
 interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -95,14 +118,29 @@ export function ReconciliationFilterSheet({ open, onOpenChange, filters, onApply
     if (open) setLocal(filters);
   }, [open, filters]);
 
+  const yearOptions = useMemo<ComboboxOption[]>(() => {
+    const out: ComboboxOption[] = [];
+    const currentYear = new Date().getFullYear();
+    for (let i = 0; i <= 3; i++) {
+      const y = currentYear - i;
+      out.push({ value: y.toString(), label: y.toString() });
+    }
+    return out;
+  }, []);
+
   const activeCount = useMemo(() => {
+    const def = getDefaultReconciliationFilters();
     let c = 0;
     if (local.matchStatus) c++;
     if (local.matchType) c++;
-    if (local.type) c++;
+    if (local.type && local.type !== def.type) c++;
     if (local.subtype) c++;
-    if (local.dateFrom) c++;
-    if (local.dateTo) c++;
+    if (local.year && local.year !== def.year) c++;
+    if (
+      local.months &&
+      (local.months.length !== 1 || local.months[0] !== def.months?.[0])
+    )
+      c++;
     if (local.amountMin !== undefined) c++;
     if (local.amountMax !== undefined) c++;
     if (local.counterparty) c++;
@@ -115,7 +153,7 @@ export function ReconciliationFilterSheet({ open, onOpenChange, filters, onApply
   };
 
   const handleReset = () => {
-    onApply(defaultReconciliationFilters);
+    onApply(getDefaultReconciliationFilters());
     onOpenChange(false);
   };
 
@@ -133,142 +171,134 @@ export function ReconciliationFilterSheet({ open, onOpenChange, filters, onApply
             )}
           </SheetTitle>
           <SheetDescription>
-            Refine a lista de transações bancárias por status, tipo, data e valor.
+            Refine a lista de transações bancárias por período, status, tipo e valor.
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Status</Label>
-              <Combobox
-                value={local.matchStatus ?? "all"}
-                onValueChange={v =>
-                  setLocal(s => ({
-                    ...s,
-                    matchStatus: v && v !== "all" ? (v as MatchStatus) : undefined,
-                  }))
-                }
-                options={STATUS_OPTIONS}
-                placeholder="Selecione o status..."
-                searchable={false}
-                clearable={false}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Origem do pareamento</Label>
-              <Combobox
-                value={local.matchType ?? "all"}
-                onValueChange={v =>
-                  setLocal(s => ({
-                    ...s,
-                    matchType: v && v !== "all" ? (v as MatchType) : undefined,
-                  }))
-                }
-                options={MATCH_TYPE_OPTIONS}
-                placeholder="Como foi conciliado"
-                searchable={false}
-                clearable={false}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Tipo</Label>
-              <Combobox
-                value={local.type ?? "all"}
-                onValueChange={v =>
-                  setLocal(s => ({
-                    ...s,
-                    type: v && v !== "all" ? (v as TransactionType) : undefined,
-                  }))
-                }
-                options={TYPE_OPTIONS}
-                placeholder="Crédito ou Débito"
-                searchable={false}
-                clearable={false}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Forma</Label>
-              <Combobox
-                value={local.subtype ?? "all"}
-                onValueChange={v =>
-                  setLocal(s => ({
-                    ...s,
-                    subtype: v && v !== "all" ? (v as BankTransactionSubtype) : undefined,
-                  }))
-                }
-                options={SUBTYPE_OPTIONS}
-                placeholder="PIX, TED, Boleto..."
-                searchable={false}
-                clearable={false}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <IconUser className="h-4 w-4" />
-              Contraparte
-            </div>
-            <Input
-              value={local.counterparty ?? ""}
-              onChange={v =>
-                setLocal(s => ({
-                  ...s,
-                  counterparty: typeof v === "string" && v ? v : undefined,
-                }))
-              }
-              placeholder="Nome ou CNPJ/CPF"
-            />
-          </div>
-
-          <div className="space-y-3">
+        <div className="mt-6 space-y-5">
+          {/* Period — year + months side by side (this is the only horizontal pair
+              kept besides date range and amount range). */}
+          <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium">
               <IconCalendar className="h-4 w-4" />
               Período
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
-                <DateTimeInput
-                  mode="date"
-                  value={local.dateFrom ? new Date(local.dateFrom) : undefined}
-                  onChange={d => {
-                    const date = d && typeof d === "object" && "from" in d ? d.from : (d as Date | undefined);
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-1">
+                <Label className="text-xs text-muted-foreground mb-1 block">Ano</Label>
+                <Combobox
+                  value={local.year?.toString() || ""}
+                  onValueChange={value => {
+                    const year = Array.isArray(value) ? value[0] : value;
+                    const newYear = year ? parseInt(year) : undefined;
                     setLocal(s => ({
                       ...s,
-                      dateFrom: date ? date.toISOString().slice(0, 10) : undefined,
+                      year: newYear,
+                      months: newYear ? s.months : undefined,
                     }));
                   }}
-                  hideLabel
-                  placeholder="Data inicial..."
+                  options={yearOptions}
+                  placeholder="Ano..."
+                  searchable={false}
+                  clearable={false}
                 />
               </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
-                <DateTimeInput
-                  mode="date"
-                  value={local.dateTo ? new Date(local.dateTo) : undefined}
-                  onChange={d => {
-                    const date = d && typeof d === "object" && "from" in d ? d.to : (d as Date | undefined);
-                    setLocal(s => ({
-                      ...s,
-                      dateTo: date ? date.toISOString().slice(0, 10) : undefined,
-                    }));
+              <div className="col-span-2">
+                <Label className="text-xs text-muted-foreground mb-1 block">Meses</Label>
+                <Combobox
+                  mode="multiple"
+                  value={local.months || []}
+                  onValueChange={value => {
+                    const months = Array.isArray(value)
+                      ? value
+                      : value
+                        ? [value]
+                        : undefined;
+                    setLocal(s => ({ ...s, months }));
                   }}
-                  hideLabel
-                  placeholder="Data final..."
+                  options={MONTH_OPTIONS}
+                  placeholder={local.year ? "Selecione os meses..." : "Selecione um ano primeiro"}
+                  searchPlaceholder="Buscar meses..."
+                  emptyText="Nenhum mês encontrado"
+                  disabled={!local.year}
+                  searchable={true}
+                  clearable={false}
+                  hideDefaultBadges={true}
                 />
               </div>
             </div>
           </div>
 
-          <div className="space-y-3">
+          {/* Stacked single-column filter fields */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Status</Label>
+            <Combobox
+              value={local.matchStatus ?? "all"}
+              onValueChange={v =>
+                setLocal(s => ({
+                  ...s,
+                  matchStatus: v && v !== "all" ? (v as MatchStatus) : undefined,
+                }))
+              }
+              options={STATUS_OPTIONS}
+              placeholder="Selecione o status..."
+              searchable={false}
+              clearable={false}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Origem do pareamento</Label>
+            <Combobox
+              value={local.matchType ?? "all"}
+              onValueChange={v =>
+                setLocal(s => ({
+                  ...s,
+                  matchType: v && v !== "all" ? (v as MatchType) : undefined,
+                }))
+              }
+              options={MATCH_TYPE_OPTIONS}
+              placeholder="Como foi conciliado"
+              searchable={false}
+              clearable={false}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Tipo</Label>
+            <Combobox
+              value={local.type ?? "all"}
+              onValueChange={v =>
+                setLocal(s => ({
+                  ...s,
+                  type: v && v !== "all" ? (v as TransactionType) : undefined,
+                }))
+              }
+              options={TYPE_OPTIONS}
+              placeholder="Crédito ou Débito"
+              searchable={false}
+              clearable={false}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Forma</Label>
+            <Combobox
+              value={local.subtype ?? "all"}
+              onValueChange={v =>
+                setLocal(s => ({
+                  ...s,
+                  subtype: v && v !== "all" ? (v as BankTransactionSubtype) : undefined,
+                }))
+              }
+              options={SUBTYPE_OPTIONS}
+              placeholder="PIX, TED, Boleto..."
+              searchable={false}
+              clearable={false}
+            />
+          </div>
+
+          <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium">
               <IconCash className="h-4 w-4" />
               Faixa de valor

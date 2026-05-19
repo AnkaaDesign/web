@@ -2,24 +2,31 @@ import { useAuth } from "@/contexts/auth-context";
 import { Navigate, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import { IconLoader2, IconShield } from "@tabler/icons-react";
-import { SECTOR_PRIVILEGES, routes } from "../../constants";
+import { SECTOR_PRIVILEGES, TEAM_LEADER, routes } from "../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { hasAnyPrivilege, hasPrivilege } from "../../utils";
 
+type PrivilegeKey = keyof typeof SECTOR_PRIVILEGES | typeof TEAM_LEADER;
+type PrivilegeRequirement = PrivilegeKey | PrivilegeKey[];
+
 interface PrivilegeRouteProps {
   children: ReactNode;
-  requiredPrivilege?: keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[];
+  requiredPrivilege?: PrivilegeRequirement;
   fallbackRoute?: string;
 }
-
-type PrivilegeKey = keyof typeof SECTOR_PRIVILEGES;
-type PrivilegeRequirement = PrivilegeKey | PrivilegeKey[];
 
 /**
  * Check if user has required privilege(s)
  * Supports both single privileges and arrays of privileges
  */
+// Map a PrivilegeKey to the runtime value expected by hasPrivilege / hasAnyPrivilege.
+// SECTOR_PRIVILEGES is a string enum whose keys equal their values, so SECTOR_PRIVILEGES[key]
+// works for sector privileges. TEAM_LEADER is a virtual privilege handled by the helpers.
+function resolvePrivilege(key: PrivilegeKey): SECTOR_PRIVILEGES | typeof TEAM_LEADER {
+  return key === TEAM_LEADER ? TEAM_LEADER : SECTOR_PRIVILEGES[key as keyof typeof SECTOR_PRIVILEGES];
+}
+
 function checkUserPrivileges(user: any, requiredPrivilege: PrivilegeRequirement, requireAll: boolean = false): boolean {
   if (!user || !requiredPrivilege) return false;
 
@@ -27,15 +34,15 @@ function checkUserPrivileges(user: any, requiredPrivilege: PrivilegeRequirement,
   if (Array.isArray(requiredPrivilege)) {
     if (requireAll) {
       // AND logic - user must have ALL privileges
-      return requiredPrivilege.every((privilege) => hasPrivilege(user, SECTOR_PRIVILEGES[privilege]));
+      return requiredPrivilege.every((privilege) => hasPrivilege(user, resolvePrivilege(privilege)));
     } else {
       // OR logic - user needs ANY of the privileges (default backend behavior)
-      return hasAnyPrivilege(user, requiredPrivilege.map((p) => SECTOR_PRIVILEGES[p]) as SECTOR_PRIVILEGES[]);
+      return hasAnyPrivilege(user, requiredPrivilege.map(resolvePrivilege));
     }
   }
 
   // Handle single privilege
-  return hasPrivilege(user, SECTOR_PRIVILEGES[requiredPrivilege]);
+  return hasPrivilege(user, resolvePrivilege(requiredPrivilege));
 }
 
 function UnauthorizedAccess({ onGoBack }: { onGoBack: () => void }) {

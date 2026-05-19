@@ -1,7 +1,6 @@
 import type { AxiosProgressEvent } from "axios";
 import { apiClient } from "./axiosClient";
 import type {
-  BankStatement,
   BankTransaction,
   FiscalDocument,
   FiscalDocumentFilters,
@@ -9,7 +8,6 @@ import type {
   MatchCandidate,
   ReconciliationPaginatedResponse,
   ReconciliationStatistics,
-  StatementFilters,
   TransactionFilters,
   XmlImportResult,
 } from "@/types/reconciliation";
@@ -21,11 +19,11 @@ import type {
 
 export const reconciliationService = {
   importOfx: (
-    file: File,
+    files: File[],
     onUploadProgress?: (progress: AxiosProgressEvent) => void,
   ) => {
     const formData = new FormData();
-    formData.append("file", file);
+    for (const f of files) formData.append("files", f);
     return apiClient.post<ImportSummary>("/financial/reconciliation/import", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress,
@@ -47,16 +45,6 @@ export const reconciliationService = {
       },
     );
   },
-
-  listStatements: (params: StatementFilters) =>
-    apiClient.get<ReconciliationPaginatedResponse<BankStatement>>("/financial/reconciliation/statements", {
-      params,
-    }),
-
-  getStatement: (id: string) =>
-    apiClient.get<BankStatement & { statusCounts: Array<{ matchStatus: string; _count: { _all: number } }> }>(
-      `/financial/reconciliation/statements/${id}`,
-    ),
 
   listTransactions: (params: TransactionFilters) =>
     apiClient.get<ReconciliationPaginatedResponse<BankTransaction>>("/financial/reconciliation/transactions", {

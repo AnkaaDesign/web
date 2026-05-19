@@ -88,10 +88,9 @@ export const routes = {
       create: "/administracao/avaliacao-competencias/nova",
       details: (id: string) => `/administracao/avaliacao-competencias/${id}`,
       edit: (id: string) => `/administracao/avaliacao-competencias/${id}/editar`,
+      entry: (id: string, entryId: string) =>
+        `/administracao/avaliacao-competencias/${id}/avaliacoes/${entryId}`,
       analytics: (id: string) => `/administracao/avaliacao-competencias/${id}/analytics`,
-      // Legacy — kept until Phase-6 page rewrite drops the old SkillModel UI.
-      model: "/administracao/avaliacao-competencias/modelo",
-      modelEdit: "/administracao/avaliacao-competencias/modelo/editar",
     },
   },
 
@@ -164,8 +163,6 @@ export const routes = {
     },
     reconciliation: {
       root: "/financeiro/conciliacao",
-      statements: "/financeiro/conciliacao/extratos",
-      statementDetail: (id: string) => `/financeiro/conciliacao/extratos/${id}`,
       transactions: "/financeiro/conciliacao/transacoes",
       fiscalDocuments: "/financeiro/conciliacao/notas",
     },
@@ -639,6 +636,7 @@ export const routes = {
       payroll: "/estatisticas/recursos-humanos/folha",
       teamPerformance: "/estatisticas/recursos-humanos/equipe",
       absenteeism: "/estatisticas/recursos-humanos/faltas",
+      skillAssessment: "/estatisticas/recursos-humanos/competencias",
     },
     // Advanced Analytics
     analytics: {

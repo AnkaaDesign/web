@@ -95,8 +95,7 @@ export function SubmitConfirmationDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
           <AlertDialogAction
-            onClick={(e) => {
-              e.preventDefault();
+            onClick={() => {
               if (canSubmit) onConfirm();
             }}
             disabled={!canSubmit}

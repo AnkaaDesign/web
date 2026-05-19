@@ -20,11 +20,12 @@ interface WarningListProps {
   selectedSeverity?: WARNING_SEVERITY;
   onDataUpdate?: (data: Warning[], meta?: WarningGetManyResponse["meta"]) => void;
   className?: string;
+  teamScope?: boolean;
 }
 
 const DEFAULT_PAGE_SIZE = 40;
 
-export function WarningList({ selectedSeverity, onDataUpdate, className }: WarningListProps) {
+export function WarningList({ selectedSeverity, onDataUpdate, className, teamScope }: WarningListProps) {
   const [_tableData, setTableData] = useState<{ warnings: Warning[]; totalRecords: number }>({ warnings: [], totalRecords: 0 });
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
@@ -117,8 +118,9 @@ export function WarningList({ selectedSeverity, onDataUpdate, className }: Warni
     return {
       ...filterWithoutOrderBy,
       limit: DEFAULT_PAGE_SIZE,
+      ...(teamScope && { _useTeamStaffEndpoint: true }),
     };
-  }, [baseQueryFilters]);
+  }, [baseQueryFilters, teamScope]);
 
   // Handle filter changes
   const handleFilterChange = useCallback(

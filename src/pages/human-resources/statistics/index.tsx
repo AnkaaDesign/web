@@ -11,6 +11,7 @@ import {
   IconCalendarOff,
   IconArrowRight,
   IconCheck,
+  IconRadar,
 } from "@tabler/icons-react";
 
 type ToneKey = "blue" | "emerald" | "violet" | "amber" | "rose" | "cyan" | "fuchsia" | "sky";
@@ -81,6 +82,19 @@ const pages: StatPage[] = [
       "Faltas e atrasos consolidados",
       "Atestados médicos",
       "Dados sincronizados do Secullum",
+    ],
+  },
+  {
+    title: "Competências",
+    description: "Radar de avaliações, comparativo entre pessoas e setores, evolução por campanha",
+    route: routes.statistics.humanResources.skillAssessment,
+    icon: IconRadar,
+    tone: "violet",
+    bullets: [
+      "Radar de competências por pessoa, setor ou empresa",
+      "Comparativo entre colaboradores e setores",
+      "Distribuição de notas por tópico",
+      "Evolução entre campanhas",
     ],
   },
 ];

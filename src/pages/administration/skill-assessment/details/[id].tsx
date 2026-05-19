@@ -2,21 +2,20 @@ import { useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   IconAlertTriangle,
+  IconBuildingFactory,
   IconCalendar,
   IconCalendarPlus,
   IconCalendarTime,
-  IconCategory,
-  IconChartBar,
   IconClipboardList,
   IconEdit,
   IconHash,
   IconInfoCircle,
   IconLoader2,
   IconLock,
+  IconNotes,
   IconRefresh,
   IconTrash,
   IconUser,
-  IconUsers,
   IconX,
 } from "@tabler/icons-react";
 
@@ -24,7 +23,6 @@ import {
   routes,
   SECTOR_PRIVILEGES,
   ASSESSMENT_STATUS,
-  ASSESSMENT_STATUS_LABELS,
 } from "../../../../constants";
 import { formatDate, formatDateTime } from "../../../../utils";
 import {
@@ -39,7 +37,14 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DetailRow } from "@/components/ui/detail-row";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { cn } from "@/lib/utils";
+import { AssessmentStatusBadge } from "@/components/production/skill-assessment/assessment-status-badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,24 +56,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { EntriesTable } from "@/components/administration/skill-assessment/entries-table";
-import { CampaignAnalytics } from "@/components/administration/skill-assessment/campaign-analytics";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { toast } from "@/components/ui/sonner";
 
-function statusBadge(s: ASSESSMENT_STATUS) {
-  const label = ASSESSMENT_STATUS_LABELS[s];
-  switch (s) {
-    case ASSESSMENT_STATUS.OPEN:
-      return <Badge className="bg-blue-600 hover:bg-blue-700">{label}</Badge>;
-    case ASSESSMENT_STATUS.CLOSED:
-      return <Badge className="bg-emerald-600 hover:bg-emerald-700">{label}</Badge>;
-    case ASSESSMENT_STATUS.CANCELLED:
-      return <Badge variant="secondary">{label}</Badge>;
-    case ASSESSMENT_STATUS.DRAFT:
-    default:
-      return <Badge variant="outline">{label}</Badge>;
-  }
-}
 
 export const SkillAssessmentDetailsPage = () => {
   usePageTracker({ title: "Detalhes da Campanha", icon: "clipboard-list" });
@@ -109,6 +99,22 @@ export const SkillAssessmentDetailsPage = () => {
       return (a.topic?.order ?? 0) - (b.topic?.order ?? 0);
     });
   }, [assessment?.topics]);
+
+  // Group topics by skill for the Accordion render.
+  const topicsBySkill = useMemo(() => {
+    const groups = new Map<
+      string,
+      { skillId: string; skillName: string; topics: typeof sortedAssessmentTopics }
+    >();
+    for (const t of sortedAssessmentTopics) {
+      const sid = t.topic?.skill?.id ?? "_unknown";
+      const sname = t.topic?.skill?.name ?? "Sem competência";
+      const g = groups.get(sid);
+      if (g) g.topics.push(t);
+      else groups.set(sid, { skillId: sid, skillName: sname, topics: [t] });
+    }
+    return Array.from(groups.values());
+  }, [sortedAssessmentTopics]);
 
   if (!id) return <Navigate to={routes.administration.skillAssessment.root} replace />;
   if (error) return <Navigate to={routes.administration.skillAssessment.root} replace />;
@@ -213,118 +219,112 @@ export const SkillAssessmentDetailsPage = () => {
                   loading: cancelMut.isPending,
                 }]
               : []),
-            { key: "delete", label: "Excluir", icon: IconTrash, onClick: () => setIsDeleteOpen(true), disabled: deleteMutation.isPending },
+            // Delete is only allowed by the API on DRAFT or CANCELLED campaigns —
+            // hide the button in OPEN/CLOSED to avoid offering an action that would always 400.
+            ...(status === ASSESSMENT_STATUS.DRAFT || status === ASSESSMENT_STATUS.CANCELLED
+              ? [{
+                  key: "delete",
+                  label: "Excluir",
+                  icon: IconTrash,
+                  variant: "destructive" as const,
+                  onClick: () => setIsDeleteOpen(true),
+                  disabled: deleteMutation.isPending,
+                }]
+              : []),
           ]}
           className="flex-shrink-0"
         />
 
         <div className="flex-1 overflow-y-auto pb-6">
-          <Tabs defaultValue="overview" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-              <TabsTrigger value="entries">Avaliações</TabsTrigger>
-              <TabsTrigger value="analytics">
-                <IconChartBar className="h-4 w-4 mr-2" />
-                Análises
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview" className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Informações Card — status, período, autor, datas do sistema */}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
-                      Informações
-                    </CardTitle>
-                    {statusBadge(status)}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <DetailRow
-                        icon={IconCalendar}
-                        label="Período"
-                        value={
-                          <span>
-                            {formatDate(assessment.periodStart)} – {formatDate(assessment.periodEnd)}
-                          </span>
-                        }
-                      />
-                      <DetailRow
-                        icon={IconUser}
-                        label="Criada por"
-                        value={<span>{assessment.createdBy?.name ?? "—"}</span>}
-                      />
-                      <DetailRow
-                        icon={IconCalendarPlus}
-                        label="Criada em"
-                        value={
-                          <span className="text-sm">
-                            {assessment.createdAt ? formatDateTime(assessment.createdAt) : "—"}
-                          </span>
-                        }
-                      />
-                      <DetailRow
-                        icon={IconCalendarTime}
-                        label="Atualizada em"
-                        value={
-                          <span className="text-sm">
-                            {assessment.updatedAt ? formatDateTime(assessment.updatedAt) : "—"}
-                          </span>
-                        }
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Descrição Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Descrição</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm whitespace-pre-wrap text-foreground/90">
-                      {assessment.description || (
-                        <span className="text-muted-foreground italic">
-                          Nenhuma descrição cadastrada.
-                        </span>
-                      )}
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Resumo Card — now full-width since lifecycle actions moved to PageHeader */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+              {/* Informações — everything about the campaign in one card */}
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <IconCategory className="h-5 w-5 text-muted-foreground" />
-                    Resumo
+                    <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
+                    Informações
                   </CardTitle>
+                  <AssessmentStatusBadge status={status} />
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="space-y-2">
+                    {/* Scope / context first */}
                     <DetailRow
-                      icon={IconUsers}
-                      label="Setores"
+                      icon={IconCalendar}
+                      label="Período"
                       value={
-                        <span className="font-mono">
-                          {assessment._count?.sectors ?? 0}
+                        <span>
+                          {formatDate(assessment.periodStart)} – {formatDate(assessment.periodEnd)}
                         </span>
                       }
                     />
                     <DetailRow
                       icon={IconHash}
                       label="Tópicos"
-                      value={<span className="font-mono">{topicsCount}</span>}
+                      value={<span className="tabular-nums">{topicsCount}</span>}
                     />
                     <DetailRow
                       icon={IconUser}
                       label="Avaliados"
                       value={
-                        <span className="font-mono">
+                        <span className="tabular-nums">
                           {assessment._count?.entries ?? 0}
+                        </span>
+                      }
+                    />
+                    <DetailRow
+                      icon={IconBuildingFactory}
+                      label="Setores incluídos"
+                      value={
+                        (assessment.sectors ?? []).length === 0 ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <span>
+                            {(assessment.sectors ?? [])
+                              .map((s) => s.sector?.name ?? s.sectorId)
+                              .join(", ")}
+                          </span>
+                        )
+                      }
+                    />
+                    <DetailRow
+                      icon={IconNotes}
+                      label="Descrição"
+                      value={
+                        assessment.description ? (
+                          <span className="whitespace-pre-wrap text-right">
+                            {assessment.description}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground italic">
+                            Nenhuma descrição cadastrada.
+                          </span>
+                        )
+                      }
+                    />
+
+                    {/* System metadata last */}
+                    <DetailRow
+                      icon={IconUser}
+                      label="Criada por"
+                      value={<span>{assessment.createdBy?.name ?? "—"}</span>}
+                    />
+                    <DetailRow
+                      icon={IconCalendarPlus}
+                      label="Criada em"
+                      value={
+                        <span className="text-sm">
+                          {assessment.createdAt ? formatDateTime(assessment.createdAt) : "—"}
+                        </span>
+                      }
+                    />
+                    <DetailRow
+                      icon={IconCalendarTime}
+                      label="Atualizada em"
+                      value={
+                        <span className="text-sm">
+                          {assessment.updatedAt ? formatDateTime(assessment.updatedAt) : "—"}
                         </span>
                       }
                     />
@@ -332,60 +332,64 @@ export const SkillAssessmentDetailsPage = () => {
                 </CardContent>
               </Card>
 
+              {/* Tópicos incluídos — grouped by competência via accordion */}
               <Card>
-                <CardHeader>
-                  <CardTitle>Setores incluídos</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <IconHash className="h-5 w-5 text-muted-foreground" />
+                    Tópicos incluídos
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {(assessment.sectors ?? []).map((s) => (
-                      <Badge key={s.sectorId} variant="outline">
-                        {s.sector?.name ?? s.sectorId}
-                      </Badge>
-                    ))}
-                    {(assessment.sectors ?? []).length === 0 && (
-                      <span className="text-sm text-muted-foreground">Nenhum setor.</span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Tópicos incluídos</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {sortedAssessmentTopics.length === 0 ? (
-                      <span className="text-sm text-muted-foreground">Nenhum tópico.</span>
-                    ) : (
-                      sortedAssessmentTopics.map((t) => (
-                        <div
-                          key={t.topicId}
-                          className="flex items-center justify-between rounded-md bg-muted/50 px-4 py-2.5 text-sm"
-                        >
-                          <div className="font-medium">{t.topic?.title ?? t.topicId}</div>
-                          {t.topic?.skill && (
-                            <Badge variant="outline" className="text-xs">
-                              {t.topic.skill.name}
-                            </Badge>
+                  {topicsBySkill.length === 0 ? (
+                    <span className="text-sm text-muted-foreground">Nenhum tópico.</span>
+                  ) : (
+                    <Accordion
+                      type="multiple"
+                      defaultValue={
+                        topicsBySkill[0] ? [topicsBySkill[0].skillId] : []
+                      }
+                      className="w-full"
+                    >
+                      {topicsBySkill.map((group, idx) => (
+                        <AccordionItem
+                          key={group.skillId}
+                          value={group.skillId}
+                          className={cn(
+                            "border-border/40",
+                            idx === topicsBySkill.length - 1 && "border-b-0",
                           )}
-                        </div>
-                      ))
-                    )}
-                  </div>
+                        >
+                          <AccordionTrigger className="py-3 hover:no-underline">
+                            <div className="flex flex-1 items-center justify-between pr-3">
+                              <span className="font-medium">{group.skillName}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {group.topics.length}
+                              </Badge>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-1.5">
+                              {group.topics.map((t) => (
+                                <div
+                                  key={t.topicId}
+                                  className="rounded-md bg-muted/50 px-3 py-2 text-sm"
+                                >
+                                  {t.topic?.title ?? t.topicId}
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </div>
 
-            <TabsContent value="entries">
-              <EntriesTable assessmentId={id} topicsCount={topicsCount} />
-            </TabsContent>
-
-            <TabsContent value="analytics">
-              <CampaignAnalytics assessmentId={id} />
-            </TabsContent>
-          </Tabs>
+            <EntriesTable assessmentId={id} topicsCount={topicsCount} />
+          </div>
         </div>
 
         <AlertDialog
@@ -450,5 +454,6 @@ export const SkillAssessmentDetailsPage = () => {
     </PrivilegeRoute>
   );
 };
+
 
 export default SkillAssessmentDetailsPage;

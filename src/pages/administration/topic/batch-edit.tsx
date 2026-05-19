@@ -101,7 +101,7 @@ export const TopicBatchEditPage = () => {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Editar Tópicos em Lote"
@@ -158,7 +158,7 @@ export const TopicBatchEditPage = () => {
                         <TableCell>
                           <Input
                             value={r.title}
-                            onChange={(e) => update(r.id, { title: e.target.value })}
+                            onChange={(value) => update(r.id, { title: (value as string) ?? "" })}
                             transparent
                           />
                         </TableCell>
@@ -174,7 +174,7 @@ export const TopicBatchEditPage = () => {
                           <Input
                             type="number"
                             value={r.order}
-                            onChange={(e) => update(r.id, { order: Number(e.target.value) })}
+                            onChange={(value) => update(r.id, { order: Number(value) || 0 })}
                             transparent
                           />
                         </TableCell>

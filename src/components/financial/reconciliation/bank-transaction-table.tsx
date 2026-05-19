@@ -21,7 +21,13 @@ import {
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { MatchStatusBadge } from "./match-status-badge";
 import { routes } from "@/constants";
-import { formatCNPJ, formatCnpjCpf, formatCurrency, formatDate } from "@/utils";
+import {
+  formatAccountNumber,
+  formatCNPJ,
+  formatCnpjCpf,
+  formatCurrency,
+  formatDate,
+} from "@/utils";
 import type { BankTransaction } from "@/types/reconciliation";
 
 interface Props {
@@ -35,9 +41,9 @@ interface Props {
   onPageSizeChange?: (s: number) => void;
   emptyMessage?: string;
   emptyIcon?: React.ElementType;
-  /** Shows a column with the source statement period — useful in the global
-   *  Transações view, redundant on the per-statement detail page. */
-  showStatementColumn?: boolean;
+  /** Shows the bank account column (bank + agency/account). Off by default
+   *  for compact lists; on for the global transactions view. */
+  showAccountColumn?: boolean;
   selectable?: boolean;
   isSelected?: (id: string) => boolean;
   onSelectionChange?: (id: string) => void;
@@ -61,7 +67,7 @@ export function BankTransactionTable({
   onPageSizeChange,
   emptyMessage = "Nenhuma transação encontrada",
   emptyIcon = IconCash,
-  showStatementColumn = false,
+  showAccountColumn = false,
   selectable,
   isSelected,
   onSelectionChange,
@@ -86,27 +92,29 @@ export function BankTransactionTable({
       key: "postedAt",
       header: "Data",
       sortable: true,
-      render: t => <span className="whitespace-nowrap">{formatDate(t.postedAt)}</span>,
+      width: "92px",
+      render: t => <span className="whitespace-nowrap text-sm">{formatDate(t.postedAt)}</span>,
     },
-    ...(showStatementColumn
+    ...(showAccountColumn
       ? ([
           {
-            key: "statement",
-            header: "Extrato",
-            render: t =>
-              t.statement ? (
-                <span className="whitespace-nowrap text-xs text-muted-foreground">
-                  {formatDate(t.statement.periodStart)} – {formatDate(t.statement.periodEnd)}
-                </span>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              ),
+            key: "account",
+            header: "Conta",
+            width: "200px",
+            render: t => (
+              <span className="text-sm whitespace-nowrap truncate block">
+                {t.bankName}
+                {t.agency ? ` · Ag ${t.agency}` : ""}
+                {t.accountNumber ? ` / ${formatAccountNumber(t.accountNumber)}` : ""}
+              </span>
+            ),
           },
         ] as StandardizedColumn<BankTransaction>[])
       : []),
     {
       key: "type",
       header: "Tipo",
+      width: "80px",
       render: t => (
         <Badge variant={t.type === "CREDIT" ? "completed" : "cancelled"} size="sm">
           {t.type === "CREDIT" ? "Crédito" : "Débito"}
@@ -116,6 +124,7 @@ export function BankTransactionTable({
     {
       key: "subtype",
       header: "Forma",
+      width: "84px",
       render: t => <span className="text-xs text-muted-foreground">{t.subtype}</span>,
     },
     {
@@ -123,10 +132,10 @@ export function BankTransactionTable({
       header: "Valor",
       align: "right",
       sortable: true,
-      width: "120px",
+      width: "110px",
       render: t => (
         <span
-          className={`font-semibold tabular-nums whitespace-nowrap ${
+          className={`font-semibold tabular-nums whitespace-nowrap text-sm ${
             t.type === "CREDIT" ? "text-emerald-700" : "text-red-700"
           }`}
         >
@@ -138,7 +147,7 @@ export function BankTransactionTable({
       key: "counterparty",
       header: "Contraparte / Descrição",
       render: t => (
-        <span className="block max-w-md truncate">
+        <span className="block truncate text-sm">
           {t.counterpartyName ||
             (t.counterpartyCnpjCpf ? formatCnpjCpf(t.counterpartyCnpjCpf) : t.memo || "—")}
         </span>
@@ -147,6 +156,7 @@ export function BankTransactionTable({
     {
       key: "linkedNf",
       header: "NF vinculada",
+      width: "180px",
       render: t => {
         const firstDoc = t.matches?.find(m => m.fiscalDocument)?.fiscalDocument;
         const extraCount = (t.matches?.filter(m => m.fiscalDocument).length ?? 0) - 1;
@@ -162,7 +172,7 @@ export function BankTransactionTable({
           <Link
             to={`${routes.financial.reconciliation.fiscalDocuments}?nfId=${firstDoc.id}`}
             onClick={e => e.stopPropagation()}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline max-w-[14rem] truncate"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline max-w-[12rem] truncate"
             title={emitDisplay}
           >
             <span className="truncate">{emitDisplay}</span>
@@ -177,7 +187,7 @@ export function BankTransactionTable({
     {
       key: "matchStatus",
       header: "Status",
-      width: "200px",
+      width: "160px",
       className: "whitespace-nowrap",
       render: t => {
         const conf = t.matches?.[0]?.confidenceScore;

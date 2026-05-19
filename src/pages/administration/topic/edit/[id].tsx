@@ -58,8 +58,9 @@ export const TopicEditPage = () => {
   const [isSubmittingAll, setIsSubmittingAll] = useState(false);
 
   const { data, isLoading, error } = useTopic(id ?? "", {
+    enabled: !!id,
     include: { skill: true, levels: true },
-  } as any, { enabled: !!id } as any);
+  });
 
   const { updateAsync } = useTopicMutations();
   const upsertLevels = useUpsertTopicLevels(id ?? "");
@@ -152,7 +153,7 @@ export const TopicEditPage = () => {
   const isSubmitting = isSubmittingAll || form.formState.isSubmitting || upsertLevels.isPending;
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <div className="container mx-auto max-w-4xl flex-shrink-0">
           <PageHeader
@@ -240,7 +241,7 @@ export const TopicEditPage = () => {
                               max={9999}
                               {...field}
                               value={field.value ?? 0}
-                              onChange={(e) => field.onChange(Number(e.target.value))}
+                              onChange={(value) => field.onChange(Number(value) || 0)}
                               disabled={isSubmitting}
                               transparent
                             />

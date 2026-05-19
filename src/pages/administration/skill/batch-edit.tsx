@@ -100,7 +100,7 @@ export const SkillBatchEditPage = () => {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           title="Editar Competências em Lote"
@@ -156,7 +156,7 @@ export const SkillBatchEditPage = () => {
                         <TableCell>
                           <Input
                             value={r.name}
-                            onChange={(e) => update(r.id, { name: e.target.value })}
+                            onChange={(value) => update(r.id, { name: (value as string) ?? "" })}
                             transparent
                           />
                         </TableCell>
@@ -164,7 +164,7 @@ export const SkillBatchEditPage = () => {
                           <Input
                             type="number"
                             value={r.order}
-                            onChange={(e) => update(r.id, { order: Number(e.target.value) })}
+                            onChange={(value) => update(r.id, { order: Number(value) || 0 })}
                             transparent
                           />
                         </TableCell>

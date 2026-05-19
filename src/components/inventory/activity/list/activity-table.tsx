@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { IconChevronDown, IconChevronUp, IconSelector, IconExternalLink, IconEdit, IconTrash, IconAlertTriangle, IconArrowsExchange } from "@tabler/icons-react";
 import type { Activity } from "../../../../types";
 import type { ActivityGetManyFormData } from "../../../../schemas";
-import { useActivityMutations, useActivities } from "../../../../hooks";
+import { useActivityMutations, useActivities, useTeamStaffActivities } from "../../../../hooks";
 import { shouldShowInteractiveElements, canEditItems, canDeleteItems } from "@/utils/permissions/entity-permissions";
 import { useAuth } from "@/hooks/common/use-auth";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -68,30 +68,38 @@ export const ActivityTable = ({ filters, visibleColumns, onDataChange, className
     resetSelectionOnPageChange: false,
   });
 
+  // Check if we should use the team-staff endpoint
+  const useTeamStaffEndpoint = (filters as any)?._useTeamStaffEndpoint;
+
   // Memoize query parameters to prevent unnecessary re-fetches
   const queryParams = React.useMemo(
-    () => ({
-      // Always apply base filters to prevent showing unintended records
-      ...filters,
-      page: page + 1, // Convert 0-based to 1-based for API
-      limit: pageSize,
-      // Convert sortConfigs to orderBy format for API
-      ...(sortConfigs.length > 0 && {
-        orderBy: convertSortConfigsToOrderBy(sortConfigs),
-      }),
-      // Filter by selected IDs when showSelectedOnly is true
-      ...(showSelectedOnly &&
-        selectedIds.length > 0 && {
-          where: {
-            id: { in: selectedIds },
-          },
+    () => {
+      const { _useTeamStaffEndpoint, ...restFilters } = filters as any;
+      return {
+        // Always apply base filters to prevent showing unintended records
+        ...restFilters,
+        page: page + 1, // Convert 0-based to 1-based for API
+        limit: pageSize,
+        // Convert sortConfigs to orderBy format for API
+        ...(sortConfigs.length > 0 && {
+          orderBy: convertSortConfigsToOrderBy(sortConfigs),
         }),
-    }),
+        // Filter by selected IDs when showSelectedOnly is true
+        ...(showSelectedOnly &&
+          selectedIds.length > 0 && {
+            where: {
+              id: { in: selectedIds },
+            },
+          }),
+      };
+    },
     [filters, page, pageSize, sortConfigs, showSelectedOnly, selectedIds],
   );
 
-  // Fetch data in the table component
-  const { data: response, isLoading, error, refetch } = useActivities(queryParams);
+  // Fetch data in the table component - use team-staff endpoint if flag is set
+  const activitiesQuery = useActivities(queryParams, { enabled: !useTeamStaffEndpoint });
+  const teamStaffQuery = useTeamStaffActivities(queryParams, { enabled: !!useTeamStaffEndpoint });
+  const { data: response, isLoading, error, refetch } = useTeamStaffEndpoint ? teamStaffQuery : activitiesQuery;
 
   const activities = response?.data || [];
   const totalRecords = response?.meta?.totalRecords || 0;

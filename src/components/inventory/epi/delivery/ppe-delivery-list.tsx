@@ -24,6 +24,8 @@ import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFoo
 
 interface PpeDeliveryListProps {
   className?: string;
+  // When true, scopes the list to the authenticated team leader's sector via the team-staff endpoint
+  teamScope?: boolean;
 }
 
 const DEFAULT_PAGE_SIZE = 40;
@@ -41,7 +43,7 @@ function createDebounce<T extends (...args: any[]) => any>(func: T, wait: number
   return debounced;
 }
 
-export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
+export function PpeDeliveryList({ className, teamScope }: PpeDeliveryListProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -229,8 +231,10 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     return {
       ...filters,
       searchingFor: searchingFor || undefined,
+      // Tells the table to route through the team-staff endpoint (scoped to led sector)
+      ...(teamScope && { _useTeamStaffEndpoint: true }),
     };
-  }, [filters, searchingFor]);
+  }, [filters, searchingFor, teamScope]);
 
   // Handler for filter changes
   const handleFilterChange = useCallback((newFilters: Partial<PpeDeliveryGetManyFormData>) => {

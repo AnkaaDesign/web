@@ -309,13 +309,25 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
       },
       {
         key: "periodStart",
-        header: "PERÍODO",
+        header: "INICIA EM",
         sortable: true,
-        className: "min-w-[200px]",
+        className: "min-w-[140px]",
         align: "left" as const,
         accessor: (a: Assessment) => (
           <span className="text-sm text-muted-foreground">
-            {formatDate(a.periodStart)} — {formatDate(a.periodEnd)}
+            {formatDate(a.periodStart)}
+          </span>
+        ),
+      },
+      {
+        key: "periodEnd",
+        header: "TERMINA EM",
+        sortable: true,
+        className: "min-w-[140px]",
+        align: "left" as const,
+        accessor: (a: Assessment) => (
+          <span className="text-sm text-muted-foreground">
+            {formatDate(a.periodEnd)}
           </span>
         ),
       },

@@ -942,22 +942,6 @@ const FinancialOverviewPage = () => {
   const goalSource: 'override' | 'default' | 'none' =
     goalOverride != null ? 'override' : defaultGoal.value != null ? 'default' : 'none';
 
-  const perPeriodGoalValues = useMemo(() => {
-    if (goalOverride != null || yearCompareMode || goalMetric == null || analysis.dimension !== 'periodo' || !defaultGoal.perPeriodValues) return null;
-    return displayBuckets.map(b => {
-      if (xMode === 'year') {
-        let total = 0; let hasAny = false;
-        for (let m = 1; m <= 12; m++) {
-          const key = `${b.period}-${String(m).padStart(2, '0')}`;
-          const v = defaultGoal.perPeriodValues!.get(key);
-          if (v != null) { total += v; hasAny = true; }
-        }
-        return hasAny ? total : null;
-      }
-      return defaultGoal.perPeriodValues!.get(b.period) ?? null;
-    });
-  }, [goalOverride, yearCompareMode, goalMetric, analysis.dimension, defaultGoal.perPeriodValues, displayBuckets, xMode]);
-
   // -------- Loading / error state aggregation --------
 
   const isLoading = collectionLoading || receivablesLoading || quoteFunnelLoading;
@@ -1074,6 +1058,7 @@ const FinancialOverviewPage = () => {
   // -------- Main chart: aggregate items into display buckets (Por Período) --------
 
   type Bucket = {
+    period: string;
     name: string;
     invoicedAmount: number;
     paidAmount: number;
@@ -1097,6 +1082,7 @@ const FinancialOverviewPage = () => {
       const over = rows.reduce((s, r) => s + r.overdueAmount, 0);
       const q = periodKey ? quoteItemsByPeriod.get(periodKey) : undefined;
       return {
+        period: periodKey ?? name,
         name,
         invoicedAmount: Math.round(inv * 100) / 100,
         paidAmount: Math.round(paid * 100) / 100,
@@ -1120,7 +1106,7 @@ const FinancialOverviewPage = () => {
         if (!byYear.has(year)) byYear.set(year, []);
         byYear.get(year)!.push(it);
       }
-      return Array.from(byYear.keys()).sort().map(y => reduce(byYear.get(y)!, y.toString()));
+      return Array.from(byYear.keys()).sort().map(y => reduce(byYear.get(y)!, y.toString(), y.toString()));
     }
 
     if (yearCompareMode && selectedYears.length >= 2) {
@@ -1149,6 +1135,22 @@ const FinancialOverviewPage = () => {
       .sort((a, b) => a.period.localeCompare(b.period))
       .map(it => reduce([it], it.periodLabel, it.period));
   }, [items, quoteItems, xMode, yearCompareMode, selectedYears, selectedMonths]);
+
+  const perPeriodGoalValues = useMemo(() => {
+    if (goalOverride != null || yearCompareMode || goalMetric == null || analysis.dimension !== 'periodo' || !defaultGoal.perPeriodValues) return null;
+    return displayBuckets.map(b => {
+      if (xMode === 'year') {
+        let total = 0; let hasAny = false;
+        for (let m = 1; m <= 12; m++) {
+          const key = `${b.period}-${String(m).padStart(2, '0')}`;
+          const v = defaultGoal.perPeriodValues!.get(key);
+          if (v != null) { total += v; hasAny = true; }
+        }
+        return hasAny ? total : null;
+      }
+      return defaultGoal.perPeriodValues!.get(b.period) ?? null;
+    });
+  }, [goalOverride, yearCompareMode, goalMetric, analysis.dimension, defaultGoal.perPeriodValues, displayBuckets, xMode]);
 
   // -------- Per-period chart data (responds to Métrica) --------
 

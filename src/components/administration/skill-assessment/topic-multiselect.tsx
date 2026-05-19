@@ -1,11 +1,10 @@
 import { useMemo } from "react";
-import { IconCheck, IconChevronDown, IconLoader2 } from "@tabler/icons-react";
+import { IconChevronDown, IconLoader2 } from "@tabler/icons-react";
 
 import { useSkills, useTopics } from "../../../hooks";
 import type { Skill, Topic } from "../../../types";
 import { cn } from "@/lib/utils";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -97,8 +96,11 @@ export function TopicMultiSelect({ value, onChange, disabled, placeholder }: Top
           <IconChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[420px] p-0" align="start">
-        <ScrollArea className="max-h-[480px]">
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] p-0"
+        align="start"
+      >
+        <ScrollArea className="h-[480px]">
           {isLoading ? (
             <div className="flex items-center justify-center py-10">
               <IconLoader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -120,22 +122,18 @@ export function TopicMultiSelect({ value, onChange, disabled, placeholder }: Top
                       className="flex w-full items-center gap-2 rounded-md px-2 py-2 hover:bg-accent text-left"
                       onClick={() => toggleSkillGroup(ids)}
                     >
-                      <div className="flex h-4 w-4 items-center justify-center rounded-sm border">
-                        {allSelected ? (
-                          <IconCheck className="h-3 w-3" />
-                        ) : partial ? (
-                          <span className="h-2 w-2 bg-foreground rounded-sm" />
-                        ) : null}
-                      </div>
+                      <Checkbox
+                        checked={allSelected}
+                        indeterminate={partial}
+                        tabIndex={-1}
+                        className="pointer-events-none"
+                      />
                       <div className="flex-1">
                         <div className="font-medium text-sm">{skill.name}</div>
                         <div className="text-xs text-muted-foreground">
                           {topics.length} tópicos
                         </div>
                       </div>
-                      <Badge variant="outline" className="text-xs">
-                        {allSelected ? "Selecionada" : "Selecionar tudo"}
-                      </Badge>
                     </button>
                     <div className="ml-6 mt-1 space-y-1">
                       {topics.map((t) => (

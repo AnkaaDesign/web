@@ -128,7 +128,7 @@ export function SkillForm(props: SkillFormProps) {
                         max={9999}
                         {...field}
                         value={field.value ?? 0}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        onChange={(value) => field.onChange(Number(value) || 0)}
                         disabled={isSubmitting}
                         transparent
                       />

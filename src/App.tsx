@@ -79,8 +79,6 @@ const FinancialBudgetCreate = lazy(() => import("@/pages/financial/budget/create
 const FinancialBudgetDetail = lazy(() => import("@/pages/financial/budget/details/[taskId]").then((module) => ({ default: module.FinancialBudgetDetailPage })));
 const FinancialNfseList = lazy(() => import("@/pages/financial/nfse/list").then((module) => ({ default: module.NfseListPage })));
 const FinancialNfseDetail = lazy(() => import("@/pages/financial/nfse/detail").then((module) => ({ default: module.NfseDetailPage })));
-const ReconciliationStatementsList = lazy(() => import("@/pages/financial/reconciliation/statements-list").then((module) => ({ default: module.ReconciliationStatementsListPage })));
-const ReconciliationStatementDetail = lazy(() => import("@/pages/financial/reconciliation/statement-detail").then((module) => ({ default: module.ReconciliationStatementDetailPage })));
 const ReconciliationTransactionsList = lazy(() => import("@/pages/financial/reconciliation/transactions-list").then((module) => ({ default: module.ReconciliationTransactionsListPage })));
 const ReconciliationFiscalDocumentsList = lazy(() => import("@/pages/financial/reconciliation/fiscal-documents-list").then((module) => ({ default: module.ReconciliationFiscalDocumentsListPage })));
 const ReconciliationStatistics = lazy(() => import("@/pages/financial/statistics/reconciliation").then((module) => ({ default: module.ReconciliationStatisticsPage })));
@@ -238,6 +236,7 @@ const FinancialNfseStatistics = lazy(() => import("@/pages/financial/statistics/
 const HRPayrollStatistics = lazy(() => import("@/pages/human-resources/statistics/payroll").then((module) => ({ default: module.default })));
 const HRTeamPerformanceStatistics = lazy(() => import("@/pages/human-resources/statistics/team-performance").then((module) => ({ default: module.default })));
 const HRFaltasStatistics = lazy(() => import("@/pages/human-resources/statistics/faltas").then((module) => ({ default: module.default })));
+const HRSkillAssessmentStatistics = lazy(() => import("@/pages/human-resources/statistics/skill-assessment").then((module) => ({ default: module.default })));
 
 // Statistics Hub Pages
 const StatisticsHub = lazy(() => import("@/pages/statistics/index").then((module) => ({ default: module.default })));
@@ -262,6 +261,7 @@ const SkillAssessmentAdminList = lazy(() => import("@/pages/administration/skill
 const SkillAssessmentAdminCreate = lazy(() => import("@/pages/administration/skill-assessment/create").then((m) => ({ default: m.SkillAssessmentCreatePage })));
 const SkillAssessmentAdminDetails = lazy(() => import("@/pages/administration/skill-assessment/details/[id]").then((m) => ({ default: m.SkillAssessmentDetailsPage })));
 const SkillAssessmentAdminEdit = lazy(() => import("@/pages/administration/skill-assessment/edit/[id]").then((m) => ({ default: m.SkillAssessmentEditPage })));
+const SkillAssessmentAdminEntry = lazy(() => import("@/pages/administration/skill-assessment/entry/[entryId]").then((m) => ({ default: m.SkillAssessmentEntryDetailsPage })));
 
 // Skill Assessment - Leader (Phase-4 rewrite: queue + per-entry fill)
 const SkillAssessmentLeaderList = lazy(() => import("@/pages/production/skill-assessment/index").then((m) => ({ default: m.SkillAssessmentLeaderPage })));
@@ -877,6 +877,16 @@ function App() {
                   }
                 />
                 <Route
+                  path="/administracao/avaliacao-competencias/:id/avaliacoes/:entryId"
+                  element={
+                    <AutoPrivilegeRoute>
+                      <Suspense fallback={<PageLoader />}>
+                        <SkillAssessmentAdminEntry />
+                      </Suspense>
+                    </AutoPrivilegeRoute>
+                  }
+                />
+                <Route
                   path="/administracao/avaliacao-competencias/:id"
                   element={
                     <AutoPrivilegeRoute>
@@ -1315,23 +1325,11 @@ function App() {
                 />
                 <Route
                   path={routes.financial.reconciliation.root}
-                  element={<Navigate to={routes.financial.reconciliation.statements} replace />}
+                  element={<Navigate to={routes.financial.reconciliation.transactions} replace />}
                 />
                 <Route
-                  path={routes.financial.reconciliation.statements}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ReconciliationStatementsList />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path="/financeiro/conciliacao/extratos/:id"
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ReconciliationStatementDetail />
-                    </Suspense>
-                  }
+                  path="/financeiro/conciliacao/extratos"
+                  element={<Navigate to={routes.financial.reconciliation.transactions} replace />}
                 />
                 <Route
                   path={routes.financial.reconciliation.transactions}
@@ -1439,6 +1437,10 @@ function App() {
                 <Route
                   path={routes.statistics.humanResources.absenteeism}
                   element={<Suspense fallback={<PageLoader />}><HRFaltasStatistics /></Suspense>}
+                />
+                <Route
+                  path={routes.statistics.humanResources.skillAssessment}
+                  element={<Suspense fallback={<PageLoader />}><HRSkillAssessmentStatistics /></Suspense>}
                 />
 
                 {/* Statistics routes - Under Construction (catch-all for unimplemented) */}

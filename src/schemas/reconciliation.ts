@@ -30,12 +30,17 @@ export const ignoreReasonSchema = z.object({
 export type IgnoreReasonPayload = z.infer<typeof ignoreReasonSchema>;
 
 export const ofxImportSchema = z.object({
-  file: z
-    .instanceof(File)
-    .refine(f => f.name.toLowerCase().endsWith(".ofx") || f.name.toLowerCase().endsWith(".qfx"), {
-      message: "Apenas arquivos .ofx ou .qfx são aceitos",
-    })
-    .refine(f => f.size <= 10 * 1024 * 1024, { message: "Arquivo excede 10 MB" }),
+  files: z
+    .array(z.instanceof(File))
+    .min(1, "Selecione ao menos um arquivo")
+    .refine(
+      files =>
+        files.every(f => {
+          const n = f.name.toLowerCase();
+          return n.endsWith(".ofx") || n.endsWith(".qfx") || n.endsWith(".zip");
+        }),
+      { message: "Apenas arquivos .ofx, .qfx ou .zip são aceitos" },
+    ),
 });
 
 export const xmlImportSchema = z.object({
@@ -54,13 +59,12 @@ export const xmlImportSchema = z.object({
 
 export const rerunMatchingSchema = z
   .object({
-    statementId: z.string().uuid().optional(),
     transactionIds: z.array(z.string().uuid()).optional(),
     dateStart: z.string().optional(),
     dateEnd: z.string().optional(),
   })
-  .refine(d => d.statementId || d.transactionIds?.length || d.dateStart || d.dateEnd, {
-    message: "Informe um escopo: extrato, transações selecionadas ou período",
+  .refine(d => d.transactionIds?.length || d.dateStart || d.dateEnd, {
+    message: "Informe um escopo: transações selecionadas ou período",
   });
 
 export type RerunMatchingPayload = z.infer<typeof rerunMatchingSchema>;

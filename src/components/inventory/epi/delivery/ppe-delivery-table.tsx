@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { IconChevronUp, IconChevronDown, IconRefresh, IconEdit, IconTrash, IconSelector, IconAlertTriangle, IconTruck, IconCheck, IconX, IconArrowBackUp } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { usePpeDeliveries } from "../../../../hooks";
+import { usePpeDeliveries, useTeamStaffEpis } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { PpeDeliveryGetManyFormData } from "../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/common/use-scrollbar-width";
@@ -84,28 +84,36 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
     [],
   );
 
+  // Scope flag pulled out of filters so it never reaches the API
+  const useTeamStaffEndpoint = (filters as any)?._useTeamStaffEndpoint === true;
+
   // Memoize query parameters to prevent infinite re-renders
   const queryFilters = React.useMemo(
-    () => ({
-      // Always apply base filters to prevent showing unintended records
-      ...filters,
-      page: page + 1, // Convert 0-based to 1-based for API
-      limit: pageSize,
-      orderBy: convertSortConfigsToOrderBy(sortConfigs),
-      include: includeConfig,
-      // Filter to show only selected items if enabled
-      ...(showSelectedOnly &&
-        selectedIds.length > 0 && {
-          where: {
-            id: { in: selectedIds },
-          },
-        }),
-    }),
+    () => {
+      const { _useTeamStaffEndpoint, ...restFilters } = filters as any;
+      return {
+        // Always apply base filters to prevent showing unintended records
+        ...restFilters,
+        page: page + 1, // Convert 0-based to 1-based for API
+        limit: pageSize,
+        orderBy: convertSortConfigsToOrderBy(sortConfigs),
+        include: includeConfig,
+        // Filter to show only selected items if enabled
+        ...(showSelectedOnly &&
+          selectedIds.length > 0 && {
+            where: {
+              id: { in: selectedIds },
+            },
+          }),
+      };
+    },
     [filters, page, pageSize, sortConfigs, includeConfig, showSelectedOnly, selectedIds],
   );
 
-  // Fetch data
-  const { data, isLoading, error } = usePpeDeliveries(queryFilters);
+  // Fetch data — swap endpoint when scoped to team leader's sector
+  const regularQuery = usePpeDeliveries(queryFilters, { enabled: !useTeamStaffEndpoint });
+  const teamQuery = useTeamStaffEpis(queryFilters, { enabled: useTeamStaffEndpoint });
+  const { data, isLoading, error } = useTeamStaffEndpoint ? teamQuery : regularQuery;
 
   const deliveries = data?.data || [];
   const totalPages = data?.meta ? Math.ceil(data.meta.totalRecords / pageSize) : 1;

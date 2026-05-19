@@ -179,29 +179,41 @@ export function useTeamStaffEpis(
 // =====================================================
 
 /**
- * Hook to fetch payroll calculations for users in the authenticated team leader's sector.
- * This hook uses the secure team-staff endpoint which automatically filters
- * based on the user's ledSectorId.
+ * Hook to fetch Secullum payroll calculations for a single team member.
+ * The backend (/team-staff/calculations) validates the target user belongs
+ * to the leader's led sector before forwarding to Secullum, so the leader
+ * can only ever pull data for users in their own sector.
  *
- * @param year - Year for calculation
- * @param month - Month for calculation (1-12)
- * @param options - React Query options
- * @returns Query result with team payroll calculations
+ * Returns the same `{ success, data: { Colunas, Linhas, Totais } }` payload
+ * shape as the HR `/integrations/secullum/calculations` endpoint.
  */
 export function useTeamStaffCalculations(
-  year: number,
-  month: number,
+  params: {
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    take?: number;
+  } | undefined,
   options?: {
     enabled?: boolean;
     staleTime?: number;
     refetchInterval?: number;
   }
 ) {
+  const ready = !!params?.userId && !!params?.startDate && !!params?.endDate;
   return useQuery({
-    queryKey: teamStaffKeys.calculationsByPeriod(year, month),
-    queryFn: () => getTeamStaffCalculations(year, month),
-    staleTime: options?.staleTime ?? 1000 * 60 * 5, // 5 minutes default
-    enabled: options?.enabled ?? true,
+    queryKey: teamStaffKeys.calculationsByUser(params),
+    queryFn: () =>
+      getTeamStaffCalculations({
+        userId: params!.userId!,
+        startDate: params!.startDate!,
+        endDate: params!.endDate!,
+        page: params?.page,
+        take: params?.take,
+      }),
+    staleTime: options?.staleTime ?? 1000 * 60 * 5,
+    enabled: (options?.enabled ?? true) && ready,
     refetchInterval: options?.refetchInterval,
   });
 }

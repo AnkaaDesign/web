@@ -26,45 +26,17 @@ export type BankTransactionSubtype =
 export type FiscalDocType = "NFE" | "NFSE" | "CTE" | "NFCE" | "CFE";
 export type OperationType = "ENTRADA" | "SAIDA";
 export type FiscalDocumentStatus = "AUTHORIZED" | "CANCELLED" | "DENIED" | "PENDING";
-export type BankStatementImportStatus =
-  | "PENDING"
-  | "PARSING"
-  | "MATCHING"
-  | "COMPLETED"
-  | "FAILED";
-export type BankStatementSource = "OFX_SICREDI" | "MANUAL";
 export type FiscalDocumentSource = "SIEG_API" | "MANUAL_UPLOAD";
 
-export interface BankStatement {
+export interface BankTransaction {
   id: string;
-  source: BankStatementSource;
+  // Bank account identifier columns — denormalized from the OFX so dedup runs
+  // on (bankCode, agency, accountNumber, fitId) without joining a statement.
   bankCode: string;
   bankName: string;
   agency: string;
   accountNumber: string;
-  ownerCnpj: string;
-  rawFileId: string | null;
-  periodStart: string;
-  periodEnd: string;
-  openingBalance: number | null;
-  closingBalance: number | null;
-  transactionCount: number;
-  totalCredits: number;
-  totalDebits: number;
-  matchedCount: number;
-  debitTransactionCount: number;
-  status: BankStatementImportStatus;
-  errorMessage: string | null;
-  uploadedById: string | null;
-  importedAt: string;
-  createdAt: string;
-  updatedAt: string;
-  uploadedBy?: { id: string; name: string | null } | null;
-}
-
-export interface BankTransaction {
-  id: string;
-  statementId: string;
+  ownerCnpj: string | null;
   fitId: string;
   postedAt: string;
   amount: number;
@@ -78,10 +50,12 @@ export interface BankTransaction {
   matchStatus: MatchStatus;
   ignoredReason: string | null;
   bankSlipId: string | null;
+  rawFileId: string | null;
+  uploadedById: string | null;
+  importedAt: string;
   createdAt: string;
   updatedAt: string;
   matches?: ReconciliationMatch[];
-  statement?: Pick<BankStatement, "id" | "periodStart" | "periodEnd">;
 }
 
 export interface ReconciliationMatch {
@@ -148,7 +122,9 @@ export interface FiscalDocument {
       memo?: string | null;
       counterpartyName?: string | null;
       counterpartyCnpjCpf?: string | null;
-      statementId?: string;
+      bankCode?: string;
+      bankName?: string;
+      accountNumber?: string;
     };
   }>;
 }
@@ -168,14 +144,32 @@ export interface MatchCandidate {
   rationale: string;
 }
 
+export interface OfxImportFileResult {
+  fileName: string;
+  statements: Array<{
+    bankCode: string;
+    bankName: string;
+    agency: string;
+    accountNumber: string;
+    periodStart: string;
+    periodEnd: string;
+    parsed: number;
+    inserted: number;
+    duplicates: number;
+  }>;
+  error?: string;
+}
+
 export interface ImportSummary {
-  statementId: string;
-  transactionCount: number;
-  matchedCount: number;
+  filesProcessed: number;
+  transactionsParsed: number;
+  transactionsInserted: number;
+  duplicatesSkipped: number;
   autoMatchedCount: number;
-  unmatchedCount: number;
   totalCredits: number;
   totalDebits: number;
+  files: OfxImportFileResult[];
+  failedFiles: string[];
 }
 
 export interface XmlImportResult {
@@ -211,7 +205,6 @@ export interface ReconciliationPaginatedResponse<T> {
 export interface TransactionFilters {
   page?: number;
   pageSize?: number;
-  statementId?: string;
   matchStatus?: MatchStatus;
   matchType?: MatchType;
   type?: TransactionType;
@@ -241,17 +234,6 @@ export interface FiscalDocumentFilters {
   valueMax?: number;
   hasMatch?: boolean;
   sortBy?: "issueDate" | "totalValue";
-  sortDir?: "asc" | "desc";
-}
-
-export interface StatementFilters {
-  page?: number;
-  pageSize?: number;
-  status?: BankStatementImportStatus;
-  source?: BankStatementSource;
-  dateFrom?: string;
-  dateTo?: string;
-  sortBy?: "importedAt" | "periodStart";
   sortDir?: "asc" | "desc";
 }
 

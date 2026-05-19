@@ -6,7 +6,6 @@
 
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   IconBuilding,
@@ -14,12 +13,9 @@ import {
   IconUserCircle,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import {
-  ASSESSMENT_ENTRY_STATUS,
-  ASSESSMENT_ENTRY_STATUS_LABELS,
-  routes,
-} from "../../../constants";
+import { routes } from "../../../constants";
 import type { AssessmentEntry } from "../../../types";
+import { AssessmentEntryStatusBadge } from "./assessment-entry-status-badge";
 
 interface PendingQueueCardProps {
   entry: AssessmentEntry;
@@ -27,18 +23,13 @@ interface PendingQueueCardProps {
   className?: string;
 }
 
-const statusVariant: Record<ASSESSMENT_ENTRY_STATUS, "secondary" | "default" | "outline"> = {
-  [ASSESSMENT_ENTRY_STATUS.PENDING]: "secondary",
-  [ASSESSMENT_ENTRY_STATUS.IN_PROGRESS]: "default",
-  [ASSESSMENT_ENTRY_STATUS.SUBMITTED]: "outline",
-};
-
 export function PendingQueueCard({ entry, totalTopics, className }: PendingQueueCardProps) {
   const navigate = useNavigate();
   const evaluatee = entry.evaluatee;
   const completed =
     entry._count?.responses ?? entry.responses?.length ?? 0;
   const pct = totalTopics > 0 ? Math.min(100, Math.round((completed / totalTopics) * 100)) : 0;
+  const fullyScored = totalTopics > 0 && completed >= totalTopics;
   const onOpen = () => navigate(routes.skillAssessmentLeader.fill(entry.id));
 
   return (
@@ -67,9 +58,10 @@ export function PendingQueueCard({ entry, totalTopics, className }: PendingQueue
             )}
           </div>
         </div>
-        <Badge variant={statusVariant[entry.status]}>
-          {ASSESSMENT_ENTRY_STATUS_LABELS[entry.status]}
-        </Badge>
+        <AssessmentEntryStatusBadge
+          status={entry.status}
+          fullyScored={fullyScored}
+        />
       </div>
 
       <div className="flex flex-col gap-1">

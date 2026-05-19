@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useSecullumCalculations, useMySecullumCalculations, useUsers } from "../../../../../hooks";
+import { useSecullumCalculations, useMySecullumCalculations, useUsers, useTeamStaffCalculations, useTeamStaffUsers } from "../../../../../hooks";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ type CalculationListMode = 'hr' | 'personal';
 interface CalculationListProps {
   className?: string;
   mode?: CalculationListMode;
+  teamScope?: boolean;
   onExportDataChange?: (data: { rows: any[]; visibleColumns: Set<string>; filters: any }) => void;
   headerSlot?: React.ReactNode;
 }
@@ -71,7 +72,7 @@ const getPayrollPeriod = (selectedMonth: Date) => {
   };
 };
 
-export function CalculationList({ className, mode = 'hr', onExportDataChange, headerSlot }: CalculationListProps) {
+export function CalculationList({ className, mode = 'hr', teamScope = false, onExportDataChange, headerSlot }: CalculationListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user: currentUser } = useAuth();
   const isPersonalMode = mode === 'personal';
@@ -121,22 +122,25 @@ export function CalculationList({ className, mode = 'hr', onExportDataChange, he
     }
   }, [isPersonalMode, currentUser?.id]);
 
-  // Fetch users for filter (only in HR mode)
-  const {
-    data: usersData,
-    isLoading: usersLoading,
-  } = useUsers(
-    isPersonalMode ? undefined : {
-      statuses: [
-        USER_STATUS.EXPERIENCE_PERIOD_1,
-        USER_STATUS.EXPERIENCE_PERIOD_2,
-        USER_STATUS.EFFECTED
-      ],
-      where: { secullumEmployeeId: { not: null } },
-      orderBy: { name: "asc" },
-      take: 100,
-    }
-  );
+  // Fetch users for filter (only in HR mode). Team-scope leaders see only their
+  // own team via the secure team-staff endpoint; HR/admins see everyone.
+  const userFilters = isPersonalMode
+    ? undefined
+    : {
+        statuses: [
+          USER_STATUS.EXPERIENCE_PERIOD_1,
+          USER_STATUS.EXPERIENCE_PERIOD_2,
+          USER_STATUS.EFFECTED,
+        ],
+        where: { secullumEmployeeId: { not: null } },
+        orderBy: { name: "asc" } as const,
+        take: 100,
+      };
+  const hrUsersQuery = useUsers(userFilters, { enabled: !isPersonalMode && !teamScope });
+  const teamUsersQuery = useTeamStaffUsers(userFilters, { enabled: !isPersonalMode && teamScope });
+  const usersQuery = teamScope ? teamUsersQuery : hrUsersQuery;
+  const usersData = usersQuery.data;
+  const usersLoading = usersQuery.isLoading;
 
   // Set first user as default when users are loaded and no user is selected (HR mode only)
   useEffect(() => {
@@ -176,12 +180,30 @@ export function CalculationList({ className, mode = 'hr', onExportDataChange, he
     return { userId: selectedUserId, startDate, endDate };
   }, [selectedUserId, isPersonalMode, customStartDate, customEndDate]);
 
-  // Fetch calculations from Secullum - use personal endpoint in personal mode
-  const hrCalculations = useSecullumCalculations(!isPersonalMode && queryParams ? queryParams : undefined);
-  const personalCalculations = useMySecullumCalculations(isPersonalMode && queryParams ? queryParams : undefined);
+  // Fetch calculations — endpoint depends on mode/scope. All three hooks always
+  // run (Rules of Hooks); their internal `enabled` checks gate the network call.
+  const hrCalculations = useSecullumCalculations(!teamScope && !isPersonalMode && queryParams ? queryParams : undefined);
+  const personalCalculations = useMySecullumCalculations(!teamScope && isPersonalMode && queryParams ? queryParams : undefined);
+  // Team leader uses the secure per-member endpoint; backend validates the
+  // target user belongs to the leader's led sector.
+  const teamCalcParams = useMemo(() => {
+    if (!teamScope || !customStartDate || !customEndDate || !selectedUserId) return undefined;
+    return {
+      userId: selectedUserId,
+      startDate: format(customStartDate, "yyyy-MM-dd"),
+      endDate: format(customEndDate, "yyyy-MM-dd"),
+    };
+  }, [teamScope, selectedUserId, customStartDate, customEndDate]);
+  const teamCalculations = useTeamStaffCalculations(teamCalcParams, { enabled: teamScope });
 
-  // Select the active query based on mode
-  const { data, isLoading, error } = isPersonalMode ? personalCalculations : hrCalculations;
+  // Select the active query. The team-staff service unwraps axios's data, so
+  // its result is already `{ success, data: { Colunas, Linhas, Totais } }`;
+  // the HR hooks hand back the raw AxiosResponse. Normalize so the extractor
+  // below (`data.data || data`) sees the same shape in both branches.
+  const activeQuery = teamScope ? teamCalculations : isPersonalMode ? personalCalculations : hrCalculations;
+  const rawData = activeQuery.data as any;
+  const data = teamScope && rawData ? { data: rawData } : rawData;
+  const { isLoading, error } = activeQuery;
 
   // Debug logging
   useEffect(() => {

@@ -16,7 +16,7 @@ export const SkillEditPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data, isLoading, error } = useSkill(id ?? "", undefined, { enabled: !!id } as any);
+  const { data, isLoading, error } = useSkill(id ?? "", { enabled: !!id });
   const { updateAsync, updateMutation } = useSkillMutations();
 
   if (!id) return <Navigate to={routes.administration.skill.root} replace />;
@@ -43,7 +43,7 @@ export const SkillEditPage = () => {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.PRODUCTION_MANAGER]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <div className="container mx-auto max-w-4xl flex-shrink-0">
           <PageHeader

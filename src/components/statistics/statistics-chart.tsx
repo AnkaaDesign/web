@@ -237,8 +237,6 @@ export const StatisticsChart = forwardRef<StatisticsChartHandle, StatisticsChart
     // Resolved upfront so goal-label colors and axis-rescaling both use the same name.
     const primarySeriesName = yAxisLabel || tooltipLabels.primary;
     const secondarySeriesName = tooltipLabels.secondary ?? 'Média/Usuário';
-    const primaryDataColor = colorOf(primarySeriesName, CHART_COLORS[0]);
-    const secondaryDataColor = colorOf(secondarySeriesName, CHART_COLORS[1]);
 
     const getItemValue = (item: ChartDataItem) => item.value ?? 0;
     const getComparisonValue = (comp: { value: number }) => comp.value ?? 0;

@@ -153,7 +153,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
 
           const loadingTask = pdfjs.getDocument({
             url,
-            docBaseUrl: null,
+            docBaseUrl: undefined,
             cMapUrl: "https://unpkg.com/pdfjs-dist@5.4.296/cmaps/",
             cMapPacked: true,
           });

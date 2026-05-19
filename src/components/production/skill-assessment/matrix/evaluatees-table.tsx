@@ -1,13 +1,9 @@
 // components/production/skill-assessment/matrix/evaluatees-table.tsx
 //
-// Matrix table for the leader's per-campaign topic-paged view. Built on the
-// UI Table primitives but with the zebra striping + heavy borders that the
-// default TableRow / TableHead apply intentionally overridden — leaders
-// scan this table row-by-row and need a calm, low-contrast surface.
-//
-// Columns are fixed-width except Avaliado so the row layout NEVER reflows
-// while a cell saves — the spinner lives inside the score-button at the
-// same glyph size as the digit it replaces.
+// Matrix table for the leader's per-campaign topic-paged view. Rows are
+// selectable — clicking a row marks the evaluatee as active, and the parent
+// ScoreLevelPicker scores them. Zebra striping + readable fonts so leaders
+// can scan a long roster comfortably.
 
 import { Card } from "@/components/ui/card";
 import {
@@ -24,20 +20,21 @@ import type { AssessmentEntry, Topic } from "@/types";
 interface EvaluateesTableProps {
   entries: AssessmentEntry[];
   activeTopic: Topic;
-  totalTopics: number;
-  scoredCountByEntry: Map<string, { scored: number; missingJustifications: number }>;
-  onCellHover: (score: number | null) => void;
+  activeEntryId: string | null;
+  /** Map of entryId → optimistic score for the current topic. */
+  optimisticScores: Map<string, number | null>;
+  onSelectEntry: (entryId: string) => void;
 }
 
 const HEAD_BASE =
-  "h-9 px-3 text-[10px] font-medium uppercase tracking-wide text-muted-foreground !bg-transparent";
+  "h-10 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground !bg-muted/20";
 
 export function EvaluateesTable({
   entries,
   activeTopic,
-  totalTopics,
-  scoredCountByEntry,
-  onCellHover,
+  activeEntryId,
+  optimisticScores,
+  onSelectEntry,
 }: EvaluateesTableProps) {
   if (entries.length === 0) {
     return (
@@ -52,31 +49,23 @@ export function EvaluateesTable({
       <div className="flex-1 overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow className="!bg-muted/20 hover:!bg-muted/20 border-b border-border/40">
+            <TableRow className={cn("hover:!bg-muted/20 border-b border-border/40")}>
               <TableHead className={HEAD_BASE}>Avaliado</TableHead>
-              <TableHead className={cn(HEAD_BASE, "w-[180px]")}>Cargo</TableHead>
-              <TableHead className={cn(HEAD_BASE, "w-[240px]")}>Nota</TableHead>
-              <TableHead className={cn(HEAD_BASE, "w-[100px] text-center")}>
-                Tópicos
-              </TableHead>
-              <TableHead className={cn(HEAD_BASE, "w-[130px]")}>Status</TableHead>
+              <TableHead className={cn(HEAD_BASE, "w-[220px]")}>Cargo</TableHead>
+              <TableHead className={cn(HEAD_BASE, "w-[100px]")}>Nota</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {entries.map((entry) => {
-              const stats = scoredCountByEntry.get(entry.id) ?? {
-                scored: 0,
-                missingJustifications: 0,
-              };
+            {entries.map((entry, idx) => {
               return (
                 <EvaluateeRow
                   key={entry.id}
                   entry={entry}
                   activeTopic={activeTopic}
-                  totalTopics={totalTopics}
-                  scoredCount={stats.scored}
-                  missingJustificationsCount={stats.missingJustifications}
-                  onCellHover={onCellHover}
+                  isActive={activeEntryId === entry.id}
+                  rowIndex={idx}
+                  overrideScore={optimisticScores.get(entry.id)}
+                  onSelect={() => onSelectEntry(entry.id)}
                 />
               );
             })}

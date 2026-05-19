@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { IconClipboardList, IconLoader2 } from "@tabler/icons-react";
 
 import { assessmentCreateSchema, assessmentUpdateSchema } from "../../../schemas";
+import { ASSESSMENT_STATUS, ASSESSMENT_STATUS_LABELS } from "../../../constants";
 import type {
   Assessment,
   AssessmentCreateFormData,
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import { Combobox } from "@/components/ui/combobox";
 import {
   FormControl,
   FormDescription,
@@ -26,17 +28,28 @@ import {
 import { SectorMultiSelect } from "./sector-multiselect";
 import { TopicMultiSelect } from "./topic-multiselect";
 
+export interface CampaignSubmitOptions {
+  openAfter: boolean;
+}
+
 interface CreateModeProps {
   mode: "create";
   defaultValues?: Partial<AssessmentCreateFormData>;
-  onSubmit: (data: AssessmentCreateFormData) => Promise<void>;
+  onSubmit: (data: AssessmentCreateFormData, opts: CampaignSubmitOptions) => Promise<void>;
 }
 
 interface UpdateModeProps {
   mode: "update";
   assessment: Assessment;
-  onSubmit: (data: AssessmentUpdateFormData) => Promise<void>;
+  onSubmit: (data: AssessmentUpdateFormData, opts: CampaignSubmitOptions) => Promise<void>;
 }
+
+// Status options shown in the form. Terminal transitions (CLOSED / CANCELLED)
+// stay on the detail page's lifecycle dialogs to preserve their confirmations.
+const STATUS_OPTIONS = [
+  { value: ASSESSMENT_STATUS.DRAFT, label: ASSESSMENT_STATUS_LABELS[ASSESSMENT_STATUS.DRAFT] },
+  { value: ASSESSMENT_STATUS.OPEN, label: ASSESSMENT_STATUS_LABELS[ASSESSMENT_STATUS.OPEN] },
+];
 
 type CampaignFormProps = (CreateModeProps | UpdateModeProps) & {
   isSubmitting?: boolean;
@@ -58,6 +71,7 @@ export function CampaignForm(props: CampaignFormProps) {
             new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
           sectorIds: props.defaultValues?.sectorIds ?? [],
           topicIds: props.defaultValues?.topicIds ?? [],
+          status: ASSESSMENT_STATUS.DRAFT,
         }
       : {
           name: props.assessment.name,
@@ -66,9 +80,11 @@ export function CampaignForm(props: CampaignFormProps) {
           periodEnd: props.assessment.periodEnd,
           sectorIds: (props.assessment.sectors ?? []).map((s) => s.sectorId),
           topicIds: (props.assessment.topics ?? []).map((t) => t.topicId),
+          // editing is only allowed in DRAFT, so the picker starts there
+          status: ASSESSMENT_STATUS.DRAFT,
         };
 
-  const form = useForm<AssessmentCreateFormData | AssessmentUpdateFormData>({
+  const form = useForm<any>({
     resolver: zodResolver(
       props.mode === "create" ? assessmentCreateSchema : assessmentUpdateSchema,
     ) as any,
@@ -78,15 +94,21 @@ export function CampaignForm(props: CampaignFormProps) {
   const isSubmitting = props.isSubmitting || form.formState.isSubmitting;
 
   const handleSubmit = async (data: any) => {
+    // `data` is post-Zod validation, which strips keys absent from the schema.
+    // `status` is a client-only intent flag (not part of the server payload),
+    // so we read it from the live form state instead of the validated payload.
+    const status = form.getValues("status");
     const normalized = {
       ...data,
-      periodStart: data.periodStart instanceof Date ? data.periodStart : new Date(data.periodStart),
+      periodStart:
+        data.periodStart instanceof Date ? data.periodStart : new Date(data.periodStart),
       periodEnd: data.periodEnd instanceof Date ? data.periodEnd : new Date(data.periodEnd),
     };
+    const opts: CampaignSubmitOptions = { openAfter: status === ASSESSMENT_STATUS.OPEN };
     if (props.mode === "create") {
-      await props.onSubmit(normalized as AssessmentCreateFormData);
+      await props.onSubmit(normalized as AssessmentCreateFormData, opts);
     } else {
-      await props.onSubmit(normalized as AssessmentUpdateFormData);
+      await props.onSubmit(normalized as AssessmentUpdateFormData, opts);
     }
   };
 
@@ -96,6 +118,7 @@ export function CampaignForm(props: CampaignFormProps) {
         id={formId}
         onSubmit={form.handleSubmit(handleSubmit)}
         className="container mx-auto max-w-5xl space-y-4"
+        autoComplete="off"
       >
         <button id={`${formId}-submit`} type="submit" className="hidden" disabled={isSubmitting} />
 
@@ -124,6 +147,7 @@ export function CampaignForm(props: CampaignFormProps) {
                       maxLength={200}
                       disabled={isSubmitting}
                       transparent
+                      autoComplete="off"
                     />
                   </FormControl>
                   <FormMessage />
@@ -190,6 +214,31 @@ export function CampaignForm(props: CampaignFormProps) {
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <FormControl>
+                    <Combobox
+                      value={field.value ?? ASSESSMENT_STATUS.DRAFT}
+                      onValueChange={(v) => field.onChange(v as string)}
+                      options={STATUS_OPTIONS}
+                      searchable={false}
+                      clearable={false}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    "Aberta" libera a coleta para os líderes assim que a campanha for salva.
+                    Para fechar ou cancelar, use as ações na página de detalhes.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </CardContent>
         </Card>
 

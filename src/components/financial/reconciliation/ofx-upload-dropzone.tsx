@@ -5,78 +5,63 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  onFileSelected: (file: File | null) => void;
-  selectedFile?: File | null;
+  onFilesSelected: (files: File[]) => void;
+  selectedFiles?: File[];
   disabled?: boolean;
 }
 
-export function OfxUploadDropzone({ onFileSelected, selectedFile, disabled }: Props) {
+export function OfxUploadDropzone({ onFilesSelected, selectedFiles = [], disabled }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const onDrop = useCallback(
     (accepted: File[]) => {
       setError(null);
-      if (accepted.length === 0) return;
-      const file = accepted[0];
-      if (file.size > 10 * 1024 * 1024) {
-        setError("Arquivo excede o limite de 10 MB");
-        return;
+      const valid: File[] = [];
+      for (const f of accepted) {
+        const lower = f.name.toLowerCase();
+        const isZip = lower.endsWith(".zip");
+        const isOfx = lower.endsWith(".ofx") || lower.endsWith(".qfx");
+        const sizeLimit = isZip ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (f.size > sizeLimit) {
+          setError(`"${f.name}" excede ${isZip ? "100" : "10"} MB`);
+          continue;
+        }
+        if (!isZip && !isOfx) {
+          setError(`"${f.name}" não é .ofx, .qfx ou .zip`);
+          continue;
+        }
+        valid.push(f);
       }
-      const name = file.name.toLowerCase();
-      if (!name.endsWith(".ofx") && !name.endsWith(".qfx")) {
-        setError("Apenas arquivos .ofx ou .qfx são aceitos");
-        return;
+      if (valid.length > 0) {
+        onFilesSelected([...selectedFiles, ...valid]);
       }
-      onFileSelected(file);
     },
-    [onFileSelected],
+    [onFilesSelected, selectedFiles],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    maxFiles: 1,
-    multiple: false,
+    maxFiles: 30,
+    multiple: true,
     disabled,
+    maxSize: 100 * 1024 * 1024,
     accept: {
       "application/x-ofx": [".ofx", ".qfx"],
       "text/plain": [".ofx", ".qfx"],
+      "application/zip": [".zip"],
+      "application/x-zip-compressed": [".zip"],
     },
   });
 
-  if (selectedFile) {
-    return (
-      <div className="rounded-lg border border-dashed p-6">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <IconFileSpreadsheet className="h-8 w-8 text-blue-700" />
-            <div>
-              <p className="font-medium">{selectedFile.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {(selectedFile.size / 1024).toFixed(1)} KB
-              </p>
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label="Remover arquivo"
-            onClick={() => onFileSelected(null)}
-            disabled={disabled}
-          >
-            <IconX className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const removeFile = (idx: number) =>
+    onFilesSelected(selectedFiles.filter((_, i) => i !== idx));
 
   return (
-    <div>
+    <div className="space-y-3">
       <div
         {...getRootProps()}
         className={cn(
-          "rounded-lg border-2 border-dashed p-12 text-center cursor-pointer transition-colors",
+          "rounded-lg border-2 border-dashed p-8 text-center cursor-pointer transition-colors",
           isDragActive
             ? "border-blue-500 bg-blue-50 dark:bg-blue-500/10"
             : "border-border hover:border-blue-300",
@@ -86,13 +71,34 @@ export function OfxUploadDropzone({ onFileSelected, selectedFile, disabled }: Pr
         <input {...getInputProps()} />
         <IconFileSpreadsheet className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
         <p className="font-medium mb-1">
-          {isDragActive ? "Solte o arquivo aqui" : "Arraste o arquivo OFX ou clique para selecionar"}
+          {isDragActive
+            ? "Solte os arquivos aqui"
+            : "Arraste OFX/QFX ou ZIP, ou clique para selecionar"}
         </p>
         <p className="text-sm text-muted-foreground">
-          Exportado do app Sicredi (.ofx ou .qfx, até 10 MB)
+          Extratos exportados do Sicredi (.ofx/.qfx até 10 MB cada, ou .zip até 100 MB)
         </p>
       </div>
-      {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {selectedFiles.length > 0 && (
+        <ul className="space-y-1 text-sm">
+          {selectedFiles.map((f, i) => (
+            <li key={`${f.name}-${i}`} className="flex items-center justify-between">
+              <span className="truncate max-w-md">{f.name}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label={`Remover ${f.name}`}
+                onClick={() => removeFile(i)}
+                disabled={disabled}
+              >
+                <IconX className="h-3 w-3" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

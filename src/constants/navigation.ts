@@ -646,10 +646,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
         id: "conciliacao-bancaria",
         title: "Conciliação Bancária",
         icon: "arrowsExchange2",
-        path: "/financeiro/conciliacao/extratos",
+        path: "/financeiro/conciliacao/transacoes",
         requiredPrivilege: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL],
         children: [
-          { id: "conciliacao-extratos", title: "Extratos", icon: "fileSpreadsheet", path: "/financeiro/conciliacao/extratos" },
           { id: "conciliacao-transacoes", title: "Transações", icon: "list", path: "/financeiro/conciliacao/transacoes" },
           { id: "conciliacao-notas", title: "Notas Fiscais", icon: "receipt", path: "/financeiro/conciliacao/notas" },
         ],
@@ -706,6 +705,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "stats-rh-folha", title: "Folha de Pagamento", icon: "chartBar", path: "/estatisticas/recursos-humanos/folha" },
           { id: "stats-rh-equipe", title: "Equipe", icon: "users", path: "/estatisticas/recursos-humanos/equipe" },
           { id: "stats-rh-faltas", title: "Faltas", icon: "calendarOff", path: "/estatisticas/recursos-humanos/faltas" },
+          { id: "stats-rh-competencias", title: "Competências", icon: "clipboardList", path: "/estatisticas/recursos-humanos/competencias" },
         ],
       },
     ],
@@ -1058,21 +1058,98 @@ export const NAVIGATION_MENU: MenuItem[] = [
     ],
   },
 
-  // PRODUCTION_MANAGER - Direct menu items (flat structure, sorted alphabetically)
-  // Provides simplified navigation for production manager users with relevant sections
+  // PRODUCTION_MANAGER - Grouped navigation
+  // Two primary domains (Produção, Colaboradores) followed by leaf items.
+  // Other items remain at root: Catálogo, Clientes, Ferramentas, Gerenciador de Arquivos, Mensagens, Minhas Mensagens.
   {
-    id: "agenda-production-manager",
-    title: "Agenda",
-    icon: "preparation",
+    id: "producao-production-manager",
+    title: "Produção",
+    icon: "factory",
+    // Parent points to Agenda (not /producao) — the /producao root page redirects
+    // non-admin/financial users to schedule, causing an Acesso Negado flash.
     path: "/producao/agenda",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    children: [
+      { id: "agenda-production-manager", title: "Agenda", icon: "preparation", path: "/producao/agenda" },
+      { id: "barracoes-production-manager", title: "Barracões", icon: "warehouse", path: "/producao/barracoes" },
+      { id: "calendario-producao-production-manager", title: "Calendário", icon: "calendarStats", path: "/producao/calendario" },
+      { id: "cronograma-production-manager", title: "Cronograma", icon: "calendarStats", path: "/producao/cronograma" },
+      { id: "historico-production-manager", title: "Histórico", icon: "history", path: "/producao/historico" },
+    ],
   },
   {
-    id: "barracoes-production-manager",
-    title: "Barracões",
-    icon: "warehouse",
-    path: "/producao/barracoes",
+    id: "colaboradores-group-production-manager",
+    title: "Colaboradores",
+    icon: "users",
+    path: "/administracao/colaboradores",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    children: [
+      {
+        id: "avaliacao-competencias-production-manager",
+        title: "Aval. de Competências",
+        icon: "clipboardList",
+        path: "/administracao/avaliacao-competencias",
+        children: [
+          {
+            id: "avaliacao-competencias-campanhas-pm",
+            title: "Campanhas",
+            icon: "clipboardList",
+            path: "/administracao/avaliacao-competencias",
+          },
+          {
+            id: "avaliacao-competencias-skills-pm",
+            title: "Competências",
+            icon: "clipboardList",
+            path: "/administracao/competencias",
+          },
+          {
+            id: "avaliacao-competencias-topics-pm",
+            title: "Tópicos",
+            icon: "clipboardList",
+            path: "/administracao/topicos",
+          },
+        ],
+      },
+      {
+        id: "colaboradores-production-manager",
+        title: "Colaboradores",
+        icon: "user",
+        path: "/administracao/colaboradores",
+      },
+      {
+        id: "controle-de-ponto-production-manager",
+        title: "Controle de Ponto",
+        icon: "fingerprint",
+        path: "/recursos-humanos/controle-ponto",
+      },
+    ],
+  },
+  {
+    id: "estatisticas-production-manager",
+    title: "Estatísticas",
+    icon: "barChart",
+    path: "/estatisticas/recursos-humanos/equipe",
+    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    children: [
+      {
+        id: "stats-equipe-production-manager",
+        title: "Equipe",
+        icon: "users",
+        path: "/estatisticas/recursos-humanos/equipe",
+      },
+      {
+        id: "stats-performance-production-manager",
+        title: "Performance",
+        icon: "activity",
+        path: "/estatisticas/producao/desempenho",
+      },
+      {
+        id: "stats-competencias-production-manager",
+        title: "Competências",
+        icon: "clipboardList",
+        path: "/estatisticas/recursos-humanos/competencias",
+      },
+    ],
   },
   {
     id: "catalogo-production-manager",
@@ -1090,38 +1167,24 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   },
   {
-    id: "cronograma-production-manager",
-    title: "Cronograma",
-    icon: "calendarStats",
-    path: "/producao/cronograma",
+    id: "ferramentas-production-manager",
+    title: "Ferramentas",
+    icon: "tools",
+    path: "/ferramentas",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
-  },
-  {
-    id: "calendario-producao-production-manager",
-    title: "Calendário",
-    icon: "calendarStats",
-    path: "/producao/calendario",
-    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
-  },
-  {
-    id: "controle-de-ponto-production-manager",
-    title: "Controle de Ponto",
-    icon: "fingerprint",
-    path: "/recursos-humanos/controle-ponto",
-    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
+    children: [
+      { id: "ferramentas-qr-code-pm", title: "Gerador de QR Code", icon: "qrcode", path: "/ferramentas/qr-code" },
+      { id: "ferramentas-paleta-pm", title: "Paleta de Cores", icon: "palette", path: "/ferramentas/paleta" },
+      { id: "ferramentas-calculadora-de-horas-pm", title: "Calculadora de Horas", icon: "clock", path: "/ferramentas/calculadora-de-horas" },
+      { id: "ferramentas-custo-horas-extras-pm", title: "Custo de Horas Extras", icon: "calendarDollar", path: "/ferramentas/custo-horas-extras" },
+      { id: "ferramentas-calculadora-de-mistura-pm", title: "Calculadora de Mistura", icon: "flask", path: "/ferramentas/calculadora-de-mistura" },
+    ],
   },
   {
     id: "gerenciador-de-arquivos-production-manager",
     title: "Gerenciador de Arquivos",
     icon: "fileManager",
     path: "/servidor/gerenciador-de-arquivos",
-    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
-  },
-  {
-    id: "historico-production-manager",
-    title: "Histórico",
-    icon: "history",
-    path: "/producao/historico",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
   },
   {
@@ -1142,31 +1205,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     icon: "message",
     path: "/pessoal/mensagens",
     requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
-  },
-  // PRODUCTION_MANAGER access to "Aval. de Competências" is consolidated into the
-  // admin block above (requiredPrivilege includes PRODUCTION_MANAGER). Read-only
-  // for the campaign list/details; setup pages (skills/topics) remain ADMIN+HR only.
-  {
-    id: "colaboradores-production-manager",
-    title: "Colaboradores",
-    icon: "users",
-    path: "/administracao/colaboradores",
-    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
-  },
-  // PRODUCTION_MANAGER - Ferramentas (flat items mirroring the full tools section)
-  {
-    id: "ferramentas-production-manager",
-    title: "Ferramentas",
-    icon: "tools",
-    path: "/ferramentas",
-    requiredPrivilege: SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
-    children: [
-      { id: "ferramentas-qr-code-pm", title: "Gerador de QR Code", icon: "qrcode", path: "/ferramentas/qr-code" },
-      { id: "ferramentas-paleta-pm", title: "Paleta de Cores", icon: "palette", path: "/ferramentas/paleta" },
-      { id: "ferramentas-calculadora-de-horas-pm", title: "Calculadora de Horas", icon: "clock", path: "/ferramentas/calculadora-de-horas" },
-      { id: "ferramentas-custo-horas-extras-pm", title: "Custo de Horas Extras", icon: "calendarDollar", path: "/ferramentas/custo-horas-extras" },
-      { id: "ferramentas-calculadora-de-mistura-pm", title: "Calculadora de Mistura", icon: "flask", path: "/ferramentas/calculadora-de-mistura" },
-    ],
   },
 
   // COMMERCIAL - Direct menu items (flat structure, sorted alphabetically)

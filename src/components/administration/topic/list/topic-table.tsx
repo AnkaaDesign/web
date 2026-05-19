@@ -272,18 +272,17 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
         key: "order",
         header: "ORDEM",
         sortable: true,
-        // Tight order column — short numeric value.
-        className: "w-20 min-w-[60px] max-w-[80px]",
+        className: "w-28 min-w-[100px] max-w-[120px]",
         align: "left" as const,
         accessor: (t: Topic) => (
-          <span className="font-mono text-sm text-muted-foreground">{t.order}</span>
+          <span className="text-sm text-muted-foreground">{t.order}</span>
         ),
       },
       {
         key: "title",
         header: "TÍTULO",
         sortable: true,
-        className: "min-w-[200px] max-w-[260px]",
+        className: "w-72 min-w-[240px] max-w-[300px]",
         align: "left" as const,
         accessor: (t: Topic) => (
           <span className="font-medium truncate block" title={t.title}>
@@ -324,7 +323,7 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
         key: "skillId",
         header: "COMPETÊNCIA",
         sortable: true,
-        className: "w-44 min-w-44 max-w-[180px]",
+        className: "w-56 min-w-[200px] max-w-[220px]",
         align: "left" as const,
         accessor: (t: Topic) =>
           t.skill ? (
@@ -339,7 +338,7 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
         key: "_count.levels",
         header: "NÍVEIS",
         sortable: false,
-        className: "w-24 min-w-24 max-w-24",
+        className: "w-32 min-w-[120px] max-w-[140px]",
         align: "center" as const,
         accessor: (t: Topic) => {
           const count = t._count?.levels ?? 0;
@@ -354,7 +353,7 @@ export function TopicTable({ filters, onDataChange, className }: TopicTableProps
         key: "isActive",
         header: "STATUS",
         sortable: false,
-        className: "w-28 min-w-28 max-w-28",
+        className: "w-36 min-w-[130px] max-w-[150px]",
         align: "center" as const,
         accessor: (t: Topic) =>
           t.isActive ? (

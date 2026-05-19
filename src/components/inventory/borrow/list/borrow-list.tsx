@@ -23,11 +23,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 interface BorrowListProps {
   className?: string;
+  teamScope?: boolean;
 }
 
 const DEFAULT_PAGE_SIZE = 40;
 
-export function BorrowList({ className }: BorrowListProps) {
+export function BorrowList({ className, teamScope }: BorrowListProps) {
   const navigate = useNavigate();
   const { update } = useBorrowMutations();
   const { batchDelete, batchUpdate } = useBorrowBatchMutations();
@@ -173,14 +174,18 @@ export function BorrowList({ className }: BorrowListProps) {
     // Build where clause
     const where = filterWithoutOrderBy.where || {};
 
-    const result = {
+    const result: Partial<BorrowGetManyFormData> & { _useTeamStaffEndpoint?: boolean } = {
       ...filterWithoutOrderBy,
       where: Object.keys(where).length > 0 ? where : undefined,
       limit: DEFAULT_PAGE_SIZE,
     };
 
+    if (teamScope) {
+      result._useTeamStaffEndpoint = true;
+    }
+
     return result;
-  }, [baseQueryFilters]);
+  }, [baseQueryFilters, teamScope]);
 
   // Handle filter changes
   const handleFilterChange = useCallback(

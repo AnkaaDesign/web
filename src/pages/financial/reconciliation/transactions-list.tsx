@@ -2,24 +2,25 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   IconArrowsExchange2,
-  IconCash,
   IconFilter,
   IconRefresh,
+  IconUpload,
 } from "@tabler/icons-react";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
-import { BankTransactionTable } from "@/components/financial/reconciliation/bank-transaction-table";
+import { TransactionsByDateAccordion } from "@/components/financial/reconciliation/transactions-by-date-accordion";
+import { OfxImportDialog } from "@/components/financial/reconciliation/ofx-import-dialog";
 import { ManualMatchDialog } from "@/components/financial/reconciliation/manual-match-dialog";
 import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";
 import { IgnoreTransactionDialog } from "@/components/financial/reconciliation/ignore-transaction-dialog";
 import {
   ReconciliationFilterSheet,
+  getDefaultReconciliationFilters,
   type ReconciliationFilters,
 } from "@/components/financial/reconciliation/reconciliation-filter-sheet";
-import { useTableState } from "@/hooks/common/use-table-state";
 import {
   useBankTransaction,
   useBankTransactions,
@@ -37,33 +38,118 @@ import type {
   MatchType,
 } from "@/types/reconciliation";
 
+// Upper bound passed to the API when the user is in period mode. Matches the
+// API DTO cap so a busy month/year still fits in a single fetch.
+const PERIOD_PAGE_SIZE = 1000;
+
+function parseMonthsParam(raw: string | null): string[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(String);
+  } catch {
+    // ignore — fall through
+  }
+  return undefined;
+}
+
+function parseFiltersFromUrl(params: URLSearchParams): ReconciliationFilters {
+  const def = getDefaultReconciliationFilters();
+  const yearParam = params.get("year");
+  const monthsParam = parseMonthsParam(params.get("months"));
+  return {
+    matchStatus:
+      (params.get("matchStatus") as ReconciliationFilters["matchStatus"]) || undefined,
+    matchType: (params.get("matchType") as MatchType | null) || undefined,
+    type: (params.get("type") as ReconciliationFilters["type"]) || def.type,
+    subtype: (params.get("subtype") as BankTransactionSubtype | null) || undefined,
+    year: yearParam ? Number(yearParam) : def.year,
+    months: monthsParam ?? def.months,
+    amountMin: params.get("amountMin") ? Number(params.get("amountMin")) : undefined,
+    amountMax: params.get("amountMax") ? Number(params.get("amountMax")) : undefined,
+    counterparty: params.get("counterparty") || undefined,
+  };
+}
+
+/**
+ * Build the inclusive list of YYYY-MM-DD strings for every day in every
+ * selected month. The accordion uses this to render *all* days in the period,
+ * not only those that contain transactions.
+ */
+function buildDatesForPeriod(year: number, months: string[]): string[] {
+  const dates: string[] = [];
+  // Sort months ascending so the accordion is chronological from top to bottom.
+  const sortedMonths = [...months].sort();
+  for (const m of sortedMonths) {
+    const monthNum = parseInt(m, 10);
+    if (!monthNum || monthNum < 1 || monthNum > 12) continue;
+    // new Date(y, m, 0) = last day of month `m-1`. Used to enumerate days.
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dd = String(d).padStart(2, "0");
+      const mm = String(monthNum).padStart(2, "0");
+      dates.push(`${year}-${mm}-${dd}`);
+    }
+  }
+  // Display newest-first by default — matches the previous sort order and
+  // mirrors how the table used to render.
+  return dates.reverse();
+}
+
+/**
+ * Derive an inclusive [dateFrom, dateTo] range from the selected year+months
+ * so the API can filter transactions. Server `postedAt` is a timestamp, so we
+ * set dateFrom to the first millisecond and dateTo to the last millisecond of
+ * the day to avoid losing the last day in the range.
+ */
+function deriveDateRange(year: number, months: string[]): { dateFrom: string; dateTo: string } | null {
+  if (!months.length) return null;
+  const sorted = [...months].map(m => parseInt(m, 10)).filter(n => n >= 1 && n <= 12).sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const firstMonth = sorted[0];
+  const lastMonth = sorted[sorted.length - 1];
+  const dateFrom = new Date(year, firstMonth - 1, 1, 0, 0, 0, 0).toISOString();
+  // Day 0 of the next month = last day of `lastMonth`.
+  const dateTo = new Date(year, lastMonth, 0, 23, 59, 59, 999).toISOString();
+  return { dateFrom, dateTo };
+}
+
 export const ReconciliationTransactionsListPage = () => {
   usePageTracker({ title: "Transações - Conciliação", icon: "list" });
   const { toast } = useToast();
-  const { page, pageSize, setPage, setPageSize } = useTableState({ defaultPageSize: 50 });
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchText, setSearchText] = useState(searchParams.get("search") || "");
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<ReconciliationFilters>(() => ({
-    matchStatus:
-      (searchParams.get("matchStatus") as ReconciliationFilters["matchStatus"]) || undefined,
-    matchType: (searchParams.get("matchType") as MatchType | null) || undefined,
-    type: (searchParams.get("type") as ReconciliationFilters["type"]) || "DEBIT",
-    subtype: (searchParams.get("subtype") as BankTransactionSubtype | null) || undefined,
-    dateFrom: searchParams.get("dateFrom") || undefined,
-    dateTo: searchParams.get("dateTo") || undefined,
-    amountMin: searchParams.get("amountMin") ? Number(searchParams.get("amountMin")) : undefined,
-    amountMax: searchParams.get("amountMax") ? Number(searchParams.get("amountMax")) : undefined,
-    counterparty: searchParams.get("counterparty") || undefined,
-  }));
+  const [importOpen, setImportOpen] = useState(false);
+  const [filters, setFilters] = useState<ReconciliationFilters>(() =>
+    parseFiltersFromUrl(searchParams),
+  );
+
+  const dateRange = useMemo(() => {
+    if (!filters.year || !filters.months?.length) return null;
+    return deriveDateRange(filters.year, filters.months);
+  }, [filters.year, filters.months]);
+
+  const dates = useMemo(() => {
+    if (!filters.year || !filters.months?.length) return [];
+    return buildDatesForPeriod(filters.year, filters.months);
+  }, [filters.year, filters.months]);
 
   const { data, isLoading, isFetching, refetch } = useBankTransactions({
-    page: page + 1,
-    pageSize,
+    page: 1,
+    pageSize: PERIOD_PAGE_SIZE,
     sortBy: "postedAt",
     sortDir: "desc",
     search: searchText || undefined,
-    ...filters,
+    matchStatus: filters.matchStatus,
+    matchType: filters.matchType,
+    type: filters.type,
+    subtype: filters.subtype,
+    amountMin: filters.amountMin,
+    amountMax: filters.amountMax,
+    counterparty: filters.counterparty,
+    dateFrom: dateRange?.dateFrom,
+    dateTo: dateRange?.dateTo,
   });
 
   // Modal state is driven by URL params so cross-links and refreshes work.
@@ -108,14 +194,12 @@ export const ReconciliationTransactionsListPage = () => {
   const unmatchMut = useUnmatchTransaction();
   const ignoreMut = useIgnoreTransaction();
 
-  // If the user lands with ?txId=… we want the search/filter inputs to reflect
-  // the current URL state — that's already covered by the initial state above.
-  // But if the search text changes, we keep it in the URL too for shareability.
+  // Keep the search query in the URL for shareability. Avoid writing when
+  // nothing changed to prevent render loops.
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
     if (searchText) params.set("search", searchText);
     else params.delete("search");
-    // Avoid a write when nothing changed (prevents render loops).
     if (params.toString() !== searchParams.toString()) {
       setSearchParams(params, { replace: true });
     }
@@ -125,7 +209,6 @@ export const ReconciliationTransactionsListPage = () => {
   const handleFilterApply = useCallback(
     (next: ReconciliationFilters) => {
       setFilters(next);
-      setPage(0);
       const params = new URLSearchParams(searchParams);
       // Strip prior filter keys, preserve modal/search params.
       [
@@ -133,43 +216,64 @@ export const ReconciliationTransactionsListPage = () => {
         "matchType",
         "type",
         "subtype",
-        "dateFrom",
-        "dateTo",
+        "year",
+        "months",
         "amountMin",
         "amountMax",
         "counterparty",
       ].forEach(k => params.delete(k));
-      Object.entries(next).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== "") params.set(k, String(v));
-      });
+      // Serialize back: months is JSON-encoded; everything else is a plain string.
+      if (next.matchStatus) params.set("matchStatus", next.matchStatus);
+      if (next.matchType) params.set("matchType", next.matchType);
+      if (next.type) params.set("type", next.type);
+      if (next.subtype) params.set("subtype", next.subtype);
+      if (next.year) params.set("year", String(next.year));
+      if (next.months && next.months.length > 0)
+        params.set("months", JSON.stringify(next.months));
+      if (next.amountMin !== undefined) params.set("amountMin", String(next.amountMin));
+      if (next.amountMax !== undefined) params.set("amountMax", String(next.amountMax));
+      if (next.counterparty) params.set("counterparty", next.counterparty);
       setSearchParams(params);
     },
-    [searchParams, setPage, setSearchParams],
+    [searchParams, setSearchParams],
   );
 
   const activeFilterCount = useMemo(() => {
+    const def = getDefaultReconciliationFilters();
     let count = 0;
     if (filters.matchStatus) count++;
     if (filters.matchType) count++;
-    if (filters.type !== "DEBIT") count++;
+    if (filters.type !== def.type) count++;
     if (filters.subtype) count++;
-    if (filters.dateFrom) count++;
-    if (filters.dateTo) count++;
+    if (filters.year && filters.year !== def.year) count++;
+    if (
+      filters.months &&
+      (filters.months.length !== 1 || filters.months[0] !== def.months?.[0])
+    )
+      count++;
     if (filters.amountMin !== undefined) count++;
     if (filters.amountMax !== undefined) count++;
     if (filters.counterparty) count++;
     return count;
   }, [filters]);
 
-  const total = data?.meta.total ?? 0;
-  const totalPages = data?.meta.totalPages ?? 1;
+  // Build a Portuguese-friendly title that reflects the active period.
+  const periodTitle = useMemo(() => {
+    if (!filters.year || !filters.months?.length) return "Transações Bancárias";
+    if (filters.months.length === 1) {
+      const monthName = new Date(filters.year, parseInt(filters.months[0]) - 1)
+        .toLocaleDateString("pt-BR", { month: "long" });
+      return `Transações - ${monthName.charAt(0).toUpperCase() + monthName.slice(1)} de ${filters.year}`;
+    }
+    return `Transações - ${filters.months.length} meses de ${filters.year}`;
+  }, [filters.year, filters.months]);
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"
-          title="Transações Bancárias"
+          title={periodTitle}
           icon={IconArrowsExchange2}
           favoritePage={FAVORITE_PAGES.FINANCEIRO_CONCILIACAO_TRANSACOES}
           breadcrumbs={[
@@ -179,6 +283,13 @@ export const ReconciliationTransactionsListPage = () => {
             { label: "Transações" },
           ]}
           actions={[
+            {
+              key: "import",
+              label: "Importar OFX",
+              icon: IconUpload,
+              onClick: () => setImportOpen(true),
+              variant: "default" as const,
+            },
             {
               key: "refresh",
               label: "Atualizar",
@@ -197,10 +308,7 @@ export const ReconciliationTransactionsListPage = () => {
               <div className="flex flex-col gap-3 sm:flex-row">
                 <TableSearchInput
                   value={searchText}
-                  onChange={v => {
-                    setSearchText(v);
-                    setPage(0);
-                  }}
+                  onChange={v => setSearchText(v)}
                   placeholder="Buscar por descrição, contraparte ou FITID..."
                 />
                 <Button
@@ -216,21 +324,11 @@ export const ReconciliationTransactionsListPage = () => {
               </div>
 
               <div className="flex-1 min-h-0 overflow-auto">
-                <BankTransactionTable
+                <TransactionsByDateAccordion
                   data={data?.data ?? []}
+                  dates={dates}
                   isLoading={isLoading}
-                  page={page}
-                  pageSize={pageSize}
-                  totalPages={totalPages}
-                  totalRecords={total}
-                  onPageChange={setPage}
-                  onPageSizeChange={size => {
-                    setPageSize(size);
-                    setPage(0);
-                  }}
-                  emptyIcon={IconCash}
-                  emptyMessage="Nenhuma transação corresponde aos filtros aplicados"
-                  showStatementColumn
+                  showAccountColumn
                   onMatch={tx => txDialog.set(tx.id)}
                   onUnmatch={tx => unmatchDialog.set(tx.id)}
                   onIgnore={tx => ignoreDialog.set(tx.id)}
@@ -247,6 +345,12 @@ export const ReconciliationTransactionsListPage = () => {
         onOpenChange={setShowFilters}
         filters={filters}
         onApply={handleFilterApply}
+      />
+
+      <OfxImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => refetch()}
       />
 
       <ManualMatchDialog

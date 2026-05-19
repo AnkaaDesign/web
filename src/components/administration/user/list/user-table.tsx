@@ -11,7 +11,7 @@ import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, Icon
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { useUsers, useUserMutations, useUserBatchMutations } from "../../../../hooks";
+import { useUsers, useUserMutations, useUserBatchMutations, useTeamStaffUsers } from "../../../../hooks";
 import { toast } from "@/components/ui/sonner";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { UserGetManyFormData } from "../../../../schemas";
@@ -36,15 +36,17 @@ interface UserTableProps {
 }
 
 export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracted, onMarkAsDismissed, onDelete, onMerge, filters = {}, onDataChange }: UserTableProps) {
+  // Opt-in flag (set by team-leader views) — strip before sending to API
+  const useTeamStaffEndpoint = (filters as any)?._useTeamStaffEndpoint === true;
   const navigate = useNavigate();
   const { delete: deleteUser, updateAsync: updateUser } = useUserMutations();
   const { batchDelete, batchUpdateAsync: batchUpdate } = useUserBatchMutations();
 
-  // Permission checks
+  // Permission checks — team leaders viewing their team can never edit/delete
   const { user } = useAuth();
-  const canEdit = user ? canEditUsers(user) : false;
-  const canDelete = user ? canDeleteUsers(user) : false;
-  const showInteractive = user ? shouldShowInteractiveElements(user, 'user') : false;
+  const canEdit = user && !useTeamStaffEndpoint ? canEditUsers(user) : false;
+  const canDelete = user && !useTeamStaffEndpoint ? canDeleteUsers(user) : false;
+  const showInteractive = user && !useTeamStaffEndpoint ? shouldShowInteractiveElements(user, 'user') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -92,9 +94,10 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
 
   // Memoize query parameters to prevent infinite re-renders
   const queryParams = React.useMemo(() => {
+    const { _useTeamStaffEndpoint, ...restFilters } = filters as any;
     const params = {
       // Always apply base filters to prevent showing unintended records
-      ...filters,
+      ...restFilters,
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       include: includeConfig,
@@ -114,8 +117,10 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
     return params;
   }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds]);
 
-  // Use the users hook with memoized parameters
-  const { data: response, isLoading, error } = useUsers(queryParams);
+  // Use the users hook with memoized parameters — switch endpoint when team-scoped
+  const usersQuery = useUsers(queryParams, { enabled: !useTeamStaffEndpoint });
+  const teamStaffQuery = useTeamStaffUsers(queryParams, { enabled: useTeamStaffEndpoint });
+  const { data: response, isLoading, error } = useTeamStaffEndpoint ? teamStaffQuery : usersQuery;
 
   const users = response?.data || [];
   const totalRecords = response?.meta?.totalRecords || 0;

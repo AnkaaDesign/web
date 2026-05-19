@@ -1,99 +1,92 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useNavigate, Navigate } from "react-router-dom";
-import { routes } from "../../constants";
-import { useAuth } from "@/hooks/common/use-auth";
-import { IconLoader2 } from "@tabler/icons-react";
-
-const teamMenuItems = [
-  {
-    id: "members",
-    title: "Membros",
-    description: "Visualize os colaboradores do seu setor",
-    route: routes.myTeam.members,
-  },
-  {
-    id: "loans",
-    title: "Empréstimos",
-    description: "Controle empréstimos de equipamentos da sua equipe",
-    route: routes.myTeam.loans,
-  },
-  {
-    id: "warnings",
-    title: "Advertências",
-    description: "Visualize e gerencie as advertências dos colaboradores",
-    route: routes.myTeam.warnings,
-  },
-  {
-    id: "ppes",
-    title: "Entregas de EPI",
-    description: "Acompanhe as entregas de EPIs dos colaboradores",
-    route: routes.myTeam.ppes,
-  },
-  {
-    id: "movements",
-    title: "Movimentações",
-    description: "Visualize as movimentações de estoque da equipe",
-    route: routes.myTeam.movements,
-  },
-  {
-    id: "calculations",
-    title: "Controle de Ponto",
-    description: "Acompanhe os registros de ponto dos colaboradores",
-    route: routes.myTeam.calculations,
-  },
-];
+import { PageHeader } from "@/components/ui/page-header";
+import { PrivilegeRoute } from "@/components/navigation/privilege-route";
+import { Card, CardContent } from "@/components/ui/card";
+import { QuickAccessCard } from "@/components/dashboard";
+import { useNavigate } from "react-router-dom";
+import { useTeamStaffUsers, useTeamStaffBorrows, useTeamStaffWarnings } from "../../hooks";
+import { usePageTracker } from "@/hooks/common/use-page-tracker";
+import { routes, TEAM_LEADER, BORROW_STATUS } from "../../constants";
+import { IconUsersGroup } from "@tabler/icons-react";
+import { Users, Wrench, AlertTriangle, ShieldCheck, Activity, Fingerprint } from "lucide-react";
 
 export default function MyTeamPage() {
   const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
 
-  // Show loading spinner while auth is being determined
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <IconLoader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
+  usePageTracker({ title: "Minha Equipe", icon: "users-group" });
 
-  // Redirect if not authenticated
-  if (!user) {
-    return <Navigate to={routes.authentication.login} replace />;
-  }
+  // Lightweight counts — request a single record just to read meta.totalRecords
+  const { data: membersData } = useTeamStaffUsers({ limit: 1 });
+  const { data: activeBorrowsData } = useTeamStaffBorrows({
+    limit: 1,
+    where: { status: BORROW_STATUS.ACTIVE },
+  });
+  const { data: warningsData } = useTeamStaffWarnings({ limit: 1 });
 
-  // Only team leaders (users with ledSector) can access this page
-  if (!user.ledSector) {
-    return <Navigate to={routes.home} replace />;
-  }
+  const memberCount = membersData?.meta?.totalRecords;
+  const activeBorrowCount = activeBorrowsData?.meta?.totalRecords;
+  const warningCount = warningsData?.meta?.totalRecords;
 
   return (
-    <div className="p-4">
-      <h1 className="text-3xl font-bold mb-2">Minha Equipe</h1>
-      <p className="text-gray-600 mb-8">Gerencie os colaboradores do seu setor com facilidade</p>
+    <PrivilegeRoute requiredPrivilege={TEAM_LEADER}>
+      <div className="h-full flex flex-col bg-background px-4 pt-4 pb-4">
+        <PageHeader
+          title="Minha Equipe"
+          icon={IconUsersGroup}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Minha Equipe" }]}
+          className="flex-shrink-0"
+        />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {teamMenuItems.map((item) => (
-          <Card key={item.id} className="hover:shadow-sm transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-xl">{item.title}</CardTitle>
-              <CardDescription>{item.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => navigate(item.route)} className="w-full">
-                Acessar {item.title}
-              </Button>
+        <div className="flex-1 overflow-y-auto pt-4">
+          <Card>
+            <CardContent className="p-6 space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground mb-4">Acesso Rápido</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <QuickAccessCard
+                    title="Membros"
+                    icon={Users}
+                    onClick={() => navigate(routes.myTeam.members)}
+                    count={memberCount}
+                    color="blue"
+                  />
+                  <QuickAccessCard
+                    title="Empréstimos"
+                    icon={Wrench}
+                    onClick={() => navigate(routes.myTeam.loans)}
+                    count={activeBorrowCount}
+                    color="orange"
+                  />
+                  <QuickAccessCard
+                    title="Advertências"
+                    icon={AlertTriangle}
+                    onClick={() => navigate(routes.myTeam.warnings)}
+                    count={warningCount}
+                    color="red"
+                  />
+                  <QuickAccessCard
+                    title="EPIs"
+                    icon={ShieldCheck}
+                    onClick={() => navigate(routes.myTeam.ppes)}
+                    color="teal"
+                  />
+                  <QuickAccessCard
+                    title="Movimentações"
+                    icon={Activity}
+                    onClick={() => navigate(routes.myTeam.movements)}
+                    color="purple"
+                  />
+                  <QuickAccessCard
+                    title="Controle de Ponto"
+                    icon={Fingerprint}
+                    onClick={() => navigate(routes.myTeam.calculations)}
+                    color="green"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
-        ))}
+        </div>
       </div>
-
-      <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-        <p className="text-sm text-blue-800">
-          <strong>Dica:</strong> Como líder, você tem acesso a informações específicas da sua equipe. Use estas ferramentas para acompanhar o desempenho e bem-estar dos seus
-          colaboradores.
-        </p>
-      </div>
-    </div>
+    </PrivilegeRoute>
   );
 }

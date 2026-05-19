@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useBorrowMutations, useBorrowBatchMutations, useBorrows } from "../../../../hooks";
+import { useBorrowMutations, useBorrowBatchMutations, useBorrows, useTeamStaffBorrows } from "../../../../hooks";
 import { useBatchResultDialog } from "@/hooks/common/use-batch-result-dialog";
 import { BorrowBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
@@ -138,31 +138,39 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
     [],
   );
 
+  // Opt-in flag to swap the data hook to the team-staff endpoint (scoped to leader's sector)
+  const useTeamStaffEndpoint = (filters as any)?._useTeamStaffEndpoint;
+
   // Memoize query parameters to prevent infinite re-renders
   const queryParams = React.useMemo(
-    () => ({
-      // Always apply base filters to prevent showing unintended records
-      ...filters,
-      page: page + 1, // Convert 0-based to 1-based for API
-      limit: pageSize,
-      include: includeConfig,
-      // Convert sortConfigs to orderBy format for API
-      ...(sortConfigs.length > 0 && {
-        orderBy: convertSortConfigsToOrderBy(sortConfigs),
-      }),
-      // Filter by selected IDs when showSelectedOnly is true
-      ...(showSelectedOnly &&
-        selectedIds.length > 0 && {
-          where: {
-            id: { in: selectedIds },
-          },
+    () => {
+      const { _useTeamStaffEndpoint, ...restFilters } = filters as any;
+      return {
+        // Always apply base filters to prevent showing unintended records
+        ...restFilters,
+        page: page + 1, // Convert 0-based to 1-based for API
+        limit: pageSize,
+        include: includeConfig,
+        // Convert sortConfigs to orderBy format for API
+        ...(sortConfigs.length > 0 && {
+          orderBy: convertSortConfigsToOrderBy(sortConfigs),
         }),
-    }),
+        // Filter by selected IDs when showSelectedOnly is true
+        ...(showSelectedOnly &&
+          selectedIds.length > 0 && {
+            where: {
+              id: { in: selectedIds },
+            },
+          }),
+      };
+    },
     [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds],
   );
 
-  // Use the borrows hook with memoized parameters
-  const { data: response, isLoading, error } = useBorrows(queryParams);
+  // Use the borrows hook with memoized parameters — swap to team-staff endpoint when flagged
+  const borrowsQuery = useBorrows(queryParams, { enabled: !useTeamStaffEndpoint });
+  const teamStaffQuery = useTeamStaffBorrows(queryParams, { enabled: !!useTeamStaffEndpoint });
+  const { data: response, isLoading, error } = useTeamStaffEndpoint ? teamStaffQuery : borrowsQuery;
 
   const borrows = response?.data || [];
   const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;

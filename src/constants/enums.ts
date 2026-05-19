@@ -2046,7 +2046,6 @@ export enum FAVORITE_PAGES {
   FINANCEIRO_FATURAMENTO = "/financeiro/faturamento",
   FINANCEIRO_ORCAMENTO = "/financeiro/orcamento",
   FINANCEIRO_ORCAMENTO_CADASTRAR = "/financeiro/orcamento/cadastrar",
-  FINANCEIRO_CONCILIACAO_EXTRATOS = "/financeiro/conciliacao/extratos",
   FINANCEIRO_CONCILIACAO_TRANSACOES = "/financeiro/conciliacao/transacoes",
   FINANCEIRO_CONCILIACAO_NOTAS = "/financeiro/conciliacao/notas",
 

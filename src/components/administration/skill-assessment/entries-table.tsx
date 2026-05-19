@@ -1,13 +1,16 @@
 import { useMemo, useState } from "react";
-import { IconLoader2, IconSearch } from "@tabler/icons-react";
+import { useNavigate } from "react-router-dom";
+import { IconChecklist, IconLoader2, IconSearch } from "@tabler/icons-react";
 
 import type { AssessmentEntry } from "../../../types";
-import { ASSESSMENT_ENTRY_STATUS, ASSESSMENT_ENTRY_STATUS_LABELS } from "../../../constants";
-import { useAssessmentEntries, useReopenAssessmentEntry } from "../../../hooks";
+import {
+  ASSESSMENT_ENTRY_STATUS,
+  ASSESSMENT_ENTRY_STATUS_LABELS,
+  routes,
+} from "../../../constants";
+import { useAssessmentEntries } from "../../../hooks";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { Progress } from "@/components/ui/progress";
@@ -19,8 +22,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { toast } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 import { ScoreBadge } from "@/components/production/skill-assessment/score-badge";
+import { AssessmentEntryStatusBadge } from "@/components/production/skill-assessment/assessment-entry-status-badge";
 
 interface EntriesTableProps {
   assessmentId: string;
@@ -35,28 +39,21 @@ const STATUS_OPTIONS = [
   })),
 ];
 
-function statusBadge(s: ASSESSMENT_ENTRY_STATUS) {
-  switch (s) {
-    case ASSESSMENT_ENTRY_STATUS.SUBMITTED:
-      return <Badge>{ASSESSMENT_ENTRY_STATUS_LABELS[s]}</Badge>;
-    case ASSESSMENT_ENTRY_STATUS.IN_PROGRESS:
-      return <Badge variant="secondary">{ASSESSMENT_ENTRY_STATUS_LABELS[s]}</Badge>;
-    case ASSESSMENT_ENTRY_STATUS.PENDING:
-    default:
-      return <Badge variant="outline">{ASSESSMENT_ENTRY_STATUS_LABELS[s]}</Badge>;
-  }
-}
+
+const HEAD_BASE =
+  "h-10 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 
 export function EntriesTable({ assessmentId, topicsCount }: EntriesTableProps) {
   const [status, setStatus] = useState<string>("ALL");
   const [search, setSearch] = useState("");
+  const navigate = useNavigate();
 
   const params = useMemo(
     () => ({
       assessmentId,
       ...(status !== "ALL" ? { status: status as any } : {}),
       include: {
-        evaluatee: true,
+        evaluatee: { include: { position: true, sector: true } },
         evaluator: true,
         responses: true,
         _count: { select: { responses: true } },
@@ -82,7 +79,10 @@ export function EntriesTable({ assessmentId, topicsCount }: EntriesTableProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Avaliações ({filtered.length})</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <IconChecklist className="h-5 w-5 text-muted-foreground" />
+          Avaliações ({filtered.length})
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col md:flex-row gap-3">
@@ -90,7 +90,7 @@ export function EntriesTable({ assessmentId, topicsCount }: EntriesTableProps) {
             <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(v) => setSearch(typeof v === "string" ? v : v == null ? "" : String(v))}
               placeholder="Buscar por avaliado ou avaliador..."
               className="pl-9"
             />
@@ -105,33 +105,44 @@ export function EntriesTable({ assessmentId, topicsCount }: EntriesTableProps) {
           </div>
         </div>
 
-        <div className="rounded-md border overflow-hidden">
+        <div className="rounded-md border border-border/40 overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Avaliado</TableHead>
-                <TableHead>Avaliador</TableHead>
-                <TableHead className="w-40">Progresso</TableHead>
-                <TableHead className="w-20 text-center">Nota</TableHead>
-                <TableHead className="w-28 text-center">Status</TableHead>
-                <TableHead className="w-32 text-right">Ações</TableHead>
+              <TableRow className="border-b border-border/40 hover:!bg-muted">
+                <TableHead className={cn(HEAD_BASE, "w-56")}>Avaliado</TableHead>
+                <TableHead className={cn(HEAD_BASE, "w-32")}>Cargo</TableHead>
+                <TableHead className={cn(HEAD_BASE, "w-32")}>Setor</TableHead>
+                <TableHead className={cn(HEAD_BASE, "w-56")}>Avaliador</TableHead>
+                <TableHead className={HEAD_BASE}>Progresso</TableHead>
+                <TableHead className={cn(HEAD_BASE, "w-20 text-center")}>Nota</TableHead>
+                <TableHead className={cn(HEAD_BASE, "w-32 text-center")}>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     <IconLoader2 className="h-5 w-5 animate-spin inline-block text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                     Nenhuma entrada de avaliação encontrada.
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((e) => <EntryRow key={e.id} entry={e} topicsCount={topicsCount} />)
+                filtered.map((e, idx) => (
+                  <EntryRow
+                    key={e.id}
+                    entry={e}
+                    topicsCount={topicsCount}
+                    rowIndex={idx}
+                    onOpen={() =>
+                      navigate(routes.administration.skillAssessment.entry(assessmentId, e.id))
+                    }
+                  />
+                ))
               )}
             </TableBody>
           </Table>
@@ -141,12 +152,23 @@ export function EntriesTable({ assessmentId, topicsCount }: EntriesTableProps) {
   );
 }
 
-function EntryRow({ entry, topicsCount }: { entry: AssessmentEntry; topicsCount: number }) {
+const CELL_BASE = "px-3 py-3 align-middle !border-b !border-border/30";
+
+function EntryRow({
+  entry,
+  topicsCount,
+  rowIndex,
+  onOpen,
+}: {
+  entry: AssessmentEntry;
+  topicsCount: number;
+  rowIndex: number;
+  onOpen: () => void;
+}) {
   const responses = entry._count?.responses ?? 0;
   const pct = topicsCount > 0 ? Math.round((responses / topicsCount) * 100) : 0;
+  const fullyScored = topicsCount > 0 && responses >= topicsCount;
 
-  // Per-entry average Nota (only meaningful for SUBMITTED entries with at
-  // least one scored response).
   const avg = useMemo(() => {
     const scored = (entry.responses ?? [])
       .map((r) => (typeof r.score === "number" ? r.score : null))
@@ -155,32 +177,35 @@ function EntryRow({ entry, topicsCount }: { entry: AssessmentEntry; topicsCount:
     return scored.reduce((a, b) => a + b, 0) / scored.length;
   }, [entry.responses]);
 
-  const reopen = useReopenAssessmentEntry(entry.id);
-
-  const handleReopen = async () => {
-    try {
-      await reopen.mutateAsync();
-      toast.success("Avaliação reaberta");
-    } catch (err) {
-      toast.error("Erro ao reabrir avaliação");
-    }
-  };
+  const evaluateePosition = (entry.evaluatee as any)?.position?.name as string | undefined;
+  const evaluateeSector = (entry.evaluatee as any)?.sector?.name as string | undefined;
 
   return (
-    <TableRow>
-      <TableCell>
+    <TableRow
+      onClick={onOpen}
+      className={cn(
+        "!border-b-0 cursor-pointer transition-colors",
+        rowIndex % 2 === 1 ? "!bg-muted/15" : "!bg-transparent",
+        "hover:!bg-muted/30",
+      )}
+    >
+      <TableCell className={cn(CELL_BASE, "w-56")}>
         <div className="font-medium">{entry.evaluatee?.name ?? "—"}</div>
-        <div className="text-xs text-muted-foreground">
-          {entry.evaluatee?.email ?? entry.evaluateeId}
-        </div>
       </TableCell>
-      <TableCell>
+      <TableCell className={cn(CELL_BASE, "w-32")}>
+        <span className="text-sm text-foreground/80">
+          {evaluateePosition ?? "—"}
+        </span>
+      </TableCell>
+      <TableCell className={cn(CELL_BASE, "w-32")}>
+        <span className="text-sm text-foreground/80">
+          {evaluateeSector ?? "—"}
+        </span>
+      </TableCell>
+      <TableCell className={CELL_BASE}>
         <div className="font-medium">{entry.evaluator?.name ?? "—"}</div>
-        <div className="text-xs text-muted-foreground">
-          {entry.evaluator?.email ?? entry.evaluatorId}
-        </div>
       </TableCell>
-      <TableCell>
+      <TableCell className={cn(CELL_BASE, "w-40")}>
         <div className="flex items-center gap-2">
           <Progress value={pct} className="h-2" />
           <span className="text-xs text-muted-foreground tabular-nums w-12 text-right">
@@ -188,26 +213,18 @@ function EntryRow({ entry, topicsCount }: { entry: AssessmentEntry; topicsCount:
           </span>
         </div>
       </TableCell>
-      <TableCell className="text-center">
+      <TableCell className={cn(CELL_BASE, "w-20 text-center")}>
         {avg != null ? (
-          <ScoreBadge
-            score={Math.round(avg)}
-            label={avg.toFixed(2)}
-            size="md"
-          />
+          <ScoreBadge score={Math.round(avg)} label={avg.toFixed(2)} size="md" />
         ) : (
           <span className="text-xs text-muted-foreground">—</span>
         )}
       </TableCell>
-      <TableCell className="text-center">{statusBadge(entry.status as ASSESSMENT_ENTRY_STATUS)}</TableCell>
-      <TableCell className="text-right">
-        {entry.status === ASSESSMENT_ENTRY_STATUS.SUBMITTED ? (
-          <Button size="sm" variant="ghost" onClick={handleReopen} disabled={reopen.isPending}>
-            {reopen.isPending ? <IconLoader2 className="h-3 w-3 animate-spin" /> : "Reabrir"}
-          </Button>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )}
+      <TableCell className={cn(CELL_BASE, "w-36 text-center")}>
+        <AssessmentEntryStatusBadge
+          status={entry.status as ASSESSMENT_ENTRY_STATUS}
+          fullyScored={fullyScored}
+        />
       </TableCell>
     </TableRow>
   );

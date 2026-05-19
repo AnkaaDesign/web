@@ -22,7 +22,7 @@ interface Props {
 
 export function OfxImportDialog({ open, onOpenChange, onImported }: Props) {
   const { toast } = useToast();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState(0);
 
   const importMutation = useImportOfx({
@@ -33,26 +33,31 @@ export function OfxImportDialog({ open, onOpenChange, onImported }: Props) {
 
   useEffect(() => {
     if (!open) {
-      setFile(null);
+      setFiles([]);
       setProgress(0);
     }
   }, [open]);
 
   const handleSubmit = () => {
-    if (!file) return;
-    importMutation.mutate(file, {
+    if (files.length === 0) return;
+    importMutation.mutate(files, {
       onSuccess: data => {
+        const failed = data.failedFiles.length;
+        const desc =
+          `${data.transactionsInserted} transações inseridas` +
+          (data.duplicatesSkipped > 0 ? `, ${data.duplicatesSkipped} duplicadas ignoradas` : "") +
+          (data.autoMatchedCount > 0 ? `, ${data.autoMatchedCount} conciliadas automaticamente` : "");
         toast({
-          title: "Extrato importado",
-          description: `${data.transactionCount} transações, ${data.autoMatchedCount} conciliadas automaticamente`,
-          variant: "success",
+          title: failed > 0 ? "Importação concluída com avisos" : "Extratos importados",
+          description: failed > 0 ? `${desc} — ${failed} arquivo(s) falharam` : desc,
+          variant: failed > 0 ? "warning" : "success",
         });
         onImported?.(data);
         onOpenChange(false);
       },
       onError: err => {
         toast({
-          title: "Erro ao importar extrato",
+          title: "Erro ao importar extratos",
           description: (err as Error).message || "Tente novamente",
           variant: "error",
         });
@@ -64,19 +69,19 @@ export function OfxImportDialog({ open, onOpenChange, onImported }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Importar Extrato OFX</DialogTitle>
+          <DialogTitle>Importar Transações OFX</DialogTitle>
           <DialogDescription>
-            Envie o extrato exportado do Sicredi (.ofx). Executamos pareamento automático contra
-            boletos pagos e notas fiscais já conhecidas.
+            Envie um ou mais arquivos .ofx/.qfx do Sicredi, ou um .zip com vários extratos.
+            Transações repetidas são detectadas pelo FITID e nunca duplicam.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <OfxUploadDropzone
-            onFileSelected={f => {
-              setFile(f ?? null);
+            onFilesSelected={fs => {
+              setFiles(fs);
               setProgress(0);
             }}
-            selectedFile={file}
+            selectedFiles={files}
             disabled={importMutation.isPending}
           />
           {importMutation.isPending && progress > 0 && (
@@ -91,9 +96,11 @@ export function OfxImportDialog({ open, onOpenChange, onImported }: Props) {
           >
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={!file || importMutation.isPending}>
+          <Button onClick={handleSubmit} disabled={files.length === 0 || importMutation.isPending}>
             <IconUpload className="h-4 w-4 mr-2" />
-            {importMutation.isPending ? "Importando..." : "Importar"}
+            {importMutation.isPending
+              ? "Importando..."
+              : `Importar ${files.length || ""} arquivo(s)`.trim()}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -6,7 +6,6 @@ import { siegService } from "@/api-client/sieg";
 import { reconciliationKeys } from "@/hooks/common/query-keys";
 import type {
   FiscalDocumentFilters,
-  StatementFilters,
   TransactionFilters,
 } from "@/types/reconciliation";
 import type {
@@ -21,9 +20,9 @@ export function useImportOfx(options?: {
 }) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) =>
+    mutationFn: (files: File[]) =>
       reconciliationService
-        .importOfx(file, options?.onUploadProgress)
+        .importOfx(files, options?.onUploadProgress)
         .then(r => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });
@@ -44,23 +43,6 @@ export function useImportFiscalDocuments(options?: {
       qc.invalidateQueries({ queryKey: reconciliationKeys.fiscalDocs() });
       qc.invalidateQueries({ queryKey: reconciliationKeys.stats() });
     },
-  });
-}
-
-export function useBankStatements(filters: StatementFilters) {
-  return useQuery({
-    queryKey: reconciliationKeys.statements(filters as Record<string, unknown>),
-    queryFn: () => reconciliationService.listStatements(filters).then(r => r.data),
-    placeholderData: previous => previous,
-  });
-}
-
-export function useBankStatement(id: string | undefined) {
-  return useQuery({
-    queryKey: id ? reconciliationKeys.statement(id) : reconciliationKeys.all,
-    queryFn: () =>
-      id ? reconciliationService.getStatement(id).then(r => r.data) : Promise.reject(),
-    enabled: !!id,
   });
 }
 

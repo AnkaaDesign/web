@@ -115,14 +115,20 @@ export class TeamStaffService {
   // =====================
 
   /**
-   * Get payroll calculations for users in the authenticated user's led sector
-   * @param year - Year for calculation
-   * @param month - Month for calculation (1-12)
-   * @returns Payroll calculations for team members
+   * Get Secullum calculations for a single team member.
+   * Backend validates the target user belongs to the leader's led sector and
+   * returns the same `{ success, data: { Colunas, Linhas, Totais } }` payload
+   * that `/integrations/secullum/calculations` returns.
    */
-  async getCalculations(year: number, month: number): Promise<any> {
-    const response = await apiClient.get<any>(`${this.basePath}/calculations`, {
-      params: { year, month },
+  async getCalculations(params: {
+    userId: string;
+    startDate: string;
+    endDate: string;
+    page?: number;
+    take?: number;
+  }): Promise<{ success: boolean; message?: string; data?: any }> {
+    const response = await apiClient.get(`${this.basePath}/calculations`, {
+      params,
     });
     return response.data;
   }
@@ -143,4 +149,10 @@ export const getTeamStaffBorrows = (params?: BorrowGetManyFormData) => teamStaff
 export const getTeamStaffWarnings = (params?: WarningGetManyFormData) => teamStaffService.getWarnings(params);
 export const getTeamStaffActivities = (params?: ActivityGetManyFormData) => teamStaffService.getActivities(params);
 export const getTeamStaffEpis = (params?: PpeDeliveryGetManyFormData) => teamStaffService.getEpis(params);
-export const getTeamStaffCalculations = (year: number, month: number) => teamStaffService.getCalculations(year, month);
+export const getTeamStaffCalculations = (params: {
+  userId: string;
+  startDate: string;
+  endDate: string;
+  page?: number;
+  take?: number;
+}) => teamStaffService.getCalculations(params);

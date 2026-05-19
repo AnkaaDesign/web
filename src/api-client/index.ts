@@ -138,3 +138,4 @@ export * from "./skill";
 export * from "./topic";
 export * from "./assessment";
 export * from "./assessment-entry";
+export * from "./skill-analytics";

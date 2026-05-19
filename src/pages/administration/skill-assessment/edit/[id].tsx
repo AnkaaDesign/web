@@ -3,11 +3,11 @@ import { IconCheck, IconClipboardList, IconLoader2 } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES, ASSESSMENT_STATUS } from "../../../../constants";
 import type { AssessmentUpdateFormData } from "../../../../types";
-import { useAssessment, useUpdateAssessment } from "../../../../hooks";
+import { useAssessment, useUpdateAssessment, useOpenAssessment } from "../../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { CampaignForm } from "@/components/administration/skill-assessment/campaign-form";
+import { CampaignForm, type CampaignSubmitOptions } from "@/components/administration/skill-assessment/campaign-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { toast } from "@/components/ui/sonner";
@@ -25,6 +25,7 @@ export const SkillAssessmentEditPage = () => {
   } as any);
 
   const updateMutation = useUpdateAssessment();
+  const openMutation = useOpenAssessment();
 
   if (!id) return <Navigate to={routes.administration.skillAssessment.root} replace />;
   if (error) return <Navigate to={routes.administration.skillAssessment.root} replace />;
@@ -53,6 +54,14 @@ export const SkillAssessmentEditPage = () => {
               { label: assessment.name, href: routes.administration.skillAssessment.details(id) },
               { label: "Editar" },
             ]}
+            actions={[
+              {
+                key: "back",
+                label: "Voltar aos detalhes",
+                onClick: () => navigate(routes.administration.skillAssessment.details(id)),
+                variant: "outline" as const,
+              },
+            ]}
             className="flex-shrink-0"
           />
           <div className="flex-1 overflow-y-auto pb-6">
@@ -70,10 +79,22 @@ export const SkillAssessmentEditPage = () => {
     );
   }
 
-  const handleSubmit = async (formData: AssessmentUpdateFormData) => {
+  const handleSubmit = async (formData: AssessmentUpdateFormData, opts: CampaignSubmitOptions) => {
     try {
       await updateMutation.mutateAsync({ id, data: formData });
-      toast.success("Campanha atualizada");
+
+      if (opts.openAfter) {
+        try {
+          await openMutation.mutateAsync(id);
+          toast.success("Campanha atualizada e aberta para coleta.");
+        } catch (openErr) {
+          toast.error("Campanha atualizada, mas falhou ao abrir. Abra manualmente na página de detalhes.");
+          if (process.env.NODE_ENV !== "production") console.error(openErr);
+        }
+      } else {
+        toast.success("Campanha atualizada");
+      }
+
       navigate(routes.administration.skillAssessment.details(id));
     } catch (err) {
       toast.error("Erro ao atualizar campanha");

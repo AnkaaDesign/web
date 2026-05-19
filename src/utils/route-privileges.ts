@@ -17,6 +17,12 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/administracao/mensagens/*": ["ADMIN", "PRODUCTION_MANAGER"],
   "/administracao/colaboradores": ["ADMIN", "PRODUCTION_MANAGER"],
   "/administracao/colaboradores/detalhes/:id": ["ADMIN", "PRODUCTION_MANAGER"],
+  "/administracao/avaliacao-competencias": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
+  "/administracao/avaliacao-competencias/*": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
+  "/administracao/competencias": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
+  "/administracao/competencias/*": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
+  "/administracao/topicos": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
+  "/administracao/topicos/*": ["ADMIN", "HUMAN_RESOURCES", "PRODUCTION_MANAGER"],
 
   // Servidor - Server management routes (mostly admin, file manager also accessible to commercial and production manager)
   "/servidor/gerenciador-de-arquivos": ["ADMIN", "COMMERCIAL", "PRODUCTION_MANAGER"],
@@ -58,6 +64,10 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   // Estatísticas - Admin access (team leaders check at component level via isTeamLeader())
   "/statistics": "ADMIN",
   "/statistics/*": "ADMIN",
+  // PRODUCTION_MANAGER stat pages — explicit allowlist (otherwise falls back to ADMIN default)
+  "/estatisticas/recursos-humanos/equipe": ["ADMIN", "PRODUCTION_MANAGER"],
+  "/estatisticas/recursos-humanos/competencias": ["ADMIN", "PRODUCTION_MANAGER"],
+  "/estatisticas/producao/desempenho": ["ADMIN", "PRODUCTION_MANAGER"],
 
   // Estoque - Warehouse operations with full access
   // WAREHOUSE has full access to all inventory routes including create, edit, and delete operations
@@ -124,7 +134,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/pintura": ["WAREHOUSE", "DESIGNER", "LOGISTIC", "PRODUCTION_MANAGER", "ADMIN"],
   "/pintura/catalogo": ["WAREHOUSE", "DESIGNER", "ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PRODUCTION"],
   // NOTE: /pintura/catalogo-basico privileges defined using routes.catalog.root on line 193 to avoid duplication
-  "/pintura/catalogo/detalhes/:id": ["WAREHOUSE", "DESIGNER", "ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PRODUCTION"],
+  "/pintura/catalogo/detalhes/:id": ["WAREHOUSE", "DESIGNER", "ADMIN", "COMMERCIAL", "LOGISTIC", "PRODUCTION_MANAGER", "PRODUCTION", "TEAM_LEADER"],
   "/pintura/catalogo/editar/:id": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can edit paints
   "/pintura/catalogo/cadastrar": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can create paints
   "/pintura/producoes": ["PRODUCTION", "WAREHOUSE", "ADMIN"], // Designer excluded from paint productions
