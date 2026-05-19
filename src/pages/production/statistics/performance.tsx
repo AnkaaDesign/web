@@ -225,6 +225,7 @@ function TaskPerformanceFiltersSheet({
   const [localMonths, setLocalMonths]   = useState<string[]>(selectedMonths);
   const [localYearCompare, setLocalYearCompare] = useState(yearCompareMode);
   const [localStep, setLocalStep] = useState<number>(filters.positionStep ?? 0.6);
+  const [localBase, setLocalBase] = useState<number>(filters.positionBase ?? 1.0);
 
   useEffect(() => {
     if (open) {
@@ -236,6 +237,7 @@ function TaskPerformanceFiltersSheet({
       setLocalMonths(selectedMonths);
       setLocalYearCompare(yearCompareMode);
       setLocalStep(filters.positionStep ?? 0.6);
+      setLocalBase(filters.positionBase ?? 1.0);
     }
   }, [open, filters, selectedYears, selectedMonths, yearCompareMode]);
 
@@ -277,11 +279,12 @@ function TaskPerformanceFiltersSheet({
       compareMode: canCompare ? localCmp : 'combined',
       sectorIds: localSectors.length > 0 ? localSectors : undefined,
       positionStep: localStep,
+      positionBase: localBase,
     };
-    const yearCompare = localYears.length >= 2 && localX !== 'year' ? localYearCompare : false;
+    const yearCompare = localYears.length >= 2 && localX === 'month' ? localYearCompare : false;
     onApply(finalFilters, localYears, localMonths, yearCompare);
     onOpenChange(false);
-  }, [localX, localY, localCmp, localSectors, localYears, localMonths, localYearCompare, localStep, canCompare, onApply, onOpenChange]);
+  }, [localX, localY, localCmp, localSectors, localYears, localMonths, localYearCompare, localStep, localBase, canCompare, onApply, onOpenChange]);
 
   const handleClear = useCallback(() => {
     setLocalX('month');
@@ -292,6 +295,7 @@ function TaskPerformanceFiltersSheet({
     setLocalMonths([]);
     setLocalYearCompare(false);
     setLocalStep(0.6);
+    setLocalBase(1.0);
   }, []);
 
   const activeCount = [localSectors.length > 0, localYears.length > 0].filter(Boolean).length;
@@ -351,8 +355,7 @@ function TaskPerformanceFiltersSheet({
               )}
             </div>
 
-            {/* Position step control */}
-            <div className="space-y-2 rounded-lg border border-border p-3">
+            <div className="space-y-2">
               <Label className="flex items-center gap-2 text-sm font-medium">
                 <IconScale className="h-4 w-4" />
                 Passo entre Cargos
@@ -367,7 +370,24 @@ function TaskPerformanceFiltersSheet({
                 decimals={2}
                 value={localStep}
                 onChange={v => setLocalStep(parseFloat(String(v ?? '0.6')) || 0)}
-                className="bg-transparent"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <IconScale className="h-4 w-4" />
+                Peso Base
+              </Label>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Peso atribuído ao cargo mais baixo (Junior I). Fórmula: peso = base + passo × rank. Aumentar a base comprime a diferença relativa entre cargos; diminuí-la amplifica.
+              </p>
+              <Input
+                type="decimal"
+                min={0}
+                step={0.1}
+                decimals={2}
+                value={localBase}
+                onChange={v => setLocalBase(parseFloat(String(v ?? '1.0')) || 0)}
               />
             </div>
 
@@ -421,7 +441,7 @@ function TaskPerformanceFiltersSheet({
               </div>
             )}
 
-            {localYears.length >= 2 && localX !== 'year' && (
+            {localYears.length >= 2 && localX === 'month' && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2 text-sm font-medium">
                   <IconArrowsExchange2 className="h-4 w-4" />
@@ -568,6 +588,7 @@ const TaskPerformancePage = () => {
       // bonus does, eliminating TZ drift.
       bonusPeriodYear: y,
       positionStep: 0.6,
+      positionBase: 1.0,
     };
   });
 
@@ -1092,6 +1113,7 @@ const TaskPerformancePage = () => {
       if (selectedYears.length) filterLines.push(`Anos: ${[...selectedYears].sort().join(', ')}`);
       if (selectedMonths.length) filterLines.push(`Meses: ${selectedMonths.length} selecionados`);
       filterLines.push(`Passo entre cargos: ${(filters.positionStep ?? 0.6).toFixed(2)}`);
+      filterLines.push(`Peso base: ${(filters.positionBase ?? 1.0).toFixed(2)}`);
       if (usePerf) filterLines.push('Métrica: Produção média/dia por colaborador');
       else if (isBothMode) filterLines.push('Métrica: Total + Produção/dia');
       if (isComparisonMode && sectorColumns.length) {
@@ -1231,7 +1253,7 @@ const TaskPerformancePage = () => {
                       </Badge>
                     )}
                     <Badge variant="outline" className="text-xs">
-                      Passo {(params?.positionStep ?? filters.positionStep ?? 0.6).toFixed(2)}
+                      Base {(params?.positionBase ?? filters.positionBase ?? 1.0).toFixed(2)} · Passo {(params?.positionStep ?? filters.positionStep ?? 0.6).toFixed(2)}
                     </Badge>
                     {selectedYears.length > 0 && (
                       <Badge variant="outline" className="text-xs">{selectedYears.sort().join(', ')}</Badge>

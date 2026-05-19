@@ -28,6 +28,13 @@ export type SkillStatsChartType =
 export interface SkillStatsBaseFilters {
   assessmentIds?: string[];
   sectorIds?: string[];
+  /**
+   * Client-only filter: the server doesn't accept positionIds yet. Used by the
+   * web stats page to derive position comparisons (≥2) from overview.byUser, and
+   * to cascade-narrow the Colaboradores picker. NOT serialized to API requests
+   * (see apiFilters strip in the stats page).
+   */
+  positionIds?: string[];
   skillIds?: string[];
   topicIds?: string[];
   userIds?: string[];

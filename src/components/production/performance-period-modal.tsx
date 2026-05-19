@@ -393,7 +393,7 @@ export function PerformancePeriodModal({
                     </TableHead>
                     <TableHead
                       className="text-right whitespace-nowrap"
-                      title="Peso da posição = 1 + passo × rank (rank=0 para a posição mais baixa). O passo é configurável no filtro."
+                      title="Peso da posição = base + passo × rank (rank=0 para a posição mais baixa). Base e passo são configuráveis no filtro."
                     >
                       Peso
                     </TableHead>
@@ -405,7 +405,7 @@ export function PerformancePeriodModal({
                       onClick={() => toggleSort('tasks')}
                       title="Tarefas Atribuídas = T × (peso × dias úteis) / Σ(peso × dias úteis). Soma exata = T."
                     >
-                      Tarefas Atribuídas {sortIcon('tasks')}
+                      Tarefas {sortIcon('tasks')}
                     </TableHead>
                   </TableRow>
                 </TableHeader>

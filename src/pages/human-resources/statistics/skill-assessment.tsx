@@ -257,22 +257,16 @@ interface FilterSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 
-  // Composition
+  // Composition. There's no compareMode prop — comparison is fully derived
+  // from filter selection counts at the page level (≥2 of any entity type
+  // becomes a comparison series; 1 narrows scope).
   xAxisMode: SkillStatsXAxisMode;
   yAxisMode: SkillStatsYAxisMode;
-  compareSectorIds: string[];
-  comparePositionIds: string[];
-  compareUserIds: string[];
-
-  // Base filters (no period / no includeInProgress UI — server defaults apply)
   filters: SkillStatsBaseFilters;
 
   onApply: (next: {
     xAxisMode: SkillStatsXAxisMode;
     yAxisMode: SkillStatsYAxisMode;
-    compareSectorIds: string[];
-    comparePositionIds: string[];
-    compareUserIds: string[];
     filters: SkillStatsBaseFilters;
   }) => void;
 }
@@ -282,42 +276,25 @@ function SkillStatsFilterSheet({
   onOpenChange,
   xAxisMode,
   yAxisMode,
-  compareSectorIds,
-  comparePositionIds,
-  compareUserIds,
   filters,
   onApply,
 }: FilterSheetProps) {
   const [localX, setLocalX] = useState<SkillStatsXAxisMode>(xAxisMode);
   const [localY, setLocalY] = useState<SkillStatsYAxisMode>(yAxisMode);
-  const [localCmpSectorIds, setLocalCmpSectorIds]     = useState<string[]>(compareSectorIds);
-  const [localCmpPositionIds, setLocalCmpPositionIds] = useState<string[]>(comparePositionIds);
-  const [localCmpUserIds, setLocalCmpUserIds]         = useState<string[]>(compareUserIds);
   const [local, setLocal] = useState<SkillStatsBaseFilters>(filters);
 
   useEffect(() => {
     if (!open) return;
     setLocalX(xAxisMode);
     setLocalY(yAxisMode);
-    setLocalCmpSectorIds(compareSectorIds);
-    setLocalCmpPositionIds(comparePositionIds);
-    setLocalCmpUserIds(compareUserIds);
     setLocal(filters);
-  }, [open, xAxisMode, yAxisMode, compareSectorIds, comparePositionIds, compareUserIds, filters]);
+  }, [open, xAxisMode, yAxisMode, filters]);
 
   // Auto-correct local Y when local X changes inside the sheet.
   useEffect(() => {
     const validYs = availableYsFor(localX);
     if (!validYs.includes(localY)) setLocalY(validYs[0]);
   }, [localX, localY]);
-
-  // Clear any compare-entity arrays that no longer match the (X, Y) matrix.
-  useEffect(() => {
-    const allowed = availableComparesFor(localX, localY);
-    if (!allowed.includes('sector') && localCmpSectorIds.length) setLocalCmpSectorIds([]);
-    if (!allowed.includes('position') && localCmpPositionIds.length) setLocalCmpPositionIds([]);
-    if (!allowed.includes('user') && localCmpUserIds.length) setLocalCmpUserIds([]);
-  }, [localX, localY, localCmpSectorIds.length, localCmpPositionIds.length, localCmpUserIds.length]);
 
   // ---- Async fetchers (kept inside sheet for query-key locality) ----
 
@@ -393,6 +370,7 @@ function SkillStatsFilterSheet({
   //     whose parent we don't know yet.
   const topicSkillMapRef = useRef<Map<string, string>>(new Map());
   const userSectorMapRef = useRef<Map<string, string>>(new Map());
+  const userPositionMapRef = useRef<Map<string, string>>(new Map());
 
   // Topics narrow by skillIds — drives the cascading filter.
   const narrowSkillIds = local.skillIds && local.skillIds.length > 0 ? local.skillIds : undefined;
@@ -417,17 +395,24 @@ function SkillStatsFilterSheet({
     };
   }, [narrowSkillIds]);
 
-  // Users narrow by sectorIds — drives the second cascade.
+  // Users cascade-narrow by BOTH sectorIds AND positionIds — picking either
+  // (or both) restricts the options to users matching the intersection.
   const narrowSectorIds = local.sectorIds && local.sectorIds.length > 0 ? local.sectorIds : undefined;
+  const narrowPositionIds = local.positionIds && local.positionIds.length > 0 ? local.positionIds : undefined;
   const fetchUsers = useCallback(async (search: string, page = 1) => {
     const res = await getUsers({
-      where: { isActive: true, ...(narrowSectorIds ? { sectorId: { in: narrowSectorIds } } : {}) },
+      where: {
+        isActive: true,
+        ...(narrowSectorIds ? { sectorId: { in: narrowSectorIds } } : {}),
+        ...(narrowPositionIds ? { positionId: { in: narrowPositionIds } } : {}),
+      },
       search: search || undefined,
       page,
       limit: COMBOBOX_PAGE_SIZE,
     } as any);
     (res.data ?? []).forEach((u: any) => {
       if (u?.id && u?.sectorId) userSectorMapRef.current.set(u.id, u.sectorId);
+      if (u?.id && u?.positionId) userPositionMapRef.current.set(u.id, u.positionId);
     });
     return {
       data: (res.data ?? []).map((u: any) => ({
@@ -437,7 +422,7 @@ function SkillStatsFilterSheet({
       })),
       hasMore: res.meta?.hasNextPage ?? false,
     };
-  }, [narrowSectorIds]);
+  }, [narrowSectorIds, narrowPositionIds]);
 
   // Hydrate maps on sheet-open for pre-selected children whose parent we
   // don't know yet (state restored from URL / persisted filter, etc.). This
@@ -475,7 +460,9 @@ function SkillStatsFilterSheet({
   useEffect(() => {
     if (!open) return;
     const selected = filters.userIds ?? [];
-    const unknown = selected.filter(id => !userSectorMapRef.current.has(id));
+    const unknown = selected.filter(id =>
+      !userSectorMapRef.current.has(id) || !userPositionMapRef.current.has(id),
+    );
     if (!unknown.length) return;
     let cancelled = false;
     getUsers({ where: { id: { in: unknown }, isActive: true }, limit: unknown.length } as any)
@@ -483,11 +470,17 @@ function SkillStatsFilterSheet({
         if (cancelled) return;
         (res.data ?? []).forEach((u: any) => {
           if (u?.id && u?.sectorId) userSectorMapRef.current.set(u.id, u.sectorId);
+          if (u?.id && u?.positionId) userPositionMapRef.current.set(u.id, u.positionId);
         });
         setLocal(prev => {
-          const sectors = prev.sectorIds ?? [];
-          if (!sectors.length || !prev.userIds?.length) return prev;
-          const pruned = pruneChildIds(prev.userIds, sectors, userSectorMapRef.current);
+          if (!prev.userIds?.length) return prev;
+          let pruned = prev.userIds;
+          if (prev.sectorIds?.length) {
+            pruned = pruneChildIds(pruned, prev.sectorIds, userSectorMapRef.current);
+          }
+          if (prev.positionIds?.length) {
+            pruned = pruneChildIds(pruned, prev.positionIds, userPositionMapRef.current);
+          }
           if (pruned.length === prev.userIds.length) return prev;
           return { ...prev, userIds: pruned };
         });
@@ -496,20 +489,10 @@ function SkillStatsFilterSheet({
     return () => { cancelled = true; };
   }, [open, filters.userIds]);
 
-  // The three compare comboboxes are mutually exclusive — picking values in
-  // one disables the others. Helpers keep that invariant in one place.
-  const hasSectorCmp = localCmpSectorIds.length > 0;
-  const hasPositionCmp = localCmpPositionIds.length > 0;
-  const hasUserCmp = localCmpUserIds.length > 0;
-  const anyCmp = hasSectorCmp || hasPositionCmp || hasUserCmp;
-
   const handleApply = () => {
     onApply({
       xAxisMode: localX,
       yAxisMode: localY,
-      compareSectorIds: localCmpSectorIds,
-      comparePositionIds: localCmpPositionIds,
-      compareUserIds: localCmpUserIds,
       filters: local,
     });
     onOpenChange(false);
@@ -518,17 +501,43 @@ function SkillStatsFilterSheet({
   const handleClear = () => {
     setLocalX('skill');
     setLocalY('averageScore');
-    setLocalCmpSectorIds([]);
-    setLocalCmpPositionIds([]);
-    setLocalCmpUserIds([]);
     setLocal({});
   };
 
   const yOptions = availableYsFor(localX);
-  const cmpOptions = availableComparesFor(localX, localY);
-  const canCmpSector   = cmpOptions.includes('sector');
-  const canCmpPosition = cmpOptions.includes('position');
-  const canCmpUser     = cmpOptions.includes('user');
+  // Count summary used by the per-picker hints below.
+  const nSectors   = local.sectorIds?.length ?? 0;
+  const nPositions = local.positionIds?.length ?? 0;
+  const nUsers     = local.userIds?.length ?? 0;
+  const nSkills    = local.skillIds?.length ?? 0;
+  const nTopics    = local.topicIds?.length ?? 0;
+
+  // Mirror the page's derivation locally so each picker can show the user
+  // exactly what its count means right now.
+  const localEffX: SkillStatsXAxisMode = (localX === 'skill' && nTopics >= 2) ? 'topic' : localX;
+  const localIsContent  = localEffX === 'skill' || localEffX === 'topic';
+  const localIsCampaign = localEffX === 'campaign';
+  const localIsPerson   = localEffX === 'sector' || localEffX === 'user';
+  const localCmpMode: SkillStatsCompareMode = (() => {
+    if (localY !== 'averageScore') return 'none';
+    if (localIsContent || localIsCampaign) {
+      if (nUsers >= 2) return 'user';
+      if (!localIsCampaign && nPositions >= 2) return 'position';
+      if (nSectors >= 2) return 'sector';
+      return 'none';
+    }
+    if (localIsPerson) {
+      if (nSkills >= 2) return 'skill';
+      return 'none';
+    }
+    return 'none';
+  })();
+  const noteCompare = (mode: SkillStatsCompareMode, count: number) => {
+    if (localCmpMode === mode) return `Comparando ${count} como séries do gráfico.`;
+    if (localCmpMode === 'none') return 'Filtro de escopo apenas (comparação indisponível neste eixo).';
+    const label = COMPARE_MODE_OPTIONS.find(o => o.value === localCmpMode)?.label;
+    return `Filtro de escopo (comparação mais específica ativa: ${label}).`;
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -582,71 +591,15 @@ function SkillStatsFilterSheet({
               </p>
             </div>
 
-            {/* Compare — three mutually exclusive entity pickers. */}
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Comparar por Setor</Label>
-              <Combobox
-                mode="multiple"
-                async
-                disabled={!canCmpSector || (anyCmp && !hasSectorCmp)}
-                queryKey={['skill-stats-compare-sectors']}
-                queryFn={fetchSectors}
-                minSearchLength={0}
-                value={localCmpSectorIds}
-                onValueChange={v => setLocalCmpSectorIds(Array.isArray(v) ? v : v ? [v] : [])}
-                placeholder={
-                  !canCmpSector
-                    ? 'Indisponível neste eixo'
-                    : anyCmp && !hasSectorCmp
-                      ? 'Limpe outra comparação para usar'
-                      : 'Selecione setores...'
-                }
-              />
+            <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+              Selecione 1 entidade para <strong>filtrar</strong> o escopo (ela
+                também restringe as opções dos filtros filhos). Selecione 2+
+              entidades de um mesmo tipo para <strong>compará-las</strong> como
+              séries no gráfico. Prioridade da comparação:
+              colaborador &gt; cargo &gt; setor.
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Comparar por Cargo</Label>
-              <Combobox
-                mode="multiple"
-                async
-                disabled={!canCmpPosition || (anyCmp && !hasPositionCmp)}
-                queryKey={['skill-stats-compare-positions']}
-                queryFn={fetchPositions}
-                minSearchLength={0}
-                value={localCmpPositionIds}
-                onValueChange={v => setLocalCmpPositionIds(Array.isArray(v) ? v : v ? [v] : [])}
-                placeholder={
-                  !canCmpPosition
-                    ? 'Disponível apenas para Eixo X = Competência'
-                    : anyCmp && !hasPositionCmp
-                      ? 'Limpe outra comparação para usar'
-                      : 'Selecione cargos...'
-                }
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Comparar por Colaborador</Label>
-              <Combobox
-                mode="multiple"
-                async
-                disabled={!canCmpUser || (anyCmp && !hasUserCmp)}
-                queryKey={['skill-stats-compare-users', narrowSectorIds]}
-                queryFn={fetchUsers}
-                minSearchLength={0}
-                value={localCmpUserIds}
-                onValueChange={v => setLocalCmpUserIds(Array.isArray(v) ? v : v ? [v] : [])}
-                placeholder={
-                  !canCmpUser
-                    ? 'Indisponível neste eixo'
-                    : anyCmp && !hasUserCmp
-                      ? 'Limpe outra comparação para usar'
-                      : 'Selecione colaboradores...'
-                }
-              />
-            </div>
-
-            {/* Campaigns */}
+            {/* Campaigns — pure scope, no comparison axis. */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">Campanhas</Label>
               <Combobox
@@ -663,7 +616,7 @@ function SkillStatsFilterSheet({
               />
             </div>
 
-            {/* Sectors */}
+            {/* Sectors — cascades to Cargos and Colaboradores. */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">Setores</Label>
               <Combobox
@@ -679,16 +632,86 @@ function SkillStatsFilterSheet({
                     ...prev,
                     sectorIds: nextSectors,
                     // Cascade: drop any selected user whose sector is no longer
-                    // in scope. Atomic with the sector update so the API can't
-                    // see a transient inconsistent state.
+                    // in scope. Atomic so the API can't see a transient state.
                     userIds: pruneChildIds(prev.userIds, nextSectors, userSectorMapRef.current),
                   }));
                 }}
                 placeholder="Todos os setores"
               />
+              {nSectors === 1 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Filtrando colaboradores deste setor.
+                </p>
+              )}
+              {nSectors >= 2 && (
+                <p className="text-[11px] text-muted-foreground">{noteCompare('sector', nSectors)}</p>
+              )}
             </div>
 
-            {/* Skills */}
+            {/* Positions (Cargos) — cascades to Colaboradores. Client-only filter:
+                the API doesn't accept positionIds yet, so 1-position-selected
+                narrows the Colaboradores picker (cascade) but does not restrict
+                the chart server-side. 2+ becomes a client-derived comparison
+                from overview.byUser. */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Cargos</Label>
+              <Combobox
+                mode="multiple"
+                async
+                queryKey={['skill-stats-positions']}
+                queryFn={fetchPositions}
+                minSearchLength={0}
+                value={local.positionIds ?? []}
+                onValueChange={v => {
+                  const nextPositions = Array.isArray(v) ? v : v ? [v] : [];
+                  setLocal(prev => ({
+                    ...prev,
+                    positionIds: nextPositions,
+                    userIds: pruneChildIds(prev.userIds, nextPositions, userPositionMapRef.current),
+                  }));
+                }}
+                placeholder="Todos os cargos"
+              />
+              {nPositions === 1 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Filtrando colaboradores deste cargo (escopo client-side).
+                </p>
+              )}
+              {nPositions >= 2 && (
+                <p className="text-[11px] text-muted-foreground">{noteCompare('position', nPositions)}</p>
+              )}
+            </div>
+
+            {/* Users — cascades from sectorIds AND positionIds. */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Colaboradores</Label>
+              <Combobox
+                mode="multiple"
+                async
+                queryKey={['skill-stats-users', narrowSectorIds, narrowPositionIds]}
+                queryFn={fetchUsers}
+                minSearchLength={0}
+                value={local.userIds ?? []}
+                onValueChange={v =>
+                  setLocal(prev => ({ ...prev, userIds: Array.isArray(v) ? v : v ? [v] : [] }))
+                }
+                placeholder={
+                  narrowSectorIds || narrowPositionIds
+                    ? 'Colaboradores no escopo selecionado'
+                    : 'Todos os colaboradores'
+                }
+              />
+              {nUsers === 1 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Visão individual deste colaborador.
+                </p>
+              )}
+              {nUsers >= 2 && (
+                <p className="text-[11px] text-muted-foreground">{noteCompare('user', nUsers)}</p>
+              )}
+            </div>
+
+            {/* Skills — cascades to Tópicos. */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">Competências</Label>
               <Combobox
@@ -703,14 +726,19 @@ function SkillStatsFilterSheet({
                   setLocal(prev => ({
                     ...prev,
                     skillIds: nextSkills,
-                    // Cascade: drop any selected topic whose skill is no longer
-                    // in scope. See pruneChildIds for the "conservative on
-                    // unknown" rule.
                     topicIds: pruneChildIds(prev.topicIds, nextSkills, topicSkillMapRef.current),
                   }));
                 }}
                 placeholder="Todas as competências"
               />
+              {nSkills === 1 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Filtrando tópicos desta competência.
+                </p>
+              )}
+              {nSkills >= 2 && (
+                <p className="text-[11px] text-muted-foreground">{noteCompare('skill', nSkills)}</p>
+              )}
             </div>
 
             {/* Topics (cascades from skillIds) */}
@@ -719,8 +747,6 @@ function SkillStatsFilterSheet({
               <Combobox
                 mode="multiple"
                 async
-                // Re-query when skillIds change so the option list reflects the
-                // narrowed scope.
                 queryKey={['skill-stats-topics', narrowSkillIds]}
                 queryFn={fetchTopics}
                 minSearchLength={0}
@@ -730,34 +756,18 @@ function SkillStatsFilterSheet({
                 }
                 placeholder={narrowSkillIds ? 'Tópicos das competências selecionadas' : 'Todos os tópicos'}
               />
-              {narrowSkillIds && (
-                <p className="text-xs text-muted-foreground">
-                  Opções filtradas pelas {narrowSkillIds.length} competência(s) selecionada(s).
+              {nTopics >= 2 && localX === 'skill' && (
+                <p className="text-[11px] text-muted-foreground">
+                  Eixo X auto-promovido para <strong>Tópico</strong> — os {nTopics} tópicos
+                  serão exibidos como barras.
                 </p>
               )}
-              {(local.topicIds?.length ?? 0) > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Tópicos selecionados têm precedência — o filtro de competências
-                  será ignorado no gráfico enquanto houver tópicos escolhidos.
+              {nTopics > 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Tópicos têm precedência — o filtro de competências é ignorado
+                  enquanto houver tópicos escolhidos.
                 </p>
               )}
-            </div>
-
-            {/* Users (cascades from sectorIds) */}
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Colaboradores</Label>
-              <Combobox
-                mode="multiple"
-                async
-                queryKey={['skill-stats-users', narrowSectorIds]}
-                queryFn={fetchUsers}
-                minSearchLength={0}
-                value={local.userIds ?? []}
-                onValueChange={v =>
-                  setLocal(prev => ({ ...prev, userIds: Array.isArray(v) ? v : v ? [v] : [] }))
-                }
-                placeholder={narrowSectorIds ? 'Colaboradores dos setores selecionados' : 'Todos os colaboradores'}
-              />
             </div>
 
           </div>
@@ -786,28 +796,62 @@ export const HRSkillAssessmentStatisticsPage = () => {
   });
 
   // --- Composition state ---
-  const [xAxisMode, setXAxisMode]     = useState<SkillStatsXAxisMode>('skill');
+  // xAxisModeRaw is the user's explicit choice; xAxisMode (below) is the
+  // effective value after a smart-default promotion (skill → topic when the
+  // user has picked 2+ topics but hasn't customized X). Manual X choices are
+  // always respected.
+  const [xAxisModeRaw, setXAxisMode]  = useState<SkillStatsXAxisMode>('skill');
   const [yAxisMode, setYAxisMode]     = useState<SkillStatsYAxisMode>('averageScore');
-  // Three mutually-exclusive compare-entity arrays. compareMode is derived
-  // from which one is populated — see below.
-  const [compareSectorIds, setCompareSectorIds]     = useState<string[]>([]);
-  const [comparePositionIds, setComparePositionIds] = useState<string[]>([]);
-  const [compareUserIds, setCompareUserIds]         = useState<string[]>([]);
   const [filters, setFilters]         = useState<SkillStatsBaseFilters>({});
   const [chartType, setChartType]     = useState<SkillStatsChartType>('bar');
   const [trendLine, setTrendLine]     = useState<TrendLineType | null>(null);
   const [radarShape, setRadarShape]   = useState<'polygon' | 'circle'>('polygon');
   const [showFilters, setShowFilters] = useState(false);
 
+  // Smart-X default: when the user is on the default 'skill' axis and picks
+  // 2+ topics, surface those topics as bars instead. Once they manually change
+  // X (to anything other than 'skill'), respect that choice unconditionally.
+  const xAxisMode = useMemo<SkillStatsXAxisMode>(() => {
+    if (xAxisModeRaw === 'skill' && (filters.topicIds?.length ?? 0) >= 2) return 'topic';
+    return xAxisModeRaw;
+  }, [xAxisModeRaw, filters.topicIds]);
+
+  // Derive comparison entirely from selection counts. Most-specific wins on
+  // the WHO axis (user > position > sector); skill comparison drives the WHAT
+  // axis when X is a person dimension.
   const { compareMode, compareEntityIds } = useMemo<{
     compareMode: SkillStatsCompareMode;
     compareEntityIds: string[];
   }>(() => {
-    if (compareSectorIds.length)   return { compareMode: 'sector',   compareEntityIds: compareSectorIds };
-    if (comparePositionIds.length) return { compareMode: 'position', compareEntityIds: comparePositionIds };
-    if (compareUserIds.length)     return { compareMode: 'user',     compareEntityIds: compareUserIds };
+    // Distribution / volume render single-value bars — no comparison series.
+    if (yAxisMode !== 'averageScore') return { compareMode: 'none', compareEntityIds: [] };
+
+    const isContent  = xAxisMode === 'skill' || xAxisMode === 'topic';
+    const isCampaign = xAxisMode === 'campaign';
+    const isPerson   = xAxisMode === 'sector' || xAxisMode === 'user';
+
+    if (isContent || isCampaign) {
+      if ((filters.userIds?.length ?? 0) >= 2)
+        return { compareMode: 'user', compareEntityIds: filters.userIds! };
+      // Position comparison is client-derived from overview.byUser.perSkillAverage —
+      // only supported on X='skill'. byUser has no perTopicAverage, and evolution
+      // has no per-position breakdown, so X='topic' and X='campaign' fall through.
+      if (xAxisMode === 'skill' && (filters.positionIds?.length ?? 0) >= 2)
+        return { compareMode: 'position', compareEntityIds: filters.positionIds! };
+      if ((filters.sectorIds?.length ?? 0) >= 2)
+        return { compareMode: 'sector', compareEntityIds: filters.sectorIds! };
+      return { compareMode: 'none', compareEntityIds: [] };
+    }
+
+    if (isPerson) {
+      // Skill comparison is client-derived from overview.bySector|byUser; the
+      // server doesn't support compare-by-skill.
+      if ((filters.skillIds?.length ?? 0) >= 2)
+        return { compareMode: 'skill', compareEntityIds: filters.skillIds! };
+      return { compareMode: 'none', compareEntityIds: [] };
+    }
     return { compareMode: 'none', compareEntityIds: [] };
-  }, [compareSectorIds, comparePositionIds, compareUserIds]);
+  }, [xAxisMode, yAxisMode, filters.userIds, filters.positionIds, filters.sectorIds, filters.skillIds]);
 
   const chartRef = useRef<StatisticsChartHandle>(null);
   const radarRef = useRef<StatisticsRadarChartHandle>(null);
@@ -848,7 +892,6 @@ export const HRSkillAssessmentStatisticsPage = () => {
 
   // --- Available options (derived from composition) ---
   const availableYs    = useMemo(() => availableYsFor(xAxisMode), [xAxisMode]);
-  const availableCmps  = useMemo(() => availableComparesFor(xAxisMode, yAxisMode), [xAxisMode, yAxisMode]);
   const availableTypes = useMemo(() => availableChartTypesFor(xAxisMode, yAxisMode, compareMode), [xAxisMode, yAxisMode, compareMode]);
 
   // --- Auto-correct composition when an upstream axis changes ---
@@ -856,14 +899,7 @@ export const HRSkillAssessmentStatisticsPage = () => {
     if (!availableYs.includes(yAxisMode)) setYAxisMode(availableYs[0]);
   }, [availableYs, yAxisMode]);
 
-  useEffect(() => {
-    if (!availableCmps.includes(compareMode) && compareMode !== 'none') {
-      // The current compare dimension is no longer valid for (X, Y) — drop it.
-      setCompareSectorIds([]);
-      setComparePositionIds([]);
-      setCompareUserIds([]);
-    }
-  }, [availableCmps, compareMode]);
+  // compareMode is fully derived now — no auto-correct effect needed.
 
   useEffect(() => {
     if (!availableTypes.includes(chartType)) {
@@ -886,11 +922,13 @@ export const HRSkillAssessmentStatisticsPage = () => {
   // selection drifted (e.g., during cascading edits). Mental model from the
   // UX: "topics > skills". Drop the skill filter at the API boundary.
   const apiFilters = useMemo<SkillStatsBaseFilters>(() => {
-    if (filters.topicIds && filters.topicIds.length > 0) {
-      const { skillIds: _skillIds, ...rest } = filters;
+    // positionIds is FE-only (no server support yet) — strip before serializing.
+    const { positionIds: _positions, ...withoutPositions } = filters;
+    if (withoutPositions.topicIds && withoutPositions.topicIds.length > 0) {
+      const { skillIds: _skillIds, ...rest } = withoutPositions;
       return rest;
     }
-    return filters;
+    return withoutPositions;
   }, [filters]);
 
   // --- Queries ---
@@ -939,14 +977,15 @@ export const HRSkillAssessmentStatisticsPage = () => {
     let c = 0;
     if (filters.assessmentIds?.length) c++;
     if (filters.sectorIds?.length)     c++;
+    if (filters.positionIds?.length)   c++;
     if (filters.skillIds?.length)      c++;
     if (filters.topicIds?.length)      c++;
     if (filters.userIds?.length)       c++;
-    if (compareMode !== 'none')        c++;
-    if (xAxisMode !== 'skill')         c++;
+    // compareMode is derived from the picker counts above, so don't double-count.
+    if (xAxisModeRaw !== 'skill')      c++;
     if (yAxisMode !== 'averageScore')  c++;
     return c;
-  }, [filters, compareMode, xAxisMode, yAxisMode]);
+  }, [filters, xAxisModeRaw, yAxisMode]);
 
   // ============================================================
   // Chart data builders — one per (X, Y, compare) family
@@ -1700,7 +1739,11 @@ export const HRSkillAssessmentStatisticsPage = () => {
                 </span>
                 {compareMode !== 'none' && compareEntityIds.length > 0 && (
                   <Badge variant="secondary" className="text-xs">
-                    {compareEntityIds.length} {compareMode === 'user' ? 'colaborador(es)' : 'setor(es)'}
+                    {compareEntityIds.length}{' '}
+                    {compareMode === 'user'     ? 'colaborador(es)'
+                      : compareMode === 'position' ? 'cargo(s)'
+                      : compareMode === 'skill'    ? 'competência(s)'
+                      : 'setor(es)'}
                   </Badge>
                 )}
                 {filters.assessmentIds?.length ? (
@@ -1711,6 +1754,11 @@ export const HRSkillAssessmentStatisticsPage = () => {
                 {filters.sectorIds?.length ? (
                   <Badge variant="outline" className="text-xs">
                     {filters.sectorIds.length} setor(es)
+                  </Badge>
+                ) : null}
+                {filters.positionIds?.length ? (
+                  <Badge variant="outline" className="text-xs">
+                    {filters.positionIds.length} cargo(s)
                   </Badge>
                 ) : null}
                 {filters.skillIds?.length ? (
@@ -1947,18 +1995,12 @@ export const HRSkillAssessmentStatisticsPage = () => {
       <SkillStatsFilterSheet
         open={showFilters}
         onOpenChange={setShowFilters}
-        xAxisMode={xAxisMode}
+        xAxisMode={xAxisModeRaw}
         yAxisMode={yAxisMode}
-        compareSectorIds={compareSectorIds}
-        comparePositionIds={comparePositionIds}
-        compareUserIds={compareUserIds}
         filters={filters}
         onApply={next => {
           setXAxisMode(next.xAxisMode);
           setYAxisMode(next.yAxisMode);
-          setCompareSectorIds(next.compareSectorIds);
-          setComparePositionIds(next.comparePositionIds);
-          setCompareUserIds(next.compareUserIds);
           setFilters(next.filters);
         }}
       />
@@ -1995,7 +2037,7 @@ function KpiCard({ label, value, icon: Icon, subtitle, onClick, disabled }: KpiC
   const interactive = !!onClick && !disabled;
   return (
     <Card
-      className={cn('py-2', interactive && 'cursor-pointer hover:bg-muted/50 transition-colors')}
+      className={cn(interactive && 'cursor-pointer transition-colors hover:bg-muted/50')}
       onClick={interactive ? onClick : undefined}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
@@ -2008,15 +2050,14 @@ function KpiCard({ label, value, icon: Icon, subtitle, onClick, disabled }: KpiC
           }
         : undefined}
     >
-      <CardContent className="flex items-start justify-between gap-2 px-3 py-1">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-muted-foreground truncate">{label}</p>
-          <p className={cn('text-xl font-bold leading-tight truncate')}>{value}</p>
-          {subtitle && (
-            <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>
-          )}
+      <CardContent className="py-3 px-4">
+        <div className="text-xs font-medium text-foreground/70 flex items-center gap-1.5">
+          <Icon className="h-3.5 w-3.5" /> {label}
         </div>
-        <Icon className="h-5 w-5 text-muted-foreground/70 flex-shrink-0" />
+        <div className="text-xl font-bold mt-0.5 text-foreground truncate">{value}</div>
+        {subtitle && (
+          <div className="text-[11px] text-foreground/70 mt-0.5 truncate">{subtitle}</div>
+        )}
       </CardContent>
     </Card>
   );

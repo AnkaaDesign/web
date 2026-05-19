@@ -29,7 +29,7 @@ interface ScoreLevelPickerProps {
 // Background palette — must mirror score-badge.SCORE_CLASSES so the picker
 // cards and the row Nota badges use the SAME colour for the same score.
 const LEVEL_BG: Record<number, string> = {
-  0: "bg-neutral-900",
+  0: "bg-neutral-900 border border-red-500/70",
   1: "bg-red-700",
   2: "bg-orange-600",
   3: "bg-teal-700",

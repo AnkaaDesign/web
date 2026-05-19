@@ -228,6 +228,7 @@ export interface TaskPerformanceFilters {
   yAxisMode?: TaskPerformanceYAxisMode;
   compareMode?: TaskPerformanceCompareMode;
   positionStep?: number;
+  positionBase?: number;
 }
 
 // Per-PERIOD per-user attribution. Same shape returned inside every item
@@ -280,7 +281,7 @@ export interface TaskPerformanceSummary {
 export interface TaskPerformanceData {
   summary: TaskPerformanceSummary;
   items: TaskPerformanceItem[];
-  params: { positionStep: number };
+  params: { positionStep: number; positionBase: number };
 }
 
 export interface TaskPerformanceResponse {

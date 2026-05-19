@@ -360,7 +360,7 @@ export const SkillAssessmentCampaignPage = () => {
               <div className="flex items-center gap-2 px-3 py-2.5">
                 <Button
                   size="icon"
-                  variant="ghost"
+                  variant="default"
                   onClick={() => goToOffset(-1)}
                   aria-label="Tópico anterior"
                   className="h-8 w-8 shrink-0"
@@ -383,7 +383,7 @@ export const SkillAssessmentCampaignPage = () => {
                 </button>
                 <Button
                   size="icon"
-                  variant="ghost"
+                  variant="default"
                   onClick={() => goToOffset(1)}
                   aria-label="Próximo tópico"
                   className="h-8 w-8 shrink-0"

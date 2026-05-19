@@ -88,7 +88,6 @@ export const SkillAssessmentEditPage = () => {
           await openMutation.mutateAsync(id);
           toast.success("Campanha atualizada e aberta para coleta.");
         } catch (openErr) {
-          toast.error("Campanha atualizada, mas falhou ao abrir. Abra manualmente na página de detalhes.");
           if (process.env.NODE_ENV !== "production") console.error(openErr);
         }
       } else {
@@ -97,7 +96,6 @@ export const SkillAssessmentEditPage = () => {
 
       navigate(routes.administration.skillAssessment.details(id));
     } catch (err) {
-      toast.error("Erro ao atualizar campanha");
       if (process.env.NODE_ENV !== "production") console.error(err);
     }
   };

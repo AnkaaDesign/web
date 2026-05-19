@@ -27,7 +27,6 @@ export const SkillAssessmentCreatePage = () => {
           await openMutation.mutateAsync(newId);
           toast.success("Campanha criada e aberta para coleta.");
         } catch (openErr) {
-          toast.error("Campanha criada, mas falhou ao abrir. Abra manualmente na página de detalhes.");
           if (process.env.NODE_ENV !== "production") console.error(openErr);
         }
       } else {
@@ -40,7 +39,6 @@ export const SkillAssessmentCreatePage = () => {
         navigate(routes.administration.skillAssessment.root);
       }
     } catch (err) {
-      toast.error("Erro ao criar campanha");
       if (process.env.NODE_ENV !== "production") console.error(err);
     }
   };

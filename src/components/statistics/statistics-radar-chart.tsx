@@ -217,9 +217,9 @@ export const StatisticsRadarChart = forwardRef<
         shape,
         indicator: indicators.map(i => ({ name: i.name, max: i.max })),
         center: ['50%', '50%'],
-        // Slightly tighter than 68% so wrapped 3-line topic names don't get
-        // clipped against the container edge.
-        radius: '62%',
+        // Sized to fill the container while leaving room for wrapped 3-line
+        // axis labels. Tested up to 5 axes with long topic names.
+        radius: '82%',
         splitNumber: 5,
         axisName: {
           color: textColor,
@@ -242,12 +242,20 @@ export const StatisticsRadarChart = forwardRef<
           // Each data row = one series (rendered as a closed polygon).
           // Hidden series get rendered with empty array so the polygon vanishes
           // but the legend slot stays stable.
-          data: resolvedSeries.map(s => {
+          data: resolvedSeries.map((s, seriesIdx) => {
             const hidden = hiddenSeries.has(s.id);
             // Keep the original (possibly-null) values in closure so the per-
             // vertex label can render "—" for missing data — coercing nulls to
             // 0 here is only for polygon geometry, not for what we *show*.
             const originalValues = s.values;
+            // When 2+ polygons share a vertex, ECharts stacks all chip labels
+            // at the same anchor and they crowd. Stagger each series' label
+            // distance and position so they fan out from the vertex instead.
+            // Series 0 → 'top' (above the vertex), series 1 → 'bottom' (below),
+            // 2 → 'top' farther out, 3 → 'bottom' farther out, etc.
+            const labelPosition: 'top' | 'bottom' =
+              seriesIdx % 2 === 0 ? 'top' : 'bottom';
+            const labelDistance = 4 + Math.floor(seriesIdx / 2) * 10;
             return {
               name: s.name,
               value: hidden ? indicators.map(() => 0) : s.values.map(v => v ?? 0),
@@ -270,6 +278,8 @@ export const StatisticsRadarChart = forwardRef<
               // missing scores read as "—" rather than a misleading "0.00".
               label: {
                 show: !hidden && labelsEnabled,
+                position: labelPosition,
+                distance: labelDistance,
                 color: textColor,
                 fontSize: 10,
                 fontWeight: 600,
