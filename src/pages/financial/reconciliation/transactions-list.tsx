@@ -25,6 +25,7 @@ import {
   useBankTransactions,
   useIgnoreTransaction,
   useMatchTransaction,
+  useRunAutoMatch,
   useUnmatchTransaction,
 } from "@/hooks/financial/use-reconciliation";
 import { useUrlDialog } from "@/hooks/common/use-url-dialog";
@@ -107,6 +108,7 @@ export const ReconciliationTransactionsListPage = () => {
   const matchMut = useMatchTransaction();
   const unmatchMut = useUnmatchTransaction();
   const ignoreMut = useIgnoreTransaction();
+  const runMut = useRunAutoMatch();
 
   // If the user lands with ?txId=… we want the search/filter inputs to reflect
   // the current URL state — that's already covered by the initial state above.
@@ -179,6 +181,34 @@ export const ReconciliationTransactionsListPage = () => {
             { label: "Transações" },
           ]}
           actions={[
+            {
+              key: "rematch",
+              label: "Re-executar Conciliação",
+              icon: IconRefresh,
+              onClick: () => {
+                runMut.mutate(
+                  {},
+                  {
+                    onSuccess: r => {
+                      toast({
+                        title: "Conciliação reexecutada",
+                        description: `${r.matched} transação(ões) conciliada(s)`,
+                        variant: "success",
+                      });
+                      refetch();
+                    },
+                    onError: err =>
+                      toast({
+                        title: "Falha ao reexecutar conciliação",
+                        description: (err as Error).message,
+                        variant: "error",
+                      }),
+                  },
+                );
+              },
+              variant: "default" as const,
+              loading: runMut.isPending,
+            },
             {
               key: "refresh",
               label: "Atualizar",

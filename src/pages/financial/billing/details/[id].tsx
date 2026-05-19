@@ -499,41 +499,56 @@ export const BillingDetailPage = () => {
       }
 
       // 4. Update quote data
-      const quotePayload: any = {
-        expiresAt: formData.expiresAt,
-        subtotal: formData.subtotal,
-        total: formData.total,
-        guaranteeYears: formData.guaranteeYears,
-        customGuaranteeText: formData.customGuaranteeText,
-        customForecastDays: canSeeBudgetInfoStep ? formData.customForecastDays : undefined,
-        simultaneousTasks: canSeeBudgetInfoStep ? formData.simultaneousTasks : undefined,
-        layoutFileId: canSeeBudgetInfoStep ? layoutFileId : undefined,
-        services: formData.services
-          .filter((s: any) => s.description?.trim())
-          .map((s: any) => ({
-            ...(s.id && { id: s.id }),
-            description: s.description,
-            observation: s.observation || null,
-            amount: Number(s.amount) || 0,
-            invoiceToCustomerId: s.invoiceToCustomerId || null,
-          })),
-        customerConfigs: formData.customerConfigs.map((c: any) => ({
-          ...(c.id && { id: c.id }),
-          customerId: c.customerId,
-          subtotal: Number(c.subtotal) || 0,
-          total: Number(c.total) || 0,
-          discountType: c.discountType || "NONE",
-          discountValue: c.discountValue != null ? Number(c.discountValue) : null,
-          discountReference: c.discountReference || null,
-          paymentCondition: c.paymentCondition || null,
-          paymentConfig: c.paymentConfig ?? null,
-          customPaymentText: c.customPaymentText || null,
-          generateInvoice: c.generateInvoice !== false,
-          generateBankSlip: c.generateBankSlip !== false,
-          orderNumber: c.orderNumber || null,
-          responsibleId: c.responsibleId || null,
-        })),
-      };
+      // When the quote is post-billing-approval (locked), only send fields the backend allows
+      // editing on a locked quote. Sending billing-structural fields (subtotal, services,
+      // customerConfigs) would throw a 400 and prevent the status update from executing.
+      const BILLING_LOCKED_STATUSES = ["BILLING_APPROVED", "UPCOMING", "DUE", "PARTIAL", "SETTLED"];
+      const isQuoteLocked = quote.status && BILLING_LOCKED_STATUSES.includes(quote.status);
+
+      const quotePayload: any = isQuoteLocked
+        ? {
+            expiresAt: formData.expiresAt,
+            guaranteeYears: formData.guaranteeYears,
+            customGuaranteeText: formData.customGuaranteeText,
+            customForecastDays: canSeeBudgetInfoStep ? formData.customForecastDays : undefined,
+            simultaneousTasks: canSeeBudgetInfoStep ? formData.simultaneousTasks : undefined,
+            layoutFileId: canSeeBudgetInfoStep ? layoutFileId : undefined,
+          }
+        : {
+            expiresAt: formData.expiresAt,
+            subtotal: formData.subtotal,
+            total: formData.total,
+            guaranteeYears: formData.guaranteeYears,
+            customGuaranteeText: formData.customGuaranteeText,
+            customForecastDays: canSeeBudgetInfoStep ? formData.customForecastDays : undefined,
+            simultaneousTasks: canSeeBudgetInfoStep ? formData.simultaneousTasks : undefined,
+            layoutFileId: canSeeBudgetInfoStep ? layoutFileId : undefined,
+            services: formData.services
+              .filter((s: any) => s.description?.trim())
+              .map((s: any) => ({
+                ...(s.id && { id: s.id }),
+                description: s.description,
+                observation: s.observation || null,
+                amount: Number(s.amount) || 0,
+                invoiceToCustomerId: s.invoiceToCustomerId || null,
+              })),
+            customerConfigs: formData.customerConfigs.map((c: any) => ({
+              ...(c.id && { id: c.id }),
+              customerId: c.customerId,
+              subtotal: Number(c.subtotal) || 0,
+              total: Number(c.total) || 0,
+              discountType: c.discountType || "NONE",
+              discountValue: c.discountValue != null ? Number(c.discountValue) : null,
+              discountReference: c.discountReference || null,
+              paymentCondition: c.paymentCondition || null,
+              paymentConfig: c.paymentConfig ?? null,
+              customPaymentText: c.customPaymentText || null,
+              generateInvoice: c.generateInvoice !== false,
+              generateBankSlip: c.generateBankSlip !== false,
+              orderNumber: c.orderNumber || null,
+              responsibleId: c.responsibleId || null,
+            })),
+          };
 
       await taskQuoteService.update(quote.id, quotePayload);
 

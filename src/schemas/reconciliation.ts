@@ -52,16 +52,14 @@ export const xmlImportSchema = z.object({
     ),
 });
 
-export const rerunMatchingSchema = z
-  .object({
-    statementId: z.string().uuid().optional(),
-    transactionIds: z.array(z.string().uuid()).optional(),
-    dateStart: z.string().optional(),
-    dateEnd: z.string().optional(),
-  })
-  .refine(d => d.statementId || d.transactionIds?.length || d.dateStart || d.dateEnd, {
-    message: "Informe um escopo: extrato, transações selecionadas ou período",
-  });
+export const rerunMatchingSchema = z.object({
+  statementId: z.string().uuid().optional(),
+  transactionIds: z.array(z.string().uuid()).optional(),
+  dateStart: z.string().optional(),
+  dateEnd: z.string().optional(),
+  // Omit all fields to re-run against ALL UNMATCHED transactions.
+  runAll: z.boolean().optional(),
+});
 
 export type RerunMatchingPayload = z.infer<typeof rerunMatchingSchema>;
 
