@@ -89,7 +89,7 @@ export function BudgetTable({ className, searchingFor, filters }: BudgetTablePro
       where: {
         status: "COMPLETED",
         quote: {
-          is: { status: "PENDING" },
+          is: { status: { in: ["PENDING", "BUDGET_APPROVED", "COMMERCIAL_APPROVED"] } },
         },
       },
     };
@@ -107,9 +107,9 @@ export function BudgetTable({ className, searchingFor, filters }: BudgetTablePro
       params.where = {
         ...params.where,
         quote: {
-          ...params.where.quote,
-          customerConfigs: {
-            some: { customerId: filters.customerId },
+          is: {
+            status: { in: ["PENDING", "BUDGET_APPROVED", "COMMERCIAL_APPROVED"] },
+            customerConfigs: { some: { customerId: filters.customerId } },
           },
         },
       };
