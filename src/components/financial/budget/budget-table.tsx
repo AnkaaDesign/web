@@ -30,8 +30,11 @@ export function BudgetTable({ className, searchingFor, filters }: BudgetTablePro
     getSortOrder,
   } = useTableState({
     defaultPageSize: 40,
-    defaultSort: [{ column: "term", direction: "asc" }],
-    sortStorageKey: "budget-table-sort",
+    defaultSort: [
+      { column: "quote.statusOrder", direction: "asc" },
+      { column: "term", direction: "asc" },
+    ],
+    sortStorageKey: "budget-table-sort-v2",
     useUrlForSort: true,
   });
 
@@ -89,7 +92,7 @@ export function BudgetTable({ className, searchingFor, filters }: BudgetTablePro
       where: {
         status: "COMPLETED",
         quote: {
-          is: { status: "PENDING" },
+          is: { status: { in: ["PENDING", "BUDGET_APPROVED"] } },
         },
       },
     };

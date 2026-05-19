@@ -1561,11 +1561,36 @@ function buildQueryParams(
   };
 }
 
-function buildOrderBy(config: TaskTableConfig): Array<Record<string, "asc" | "desc">> {
-  if (config.sorts && config.sorts.length > 0) {
-    return config.sorts.map((s) => ({ [s.key]: s.direction }));
+// Column keys whose backing data lives on a related model — these need to be
+// expanded into nested Prisma orderBy clauses or Prisma silently ignores them.
+// (e.g. sorting by "quoteStatus" must hit `quote.statusOrder`, not a top-level
+// `quoteStatus` field that doesn't exist on Task.)
+const ORDER_BY_PATH_MAP: Partial<Record<ColumnKey, readonly string[]>> = {
+  quoteStatus: ["quote", "statusOrder"],
+  quoteTotal: ["quote", "total"],
+  customerName: ["customer", "fantasyName"],
+  sector: ["sector", "name"],
+  generalPainting: ["generalPainting", "name"],
+  plate: ["truck", "plate"],
+  chassisNumber: ["truck", "chassisNumber"],
+};
+
+function orderByEntry(key: string, direction: "asc" | "desc"): Record<string, any> {
+  const path = ORDER_BY_PATH_MAP[key as ColumnKey];
+  if (!path || path.length === 0) return { [key]: direction };
+  const last = path[path.length - 1];
+  let nested: Record<string, any> = { [last]: direction };
+  for (let i = path.length - 2; i >= 0; i--) {
+    nested = { [path[i]]: nested };
   }
-  return [{ [config.sort.key]: config.sort.direction }];
+  return nested;
+}
+
+function buildOrderBy(config: TaskTableConfig): Array<Record<string, any>> {
+  if (config.sorts && config.sorts.length > 0) {
+    return config.sorts.map((s) => orderByEntry(s.key, s.direction));
+  }
+  return [orderByEntry(config.sort.key, config.sort.direction)];
 }
 
 // ============================================================================
@@ -2122,7 +2147,7 @@ function TaskTableRender({
         </TabsContent>
       </Tabs>
     ) : (
-      tableBody
+      <div className="h-full min-h-0 overflow-auto">{tableBody}</div>
     );
 
   return (

@@ -86,6 +86,13 @@ export function BillingTable({ className, searchingFor, filters }: BillingTableP
                     corporateName: true,
                   },
                 },
+                installments: {
+                  select: {
+                    id: true,
+                    dueDate: true,
+                    status: true,
+                  },
+                },
               },
             },
           },

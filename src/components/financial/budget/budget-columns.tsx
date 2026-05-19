@@ -1,7 +1,9 @@
 import type { Task } from "@/types";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
+import { QuoteStatusBadge } from "@/components/production/task/quote/quote-status-badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { formatDate, formatCurrency } from "@/utils";
+import type { TASK_QUOTE_STATUS } from "@/types/task-quote";
 
 const renderDate = (date: Date | string | null | undefined) => {
   if (!date) return <span className="text-muted-foreground">-</span>;
@@ -87,6 +89,19 @@ export function createBudgetColumns(): StandardizedColumn<Task>[] {
             {formatCurrency(Number(total))}
           </span>
         );
+      },
+    },
+    {
+      key: "quote.statusOrder",
+      header: "STATUS",
+      sortable: true,
+      width: "10%",
+      render: (task) => {
+        const status = task.quote?.status;
+        if (status !== "PENDING" && status !== "BUDGET_APPROVED") {
+          return <span className="text-muted-foreground">-</span>;
+        }
+        return <QuoteStatusBadge status={status as TASK_QUOTE_STATUS} size="sm" />;
       },
     },
   ];

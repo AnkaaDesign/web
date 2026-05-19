@@ -10,6 +10,23 @@ const renderDate = (date: Date | string | null | undefined) => {
   return <span className="whitespace-nowrap">{formatDate(date)}</span>;
 };
 
+const findCurrentInstallmentDueDate = (task: Task): Date | null => {
+  const configs = task.quote?.customerConfigs;
+  if (!configs || configs.length === 0) return null;
+  let earliest: Date | null = null;
+  for (const config of configs) {
+    for (const installment of config.installments || []) {
+      if (installment.status !== "OVERDUE" && installment.status !== "PENDING") continue;
+      const due = installment.dueDate ? new Date(installment.dueDate) : null;
+      if (!due) continue;
+      if (!earliest || due.getTime() < earliest.getTime()) {
+        earliest = due;
+      }
+    }
+  }
+  return earliest;
+};
+
 export function createBillingColumns(): StandardizedColumn<Task>[] {
   return [
     {
@@ -82,6 +99,16 @@ export function createBillingColumns(): StandardizedColumn<Task>[] {
             {formatCurrency(Number(total))}
           </span>
         );
+      },
+    },
+    {
+      key: "currentInstallmentDueDate",
+      header: "VENCIMENTO",
+      sortable: false,
+      width: "9%",
+      render: (task) => {
+        if (task.quote?.status !== "DUE") return <span className="text-muted-foreground">-</span>;
+        return renderDate(findCurrentInstallmentDueDate(task));
       },
     },
     {
