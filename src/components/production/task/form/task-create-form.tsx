@@ -121,8 +121,8 @@ export const TaskCreateForm = () => {
         {
           description: "Em Negociação",
           type: SERVICE_ORDER_TYPE.COMMERCIAL,
-          status: SERVICE_ORDER_STATUS.PENDING,
-          statusOrder: 1,
+          status: SERVICE_ORDER_STATUS.IN_PROGRESS,
+          statusOrder: 2,
           assignedToId: null,
         },
         {
@@ -407,7 +407,7 @@ export const TaskCreateForm = () => {
               status: so.status || SERVICE_ORDER_STATUS.PENDING,
               statusOrder: so.statusOrder || 1,
               assignedToId: so.assignedToId || null,
-
+              startedAt: so.status === SERVICE_ORDER_STATUS.IN_PROGRESS ? new Date() : null,
             })) : undefined,
             ...additionalData,
           } as TaskCreateFormData;

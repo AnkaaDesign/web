@@ -23,6 +23,8 @@ import {
   IconClipboardList,
   IconFlag3,
   IconLayoutGrid,
+  IconLoader2,
+  IconMessage2,
   IconNotes,
 } from "@tabler/icons-react";
 
@@ -31,6 +33,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/sonner";
 
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
@@ -466,6 +469,46 @@ export const SkillAssessmentCampaignPage = () => {
                 />
               </div>
             </div>
+
+            {/* Justificativa — per (evaluatee, topic) free-text note */}
+            {activeTopic && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <IconMessage2 className="h-4 w-4 text-muted-foreground" />
+                    Justificativa
+                    {activeEntry?.evaluatee?.name && (
+                      <span className="text-xs font-normal text-muted-foreground">
+                        · {activeEntry.evaluatee.name}
+                      </span>
+                    )}
+                    {cell.isSaving && (
+                      <span className="ml-auto flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                        <IconLoader2 className="h-3 w-3 animate-spin" />
+                        Salvando…
+                      </span>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    placeholder={
+                      !activeEntry
+                        ? "Selecione um avaliado para escrever uma justificativa."
+                        : activeIsReadOnly
+                          ? "Esta avaliação foi enviada e não pode ser editada."
+                          : pickerCurrentScore == null
+                            ? "Selecione uma nota para registrar uma justificativa (opcional)."
+                            : "Descreva o porquê da nota atribuída (opcional)."
+                    }
+                    value={cell.justification}
+                    onChange={(e) => cell.setJustification(e.target.value)}
+                    disabled={!activeEntry || activeIsReadOnly}
+                    rows={4}
+                  />
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
       </div>
