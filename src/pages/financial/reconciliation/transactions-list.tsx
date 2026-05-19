@@ -26,6 +26,7 @@ import {
   useBankTransactions,
   useIgnoreTransaction,
   useMatchTransaction,
+  useRunAutoMatch,
   useUnmatchTransaction,
 } from "@/hooks/financial/use-reconciliation";
 import { useUrlDialog } from "@/hooks/common/use-url-dialog";
@@ -193,6 +194,7 @@ export const ReconciliationTransactionsListPage = () => {
   const matchMut = useMatchTransaction();
   const unmatchMut = useUnmatchTransaction();
   const ignoreMut = useIgnoreTransaction();
+  const runMut = useRunAutoMatch();
 
   // Keep the search query in the URL for shareability. Avoid writing when
   // nothing changed to prevent render loops.
@@ -284,11 +286,39 @@ export const ReconciliationTransactionsListPage = () => {
           ]}
           actions={[
             {
+              key: "rematch",
+              label: "Re-executar Conciliação",
+              icon: IconRefresh,
+              onClick: () => {
+                runMut.mutate(
+                  {},
+                  {
+                    onSuccess: r => {
+                      toast({
+                        title: "Conciliação reexecutada",
+                        description: `${r.matched} transação(ões) conciliada(s)`,
+                        variant: "success",
+                      });
+                      refetch();
+                    },
+                    onError: err =>
+                      toast({
+                        title: "Falha ao reexecutar conciliação",
+                        description: (err as Error).message,
+                        variant: "error",
+                      }),
+                  },
+                );
+              },
+              variant: "default" as const,
+              loading: runMut.isPending,
+            },
+            {
               key: "import",
               label: "Importar OFX",
               icon: IconUpload,
               onClick: () => setImportOpen(true),
-              variant: "default" as const,
+              variant: "outline" as const,
             },
             {
               key: "refresh",
