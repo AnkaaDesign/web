@@ -1069,6 +1069,7 @@ const taskServiceOrderCreateSchema = z.object({
       SERVICE_ORDER_STATUS.COMPLETED,
       SERVICE_ORDER_STATUS.CANCELLED,
       SERVICE_ORDER_STATUS.WAITING_APPROVE,
+      SERVICE_ORDER_STATUS.WAITING_ARTWORK,
     ] as [string, ...string[]], {
       errorMap: () => ({ message: "Selecione um status válido" }),
     })

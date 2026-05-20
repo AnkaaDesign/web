@@ -189,11 +189,18 @@ export function TaskHistoryContextMenu({
 
   const handleEdit = () => {
     if (taskIds.length === 1) {
-      const editRoute =
-        navigationRoute === 'preparation' ? routes.production.preparation.edit(taskIds[0]) :
-        navigationRoute === 'history' ? routes.production.history.edit(taskIds[0]) :
-        routes.production.schedule.edit(taskIds[0]);
-      navigate(editRoute);
+      if (isCommercial) {
+        const quoteRoute = isTaskQuoteBillingPhase(task?.quote?.status)
+          ? routes.financial.billing.details(taskIds[0])
+          : routes.financial.budget.details(taskIds[0]);
+        navigate(quoteRoute);
+      } else {
+        const editRoute =
+          navigationRoute === 'preparation' ? routes.production.preparation.edit(taskIds[0]) :
+          navigationRoute === 'history' ? routes.production.history.edit(taskIds[0]) :
+          routes.production.schedule.edit(taskIds[0]);
+        navigate(editRoute);
+      }
     } else if (taskIds.length > 1) {
       // Navigate to batch edit page if available
       const ids = taskIds.join(",");

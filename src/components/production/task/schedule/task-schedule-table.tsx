@@ -436,7 +436,14 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
 
         case "edit":
           if (tasks.length === 1) {
-            navigate(routes.production.schedule.edit(tasks[0].id));
+            if (user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL) {
+              const quoteRoute = isTaskQuoteBillingPhase(tasks[0].quote?.status)
+                ? routes.financial.billing.details(tasks[0].id)
+                : routes.financial.budget.details(tasks[0].id);
+              navigate(quoteRoute);
+            } else {
+              navigate(routes.production.schedule.edit(tasks[0].id));
+            }
           } else {
             // Batch edit
             const ids = tasks.map((t) => t.id).join(",");

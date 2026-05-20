@@ -39,12 +39,14 @@ import type { TASK_QUOTE_STATUS, TaskQuote } from "@/types/task-quote";
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "PENDING", label: "Pendente" },
   { value: "BUDGET_APPROVED", label: "Orçamento Aprovado" },
+  { value: "COMMERCIAL_APPROVED", label: "Aprovado pelo Comercial" },
 ];
 
 const getStatusTriggerClass = (status: string) => {
   const map: Record<string, string> = {
     PENDING: "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600",
     BUDGET_APPROVED: "bg-green-700 text-white hover:bg-green-800 border-green-800",
+    COMMERCIAL_APPROVED: "bg-blue-700 text-white hover:bg-blue-800 border-blue-800",
   };
   return map[status] || "";
 };
