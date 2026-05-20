@@ -583,8 +583,10 @@ export const FinancialBudgetDetailPage = () => {
         }
       }
 
-      // 2. Upload new layout files
-      let layoutFileId = data.layoutFileId;
+      // 2. Resolve layoutFileId from the current layoutFiles state — NOT from
+      // form.data.layoutFileId, which isn't updated when the user removes the
+      // file via the upload widget. Empty layoutFiles ⇒ null ⇒ backend disconnects.
+      let layoutFileId: string | null = null;
       const newLayoutFiles = layoutFiles.filter((f) => !f.uploaded);
       if (newLayoutFiles.length > 0) {
         try {
@@ -597,6 +599,9 @@ export const FinancialBudgetDetailPage = () => {
         } catch (error: any) {
           toast.error(`Erro ao enviar layout: ${error.message}`);
         }
+      } else if (layoutFiles.length > 0) {
+        // Pre-existing layout, no new upload — preserve the connection.
+        layoutFileId = (layoutFiles[0] as any).uploadedFileId || layoutFiles[0].id || null;
       }
 
       // 3. Build responsible data
@@ -725,10 +730,36 @@ export const FinancialBudgetDetailPage = () => {
       };
 
       if (existingQuote?.id) {
-        await updateQuoteMutation.mutateAsync({
-          id: existingQuote.id,
-          data: quoteData,
-        });
+        // Short-circuit: skip the quote update entirely when no quote-form
+        // field is dirty. Prevents Task-only edits (e.g. truck plate) from
+        // round-tripping through the quote endpoint. The API also filters
+        // no-ops defensively, but skipping the call is cheaper.
+        const dirty = form.formState.dirtyFields as Record<string, unknown>;
+        const newLayoutUploaded = newLayoutFiles.length > 0;
+        // Detect layout removal: had a layoutFile before, none now.
+        const layoutRemoved =
+          !!existingQuote.layoutFileId && layoutFiles.length === 0;
+        const quoteFieldDirty =
+          newLayoutUploaded ||
+          layoutRemoved ||
+          Boolean(
+            dirty.expiresAt ||
+              dirty.subtotal ||
+              dirty.total ||
+              dirty.guaranteeYears ||
+              dirty.customGuaranteeText ||
+              dirty.customForecastDays ||
+              dirty.layoutFileId ||
+              dirty.simultaneousTasks ||
+              dirty.customerConfigs ||
+              dirty.services,
+          );
+        if (quoteFieldDirty) {
+          await updateQuoteMutation.mutateAsync({
+            id: existingQuote.id,
+            data: quoteData,
+          });
+        }
       } else {
         quoteData.status = "PENDING";
         await createQuoteMutation.mutateAsync(quoteData);

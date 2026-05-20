@@ -639,13 +639,27 @@ export const topicBatchDeleteSchema = z.object({
 // CRUD: Assessment
 // =====================
 
+export const assessmentSectorConfigSchema = z
+  .object({
+    sectorId: z.string().uuid(),
+    appraiserId: z.string().uuid().nullable().optional(),
+    evaluateeIds: z.array(z.string().uuid()).default([]),
+  })
+  .refine(
+    (d) => !d.appraiserId || !d.evaluateeIds.includes(d.appraiserId),
+    {
+      message: "O avaliador não pode estar na lista de avaliados do mesmo setor",
+      path: ["evaluateeIds"],
+    },
+  );
+
 export const assessmentCreateSchema = z
   .object({
     name: z.string().min(1, "Nome é obrigatório").max(200),
     description: z.string().max(2000).nullable().optional(),
     periodStart: z.coerce.date(),
     periodEnd: z.coerce.date(),
-    sectorIds: z.array(z.string().uuid()).min(1, "Selecione ao menos um setor"),
+    sectors: z.array(assessmentSectorConfigSchema).min(1, "Selecione ao menos um setor"),
     topicIds: z.array(z.string().uuid()).optional(),
     skillIds: z.array(z.string().uuid()).optional(),
   })
@@ -664,7 +678,7 @@ export const assessmentUpdateSchema = z
     description: z.string().max(2000).nullable().optional(),
     periodStart: z.coerce.date().optional(),
     periodEnd: z.coerce.date().optional(),
-    sectorIds: z.array(z.string().uuid()).min(1).optional(),
+    sectors: z.array(assessmentSectorConfigSchema).min(1).optional(),
     topicIds: z.array(z.string().uuid()).optional(),
     skillIds: z.array(z.string().uuid()).optional(),
   })

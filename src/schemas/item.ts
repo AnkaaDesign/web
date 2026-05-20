@@ -1387,6 +1387,7 @@ const itemFilters = {
 
   // Measure filters (handled through measures relation)
   hasMeasures: z.boolean().optional(),
+  hasMultipleMeasures: z.boolean().optional(),
 };
 
 const itemBrandFilters = {
@@ -1769,6 +1770,15 @@ const itemTransform = (data: any) => {
   } else if (data.where && data.where.hasMeasures === false) {
     andConditions.push({ measures: { none: {} } });
     delete data.where.hasMeasures;
+  }
+
+  // hasMultipleMeasures filter - handled in service layer (needs count aggregation)
+  // This filter requires checking if measures count > 1, which needs to be done
+  // at the service/database level with proper aggregation
+  if (data.hasMultipleMeasures === true) {
+    delete data.hasMultipleMeasures;
+  } else if (data.hasMultipleMeasures === false) {
+    delete data.hasMultipleMeasures;
   }
 
   // Date filters

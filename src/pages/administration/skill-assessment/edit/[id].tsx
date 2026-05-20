@@ -19,7 +19,7 @@ export const SkillAssessmentEditPage = () => {
 
   const { data, isLoading, error } = useAssessment(id ?? "", {
     include: {
-      sectors: true,
+      sectors: { include: { evaluatees: true } },
       topics: true,
     } as any,
   } as any);

@@ -13,7 +13,6 @@ import {
   IconLoader2,
   IconLock,
   IconNotes,
-  IconRefresh,
   IconTrash,
   IconUser,
   IconX,
@@ -55,10 +54,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { EntriesTable } from "@/components/administration/skill-assessment/entries-table";
+import { EntriesTable, type PlannedEntry } from "@/components/administration/skill-assessment/entries-table";
 import { usePageTracker } from "@/hooks/common/use-page-tracker";
 import { toast } from "@/components/ui/sonner";
 
+/**
+ * Flatten the AssessmentSector + evaluatees graph into one pseudo-entry per
+ * evaluatee. Used to populate the Avaliações list while the campaign is still
+ * in DRAFT (real AssessmentEntry rows only exist after open).
+ */
+function buildPlannedEntries(assessment: any): PlannedEntry[] {
+  const rows: PlannedEntry[] = [];
+  for (const cfg of assessment?.sectors ?? []) {
+    const appraiser = cfg.appraiser ?? cfg.sector?.leader ?? null;
+    for (const ev of cfg.evaluatees ?? []) {
+      const user = ev.user;
+      if (!user) continue;
+      rows.push({
+        id: `${cfg.sectorId}:${user.id}`,
+        evaluatee: user,
+        evaluator: appraiser,
+        sectorName: cfg.sector?.name,
+      });
+    }
+  }
+  return rows;
+}
 
 export const SkillAssessmentDetailsPage = () => {
   usePageTracker({ title: "Detalhes da Campanha", icon: "clipboard-list" });
@@ -72,10 +93,21 @@ export const SkillAssessmentDetailsPage = () => {
   const closeMut = useCloseAssessment();
   const cancelMut = useCancelAssessment();
 
-  const { data, isLoading, error, refetch, isRefetching } = useAssessment(id ?? "", {
+  const { data, isLoading, error } = useAssessment(id ?? "", {
     include: {
       createdBy: true,
-      sectors: { include: { sector: true } },
+      sectors: {
+        include: {
+          sector: { include: { leader: true } },
+          appraiser: true,
+          evaluatees: {
+            include: {
+              user: { include: { position: true, sector: true } },
+            },
+          },
+          _count: { select: { evaluatees: true } },
+        },
+      },
       skills: { include: { skill: true } },
       topics: { include: { topic: { include: { skill: true } } } },
       _count: { select: { sectors: true, topics: true, entries: true } },
@@ -130,6 +162,17 @@ export const SkillAssessmentDetailsPage = () => {
   const status = assessment.status as ASSESSMENT_STATUS;
   const canEdit = status === ASSESSMENT_STATUS.DRAFT;
   const topicsCount = assessment._count?.topics ?? assessment.topics?.length ?? 0;
+  // In DRAFT, entries don't exist yet — show the planned evaluatee count from
+  // the per-sector configuration. After OPEN, the entries are the source of truth.
+  // Using `_count.evaluatees` keeps the payload small (no full user records).
+  const plannedEvaluateeCount = (assessment.sectors ?? []).reduce(
+    (sum: number, s: any) => sum + (s._count?.evaluatees ?? s.evaluatees?.length ?? 0),
+    0,
+  );
+  const evaluateesCount =
+    status === ASSESSMENT_STATUS.DRAFT
+      ? plannedEvaluateeCount
+      : (assessment._count?.entries ?? plannedEvaluateeCount);
 
   const handleDelete = async () => {
     try {
@@ -193,7 +236,6 @@ export const SkillAssessmentDetailsPage = () => {
             { label: assessment.name },
           ]}
           actions={[
-            { key: "refresh", label: "Atualizar", icon: IconRefresh, onClick: () => refetch(), loading: isRefetching },
             ...(canEdit
               ? [{ key: "edit", label: "Editar", icon: IconEdit, onClick: () => navigate(routes.administration.skillAssessment.edit(id)) }]
               : []),
@@ -219,9 +261,9 @@ export const SkillAssessmentDetailsPage = () => {
                   loading: cancelMut.isPending,
                 }]
               : []),
-            // Delete is only allowed by the API on DRAFT or CANCELLED campaigns —
-            // hide the button in OPEN/CLOSED to avoid offering an action that would always 400.
-            ...(status === ASSESSMENT_STATUS.DRAFT || status === ASSESSMENT_STATUS.CANCELLED
+            // Only CANCELLED campaigns can be deleted — DRAFT must be cancelled
+            // first. This prevents accidental destruction of in-progress work.
+            ...(status === ASSESSMENT_STATUS.CANCELLED
               ? [{
                   key: "delete",
                   label: "Excluir",
@@ -268,9 +310,7 @@ export const SkillAssessmentDetailsPage = () => {
                       icon={IconUser}
                       label="Avaliados"
                       value={
-                        <span className="tabular-nums">
-                          {assessment._count?.entries ?? 0}
-                        </span>
+                        <span className="tabular-nums">{evaluateesCount}</span>
                       }
                     />
                     <DetailRow
@@ -388,7 +428,15 @@ export const SkillAssessmentDetailsPage = () => {
               </Card>
             </div>
 
-            <EntriesTable assessmentId={id} topicsCount={topicsCount} />
+            <EntriesTable
+              assessmentId={id}
+              topicsCount={topicsCount}
+              plannedEntries={
+                status === ASSESSMENT_STATUS.DRAFT
+                  ? buildPlannedEntries(assessment)
+                  : undefined
+              }
+            />
           </div>
         </div>
 

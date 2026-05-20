@@ -1838,7 +1838,9 @@ export const TaskDetailsPage = () => {
                     },
                   ]
                 : []),
-              ...(canEdit && task.status === TASK_STATUS.PREPARATION
+              ...(canEdit
+                && task.status === TASK_STATUS.PREPARATION
+                && userSectorPrivilege !== SECTOR_PRIVILEGES.COMMERCIAL
                 ? [
                     {
                       key: "resume",
@@ -1867,9 +1869,20 @@ export const TaskDetailsPage = () => {
                 key: "edit",
                 label: "Editar",
                 icon: IconEdit,
-                onClick: () => navigate(breadcrumbConfig.editRoute(task.id), {
-                  state: taskIds ? { taskIds } : undefined,
-                }),
+                onClick: () => {
+                  // Commercial users edit the quote, not the task itself — quote editing is their primary workflow.
+                  if (userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL && task.quote) {
+                    navigate(
+                      isTaskQuoteBillingPhase(task.quote.status)
+                        ? routes.financial.billing.details(task.id)
+                        : routes.financial.budget.details(task.id)
+                    );
+                    return;
+                  }
+                  navigate(breadcrumbConfig.editRoute(task.id), {
+                    state: taskIds ? { taskIds } : undefined,
+                  });
+                },
               }] : []),
             ]}
           className="flex-shrink-0"
@@ -2266,7 +2279,7 @@ export const TaskDetailsPage = () => {
                             <IconLayoutGrid className="h-4 w-4" />
                             Visualizar
                           </Button>
-                          {canEditQuoteSection && (
+                          {canEditQuoteSection && userSectorPrivilege !== SECTOR_PRIVILEGES.COMMERCIAL && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -3246,6 +3259,8 @@ export const TaskDetailsPage = () => {
                           const isDesignerUser = userSectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
                           const isAdminUser = userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
                           const currentSOStatus = serviceOrder.status as SERVICE_ORDER_STATUS | null;
+                          // "Em Negociação" (Commercial) auto-completes when the task quote is approved — hide manual Concluir.
+                          const isAutoCompletingTask = serviceOrder.type === SERVICE_ORDER_TYPE.COMMERCIAL && serviceOrder.description === 'Em Negociação';
 
                           // State-machine: options depend on current status; current state keeps its name, transitions use action verbs.
                           const statusOptions: ComboboxOption[] = [];
@@ -3268,7 +3283,7 @@ export const TaskDetailsPage = () => {
                             if (isArtworkServiceOrder) {
                               statusOptions.push({ value: SERVICE_ORDER_STATUS.WAITING_APPROVE, label: "Enviar para Aprovação" });
                             }
-                            if (!(isArtworkServiceOrder && isDesignerUser)) {
+                            if (!(isArtworkServiceOrder && isDesignerUser) && !isAutoCompletingTask) {
                               statusOptions.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" });
                             }
                             if (isAdminUser) {
@@ -3282,8 +3297,28 @@ export const TaskDetailsPage = () => {
                             statusOptions.push(
                               { value: SERVICE_ORDER_STATUS.PAUSED, label: "Pausado" },
                               { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: "Continuar" },
-                              { value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" },
                             );
+                            if (!isAutoCompletingTask) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" });
+                            }
+                            if (isAdminUser) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.PENDING, label: "Voltar para Pendente" });
+                            }
+                            if (canCancelServiceOrder(userSectorPrivilege)) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.CANCELLED, label: "Cancelar" });
+                            }
+                          } else if (currentSOStatus === SERVICE_ORDER_STATUS.WAITING_ARTWORK) {
+                            // Aguardando Arte → auto-set by Em Negociação sync. Auto-clears when artwork is uploaded.
+                            // For Em Negociação specifically: NEVER offer Concluir — completion is driven by
+                            // artwork-upload, not by hand. Pausar / Voltar para Pendente / Cancelar follow the
+                            // same gating as the IN_PROGRESS branch.
+                            statusOptions.push(
+                              { value: SERVICE_ORDER_STATUS.WAITING_ARTWORK, label: "Aguardando Arte" },
+                              { value: SERVICE_ORDER_STATUS.PAUSED, label: "Pausar" },
+                            );
+                            if (!isAutoCompletingTask) {
+                              statusOptions.push({ value: SERVICE_ORDER_STATUS.COMPLETED, label: "Concluir" });
+                            }
                             if (isAdminUser) {
                               statusOptions.push({ value: SERVICE_ORDER_STATUS.PENDING, label: "Voltar para Pendente" });
                             }
@@ -3338,6 +3373,7 @@ export const TaskDetailsPage = () => {
                               case SERVICE_ORDER_STATUS.PAUSED:
                                 return "bg-yellow-500 text-white hover:bg-yellow-600 border-yellow-600";
                               case SERVICE_ORDER_STATUS.WAITING_APPROVE:
+                              case SERVICE_ORDER_STATUS.WAITING_ARTWORK:
                                 return "bg-purple-600 text-white hover:bg-purple-700 border-purple-700";
                               case SERVICE_ORDER_STATUS.COMPLETED:
                                 return "bg-green-700 text-white hover:bg-green-800 border-green-800";

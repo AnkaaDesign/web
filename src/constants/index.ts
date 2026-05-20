@@ -5,7 +5,6 @@ export * from "./secullum-justifications";
 export * from "./sortOrders";
 export * from "./brazil";
 export * from "./navigation";
-export * from "./stock-thresholds";
 export * from "./badge-colors";
 export * from "./deployment-labels";
 export * from "./deployment-sort-orders";

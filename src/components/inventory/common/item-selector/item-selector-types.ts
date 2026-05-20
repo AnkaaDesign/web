@@ -151,6 +151,12 @@ export interface ItemSelectorTableProps {
   /** Handler for filter changes */
   onFiltersChange?: (filters: Partial<ItemGetManyFormData>) => void;
 
+  // Extra context for column accessors that need values from the parent form
+  // (e.g. order-schedule preview column needs the selected frequency's cycle
+  // days to compute the estimated quantity).
+  /** Cycle length in days — enables the "QTD. POR CICLO (ESTIMADA)" column */
+  cycleDays?: number;
+
   // Temporary items support — when these props are passed in, the selector
   // shows a sticky first-row form for adding free-text items to the order
   // alongside inventory selections.

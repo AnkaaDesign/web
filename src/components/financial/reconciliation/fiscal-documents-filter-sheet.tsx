@@ -9,8 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Combobox } from "@/components/ui/combobox";
-import { DateTimeInput } from "@/components/ui/date-time-input";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import {
   IconFilter,
@@ -23,24 +22,54 @@ import type {
   FiscalDocType,
   FiscalDocumentStatus,
   OperationType,
-  FiscalDocumentFilters,
 } from "@/types/reconciliation";
 
-type SubsetFilters = Pick<
-  FiscalDocumentFilters,
-  | "docType"
-  | "operationType"
-  | "status"
-  | "dateFrom"
-  | "dateTo"
-  | "valueMin"
-  | "valueMax"
-  | "emitCnpj"
-  | "destCnpj"
-  | "hasMatch"
->;
+export interface FiscalDocumentsFiltersUi {
+  docType?: FiscalDocType;
+  operationType?: OperationType;
+  status?: FiscalDocumentStatus;
+  valueMin?: number;
+  valueMax?: number;
+  emitCnpj?: string;
+  destCnpj?: string;
+  hasMatch?: boolean;
+  /** Period (year + selected months). Mirrors the transactions page. */
+  year?: number;
+  months?: string[];
+}
 
-export const defaultFiscalDocumentsFilters: SubsetFilters = {};
+// Keep a type alias so the page file can stay shorter.
+type SubsetFilters = FiscalDocumentsFiltersUi;
+
+/**
+ * Default to the current period — the accordion needs a period to enumerate
+ * dates against.
+ */
+export function getDefaultFiscalDocumentsFilters(): FiscalDocumentsFiltersUi {
+  const now = new Date();
+  return {
+    year: now.getFullYear(),
+    months: [String(now.getMonth() + 1).padStart(2, "0")],
+  };
+}
+
+export const defaultFiscalDocumentsFilters: FiscalDocumentsFiltersUi =
+  getDefaultFiscalDocumentsFilters();
+
+const MONTH_OPTIONS = [
+  { value: "01", label: "Janeiro" },
+  { value: "02", label: "Fevereiro" },
+  { value: "03", label: "Março" },
+  { value: "04", label: "Abril" },
+  { value: "05", label: "Maio" },
+  { value: "06", label: "Junho" },
+  { value: "07", label: "Julho" },
+  { value: "08", label: "Agosto" },
+  { value: "09", label: "Setembro" },
+  { value: "10", label: "Outubro" },
+  { value: "11", label: "Novembro" },
+  { value: "12", label: "Dezembro" },
+];
 
 const DOC_TYPE_OPTIONS = [
   { value: "all", label: "Todos" },
@@ -85,13 +114,28 @@ export function FiscalDocumentsFilterSheet({ open, onOpenChange, filters, onAppl
     if (open) setLocal(filters);
   }, [open, filters]);
 
+  const yearOptions = useMemo<ComboboxOption[]>(() => {
+    const out: ComboboxOption[] = [];
+    const currentYear = new Date().getFullYear();
+    for (let i = 0; i <= 3; i++) {
+      const y = currentYear - i;
+      out.push({ value: y.toString(), label: y.toString() });
+    }
+    return out;
+  }, []);
+
   const activeCount = useMemo(() => {
+    const def = getDefaultFiscalDocumentsFilters();
     let c = 0;
     if (local.docType) c++;
     if (local.operationType) c++;
     if (local.status) c++;
-    if (local.dateFrom) c++;
-    if (local.dateTo) c++;
+    if (local.year && local.year !== def.year) c++;
+    if (
+      local.months &&
+      (local.months.length !== 1 || local.months[0] !== def.months?.[0])
+    )
+      c++;
     if (local.valueMin !== undefined) c++;
     if (local.valueMax !== undefined) c++;
     if (local.emitCnpj) c++;
@@ -105,7 +149,7 @@ export function FiscalDocumentsFilterSheet({ open, onOpenChange, filters, onAppl
     onOpenChange(false);
   };
   const handleReset = () => {
-    onApply(defaultFiscalDocumentsFilters);
+    onApply(getDefaultFiscalDocumentsFilters());
     onOpenChange(false);
   };
 
@@ -131,6 +175,58 @@ export function FiscalDocumentsFilterSheet({ open, onOpenChange, filters, onAppl
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
+          {/* Period — year + months, same workflow as the transactions page. */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <IconCalendar className="h-4 w-4" />
+              Período
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-1">
+                <Label className="text-xs text-muted-foreground mb-1 block">Ano</Label>
+                <Combobox
+                  value={local.year?.toString() || ""}
+                  onValueChange={value => {
+                    const year = Array.isArray(value) ? value[0] : value;
+                    const newYear = year ? parseInt(year) : undefined;
+                    setLocal(s => ({
+                      ...s,
+                      year: newYear,
+                      months: newYear ? s.months : undefined,
+                    }));
+                  }}
+                  options={yearOptions}
+                  placeholder="Ano..."
+                  searchable={false}
+                  clearable={false}
+                />
+              </div>
+              <div className="col-span-2">
+                <Label className="text-xs text-muted-foreground mb-1 block">Meses</Label>
+                <Combobox
+                  mode="multiple"
+                  value={local.months || []}
+                  onValueChange={value => {
+                    const months = Array.isArray(value)
+                      ? value
+                      : value
+                        ? [value]
+                        : undefined;
+                    setLocal(s => ({ ...s, months }));
+                  }}
+                  options={MONTH_OPTIONS}
+                  placeholder={local.year ? "Selecione os meses..." : "Selecione um ano primeiro"}
+                  searchPlaceholder="Buscar meses..."
+                  emptyText="Nenhum mês encontrado"
+                  disabled={!local.year}
+                  searchable={true}
+                  clearable={false}
+                  hideDefaultBadges={true}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Tipo</Label>
@@ -226,47 +322,6 @@ export function FiscalDocumentsFilterSheet({ open, onOpenChange, filters, onAppl
                     }))
                   }
                   placeholder="Somente dígitos"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <IconCalendar className="h-4 w-4" />
-              Período de emissão
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
-                <DateTimeInput
-                  mode="date"
-                  value={local.dateFrom ? new Date(local.dateFrom) : undefined}
-                  onChange={d => {
-                    const date = d && typeof d === "object" && "from" in d ? d.from : (d as Date | undefined);
-                    setLocal(s => ({
-                      ...s,
-                      dateFrom: date ? date.toISOString().slice(0, 10) : undefined,
-                    }));
-                  }}
-                  hideLabel
-                  placeholder="Data inicial..."
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
-                <DateTimeInput
-                  mode="date"
-                  value={local.dateTo ? new Date(local.dateTo) : undefined}
-                  onChange={d => {
-                    const date = d && typeof d === "object" && "from" in d ? d.to : (d as Date | undefined);
-                    setLocal(s => ({
-                      ...s,
-                      dateTo: date ? date.toISOString().slice(0, 10) : undefined,
-                    }));
-                  }}
-                  hideLabel
-                  placeholder="Data final..."
                 />
               </div>
             </div>

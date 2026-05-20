@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconChartBar, IconSquareArrowUpFilled, IconSquareArrowDownFilled, IconCurrencyDollar, IconActivity, IconAlertTriangle, IconTags } from "@tabler/icons-react";
+import { IconChartBar, IconSquareArrowUpFilled, IconSquareArrowDownFilled, IconCurrencyDollar, IconActivity, IconAlertTriangle, IconTags, IconArrowsExchange } from "@tabler/icons-react";
 import type { Item } from "../../../../types";
 import { formatCurrency, determineStockLevel, getStockLevelMessage } from "../../../../utils";
 import { STOCK_LEVEL_LABELS, ORDER_STATUS, ABC_CATEGORY_LABELS, XYZ_CATEGORY_LABELS, ACTIVITY_OPERATION, STOCK_LEVEL } from "../../../../constants";
@@ -36,6 +36,17 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
 
     const stockMessage = getStockLevelMessage(stockLevel, item.quantity || 0, item.reorderPoint || null);
 
+    // Borrowed quantity (algorithm-spec §13) — prefer summing open borrow quantities
+    // when the borrows relation is included; fall back to the relation count.
+    const openBorrows = (item.borrows || []).filter((b) => b.returnedAt == null);
+    const hasBorrowsRelation = Array.isArray(item.borrows);
+    const borrowedQuantity = hasBorrowsRelation
+      ? openBorrows.reduce((sum, b) => sum + (b.quantity || 0), 0)
+      : 0;
+    const borrowedItemsCount = hasBorrowsRelation
+      ? openBorrows.length
+      : ((item as any)._count?.borrows || 0);
+
     return {
       totalEntries,
       totalExits,
@@ -45,6 +56,9 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
       stockLevel,
       stockMessage,
       stockLabel: STOCK_LEVEL_LABELS[stockLevel],
+      borrowedQuantity,
+      borrowedItemsCount,
+      hasBorrowsRelation,
     };
   }, [item]);
 
@@ -133,6 +147,19 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
               </span>
             </div>
             <p className="text-sm text-muted-foreground mt-2">{metrics.stockMessage}</p>
+            {/* Borrowed sub-indicator (algorithm-spec §13) */}
+            {(metrics.hasBorrowsRelation
+              ? metrics.borrowedQuantity > 0
+              : metrics.borrowedItemsCount > 0) && (
+              <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700">
+                <IconArrowsExchange className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" />
+                <span className="text-xs font-semibold text-amber-800 dark:text-amber-200">
+                  {metrics.hasBorrowsRelation
+                    ? `Emprestado: ${metrics.borrowedQuantity.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`
+                    : `Empréstimos abertos: ${metrics.borrowedItemsCount}`}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

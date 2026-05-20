@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   IconArrowsExchange2,
   IconFilter,
+  IconHelpCircle,
   IconRefresh,
   IconUpload,
 } from "@tabler/icons-react";
@@ -14,6 +15,7 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { TransactionsByDateAccordion } from "@/components/financial/reconciliation/transactions-by-date-accordion";
 import { OfxImportDialog } from "@/components/financial/reconciliation/ofx-import-dialog";
 import { ManualMatchDialog } from "@/components/financial/reconciliation/manual-match-dialog";
+import { ScoringWorkflowDialog } from "@/components/financial/reconciliation/scoring-workflow-dialog";
 import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";
 import { IgnoreTransactionDialog } from "@/components/financial/reconciliation/ignore-transaction-dialog";
 import {
@@ -76,24 +78,37 @@ function parseFiltersFromUrl(params: URLSearchParams): ReconciliationFilters {
  * Build the inclusive list of YYYY-MM-DD strings for every day in every
  * selected month. The accordion uses this to render *all* days in the period,
  * not only those that contain transactions.
+ *
+ * For the current month, the list stops at today — future days carry no
+ * transactions and just create empty noise above the meaningful rows.
  */
 function buildDatesForPeriod(year: number, months: string[]): string[] {
   const dates: string[] = [];
-  // Sort months ascending so the accordion is chronological from top to bottom.
+  const today = new Date();
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth() + 1;
+  const todayDay = today.getDate();
   const sortedMonths = [...months].sort();
   for (const m of sortedMonths) {
     const monthNum = parseInt(m, 10);
     if (!monthNum || monthNum < 1 || monthNum > 12) continue;
     // new Date(y, m, 0) = last day of month `m-1`. Used to enumerate days.
-    const daysInMonth = new Date(year, monthNum, 0).getDate();
-    for (let d = 1; d <= daysInMonth; d++) {
+    let lastDay = new Date(year, monthNum, 0).getDate();
+    // Cap at today when iterating the current month so we don't render an
+    // empty stack of future days above the latest real activity.
+    if (year === todayYear && monthNum === todayMonth) {
+      lastDay = Math.min(lastDay, todayDay);
+    } else if (year > todayYear || (year === todayYear && monthNum > todayMonth)) {
+      // Future month: skip entirely.
+      continue;
+    }
+    for (let d = 1; d <= lastDay; d++) {
       const dd = String(d).padStart(2, "0");
       const mm = String(monthNum).padStart(2, "0");
       dates.push(`${year}-${mm}-${dd}`);
     }
   }
-  // Display newest-first by default — matches the previous sort order and
-  // mirrors how the table used to render.
+  // Newest-first to match how the accordion has always rendered.
   return dates.reverse();
 }
 
@@ -122,6 +137,7 @@ export const ReconciliationTransactionsListPage = () => {
   const [searchText, setSearchText] = useState(searchParams.get("search") || "");
   const [showFilters, setShowFilters] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [scoringHelpOpen, setScoringHelpOpen] = useState(false);
   const [filters, setFilters] = useState<ReconciliationFilters>(() =>
     parseFiltersFromUrl(searchParams),
   );
@@ -136,7 +152,7 @@ export const ReconciliationTransactionsListPage = () => {
     return buildDatesForPeriod(filters.year, filters.months);
   }, [filters.year, filters.months]);
 
-  const { data, isLoading, isFetching, refetch } = useBankTransactions({
+  const { data, isLoading, refetch } = useBankTransactions({
     page: 1,
     pageSize: PERIOD_PAGE_SIZE,
     sortBy: "postedAt",
@@ -321,12 +337,11 @@ export const ReconciliationTransactionsListPage = () => {
               variant: "outline" as const,
             },
             {
-              key: "refresh",
-              label: "Atualizar",
-              icon: IconRefresh,
-              onClick: () => refetch(),
+              key: "scoring-help",
+              label: "Como funciona",
+              icon: IconHelpCircle,
+              onClick: () => setScoringHelpOpen(true),
               variant: "outline" as const,
-              loading: isFetching,
             },
           ]}
           className="flex-shrink-0"
@@ -381,6 +396,11 @@ export const ReconciliationTransactionsListPage = () => {
         open={importOpen}
         onOpenChange={setImportOpen}
         onImported={() => refetch()}
+      />
+
+      <ScoringWorkflowDialog
+        open={scoringHelpOpen}
+        onOpenChange={setScoringHelpOpen}
       />
 
       <ManualMatchDialog

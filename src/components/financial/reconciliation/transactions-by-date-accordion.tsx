@@ -121,17 +121,32 @@ export function TransactionsByDateAccordion({
   const summaries = useMemo(() => {
     const out = new Map<
       string,
-      { count: number; credits: number; debits: number }
+      {
+        count: number;
+        credits: number;
+        debits: number;
+        matched: number;
+        ignored: number;
+        pending: number;
+      }
     >();
     for (const [day, txs] of txByDate) {
       let credits = 0;
       let debits = 0;
+      let matched = 0;
+      let ignored = 0;
+      let pending = 0;
       for (const t of txs) {
-        const amt = Number(t.amount) || 0;
+        // OFX debits are stored as negative amounts. The banner shows them
+        // as absolute totals (the sign is conveyed by the −/+ prefix).
+        const amt = Math.abs(Number(t.amount) || 0);
         if (t.type === "CREDIT") credits += amt;
         else debits += amt;
+        if (t.matchStatus === "AUTO_MATCHED" || t.matchStatus === "MANUAL_MATCHED") matched += 1;
+        else if (t.matchStatus === "IGNORED") ignored += 1;
+        else pending += 1;
       }
-      out.set(day, { count: txs.length, credits, debits });
+      out.set(day, { count: txs.length, credits, debits, matched, ignored, pending });
     }
     return out;
   }, [txByDate]);
@@ -150,7 +165,7 @@ export function TransactionsByDateAccordion({
       // Wider so longer emitter names ("FARBEN S/A INDUSTRIA QUIMICA") fit
       // without truncation. The freed space comes from Contraparte (flex).
       { key: "linkedNf", header: "NF vinculada", width: "300px", show: true },
-      { key: "matchStatus", header: "Status", width: "170px", show: true },
+      { key: "matchStatus", header: "Status", width: "220px", show: true },
     ],
     [showAccountColumn],
   );
@@ -232,7 +247,8 @@ export function TransactionsByDateAccordion({
               {dates.map(date => {
                 const txs = txByDate.get(date) ?? [];
                 const summary =
-                  summaries.get(date) ?? { count: 0, credits: 0, debits: 0 };
+                  summaries.get(date) ??
+                  { count: 0, credits: 0, debits: 0, matched: 0, ignored: 0, pending: 0 };
                 const isOpen = openDates.has(date);
                 const isEmpty = summary.count === 0;
                 const { dayLabel, weekday } = formatDayHeader(date);
@@ -323,19 +339,65 @@ export function TransactionsByDateAccordion({
   );
 }
 
+interface DaySummary {
+  count: number;
+  credits: number;
+  debits: number;
+  matched: number;
+  ignored: number;
+  pending: number;
+}
+
 interface DayGroupProps {
   date: string;
   dayLabel: string;
   weekday: string;
   isOpen: boolean;
   isEmpty: boolean;
-  summary: { count: number; credits: number; debits: number };
+  summary: DaySummary;
   txs: BankTransaction[];
   columns: ColumnSpec[];
   colSpan: number;
   onToggle: () => void;
   onViewDetails?: (tx: BankTransaction) => void;
   onContextMenu: (e: React.MouseEvent, tx: BankTransaction) => void;
+}
+
+/**
+ * Compact progress strip that lives inside the day-group banner's Status
+ * column. Shows two stacked segments — matched (green) and ignored (gray) —
+ * over a pending base, with a "X/Y" counter alongside.
+ */
+function DayProgressBar({ summary }: { summary: DaySummary }) {
+  const { count, matched, ignored } = summary;
+  if (count === 0) return null;
+  const resolved = matched + ignored;
+  const matchedPct = (matched / count) * 100;
+  const ignoredPct = (ignored / count) * 100;
+  const isComplete = resolved === count;
+  const counterText = `${resolved}/${count}`;
+  return (
+    <div className="flex items-center gap-2 w-full" title={`${matched} conciliada(s), ${ignored} ignorada(s), ${count - resolved} pendente(s)`}>
+      <div className="relative flex-1 h-2 rounded-full overflow-hidden bg-muted">
+        <div
+          className="absolute inset-y-0 left-0 bg-emerald-600 transition-all"
+          style={{ width: `${matchedPct}%` }}
+        />
+        <div
+          className="absolute inset-y-0 bg-neutral-400 dark:bg-neutral-500 transition-all"
+          style={{ left: `${matchedPct}%`, width: `${ignoredPct}%` }}
+        />
+      </div>
+      <span
+        className={cn(
+          "text-[11px] font-semibold tabular-nums whitespace-nowrap",
+          isComplete ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
+        )}
+      >
+        {counterText}
+      </span>
+    </div>
+  );
 }
 
 function DayGroup({
@@ -346,7 +408,6 @@ function DayGroup({
   summary,
   txs,
   columns,
-  colSpan,
   onToggle,
   onViewDetails,
   onContextMenu,
@@ -354,9 +415,9 @@ function DayGroup({
   return (
     <>
       {/* Group banner — distinct background + heavier border so it reads as a
-          sub-header, not as a row with status. The count and totals use plain
-          text/colored numerals (not Badge) so they don't compete visually with
-          the "Status" column badges below. */}
+          sub-header. We render one TableCell per column (instead of a single
+          colSpan one) so the day's total value lands under VALOR and the
+          progress bar lands under STATUS, matching the underlying table layout. */}
       <TableRow
         className={cn(
           "cursor-pointer transition-colors border-t-2 border-b border-border bg-muted/60",
@@ -365,58 +426,82 @@ function DayGroup({
         )}
         onClick={onToggle}
       >
-        <TableCell colSpan={colSpan} className="p-0 !border-r-0">
-          <div className="flex items-center">
-            {/* Left section is locked to the DATA column width so the chevron
-                + date label visually live inside that column instead of
-                drifting into CONTA. */}
-            <div
-              className="flex items-center gap-2 px-4 py-3 flex-shrink-0"
-              style={{ width: `${DATE_COLUMN_WIDTH}px` }}
-            >
-              <IconChevronRight
-                className={cn(
-                  "h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform duration-150",
-                  isOpen && "rotate-90",
-                  isEmpty && "opacity-50",
-                )}
-              />
-              <span
-                className={cn(
-                  "font-semibold tabular-nums text-sm whitespace-nowrap",
-                  isEmpty ? "text-muted-foreground/70" : "text-foreground",
-                )}
-              >
-                {dayLabel}
-              </span>
-              <span
-                className={cn(
-                  // Same font size/weight family as the date so they read as a
-                  // single label ("26/04/26 Dom."), just slightly dimmer.
-                  "font-semibold tabular-nums text-sm whitespace-nowrap",
-                  isEmpty ? "text-muted-foreground/60" : "text-muted-foreground",
-                )}
-              >
-                {weekday}
-              </span>
-            </div>
-            {/* Right section: totals only when the day has movement. */}
-            {!isEmpty && (
-              <div className="flex items-center gap-4 ml-auto pr-4 whitespace-nowrap">
-                {summary.credits > 0 && (
-                  <span className="text-sm font-semibold tabular-nums text-emerald-700">
-                    +{formatCurrency(summary.credits)}
+        {columns.map(c => {
+          if (c.key === "postedAt") {
+            return (
+              <TableCell key={c.key} className="p-0 !border-r-0">
+                <div className="flex items-center gap-2 px-4 py-3">
+                  <IconChevronRight
+                    className={cn(
+                      "h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform duration-150",
+                      isOpen && "rotate-90",
+                      isEmpty && "opacity-50",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "font-semibold tabular-nums text-sm whitespace-nowrap",
+                      isEmpty ? "text-muted-foreground/70" : "text-foreground",
+                    )}
+                  >
+                    {dayLabel}
                   </span>
-                )}
-                {summary.debits > 0 && (
-                  <span className="text-sm font-semibold tabular-nums text-red-700">
-                    −{formatCurrency(summary.debits)}
+                  <span
+                    className={cn(
+                      "font-semibold tabular-nums text-sm whitespace-nowrap",
+                      isEmpty ? "text-muted-foreground/60" : "text-muted-foreground",
+                    )}
+                  >
+                    {weekday}
                   </span>
-                )}
-              </div>
-            )}
-          </div>
-        </TableCell>
+                </div>
+              </TableCell>
+            );
+          }
+          if (c.key === "amount") {
+            return (
+              <TableCell key={c.key} className="p-0 !border-r-0 text-right">
+                {!isEmpty && (summary.credits > 0 || summary.debits > 0) ? (
+                  <div className="flex flex-col items-end gap-0.5 px-4 py-2.5 leading-tight">
+                    {summary.credits > 0 && (
+                      <span className="text-xs font-semibold tabular-nums text-emerald-700 whitespace-nowrap">
+                        +{formatCurrency(summary.credits)}
+                      </span>
+                    )}
+                    {summary.debits > 0 && (
+                      <span
+                        className={cn(
+                          "tabular-nums whitespace-nowrap font-semibold",
+                          // The debit total is the headline number on the day
+                          // banner — saídas drive reconciliation, so render it
+                          // a notch larger than credits when both are present.
+                          summary.credits > 0 ? "text-xs" : "text-sm",
+                          "text-red-700",
+                        )}
+                      >
+                        −{formatCurrency(summary.debits)}
+                      </span>
+                    )}
+                  </div>
+                ) : null}
+              </TableCell>
+            );
+          }
+          if (c.key === "matchStatus") {
+            return (
+              <TableCell key={c.key} className="p-0 !border-r-0">
+                {!isEmpty ? (
+                  <div className="px-4 py-3">
+                    <DayProgressBar summary={summary} />
+                  </div>
+                ) : null}
+              </TableCell>
+            );
+          }
+          // Account / type / subtype / counterparty / linkedNf — intentionally
+          // blank so the banner reads as a sub-header, not as data.
+          return <TableCell key={c.key} className="p-0 !border-r-0" />;
+        })}
       </TableRow>
 
       {isOpen &&

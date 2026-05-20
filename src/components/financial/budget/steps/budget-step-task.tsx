@@ -32,7 +32,6 @@ import { CustomerSelector } from "@/components/production/task/form/customer-sel
 import { PlateTagsInput } from "@/components/production/task/form/plate-tags-input";
 import { SerialNumberRangeInput } from "@/components/production/task/form/serial-number-range-input";
 import { TaskNameAutocomplete } from "@/components/production/task/form/task-name-autocomplete";
-import { ServiceSelectorAutoGrouped } from "@/components/production/task/form/service-selector-auto-grouped";
 import { GeneralPaintingSelector } from "@/components/production/task/form/general-painting-selector";
 import { ResponsibleManager } from "@/components/administration/customer/responsible";
 import { Input } from "@/components/ui/input";
@@ -387,43 +386,10 @@ export function BudgetStepTask({
           </AccordionItem>
         )}
 
-        {/* 3. Service Orders */}
-        <AccordionItem
-          value="serviceOrders"
-          id="accordion-item-serviceOrders"
-          className="border border-border rounded-lg"
-        >
-          <Card className="border-0">
-            <AccordionTrigger className="px-0 hover:no-underline">
-              <CardHeader className="flex-1 py-4">
-                <CardTitle className="flex items-center gap-2">
-                  <IconClipboardList className="h-5 w-5" />
-                  Serviços
-                </CardTitle>
-              </CardHeader>
-            </AccordionTrigger>
-            <AccordionContent>
-              <CardContent className="pt-0">
-                <FormField
-                  control={control}
-                  name="serviceOrders"
-                  render={() => (
-                    <FormItem>
-                      <ServiceSelectorAutoGrouped
-                        control={control}
-                        disabled={disabled}
-                        currentUserId={user?.id}
-                        userPrivilege={user?.sector?.privileges}
-                        isAccordionOpen={openAccordion === "serviceOrders"}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </AccordionContent>
-          </Card>
-        </AccordionItem>
+        {/* Service Orders moved to Step 3 ("Serviços e preços"). The
+            quote-service → PRODUCTION-SO sync in task.service.ts derives the
+            production orders from the billable services entered there, so a
+            second Step-1 picker would only create duplicate noise. */}
 
         {/* 4. Paint - COMMERCIAL/ADMIN */}
         {showPaint && (

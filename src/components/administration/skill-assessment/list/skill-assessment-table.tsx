@@ -10,6 +10,9 @@ import {
   IconClipboardList,
   IconAlertTriangle,
   IconPlus,
+  IconPlayerPlay,
+  IconLock,
+  IconX,
 } from "@tabler/icons-react";
 
 import type {
@@ -28,7 +31,13 @@ import {
   canDeleteHrEntities,
   shouldShowInteractiveElements,
 } from "@/utils/permissions/entity-permissions";
-import { useAssessments, useDeleteAssessment } from "../../../../hooks";
+import {
+  useAssessments,
+  useDeleteAssessment,
+  useOpenAssessment,
+  useCloseAssessment,
+  useCancelAssessment,
+} from "../../../../hooks";
 import { formatDate } from "../../../../utils";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -101,6 +110,13 @@ const getStatusVariant = (
 export function SkillAssessmentTable({ filters, onDataChange, className }: SkillAssessmentTableProps) {
   const navigate = useNavigate();
   const deleteAssessmentMutation = useDeleteAssessment();
+  const openAssessmentMutation = useOpenAssessment();
+  const closeAssessmentMutation = useCloseAssessment();
+  const cancelAssessmentMutation = useCancelAssessment();
+  const [pendingLifecycle, setPendingLifecycle] = useState<
+    | { kind: "open" | "close" | "cancel"; assessment: Assessment }
+    | null
+  >(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { user } = useAuth();
@@ -149,6 +165,9 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
       limit: pageSize,
       include: {
         createdBy: true,
+        // Per-sector evaluatee counts so we can show planned counts in DRAFT
+        // (before any AssessmentEntry rows exist). Sum on the client.
+        sectors: { include: { _count: { select: { evaluatees: true } } } },
         _count: { select: { sectors: true, topics: true, entries: true } },
       } as any,
       ...(sortConfigs.length > 0
@@ -243,6 +262,35 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
     }
   }, [contextMenu]);
 
+  const handleLifecycle = useCallback(
+    (kind: "open" | "close" | "cancel") => {
+      if (contextMenu && !contextMenu.isBulk) {
+        setPendingLifecycle({ kind, assessment: contextMenu.assessments[0] });
+        setContextMenu(null);
+      }
+    },
+    [contextMenu],
+  );
+
+  const confirmLifecycle = async () => {
+    if (!pendingLifecycle) return;
+    const { kind, assessment } = pendingLifecycle;
+    const mutation =
+      kind === "open"
+        ? openAssessmentMutation
+        : kind === "close"
+          ? closeAssessmentMutation
+          : cancelAssessmentMutation;
+    try {
+      await mutation.mutateAsync(assessment.id);
+      refetch();
+    } catch {
+      // toast handled by mutation
+    } finally {
+      setPendingLifecycle(null);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!deleteDialog) return;
     try {
@@ -295,6 +343,9 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
 
   const columns = useMemo(
     () => [
+      // Widths picked so every header text fits without truncation alongside
+      // its sort icon. CAMPANHA is the only flex column (min-only) and absorbs
+      // the remaining width.
       {
         key: "name",
         header: "CAMPANHA",
@@ -311,7 +362,7 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
         key: "periodStart",
         header: "INICIA EM",
         sortable: true,
-        className: "min-w-[140px]",
+        className: "w-32 min-w-32 max-w-32",
         align: "left" as const,
         accessor: (a: Assessment) => (
           <span className="text-sm text-muted-foreground">
@@ -323,7 +374,7 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
         key: "periodEnd",
         header: "TERMINA EM",
         sortable: true,
-        className: "min-w-[140px]",
+        className: "w-32 min-w-32 max-w-32",
         align: "left" as const,
         accessor: (a: Assessment) => (
           <span className="text-sm text-muted-foreground">
@@ -335,7 +386,7 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
         key: "createdBy.name",
         header: "CRIADA POR",
         sortable: false,
-        className: "w-40 min-w-40 max-w-40",
+        className: "w-48 min-w-48 max-w-48",
         align: "left" as const,
         accessor: (a: Assessment) =>
           a.createdBy?.name ? (
@@ -350,7 +401,7 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
         key: "_count.sectors",
         header: "SETORES",
         sortable: false,
-        className: "w-24 min-w-24 max-w-24",
+        className: "w-28 min-w-28 max-w-28",
         align: "center" as const,
         accessor: (a: Assessment) => (
           <Badge variant="default" className="w-10 justify-center">
@@ -362,7 +413,7 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
         key: "_count.topics",
         header: "TÓPICOS",
         sortable: false,
-        className: "w-24 min-w-24 max-w-24",
+        className: "w-28 min-w-28 max-w-28",
         align: "center" as const,
         accessor: (a: Assessment) => (
           <Badge variant="default" className="w-10 justify-center">
@@ -374,20 +425,30 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
         key: "_count.entries",
         header: "AVALIADOS",
         sortable: false,
-        className: "w-28 min-w-28 max-w-28",
+        className: "w-32 min-w-32 max-w-32",
         align: "center" as const,
-        accessor: (a: Assessment) => (
-          <Badge variant="default" className="w-10 justify-center">
-            {a._count?.entries ?? 0}
-          </Badge>
-        ),
+        accessor: (a: Assessment) => {
+          const planned = (a.sectors ?? []).reduce(
+            (sum, s: any) => sum + (s._count?.evaluatees ?? 0),
+            0,
+          );
+          const count =
+            a.status === ASSESSMENT_STATUS.DRAFT
+              ? planned
+              : (a._count?.entries ?? planned);
+          return (
+            <Badge variant="default" className="w-10 justify-center">
+              {count}
+            </Badge>
+          );
+        },
       },
       {
         key: "status",
         header: "STATUS",
         sortable: true,
-        className: "w-28 min-w-28 max-w-28",
-        align: "center" as const,
+        className: "w-32 min-w-32 max-w-32",
+        align: "left" as const,
         accessor: (a: Assessment) => (
           <Badge variant={getStatusVariant(a.status as ASSESSMENT_STATUS)} className="font-normal">
             {ASSESSMENT_STATUS_LABELS[a.status as ASSESSMENT_STATUS]}
@@ -618,30 +679,77 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
             </div>
           )}
 
-          {!contextMenu?.isBulk && (
-            <DropdownMenuItem onClick={handleViewDetails}>
-              <IconEye className="mr-2 h-4 w-4" />
-              Ver Detalhes
-            </DropdownMenuItem>
-          )}
+          {(() => {
+            // Single-row context menu drives the lifecycle actions.
+            // Bulk only exposes Excluir (CANCELLED ones only) — open/close/cancel
+            // in bulk would need confirmations per-status, which is out of scope.
+            const single = !contextMenu?.isBulk
+              ? contextMenu?.assessments[0]
+              : undefined;
+            const singleStatus = single?.status as ASSESSMENT_STATUS | undefined;
+            const isDraft = singleStatus === ASSESSMENT_STATUS.DRAFT;
+            const isOpen = singleStatus === ASSESSMENT_STATUS.OPEN;
+            const isCancelled = singleStatus === ASSESSMENT_STATUS.CANCELLED;
+            const canStatusCancel = isDraft || isOpen;
+            // Excluir only applies to CANCELLED rows. For bulk, we let the
+            // delete dialog filter on submit (or just allow the attempt).
+            const showDelete = !contextMenu?.isBulk
+              ? isCancelled && canDelete
+              : canDelete;
 
-          {!contextMenu?.isBulk && canEdit && (
-            <DropdownMenuItem onClick={handleEdit}>
-              <IconEdit className="mr-2 h-4 w-4" />
-              Editar
-            </DropdownMenuItem>
-          )}
+            return (
+              <>
+                {!contextMenu?.isBulk && (
+                  <DropdownMenuItem onClick={handleViewDetails}>
+                    <IconEye className="mr-2 h-4 w-4" />
+                    Ver Detalhes
+                  </DropdownMenuItem>
+                )}
 
-          {(canEdit || canDelete) && <DropdownMenuSeparator />}
+                {single && canEdit && isDraft && (
+                  <DropdownMenuItem onClick={handleEdit}>
+                    <IconEdit className="mr-2 h-4 w-4" />
+                    Editar
+                  </DropdownMenuItem>
+                )}
 
-          {canDelete && (
-            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-              <IconTrash className="mr-2 h-4 w-4" />
-              {contextMenu?.isBulk && contextMenu.assessments.length > 1
-                ? "Excluir selecionadas"
-                : "Excluir"}
-            </DropdownMenuItem>
-          )}
+                {single && canEdit && isDraft && (
+                  <DropdownMenuItem onClick={() => handleLifecycle("open")}>
+                    <IconPlayerPlay className="mr-2 h-4 w-4" />
+                    Abrir campanha
+                  </DropdownMenuItem>
+                )}
+
+                {single && canEdit && isOpen && (
+                  <DropdownMenuItem onClick={() => handleLifecycle("close")}>
+                    <IconLock className="mr-2 h-4 w-4" />
+                    Fechar campanha
+                  </DropdownMenuItem>
+                )}
+
+                {single && canEdit && canStatusCancel && (
+                  <DropdownMenuItem
+                    onClick={() => handleLifecycle("cancel")}
+                    className="text-destructive"
+                  >
+                    <IconX className="mr-2 h-4 w-4" />
+                    Cancelar campanha
+                  </DropdownMenuItem>
+                )}
+
+                {showDelete && <DropdownMenuSeparator />}
+
+                {showDelete && (
+                  <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                    <IconTrash className="mr-2 h-4 w-4" />
+                    {contextMenu?.isBulk && contextMenu.assessments.length > 1
+                      ? "Excluir selecionadas"
+                      : "Excluir"}
+                  </DropdownMenuItem>
+                )}
+              </>
+            );
+          })()}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
 
@@ -663,6 +771,46 @@ export function SkillAssessmentTable({ filters, onDataChange, className }: Skill
               disabled={deleteAssessmentMutation.isPending}
             >
               {deleteAssessmentMutation.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!pendingLifecycle}
+        onOpenChange={(open) => !open && setPendingLifecycle(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingLifecycle?.kind === "open" && "Abrir campanha?"}
+              {pendingLifecycle?.kind === "close" && "Fechar campanha?"}
+              {pendingLifecycle?.kind === "cancel" && "Cancelar campanha?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingLifecycle?.kind === "open" &&
+                `Esta ação gera as fichas para todos os avaliados configurados de "${pendingLifecycle.assessment.name}" e libera a coleta para os avaliadores.`}
+              {pendingLifecycle?.kind === "close" &&
+                `Esta ação encerra a coleta de "${pendingLifecycle.assessment.name}". Avaliadores não poderão mais enviar avaliações pendentes.`}
+              {pendingLifecycle?.kind === "cancel" &&
+                `Esta ação invalida "${pendingLifecycle.assessment.name}". As entradas existentes ficam congeladas e não recebem novas respostas.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmLifecycle}
+              className={cn(
+                pendingLifecycle?.kind === "cancel" &&
+                  "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+              )}
+              disabled={
+                openAssessmentMutation.isPending ||
+                closeAssessmentMutation.isPending ||
+                cancelAssessmentMutation.isPending
+              }
+            >
+              Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

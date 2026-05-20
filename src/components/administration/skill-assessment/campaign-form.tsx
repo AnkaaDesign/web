@@ -1,4 +1,5 @@
-import { useForm, FormProvider } from "react-hook-form";
+import { useCallback } from "react";
+import { useForm, FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconClipboardList, IconLoader2 } from "@tabler/icons-react";
 
@@ -7,6 +8,7 @@ import { ASSESSMENT_STATUS, ASSESSMENT_STATUS_LABELS } from "../../../constants"
 import type {
   Assessment,
   AssessmentCreateFormData,
+  AssessmentSectorConfig,
   AssessmentUpdateFormData,
 } from "../../../types";
 
@@ -27,6 +29,7 @@ import {
 
 import { SectorMultiSelect } from "./sector-multiselect";
 import { TopicMultiSelect } from "./topic-multiselect";
+import { SectorAssessmentConfigCard } from "./sector-assessment-config-card";
 
 export interface CampaignSubmitOptions {
   openAfter: boolean;
@@ -69,7 +72,7 @@ export function CampaignForm(props: CampaignFormProps) {
           periodEnd:
             props.defaultValues?.periodEnd ??
             new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
-          sectorIds: props.defaultValues?.sectorIds ?? [],
+          sectors: (props.defaultValues?.sectors ?? []) as AssessmentSectorConfig[],
           topicIds: props.defaultValues?.topicIds ?? [],
           status: ASSESSMENT_STATUS.DRAFT,
         }
@@ -78,7 +81,11 @@ export function CampaignForm(props: CampaignFormProps) {
           description: props.assessment.description ?? "",
           periodStart: props.assessment.periodStart,
           periodEnd: props.assessment.periodEnd,
-          sectorIds: (props.assessment.sectors ?? []).map((s) => s.sectorId),
+          sectors: (props.assessment.sectors ?? []).map((s) => ({
+            sectorId: s.sectorId,
+            appraiserId: s.appraiserId ?? null,
+            evaluateeIds: (s.evaluatees ?? []).map((e) => e.userId),
+          })) as AssessmentSectorConfig[],
           topicIds: (props.assessment.topics ?? []).map((t) => t.topicId),
           // editing is only allowed in DRAFT, so the picker starts there
           status: ASSESSMENT_STATUS.DRAFT,
@@ -92,6 +99,37 @@ export function CampaignForm(props: CampaignFormProps) {
   });
 
   const isSubmitting = props.isSubmitting || form.formState.isSubmitting;
+
+  const sectorFieldArray = useFieldArray({
+    control: form.control,
+    name: "sectors",
+    keyName: "_key",
+  });
+  const sectorsValue = (useWatch({ control: form.control, name: "sectors" }) ?? []) as
+    | AssessmentSectorConfig[]
+    | undefined;
+  const selectedSectorIds = (sectorsValue ?? []).map((s) => s.sectorId);
+
+  /**
+   * The SectorMultiSelect feeds us a flat string[] of sector IDs. Translate
+   * back to the structured field-array, preserving per-sector config (appraiser
+   * + evaluatees) for sectors that stay selected. New sectors start with empty
+   * config and let the card seed itself on mount.
+   */
+  const handleSectorPickerChange = useCallback(
+    (next: string[]) => {
+      const current = (form.getValues("sectors") ?? []) as AssessmentSectorConfig[];
+      const byId = new Map(current.map((s) => [s.sectorId, s]));
+      const nextConfigs: AssessmentSectorConfig[] = next.map(
+        (id) => byId.get(id) ?? { sectorId: id, appraiserId: null, evaluateeIds: [] },
+      );
+      form.setValue("sectors", nextConfigs, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    },
+    [form],
+  );
 
   const handleSubmit = async (data: any) => {
     // `data` is post-Zod validation, which strips keys absent from the schema.
@@ -250,26 +288,47 @@ export function CampaignForm(props: CampaignFormProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <FormField
-              control={form.control}
-              name="sectorIds"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Setores <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <SectorMultiSelect
-                      value={field.value ?? []}
-                      onChange={field.onChange}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Cada colaborador dos setores selecionados receberá uma entrada de avaliação.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
+            <FormItem>
+              <FormLabel>
+                Setores <span className="text-destructive">*</span>
+              </FormLabel>
+              <FormControl>
+                <SectorMultiSelect
+                  value={selectedSectorIds}
+                  onChange={handleSectorPickerChange}
+                  disabled={isSubmitting}
+                />
+              </FormControl>
+              <FormDescription>
+                Para cada setor selecionado abaixo, confirme o avaliador e os colaboradores
+                que serão avaliados.
+              </FormDescription>
+              {form.formState.errors.sectors && !Array.isArray(form.formState.errors.sectors) && (
+                <p className="text-sm font-medium text-destructive">
+                  {(form.formState.errors.sectors as any)?.message}
+                </p>
               )}
-            />
+            </FormItem>
+
+            {sectorFieldArray.fields.length > 0 && (
+              <div className="space-y-3">
+                {sectorFieldArray.fields.map((field, idx) => {
+                  const cfg = (sectorsValue ?? [])[idx];
+                  if (!cfg?.sectorId) return null;
+                  return (
+                    <SectorAssessmentConfigCard
+                      key={field._key as string}
+                      index={idx}
+                      sectorId={cfg.sectorId}
+                      disabled={isSubmitting}
+                      onRemove={() => {
+                        sectorFieldArray.remove(idx);
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )}
 
             <FormField
               control={form.control}

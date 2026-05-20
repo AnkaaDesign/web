@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api-client/axiosClient';
 
 // =====================
@@ -56,15 +56,6 @@ export interface AutoOrderAnalysisResponse {
   };
 }
 
-export interface AutoOrderCreateRequest {
-  recommendations: Array<{
-    itemId: string;
-    quantity: number;
-    reason?: string;
-  }>;
-  groupBySupplier?: boolean;
-}
-
 export interface ScheduledItem {
   itemId: string;
   itemName: string;
@@ -102,13 +93,6 @@ export async function analyzeAutoOrders(params?: {
   return response.data;
 }
 
-export async function createAutoOrders(
-  data: AutoOrderCreateRequest,
-): Promise<{ success: boolean; message: string; data: any }> {
-  const response = await apiClient.post('/orders/auto/create', data);
-  return response.data;
-}
-
 export async function getScheduledItems(): Promise<{
   success: boolean;
   data: { totalScheduledItems: number; items: ScheduledItem[] };
@@ -131,18 +115,6 @@ export function useAutoOrderAnalysis(params?: {
     queryKey: ['auto-order-analysis', params],
     queryFn: () => analyzeAutoOrders(params),
     staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-}
-
-export function useCreateAutoOrders() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: createAutoOrders,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auto-order-analysis'] });
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-    },
   });
 }
 

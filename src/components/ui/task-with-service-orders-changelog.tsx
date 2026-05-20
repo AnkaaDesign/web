@@ -275,6 +275,49 @@ const renderServicesCards = (services: any[]) => {
   );
 };
 
+// Render quote services (snapshot) as cards — shape: { description, amount, observation }
+const renderQuoteServiceCards = (services: any[]) => {
+  if (!Array.isArray(services) || services.length === 0) {
+    return (
+      <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>
+    );
+  }
+
+  return (
+    <div className="space-y-3 mt-2">
+      {services.map((service: any, index: number) => (
+        <div
+          key={index}
+          className="border dark:border-border rounded-lg p-3 bg-card space-y-2"
+        >
+          {service.description && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Descrição: </span>
+              <span className="text-foreground font-medium">
+                {service.description}
+              </span>
+            </div>
+          )}
+          {typeof service.amount === "number" && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Valor: </span>
+              <span className="text-foreground font-medium">
+                {formatCurrency(service.amount)}
+              </span>
+            </div>
+          )}
+          {service.observation && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Observação: </span>
+              <span className="text-foreground">{service.observation}</span>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // Render airbrushings as cards
 const renderAirbrushingsCards = (airbrushings: any[]) => {
   if (!Array.isArray(airbrushings) || airbrushings.length === 0) {
@@ -1874,6 +1917,46 @@ const ChangelogTimelineItem = ({
                                       Depois:
                                     </span>
                                     {renderAirbrushingsCards(newParsed)}
+                                  </div>
+                                </>
+                              );
+                            })()
+                          ) : changelog.field === "services_snapshot" ? (
+                            (() => {
+                              const parseSnapshot = (val: any) => {
+                                if (!val) return null;
+                                let parsed = val;
+                                if (
+                                  typeof val === "string" &&
+                                  (val.trim().startsWith("{") ||
+                                    val.trim().startsWith("["))
+                                ) {
+                                  try {
+                                    parsed = JSON.parse(val);
+                                  } catch (e) {
+                                    return null;
+                                  }
+                                }
+                                if (Array.isArray(parsed)) return parsed;
+                                if (parsed && Array.isArray(parsed.services))
+                                  return parsed.services;
+                                return null;
+                              };
+                              const oldServices = parseSnapshot(changelog.oldValue);
+                              const newServices = parseSnapshot(changelog.newValue);
+                              return (
+                                <>
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">
+                                      Antes:
+                                    </span>
+                                    {renderQuoteServiceCards(oldServices || [])}
+                                  </div>
+                                  <div className="mt-3">
+                                    <span className="text-sm text-muted-foreground">
+                                      Depois:
+                                    </span>
+                                    {renderQuoteServiceCards(newServices || [])}
                                   </div>
                                 </>
                               );

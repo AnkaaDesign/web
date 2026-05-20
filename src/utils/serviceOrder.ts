@@ -40,6 +40,7 @@ export function getServiceOrderStatusColor(status: SERVICE_ORDER_STATUS): BadgeV
   const statusColorMap: Record<SERVICE_ORDER_STATUS, BadgeVariant> = {
     [SERVICE_ORDER_STATUS.PENDING]: "gray",
     [SERVICE_ORDER_STATUS.IN_PROGRESS]: "blue",
+    [SERVICE_ORDER_STATUS.WAITING_ARTWORK]: "purple",
     [SERVICE_ORDER_STATUS.PAUSED]: "yellow",
     [SERVICE_ORDER_STATUS.WAITING_APPROVE]: "purple",
     [SERVICE_ORDER_STATUS.COMPLETED]: "green",

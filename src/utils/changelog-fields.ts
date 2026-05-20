@@ -778,7 +778,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     customerSignatureId: "Assinatura do Cliente",
     customForecastDays: "Dias de Previsão Personalizados",
     services: "Serviços do Orçamento",
-    services_snapshot: "Serviços do Orçamento (snapshot)",
+    services_snapshot: "Serviços do Orçamento",
     // Nested relationship fields
     "services.length": "Quantidade de Serviços",
   },

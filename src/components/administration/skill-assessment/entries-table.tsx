@@ -1,14 +1,26 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconChecklist, IconLoader2, IconSearch } from "@tabler/icons-react";
 
-import type { AssessmentEntry } from "../../../types";
+import type { AssessmentEntry, User } from "../../../types";
 import {
   ASSESSMENT_ENTRY_STATUS,
   ASSESSMENT_ENTRY_STATUS_LABELS,
   routes,
 } from "../../../constants";
 import { useAssessmentEntries } from "../../../hooks";
+
+/**
+ * Synthesized "to-be-created" entry for DRAFT campaigns. Rendered alongside
+ * real entries when the campaign hasn't been opened yet, so HR can see who is
+ * about to be assessed and by whom.
+ */
+export interface PlannedEntry {
+  id: string;
+  evaluatee: User;
+  evaluator: User | null;
+  sectorName?: string;
+}
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +41,12 @@ import { AssessmentEntryStatusBadge } from "@/components/production/skill-assess
 interface EntriesTableProps {
   assessmentId: string;
   topicsCount: number;
+  /**
+   * When set, the table renders these pseudo-entries instead of fetching real
+   * AssessmentEntry rows. Used for DRAFT campaigns where entries don't exist
+   * yet but HR still wants to preview who'll be assessed.
+   */
+  plannedEntries?: PlannedEntry[];
 }
 
 const STATUS_OPTIONS = [
@@ -43,10 +61,15 @@ const STATUS_OPTIONS = [
 const HEAD_BASE =
   "h-10 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 
-export function EntriesTable({ assessmentId, topicsCount }: EntriesTableProps) {
+export function EntriesTable({
+  assessmentId,
+  topicsCount,
+  plannedEntries,
+}: EntriesTableProps) {
   const [status, setStatus] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
+  const isPlannedMode = plannedEntries !== undefined;
 
   const params = useMemo(
     () => ({
@@ -63,25 +86,88 @@ export function EntriesTable({ assessmentId, topicsCount }: EntriesTableProps) {
     [assessmentId, status],
   );
 
-  const { data, isLoading } = useAssessmentEntries(params as any);
+  // Skip the network call entirely when we're rendering planned entries.
+  const { data, isLoading } = useAssessmentEntries(params as any, {
+    enabled: !isPlannedMode,
+  } as any);
   const entries: AssessmentEntry[] = data?.data ?? [];
+
+  // Group rows visually by Setor → Cargo → Nome, so HR can scan a campaign
+  // sector-by-sector instead of seeing names interleaved across sectors.
+  const collator = useMemo(
+    () => new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true }),
+    [],
+  );
+  const compareEvaluatees = useCallback(
+    (a: { sector?: string; position?: string; name?: string }, b: typeof a) => {
+      const s = collator.compare(a.sector ?? "", b.sector ?? "");
+      if (s !== 0) return s;
+      const p = collator.compare(a.position ?? "", b.position ?? "");
+      if (p !== 0) return p;
+      return collator.compare(a.name ?? "", b.name ?? "");
+    },
+    [collator],
+  );
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return entries;
-    return entries.filter(
-      (e) =>
-        e.evaluatee?.name?.toLowerCase().includes(term) ||
-        e.evaluator?.name?.toLowerCase().includes(term),
+    const matched = !term
+      ? entries
+      : entries.filter(
+          (e) =>
+            e.evaluatee?.name?.toLowerCase().includes(term) ||
+            e.evaluator?.name?.toLowerCase().includes(term),
+        );
+    return [...matched].sort((a, b) =>
+      compareEvaluatees(
+        {
+          sector: (a.evaluatee as any)?.sector?.name,
+          position: (a.evaluatee as any)?.position?.name,
+          name: a.evaluatee?.name,
+        },
+        {
+          sector: (b.evaluatee as any)?.sector?.name,
+          position: (b.evaluatee as any)?.position?.name,
+          name: b.evaluatee?.name,
+        },
+      ),
     );
-  }, [entries, search]);
+  }, [entries, search, compareEvaluatees]);
+
+  const filteredPlanned = useMemo(() => {
+    if (!plannedEntries) return [];
+    const term = search.trim().toLowerCase();
+    const matched = !term
+      ? plannedEntries
+      : plannedEntries.filter(
+          (p) =>
+            p.evaluatee?.name?.toLowerCase().includes(term) ||
+            p.evaluator?.name?.toLowerCase().includes(term),
+        );
+    return [...matched].sort((a, b) =>
+      compareEvaluatees(
+        {
+          sector: a.sectorName ?? (a.evaluatee as any)?.sector?.name,
+          position: (a.evaluatee as any)?.position?.name,
+          name: a.evaluatee?.name,
+        },
+        {
+          sector: b.sectorName ?? (b.evaluatee as any)?.sector?.name,
+          position: (b.evaluatee as any)?.position?.name,
+          name: b.evaluatee?.name,
+        },
+      ),
+    );
+  }, [plannedEntries, search, compareEvaluatees]);
+
+  const totalCount = isPlannedMode ? filteredPlanned.length : filtered.length;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <IconChecklist className="h-5 w-5 text-muted-foreground" />
-          Avaliações ({filtered.length})
+          Avaliações ({totalCount})
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -95,14 +181,16 @@ export function EntriesTable({ assessmentId, topicsCount }: EntriesTableProps) {
               className="pl-9"
             />
           </div>
-          <div className="w-full md:w-64">
-            <Combobox
-              value={status}
-              onValueChange={(v) => setStatus((v as string) ?? "ALL")}
-              options={STATUS_OPTIONS}
-              placeholder="Filtrar por status"
-            />
-          </div>
+          {!isPlannedMode && (
+            <div className="w-full md:w-64">
+              <Combobox
+                value={status}
+                onValueChange={(v) => setStatus((v as string) ?? "ALL")}
+                options={STATUS_OPTIONS}
+                placeholder="Filtrar por status"
+              />
+            </div>
+          )}
         </div>
 
         <div className="rounded-md border border-border/40 overflow-hidden">
@@ -119,7 +207,19 @@ export function EntriesTable({ assessmentId, topicsCount }: EntriesTableProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {isPlannedMode ? (
+                filteredPlanned.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                      Nenhum avaliado selecionado ainda.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredPlanned.map((p, idx) => (
+                    <PlannedRow key={p.id} planned={p} rowIndex={idx} />
+                  ))
+                )
+              ) : isLoading ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
                     <IconLoader2 className="h-5 w-5 animate-spin inline-block text-muted-foreground" />
@@ -153,6 +253,48 @@ export function EntriesTable({ assessmentId, topicsCount }: EntriesTableProps) {
 }
 
 const CELL_BASE = "px-3 py-3 align-middle !border-b !border-border/30";
+
+function PlannedRow({ planned, rowIndex }: { planned: PlannedEntry; rowIndex: number }) {
+  const evaluateePosition = (planned.evaluatee as any)?.position?.name as string | undefined;
+  const evaluateeSector =
+    planned.sectorName ?? ((planned.evaluatee as any)?.sector?.name as string | undefined);
+  return (
+    <TableRow
+      className={cn(
+        "!border-b-0 transition-colors",
+        rowIndex % 2 === 1 ? "!bg-muted/15" : "!bg-transparent",
+      )}
+    >
+      <TableCell className={cn(CELL_BASE, "w-56")}>
+        <div className="font-medium">{planned.evaluatee?.name ?? "—"}</div>
+      </TableCell>
+      <TableCell className={cn(CELL_BASE, "w-32")}>
+        <span className="text-sm text-foreground/80">{evaluateePosition ?? "—"}</span>
+      </TableCell>
+      <TableCell className={cn(CELL_BASE, "w-32")}>
+        <span className="text-sm text-foreground/80">{evaluateeSector ?? "—"}</span>
+      </TableCell>
+      <TableCell className={CELL_BASE}>
+        {planned.evaluator ? (
+          <div className="font-medium">{planned.evaluator.name}</div>
+        ) : (
+          <span className="text-sm text-amber-600 dark:text-amber-400">
+            Sem avaliador definido
+          </span>
+        )}
+      </TableCell>
+      <TableCell className={cn(CELL_BASE, "w-40")}>
+        <span className="text-xs text-muted-foreground">—</span>
+      </TableCell>
+      <TableCell className={cn(CELL_BASE, "w-20 text-center")}>
+        <span className="text-xs text-muted-foreground">—</span>
+      </TableCell>
+      <TableCell className={cn(CELL_BASE, "w-36 text-center")}>
+        <AssessmentEntryStatusBadge status={ASSESSMENT_ENTRY_STATUS.PENDING} />
+      </TableCell>
+    </TableRow>
+  );
+}
 
 function EntryRow({
   entry,

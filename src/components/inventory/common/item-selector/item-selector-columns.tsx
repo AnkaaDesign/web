@@ -48,12 +48,39 @@ const renderMonthlyConsumptionWithTrend = (item: Item) => {
 };
 
 /**
+ * Compute estimated per-cycle quantity for the order-schedule preview.
+ * Algorithm-spec §9: system auto-calculates the quantity each cycle from
+ * daily consumption × cycle days + lead time + safety buffer, snapped up to
+ * the box quantity (when defined). Floored at the reorder point so the next
+ * cycle always replenishes to a healthy level.
+ */
+export function computeCyclePreviewQuantity(item: Item, cycleDays: number): number | null {
+  if (!cycleDays || cycleDays <= 0) return null;
+  const monthly = item.monthlyConsumption || 0;
+  if (monthly <= 0 && (item.reorderPoint || 0) <= 0) return null;
+  const dailyConsumption = monthly / 30;
+  const leadTime = item.estimatedLeadTime || 0;
+  const safetyBuffer = 0.05; // 5% safety buffer (matches API default)
+  const projected = dailyConsumption * (cycleDays + leadTime) * (1 + safetyBuffer);
+  const floor = item.reorderPoint || 0;
+  let quantity = Math.max(projected, floor);
+  // Snap up to multiples of boxQuantity when set
+  if (item.boxQuantity && item.boxQuantity > 0) {
+    quantity = Math.ceil(quantity / item.boxQuantity) * item.boxQuantity;
+  } else {
+    quantity = Math.ceil(quantity);
+  }
+  return quantity;
+}
+
+/**
  * Create all available columns for item selector
  * Includes both display columns and editable input columns
  */
 export const createItemSelectorColumns = (
   editableConfig?: EditableColumnsConfig,
-  _context?: ItemSelectorContext
+  _context?: ItemSelectorContext,
+  extraConfig?: { cycleDays?: number }
 ): ItemSelectorColumn[] => {
   const columns: ItemSelectorColumn[] = [
     // Checkbox column - always fixed
@@ -240,6 +267,32 @@ export const createItemSelectorColumns = (
       ),
       sortable: true,
       className: "w-28",
+      align: "left",
+    },
+    // Order-schedule preview column (algorithm-spec §9). Hidden by default and
+    // only rendered with a meaningful value when a cycleDays value is provided
+    // by the parent form.
+    {
+      key: "computedCycleQuantity",
+      header: "QTD. POR CICLO (ESTIMADA)",
+      accessor: (item: Item) => {
+        const cycleDays = extraConfig?.cycleDays;
+        if (!cycleDays) return <div className="text-muted-foreground">—</div>;
+        const qty = computeCyclePreviewQuantity(item, cycleDays);
+        if (qty == null) return <div className="text-muted-foreground">—</div>;
+        return (
+          <div className="flex flex-col">
+            <span className="font-semibold tabular-nums">
+              {qty.toLocaleString("pt-BR")}
+            </span>
+            <span className="text-[10px] text-muted-foreground leading-tight">
+              Estimada — confirmada a cada ciclo
+            </span>
+          </div>
+        );
+      },
+      sortable: false,
+      className: "w-44",
       align: "left",
     },
     {

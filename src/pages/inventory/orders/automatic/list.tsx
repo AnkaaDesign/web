@@ -5,7 +5,6 @@ import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from '../../../../constants
 import { usePageTracker } from '@/hooks/common/use-page-tracker';
 import {
   IconRefresh,
-  IconShoppingCart,
   IconAlertTriangle,
   IconTrendingUp,
   IconTrendingDown,
@@ -17,13 +16,12 @@ import {
   IconSelector,
   IconFilter,
 } from '@tabler/icons-react';
-import { useAutoOrderAnalysis, useCreateAutoOrders } from '@/services/api/auto-order';
+import { useAutoOrderAnalysis } from '@/services/api/auto-order';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useToast } from '@/hooks/common/use-toast';
 import { formatCurrency, formatNumberWithDecimals } from '@/utils/number';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -44,7 +42,6 @@ const CRITICALITY_OPTIONS = [
 ];
 
 export const AutomaticOrderListPage = () => {
-  const { toast } = useToast();
   const [searchValue, setSearchValue] = useState('');
   const [minStockCriteria, setMinStockCriteria] = useState<'all' | 'low' | 'critical'>('all');
   const [sortConfigs, setSortConfigs] = useState<Map<string, SortConfig>>(new Map());
@@ -64,45 +61,6 @@ export const AutomaticOrderListPage = () => {
   } = useAutoOrderAnalysis({
     minStockCriteria,
   });
-
-  const createAutoOrders = useCreateAutoOrders();
-
-  const handleCreateOrders = async () => {
-    if (!analysisData?.data.recommendations || analysisData.data.recommendations.length === 0) {
-      toast({
-        title: 'Nenhum item para ordenar',
-        description: 'Não há recomendações de pedidos automáticos',
-        variant: 'error',
-      });
-      return;
-    }
-
-    const recommendations = analysisData.data.recommendations;
-
-    try {
-      await createAutoOrders.mutateAsync({
-        recommendations: recommendations.map(r => ({
-          itemId: r.itemId,
-          quantity: r.recommendedOrderQuantity,
-          reason: r.reason,
-        })),
-        groupBySupplier: true,
-      });
-
-      toast({
-        title: 'Pedidos criados com sucesso',
-        description: `${recommendations.length} item(ns) adicionado(s) aos pedidos`,
-      });
-
-      refetch();
-    } catch (error) {
-      toast({
-        title: 'Erro ao criar pedidos',
-        description: 'Não foi possível criar os pedidos automáticos',
-        variant: 'error',
-      });
-    }
-  };
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {
@@ -224,15 +182,6 @@ export const AutomaticOrderListPage = () => {
               onClick: () => refetch(),
               variant: 'outline',
               loading: isRefetching,
-            },
-            {
-              key: 'create',
-              label: 'Criar Pedidos (0)',
-              icon: IconShoppingCart,
-              onClick: handleCreateOrders,
-              variant: 'default',
-              disabled: !analysisData?.data.recommendations?.length,
-              loading: createAutoOrders.isPending,
             },
           ]}
           className="flex-shrink-0"

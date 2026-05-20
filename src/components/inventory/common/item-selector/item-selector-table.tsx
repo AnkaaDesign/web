@@ -76,6 +76,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   onTemporaryItemAdd,
   onTemporaryItemUpdate,
   onTemporaryItemRemove,
+  cycleDays,
 }) => {
   // Local state for immediate UI updates
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTermProp || "");
@@ -185,8 +186,8 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   };
 
   const allColumns = useMemo(
-    () => createItemSelectorColumns(editableColumns, contextRef.current),
-    [editableColumns]
+    () => createItemSelectorColumns(editableColumns, contextRef.current, { cycleDays }),
+    [editableColumns, cycleDays]
   );
 
   // Filter columns by visibility

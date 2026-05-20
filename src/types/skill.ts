@@ -80,12 +80,23 @@ export interface Skill extends BaseEntity {
   };
 }
 
+export interface AssessmentSectorEvaluatee {
+  assessmentId: string;
+  sectorId: string;
+  userId: string;
+
+  user?: User;
+}
+
 export interface AssessmentSector {
   assessmentId: string;
   sectorId: string;
+  appraiserId?: string | null;
 
   assessment?: Assessment;
   sector?: Sector;
+  appraiser?: User | null;
+  evaluatees?: AssessmentSectorEvaluatee[];
 }
 
 export interface AssessmentSkill {
@@ -343,12 +354,18 @@ export interface TopicLevelsUpsertFormData {
   levels: TopicLevelFormData[]; // upsert (replace by score) — usually 6 entries
 }
 
+export interface AssessmentSectorConfig {
+  sectorId: string;
+  appraiserId?: string | null;
+  evaluateeIds: string[];
+}
+
 export interface AssessmentCreateFormData {
   name: string;
   description?: string | null;
   periodStart: Date;
   periodEnd: Date;
-  sectorIds: string[];
+  sectors: AssessmentSectorConfig[];
   // either pass topicIds directly OR pass skillIds (which expand to all their topics)
   topicIds?: string[];
   skillIds?: string[];
@@ -359,7 +376,7 @@ export interface AssessmentUpdateFormData {
   description?: string | null;
   periodStart?: Date;
   periodEnd?: Date;
-  sectorIds?: string[];
+  sectors?: AssessmentSectorConfig[];
   topicIds?: string[];
   skillIds?: string[];
 }

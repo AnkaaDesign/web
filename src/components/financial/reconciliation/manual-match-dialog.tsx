@@ -20,6 +20,7 @@ import type { BankTransaction, MatchCandidate } from "@/types/reconciliation";
 import type { ManualMatchPayload } from "@/schemas/reconciliation";
 import { getConfidenceBadgeVariant } from "./match-status-badge";
 import { MatchCard } from "./match-card";
+import { docTypeLabel, docTypeVariant } from "./fiscal-doc-badge";
 
 interface Props {
   open: boolean;
@@ -177,8 +178,8 @@ export function ManualMatchDialog({
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-2 flex-wrap min-w-0">
                         {doc?.docType && (
-                          <Badge size="sm" variant="inProgress">
-                            {doc.docType}
+                          <Badge size="sm" variant={docTypeVariant(doc.docType)}>
+                            {docTypeLabel(doc.docType)}
                           </Badge>
                         )}
                         <span className="font-medium truncate">
@@ -283,8 +284,8 @@ export function ManualMatchDialog({
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge size="sm" variant="inProgress">
-                        {c.docType}
+                      <Badge size="sm" variant={docTypeVariant(c.docType)}>
+                        {docTypeLabel(c.docType)}
                       </Badge>
                       <span className="font-medium truncate">
                         {c.emitName || (c.emitCnpj ? formatCNPJ(c.emitCnpj) : "—")}
