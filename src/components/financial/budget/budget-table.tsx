@@ -90,7 +90,6 @@ export function BudgetTable({ className, searchingFor, filters }: BudgetTablePro
         },
       },
       where: {
-        status: "COMPLETED",
         quote: {
           is: { status: { in: ["PENDING", "BUDGET_APPROVED"] } },
         },

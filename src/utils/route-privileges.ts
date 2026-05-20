@@ -65,6 +65,7 @@ export const ROUTE_PRIVILEGES: Record<string, RoutePrivilegeValue> = {
   "/statistics": "ADMIN",
   "/statistics/*": "ADMIN",
   // PRODUCTION_MANAGER stat pages — explicit allowlist (otherwise falls back to ADMIN default)
+  "/estatisticas/recursos-humanos": ["ADMIN", "PRODUCTION_MANAGER"],
   "/estatisticas/recursos-humanos/equipe": ["ADMIN", "PRODUCTION_MANAGER"],
   "/estatisticas/recursos-humanos/competencias": ["ADMIN", "PRODUCTION_MANAGER"],
   "/estatisticas/producao/desempenho": ["ADMIN", "PRODUCTION_MANAGER"],
