@@ -5,6 +5,8 @@ import { reconciliationService } from "@/api-client/reconciliation";
 import { siegService } from "@/api-client/sieg";
 import { reconciliationKeys } from "@/hooks/common/query-keys";
 import type {
+  ChangeCategoryPayload,
+  ClassifyBatchPayload,
   FiscalDocumentFilters,
   TransactionFilters,
 } from "@/types/reconciliation";
@@ -144,6 +146,33 @@ export function useRunAutoMatch() {
   return useMutation({
     mutationFn: (payload: RerunMatchingPayload) =>
       reconciliationService.runAutoMatch(payload).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reconciliationKeys.all });
+    },
+  });
+}
+
+export function useChangeCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      transactionId,
+      payload,
+    }: {
+      transactionId: string;
+      payload: ChangeCategoryPayload;
+    }) => reconciliationService.changeCategory(transactionId, payload).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reconciliationKeys.all });
+    },
+  });
+}
+
+export function useClassifyBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ClassifyBatchPayload) =>
+      reconciliationService.classifyBatch(payload).then(r => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reconciliationKeys.all });
     },

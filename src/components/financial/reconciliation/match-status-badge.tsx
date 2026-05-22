@@ -1,17 +1,48 @@
 import { Badge } from "@/components/ui/badge";
 import type { BadgeProps } from "@/components/ui/badge";
-import type { MatchStatus } from "@/types/reconciliation";
+import type {
+  ReconciliationCategory,
+  ReconciliationSource,
+  ReconciliationStatus,
+} from "@/types/reconciliation";
 
-const STATUS_CONFIG: Record<
-  MatchStatus,
-  { label: string; variant: "completed" | "pending" | "inProgress" | "muted" | "cancelled" }
+export const STATUS_LABEL: Record<ReconciliationStatus, string> = {
+  PENDING: "Pendente",
+  RECONCILED: "Conciliado",
+  PARTIAL: "Parcial",
+  IGNORED: "Ignorado",
+  DISPUTED: "Em disputa",
+};
+
+const STATUS_VARIANT: Record<
+  ReconciliationStatus,
+  "completed" | "pending" | "inProgress" | "muted" | "cancelled"
 > = {
-  UNMATCHED: { label: "Não conciliado", variant: "pending" },
-  AUTO_MATCHED: { label: "Conciliado (auto)", variant: "inProgress" },
-  MANUAL_MATCHED: { label: "Conciliado", variant: "completed" },
-  PARTIAL: { label: "Parcial", variant: "pending" },
-  IGNORED: { label: "Ignorado", variant: "muted" },
-  DISPUTED: { label: "Em disputa", variant: "cancelled" },
+  PENDING: "pending",
+  RECONCILED: "completed",
+  PARTIAL: "pending",
+  IGNORED: "muted",
+  DISPUTED: "cancelled",
+};
+
+export const CATEGORY_LABEL: Record<ReconciliationCategory, string> = {
+  NF: "NF",
+  TRIBUTO: "Tributo",
+  FOLHA: "Folha",
+  TRANSFERENCIA: "Transferência",
+  TARIFA_BANCARIA: "Tarifa Bancária",
+  CONVENIO: "Convênio",
+  PRO_LABORE: "Pró-Labore",
+  ALUGUEL: "Aluguel",
+  ESTORNO: "Estorno",
+  OUTROS: "Outros",
+  UNCLASSIFIED: "Não classificado",
+};
+
+// Only MANUAL is annotated — AUTO is the default state and would just add
+// visual noise. The filter sheet still exposes both sources for querying.
+const SOURCE_LABEL: Partial<Record<ReconciliationSource, string>> = {
+  MANUAL: "manual",
 };
 
 /**
@@ -31,18 +62,49 @@ export function getConfidenceBadgeVariant(confidence: number): BadgeProps["varia
 }
 
 interface Props {
-  status: MatchStatus;
+  status: ReconciliationStatus;
+  category?: ReconciliationCategory;
+  source?: ReconciliationSource | null;
+  // NF confidence score, only displayed when the row is RECONCILED via NF auto-match.
   confidence?: number | null;
+  className?: string;
 }
 
-export function MatchStatusBadge({ status, confidence }: Props) {
-  const cfg = STATUS_CONFIG[status];
-  if (status === "AUTO_MATCHED" && typeof confidence === "number") {
-    return (
-      <Badge variant={cfg.variant} className="whitespace-nowrap">
-        {cfg.label} · {confidence}%
-      </Badge>
-    );
-  }
-  return <Badge variant={cfg.variant} className="whitespace-nowrap">{cfg.label}</Badge>;
+/**
+ * Renders the reconciliation state as a two-part chip:
+ *
+ *   [Status] · [Category] (source) [· confidence%]
+ *
+ * Example: "Conciliado · Tarifa Bancária (auto)"
+ * Example: "Conciliado · NF (auto) · 92%"
+ * Example: "Pendente · NF"
+ *
+ * Skips the category chip when UNCLASSIFIED — only the status appears.
+ */
+export function MatchStatusBadge({
+  status,
+  category,
+  source,
+  confidence,
+  className,
+}: Props) {
+  const cfg = STATUS_VARIANT[status];
+  const showCategory = category && category !== "UNCLASSIFIED";
+  const showConfidence =
+    status === "RECONCILED" &&
+    category === "NF" &&
+    source === "AUTO" &&
+    typeof confidence === "number";
+
+  const parts: string[] = [STATUS_LABEL[status]];
+  if (showCategory) parts.push(`· ${CATEGORY_LABEL[category!]}`);
+  const sourceTag = source && status === "RECONCILED" ? SOURCE_LABEL[source] : undefined;
+  if (sourceTag) parts.push(`(${sourceTag})`);
+  if (showConfidence) parts.push(`· ${confidence}%`);
+
+  return (
+    <Badge variant={cfg} className={`whitespace-nowrap ${className ?? ""}`}>
+      {parts.join(" ")}
+    </Badge>
+  );
 }

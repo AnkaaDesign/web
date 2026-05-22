@@ -18,6 +18,7 @@ import { ManualMatchDialog } from "@/components/financial/reconciliation/manual-
 import { ScoringWorkflowDialog } from "@/components/financial/reconciliation/scoring-workflow-dialog";
 import { UnmatchConfirmDialog } from "@/components/financial/reconciliation/unmatch-confirm-dialog";
 import { IgnoreTransactionDialog } from "@/components/financial/reconciliation/ignore-transaction-dialog";
+import { CategoryPickerDialog } from "@/components/financial/reconciliation/category-picker-dialog";
 import {
   ReconciliationFilterSheet,
   getDefaultReconciliationFilters,
@@ -26,6 +27,7 @@ import {
 import {
   useBankTransaction,
   useBankTransactions,
+  useChangeCategory,
   useIgnoreTransaction,
   useMatchTransaction,
   useRunAutoMatch,
@@ -39,11 +41,20 @@ import type {
   BankTransaction,
   BankTransactionSubtype,
   MatchType,
+  ReconciliationCategory,
 } from "@/types/reconciliation";
 
 // Upper bound passed to the API when the user is in period mode. Matches the
 // API DTO cap so a busy month/year still fits in a single fetch.
 const PERIOD_PAGE_SIZE = 1000;
+
+// Defensive guard: dialog URL state should hold a BankTransaction UUID. If a
+// non-UUID slips in (e.g. because a future URL key collision aliases a filter
+// value into a dialog hook), skip the fetch rather than triggering a 404.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const asUuid = (v: string | null | undefined): string | undefined =>
+  v && UUID_RE.test(v) ? v : undefined;
 
 function parseMonthsParam(raw: string | null): string[] | undefined {
   if (!raw) return undefined;
@@ -60,9 +71,24 @@ function parseFiltersFromUrl(params: URLSearchParams): ReconciliationFilters {
   const def = getDefaultReconciliationFilters();
   const yearParam = params.get("year");
   const monthsParam = parseMonthsParam(params.get("months"));
+  const categoryParam = params.get("category");
+  // Comma-separated category multi-select: `?category=NF,TARIFA_BANCARIA`.
+  const categories: ReconciliationCategory[] = categoryParam
+    ? (categoryParam.split(",").filter(Boolean) as ReconciliationCategory[])
+    : [];
   return {
-    matchStatus:
-      (params.get("matchStatus") as ReconciliationFilters["matchStatus"]) || undefined,
+    reconciliationStatus:
+      (params.get("reconciliationStatus") as ReconciliationFilters["reconciliationStatus"]) ||
+      undefined,
+    category:
+      categories.length > 1
+        ? categories
+        : categories.length === 1
+          ? categories[0]
+          : undefined,
+    reconciliationSource:
+      (params.get("reconciliationSource") as ReconciliationFilters["reconciliationSource"]) ||
+      undefined,
     matchType: (params.get("matchType") as MatchType | null) || undefined,
     type: (params.get("type") as ReconciliationFilters["type"]) || def.type,
     subtype: (params.get("subtype") as BankTransactionSubtype | null) || undefined,
@@ -158,7 +184,9 @@ export const ReconciliationTransactionsListPage = () => {
     sortBy: "postedAt",
     sortDir: "desc",
     search: searchText || undefined,
-    matchStatus: filters.matchStatus,
+    reconciliationStatus: filters.reconciliationStatus,
+    category: filters.category,
+    reconciliationSource: filters.reconciliationSource,
     matchType: filters.matchType,
     type: filters.type,
     subtype: filters.subtype,
@@ -176,34 +204,42 @@ export const ReconciliationTransactionsListPage = () => {
   const txDialog = useUrlDialog("txId");
   const unmatchDialog = useUrlDialog("unmatch");
   const ignoreDialog = useUrlDialog("ignore");
+  // Distinct from the ?category= FILTER URL key. If both shared the same key,
+  // filtering by category would also open the category-edit dialog with the
+  // category enum value (e.g. "TRIBUTO") interpreted as a transaction ID,
+  // triggering a phantom GET /transactions/TRIBUTO → 404.
+  const categoryDialog = useUrlDialog("editCategory");
 
   // Prefer the already-loaded list row; fall back to fetching the single tx
   // by id when the deep link arrives before the list contains it (e.g., the
   // user shared a link to a tx that's on a different page).
+  const txDialogId = asUuid(txDialog.value);
   const txFromList = useMemo<BankTransaction | null>(() => {
-    if (!txDialog.value || !data) return null;
-    return data.data.find(t => t.id === txDialog.value) ?? null;
-  }, [txDialog.value, data]);
+    if (!txDialogId || !data) return null;
+    return data.data.find(t => t.id === txDialogId) ?? null;
+  }, [txDialogId, data]);
   const { data: fetchedTx } = useBankTransaction(
-    txDialog.value && !txFromList ? txDialog.value : undefined,
+    txDialogId && !txFromList ? txDialogId : undefined,
   );
   const matchTx = txFromList ?? fetchedTx ?? null;
 
+  const unmatchDialogId = asUuid(unmatchDialog.value);
   const unmatchTxFromList = useMemo<BankTransaction | null>(() => {
-    if (!unmatchDialog.value || !data) return null;
-    return data.data.find(t => t.id === unmatchDialog.value) ?? null;
-  }, [unmatchDialog.value, data]);
+    if (!unmatchDialogId || !data) return null;
+    return data.data.find(t => t.id === unmatchDialogId) ?? null;
+  }, [unmatchDialogId, data]);
   const { data: fetchedUnmatchTx } = useBankTransaction(
-    unmatchDialog.value && !unmatchTxFromList ? unmatchDialog.value : undefined,
+    unmatchDialogId && !unmatchTxFromList ? unmatchDialogId : undefined,
   );
   const unmatchTx = unmatchTxFromList ?? fetchedUnmatchTx ?? null;
 
+  const ignoreDialogId = asUuid(ignoreDialog.value);
   const ignoreTxFromList = useMemo<BankTransaction | null>(() => {
-    if (!ignoreDialog.value || !data) return null;
-    return data.data.find(t => t.id === ignoreDialog.value) ?? null;
-  }, [ignoreDialog.value, data]);
+    if (!ignoreDialogId || !data) return null;
+    return data.data.find(t => t.id === ignoreDialogId) ?? null;
+  }, [ignoreDialogId, data]);
   const { data: fetchedIgnoreTx } = useBankTransaction(
-    ignoreDialog.value && !ignoreTxFromList ? ignoreDialog.value : undefined,
+    ignoreDialogId && !ignoreTxFromList ? ignoreDialogId : undefined,
   );
   const ignoreTx = ignoreTxFromList ?? fetchedIgnoreTx ?? null;
 
@@ -211,6 +247,17 @@ export const ReconciliationTransactionsListPage = () => {
   const unmatchMut = useUnmatchTransaction();
   const ignoreMut = useIgnoreTransaction();
   const runMut = useRunAutoMatch();
+  const categoryMut = useChangeCategory();
+
+  const categoryDialogId = asUuid(categoryDialog.value);
+  const categoryTxFromList = useMemo<BankTransaction | null>(() => {
+    if (!categoryDialogId || !data) return null;
+    return data.data.find(t => t.id === categoryDialogId) ?? null;
+  }, [categoryDialogId, data]);
+  const { data: fetchedCategoryTx } = useBankTransaction(
+    categoryDialogId && !categoryTxFromList ? categoryDialogId : undefined,
+  );
+  const categoryTx = categoryTxFromList ?? fetchedCategoryTx ?? null;
 
   // Keep the search query in the URL for shareability. Avoid writing when
   // nothing changed to prevent render loops.
@@ -230,7 +277,9 @@ export const ReconciliationTransactionsListPage = () => {
       const params = new URLSearchParams(searchParams);
       // Strip prior filter keys, preserve modal/search params.
       [
-        "matchStatus",
+        "reconciliationStatus",
+        "category",
+        "reconciliationSource",
         "matchType",
         "type",
         "subtype",
@@ -241,7 +290,14 @@ export const ReconciliationTransactionsListPage = () => {
         "counterparty",
       ].forEach(k => params.delete(k));
       // Serialize back: months is JSON-encoded; everything else is a plain string.
-      if (next.matchStatus) params.set("matchStatus", next.matchStatus);
+      if (next.reconciliationStatus) params.set("reconciliationStatus", next.reconciliationStatus);
+      if (next.category) {
+        params.set(
+          "category",
+          Array.isArray(next.category) ? next.category.join(",") : next.category,
+        );
+      }
+      if (next.reconciliationSource) params.set("reconciliationSource", next.reconciliationSource);
       if (next.matchType) params.set("matchType", next.matchType);
       if (next.type) params.set("type", next.type);
       if (next.subtype) params.set("subtype", next.subtype);
@@ -259,7 +315,9 @@ export const ReconciliationTransactionsListPage = () => {
   const activeFilterCount = useMemo(() => {
     const def = getDefaultReconciliationFilters();
     let count = 0;
-    if (filters.matchStatus) count++;
+    if (filters.reconciliationStatus) count++;
+    if (filters.category) count++;
+    if (filters.reconciliationSource) count++;
     if (filters.matchType) count++;
     if (filters.type !== def.type) count++;
     if (filters.subtype) count++;
@@ -310,9 +368,13 @@ export const ReconciliationTransactionsListPage = () => {
                   {},
                   {
                     onSuccess: r => {
+                      // Pipeline result: classifier ran first, then NF matcher.
+                      // Surface the totals from both stages so the user sees
+                      // exactly what happened.
+                      const classified = r.classified?.reconciled ?? 0;
                       toast({
-                        title: "Conciliação reexecutada",
-                        description: `${r.matched} transação(ões) conciliada(s)`,
+                        title: "Conciliação concluída",
+                        description: `${classified} auto-classificada(s) · ${r.matched} NF(s) conciliada(s)`,
                         variant: "success",
                       });
                       refetch();
@@ -377,6 +439,7 @@ export const ReconciliationTransactionsListPage = () => {
                   onMatch={tx => txDialog.set(tx.id)}
                   onUnmatch={tx => unmatchDialog.set(tx.id)}
                   onIgnore={tx => ignoreDialog.set(tx.id)}
+                  onChangeCategory={tx => categoryDialog.set(tx.id)}
                   onViewDetails={tx => txDialog.set(tx.id)}
                 />
               </div>
@@ -471,6 +534,31 @@ export const ReconciliationTransactionsListPage = () => {
               onError: err =>
                 toast({
                   title: "Falha ao ignorar transação",
+                  description: (err as Error).message,
+                  variant: "error",
+                }),
+            },
+          );
+        }}
+      />
+
+      <CategoryPickerDialog
+        open={categoryDialog.open}
+        onOpenChange={open => !open && categoryDialog.clear()}
+        transaction={categoryTx}
+        isLoading={categoryMut.isPending}
+        onConfirm={payload => {
+          if (!categoryTx) return;
+          categoryMut.mutate(
+            { transactionId: categoryTx.id, payload },
+            {
+              onSuccess: () => {
+                toast({ title: "Categoria atualizada", variant: "success" });
+                categoryDialog.clear();
+              },
+              onError: err =>
+                toast({
+                  title: "Falha ao alterar categoria",
                   description: (err as Error).message,
                   variant: "error",
                 }),

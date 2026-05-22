@@ -4,6 +4,7 @@ import {
   IconArrowUpRight,
   IconBan,
   IconCash,
+  IconCategory,
   IconChevronRight,
   IconEye,
   IconLink,
@@ -25,7 +26,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { MatchStatusBadge } from "./match-status-badge";
+import { CATEGORY_LABEL, MatchStatusBadge } from "./match-status-badge";
 import { cn } from "@/lib/utils";
 import { routes } from "@/constants";
 import {
@@ -48,6 +49,7 @@ interface Props {
   onUnmatch?: (tx: BankTransaction) => void;
   onIgnore?: (tx: BankTransaction) => void;
   onViewDetails?: (tx: BankTransaction) => void;
+  onChangeCategory?: (tx: BankTransaction) => void;
 }
 
 const WEEKDAYS_SHORT = ["Dom.", "Seg.", "Ter.", "Qua.", "Qui.", "Sex.", "Sáb."];
@@ -96,6 +98,7 @@ export function TransactionsByDateAccordion({
   onUnmatch,
   onIgnore,
   onViewDetails,
+  onChangeCategory,
 }: Props) {
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -142,8 +145,12 @@ export function TransactionsByDateAccordion({
         const amt = Math.abs(Number(t.amount) || 0);
         if (t.type === "CREDIT") credits += amt;
         else debits += amt;
-        if (t.matchStatus === "AUTO_MATCHED" || t.matchStatus === "MANUAL_MATCHED") matched += 1;
-        else if (t.matchStatus === "IGNORED") ignored += 1;
+        // RECONCILED + PARTIAL both count as resolved in the daily counter —
+        // they're explained, even if partially. Only PENDING/DISPUTED pull
+        // their weight against the ratio.
+        if (t.reconciliationStatus === "RECONCILED" || t.reconciliationStatus === "PARTIAL")
+          matched += 1;
+        else if (t.reconciliationStatus === "IGNORED") ignored += 1;
         else pending += 1;
       }
       out.set(day, { count: txs.length, credits, debits, matched, ignored, pending });
@@ -165,7 +172,7 @@ export function TransactionsByDateAccordion({
       // Wider so longer emitter names ("FARBEN S/A INDUSTRIA QUIMICA") fit
       // without truncation. The freed space comes from Contraparte (flex).
       { key: "linkedNf", header: "NF vinculada", width: "300px", show: true },
-      { key: "matchStatus", header: "Status", width: "220px", show: true },
+      { key: "reconciliationStatus", header: "Status", width: "260px", show: true },
     ],
     [showAccountColumn],
   );
@@ -295,7 +302,7 @@ export function TransactionsByDateAccordion({
                 Ver detalhes
               </DropdownMenuItem>
             )}
-            {onMatch && ctxTx.matchStatus !== "MANUAL_MATCHED" && (
+            {onMatch && !(ctxTx.reconciliationStatus === "RECONCILED" && ctxTx.reconciliationSource === "MANUAL") && (
               <DropdownMenuItem
                 onClick={() => {
                   onMatch(ctxTx);
@@ -304,6 +311,17 @@ export function TransactionsByDateAccordion({
               >
                 <IconLink className="h-4 w-4 mr-2" />
                 Conciliar manualmente
+              </DropdownMenuItem>
+            )}
+            {onChangeCategory && (
+              <DropdownMenuItem
+                onClick={() => {
+                  onChangeCategory(ctxTx);
+                  closeContextMenu();
+                }}
+              >
+                <IconCategory className="h-4 w-4 mr-2" />
+                Alterar categoria
               </DropdownMenuItem>
             )}
             {onUnmatch && ctxHasMatches && (
@@ -321,7 +339,7 @@ export function TransactionsByDateAccordion({
                 </DropdownMenuItem>
               </>
             )}
-            {onIgnore && ctxTx.matchStatus !== "IGNORED" && (
+            {onIgnore && ctxTx.reconciliationStatus !== "IGNORED" && (
               <DropdownMenuItem
                 onClick={() => {
                   onIgnore(ctxTx);
@@ -487,7 +505,7 @@ function DayGroup({
               </TableCell>
             );
           }
-          if (c.key === "matchStatus") {
+          if (c.key === "reconciliationStatus") {
             return (
               <TableCell key={c.key} className="p-0 !border-r-0">
                 {!isEmpty ? (
@@ -585,6 +603,15 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
       const extraCount =
         (t.matches?.filter(m => m.fiscalDocument).length ?? 0) - 1;
       if (!firstDoc?.id) {
+        // For self-justifying categories surface the category label so the
+        // column carries real info instead of a dash.
+        if (t.category && t.category !== "UNCLASSIFIED" && t.category !== "NF") {
+          return (
+            <span className="text-muted-foreground text-xs italic">
+              {CATEGORY_LABEL[t.category]}
+            </span>
+          );
+        }
         return <span className="text-muted-foreground text-xs">—</span>;
       }
       const emitDisplay = firstDoc.emitName
@@ -607,9 +634,16 @@ function renderCell(key: string, t: BankTransaction): React.ReactNode {
         </Link>
       );
     }
-    case "matchStatus": {
+    case "reconciliationStatus": {
       const conf = t.matches?.[0]?.confidenceScore;
-      return <MatchStatusBadge status={t.matchStatus} confidence={conf} />;
+      return (
+        <MatchStatusBadge
+          status={t.reconciliationStatus}
+          category={t.category}
+          source={t.reconciliationSource}
+          confidence={conf}
+        />
+      );
     }
     default:
       return null;

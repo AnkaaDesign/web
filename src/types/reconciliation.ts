@@ -1,10 +1,27 @@
-export type MatchStatus =
-  | "UNMATCHED"
-  | "AUTO_MATCHED"
-  | "MANUAL_MATCHED"
+// Lifecycle (independent from how it got there and what category it is).
+export type ReconciliationStatus =
+  | "PENDING"
+  | "RECONCILED"
   | "PARTIAL"
   | "IGNORED"
   | "DISPUTED";
+
+export type ReconciliationSource = "AUTO" | "MANUAL";
+
+// What kind of payment. Drives whether NF matching applies. Non-NF categories
+// are self-justifying — reconciled by virtue of being classified.
+export type ReconciliationCategory =
+  | "NF"
+  | "TRIBUTO"
+  | "FOLHA"
+  | "TRANSFERENCIA"
+  | "TARIFA_BANCARIA"
+  | "CONVENIO"
+  | "PRO_LABORE"
+  | "ALUGUEL"
+  | "ESTORNO"
+  | "OUTROS"
+  | "UNCLASSIFIED";
 
 export type MatchType = "EXACT" | "VALUE_DATE" | "FUZZY" | "MANUAL" | "BANK_SLIP_BRIDGE";
 
@@ -47,7 +64,11 @@ export interface BankTransaction {
   counterpartyCnpjCpf: string | null;
   counterpartyName: string | null;
   runningBalance: number | null;
-  matchStatus: MatchStatus;
+  reconciliationStatus: ReconciliationStatus;
+  reconciliationSource: ReconciliationSource | null;
+  category: ReconciliationCategory;
+  categorySource: ReconciliationSource | null;
+  classifiedAt: string | null;
   ignoredReason: string | null;
   bankSlipId: string | null;
   rawFileId: string | null;
@@ -187,7 +208,8 @@ export interface ReconciliationStatistics {
   matchedOverTime: Array<{ period: string; matched: number; unmatched: number }>;
   topUnmatchedByCounterparty: Array<{ counterparty: string; amount: number; count: number }>;
   matchTypeDistribution: Record<MatchType, number>;
-  matchStatusDistribution: Record<MatchStatus, number>;
+  statusDistribution: Record<ReconciliationStatus, number>;
+  categoryDistribution: Record<ReconciliationCategory, number>;
 }
 
 export interface ReconciliationPaginationMeta {
@@ -205,7 +227,9 @@ export interface ReconciliationPaginatedResponse<T> {
 export interface TransactionFilters {
   page?: number;
   pageSize?: number;
-  matchStatus?: MatchStatus;
+  reconciliationStatus?: ReconciliationStatus | ReconciliationStatus[];
+  category?: ReconciliationCategory | ReconciliationCategory[];
+  reconciliationSource?: ReconciliationSource;
   matchType?: MatchType;
   type?: TransactionType;
   subtype?: BankTransactionSubtype;
@@ -217,6 +241,26 @@ export interface TransactionFilters {
   search?: string;
   sortBy?: "postedAt" | "amount";
   sortDir?: "asc" | "desc";
+}
+
+export interface ChangeCategoryPayload {
+  category: ReconciliationCategory;
+  saveAlias?: boolean;
+  notes?: string;
+}
+
+export interface ClassifyBatchPayload {
+  transactionIds?: string[];
+  reconciliationStatus?: ReconciliationStatus;
+  category?: ReconciliationCategory;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface ClassifyBatchResult {
+  processed: number;
+  reconciled: number;
+  byCategory: Record<string, number>;
 }
 
 export interface FiscalDocumentFilters {

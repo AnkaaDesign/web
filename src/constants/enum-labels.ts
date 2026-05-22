@@ -929,6 +929,102 @@ export function getDynamicFrequencyLabel(frequency: SCHEDULE_FREQUENCY, interval
   }
 }
 
+/**
+ * Returns the human-readable cadence detail suffix for a schedule.
+ * Examples:
+ *   - "Mensal — toda primeira quinta-feira"   (monthlyConfig.occurrence + dayOfWeek)
+ *   - "Bimestral — dia 10"                    (monthlyConfig.dayOfMonth or flat dayOfMonth)
+ *   - "Semanal — terça-feira"                 (weekly + dayOfWeek)
+ *   - "Anual — 15 de março"                   (annual + month + dayOfMonth)
+ *   - "Anual — primeira segunda-feira de Maio" (annual + yearlyConfig.occurrence)
+ * Composes with `getDynamicFrequencyLabel`. Returns the base label alone when
+ * no detail can be derived (e.g., schedule has no config attached yet).
+ */
+export function getScheduleCadenceLabel(
+  frequency: SCHEDULE_FREQUENCY,
+  frequencyCount: number = 1,
+  opts: {
+    dayOfMonth?: number | null;
+    dayOfWeek?: WEEK_DAY | string | null;
+    month?: MONTH | string | null;
+    monthlyConfig?: {
+      dayOfMonth?: number | null;
+      occurrence?: MONTH_OCCURRENCE | string | null;
+      dayOfWeek?: WEEK_DAY | string | null;
+    } | null;
+    weeklyConfig?: {
+      monday?: boolean; tuesday?: boolean; wednesday?: boolean;
+      thursday?: boolean; friday?: boolean; saturday?: boolean; sunday?: boolean;
+    } | null;
+    yearlyConfig?: {
+      month?: MONTH | string | null;
+      dayOfMonth?: number | null;
+      occurrence?: MONTH_OCCURRENCE | string | null;
+      dayOfWeek?: WEEK_DAY | string | null;
+    } | null;
+  } = {},
+): string {
+  const base = getDynamicFrequencyLabel(frequency, frequencyCount);
+  const detail = describeCadenceDetail(frequency, opts);
+  return detail ? `${base} — ${detail}` : base;
+}
+
+function describeCadenceDetail(
+  frequency: SCHEDULE_FREQUENCY,
+  opts: Parameters<typeof getScheduleCadenceLabel>[2],
+): string | null {
+  const wd = (v: any) => v ? (WEEK_DAY_LABELS as any)[v]?.toLowerCase() ?? null : null;
+  const occ = (v: any) => v ? (MONTH_OCCURRENCE_LABELS as any)[v]?.toLowerCase() ?? null : null;
+  const mo = (v: any) => v ? (MONTH_LABELS as any)[v] ?? null : null;
+
+  if (frequency === SCHEDULE_FREQUENCY.WEEKLY || frequency === SCHEDULE_FREQUENCY.BIWEEKLY) {
+    if (opts?.weeklyConfig) {
+      const days: string[] = [];
+      const w = opts.weeklyConfig;
+      if (w.monday) days.push("segunda");
+      if (w.tuesday) days.push("terça");
+      if (w.wednesday) days.push("quarta");
+      if (w.thursday) days.push("quinta");
+      if (w.friday) days.push("sexta");
+      if (w.saturday) days.push("sábado");
+      if (w.sunday) days.push("domingo");
+      if (days.length) return days.length === 1 ? `${days[0]}-feira` : days.join(", ");
+    }
+    if (opts?.dayOfWeek) return wd(opts.dayOfWeek);
+    return null;
+  }
+
+  const isMonthlyish =
+    frequency === SCHEDULE_FREQUENCY.MONTHLY ||
+    frequency === SCHEDULE_FREQUENCY.BIMONTHLY ||
+    frequency === SCHEDULE_FREQUENCY.QUARTERLY ||
+    frequency === SCHEDULE_FREQUENCY.TRIANNUAL ||
+    frequency === SCHEDULE_FREQUENCY.QUADRIMESTRAL ||
+    frequency === SCHEDULE_FREQUENCY.SEMI_ANNUAL;
+
+  if (isMonthlyish) {
+    const mc = opts?.monthlyConfig;
+    if (mc?.occurrence && mc?.dayOfWeek) {
+      return `toda ${occ(mc.occurrence)} ${wd(mc.dayOfWeek)}-feira`;
+    }
+    const dom = mc?.dayOfMonth ?? opts?.dayOfMonth ?? null;
+    if (dom != null) return `dia ${dom}`;
+    return null;
+  }
+
+  if (frequency === SCHEDULE_FREQUENCY.ANNUAL) {
+    const yc = opts?.yearlyConfig;
+    if (yc?.month && yc?.occurrence && yc?.dayOfWeek) {
+      return `${occ(yc.occurrence)} ${wd(yc.dayOfWeek)}-feira de ${mo(yc.month)}`;
+    }
+    if (yc?.month && yc?.dayOfMonth) return `${yc.dayOfMonth} de ${mo(yc.month)}`;
+    if (opts?.month && opts?.dayOfMonth) return `${opts.dayOfMonth} de ${mo(opts.month)}`;
+    return null;
+  }
+
+  return null;
+}
+
 export const PANTS_SIZE_LABELS: Record<PANTS_SIZE, string> = {
   [PANTS_SIZE.SIZE_36]: "36",
   [PANTS_SIZE.SIZE_38]: "38",

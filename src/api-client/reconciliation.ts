@@ -2,6 +2,9 @@ import type { AxiosProgressEvent } from "axios";
 import { apiClient } from "./axiosClient";
 import type {
   BankTransaction,
+  ChangeCategoryPayload,
+  ClassifyBatchPayload,
+  ClassifyBatchResult,
   FiscalDocument,
   FiscalDocumentFilters,
   ImportSummary,
@@ -81,8 +84,20 @@ export const reconciliationService = {
       payload,
     ),
 
+  changeCategory: (transactionId: string, payload: ChangeCategoryPayload) =>
+    apiClient.post<BankTransaction>(
+      `/financial/reconciliation/transactions/${transactionId}/category`,
+      payload,
+    ),
+
+  classifyBatch: (payload: ClassifyBatchPayload) =>
+    apiClient.post<ClassifyBatchResult>("/financial/reconciliation/classify", payload),
+
   runAutoMatch: (payload: RerunMatchingPayload) =>
-    apiClient.post<{ matched: number }>("/financial/reconciliation/run", payload),
+    apiClient.post<{ classified: ClassifyBatchResult; matched: number }>(
+      "/financial/reconciliation/run",
+      payload,
+    ),
 
   getStatistics: (params: { from?: string; to?: string; months?: number }) =>
     apiClient.get<ReconciliationStatistics>("/financial/reconciliation/statistics", { params }),

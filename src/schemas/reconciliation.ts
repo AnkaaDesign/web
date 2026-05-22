@@ -62,7 +62,7 @@ export const rerunMatchingSchema = z.object({
   transactionIds: z.array(z.string().uuid()).optional(),
   dateStart: z.string().optional(),
   dateEnd: z.string().optional(),
-  // Omit all fields to re-run against ALL UNMATCHED transactions.
+  // Omit all fields to re-run against ALL PENDING NF transactions.
   runAll: z.boolean().optional(),
 });
 

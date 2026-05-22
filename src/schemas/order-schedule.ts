@@ -3,7 +3,20 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, dateRangeSchema, uuidArraySchema } from "./common";
 import type { OrderSchedule } from "../types";
-import { SCHEDULE_FREQUENCY } from "../constants";
+import { SCHEDULE_FREQUENCY, MONTH_OCCURRENCE, WEEK_DAY } from "../constants";
+
+// Inline nested-create payload for MonthlyScheduleConfig.
+// Used when the user picks "Dia da semana específico do mês" (e.g. 1st Thursday)
+// instead of a flat day-of-month. Field name on the wire is `monthlySchedule`
+// to match the API repo (`weeklySchedule`/`monthlySchedule`/`yearlySchedule`
+// in mapCreateFormDataToDatabaseCreateInput); the read-side relation is still
+// `monthlyConfig`.
+const monthlyScheduleInlineSchema = z
+  .object({
+    occurrence: z.nativeEnum(MONTH_OCCURRENCE, { errorMap: () => ({ message: "Ocorrência inválida" }) }),
+    dayOfWeek: z.nativeEnum(WEEK_DAY, { errorMap: () => ({ message: "Dia da semana inválido" }) }),
+  })
+  .strict();
 
 // =====================
 // OrderSchedule Include Schemas
@@ -659,6 +672,13 @@ export const orderScheduleCreateSchema = z
     weeklyConfigId: z.string().uuid("Configuração semanal inválida").optional(),
     monthlyConfigId: z.string().uuid("Configuração mensal inválida").optional(),
     yearlyConfigId: z.string().uuid("Configuração anual inválida").optional(),
+
+    // Inline positional config (sibling to monthlyConfigId). Wire name is
+    // `monthlySchedule` (the API repo destructures this exact key in
+    // mapCreateFormDataToDatabaseCreateInput and emits a Prisma nested-create).
+    // When set, dayOfMonth must be omitted — backend creates a new
+    // MonthlyScheduleConfig row + links it to the schedule.
+    monthlySchedule: monthlyScheduleInlineSchema.optional(),
   })
   .refine(
     (data) => {
@@ -677,9 +697,9 @@ export const orderScheduleCreateSchema = z
         case SCHEDULE_FREQUENCY.TRIANNUAL:
         case SCHEDULE_FREQUENCY.QUADRIMESTRAL:
         case SCHEDULE_FREQUENCY.SEMI_ANNUAL:
-          return !!data.dayOfMonth || !!data.monthlyConfigId;
+          return !!data.dayOfMonth || !!data.monthlyConfigId || !!data.monthlySchedule;
         case SCHEDULE_FREQUENCY.ANNUAL:
-          return (!!data.dayOfMonth && !!data.month) || !!data.yearlyConfigId;
+          return (!!data.dayOfMonth && !!data.month) || !!data.yearlyConfigId || !!data.monthlySchedule;
         case SCHEDULE_FREQUENCY.CUSTOM:
           return !!data.customMonths && data.customMonths.length > 0;
         default:
@@ -726,6 +746,12 @@ export const orderScheduleUpdateSchema = z
     weeklyConfigId: z.string().uuid().nullable().optional(),
     monthlyConfigId: z.string().uuid().nullable().optional(),
     yearlyConfigId: z.string().uuid().nullable().optional(),
+
+    // Inline positional config — wire name `monthlySchedule` matches the API
+    // repo's upsert path. Backend `upsert`s the linked MonthlyScheduleConfig
+    // row (creates if missing, updates if exists). Clear via undefined; the
+    // repo only acts when this key is present in the payload.
+    monthlySchedule: monthlyScheduleInlineSchema.optional(),
 
     // New auto-creation fields
     finishedAt: z.coerce.date().nullable().optional(),
@@ -816,6 +842,17 @@ export const mapOrderScheduleToFormData = createMapToFormDataHelper<OrderSchedul
   weeklyConfigId: orderSchedule.weeklyConfigId || null,
   monthlyConfigId: orderSchedule.monthlyConfigId || null,
   yearlyConfigId: orderSchedule.yearlyConfigId || null,
+  // Round-trip the loaded positional config back into the write-side `monthlySchedule`
+  // key (the API repo's create/update destructures `monthlySchedule`, not `monthlyConfig`).
+  // Requires include.monthlyConfig=true on the GET. Only populate when both
+  // occurrence + dayOfWeek are present — partial configs surface as undefined.
+  monthlySchedule:
+    orderSchedule.monthlyConfig?.occurrence && orderSchedule.monthlyConfig?.dayOfWeek
+      ? {
+          occurrence: orderSchedule.monthlyConfig.occurrence as MONTH_OCCURRENCE,
+          dayOfWeek: orderSchedule.monthlyConfig.dayOfWeek as WEEK_DAY,
+        }
+      : undefined,
   finishedAt: orderSchedule.finishedAt || null,
   lastRunId: orderSchedule.lastRunId || null,
   originalScheduleId: orderSchedule.originalScheduleId || null,

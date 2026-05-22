@@ -17,7 +17,7 @@ import {
 import type { OrderScheduleUpdateFormData } from "../../../../schemas";
 import { orderScheduleUpdateSchema } from "../../../../schemas";
 import { useOrderScheduleMutations } from "../../../../hooks";
-import { routes, SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, WEEK_DAY_LABELS, MONTH_LABELS } from "../../../../constants";
+import { routes, SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, WEEK_DAY_LABELS, MONTH_LABELS, MONTH_OCCURRENCE_LABELS, MONTH_OCCURRENCE, WEEK_DAY } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -26,6 +26,7 @@ import { FormSteps } from "@/components/ui/form-steps";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { ItemSelectorTable } from "../../common/item-selector/item-selector-table";
 import { DateTimeInput } from "@/components/ui/date-time-input";
@@ -40,6 +41,14 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const { updateMutation } = useOrderScheduleMutations();
+
+  // Initialize mode from loaded schedule: positional iff both occurrence+dayOfWeek present.
+  const hasPositionalConfig = Boolean(
+    schedule.monthlyConfig?.occurrence && schedule.monthlyConfig?.dayOfWeek,
+  );
+  const [monthlyScheduleMode, setMonthlyScheduleMode] = useState<"fixed" | "positional">(
+    hasPositionalConfig ? "positional" : "fixed",
+  );
 
   const steps = [
     {
@@ -73,6 +82,12 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
       dayOfMonth: schedule.dayOfMonth ?? undefined,
       dayOfWeek: schedule.dayOfWeek ?? undefined,
       month: schedule.month ?? undefined,
+      monthlySchedule: hasPositionalConfig
+        ? {
+            occurrence: schedule.monthlyConfig!.occurrence as MONTH_OCCURRENCE,
+            dayOfWeek: schedule.monthlyConfig!.dayOfWeek as WEEK_DAY,
+          }
+        : undefined,
     },
     mode: "onTouched",
     reValidateMode: "onChange",
@@ -295,6 +310,21 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
   const watchedMonth = form.watch("month");
   const watchedSpecificDate = form.watch("specificDate");
   const watchedNextRun = form.watch("nextRun");
+  const watchedMonthlySchedule = form.watch("monthlySchedule");
+
+  const handleMonthlyScheduleModeChange = useCallback(
+    (next: "fixed" | "positional") => {
+      setMonthlyScheduleMode(next);
+      if (next === "fixed") {
+        // undefined tells the form not to send a monthlySchedule key in the
+        // update payload; the API repo only acts on this key when present.
+        form.setValue("monthlySchedule", undefined as any, { shouldValidate: false });
+      } else {
+        form.setValue("dayOfMonth", null as any, { shouldValidate: false });
+      }
+    },
+    [form],
+  );
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
@@ -520,32 +550,103 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                                   />
                                 )}
 
-                                {/* Day of month field (for monthly/quarterly/annual frequencies) */}
+                                {/* Day-of-month vs positional weekday config (monthly-ish frequencies).
+                                    Annual still uses flat dayOfMonth+month — positional yearly is out of scope. */}
                                 {watchedFrequency && frequencyGroups.needsDayOfMonth.includes(watchedFrequency as SCHEDULE_FREQUENCY) && (
-                                  <FormField
-                                    control={form.control}
-                                    name="dayOfMonth"
-                                    render={({ field }) => (
-                                      <FormItem className="flex-1 min-w-[150px]">
-                                        <FormLabel>Dia do Mês <span className="text-destructive">*</span></FormLabel>
-                                        <FormControl>
-                                          <Input
-                                            type="number"
-                                            min={1}
-                                            max={31}
-                                            placeholder="1-31"
-                                            disabled={isSubmitting}
-                                            className="bg-transparent"
-                                            ref={field.ref}
-                                            value={field.value ?? ""}
-                                            onChange={(value) => field.onChange(typeof value === 'number' ? value : parseInt(String(value)) || undefined)}
-                                            onBlur={field.onBlur}
-                                          />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
+                                  <div className="flex flex-col gap-2 w-full">
+                                    {watchedFrequency !== SCHEDULE_FREQUENCY.ANNUAL && (
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-sm font-medium">Quando executar no mês</span>
+                                        <ToggleGroup
+                                          type="single"
+                                          value={monthlyScheduleMode}
+                                          onValueChange={(v) => v && handleMonthlyScheduleModeChange(v as "fixed" | "positional")}
+                                          className="justify-start gap-2"
+                                        >
+                                          <ToggleGroupItem value="fixed" disabled={isSubmitting} className="px-3">
+                                            Dia fixo do mês
+                                          </ToggleGroupItem>
+                                          <ToggleGroupItem value="positional" disabled={isSubmitting} className="px-3">
+                                            Dia da semana (ex: 1ª quinta-feira)
+                                          </ToggleGroupItem>
+                                        </ToggleGroup>
+                                      </div>
                                     )}
-                                  />
+
+                                    <div className="flex flex-wrap gap-4">
+                                      {(monthlyScheduleMode === "fixed" || watchedFrequency === SCHEDULE_FREQUENCY.ANNUAL) && (
+                                        <FormField
+                                          control={form.control}
+                                          name="dayOfMonth"
+                                          render={({ field }) => (
+                                            <FormItem className="flex-1 min-w-[150px]">
+                                              <FormLabel>Dia do Mês <span className="text-destructive">*</span></FormLabel>
+                                              <FormControl>
+                                                <Input
+                                                  type="number"
+                                                  min={1}
+                                                  max={31}
+                                                  placeholder="1-31"
+                                                  disabled={isSubmitting}
+                                                  className="bg-transparent"
+                                                  ref={field.ref}
+                                                  value={field.value ?? ""}
+                                                  onChange={(value) => field.onChange(typeof value === 'number' ? value : parseInt(String(value)) || undefined)}
+                                                  onBlur={field.onBlur}
+                                                />
+                                              </FormControl>
+                                              <FormMessage />
+                                            </FormItem>
+                                          )}
+                                        />
+                                      )}
+
+                                      {monthlyScheduleMode === "positional" && watchedFrequency !== SCHEDULE_FREQUENCY.ANNUAL && (
+                                        <>
+                                          <FormField
+                                            control={form.control}
+                                            name="monthlySchedule.occurrence"
+                                            render={({ field }) => (
+                                              <FormItem className="flex-1 min-w-[180px]">
+                                                <FormLabel>Ocorrência <span className="text-destructive">*</span></FormLabel>
+                                                <FormControl>
+                                                  <Combobox
+                                                    value={field.value || undefined}
+                                                    onValueChange={field.onChange}
+                                                    disabled={isSubmitting}
+                                                    options={Object.entries(MONTH_OCCURRENCE_LABELS).map(([value, label]) => ({ value, label }))}
+                                                    placeholder="Primeira, Segunda…"
+                                                    searchable={false}
+                                                  />
+                                                </FormControl>
+                                                <FormMessage />
+                                              </FormItem>
+                                            )}
+                                          />
+                                          <FormField
+                                            control={form.control}
+                                            name="monthlySchedule.dayOfWeek"
+                                            render={({ field }) => (
+                                              <FormItem className="flex-1 min-w-[200px]">
+                                                <FormLabel>Dia da Semana <span className="text-destructive">*</span></FormLabel>
+                                                <FormControl>
+                                                  <Combobox
+                                                    value={field.value || undefined}
+                                                    onValueChange={field.onChange}
+                                                    disabled={isSubmitting}
+                                                    options={Object.entries(WEEK_DAY_LABELS).map(([value, label]) => ({ value, label }))}
+                                                    placeholder="Selecione o dia da semana"
+                                                    searchable={false}
+                                                  />
+                                                </FormControl>
+                                                <FormMessage />
+                                              </FormItem>
+                                            )}
+                                          />
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
                                 )}
 
                                 {/* Next run date field (for all except ONCE and CUSTOM) */}
@@ -646,6 +747,16 @@ export const OrderScheduleEditForm = ({ schedule, id }: OrderScheduleEditFormPro
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                             <span className="text-sm font-medium text-muted-foreground">Dia do Mês</span>
                             <span className="text-sm font-semibold text-foreground">{watchedDayOfMonth}</span>
+                          </div>
+                        )}
+
+                        {watchedMonthlySchedule?.occurrence && watchedMonthlySchedule?.dayOfWeek && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                            <span className="text-sm font-medium text-muted-foreground">Dia no mês</span>
+                            <span className="text-sm font-semibold text-foreground">
+                              {(MONTH_OCCURRENCE_LABELS as any)[watchedMonthlySchedule.occurrence]}{" "}
+                              {(WEEK_DAY_LABELS as any)[watchedMonthlySchedule.dayOfWeek]?.toLowerCase()}-feira
+                            </span>
                           </div>
                         )}
 

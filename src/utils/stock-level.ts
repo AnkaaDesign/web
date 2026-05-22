@@ -10,12 +10,15 @@ import { ITEM_CATEGORY_TYPE, STOCK_LEVEL } from "../constants";
 const STOCK_LEVEL_LOW_MULTIPLIER = 1.2;
 
 /**
- * Spec §15 band classifier. Active pending orders do NOT shift thresholds —
- * surface a "pedido em aberto" badge separately in the UI instead.
+ * Spec §15 band classifier. Open orders projected to arrive within the lead-
+ * time window count toward the effective quantity used for the
+ * CRITICAL/LOW/OPTIMAL bands. Hard-floor checks (negative-stock, out-of-stock)
+ * use the physical quantity only.
  *
- * The legacy 4th positional `hasActiveOrder` argument is accepted but ignored
- * to keep existing callers compiling. Pass `categoryType` to enable the TOOL
- * short-circuit (spec §15.2).
+ * The 4th positional argument is kept as `hasActiveOrder` for back-compat with
+ * call sites that don't yet pass an `incomingOrderedQuantity`. When `incoming`
+ * is provided, it's used to compute the effective stock; otherwise classification
+ * is purely physical.
  */
 export function determineStockLevel(
   quantity: number,
@@ -23,8 +26,10 @@ export function determineStockLevel(
   maxQuantity: number | null,
   _hasActiveOrder: boolean = false,
   categoryType: ITEM_CATEGORY_TYPE | null = null,
+  incomingOrderedQuantity: number = 0,
 ): STOCK_LEVEL {
   if (!Number.isFinite(quantity)) return STOCK_LEVEL.OPTIMAL;
+  const incoming = Math.max(0, incomingOrderedQuantity || 0);
 
   if (categoryType === ITEM_CATEGORY_TYPE.TOOL) {
     return quantity > 0 ? STOCK_LEVEL.OPTIMAL : STOCK_LEVEL.OUT_OF_STOCK;
@@ -38,12 +43,15 @@ export function determineStockLevel(
   const hasMaxSignal = maxQuantity !== null && maxQuantity > 0;
   if (!hasReorderSignal && !hasMaxSignal) return STOCK_LEVEL.OPTIMAL;
 
-  if (hasReorderSignal && quantity <= (reorderPoint as number)) return STOCK_LEVEL.CRITICAL;
+  const effective = quantity + incoming;
+
+  if (hasReorderSignal && effective <= (reorderPoint as number)) return STOCK_LEVEL.CRITICAL;
   if (
     hasReorderSignal &&
-    quantity <= (reorderPoint as number) * STOCK_LEVEL_LOW_MULTIPLIER
+    effective <= (reorderPoint as number) * STOCK_LEVEL_LOW_MULTIPLIER
   )
     return STOCK_LEVEL.LOW;
+  // OVERSTOCKED uses physical quantity only.
   if (hasMaxSignal && quantity > (maxQuantity as number)) return STOCK_LEVEL.OVERSTOCKED;
   return STOCK_LEVEL.OPTIMAL;
 }

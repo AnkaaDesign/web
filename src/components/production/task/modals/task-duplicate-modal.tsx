@@ -153,11 +153,12 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       status: TASK_STATUS.PREPARATION,
       serialNumber: copyData.serialNumber || null,
       details: sourceTask.details,
-      entryDate: sourceTask.entryDate,
-      term: sourceTask.term,
-      forecastDate: sourceTask.forecastDate,
-      startedAt: null, // Reset
-      finishedAt: null, // Reset
+      // All dates reset — duplicates start fresh
+      entryDate: null,
+      term: null,
+      forecastDate: null,
+      startedAt: null,
+      finishedAt: null,
       paintId: sourceTask.paintId,
       customerId: sourceTask.customerId,
       sectorId: sourceTask.sectorId,
@@ -222,7 +223,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
               })),
               subtotal: Number(sourceTask.quote.subtotal) || 0,
               total: Number(sourceTask.quote.total) || 0,
-              expiresAt: sourceTask.quote.expiresAt,
+              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
               guaranteeYears: sourceTask.quote.guaranteeYears != null ? Number(sourceTask.quote.guaranteeYears) : null,
               customGuaranteeText: sourceTask.quote.customGuaranteeText,
               customForecastDays: sourceTask.quote.customForecastDays != null ? Number(sourceTask.quote.customForecastDays) : null,

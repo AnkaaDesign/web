@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { IconCalendar, IconClock, IconPackage } from "@tabler/icons-react";
-import { getDynamicFrequencyLabel } from "../../../../constants";
+import { getScheduleCadenceLabel } from "../../../../constants";
 import type { OrderSchedule } from "../../../../types";
 
 export interface OrderScheduleColumn {
@@ -41,11 +41,19 @@ export function createOrderScheduleColumns(): OrderScheduleColumn[] {
       key: "frequency",
       header: "Frequência",
       accessor: (schedule: OrderSchedule) => {
-        const frequencyLabel = getDynamicFrequencyLabel(schedule.frequency, schedule.frequencyCount);
-        return <span className="font-medium">{frequencyLabel}</span>;
+        // Show base label + detail when available: "Mensal — toda primeira quinta-feira"
+        const label = getScheduleCadenceLabel(schedule.frequency, schedule.frequencyCount, {
+          dayOfMonth: schedule.dayOfMonth as any,
+          dayOfWeek: schedule.dayOfWeek as any,
+          month: schedule.month as any,
+          monthlyConfig: (schedule as any).monthlyConfig ?? null,
+          weeklyConfig: (schedule as any).weeklyConfig ?? null,
+          yearlyConfig: (schedule as any).yearlyConfig ?? null,
+        });
+        return <span className="font-medium">{label}</span>;
       },
       sortable: true,
-      className: "w-32",
+      className: "w-64",
       align: "left",
     },
     {

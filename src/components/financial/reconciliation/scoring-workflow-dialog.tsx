@@ -38,9 +38,9 @@ const PASSES: {
 }[] = [
   {
     step: "Etapa 1",
-    title: "CNPJ + valor equivalentes",
+    title: "Sinais fortes alinhados",
     description:
-      "Quando o CNPJ do fornecedor bate exatamente e o valor da saída está dentro de ±R$ 0,50 da nota fiscal (tolerância única que cobre taxa de PIX, arredondamento e ajustes), o pareamento é confirmado automaticamente — mesmo que a data esteja distante, porque pagamentos B2B costumam atrasar semanas. O CNPJ pode vir do extrato OFX ou de uma associação memo → CNPJ aprendida. Se houver mais de uma nota igualmente equivalente, vence a mais próxima da data (com pelo menos 30 dias de vantagem).",
+      "Confirma o pareamento automaticamente quando o valor da saída está dentro de ±R$ 0,50 da nota E (a) o CNPJ bate exatamente, OU (b) o CNPJ é da mesma raiz (filial diferente) e a razão social também coincide. A data deixa de ser obrigatória porque pagamentos B2B costumam atrasar semanas; basta que a nota tenha sido emitida antes do pagamento (até 5 dias de tolerância para fuso). O CNPJ pode vir do extrato OFX ou de uma associação memo → CNPJ aprendida. Se houver várias notas igualmente fortes, vence a mais próxima da data — com pelo menos 3 dias de vantagem sobre a segunda candidata.",
     icon: IconTargetArrow,
     color: "blue",
     outcome: "Conciliação automática",
@@ -50,7 +50,7 @@ const PASSES: {
     step: "Etapa 2",
     title: "Pareamento por score",
     description:
-      "Quando o valor não bate dentro da tolerância de R$ 0,50, o sistema calcula uma pontuação somando valor + data + CNPJ + razão social. Aceita também filiais da mesma empresa (mesma raiz de CNPJ). Útil para casos onde múltiplos sinais fracos somados indicam um match claro.",
+      "Quando os critérios da Etapa 1 não fecham, o sistema calcula uma pontuação somando valor + data + CNPJ + razão social. A combinação determinística (valor exato + razão social ≥ 80% + CNPJ pelo menos da mesma raiz) tem piso de 95 pontos, refletindo a quase-certeza desse alinhamento. Útil para casos onde múltiplos sinais fracos somados indicam um match claro.",
     icon: IconScale,
     color: "indigo",
     outcome: "Auto se score ≥ 90 e vantagem ≥ 8 sobre o 2º colocado",
@@ -95,11 +95,13 @@ const SCORE_PARTS: {
     color: "blue",
     bullets: [
       { label: "Até 1 dia", points: "20 pts" },
-      { label: "Até 3 dias", points: "17 pts" },
-      { label: "Até 5 dias", points: "14 pts" },
-      { label: "Até 10 dias", points: "10 pts" },
-      { label: "Até 20 dias", points: "5 pts" },
-      { label: "Até 30 dias", points: "2 pts" },
+      { label: "Até 3 dias", points: "18 pts" },
+      { label: "Até 5 dias", points: "16 pts" },
+      { label: "Até 10 dias", points: "14 pts" },
+      { label: "Até 15 dias", points: "11 pts" },
+      { label: "Até 20 dias", points: "7 pts" },
+      { label: "Até 30 dias", points: "4 pts" },
+      { label: "Até 45 dias", points: "2 pts" },
     ],
   },
   {
@@ -109,7 +111,7 @@ const SCORE_PARTS: {
     color: "indigo",
     bullets: [
       { label: "CNPJ idêntico", points: "30 pts" },
-      { label: "Mesma raiz (filial)", points: "24 pts" },
+      { label: "Mesma raiz (filial)", points: "26 pts" },
       { label: "Inferido pelo histórico", points: "23 a 30 pts" },
       { label: "Sem correspondência", points: "0 pts" },
     ],
@@ -319,6 +321,26 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
             })}
           </div>
 
+          {/* Trio bonus explainer — when value + name + cnpj all align, the
+              score is floored at 95 even with a wider date gap. */}
+          <div className="rounded-lg border border-emerald-300/60 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 p-4">
+            <div className="flex items-start gap-2">
+              <IconTargetArrow className="h-4 w-4 text-emerald-700 dark:text-emerald-300 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                  Piso de 95 para combinação determinística
+                </p>
+                <p className="text-xs text-emerald-900/80 dark:text-emerald-200/80 leading-relaxed mt-1">
+                  Quando <strong>valor idêntico</strong> (Δ ≤ R$ 0,50) +{" "}
+                  <strong>razão social ≥ 80%</strong> + <strong>CNPJ idêntico ou mesma raiz</strong>{" "}
+                  ocorrem juntos, a soma é elevada para no mínimo 95 pontos — a coincidência
+                  desses três sinais com uma nota diferente é praticamente nula. A data
+                  vira informativa, não decisiva.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* "Inferido pelo histórico" explainer — this row is the only one in the
               score table whose value depends on past confirmations, so it needs
               its own breakdown. */}
@@ -477,8 +499,11 @@ export function ScoringWorkflowDialog({ open, onOpenChange }: Props) {
 
         <div className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
           <strong className="text-foreground">Resumo:</strong> são auto-conciliadas
-          apenas as saídas que casam por <strong className="text-foreground">CNPJ
-          exato + valor dentro de R$ 0,50</strong> da NFe, ou que somam{" "}
+          apenas as saídas que combinam{" "}
+          <strong className="text-foreground">valor dentro de R$ 0,50</strong> com{" "}
+          <strong className="text-foreground">CNPJ idêntico</strong> ou{" "}
+          <strong className="text-foreground">mesma raiz + razão social compatível</strong>{" "}
+          (com a nota emitida antes do pagamento), ou que somam{" "}
           <strong className="text-foreground">score ≥ 90</strong> com vantagem clara
           sobre alternativas. O resto vira sugestão manual — e cada confirmação sua
           ensina o sistema para a próxima vez.

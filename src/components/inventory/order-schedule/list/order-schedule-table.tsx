@@ -99,12 +99,18 @@ export function OrderScheduleTable({
     resetSelectionOnPageChange: false,
   });
 
-  // Memoize query parameters
+  // Memoize query parameters. Includes weekly/monthly/yearly configs so the
+  // cadence column can render positional configs (e.g. "1st Thursday").
   const queryParams = useMemo(
     () => ({
       ...filters,
       page: page + 1,
       limit: pageSize,
+      include: {
+        weeklyConfig: { include: { daysOfWeek: true } },
+        monthlyConfig: { include: { occurrences: true } },
+        yearlyConfig: { include: { monthlyConfigs: true } },
+      },
       orderBy: convertSortConfigsToOrderBy(
         sortConfigs.length > 0 ? sortConfigs : [{ column: "createdAt", direction: "desc" }]
       ),

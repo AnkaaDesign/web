@@ -132,7 +132,7 @@ export const ReconciliationStatisticsPage = () => {
                   data={data?.topUnmatchedByCounterparty ?? []}
                   onBarClick={counterparty =>
                     navigate(
-                      `${routes.financial.reconciliation.transactions}?matchStatus=UNMATCHED&counterparty=${encodeURIComponent(counterparty)}`,
+                      `${routes.financial.reconciliation.transactions}?reconciliationStatus=PENDING&counterparty=${encodeURIComponent(counterparty)}`,
                     )
                   }
                 />
@@ -192,14 +192,14 @@ function SummaryGrid({
         value={isLoading ? null : formatCurrency(stats?.totalConciliadoMes ?? 0)}
         Icon={IconCheck}
         tone="emerald"
-        href={`${routes.financial.reconciliation.transactions}?matchStatus=AUTO_MATCHED`}
+        href={`${routes.financial.reconciliation.transactions}?reconciliationStatus=RECONCILED&reconciliationSource=AUTO`}
       />
       <KpiCard
         label="Pendente de conciliação"
         value={isLoading ? null : formatCurrency(stats?.pendenteConciliacao ?? 0)}
         Icon={IconClockHour4}
         tone="amber"
-        href={`${routes.financial.reconciliation.transactions}?matchStatus=UNMATCHED`}
+        href={`${routes.financial.reconciliation.transactions}?reconciliationStatus=PENDING`}
       />
       <KpiCard
         label="Notas recebidas"

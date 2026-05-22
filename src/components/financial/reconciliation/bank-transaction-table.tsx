@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { MatchStatusBadge } from "./match-status-badge";
+import { CATEGORY_LABEL, MatchStatusBadge } from "./match-status-badge";
 import { routes } from "@/constants";
 import {
   formatAccountNumber,
@@ -161,6 +161,15 @@ export function BankTransactionTable({
         const firstDoc = t.matches?.find(m => m.fiscalDocument)?.fiscalDocument;
         const extraCount = (t.matches?.filter(m => m.fiscalDocument).length ?? 0) - 1;
         if (!firstDoc?.id) {
+          // For non-NF categories we surface the category label here so the
+          // column carries meaningful info instead of an em-dash.
+          if (t.category && t.category !== "UNCLASSIFIED" && t.category !== "NF") {
+            return (
+              <span className="text-muted-foreground text-xs italic">
+                {CATEGORY_LABEL[t.category]}
+              </span>
+            );
+          }
           return <span className="text-muted-foreground text-xs">—</span>;
         }
         const emitDisplay = firstDoc.emitName
@@ -185,13 +194,20 @@ export function BankTransactionTable({
       },
     },
     {
-      key: "matchStatus",
+      key: "reconciliationStatus",
       header: "Status",
-      width: "160px",
+      width: "240px",
       className: "whitespace-nowrap",
       render: t => {
         const conf = t.matches?.[0]?.confidenceScore;
-        return <MatchStatusBadge status={t.matchStatus} confidence={conf} />;
+        return (
+          <MatchStatusBadge
+            status={t.reconciliationStatus}
+            category={t.category}
+            source={t.reconciliationSource}
+            confidence={conf}
+          />
+        );
       },
     },
   ];
@@ -245,7 +261,7 @@ export function BankTransactionTable({
                 Ver detalhes
               </DropdownMenuItem>
             )}
-            {onMatch && ctxTx.matchStatus !== "MANUAL_MATCHED" && (
+            {onMatch && !(ctxTx.reconciliationStatus === "RECONCILED" && ctxTx.reconciliationSource === "MANUAL") && (
               <DropdownMenuItem
                 onClick={() => {
                   onMatch(ctxTx);
@@ -271,7 +287,7 @@ export function BankTransactionTable({
                 </DropdownMenuItem>
               </>
             )}
-            {onIgnore && ctxTx.matchStatus !== "IGNORED" && (
+            {onIgnore && ctxTx.reconciliationStatus !== "IGNORED" && (
               <DropdownMenuItem
                 onClick={() => {
                   onIgnore(ctxTx);
