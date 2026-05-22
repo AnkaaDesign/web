@@ -660,6 +660,11 @@ export const orderScheduleCreateSchema = z
     isActive: z.boolean().default(true),
     items: uuidArraySchema("item"),
 
+    // Target supplier for generated orders. Nullable to keep parity with legacy
+    // schedules. UI selector still pending; the field is part of the contract
+    // so any caller can populate it.
+    supplierId: z.string().uuid("Fornecedor inválido").nullable().optional(),
+
     // Specific scheduling fields - conditionally required based on frequency
     specificDate: z.coerce.date().optional(),
     nextRun: z.coerce.date().optional(),
@@ -735,6 +740,10 @@ export const orderScheduleUpdateSchema = z
     dayOfWeek: z.string().nullable().optional(),
     month: z.string().nullable().optional(),
     customMonths: z.array(z.string()).optional(),
+
+    // Target supplier — nullable so editing existing schedules without
+    // changing supplier is a no-op.
+    supplierId: z.string().uuid("Fornecedor inválido").nullable().optional(),
 
     // Reschedule fields
     rescheduleCount: z.number().int().min(0).optional(),
@@ -839,6 +848,7 @@ export const mapOrderScheduleToFormData = createMapToFormDataHelper<OrderSchedul
   originalDate: orderSchedule.originalDate || null,
   lastRescheduleDate: orderSchedule.lastRescheduleDate || null,
   rescheduleReason: orderSchedule.rescheduleReason ?? undefined,
+  supplierId: orderSchedule.supplierId ?? null,
   weeklyConfigId: orderSchedule.weeklyConfigId || null,
   monthlyConfigId: orderSchedule.monthlyConfigId || null,
   yearlyConfigId: orderSchedule.yearlyConfigId || null,

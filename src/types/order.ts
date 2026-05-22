@@ -27,6 +27,10 @@ export interface OrderSchedule extends BaseEntity {
   name: string | null;
   description: string | null;
 
+  // Target supplier for generated orders. Nullable for legacy schedules created
+  // before the field existed; service propagates `supplierId ?? null` to orders.
+  supplierId: string | null;
+
   frequency: SCHEDULE_FREQUENCY;
   frequencyCount: number;
   isActive: boolean;
