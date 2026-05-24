@@ -80,10 +80,9 @@ import {
   ToggleRow,
   LimitInput,
   REFETCH_INTERVAL_OPTIONS,
-  DENSITY_OPTIONS,
+  DensitySegmented,
   DENSITY_VALUES,
   densityClasses,
-  type Density,
 } from "./_shared";
 import type {
   WidgetAccentColor,
@@ -1245,21 +1244,10 @@ function ConfigComp({
             </Section>
             <Section title="Densidade e linhas">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Densidade</Label>
-                  <Combobox
-                    mode="single"
-                    value={config.display.density}
-                    onValueChange={(v) =>
-                      setDisplay(
-                        "density",
-                        (typeof v === "string" ? v : "comfortable") as Density,
-                      )
-                    }
-                    options={DENSITY_OPTIONS}
-                    clearable={false}
-                  />
-                </div>
+                <DensitySegmented
+                  value={config.display.density}
+                  onChange={(d) => setDisplay("density", d)}
+                />
                 <ToggleRow
                   label="Cabeçalho fixo"
                   checked={config.display.stickyHeader}

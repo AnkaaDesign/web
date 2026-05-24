@@ -106,7 +106,6 @@ import {
   AlertDialogTitle,
 } from "../../components/ui/alert-dialog";
 import { getFileThumbnailUrl } from "../../utils/file";
-import { cn } from "../../lib/utils";
 
 import { WidgetCard } from "../components/widget-card";
 import { ColumnPicker } from "../components/column-picker";
@@ -120,6 +119,7 @@ import {
   Section,
   ToggleRow,
   LimitInput,
+  DensitySegmented,
   DENSITY_VALUES,
   REFETCH_INTERVAL_OPTIONS,
   densityClasses,
@@ -2537,21 +2537,10 @@ function TaskTableConfigComponent({
           </Section>
           <Section title="Densidade e linhas" defaultOpen>
             <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Densidade</Label>
-                <div className="flex gap-1.5">
-                  {DENSITY_PILL_OPTIONS.map((opt) => (
-                    <DensityPill
-                      key={opt.value}
-                      label={opt.label}
-                      active={c.display.density === opt.value}
-                      onClick={() =>
-                        setDisplay("density", opt.value as (typeof DENSITY_VALUES)[number])
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
+              <DensitySegmented
+                value={c.display.density}
+                onChange={(d) => setDisplay("density", d)}
+              />
               <div className="grid grid-cols-3 gap-2">
                 <ToggleRow
                   label="Linhas divisórias"
@@ -3190,42 +3179,6 @@ function TaskTableConfigComponent({
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-// ============================================================================
-// Pill controls — density selector matching the recent-messages widget style
-// ============================================================================
-
-const DENSITY_PILL_OPTIONS: { value: string; label: string }[] = [
-  { value: "compact", label: "Compacta" },
-  { value: "comfortable", label: "Confortável" },
-  { value: "spacious", label: "Espaçosa" },
-];
-
-function DensityPill({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "flex-1 h-9 px-2 rounded-md border-[1.5px] font-medium text-xs transition-colors",
-        active
-          ? "border-primary bg-primary text-primary-foreground font-bold"
-          : "border-border bg-muted/30 text-foreground hover:bg-muted/50",
-      )}
-    >
-      {label}
-    </button>
   );
 }
 

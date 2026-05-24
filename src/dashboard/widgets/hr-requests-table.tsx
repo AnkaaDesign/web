@@ -100,8 +100,8 @@ import {
   ToggleRow,
   LimitInput,
   SORT_DIRECTION_OPTIONS,
+  DensitySegmented,
   DENSITY_VALUES,
-  DENSITY_OPTIONS,
   cardDensityClasses,
   type Density,
 } from "./_shared";
@@ -1112,21 +1112,10 @@ function HrRequestsTableConfigComponent({
             </Section>
             <Section title="Densidade e linhas">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Densidade</Label>
-                  <Combobox
-                    mode="single"
-                    value={c.display.density}
-                    onValueChange={(v) =>
-                      setDisplay(
-                        "density",
-                        (typeof v === "string" ? v : "comfortable") as Density,
-                      )
-                    }
-                    options={DENSITY_OPTIONS}
-                    clearable={false}
-                  />
-                </div>
+                <DensitySegmented
+                  value={c.display.density}
+                  onChange={(d) => setDisplay("density", d)}
+                />
                 <LimitInput value={c.limit} onChange={(n) => set("limit", n)} />
               </div>
             </Section>

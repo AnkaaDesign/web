@@ -68,8 +68,8 @@ import {
   SectionGroup,
   ToggleRow,
   LimitInput,
+  DensitySegmented,
   DENSITY_VALUES,
-  DENSITY_OPTIONS,
   densityClasses,
   type Density,
 } from "./_shared";
@@ -845,21 +845,10 @@ function BorrowTableConfigComponent({
             </Section>
             <Section title="Densidade e linhas">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Densidade</Label>
-                  <Combobox
-                    mode="single"
-                    value={c.display?.density ?? "comfortable"}
-                    onValueChange={(v) =>
-                      setDisplay(
-                        "density",
-                        (typeof v === "string" ? v : "comfortable") as Density,
-                      )
-                    }
-                    options={DENSITY_OPTIONS}
-                    clearable={false}
-                  />
-                </div>
+                <DensitySegmented
+                  value={c.display?.density ?? "comfortable"}
+                  onChange={(d) => setDisplay("density", d)}
+                />
                 <ToggleRow
                   label="Cabeçalho fixo"
                   checked={c.display?.stickyHeader ?? true}

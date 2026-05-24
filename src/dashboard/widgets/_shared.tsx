@@ -7,7 +7,6 @@ import { createContext, useContext, useId, useMemo, useState, type ReactNode } f
 import { IconChevronDown } from "@tabler/icons-react";
 import { useHomeDashboard } from "../../hooks/common/use-dashboard";
 import type { HomeDashboardData } from "../../types";
-import { Combobox } from "../../components/ui/combobox";
 import {
   Collapsible,
   CollapsibleContent,
@@ -15,6 +14,8 @@ import {
 } from "../../components/ui/collapsible";
 import { Label } from "../../components/ui/label";
 import { Input } from "../../components/ui/input";
+import { Switch } from "../../components/ui/switch";
+import { cn } from "../../lib/utils";
 
 interface HomeDashboardWidgetBodyProps<TSlice> {
   selector: (data: HomeDashboardData) => TSlice;
@@ -127,9 +128,10 @@ export const YES_NO_OPTIONS: Array<{ value: "yes" | "no"; label: string }> = [
 ];
 
 /**
- * Boolean field rendered as a Sim/Não Combobox so every config control on the
- * page shares the same dropdown look. This is the canonical replacement for
- * raw Checkbox / native input checkboxes inside config modals.
+ * Boolean field rendered as a Switch. Canonical control for any boolean config
+ * (replaces the old Sim/Não dropdown). See WIDGET_CONFIG_SPEC.md §2.2 — a
+ * dropdown to flip a boolean is the heaviest possible control; a Switch matches
+ * the mobile app and is one tap.
  */
 export function ToggleRow({
   label,
@@ -143,17 +145,141 @@ export function ToggleRow({
   onCheckedChange: (v: boolean) => void;
 }) {
   return (
-    <div className="space-y-1">
-      <Label className="text-xs">{label}</Label>
-      <Combobox
-        mode="single"
-        value={checked ? "yes" : "no"}
-        onValueChange={(v) => onCheckedChange(v === "yes")}
-        options={YES_NO_OPTIONS}
-        clearable={false}
-      />
+    <div className="flex items-center justify-between gap-3">
+      <div className="space-y-0.5">
+        <Label className="text-xs">{label}</Label>
+        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+      </div>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Segmented controls — the gold-standard "[1][2]" pill group.
+//
+// Canonical control for small enums (≤5 options) and bounded small integers.
+// See WIDGET_CONFIG_SPEC.md §2.1. This is the single shared primitive; widgets
+// MUST import these instead of redefining local NumberPill/DensityPill copies.
+// ---------------------------------------------------------------------------
+
+const PILL_BASE =
+  "h-9 rounded-md border-[1.5px] text-sm font-bold transition-colors";
+const PILL_ACTIVE =
+  "border-primary bg-primary text-primary-foreground";
+const PILL_INACTIVE =
+  "border-border bg-muted/30 text-foreground hover:bg-muted/50";
+
+/** Pick one of N options, rendered as a row of segmented pills. */
+export function SegmentedControl<T extends string | number>({
+  label,
+  hint,
+  options,
+  value,
+  onChange,
+  fill = true,
+}: {
+  label?: string;
+  hint?: string;
+  options: ReadonlyArray<{ value: T; label: string }>;
+  value: T;
+  onChange: (v: T) => void;
+  /** Equal-width segments (default) vs min-width pills. */
+  fill?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      {label && <Label className="text-xs">{label}</Label>}
+      <div className="flex gap-2 flex-wrap">
+        {options.map((opt) => {
+          const active = opt.value === value;
+          return (
+            <button
+              key={String(opt.value)}
+              type="button"
+              onClick={() => onChange(opt.value)}
+              aria-pressed={active}
+              className={cn(
+                PILL_BASE,
+                fill ? "flex-1 px-2" : "min-w-[44px] px-3",
+                active ? PILL_ACTIVE : PILL_INACTIVE,
+              )}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
+  );
+}
+
+/** Pick an integer in [min, max], rendered as a row of numbered pills. */
+export function NumberPills({
+  label,
+  hint,
+  min,
+  max,
+  value,
+  onChange,
+  fill = true,
+}: {
+  label?: string;
+  hint?: string;
+  min: number;
+  max: number;
+  value: number;
+  onChange: (n: number) => void;
+  fill?: boolean;
+}) {
+  const nums: number[] = [];
+  for (let n = min; n <= max; n += 1) nums.push(n);
+  return (
+    <div className="space-y-1.5">
+      {label && <Label className="text-xs">{label}</Label>}
+      <div className="flex gap-2 flex-wrap">
+        {nums.map((n) => {
+          const active = n === value;
+          return (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange(n)}
+              aria-pressed={active}
+              className={cn(
+                PILL_BASE,
+                fill ? "flex-1" : "min-w-[44px] px-3",
+                active ? PILL_ACTIVE : PILL_INACTIVE,
+              )}
+            >
+              {n}
+            </button>
+          );
+        })}
+      </div>
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+/** Density picker rendered as the canonical segmented control. */
+export function DensitySegmented({
+  value,
+  onChange,
+  label = "Densidade",
+}: {
+  value: Density;
+  onChange: (d: Density) => void;
+  label?: string;
+}) {
+  return (
+    <SegmentedControl
+      label={label}
+      options={DENSITY_OPTIONS as ReadonlyArray<{ value: Density; label: string }>}
+      value={value}
+      onChange={onChange}
+    />
   );
 }
 

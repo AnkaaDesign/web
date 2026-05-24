@@ -24,6 +24,8 @@ import {
   Section,
   SectionGroup,
   ToggleRow,
+  NumberPills,
+  DensitySegmented,
   DENSITY_VALUES,
   type Density,
 } from "./_shared";
@@ -42,7 +44,6 @@ import type {
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs";
-import { cn } from "../../lib/utils";
 import { MessageModal } from "../../components/common/message-modal/message-modal";
 import { useMarkAsViewed } from "../../hooks/administration/use-message";
 import type { HomeDashboardMessage } from "../../types";
@@ -553,118 +554,30 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
           <SectionGroup defaultOpenId={null}>
             <Section title="Grade e densidade" defaultOpen>
               <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Densidade</Label>
-                  <div className="flex gap-1.5">
-                    {DENSITY_PILL_OPTIONS.map((opt) => (
-                      <DensityPill
-                        key={opt.value}
-                        label={opt.label}
-                        active={(config.density ?? "comfortable") === opt.value}
-                        onClick={() => set("density", opt.value as Density)}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Mensagens por linha (1–8)</Label>
-                  <div className="flex gap-1.5">
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                      <NumberPill
-                        key={n}
-                        value={n}
-                        fill
-                        active={config.itemsPerRow === n}
-                        onClick={() => set("itemsPerRow", n)}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Linhas visíveis (1–6)</Label>
-                  <div className="flex gap-1.5">
-                    {[1, 2, 3, 4, 5, 6].map((n) => (
-                      <NumberPill
-                        key={n}
-                        value={n}
-                        active={config.itemsPerColumn === n}
-                        onClick={() => set("itemsPerColumn", n)}
-                      />
-                    ))}
-                  </div>
-                </div>
+                <DensitySegmented
+                  value={config.density ?? "comfortable"}
+                  onChange={(d) => set("density", d)}
+                />
+                <NumberPills
+                  label="Mensagens por linha (1–8)"
+                  min={1}
+                  max={8}
+                  value={config.itemsPerRow}
+                  onChange={(n) => set("itemsPerRow", n)}
+                />
+                <NumberPills
+                  label="Linhas visíveis (1–6)"
+                  min={1}
+                  max={6}
+                  value={config.itemsPerColumn}
+                  onChange={(n) => set("itemsPerColumn", n)}
+                />
               </div>
             </Section>
           </SectionGroup>
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-// ============================================================
-// Pill controls — mirror the mobile NumberPill / DensityPill so the
-// configurator feels consistent across platforms.
-// ============================================================
-
-const DENSITY_PILL_OPTIONS: { value: Density; label: string }[] = [
-  { value: "compact", label: "Compacta" },
-  { value: "comfortable", label: "Confortável" },
-  { value: "spacious", label: "Espaçosa" },
-];
-
-function NumberPill({
-  value,
-  active,
-  fill,
-  onClick,
-}: {
-  value: number;
-  active: boolean;
-  fill?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "h-9 rounded-md border-[1.5px] font-bold text-sm transition-colors",
-        fill ? "flex-1" : "min-w-[44px] px-3",
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-muted/30 text-foreground hover:bg-muted/50",
-      )}
-    >
-      {value}
-    </button>
-  );
-}
-
-function DensityPill({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "flex-1 h-9 px-2 rounded-md border-[1.5px] font-medium text-xs transition-colors",
-        active
-          ? "border-primary bg-primary text-primary-foreground font-bold"
-          : "border-border bg-muted/30 text-foreground hover:bg-muted/50",
-      )}
-    >
-      {label}
-    </button>
   );
 }
 
