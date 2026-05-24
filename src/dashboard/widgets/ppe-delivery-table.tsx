@@ -87,6 +87,8 @@ import {
   DensitySegmented,
   DENSITY_VALUES,
   densityClasses,
+  makeTableDisplaySchema,
+  TABLE_DISPLAY_DEFAULTS,
   type Density,
 } from "./_shared";
 
@@ -311,30 +313,11 @@ export const ppeDeliveryTableConfigSchema = z.object({
     color: "amber",
     icon: "ClipboardCheck",
   }),
-  display: z
-    .object({
-      density: z.enum(DENSITY_VALUES).default("comfortable"),
-      // striping/hoverHighlight kept for back-compat but hardcoded ON in render.
-      striping: z.boolean().default(true),
-      gridLines: z.boolean().default(true),
-      hoverHighlight: z.boolean().default(true),
-      stickyHeader: z.boolean().default(true),
-      showHeader: z.boolean().default(true),
-      showCount: z.boolean().default(true),
-      showSearchBox: z.boolean().default(true),
-      emptyStateMessage: z.string().max(160).default(""),
-    })
-    .default({
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      stickyHeader: true,
-      showHeader: true,
-      showCount: true,
-      showSearchBox: true,
-      emptyStateMessage: "",
-    }),
+  // Canonical cross-platform table display block. Previous defaults all matched
+  // TABLE_DISPLAY_DEFAULTS (incl. showSearchBox=true, emptyStateMessage=""); the
+  // factory additively contributes showColumnHeaders / showRowDot /
+  // showViewAllLink / refreshIntervalMs.
+  display: makeTableDisplaySchema(),
   columns: z
     .array(z.enum(COLUMN_KEY_VALUES))
     .min(1)
@@ -989,18 +972,8 @@ export const ppeDeliveryTableWidget: WidgetDefinition<PpeDeliveryTableConfig> = 
   configSchema: ppeDeliveryTableConfigSchema,
   defaultConfig: {
     title: "Entregas de EPI",
-    accent: { color: "amber", icon: "ClipboardCheck", shade: "500" },
-    display: {
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      stickyHeader: true,
-      showHeader: true,
-      showCount: true,
-      showSearchBox: true,
-      emptyStateMessage: "",
-    },
+    accent: { color: "amber", icon: "ClipboardCheck" },
+    display: { ...TABLE_DISPLAY_DEFAULTS },
     columns: ["itemName", "userName", "quantity", "status", "scheduledDate"],
     filters: {
       searchingFor: "",

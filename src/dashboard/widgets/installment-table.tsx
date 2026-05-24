@@ -83,6 +83,9 @@ import {
   DensitySegmented,
   DENSITY_VALUES,
   densityClasses,
+  makeTableDisplaySchema,
+  TABLE_DISPLAY_DEFAULTS,
+  coerceRefreshMs,
 } from "./_shared";
 import type {
   WidgetAccentColor,
@@ -183,43 +186,26 @@ const RELEVANT_QUOTE_STATUSES = [
 // Schema
 // ============================================================================
 
-export const installmentTableConfigSchema = z.object({
+const installmentTableConfigSchemaInner = z.object({
   title: z.string().min(1).max(80).default("Boletos"),
   accent: makeAccentSchema({
     color: "blue",
     icon: "Receipt",
   }),
 
-  display: z
-    .object({
-      density: z.enum(DENSITY_VALUES).default("comfortable"),
-      // striping/gridLines/hoverHighlight kept for back-compat but hardcoded ON.
-      striping: z.boolean().default(true),
-      gridLines: z.boolean().default(true),
-      hoverHighlight: z.boolean().default(true),
-      stickyHeader: z.boolean().default(true),
-      showHeader: z.boolean().default(true),
-      showSearchBox: z.boolean().default(true),
-      showBucketChips: z.boolean().default(true),
-      showCount: z.boolean().default(true),
-      showViewAllLink: z.boolean().default(true),
-      layoutMode: z.enum(LAYOUT_MODES).default("flat"),
-      emptyStateMessage: z.string().max(160).default(""),
-    })
-    .default({
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      stickyHeader: true,
-      showHeader: true,
-      showSearchBox: true,
-      showBucketChips: true,
-      showCount: true,
-      showViewAllLink: true,
-      layoutMode: "flat",
-      emptyStateMessage: "",
-    }),
+  // Canonical cross-platform table display block plus installment-specific
+  // extras (bucket chips, layout mode). Shared-field defaults all matched
+  // TABLE_DISPLAY_DEFAULTS; the factory additively contributes showColumnHeaders
+  // / showRowDot / refreshIntervalMs. The extras object is itself `.default()`ed
+  // so the intersection still parses when `display` is absent.
+  display: makeTableDisplaySchema().and(
+    z
+      .object({
+        showBucketChips: z.boolean().default(true),
+        layoutMode: z.enum(LAYOUT_MODES).default("flat"),
+      })
+      .default({ showBucketChips: true, layoutMode: "flat" }),
+  ),
 
   columns: z
     .array(z.enum(COLUMN_KEYS))
@@ -263,8 +249,36 @@ export const installmentTableConfigSchema = z.object({
 
   limit: z.number().int().min(5).max(200).default(50),
 
+  // Legacy top-level refresh field. Kept for back-compat (the config UI still
+  // writes it); the canonical value lives in `display.refreshIntervalMs`, folded
+  // in by the preprocess wrapper below.
   refetchInterval: z.number().int().min(0).default(0),
 });
+
+// Back-compat shim: older persisted configs stored the refresh interval at the
+// top level (`refetchInterval`, number) and have no `display.refreshIntervalMs`.
+// Fold the legacy value into the canonical field before validation. Guarded so
+// undefined / non-object input passes through untouched.
+export const installmentTableConfigSchema = z.preprocess((raw) => {
+  if (!raw || typeof raw !== "object") return raw;
+  const obj = raw as Record<string, unknown>;
+  const display =
+    obj.display && typeof obj.display === "object"
+      ? (obj.display as Record<string, unknown>)
+      : undefined;
+  const hasCanonical =
+    display && typeof display.refreshIntervalMs === "number";
+  if (!hasCanonical && obj.refetchInterval !== undefined) {
+    return {
+      ...obj,
+      display: {
+        ...(display ?? {}),
+        refreshIntervalMs: coerceRefreshMs(obj.refetchInterval),
+      },
+    };
+  }
+  return raw;
+}, installmentTableConfigSchemaInner);
 
 export type InstallmentTableConfig = z.infer<typeof installmentTableConfigSchema>;
 
@@ -850,8 +864,12 @@ function Render({ config, instanceId }: WidgetRenderProps<InstallmentTableConfig
     [setColumnWidthPx],
   );
 
+  // Canonical refresh field. 0 disables polling. Falls back to the legacy
+  // top-level `refetchInterval` for configs that predate the preprocess shim.
+  const refreshIntervalMs =
+    display.refreshIntervalMs || config.refetchInterval || 0;
   const { rows: rawRows, isLoading, isError } = useFlatInstallments(
-    config.refetchInterval,
+    refreshIntervalMs,
   );
 
   // Pre-compute bucket counts for the chip row (against ALL rows so the
@@ -1467,21 +1485,13 @@ export const installmentTableWidget: WidgetDefinition<InstallmentTableConfig> = 
   configSchema: installmentTableConfigSchema,
   defaultConfig: {
     title: "Boletos",
-    accent: { color: "blue", icon: "Receipt", shade: "500" },
+    accent: { color: "blue", icon: "Receipt" },
     display: {
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      stickyHeader: true,
-      showHeader: true,
-      showSearchBox: true,
-      showBucketChips: true,
-      showCount: true,
-      showViewAllLink: true,
-      layoutMode: "flat",
-      emptyStateMessage: "",
-    },
+      ...TABLE_DISPLAY_DEFAULTS,
+      // The intersection in configSchema also accepts the bucket-chip / layout
+      // extras.
+      ...({ showBucketChips: true, layoutMode: "flat" } as any),
+    } as any,
     columns: [
       "customer",
       "task",

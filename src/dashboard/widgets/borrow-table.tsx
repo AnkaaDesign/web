@@ -71,6 +71,8 @@ import {
   DensitySegmented,
   DENSITY_VALUES,
   densityClasses,
+  makeTableDisplaySchema,
+  TABLE_DISPLAY_DEFAULTS,
   type Density,
 } from "./_shared";
 
@@ -368,26 +370,11 @@ export const borrowTableConfigSchema = z.object({
     )
     .default([{ key: "createdAt", direction: "desc" }]),
   limit: z.number().int().min(5).max(200).default(30),
-  display: z
-    .object({
-      density: z.enum(DENSITY_VALUES).default("comfortable"),
-      // striping/gridLines/hoverHighlight kept for back-compat but hardcoded ON.
-      striping: z.boolean().default(true),
-      gridLines: z.boolean().default(true),
-      hoverHighlight: z.boolean().default(true),
-      stickyHeader: z.boolean().default(true),
-      showHeader: z.boolean().default(true),
-      showCount: z.boolean().default(true),
-    })
-    .default({
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      stickyHeader: true,
-      showHeader: true,
-      showCount: true,
-    }),
+  // Canonical cross-platform table display block. Every shared field keeps this
+  // widget's previous defaults (all matched TABLE_DISPLAY_DEFAULTS), and the
+  // factory additively contributes showColumnHeaders / showRowDot /
+  // showViewAllLink / showSearchBox / emptyStateMessage / refreshIntervalMs.
+  display: makeTableDisplaySchema(),
 });
 
 export type BorrowTableConfig = z.infer<typeof borrowTableConfigSchema>;
@@ -1016,7 +1003,7 @@ export const borrowTableWidget: WidgetDefinition<BorrowTableConfig> = {
   configSchema: borrowTableConfigSchema,
   defaultConfig: {
     title: "Empréstimos",
-    accent: { color: "violet", icon: "Package", shade: "500" },
+    accent: { color: "violet", icon: "Package" },
     columns: ["itemUniCode", "itemName", "status", "borrowedAt"],
     filters: {
       searchingFor: "",
@@ -1031,15 +1018,7 @@ export const borrowTableWidget: WidgetDefinition<BorrowTableConfig> = {
     },
     sorts: [{ key: "createdAt", direction: "desc" }],
     limit: 30,
-    display: {
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      stickyHeader: true,
-      showHeader: true,
-      showCount: true,
-    },
+    display: { ...TABLE_DISPLAY_DEFAULTS },
   },
   RenderComponent: BorrowTableRender,
   ConfigComponent: BorrowTableConfigComponent,

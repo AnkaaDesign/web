@@ -123,6 +123,9 @@ import {
   DENSITY_VALUES,
   REFETCH_INTERVAL_OPTIONS,
   densityClasses,
+  makeTableDisplaySchema,
+  TABLE_DISPLAY_DEFAULTS,
+  coerceRefreshMs,
 } from "./_shared";
 import type {
   WidgetAccentColor,
@@ -1165,7 +1168,7 @@ const dateRangeSchema = z
   })
   .default({ from: null, to: null });
 
-export const taskTableConfigSchema = z.object({
+const taskTableConfigSchemaInner = z.object({
   title: z.string().min(1).max(80).default("Tarefas"),
   accent: z
     .object({
@@ -1251,31 +1254,23 @@ export const taskTableConfigSchema = z.object({
 
   rowClickTarget: z.enum(["task", "budget", "billing"]).default("task"),
 
-  display: z
-    .object({
-      density: z.enum(DENSITY_VALUES).default("comfortable"),
-      striping: z.boolean().default(true),
-      gridLines: z.boolean().default(true),
-      hoverHighlight: z.boolean().default(true),
-      stickyHeader: z.boolean().default(true),
-      showRowDot: z.boolean().default(true),
-      showSearchBox: z.boolean().default(false),
-      showViewAllLink: z.boolean().default(true),
-      showCount: z.boolean().default(true),
-      layoutMode: z.enum(LAYOUT_MODES).default("flat"),
-    })
-    .default({
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      stickyHeader: true,
-      showRowDot: true,
-      showSearchBox: false,
-      showViewAllLink: true,
-      showCount: true,
-      layoutMode: "flat",
-    }),
+  // Canonical cross-platform table display block plus the task-specific layout
+  // mode. Two shared fields keep this widget's prior (non-default) values via the
+  // factory overrides: showRowDot=true and showSearchBox=false. The factory
+  // additively contributes showColumnHeaders / emptyStateMessage /
+  // refreshIntervalMs / showHeader (the last unused here — task-table reads the
+  // top-level `config.showHeader`). The extras object is itself `.default()`ed so
+  // the intersection still parses when `display` is absent.
+  display: makeTableDisplaySchema({
+    showRowDot: true,
+    showSearchBox: false,
+  }).and(
+    z
+      .object({
+        layoutMode: z.enum(LAYOUT_MODES).default("flat"),
+      })
+      .default({ layoutMode: "flat" }),
+  ),
 
   cellModes: z
     .object({
@@ -1409,11 +1404,44 @@ export const taskTableConfigSchema = z.object({
 
   behavior: z
     .object({
+      // Legacy refresh field. Kept for back-compat (the config UI still writes
+      // it); the canonical value lives in `display.refreshIntervalMs`, folded in
+      // by the preprocess wrapper below.
       refetchIntervalMs: z.number().int().min(0).max(3_600_000).default(0),
       viewAllRouteOverride: z.string().default(""),
     })
     .default({ refetchIntervalMs: 0, viewAllRouteOverride: "" }),
 });
+
+// Back-compat shim: older persisted configs stored the refresh interval at
+// `behavior.refetchIntervalMs` (number) and have no `display.refreshIntervalMs`.
+// Fold the legacy value into the canonical field before validation. Guarded so
+// undefined / non-object input passes through untouched.
+export const taskTableConfigSchema = z.preprocess((raw) => {
+  if (!raw || typeof raw !== "object") return raw;
+  const obj = raw as Record<string, unknown>;
+  const display =
+    obj.display && typeof obj.display === "object"
+      ? (obj.display as Record<string, unknown>)
+      : undefined;
+  const behavior =
+    obj.behavior && typeof obj.behavior === "object"
+      ? (obj.behavior as Record<string, unknown>)
+      : undefined;
+  const hasCanonical =
+    display && typeof display.refreshIntervalMs === "number";
+  const legacy = behavior?.refetchIntervalMs;
+  if (!hasCanonical && legacy !== undefined) {
+    return {
+      ...obj,
+      display: {
+        ...(display ?? {}),
+        refreshIntervalMs: coerceRefreshMs(legacy),
+      },
+    };
+  }
+  return raw;
+}, taskTableConfigSchemaInner);
 
 export type TaskTableConfig = z.infer<typeof taskTableConfigSchema>;
 type DateRangeValue = z.infer<typeof dateRangeSchema>;
@@ -1767,8 +1795,11 @@ function TaskTableRender({
   // Background refetch — useTasks doesn't support refetchInterval, so we drive
   // it ourselves. Skip when the tab is hidden so we don't churn against the API
   // for an off-screen dashboard. Clamp to a 5s floor so a misconfigured value
-  // can't hammer the API.
-  const rawInterval = config.behavior?.refetchIntervalMs ?? 0;
+  // can't hammer the API. The interval reads from the canonical
+  // `display.refreshIntervalMs` (0 disables), falling back to the legacy
+  // `behavior.refetchIntervalMs` for configs that predate the preprocess shim.
+  const rawInterval =
+    config.display?.refreshIntervalMs || config.behavior?.refetchIntervalMs || 0;
   const refetchInterval = rawInterval > 0 ? Math.max(5000, rawInterval) : 0;
   useEffect(() => {
     if (!refetchInterval || !refetch) return;
@@ -1964,15 +1995,9 @@ function TaskTableRender({
   );
 
   const display = config.display ?? {
-    density: "comfortable" as const,
-    striping: true,
-    gridLines: true,
-    hoverHighlight: true,
-    stickyHeader: true,
+    ...TABLE_DISPLAY_DEFAULTS,
     showRowDot: true,
     showSearchBox: false,
-    showViewAllLink: true,
-    showCount: true,
     layoutMode: "flat" as const,
   };
   const dens = densityClasses(display.density);
@@ -3216,17 +3241,12 @@ export const taskTableWidget: WidgetDefinition<TaskTableConfig> = {
     accent: { color: "gray", icon: "ClipboardText", borderColor: "none" },
     rowClickTarget: "task",
     display: {
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      stickyHeader: true,
+      ...TABLE_DISPLAY_DEFAULTS,
       showRowDot: true,
       showSearchBox: false,
-      showViewAllLink: true,
-      showCount: true,
-      layoutMode: "flat",
-    },
+      // The intersection in configSchema also accepts the layoutMode extra.
+      ...({ layoutMode: "flat" } as any),
+    } as any,
     cellModes: {
       serviceOrder: "progress-bar",
       paint: "swatch-name",

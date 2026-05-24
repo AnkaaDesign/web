@@ -62,6 +62,8 @@ import {
   DensitySegmented,
   DENSITY_VALUES,
   densityClasses,
+  makeTableDisplaySchema,
+  TABLE_DISPLAY_DEFAULTS,
   type Density,
 } from "./_shared";
 import type {
@@ -453,26 +455,11 @@ export const itemTableConfigSchema = z.object({
     )
     .default([{ key: "name", direction: "asc" }]),
   limit: z.number().int().min(5).max(200).default(20),
-  display: z
-    .object({
-      density: z.enum(DENSITY_VALUES).default("comfortable"),
-      // striping/gridLines/hoverHighlight kept for back-compat but hardcoded ON.
-      striping: z.boolean().default(true),
-      gridLines: z.boolean().default(true),
-      hoverHighlight: z.boolean().default(true),
-      stickyHeader: z.boolean().default(true),
-      showHeader: z.boolean().default(true),
-      showCount: z.boolean().default(true),
-    })
-    .default({
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      stickyHeader: true,
-      showHeader: true,
-      showCount: true,
-    }),
+  // Canonical cross-platform table display block. Previous defaults all matched
+  // TABLE_DISPLAY_DEFAULTS; the factory additively contributes
+  // showColumnHeaders / showRowDot / showViewAllLink / showSearchBox /
+  // emptyStateMessage / refreshIntervalMs.
+  display: makeTableDisplaySchema(),
 });
 
 export type ItemTableConfig = z.infer<typeof itemTableConfigSchema>;
@@ -1109,7 +1096,7 @@ export const itemTableWidget: WidgetDefinition<ItemTableConfig> = {
   configSchema: itemTableConfigSchema,
   defaultConfig: {
     title: "Itens",
-    accent: { color: "yellow", icon: "Package", shade: "500" },
+    accent: { color: "yellow", icon: "Package" },
     columns: ["name", "brand", "quantity", "monthlyConsumption"],
     filters: {
       searchingFor: "",
@@ -1128,15 +1115,7 @@ export const itemTableWidget: WidgetDefinition<ItemTableConfig> = {
     },
     sorts: [{ key: "name", direction: "asc" }],
     limit: 20,
-    display: {
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      stickyHeader: true,
-      showHeader: true,
-      showCount: true,
-    },
+    display: { ...TABLE_DISPLAY_DEFAULTS },
   },
   RenderComponent: ItemTableRender,
   ConfigComponent: ItemTableConfigComponent,

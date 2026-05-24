@@ -4,6 +4,7 @@
 // how many widgets the user has configured.
 
 import { createContext, useContext, useId, useMemo, useState, type ReactNode } from "react";
+import { z } from "zod";
 import { IconChevronDown } from "@tabler/icons-react";
 import { useHomeDashboard } from "../../hooks/common/use-dashboard";
 import type { HomeDashboardData } from "../../types";
@@ -376,4 +377,87 @@ export function LimitInput({
       </p>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Canonical table `display` schema — the cross-platform contract.
+//
+// Mirrors mobile's `makeTableDisplaySchema` (mobile/src/dashboard/widgets/
+// _shared.tsx) field-for-field so a config's `display` block means the same
+// thing on both platforms. See WIDGET_CONFIG_SPEC.md §3.2 / §5.2.
+//
+// Every field has a `.default(...)`, so older persisted configs that lack a
+// field parse cleanly (the field fills from the default). Adding fields here is
+// therefore back-compat-safe. Widget-specific extras (layoutMode, showBucketChips,
+// ...) are added per widget via `.and(z.object({...}))`.
+// ---------------------------------------------------------------------------
+
+export interface TableDisplay {
+  showHeader: boolean;
+  showColumnHeaders: boolean;
+  showCount: boolean;
+  showViewAllLink: boolean;
+  showSearchBox: boolean;
+  showRowDot: boolean;
+  density: Density;
+  striping: boolean;
+  gridLines: boolean;
+  hoverHighlight: boolean;
+  stickyHeader: boolean;
+  emptyStateMessage: string;
+  /** Auto-refresh interval in milliseconds; 0 disables. Canonical refresh field
+   *  (replaces the old web `behavior.refetchIntervalMs` / top-level
+   *  `refetchInterval` and mobile's string `display.refetchInterval`). */
+  refreshIntervalMs: number;
+}
+
+export const TABLE_DISPLAY_DEFAULTS: TableDisplay = {
+  showHeader: true,
+  showColumnHeaders: true,
+  showCount: true,
+  showViewAllLink: true,
+  showSearchBox: true,
+  showRowDot: false,
+  density: "comfortable",
+  striping: true,
+  gridLines: true,
+  hoverHighlight: true,
+  stickyHeader: true,
+  emptyStateMessage: "",
+  refreshIntervalMs: 0,
+};
+
+export function makeTableDisplaySchema(overrides?: Partial<TableDisplay>) {
+  const merged = { ...TABLE_DISPLAY_DEFAULTS, ...(overrides ?? {}) };
+  return z
+    .object({
+      showHeader: z.boolean().default(merged.showHeader),
+      showColumnHeaders: z.boolean().default(merged.showColumnHeaders),
+      showCount: z.boolean().default(merged.showCount),
+      showViewAllLink: z.boolean().default(merged.showViewAllLink),
+      showSearchBox: z.boolean().default(merged.showSearchBox),
+      showRowDot: z.boolean().default(merged.showRowDot),
+      density: z.enum(DENSITY_VALUES).default(merged.density),
+      striping: z.boolean().default(merged.striping),
+      gridLines: z.boolean().default(merged.gridLines),
+      hoverHighlight: z.boolean().default(merged.hoverHighlight),
+      stickyHeader: z.boolean().default(merged.stickyHeader),
+      emptyStateMessage: z.string().max(160).default(merged.emptyStateMessage),
+      refreshIntervalMs: z.number().int().min(0).default(merged.refreshIntervalMs),
+    })
+    .default(merged);
+}
+
+/**
+ * Back-compat shim for the refresh interval. Reads any of the legacy shapes and
+ * returns a number of milliseconds. Use inside a widget's `z.preprocess` when
+ * folding old configs into the canonical `display.refreshIntervalMs`.
+ *   - web task-table:   `behavior.refetchIntervalMs` (number)
+ *   - web installment:  top-level `refetchInterval` (number)
+ *   - mobile tables:    `display.refetchInterval` (string of ms)
+ */
+export function coerceRefreshMs(raw: unknown): number {
+  if (typeof raw === "number" && Number.isFinite(raw)) return Math.max(0, Math.floor(raw));
+  if (typeof raw === "string" && /^\d+$/.test(raw)) return Math.max(0, parseInt(raw, 10));
+  return 0;
 }

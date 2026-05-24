@@ -103,6 +103,8 @@ import {
   DensitySegmented,
   DENSITY_VALUES,
   cardDensityClasses,
+  makeTableDisplaySchema,
+  TABLE_DISPLAY_DEFAULTS,
   type Density,
 } from "./_shared";
 
@@ -282,29 +284,11 @@ export const hrRequestsTableConfigSchema = z.object({
     color: "indigo",
     icon: "Clock",
   }),
-  display: z
-    .object({
-      density: z.enum(DENSITY_VALUES).default("comfortable"),
-      // striping/gridLines/hoverHighlight kept in schema for back-compat but
-      // hardcoded ON in render — no longer surfaced in the UI.
-      striping: z.boolean().default(true),
-      gridLines: z.boolean().default(true),
-      hoverHighlight: z.boolean().default(true),
-      showHeader: z.boolean().default(true),
-      showCount: z.boolean().default(true),
-      showSearchBox: z.boolean().default(true),
-      emptyStateMessage: z.string().max(160).default(""),
-    })
-    .default({
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      showHeader: true,
-      showCount: true,
-      showSearchBox: true,
-      emptyStateMessage: "",
-    }),
+  // Canonical cross-platform table display block. Previous defaults all matched
+  // TABLE_DISPLAY_DEFAULTS (incl. showSearchBox=true, emptyStateMessage=""); the
+  // factory additively contributes stickyHeader / showColumnHeaders / showRowDot
+  // / showViewAllLink / refreshIntervalMs.
+  display: makeTableDisplaySchema(),
   filters: z
     .object({
       searchingFor: z.string().default(""),
@@ -1259,17 +1243,8 @@ export const hrRequestsTableWidget: WidgetDefinition<HrRequestsTableConfig> = {
   configSchema: hrRequestsTableConfigSchema,
   defaultConfig: {
     title: "Requisições de RH",
-    accent: { color: "indigo", icon: "Clock", shade: "500" },
-    display: {
-      density: "comfortable",
-      striping: true,
-      gridLines: true,
-      hoverHighlight: true,
-      showHeader: true,
-      showCount: true,
-      showSearchBox: true,
-      emptyStateMessage: "",
-    },
+    accent: { color: "indigo", icon: "Clock" },
+    display: { ...TABLE_DISPLAY_DEFAULTS },
     filters: { searchingFor: "", estados: [0], tipos: [] },
     sorts: [{ key: "dataSolicitacao", direction: "desc" }],
     limit: 30,
