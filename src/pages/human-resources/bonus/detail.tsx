@@ -201,41 +201,24 @@ export default function BonusDetailPage() {
     return null;
   }, [id, bonusError, isBonusLoading, bonus, cachedBonus]);
 
-  // Calculate final bonus amount (extras + base - discounts)
+  // Final bonus amount = the server's authoritative `netBonus`. The API
+  // (recalculateNetBonus) is the single source of truth: it applies extras,
+  // then the discount cascade in calculationOrder (percentage = % of running
+  // value, fixed = min(value, running), each step floored at 0) and rounds
+  // once at the end. We must NOT re-derive that cascade on the client — doing
+  // so previously dropped the fixed-discount min/floor clamps and the single
+  // final round, drifting from the saved value.
   const calculateFinalAmount = useMemo(() => {
     if (!bonus) return 0;
-
-    const baseBonus = typeof bonus.baseBonus === 'number'
-      ? bonus.baseBonus
-      : (bonus.baseBonus as any)?.toNumber?.() || Number(bonus.baseBonus) || 0;
-
-    // Apply extras first
-    let totalExtras = 0;
-    if (bonus.bonusExtras && bonus.bonusExtras.length > 0) {
-      bonus.bonusExtras.forEach((extra: any) => {
-        if (extra.value) {
-          totalExtras += Number(extra.value);
-        } else if (extra.percentage) {
-          totalExtras += baseBonus * (Number(extra.percentage) / 100);
-        }
-      });
+    const toNum = (v: any): number =>
+      typeof v === 'number' ? v : v?.toNumber?.() ?? Number(v) ?? 0;
+    const netBonus = (bonus as any).netBonus;
+    if (netBonus !== null && netBonus !== undefined) {
+      return toNum(netBonus);
     }
-
-    let finalAmount = baseBonus + totalExtras;
-
-    if (bonus.bonusDiscounts && bonus.bonusDiscounts.length > 0) {
-      bonus.bonusDiscounts
-        .sort((a: any, b: any) => a.calculationOrder - b.calculationOrder)
-        .forEach((discount: any) => {
-          if (discount.percentage) {
-            finalAmount -= finalAmount * (Number(discount.percentage) / 100);
-          } else if (discount.value) {
-            finalAmount -= Number(discount.value);
-          }
-        });
-    }
-
-    return Math.max(0, finalAmount);
+    // Fallback only when the server omitted netBonus: show the base bonus
+    // (no client-side cascade re-derivation).
+    return toNum(bonus.baseBonus);
   }, [bonus]);
 
   // Get task statistics - prefer full bonus data, otherwise use cheap periodStats.

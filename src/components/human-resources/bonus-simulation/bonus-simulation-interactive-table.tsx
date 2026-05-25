@@ -31,7 +31,7 @@ import {
 import { formatCurrency, getBonusPeriod, getCurrentPayrollPeriod, formatDate } from "../../../utils";
 import { useUsers, useSectors } from "../../../hooks";
 import { bonusService } from "../../../api-client";
-import { useBonusSimulation } from "../../../hooks/human-resources/use-bonus";
+import { useBonusSimulation, usePeriodAdjustment } from "../../../hooks/human-resources/use-bonus";
 import { cn } from "@/lib/utils";
 import { USER_STATUS } from "../../../constants";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
@@ -178,6 +178,14 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
   // If today is Sept 26th or later, this returns October
   const { year: periodYear, month: periodMonth } = getCurrentPayrollPeriod();
   const currentPeriod = getBonusPeriod(periodYear, periodMonth);
+
+  // Saved period reajuste (the "Reajuste: +X%" badge value). The simulation
+  // applies it by sending the period (year/month) to /bonus/simulate; the API
+  // injects the saved BonusPeriodConfig adjustment so the simulated value
+  // matches the real, saved bonus. This hook is only for the display badge —
+  // the calculation reads the same source server-side.
+  const { data: periodAdjustmentData } = usePeriodAdjustment(periodYear, periodMonth);
+  const adjustmentPercent = periodAdjustmentData?.adjustment ?? 0;
 
 
   // Fetch sectors for filtering (Sector model has no status field)
@@ -414,8 +422,12 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
               sectorName: u.sectorName ?? undefined,
               performanceLevel: u.performanceLevel,
             })),
+            // Send the period so the API injects the saved reajuste — the
+            // simulation then matches the real (saved) bonus to the cent.
+            year: periodYear,
+            month: periodMonth,
           },
-    [simulatedUsers, averageTasksPerUser],
+    [simulatedUsers, averageTasksPerUser, periodYear, periodMonth],
   );
   const { data: simulation } = useBonusSimulation(simulationInput, {
     enabled: simulationInput !== null,
@@ -1171,6 +1183,11 @@ export function BonusSimulationInteractiveTable({ className, embedded: _embedded
               <span className="text-xs text-muted-foreground">
                 ({liveTaskInfo.rawCount} total{liveTaskInfo.suspendedCount > 0 ? `, ${liveTaskInfo.suspendedCount} suspensa${liveTaskInfo.suspendedCount !== 1 ? 's' : ''}` : ''})
               </span>
+              {adjustmentPercent !== 0 && (
+                <Badge variant="outline" className="bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30">
+                  Reajuste: {adjustmentPercent > 0 ? '+' : ''}{adjustmentPercent}%
+                </Badge>
+              )}
             </div>
           </div>
         )}

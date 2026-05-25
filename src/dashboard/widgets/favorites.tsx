@@ -58,8 +58,9 @@ const configSchema = z.object({
     .object({
       showHeader: z.boolean().default(true),
       showCount: z.boolean().default(true),
+      showViewAllLink: z.boolean().default(true),
     })
-    .default({ showHeader: true, showCount: true }),
+    .default({ showHeader: true, showCount: true, showViewAllLink: true }),
 });
 type Config = z.infer<typeof configSchema>;
 
@@ -193,7 +194,9 @@ function FavoritesRender({ config, size: tileSize }: WidgetRenderProps<Config>) 
       }
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       count={showCount ? favorites.length || null : null}
-      viewAllHref={routes.favorites}
+      viewAllHref={
+        (config.display?.showViewAllLink ?? true) ? routes.favorites : undefined
+      }
       showHeader={config.display?.showHeader ?? true}
       accentColor={config.accent?.color as WidgetAccentColor}
       accentShade={config.accent?.shade as WidgetAccentShade | undefined}
@@ -321,6 +324,16 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
                     } as Config["display"])
                   }
                 />
+                <ToggleRow
+                  label='Link "Ver todos"'
+                  checked={config.display?.showViewAllLink ?? true}
+                  onCheckedChange={(v) =>
+                    set("display", {
+                      ...(config.display ?? {}),
+                      showViewAllLink: v,
+                    } as Config["display"])
+                  }
+                />
               </div>
             </Section>
           </SectionGroup>
@@ -385,7 +398,7 @@ export const favoritesWidget: WidgetDefinition<Config> = {
     itemsPerColumn: 1,
     density: "comfortable",
     layout: "row",
-    display: { showHeader: true, showCount: true },
+    display: { showHeader: true, showCount: true, showViewAllLink: true },
   },
   RenderComponent: FavoritesRender,
   ConfigComponent: ConfigComp,

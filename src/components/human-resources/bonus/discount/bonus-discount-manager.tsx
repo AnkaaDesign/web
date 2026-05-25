@@ -103,13 +103,18 @@ export function BonusDiscountManager({
   );
   let currentValue = baseBonus + totalExtrasValue;
   let totalDiscountValue = 0;
+  // Per-discount actual contribution (a percentage discount applies to the
+  // RUNNING value, not the base), so the table column can show the true amount.
+  const discountAmountById = new Map<string, number>();
   for (const discount of sortedDiscounts) {
     if (discount.percentage !== null && discount.percentage !== undefined) {
       const amount = currentValue * (Number(discount.percentage) / 100);
+      discountAmountById.set(discount.id, amount);
       totalDiscountValue += amount;
       currentValue = Math.max(0, currentValue - amount);
     } else if (discount.value !== null && discount.value !== undefined) {
       const amount = Math.min(Number(discount.value), currentValue);
+      discountAmountById.set(discount.id, amount);
       totalDiscountValue += amount;
       currentValue = Math.max(0, currentValue - amount);
     }
@@ -141,10 +146,12 @@ export function BonusDiscountManager({
       key: "value",
       header: "Desconto",
       render: (discount) => {
-        const baseValue = typeof bonus.baseBonus === 'number' ? bonus.baseBonus : bonus.baseBonus.toNumber();
-        const percentageValue = typeof discount.percentage === 'number' ? discount.percentage : discount.percentage?.toNumber() || 0;
-        const valueAmount = discount.value ? (typeof discount.value === 'number' ? discount.value : discount.value.toNumber()) : 0;
-        const discountAmount = valueAmount || (baseValue * percentageValue / 100);
+        // Use the actual cascade contribution (percentage discounts apply to the
+        // running value, not the base). Falls back to a base estimate only if the
+        // discount wasn't part of the computed cascade.
+        const fallbackPct = typeof discount.percentage === 'number' ? discount.percentage : discount.percentage?.toNumber() || 0;
+        const fallbackValue = discount.value ? (typeof discount.value === 'number' ? discount.value : discount.value.toNumber()) : 0;
+        const discountAmount = discountAmountById.get(discount.id) ?? (fallbackValue || (baseBonus * fallbackPct / 100));
         return (
           <span className="font-medium text-red-600">
             -{formatCurrency(discountAmount)}

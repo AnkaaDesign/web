@@ -382,23 +382,39 @@ interface DayGroupProps {
 }
 
 /**
+ * Maps a day's reconciliation ratio (resolved/count, 0–100) to a
+ * red→orange→yellow→green tier so the fill color encodes "how reconciled is
+ * this day" at a glance, complementing the X/Y counter. 100% gets the strongest
+ * green; partial days warm toward red as the backlog grows.
+ */
+function reconciliationTier(pct: number): { bar: string; text: string } {
+  if (pct >= 100) return { bar: "bg-green-600", text: "text-green-700 dark:text-green-400" };
+  if (pct >= 75) return { bar: "bg-green-500", text: "text-green-700 dark:text-green-400" };
+  if (pct >= 50) return { bar: "bg-yellow-500", text: "text-yellow-700 dark:text-yellow-500" };
+  if (pct >= 25) return { bar: "bg-orange-500", text: "text-orange-700 dark:text-orange-400" };
+  return { bar: "bg-red-500", text: "text-red-700 dark:text-red-400" };
+}
+
+/**
  * Compact progress strip that lives inside the day-group banner's Status
- * column. Shows two stacked segments — matched (green) and ignored (gray) —
- * over a pending base, with a "X/Y" counter alongside.
+ * column. The matched segment is colored by the day's reconciliation tier
+ * (red→orange→yellow→green); ignored transactions render as a gray segment, and
+ * a "X/Y" counter — tinted to the same tier — sits alongside.
  */
 function DayProgressBar({ summary }: { summary: DaySummary }) {
   const { count, matched, ignored } = summary;
   if (count === 0) return null;
   const resolved = matched + ignored;
+  const resolvedPct = (resolved / count) * 100;
   const matchedPct = (matched / count) * 100;
   const ignoredPct = (ignored / count) * 100;
-  const isComplete = resolved === count;
   const counterText = `${resolved}/${count}`;
+  const tier = reconciliationTier(resolvedPct);
   return (
     <div className="flex items-center gap-2 w-full" title={`${matched} conciliada(s), ${ignored} ignorada(s), ${count - resolved} pendente(s)`}>
       <div className="relative flex-1 h-2 rounded-full overflow-hidden bg-muted">
         <div
-          className="absolute inset-y-0 left-0 bg-emerald-600 transition-all"
+          className={cn("absolute inset-y-0 left-0 transition-all", tier.bar)}
           style={{ width: `${matchedPct}%` }}
         />
         <div
@@ -409,7 +425,7 @@ function DayProgressBar({ summary }: { summary: DaySummary }) {
       <span
         className={cn(
           "text-[11px] font-semibold tabular-nums whitespace-nowrap",
-          isComplete ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
+          tier.text,
         )}
       >
         {counterText}

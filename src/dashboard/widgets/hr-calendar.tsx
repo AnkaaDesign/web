@@ -158,6 +158,7 @@ const hrCalendarConfigSchema = z.object({
   display: z
     .object({
       showHeader: z.boolean().default(true),
+      showViewAllLink: z.boolean().default(true),
       showFilters: z.boolean().default(true),
       showVacation: z.boolean().default(true),
       showJustifiedFalta: z.boolean().default(true),
@@ -168,6 +169,7 @@ const hrCalendarConfigSchema = z.object({
     })
     .default({
       showHeader: true,
+      showViewAllLink: true,
       showFilters: true,
       showVacation: true,
       showJustifiedFalta: true,
@@ -517,7 +519,11 @@ function HrCalendarRender({ config, size }: WidgetRenderProps<HrCalendarConfig>)
       title={<span className={accent.classes.text}>{config.title}</span>}
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       headerExtra={headerExtra}
-      viewAllHref={routes.humanResources.calendar.root}
+      viewAllHref={
+        (config.display.showViewAllLink ?? true)
+          ? routes.humanResources.calendar.root
+          : undefined
+      }
       showHeader={config.display.showHeader ?? true}
       accentColor={config.accent?.color as WidgetAccentColor}
       accentShade={config.accent?.shade as WidgetAccentShade | undefined}
@@ -662,11 +668,16 @@ function HrCalendarConfigComponent({
                 }
               />
             </Section>
-            <Section title="Cabeçalho">
+            <Section title="Cabeçalho e link">
               <ToggleRow
                 label="Exibir cabeçalho"
                 checked={config.display.showHeader ?? true}
                 onCheckedChange={(v) => setDisplay("showHeader", v)}
+              />
+              <ToggleRow
+                label='Link "Ver todos"'
+                checked={config.display.showViewAllLink ?? true}
+                onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
               />
             </Section>
           </SectionGroup>
@@ -788,6 +799,7 @@ export const hrCalendarWidget: WidgetDefinition<HrCalendarConfig> = {
     accent: { color: "violet", icon: "Calendar", shade: "500" },
     display: {
       showHeader: true,
+      showViewAllLink: true,
       showFilters: true,
       showVacation: true,
       showJustifiedFalta: true,

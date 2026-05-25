@@ -360,6 +360,11 @@ export interface SimulateInput {
     ceil?: number;
     adjustment?: number;
   };
+  /** Period the simulation targets. When set (and no explicit
+   * config.adjustment), the API injects the saved period reajuste so the
+   * simulation matches the real bonus. */
+  year?: number;
+  month?: number;
   salaryRange?: { min: number; max: number };
   b1Sweep?: {
     salary: number;

@@ -526,7 +526,11 @@ function PpeDeliveryTableRender({
       showHeader={config.display.showHeader ?? true}
       title={<span className={accent.classes.text}>{config.title}</span>}
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
-      viewAllHref={routes.humanResources.ppe.deliveries.root}
+      viewAllHref={
+        (config.display.showViewAllLink ?? true)
+          ? routes.humanResources.ppe.deliveries.root
+          : undefined
+      }
       headerExtra={headerExtra}
       count={(config.display.showCount ?? true) && !isLoading ? visibleCount : null}
       accentColor={config.accent?.color as WidgetAccentColor}
@@ -850,6 +854,11 @@ function PpeDeliveryTableConfigComponent({
                   label="Caixa de busca"
                   checked={c.display.showSearchBox}
                   onCheckedChange={(v) => setDisplay("showSearchBox", v)}
+                />
+                <ToggleRow
+                  label='Link "Ver todos"'
+                  checked={c.display.showViewAllLink ?? true}
+                  onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
                 />
               </div>
             </Section>

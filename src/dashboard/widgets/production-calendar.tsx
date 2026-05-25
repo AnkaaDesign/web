@@ -107,6 +107,7 @@ const productionCalendarConfigSchema = z.object({
   display: z
     .object({
       showHeader: z.boolean().default(true),
+      showViewAllLink: z.boolean().default(true),
       showFilters: z.boolean().default(true),
       showTerm: z.boolean().default(true),
       showForecast: z.boolean().default(true),
@@ -132,6 +133,7 @@ const productionCalendarConfigSchema = z.object({
     })
     .default({
       showHeader: true,
+      showViewAllLink: true,
       showFilters: true,
       showTerm: true,
       showForecast: true,
@@ -449,7 +451,11 @@ function ProductionCalendarRender({
       title={<span className={accent.classes.text}>{config.title}</span>}
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       headerExtra={headerExtra}
-      viewAllHref={routes.production.schedule.list}
+      viewAllHref={
+        (config.display.showViewAllLink ?? true)
+          ? routes.production.schedule.list
+          : undefined
+      }
       showHeader={config.display.showHeader ?? true}
       accentColor={config.accent?.color as WidgetAccentColor}
       accentShade={config.accent?.shade as WidgetAccentShade | undefined}
@@ -649,11 +655,16 @@ function ProductionCalendarConfigComponent({
                 }
               />
             </Section>
-            <Section title="Cabeçalho">
+            <Section title="Cabeçalho e link">
               <ToggleRow
                 label="Exibir cabeçalho"
                 checked={config.display.showHeader ?? true}
                 onCheckedChange={(v) => setDisplay("showHeader", v)}
+              />
+              <ToggleRow
+                label='Link "Ver todos"'
+                checked={config.display.showViewAllLink ?? true}
+                onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
               />
             </Section>
             <Section title="Cores dos eventos">
@@ -800,9 +811,10 @@ export const productionCalendarWidget: WidgetDefinition<ProductionCalendarConfig
     "Visão mensal do período (26→25) com tarefas plotadas por prazo, previsão, início e conclusão. Cada tipo de evento tem cor própria e pode ser ativado/desativado.",
   icon: IconCalendarStats,
   category: "production",
+  // PRODUCTION (shop-floor) is intentionally excluded — the schedule overview is
+  // a managerial view; PRODUCTION_MANAGER keeps access.
   allowedSectors: [
     SECTOR_PRIVILEGES.ADMIN,
-    SECTOR_PRIVILEGES.PRODUCTION,
     SECTOR_PRIVILEGES.PRODUCTION_MANAGER,
     SECTOR_PRIVILEGES.COMMERCIAL,
     SECTOR_PRIVILEGES.LOGISTIC,
@@ -820,6 +832,7 @@ export const productionCalendarWidget: WidgetDefinition<ProductionCalendarConfig
     accent: { color: "indigo", icon: "Calendar", shade: "500" },
     display: {
       showHeader: true,
+      showViewAllLink: true,
       showFilters: true,
       showTerm: true,
       showForecast: true,

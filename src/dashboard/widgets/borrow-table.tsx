@@ -549,7 +549,11 @@ function BorrowTableRender({
       showHeader={config.display.showHeader ?? true}
       title={<span className={accent.classes.text}>{config.title}</span>}
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
-      viewAllHref={routes.inventory.loans.list}
+      viewAllHref={
+        (config.display.showViewAllLink ?? true)
+          ? routes.inventory.loans.list
+          : undefined
+      }
       count={(config.display.showCount ?? true) && !isLoading ? visibleCount : null}
       accentColor={config.accent?.color as WidgetAccentColor}
       accentShade={config.accent?.shade as WidgetAccentShade | undefined}
@@ -854,6 +858,11 @@ function BorrowTableConfigComponent({
                   label="Exibir contagem"
                   checked={c.display?.showCount ?? true}
                   onCheckedChange={(v) => setDisplay("showCount", v)}
+                />
+                <ToggleRow
+                  label='Link "Ver todos"'
+                  checked={c.display?.showViewAllLink ?? true}
+                  onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
                 />
               </div>
             </Section>

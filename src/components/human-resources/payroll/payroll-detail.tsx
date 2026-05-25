@@ -108,7 +108,11 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
   // Calculate totals with proper fallbacks
   // Get base remuneration from payroll.baseRemuneration, or user.position.remuneration, or 0
   const baseRemuneration = payroll?.baseRemuneration || payroll?.user?.position?.remuneration || 0;
-  const bonusValue = payroll?.bonus?.baseBonus || 0;
+  // Use the server's NET bonus (after extras + discount cascade) — that is the
+  // realized bonus that contributes to gross. baseBonus (pre-discount) would
+  // overstate the salary whenever the bonus has any discount. Fall back to
+  // baseBonus only when the server omitted netBonus.
+  const bonusValue = payroll?.bonus?.netBonus ?? payroll?.bonus?.baseBonus ?? 0;
   const grossSalary = Number(baseRemuneration) + Number(bonusValue);
 
   // Handle discount operations

@@ -562,7 +562,9 @@ function ItemTableRender({ config }: WidgetRenderProps<ItemTableConfig>) {
       showHeader={config.display.showHeader ?? true}
       title={<span className={accent.classes.text}>{config.title}</span>}
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
-      viewAllHref="/estoque/produtos"
+      viewAllHref={
+        (config.display.showViewAllLink ?? true) ? "/estoque/produtos" : undefined
+      }
       count={(config.display.showCount ?? true) && !isLoading ? visibleCount : null}
       accentColor={config.accent?.color as WidgetAccentColor}
       accentShade={config.accent?.shade as WidgetAccentShade | undefined}
@@ -882,6 +884,11 @@ function ItemTableConfigComponent({
                   label="Exibir contagem"
                   checked={c.display?.showCount ?? true}
                   onCheckedChange={(v) => setDisplay("showCount", v)}
+                />
+                <ToggleRow
+                  label='Link "Ver todos"'
+                  checked={c.display?.showViewAllLink ?? true}
+                  onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
                 />
               </div>
             </Section>

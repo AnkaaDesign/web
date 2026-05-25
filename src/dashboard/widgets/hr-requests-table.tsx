@@ -491,7 +491,11 @@ function HrRequestsTableRender({
       showHeader={config.display.showHeader ?? true}
       title={<span className={accent.classes.text}>{config.title}</span>}
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
-      viewAllHref={routes.humanResources.requisicoes.list}
+      viewAllHref={
+        (config.display.showViewAllLink ?? true)
+          ? routes.humanResources.requisicoes.list
+          : undefined
+      }
       headerExtra={headerExtra}
       count={(config.display.showCount ?? true) && !isLoading ? rows.length : null}
       accentColor={config.accent?.color as WidgetAccentColor}
@@ -1119,6 +1123,11 @@ function HrRequestsTableConfigComponent({
                   label="Caixa de busca"
                   checked={c.display.showSearchBox}
                   onCheckedChange={(v) => setDisplay("showSearchBox", v)}
+                />
+                <ToggleRow
+                  label='Link "Ver todos"'
+                  checked={c.display.showViewAllLink ?? true}
+                  onCheckedChange={(v) => setDisplay("showViewAllLink", v)}
                 />
               </div>
 

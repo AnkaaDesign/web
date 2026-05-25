@@ -20,7 +20,7 @@ import {
   IconEye,
 } from "@tabler/icons-react";
 
-import { GOAL_METRIC, SECTOR_PRIVILEGES, routes } from "../../constants";
+import { GOAL_METRIC, SECTOR_PRIVILEGES } from "../../constants";
 import { useSectors } from "../../hooks/administration/use-sector";
 import { useTaskProductionStats } from "../../hooks/production/use-production-analytics";
 import { useDefaultGoal } from "../../hooks/administration/use-default-goal";
@@ -507,6 +507,61 @@ function ProductivityRender({
     return xAxisMode === "day" && !useAvg ? Math.round(split) : split;
   }, [config.goal.override, defaultGoal.value, goalSectorSplit, xAxisMode, useAvg]);
 
+  // Per-period goal values aligned to the chart bars — mirrors the productivity
+  // page (statistics/productivity.tsx). Each month can have a different target,
+  // so the goal line must FOLLOW the bars (stepped line through per-period
+  // points) rather than render as a single flat reference line. Only applies
+  // when there's no manual flat override (an override is a flat scalar). See
+  // WIDGET_CONFIG_SPEC — the widget should match the statistics page's goal line.
+  const perPeriodGoalValues = useMemo<(number | null)[] | null>(() => {
+    if (config.goal.override != null || !defaultGoalRaw.perPeriodValues) return null;
+    return items.map((item) => {
+      let rawSum: number | null;
+      if (xAxisMode === "year") {
+        // item.period = "2026" → aggregate the 12 months' targets for that year.
+        let total = 0;
+        let hasAny = false;
+        for (let m = 1; m <= 12; m++) {
+          const key = `${item.period}-${String(m).padStart(2, "0")}`;
+          const v = defaultGoalRaw.perPeriodValues!.get(key);
+          if (v != null) {
+            total += v;
+            hasAny = true;
+          }
+        }
+        rawSum = hasAny ? total : null;
+      } else {
+        rawSum = defaultGoalRaw.perPeriodValues!.get(item.period) ?? null;
+      }
+      if (rawSum == null) return null;
+      let val = rawSum;
+      if (scaleBy?.numerator != null && scaleBy.denominator != null && scaleBy.denominator > 0) {
+        val = val * (scaleBy.numerator / scaleBy.denominator);
+      }
+      if (goalSectorSplit > 1) val = val / goalSectorSplit;
+      if (useAvg) {
+        const activeUsers = item.activeUsers ?? 0;
+        if (activeUsers <= 0) return null;
+        val = val / activeUsers;
+      }
+      if (xAxisMode === "day" && !useAvg) val = Math.round(val);
+      return val;
+    });
+  }, [
+    config.goal.override,
+    defaultGoalRaw.perPeriodValues,
+    items,
+    scaleBy,
+    goalSectorSplit,
+    xAxisMode,
+    useAvg,
+  ]);
+
+  const hasPerPeriodGoal = useMemo(
+    () => !!perPeriodGoalValues?.some((v) => v != null),
+    [perPeriodGoalValues],
+  );
+
   const trendLine: TrendLineType | null =
     config.chart.trendLine === "none" ? null : config.chart.trendLine;
 
@@ -549,7 +604,6 @@ function ProductivityRender({
       title={<span className={accent.classes.text}>{config.title}</span>}
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
       headerExtra={headerExtra}
-      viewAllHref={routes.statistics.production.productivity}
       showHeader={config.display.showHeader}
       accentColor={config.accent?.color as WidgetAccentColor}
       accentShade={config.accent?.shade as WidgetAccentShade | undefined}
@@ -594,6 +648,7 @@ function ProductivityRender({
               chartType={config.chart.type}
               trendLine={trendLine}
               goalValue={goalValue}
+              perPeriodGoalValues={hasPerPeriodGoal ? perPeriodGoalValues : null}
               valueDecimals={useAvg ? 2 : xAxisMode === "day" ? 1 : 0}
               // User toggle in the config sheet wins, but suppress the legend
               // entirely when there's nothing to label (single series, no
@@ -602,6 +657,7 @@ function ProductivityRender({
                 config.display.showLegend &&
                 (seriesList.length > 1 ||
                   goalValue != null ||
+                  hasPerPeriodGoal ||
                   trendLine != null)
               }
               showZoom={config.display.showZoom}
@@ -632,6 +688,7 @@ function CompactProductivityChart({
   chartType,
   trendLine,
   goalValue,
+  perPeriodGoalValues,
   valueDecimals,
   showLegend,
   showZoom,
@@ -641,10 +698,15 @@ function CompactProductivityChart({
   chartType: "bar" | "line" | "line-smooth" | "area" | "area-smooth";
   trendLine: TrendLineType | null;
   goalValue: number | null;
+  /** Per-period goal values aligned to `xLabels`. When present (and any value
+   *  is non-null) the goal renders as a dashed line FOLLOWING each period's
+   *  goal — matching the statistics page — instead of the flat markLine. */
+  perPeriodGoalValues: (number | null)[] | null;
   valueDecimals: number;
   showLegend: boolean;
   showZoom: boolean;
 }) {
+  const usePerPeriod = !!perPeriodGoalValues?.some((v) => v != null);
   const option = useMemo<EChartsOption>(() => {
     const smooth = chartType === "line-smooth" || chartType === "area-smooth";
     const baseType: "bar" | "line" =
@@ -684,8 +746,11 @@ function CompactProductivityChart({
             },
           }
         : {}),
-      // Goal marker is attached to the first series so it renders just once.
-      ...(i === 0 && goalValue != null
+      // Flat goal marker (attached to the first series so it renders once) —
+      // ONLY when there's no per-period goal schedule. A flat line is correct
+      // for a manual override or a single constant target; a per-period DB goal
+      // is drawn as its own following line below.
+      ...(i === 0 && !usePerPeriod && goalValue != null
         ? {
             markLine: {
               silent: true,
@@ -704,6 +769,27 @@ function CompactProductivityChart({
           }
         : {}),
     }));
+
+    // Per-period goal line — a dashed line with diamond markers that FOLLOWS
+    // each period's configured target (mirrors statistics-chart.tsx). Each
+    // month can have a different goal, so the line steps with the bars instead
+    // of sitting flat. Rendered as its own series so it spans all bars.
+    if (usePerPeriod) {
+      echartsSeries.push({
+        name: "Meta",
+        type: "line",
+        data: perPeriodGoalValues,
+        symbol: "diamond",
+        symbolSize: 7,
+        showSymbol: true,
+        connectNulls: false,
+        silent: true,
+        z: 5,
+        lineStyle: { color: GOAL_COLOR, width: 1.5, type: "dashed" },
+        itemStyle: { color: GOAL_COLOR },
+        label: { show: false },
+      });
+    }
 
     // Trend line — only meaningful for the primary series in single-series mode.
     if (trendLine && series.length === 1) {
@@ -726,10 +812,11 @@ function CompactProductivityChart({
       0,
       ...series.flatMap((s) => s.values.filter((v): v is number => v != null)),
     );
-    const yMax =
-      goalValue != null && goalValue > dataMax
-        ? niceMaxFor(goalValue * 1.05, 4)
-        : undefined;
+    // The goal (flat OR the tallest per-period point) must stay on-chart.
+    const goalMax = usePerPeriod
+      ? Math.max(0, ...perPeriodGoalValues!.filter((v): v is number => v != null))
+      : goalValue ?? 0;
+    const yMax = goalMax > dataMax ? niceMaxFor(goalMax * 1.05, 4) : undefined;
 
     // Show a dataZoom slider only when the user has it enabled AND the bar
     // count actually justifies one (≥ 12 — fewer bars fit comfortably without
@@ -796,7 +883,7 @@ function CompactProductivityChart({
       },
       series: echartsSeries,
     };
-  }, [xLabels, series, chartType, trendLine, goalValue, valueDecimals, showZoom]);
+  }, [xLabels, series, chartType, trendLine, goalValue, perPeriodGoalValues, usePerPeriod, valueDecimals, showZoom]);
 
   return (
     <div className="h-full w-full flex flex-col">
@@ -832,7 +919,7 @@ function CompactProductivityChart({
               <span>{TREND_LABELS_PT[trendLine]}</span>
             </div>
           )}
-          {goalValue != null && (
+          {(goalValue != null || usePerPeriod) && (
             <div className="flex items-center gap-1.5">
               <span
                 className="inline-block h-0.5 w-4 rounded-full shrink-0"

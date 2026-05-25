@@ -65,8 +65,9 @@ const configSchema = z.object({
   display: z
     .object({
       showHeader: z.boolean().default(true),
+      showViewAllLink: z.boolean().default(true),
     })
-    .default({ showHeader: true }),
+    .default({ showHeader: true, showViewAllLink: true }),
 });
 type Config = z.infer<typeof configSchema>;
 
@@ -450,7 +451,11 @@ function Render({ config }: WidgetRenderProps<Config>) {
         </span>
       }
       icon={<AccentIcon className={`h-4 w-4 ${accent.classes.icon}`} />}
-      viewAllHref={routes.administration.messages.root}
+      viewAllHref={
+        (config.display?.showViewAllLink ?? true)
+          ? routes.administration.messages.root
+          : undefined
+      }
       showHeader={config.display?.showHeader ?? true}
       accentColor={config.accent?.color as WidgetAccentColor}
       accentShade={config.accent?.shade as WidgetAccentShade | undefined}
@@ -539,12 +544,22 @@ function ConfigComp({ config, onChange }: WidgetConfigProps<Config>) {
                 }
               />
             </Section>
-            <Section title="Cabeçalho">
+            <Section title="Cabeçalho e link">
               <ToggleRow
                 label="Exibir cabeçalho"
                 checked={config.display?.showHeader ?? true}
                 onCheckedChange={(v) =>
                   set("display", { ...(config.display ?? {}), showHeader: v } as Config["display"])
+                }
+              />
+              <ToggleRow
+                label='Link "Ver todos"'
+                checked={config.display?.showViewAllLink ?? true}
+                onCheckedChange={(v) =>
+                  set("display", {
+                    ...(config.display ?? {}),
+                    showViewAllLink: v,
+                  } as Config["display"])
                 }
               />
             </Section>
@@ -599,7 +614,7 @@ export const recentMessagesWidget: WidgetDefinition<Config> = {
     itemsPerRow: 4,
     itemsPerColumn: 2,
     density: "comfortable",
-    display: { showHeader: true },
+    display: { showHeader: true, showViewAllLink: true },
   },
   RenderComponent: Render,
   ConfigComponent: ConfigComp,

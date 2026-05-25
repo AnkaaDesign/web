@@ -176,6 +176,10 @@ export const bonusService = {
       ceil?: number;
       adjustment?: number;
     };
+    /** Period the simulation targets. When set (and no explicit
+     * config.adjustment), the API injects the saved period reajuste. */
+    year?: number;
+    month?: number;
     salaryRange?: { min: number; max: number };
     b1Sweep?: {
       salary: number;

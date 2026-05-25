@@ -76,12 +76,16 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
       const remuneration = user.position?.remuneration || 0;
       totalRemuneration += remuneration;
 
-      // Check if user is eligible for bonus:
-      // 1. User must be EFFECTED (not experience period or dismissed)
-      // 2. Position must be bonifiable
+      // Eligible for bonus = the canonical four predicates (must match the API
+      // live calc): EFFECTED + bonifiable + performanceLevel > 0 + registered in
+      // Secullum. Previously this only checked EFFECTED + bonifiable, inflating
+      // the eligible count and skewing the average-bonus denominator.
+      const u = user as typeof user & { performanceLevel?: number | null; secullumEmployeeId?: number | null };
       const isEligible =
-        user.status === USER_STATUS.EFFECTED &&
-        user.position?.bonifiable === true;
+        u.status === USER_STATUS.EFFECTED &&
+        u.position?.bonifiable === true &&
+        (u.performanceLevel ?? 0) > 0 &&
+        u.secullumEmployeeId != null;
 
       if (isEligible) {
         // Use actual bonus data from API (bonus relation is the source of truth)
